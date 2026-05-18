@@ -42,6 +42,12 @@ export const WireNotificationType = {
   SUBSCRIPTION_UPDATED: 'SUBSCRIPTION_UPDATED',
   /** Sent to a user 3 days before their free trial expires (Stripe trial_will_end event). */
   TRIAL_WILL_END: 'TRIAL_WILL_END',
+  /**
+   * Sent to a specific user when a new in-app notification is logged
+   * to notification_history. Drives the notification bell badge so the
+   * unread count updates without polling.
+   */
+  NOTIFICATION_RECEIVED: 'NOTIFICATION_RECEIVED',
 } as const;
 
 export type WireNotificationType =
@@ -75,6 +81,7 @@ export const ClientNotificationType = {
   USER_LIST: 'user-list',
   SUBSCRIPTION_UPDATED: 'subscription-updated',
   TRIAL_WILL_END: 'trial-will-end',
+  NOTIFICATION_RECEIVED: 'notification-received',
 } as const;
 
 export type ClientNotificationType =

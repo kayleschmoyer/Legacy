@@ -32,4 +32,5 @@ export type {
   UserLeftNotification,
   UserListNotification,
   SubscriptionUpdatedNotification,
+  NotificationReceivedNotification,
 } from './types';

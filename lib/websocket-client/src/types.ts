@@ -229,6 +229,26 @@ export interface TrialWillEndNotification {
   trialEndsAt: string;
 }
 
+/**
+ * A new in-app notification was logged to notification_history for this user.
+ * Pushed only to the recipient's active WebSocket connections. Drives the
+ * notification bell badge so the unread count updates without polling.
+ *
+ * **Payload intentionally omits user-facing content** (title / body).
+ * Consumers should refetch the rendered row from GraphQL on receipt; the
+ * WebSocket transport never carries free-form text that would become a
+ * new XSS surface.
+ */
+export interface NotificationReceivedNotification {
+  type: typeof ClientNotificationType.NOTIFICATION_RECEIVED;
+  /** notification_history row id, or null if the history insert was non-fatal-failed. */
+  historyId: number | null;
+  /** Discriminator for the notification kind (e.g. `matchup_started`). Not user-rendered. */
+  notificationType: string;
+  /** ISO-8601 receipt timestamp. */
+  receivedAt: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -249,7 +269,8 @@ export type NotificationData =
   | UserLeftNotification
   | UserListNotification
   | SubscriptionUpdatedNotification
-  | TrialWillEndNotification;
+  | TrialWillEndNotification
+  | NotificationReceivedNotification;
 
 /**
  * WebSocket message structure

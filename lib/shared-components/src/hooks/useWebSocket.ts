@@ -10,6 +10,7 @@ import {
   type LeagueChatMessageNotification,
   type MatchupStatsCompleteNotification,
   type NotificationData,
+  type NotificationReceivedNotification,
   type PlayerStatsLoadingNotification,
   type PlayerStatsUpdatedNotification,
   type RosterUpdateNotification,
@@ -64,6 +65,7 @@ export type {
   DraftResumedNotification,
   DraftStartedNotification,
   LeagueChatMessageNotification,
+  NotificationReceivedNotification,
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
@@ -94,6 +96,9 @@ interface UseWebSocketOptions {
   ) => void;
   onRosterUpdate?: (notification: RosterUpdateNotification) => void;
   onLeagueChatMessage?: (notification: LeagueChatMessageNotification) => void;
+  onNotificationReceived?: (
+    notification: NotificationReceivedNotification,
+  ) => void;
   onUserJoined?: (notification: UserJoinedNotification) => void;
   onUserLeft?: (notification: UserLeftNotification) => void;
   onUserList?: (notification: UserListNotification) => void;
@@ -136,6 +141,7 @@ export function useWebSocket({
   onMatchupStatsComplete,
   onRosterUpdate,
   onLeagueChatMessage,
+  onNotificationReceived,
   onUserJoined,
   onUserLeft,
   onUserList,
@@ -161,6 +167,7 @@ export function useWebSocket({
   const onMatchupStatsCompleteRef = useLatestRef(onMatchupStatsComplete);
   const onRosterUpdateRef = useLatestRef(onRosterUpdate);
   const onLeagueChatMessageRef = useLatestRef(onLeagueChatMessage);
+  const onNotificationReceivedRef = useLatestRef(onNotificationReceived);
   const onUserJoinedRef = useLatestRef(onUserJoined);
   const onUserLeftRef = useLatestRef(onUserLeft);
   const onUserListRef = useLatestRef(onUserList);
@@ -407,6 +414,15 @@ export function useWebSocket({
           onLeagueChatMessageRef.current?.(n as LeagueChatMessageNotification);
         },
       ),
+      client.on(
+        ClientNotificationType.NOTIFICATION_RECEIVED,
+        (n: NotificationData) => {
+          LOGGER.info('[useWebSocket] received notification-received', n);
+          onNotificationReceivedRef.current?.(
+            n as NotificationReceivedNotification,
+          );
+        },
+      ),
       client.on(ClientNotificationType.USER_JOINED, (n: NotificationData) => {
         LOGGER.info('[useWebSocket] received user-joined', n);
         onUserJoinedRef.current?.(n as UserJoinedNotification);
@@ -454,6 +470,7 @@ export function useWebSocket({
     onMatchupStatsCompleteRef,
     onRosterUpdateRef,
     onLeagueChatMessageRef,
+    onNotificationReceivedRef,
     onUserJoinedRef,
     onUserLeftRef,
     onUserListRef,

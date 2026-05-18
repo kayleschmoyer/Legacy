@@ -1,12 +1,14 @@
 import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 import webpush from 'web-push';
 import { LOGGER } from '@legacy-sports/logging';
+import { createNotificationService as createWsNotificationService } from '@legacy-sports/aws-utils';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import type { NotificationEvent, SendResult } from './types';
 
 const expo = new Expo({ useFcmV1: true });
 const dbService = createDatabaseService(getDbOptions());
+const wsNotificationService = createWsNotificationService();
 
 // Configure VAPID for Web Push (keys from environment)
 const VAPID_PUBLIC_KEY = process.env['VAPID_PUBLIC_KEY'] ?? '';
@@ -59,6 +61,11 @@ export async function deliverNotification(
       body,
       data,
     );
+    await pushNotificationReceivedEvent({
+      userId,
+      historyId,
+      notificationType,
+    });
     return {
       userId,
       tokensAttempted: 0,
@@ -184,6 +191,14 @@ export async function deliverNotification(
     data,
   );
 
+  // 7. Push WebSocket `notification-received` event so the in-app bell
+  //    badge updates within ~1s instead of waiting for the next poll.
+  await pushNotificationReceivedEvent({
+    userId,
+    historyId,
+    notificationType,
+  });
+
   LOGGER.info('Notification delivery complete', {
     userId,
     notificationType,
@@ -200,4 +215,33 @@ export async function deliverNotification(
     tokensFailed,
     historyId,
   };
+}
+
+/**
+ * Push a `notification-received` WebSocket event so the recipient's
+ * notification-bell badge updates immediately without polling.
+ *
+ * Non-fatal: WebSocket delivery failures are logged but never surfaced
+ * to the SQS handler — push notifications and history logging are the
+ * primary outcomes of this Lambda, and the badge will recover on next
+ * page load / explicit refetch if the WebSocket push is lost.
+ */
+async function pushNotificationReceivedEvent(params: {
+  userId: number;
+  historyId: number | null;
+  notificationType: string;
+}): Promise<void> {
+  if (!wsNotificationService) return;
+  try {
+    await wsNotificationService.notifyNotificationReceived(params.userId, {
+      historyId: params.historyId,
+      notificationType: params.notificationType,
+    });
+  } catch (error) {
+    LOGGER.warn(
+      'WebSocket notification-received push failed (non-fatal)',
+      error instanceof Error ? error : new Error(String(error)),
+      { userId: params.userId },
+    );
+  }
 }

@@ -12,6 +12,7 @@
     "test:all-files": "jest"
   },
   "dependencies": {
+    "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",

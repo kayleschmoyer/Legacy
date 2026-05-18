@@ -150,6 +150,27 @@ export interface DirectMessageNotification {
   createdAt: string;
 }
 
+/**
+ * Sent to a specific user when a new in-app notification has been
+ * logged to notification_history. Drives the notification bell badge
+ * so the unread count updates immediately without client polling.
+ * Delivered only to the affected user's active WebSocket connections.
+ *
+ * **Payload intentionally omits user-facing content** (title / body).
+ * Clients fetch the rendered notification row from GraphQL on receipt,
+ * so the WebSocket transport never carries free-form text that would
+ * become a new XSS surface.
+ */
+export interface NotificationReceivedNotification {
+  type: typeof WireNotificationType.NOTIFICATION_RECEIVED;
+  /** notification_history row id, or null if the insert was non-fatal-failed. */
+  historyId: number | null;
+  /** Discriminator for the notification kind (e.g. `matchup_started`). Not user-rendered. */
+  notificationType: string;
+  /** ISO-8601 receipt timestamp. */
+  receivedAt: string;
+}
+
 export interface NotificationMessage {
   type: string;
   data: unknown;
@@ -1143,6 +1164,71 @@ export class WebSocketNotificationService {
         error,
         userId,
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Notify a user that a new in-app notification has been logged to
+   * `notification_history`. Delivered only to the user's currently
+   * active WebSocket connections; if the user has no active connections,
+   * this is a no-op (the unread count will be picked up on next page load
+   * or via the next event).
+   *
+   * Fired by the notifications Lambda after `logNotificationHistory`.
+   *
+   * @param userId  - The user who received the notification.
+   * @param payload - Notification details (excludes the `type` discriminator
+   *                  and `receivedAt`, which is stamped here).
+   */
+  async notifyNotificationReceived(
+    userId: number,
+    payload: Omit<NotificationReceivedNotification, 'type' | 'receivedAt'>,
+  ): Promise<void> {
+    if (!this.websocketEndpoint) {
+      LOGGER.warn(
+        'WebSocket endpoint not configured, skipping notification-received push',
+      );
+      return;
+    }
+
+    const notification: NotificationReceivedNotification = {
+      type: WireNotificationType.NOTIFICATION_RECEIVED,
+      ...payload,
+      receivedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending notification-received WebSocket event', {
+      userId,
+      historyId: payload.historyId,
+      notificationType: payload.notificationType,
+    });
+
+    try {
+      const connectionIds = await this.getUserConnections(userId);
+
+      if (connectionIds.length === 0) {
+        LOGGER.info(
+          'User has no active WebSocket connections, notification-received not pushed',
+          { userId },
+        );
+        return;
+      }
+
+      await Promise.allSettled(
+        connectionIds.map((connectionId) =>
+          this.sendToConnection(connectionId, {
+            type: 'notification',
+            data: notification,
+          }),
+        ),
+      );
+    } catch (error) {
+      LOGGER.error(
+        'Error sending notification-received event',
+        error instanceof Error ? error : new Error(String(error)),
+        { userId },
+      );
       throw error;
     }
   }

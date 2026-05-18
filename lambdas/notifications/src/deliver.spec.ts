@@ -6,6 +6,7 @@ const mockGetUserNotificationPreferences = jest.fn();
 const mockGetUserDeviceTokens = jest.fn();
 const mockLogNotificationHistory = jest.fn();
 const mockDisableDeviceToken = jest.fn();
+const mockNotifyNotificationReceived = jest.fn();
 
 jest.mock('@legacy-sports/db-client', () => ({
   createDatabaseService: jest.fn(() => ({
@@ -15,6 +16,12 @@ jest.mock('@legacy-sports/db-client', () => ({
       logNotificationHistory: mockLogNotificationHistory,
       disableDeviceToken: mockDisableDeviceToken,
     },
+  })),
+}));
+
+jest.mock('@legacy-sports/aws-utils', () => ({
+  createNotificationService: jest.fn(() => ({
+    notifyNotificationReceived: mockNotifyNotificationReceived,
   })),
 }));
 
@@ -103,6 +110,7 @@ describe('deliverNotification', () => {
     mockIsExpoPushToken.mockReturnValue(true);
     mockSendPushNotificationsAsync.mockResolvedValue([]);
     mockLogNotificationHistory.mockResolvedValue(42);
+    mockNotifyNotificationReceived.mockResolvedValue(undefined);
   });
 
   describe('preference enforcement', () => {
@@ -255,6 +263,58 @@ describe('deliverNotification', () => {
       await deliverNotification(makeEvent());
 
       expect(mockDisableDeviceToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('WebSocket notification-received push', () => {
+    it('pushes notification-received after logging history (no tokens path)', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue(null);
+      mockGetUserDeviceTokens.mockResolvedValue([]);
+
+      await deliverNotification(makeEvent());
+
+      expect(mockLogNotificationHistory).toHaveBeenCalledTimes(1);
+      expect(mockNotifyNotificationReceived).toHaveBeenCalledWith(1, {
+        historyId: 42,
+        notificationType: 'matchup_started',
+      });
+    });
+
+    it('pushes notification-received after a successful push delivery', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue(null);
+      mockGetUserDeviceTokens.mockResolvedValue([makeDeviceToken()]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: 'ok' }]);
+
+      await deliverNotification(makeEvent());
+
+      expect(mockNotifyNotificationReceived).toHaveBeenCalledWith(1, {
+        historyId: 42,
+        notificationType: 'matchup_started',
+      });
+    });
+
+    it('does not throw when the WebSocket push fails (non-fatal)', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue(null);
+      mockGetUserDeviceTokens.mockResolvedValue([]);
+      mockNotifyNotificationReceived.mockRejectedValue(
+        new Error('connection table missing'),
+      );
+
+      await expect(deliverNotification(makeEvent())).resolves.toMatchObject({
+        userId: 1,
+        historyId: 42,
+      });
+    });
+
+    it('skips the push when pushEnabled is false (no history logged)', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue({
+        pushEnabled: false,
+      });
+
+      await deliverNotification(makeEvent());
+
+      expect(mockLogNotificationHistory).not.toHaveBeenCalled();
+      expect(mockNotifyNotificationReceived).not.toHaveBeenCalled();
     });
   });
 

@@ -72,12 +72,26 @@ function matchesFilter(
 
 export interface NotificationsScreenProps {
   userId: number;
+  /**
+   * WebSocket URL forwarded to `useNotifications` so the unread-count
+   * badge can update in real time. Falls back to `VITE_WEBSOCKET_URL`
+   * when omitted.
+   */
+  websocketUrl?: string;
+  /**
+   * Auth token for the WebSocket connection. Without a token the
+   * notification-received subscription is disabled and the badge only
+   * refreshes on mount.
+   */
+  websocketToken?: string;
   onNavigateToMatchup?: (matchupId: number, leagueId: number) => void;
   onNavigateToLeague?: (leagueId: number) => void;
 }
 
 export function NotificationsScreen({
   userId,
+  websocketUrl,
+  websocketToken,
   onNavigateToMatchup,
   onNavigateToLeague,
 }: NotificationsScreenProps): React.JSX.Element {
@@ -92,7 +106,10 @@ export function NotificationsScreen({
     markAsRead,
     markAllAsRead,
     updatePreferences,
-  } = useNotifications(userId);
+  } = useNotifications(userId, {
+    websocketUrl,
+    token: websocketToken,
+  });
 
   const filteredNotifications = useMemo(
     () => notifications.filter((n) => matchesFilter(n, activeFilter)),
