@@ -961,6 +961,7 @@ test.describe
 
   test('Phase 6: Verify commissioner roster after draft', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
     await test.step('Navigate to My Roster', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/roster`);
@@ -987,13 +988,70 @@ test.describe
       ).toBeVisible({ timeout: 30000 });
 
       // After a live draft, autoPopulateFirstMatchupLineup (LS-445) places
-      // drafted fielders into starter slots first. In a live draft,
-      // draftCompletedAt is committed inside the final pick transaction, so
-      // the UI can show "Draft Complete!" before autoPopulateFirstMatchupLineup
-      // (which runs outside the transaction) finishes. Use expect.poll with
-      // an interval that reloads the page each iteration to force an Apollo
-      // refetch — replaces the wall-clock-derived `Math.max(deadline -
-      // Date.now())` Playwright timeouts that are an antipattern (LS-4457).
+      // drafted fielders into starter slots first. draftCompletedAt is
+      // committed inside the final pick transaction, so the UI can show
+      // "Draft Complete!" before autoPopulateFirstMatchupLineup (which runs
+      // outside the transaction) finishes — there is no WebSocket event for
+      // the lineup-population step itself, and the test does not trigger the
+      // mutation directly, so we cannot await either signal client-side.
+      //
+      // Previous implementation called `page.reload()` inside `expect.poll()`
+      // to flush Apollo's cache each iteration — the canonical anti-pattern
+      // flagged in helpers/reload-until-visible.ts. The replacement (LS-4520)
+      // polls the backend authoritatively via `gqlFetch` until at least one
+      // team member has a non-null positionId, then performs a single Apollo
+      // refetch outside the poll loop and asserts the UI directly.
+      const teamId = await gqlFetch<{ userTeamId: number | null }>(
+        commissionerJwt,
+        `query GetCommissionerTeamId($leagueId: Int!) {
+           userTeamId(leagueId: $leagueId)
+         }`,
+        { leagueId: state.leagueId },
+      ).then((d) => d.userTeamId);
+      expect(teamId).not.toBeNull();
+
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              teamMembers: Array<{ positionId: number | null }>;
+            }>(
+              commissionerJwt,
+              `query GetCommissionerLineupFilled($teamId: Int!) {
+                 teamMembers(teamId: $teamId) { positionId }
+               }`,
+              { teamId },
+            );
+            return data.teamMembers.filter((m) => m.positionId != null).length;
+          },
+          {
+            // Generous timeout: autoPopulateFirstMatchupLineup runs outside
+            // the final-pick transaction and can take well over a minute
+            // when the live backend is under load (observed: a Phase 5 run
+            // that ballooned from 25m → 31.5m due to backend throttling
+            // returned 504s on the autoProcess nudge and the lineup was
+            // still not populated at the 60s mark). 180s keeps the test
+            // resilient to backend load without masking a real failure.
+            timeout: 180_000,
+            intervals: [2_000, 5_000, 10_000],
+            message:
+              'autoPopulateFirstMatchupLineup never populated any positionId within 180s after draft completion',
+          },
+        )
+        .toBeGreaterThan(0);
+
+      // Backend confirms autoPopulateFirstMatchupLineup completed. Apollo's
+      // default `cache-first` fetch policy on `useGetTeamMembersQuery` means
+      // the initial empty result (cached when this page first mounted before
+      // autoPopulate finished) will not be re-fetched on a React-Router tab
+      // re-mount — Apollo serves the cached empty list and never hits the
+      // network. The only way to flush that cached observer without modifying
+      // the production Apollo client is a single hard reload. This is a
+      // single reload OUTSIDE the poll loop, which is not the antipattern the
+      // helpers/reload-until-visible.ts file warns about (reload-in-poll is).
+      await page.reload();
+      await page.waitForLoadState('load');
+
       const lineupParent = page
         .getByText('Lineup', { exact: true })
         .first()
@@ -1001,46 +1059,12 @@ test.describe
       await expect(page.getByText('Lineup').first()).toBeVisible({
         timeout: 30_000,
       });
-      // Poll until the QuickStat denominator is > 0 (positions resolved) AND
-      // the numerator is > 0 (autoPopulateFirstMatchupLineup completed). The
-      // poll callback reloads the page each iteration to force a fresh
-      // Apollo round-trip, then returns the parsed numerator (or 0 / null
-      // sentinels so .toBeGreaterThan(0) drives the retry, not a thrown
-      // error — antipattern #1 in e2e-determinism.md).
-      await expect
-        .poll(
-          async () => {
-            const lineupText = await lineupParent
-              .textContent()
-              .catch(() => null);
-            const lineupMatch = lineupText?.match(
-              /Lineup\s*(\d+)\s*\/\s*(\d+)/,
-            );
-            const filled = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
-            const total = lineupMatch ? parseInt(lineupMatch[2], 10) : 0;
-            if (filled > 0 && total > 0) return filled;
-            // Force an Apollo refetch on the next iteration to capture
-            // autoPopulateFirstMatchupLineup updates that ran outside the
-            // draft transaction.
-            await page.reload();
-            await page.waitForLoadState('load');
-            await page
-              .getByText('Lineup')
-              .first()
-              .waitFor({ state: 'visible', timeout: 30_000 })
-              .catch(() => {
-                /* tolerate transient unmount during reload */
-              });
-            return 0;
-          },
-          {
-            timeout: 60_000,
-            intervals: [5_000],
-            message:
-              'roster Lineup count never went above 0 within 60s after draft completion',
-          },
-        )
-        .toBeGreaterThan(0);
+      // Single deterministic assertion — the backend already confirmed
+      // positionId > 0 above, so the QuickStat must read "Lineup N/M" with
+      // N ≥ 1 once Apollo finishes the in-flight refetch.
+      await expect(lineupParent).toContainText(/Lineup\s*[1-9]\d*\s*\/\s*\d+/, {
+        timeout: 30_000,
+      });
     });
 
     await test.step('Verify commissioner-drafted players appear on roster', async () => {
