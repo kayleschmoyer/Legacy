@@ -908,9 +908,12 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 10: Week advancement', async ({ commissionerPage: page }) => {
-    // GAMES_PER_MATCHUP cycles × per-cycle stats hydration (CloudWatch p90
-    // ~78 s warm-cache, ~30 s mean) plus advance-week mutation overhead.
-    test.setTimeout(360_000);
+    // GAMES_PER_MATCHUP cycles × advance-week.ts per-cycle budget (150 s
+    // worst-case: 90 s WS-driven fast path + 60 s reload-driven fallback)
+    // plus advance-week mutation overhead. Sized for cold-cache stats
+    // hydration (CloudWatch p90 ~78 s warm-cache, ~30 s mean) with headroom
+    // for the LS-4534 fallback path when MATCHUP_STATS_COMPLETE is dropped.
+    test.setTimeout(540_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -919,11 +922,13 @@ test.describe
 
     await test.step('Drive Select Game loop and advance week 1 → 2', async () => {
       // advanceWeek loops the `Select Game N of M` button GAMES_PER_MATCHUP
-      // times, then clicks `Advance League Week`. No page.reload(): the
-      // commissioner page subscribes to MATCHUP_STATS_COMPLETE (v1
+      // times, then clicks `Advance League Week`. Fast path is WS-driven:
+      // the commissioner page subscribes to MATCHUP_STATS_COMPLETE (v1
       // LeagueDetailPage.tsx:754, v2 Commish.tsx after LS-4515) and refetches
       // matchups automatically, so the NextStepControl button label updates
-      // in-place as each stats-hydration cycle completes.
+      // in-place as each stats-hydration cycle completes. If a WS event is
+      // dropped (LS-4534), the helper falls back to page.reload() + fresh
+      // GraphQL fetch within the same cycle budget.
       await advanceWeek(page, GAMES_PER_MATCHUP);
     });
   });
@@ -1023,9 +1028,11 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 13: Season end & renewal', async ({ commissionerPage: page }) => {
-    // (TOTAL_MATCHUPS - 1) advanceWeek calls × GAMES_PER_MATCHUP cycles each,
-    // plus the renewal mutation. Sized to cover cold-cache stats hydration.
-    test.setTimeout(600_000);
+    // (TOTAL_MATCHUPS - 1) advanceWeek calls × GAMES_PER_MATCHUP cycles each
+    // (each cycle: up to 150 s — 90 s WS fast path + 60 s reload fallback),
+    // plus the renewal mutation. Sized to cover cold-cache stats hydration
+    // and the LS-4534 fallback path when MATCHUP_STATS_COMPLETE is dropped.
+    test.setTimeout(960_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
