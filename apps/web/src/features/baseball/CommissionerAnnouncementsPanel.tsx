@@ -106,6 +106,15 @@ export function CommissionerAnnouncementsPanel({
     const text = inputText.trim();
     if (!text || posting) return;
     setPostError(null);
+    // Close the compose form synchronously before firing the mutation so the
+    // UX (and the integration assertion) does not depend on POST round-trip
+    // latency. The prior LS-4533 fix only dropped awaitRefetchQueries, which
+    // was not enough — the mutation itself can take several seconds against
+    // the live backend, leaving the textarea visible past the test's 5s
+    // not.toBeVisible timeout. Optimistically clearing decouples the form
+    // reset from network latency; on error we restore the text and re-open.
+    setInputText('');
+    setShowCompose(false);
     try {
       await postAnnouncement({
         variables: { leagueId, messageText: text },
@@ -115,10 +124,6 @@ export function CommissionerAnnouncementsPanel({
         // announcements. Refetch both list queries — GetLeagueActivity is
         // passed by name so every active observer refetches regardless of
         // its (leagueId, limit, eventTypes) variables (LS-3769).
-        // Refetches fire in the background; do not block the form reset on
-        // them — awaiting could leave the compose textarea visible past
-        // assertion timeouts when a refetch runs slowly against the live
-        // backend (LS-4533).
         refetchQueries: [
           {
             query: GetLeagueAnnouncements,
@@ -127,9 +132,9 @@ export function CommissionerAnnouncementsPanel({
           'GetLeagueActivity',
         ],
       });
-      setInputText('');
-      setShowCompose(false);
     } catch (err: unknown) {
+      setInputText(text);
+      setShowCompose(true);
       setPostError(
         err instanceof Error ? err.message : 'Failed to post announcement',
       );

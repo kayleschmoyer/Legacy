@@ -127,13 +127,20 @@ test.describe
 
     await test.step('Submit and verify announcement appears in the list', async () => {
       await page.getByRole('button', { name: /post announcement/i }).click();
-      await expect(page.getByText(state.announcementText)).toBeVisible({
-        timeout: 15_000,
-      });
-      // Compose form closes after a successful post.
+      // Wait for the compose form to close before checking the list. The
+      // optimistic-clear fix (LS-4533) makes this synchronous, but we still
+      // assert it here as a regression guard against future latency-coupling.
       await expect(
         page.getByPlaceholder(/write an announcement/i),
-      ).not.toBeVisible();
+      ).not.toBeVisible({ timeout: 10_000 });
+      // Scope the text check to a panel announcement row — against the live
+      // backend the same text also surfaces in the league activity feed,
+      // which would trigger a strict-mode violation with a bare getByText.
+      await expect(
+        page
+          .locator('[data-testid^="announcement-row-"]')
+          .getByText(state.announcementText),
+      ).toBeVisible({ timeout: 15_000 });
     });
   });
 
