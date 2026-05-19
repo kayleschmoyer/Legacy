@@ -142,6 +142,19 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     league?.id ?? undefined,
   );
 
+  // Commissioner-settings toast state lives at the page level — not inside
+  // CommishTab — so a transient CommishTab unmount (e.g. isCommissioner briefly
+  // flipping false during an Apollo cache refetch after the save mutation
+  // lands) can't drop the "saved successfully" message before it renders.
+  // LS-4193 → LS-4207 → LS-4216 → LS-4227 → LS-4236 → LS-4242 → LS-4249 →
+  // LS-4314 → LS-4542 (this fix). LS-4249 deduplicated to a single role=status
+  // in CommishTab; LS-4314 added previousData fallback to keep CommishTab
+  // mounted across refetches; LS-4412 then re-introduced an unmount vector by
+  // gating the render on isCommissioner. Lifting the state here makes the
+  // toast resilient to any future CommishTab unmount cause.
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
   const [storedRole, setStoredRole] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     try {
@@ -427,13 +440,50 @@ export function LeagueDetailPageV2(): React.JSX.Element {
               />
             </div>
           )}
+          {tab === 'commish' && settingsError ? (
+            <div
+              role="alert"
+              aria-live="assertive"
+              style={{
+                background: 'rgba(196, 30, 58, 0.1)',
+                border: '1px solid rgba(196, 30, 58, 0.4)',
+                borderRadius: 8,
+                padding: 12,
+                color: '#c41e3a',
+                fontWeight: 600,
+              }}
+            >
+              Error saving settings: {settingsError}
+            </div>
+          ) : null}
+          {tab === 'commish' && settingsSuccess ? (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                borderRadius: 8,
+                padding: 12,
+                color: '#16a34a',
+                fontWeight: 600,
+              }}
+            >
+              {settingsSuccess}
+            </div>
+          ) : null}
           {tab === 'commish' && isCommissioner && (
             <div
               role="tabpanel"
               id="panel-commish"
               aria-labelledby="tab-commish"
             >
-              <CommishTab league={league} teams={teams} />
+              <CommishTab
+                league={league}
+                teams={teams}
+                onSettingsSuccess={setSettingsSuccess}
+                onSettingsError={setSettingsError}
+              />
             </div>
           )}
         </div>

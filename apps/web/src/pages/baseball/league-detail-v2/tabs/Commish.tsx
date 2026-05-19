@@ -63,14 +63,20 @@ const Accord: React.FC<{
 export interface CommishTabProps {
   league: LeagueFragment;
   teams: readonly TeamFragment[];
+  // LS-4542: settings toast state is owned by LeagueDetailPageV2 so it
+  // survives a transient CommishTab unmount during the save flow.
+  onSettingsSuccess: (msg: string | null) => void;
+  onSettingsError: (msg: string | null) => void;
 }
 
-export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
+export const CommishTab: React.FC<CommishTabProps> = ({
+  league,
+  onSettingsSuccess,
+  onSettingsError,
+}) => {
   const navigate = useNavigate();
   const [openId, setOpenId] = useState<string>('announcements');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
-  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [waiverSuccess, setWaiverSuccess] = useState<string | null>(null);
   const [waiverError, setWaiverError] = useState<string | null>(null);
   const leagueId = league.id ?? 0;
@@ -140,12 +146,12 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
           onSuccess={(msg) => {
-            setSettingsError(null);
-            setSettingsSuccess(msg);
+            onSettingsError(null);
+            onSettingsSuccess(msg);
           }}
           onError={(err) => {
-            setSettingsSuccess(null);
-            setSettingsError(err.message);
+            onSettingsSuccess(null);
+            onSettingsError(err.message);
           }}
         />
       ) : null,
@@ -279,38 +285,6 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           }}
         >
           Error: {nextStepError}
-        </div>
-      ) : null}
-      {settingsError ? (
-        <div
-          role="alert"
-          aria-live="assertive"
-          style={{
-            background: 'rgba(196, 30, 58, 0.1)',
-            border: '1px solid rgba(196, 30, 58, 0.4)',
-            borderRadius: 8,
-            padding: 12,
-            color: '#c41e3a',
-            fontWeight: 600,
-          }}
-        >
-          Error saving settings: {settingsError}
-        </div>
-      ) : null}
-      {settingsSuccess ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            background: 'rgba(34, 197, 94, 0.1)',
-            border: '1px solid rgba(34, 197, 94, 0.4)',
-            borderRadius: 8,
-            padding: 12,
-            color: '#16a34a',
-            fontWeight: 600,
-          }}
-        >
-          {settingsSuccess}
         </div>
       ) : null}
       {waiverError ? (
