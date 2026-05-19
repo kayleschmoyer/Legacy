@@ -1,3 +1,4 @@
+import { cleanupLeague } from '../helpers/cleanup-league';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
 
@@ -80,6 +81,14 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     };
   });
 
+  // Layer-2 per-test league cleanup (LS-4539). Removes orphans even when the
+  // test body throws — Playwright still runs afterAll on test failure. Process
+  // crashes are caught by global-teardown (Layer 3) and the next run's
+  // pre-run sweep in global-setup (Layer 1).
+  test.afterAll(async ({ apiCommissioner }) => {
+    await cleanupLeague(apiCommissioner, state.leagueId);
+  });
+
   // -------------------------------------------------------------------------
   // PHASE 1 — PRE-SEASON: LEAGUE SETUP
   // -------------------------------------------------------------------------
@@ -103,7 +112,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
          }`,
         {
           input: {
-            leagueName: 'Integration Season Test League',
+            leagueName: `Integration Season Test League ${Date.now()}`,
             numberOfTeams: 3,
             numberOfDivisions: 1,
             maxRosterSize: 4,

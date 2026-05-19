@@ -32,6 +32,7 @@
  */
 
 import { expect } from '@playwright/test';
+import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
@@ -74,6 +75,14 @@ test.describe
       managerTeamName: 'Roster Testers',
       renamedTeamName: '',
     };
+  });
+
+  // Layer-2 per-test league cleanup (LS-4539). Removes orphans even when the
+  // test body throws — Playwright still runs afterAll on test failure. Process
+  // crashes are caught by global-teardown (Layer 3) and the next run's
+  // pre-run sweep in global-setup (Layer 1).
+  test.afterAll(async ({ apiCommissioner }) => {
+    await cleanupLeague(apiCommissioner, state.leagueId);
   });
 
   // -----------------------------------------------------------------

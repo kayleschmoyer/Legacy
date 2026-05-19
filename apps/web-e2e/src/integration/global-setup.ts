@@ -8,8 +8,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  ACTIVE_RUN_LOCK_STALE_MS,
+  isActiveRunLockFresh,
   isTestLeague,
   isYoungerThanCleanupThreshold,
+  writeActiveRunLock,
 } from './test-league-cleanup';
 import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
 
@@ -212,6 +215,23 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     );
     return;
   }
+
+  // Active-run sentinel — file-based lockfile (LS-4539). Aborts the sweep if
+  // another Playwright process on this machine started within the last few
+  // minutes. Stale locks (older than `ACTIVE_RUN_LOCK_STALE_MS`) are ignored
+  // so a crashed previous run cannot block crash recovery indefinitely. Cross-
+  // machine concurrency is still protected by the per-league 4h age guard
+  // below; the lockfile is an extra layer for same-machine reruns.
+  if (isActiveRunLockFresh()) {
+    LOGGER.warn(
+      `[integration setup] Active-run lockfile is fresh (<${
+        ACTIVE_RUN_LOCK_STALE_MS / 60_000
+      } min old) — another integration process may be running on this host; ` +
+        `skipping the entire pre-run sweep.`,
+    );
+    return;
+  }
+  writeActiveRunLock();
 
   // Protect leagues created within the last few hours: they may be owned by a
   // concurrent integration run on another branch (the commissioner test user

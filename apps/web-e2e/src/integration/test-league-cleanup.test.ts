@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
+  ACTIVE_RUN_LOCK_STALE_MS,
+  clearActiveRunLock,
   extractLeagueAgeMs,
+  isActiveRunLockFresh,
   isTestLeague,
   isYoungerThanCleanupThreshold,
   MIN_LEAGUE_AGE_FOR_CLEANUP_MS,
+  writeActiveRunLock,
 } from './test-league-cleanup';
 
 const FIXED_NOW = 1715731200000;
@@ -14,9 +21,21 @@ void test('MIN_LEAGUE_AGE_FOR_CLEANUP_MS is 4 hours', () => {
   assert.equal(MIN_LEAGUE_AGE_FOR_CLEANUP_MS, 4 * HOUR_MS);
 });
 
-void test('isTestLeague matches the three test-name patterns', () => {
+void test('isTestLeague matches every spec-produced name pattern', () => {
   assert.equal(isTestLeague('Test League 2026-05-14T20:00:00.000Z'), true);
   assert.equal(isTestLeague('Integration Season Test League'), true);
+  assert.equal(
+    isTestLeague('Integration Season Test League 1715731200000'),
+    true,
+  );
+  // LS-4539: this name was missed by the original patterns; 110 orphans
+  // accumulated before it was added. Guard against regression.
+  assert.equal(isTestLeague('Season Lifecycle Integration Test'), true);
+  assert.equal(
+    isTestLeague('Season Lifecycle Integration Test 1715731200000'),
+    true,
+  );
+  assert.equal(isTestLeague('Mock Draft Practice'), true);
   assert.equal(isTestLeague('Live Draft E2E 1715731200000'), true);
   assert.equal(isTestLeague('Trade Flow E2E 1715731200000'), true);
 });
@@ -25,6 +44,10 @@ void test('isTestLeague rejects user-created leagues', () => {
   assert.equal(isTestLeague('My Real League'), false);
   assert.equal(isTestLeague('The 2024 Champs'), false);
   assert.equal(isTestLeague('Random League'), false);
+  // Substring-only matches that should NOT trigger: the `test` lowercase
+  // appears in many real league names (e.g. someone's team called "Testers")
+  // — patterns intentionally use `startsWith` or word-boundary regexes.
+  assert.equal(isTestLeague('Greatest League Ever'), false);
 });
 
 void test('extractLeagueAgeMs parses trailing 13-digit unix ms', () => {
@@ -92,4 +115,62 @@ void test('isYoungerThanCleanupThreshold is false when no timestamp is parseable
     isYoungerThanCleanupThreshold('Integration Season Test League', FIXED_NOW),
     false,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Active-run lockfile (LS-4539)
+// ---------------------------------------------------------------------------
+
+void test('ACTIVE_RUN_LOCK_STALE_MS is 15 minutes', () => {
+  assert.equal(ACTIVE_RUN_LOCK_STALE_MS, 15 * 60 * 1000);
+});
+
+void test('isActiveRunLockFresh returns false when no lock exists', () => {
+  const tmp = path.join(
+    os.tmpdir(),
+    `ls-4539-lock-${process.pid}-${Date.now()}`,
+  );
+  assert.equal(isActiveRunLockFresh(Date.now(), tmp), false);
+});
+
+void test('write + isFresh + clear roundtrip', () => {
+  const tmp = path.join(
+    os.tmpdir(),
+    `ls-4539-lock-${process.pid}-${Date.now()}-rt`,
+  );
+  try {
+    writeActiveRunLock(tmp);
+    assert.equal(fs.existsSync(tmp), true);
+    assert.equal(isActiveRunLockFresh(Date.now(), tmp), true);
+    clearActiveRunLock(tmp);
+    assert.equal(fs.existsSync(tmp), false);
+    assert.equal(isActiveRunLockFresh(Date.now(), tmp), false);
+  } finally {
+    if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+  }
+});
+
+void test('isActiveRunLockFresh returns false for stale locks', () => {
+  const tmp = path.join(
+    os.tmpdir(),
+    `ls-4539-lock-${process.pid}-${Date.now()}-stale`,
+  );
+  try {
+    writeActiveRunLock(tmp);
+    // Simulate a 20-minute-old lock by checking against a `now` 20 min in the future.
+    const future = Date.now() + 20 * 60 * 1000;
+    assert.equal(isActiveRunLockFresh(future, tmp), false);
+  } finally {
+    if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+  }
+});
+
+void test('clearActiveRunLock is idempotent — no-op when file already gone', () => {
+  const tmp = path.join(
+    os.tmpdir(),
+    `ls-4539-lock-${process.pid}-${Date.now()}-idemp`,
+  );
+  // Should not throw even though the file does not exist.
+  clearActiveRunLock(tmp);
+  clearActiveRunLock(tmp);
 });

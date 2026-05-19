@@ -20,6 +20,7 @@
 
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { switchUser, test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
@@ -91,6 +92,14 @@ test.describe
       originalMultiplier: 0,
       updatedMultiplier: 0,
     };
+  });
+
+  // Layer-2 per-test league cleanup (LS-4539). Removes orphans even when the
+  // test body throws — Playwright still runs afterAll on test failure. Process
+  // crashes are caught by global-teardown (Layer 3) and the next run's
+  // pre-run sweep in global-setup (Layer 1).
+  test.afterAll(async ({ apiCommissioner }) => {
+    await cleanupLeague(apiCommissioner, state.leagueId);
   });
 
   // -----------------------------------------------------------------------

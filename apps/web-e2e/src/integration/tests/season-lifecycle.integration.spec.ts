@@ -26,6 +26,7 @@
  *     src/integration/tests/season-lifecycle.integration.spec.ts
  */
 
+import { cleanupLeague } from '../helpers/cleanup-league';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
 import { waitForAllMatchupsStatsLoaded } from '../helpers/wait-for-stats-loaded';
@@ -71,6 +72,14 @@ test.describe
     };
   });
 
+  // Layer-2 per-test league cleanup (LS-4539). Removes orphans even when the
+  // test body throws — Playwright still runs afterAll on test failure. Process
+  // crashes are caught by global-teardown (Layer 3) and the next run's
+  // pre-run sweep in global-setup (Layer 1).
+  test.afterAll(async ({ apiCommissioner }) => {
+    await cleanupLeague(apiCommissioner, state.leagueId);
+  });
+
   // -----------------------------------------------------------------------
   // PHASE 1 — LEAGUE CREATION
   // -----------------------------------------------------------------------
@@ -98,7 +107,7 @@ test.describe
            }`,
         {
           input: {
-            leagueName: 'Season Lifecycle Integration Test',
+            leagueName: `Season Lifecycle Integration Test ${Date.now()}`,
             numberOfTeams: 3,
             numberOfDivisions: 1,
             maxRosterSize: 4,

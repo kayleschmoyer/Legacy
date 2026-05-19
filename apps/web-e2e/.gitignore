@@ -5,3 +5,6 @@ playwright-report/
 # Test artifacts
 .auth/
 coverage/
+
+# Active-run sentinel written by integration globalSetup (LS-4539)
+.playwright-integration.lock

@@ -28,6 +28,7 @@
 
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import {
   dismissPickAnnouncementOverlay,
@@ -78,16 +79,20 @@ test.describe
     state = { leagueId: 0, inviteCode: '', leagueName: '' };
   });
 
-  // Resume the draft after the suite so any post-suite cleanup (or manual
-  // inspection) sees the league in a normal state. Best-effort: if the league
-  // was never created (Phase 1 failed) or the draft was never paused, swallow.
+  // Layer-2 per-test cleanup (LS-4539). Resumes any paused draft first so the
+  // league is in a normal state on manual inspection, then deletes the league
+  // so the run leaves no orphans. Both steps are best-effort; process crashes
+  // are caught by global-teardown (Layer 3) and the next run's pre-run sweep
+  // in global-setup (Layer 1).
   test.afterAll(async ({ apiCommissioner }) => {
-    if (!state.leagueId) return;
-    try {
-      await resumeDraft(apiCommissioner, state.leagueId);
-    } catch {
-      // League cleanup will reap the paused draft anyway.
+    if (state.leagueId) {
+      try {
+        await resumeDraft(apiCommissioner, state.leagueId);
+      } catch {
+        // Draft may not have been paused — fall through to cleanup.
+      }
     }
+    await cleanupLeague(apiCommissioner, state.leagueId);
   });
 
   // -----------------------------------------------------------------------

@@ -4,6 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  clearActiveRunLock,
   isTestLeague,
   isYoungerThanCleanupThreshold,
 } from './test-league-cleanup';
@@ -105,7 +106,13 @@ export default async function globalTeardown(
   // delete them — yanking the league row out from under an in-flight test
   // (LS-4318). Skip teardown in that case; the next run's globalSetup
   // deletes any leagues left behind, so accumulation is bounded.
-  if (config.shard) return;
+  if (config.shard) {
+    // Still clear the active-run lock so the next single-process run can
+    // sweep — the shard-skip rule only applies to *this* sweep, not to
+    // future ones.
+    clearActiveRunLock();
+    return;
+  }
   // Always run cleanup after integration tests to prevent league accumulation
   // across runs. Previously gated by INTEGRATION_TEARDOWN=true, but skipping
   // cleanup was the root cause of free-tier league limit failures (LS-1502).
@@ -114,6 +121,7 @@ export default async function globalTeardown(
     LOGGER.info(
       '[integration teardown] No auth token available — skipping league cleanup.',
     );
+    clearActiveRunLock();
     return;
   }
 
@@ -124,6 +132,7 @@ export default async function globalTeardown(
   const leagues = data?.userLeagues;
   if (!leagues?.length) {
     LOGGER.info('[integration teardown] No leagues to clean up.');
+    clearActiveRunLock();
     return;
   }
 
@@ -132,6 +141,7 @@ export default async function globalTeardown(
     LOGGER.info(
       `[integration teardown] ${leagues.length} league(s) found but none matched test patterns — skipping.`,
     );
+    clearActiveRunLock();
     return;
   }
 
@@ -153,6 +163,7 @@ export default async function globalTeardown(
     LOGGER.info(
       `[integration teardown] No stale test leagues to delete — done.`,
     );
+    clearActiveRunLock();
     return;
   }
 
@@ -179,4 +190,8 @@ export default async function globalTeardown(
   LOGGER.info(
     `[integration teardown] Deleted ${deleted}/${targets.length} test league(s).`,
   );
+
+  // Release the active-run sentinel last so a fresh integration process can
+  // pick up sweeping immediately after this one exits cleanly.
+  clearActiveRunLock();
 }
