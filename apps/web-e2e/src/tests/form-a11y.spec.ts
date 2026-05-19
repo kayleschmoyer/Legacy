@@ -506,6 +506,15 @@ test.describe('Form field accessibility @regression', () => {
       // Use a placeholder join code for navigation
       await page.goto('/baseball/league/join/TESTCODE');
       await page.waitForLoadState('networkidle');
+      // Auth guard runs in a useEffect after first paint; networkidle may fire
+      // while the loading spinner is still showing. Wait for the form to render
+      // before auditing accessibility (same race addressed in LS-4404).
+      await expect(page.getByPlaceholder('Enter 8-character code')).toBeVisible(
+        { timeout: 10000 },
+      );
+      await expect(page.getByPlaceholder('Enter your team name')).toBeVisible({
+        timeout: 10000,
+      });
 
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
