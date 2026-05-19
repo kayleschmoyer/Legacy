@@ -109,13 +109,16 @@ export function CommissionerAnnouncementsPanel({
     try {
       await postAnnouncement({
         variables: { leagueId, messageText: text },
-        awaitRefetchQueries: true,
         // The mutation returns the new LeagueChatMessage entity (handled by
         // the normalized cache), but the league activity feed renders a
         // separate LeagueActivity event type that the server derives from
         // announcements. Refetch both list queries — GetLeagueActivity is
         // passed by name so every active observer refetches regardless of
         // its (leagueId, limit, eventTypes) variables (LS-3769).
+        // Refetches fire in the background; do not block the form reset on
+        // them — awaiting could leave the compose textarea visible past
+        // assertion timeouts when a refetch runs slowly against the live
+        // backend (LS-4533).
         refetchQueries: [
           {
             query: GetLeagueAnnouncements,
