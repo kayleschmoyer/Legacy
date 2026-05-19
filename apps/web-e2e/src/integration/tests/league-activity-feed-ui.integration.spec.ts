@@ -236,9 +236,17 @@ test.describe
         .getByPlaceholder(/write an announcement/i)
         .fill(state.announcementText);
       await page.getByRole('button', { name: /post announcement/i }).click();
-      await expect(page.getByText(state.announcementText)).toBeVisible({
-        timeout: 15_000,
-      });
+      // Scope to the Commissioner Announcements panel — the same Overview page
+      // also renders the LeagueActivityFeed, which now includes a muted preview
+      // of the announcement text (first 80 chars) as the activity item detail
+      // (LS-3769 wired refetchQueries: ['GetLeagueActivity'] into the post
+      // announcement mutation). An unscoped getByText resolves to both spans
+      // and triggers a strict-mode violation (LS-4543).
+      await expect(
+        page
+          .locator('[data-testid^="announcement-row-"]')
+          .getByText(state.announcementText),
+      ).toBeVisible({ timeout: 15_000 });
       // Verify the league_announcement row appears in the activity feed on this
       // same page. The mutation uses refetchQueries + awaitRefetchQueries, so
       // the feed re-queries before the mutation resolves. Confirming here
