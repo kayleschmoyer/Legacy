@@ -74,9 +74,11 @@ export default defineConfig({
      * Playwright 1.59.x — top-level reducedMotion is not a typed property. */
     contextOptions: { reducedMotion: 'reduce' },
 
-    /* Retain trace on failure.  With retries=0 there is no "first retry", so
-     * traces must be captured on the original failing run instead. */
-    trace: 'retain-on-failure',
+    /* Traces disabled (LS-4537): a single trace zip can exceed GitHub's 100 MB
+     * per-file limit when pushed to the legacy-sports-deploys gh-pages branch,
+     * causing the Deploy Playwright Report job to fail. Re-enable once report
+     * hosting is migrated to S3/CloudFront. */
+    trace: 'off',
   },
 
   expect: {

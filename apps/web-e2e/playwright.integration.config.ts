@@ -28,6 +28,6 @@ export default defineConfig({
   use: {
     baseURL:
       process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',
-    trace: 'retain-on-failure',
+    trace: 'off',
   },
 });
