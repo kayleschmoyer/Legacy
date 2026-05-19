@@ -15,7 +15,10 @@
  */
 import { expect, test } from '@playwright/test';
 import { awsRequestContext } from '../helpers/graphql';
-import { validateInviteCodePreflight } from '../helpers/wait-for-join-page';
+import {
+  formatNoLeagueIdError,
+  validateInviteCodePreflight,
+} from '../helpers/wait-for-join-page';
 
 type FetchFn = typeof globalThis.fetch;
 
@@ -143,5 +146,102 @@ test.describe('validateInviteCodePreflight error surfacing (LS-4444)', () => {
     await expect(
       validateInviteCodePreflight('fake-jwt', 'OKCODE'),
     ).resolves.toBeUndefined();
+  });
+});
+
+test.describe('formatNoLeagueIdError (LS-4541)', () => {
+  const baseArgs = {
+    inviteCode: 'ABCD1234',
+    teamName: 'Test Team',
+    requestContext: ' [requestId=req-LS-4541]',
+    httpStatus: 200,
+  };
+
+  test('identifies branch=data=null when data is missing entirely', () => {
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      json: { errors: [] },
+    });
+    expect(msg).toContain('ABCD1234');
+    expect(msg).toContain('Test Team');
+    expect(msg).toContain('branch=data=null');
+    expect(msg).toContain('httpStatus=200');
+    expect(msg).toContain('errors=none');
+    expect(msg).toContain('requestId=req-LS-4541');
+  });
+
+  test('identifies branch=joinLeagueByCode=missing when field is undefined', () => {
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      json: { data: {} },
+    });
+    expect(msg).toContain('branch=joinLeagueByCode=missing');
+  });
+
+  test('identifies branch=joinLeagueByCode=null when field is explicitly null', () => {
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      json: { data: { joinLeagueByCode: null } },
+    });
+    expect(msg).toContain('branch=joinLeagueByCode=null');
+  });
+
+  test('identifies branch=leagueId=null when team object is present but field is null', () => {
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      json: {
+        data: {
+          joinLeagueByCode: { leagueId: null as unknown as number },
+        },
+      },
+    });
+    expect(msg).toContain('branch=leagueId=null');
+  });
+
+  test('surfaces errors[] contents inline when the payload contains both data:null and errors', () => {
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      json: {
+        errors: [
+          {
+            message: 'Cannot return null for non-nullable field Team.leagueId',
+          },
+          { message: 'Internal server error' },
+        ],
+      },
+    });
+    expect(msg).toContain('errors=2:[');
+    expect(msg).toContain(
+      'Cannot return null for non-nullable field Team.leagueId',
+    );
+    expect(msg).toContain('Internal server error');
+  });
+
+  test('reports the actual HTTP status (catches 5xx-with-body shapes)', () => {
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      httpStatus: 502,
+      json: { data: null },
+    });
+    expect(msg).toContain('httpStatus=502');
+  });
+
+  test('truncates the body preview at 2000 chars to keep error messages bounded', () => {
+    const huge = 'x'.repeat(5000);
+    const msg = formatNoLeagueIdError({
+      ...baseArgs,
+      json: {
+        data: {
+          joinLeagueByCode: {
+            leagueId: null as unknown as number,
+            // @ts-expect-error — synthetic oversize body for the truncation check
+            blob: huge,
+          },
+        },
+      },
+    });
+    const bodyMatch = msg.match(/body=(.*)$/);
+    if (!bodyMatch) throw new Error(`Expected body= in message, got: ${msg}`);
+    expect(bodyMatch[1].length).toBeLessThanOrEqual(2000);
   });
 });

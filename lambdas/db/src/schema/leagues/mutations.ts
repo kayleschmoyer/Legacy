@@ -690,6 +690,22 @@ builder.mutationField('joinLeagueByCode', (t) =>
 
         const team = updatedTeams[0];
 
+        // LS-4541: defense in depth — if the UPDATE...RETURNING produced an
+        // unexpected shape (no rows, or a row missing the leagueId we just
+        // wrote), fail loudly here rather than letting Pothos serialize a
+        // bogus Team object. The schema marks Team.leagueId as non-nullable,
+        // so a missing value would otherwise collapse the entire mutation
+        // result to `null` with a buried non-null violation in errors[];
+        // surfacing it as an explicit server error keeps CloudWatch the
+        // single source of truth for join-flow failures.
+        if (!team || typeof team.leagueId !== 'number') {
+          throw new Error(
+            `joinLeagueByCode: UPDATE teams returned malformed row ` +
+              `(teamId=${unassignedTeams[0].id} leagueId=${league.id}); ` +
+              `expected { id, leagueId } but got ${JSON.stringify(team)}`,
+          );
+        }
+
         // Add user to league members with explicit typing
         const leagueMemberData: {
           leagueId: number;

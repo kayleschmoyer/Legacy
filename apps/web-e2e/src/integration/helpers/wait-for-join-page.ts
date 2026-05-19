@@ -225,6 +225,57 @@ function isUnauthenticatedResponse(json: JoinLeagueByCodeResponse): boolean {
   );
 }
 
+/**
+ * Build the diagnostic message thrown when `joinLeagueByCode` returns success
+ * (no `errors[]`) but `data.joinLeagueByCode.leagueId` is null/missing.
+ *
+ * Surfaces enough payload context to triage the next occurrence without a
+ * Playwright trace:
+ *
+ * - `branch`: which sub-field collapsed (data / joinLeagueByCode / leagueId) —
+ *   distinguishes a resolver-level null from an API Gateway truncation from a
+ *   schema non-null violation that GraphQL itself rewrote to a null parent.
+ * - `httpStatus`: catches a 2xx body without leagueId (impossible by schema)
+ *   vs. a 502/504 that somehow still produced a JSON body.
+ * - `errors`: count + concatenated messages so a buried partial-error shape
+ *   (e.g. a non-null violation that wasn't recognised above the `length` check
+ *   because the array was shaped unexpectedly) is still visible inline.
+ * - `body`: truncated raw payload — last-resort context for serialization or
+ *   shape bugs that don't fit any of the categories above.
+ *
+ * Pure and exported for contract testing (the live joinLeagueAsManager path
+ * cannot reach this branch when the resolver behaves correctly).
+ */
+export function formatNoLeagueIdError(args: {
+  inviteCode: string;
+  teamName: string;
+  json: JoinLeagueByCodeResponse;
+  requestContext: string;
+  httpStatus: number;
+}): string {
+  const { inviteCode, teamName, json, requestContext, httpStatus } = args;
+  const nullBranch =
+    json.data == null
+      ? 'data=null'
+      : json.data.joinLeagueByCode === undefined
+        ? 'joinLeagueByCode=missing'
+        : json.data.joinLeagueByCode === null
+          ? 'joinLeagueByCode=null'
+          : 'leagueId=null';
+  const bodyPreview = JSON.stringify(json).slice(0, 2000);
+  const errorsSummary = json.errors?.length
+    ? ` errors=${json.errors.length}:[${json.errors
+        .map((e) => e.message)
+        .join('|')}]`
+    : ' errors=none';
+  return (
+    `joinLeagueByCode("${inviteCode}", "${teamName}") returned no ` +
+    `leagueId${requestContext} ` +
+    `[branch=${nullBranch} httpStatus=${httpStatus}${errorsSummary}] ` +
+    `body=${bodyPreview}`
+  );
+}
+
 export interface JoinLeagueAsManagerOptions {
   /** Manager JWT — used to warm the validateInviteCode Lambda for this user. */
   jwt: string;
@@ -412,9 +463,20 @@ export async function joinLeagueAsManager(
 
   const leagueId = json.data?.joinLeagueByCode?.leagueId;
   if (leagueId == null) {
+    // LS-4541: hand off to the pure formatter so the diagnostic contract is
+    // exercised by contract tests. Earlier iterations collapsed this branch
+    // to a single "returned no leagueId" line, leaving no signal about which
+    // sub-field was null, whether errors[] was empty, or what the HTTP
+    // status was — which made the failure indistinguishable from a resolver
+    // bug, API Gateway truncation, or a stale-response race.
     throw new Error(
-      `joinLeagueByCode("${inviteCode}", "${teamName}") returned no ` +
-        `leagueId${requestContext}`,
+      formatNoLeagueIdError({
+        inviteCode,
+        teamName,
+        json,
+        requestContext,
+        httpStatus: response.status(),
+      }),
     );
   }
 
