@@ -2321,6 +2321,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           <LeagueDuesStatusDashboard
             leagueId={leagueId}
             isCommissioner={isCommissioner}
+            currentUserId={user?.id}
             onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);

@@ -9,7 +9,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, eq, sql } from 'drizzle-orm';
 import { builder, type Context } from './builder';
-import { AuthenticationError, UserInputError } from './graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from './graphql-errors';
 import {
   verifyCommissionerAccess,
   verifyLeagueMembership,
@@ -279,6 +283,14 @@ builder.mutationField('markMemberPaid', (t) =>
       if (!context.user) throw AuthenticationError();
 
       await verifyCommissionerAccess(context.db, leagueId, context.user.id);
+
+      // A commissioner may not mark their own dues paid — prevents
+      // self-exemption from dues collection (LS-4029).
+      if (userId === context.user.id) {
+        throw ForbiddenError(
+          'Commissioners cannot mark their own dues as paid',
+        );
+      }
 
       // Verify target user is a league member
       await verifyLeagueMembership(context.db, leagueId, userId);
@@ -624,6 +636,15 @@ builder.mutationField('markMemberUnpaid', (t) =>
       if (!context.user) throw AuthenticationError();
 
       await verifyCommissionerAccess(context.db, leagueId, context.user.id);
+
+      // A commissioner may not toggle their own dues status — pairs with
+      // the markMemberPaid guard so the rule applies in both directions
+      // (LS-4029).
+      if (userId === context.user.id) {
+        throw ForbiddenError(
+          'Commissioners cannot mark their own dues as unpaid',
+        );
+      }
 
       // Verify target user is a league member
       await verifyLeagueMembership(context.db, leagueId, userId);

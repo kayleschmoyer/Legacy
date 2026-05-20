@@ -438,6 +438,22 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       expect(result.username).toBe('testuser');
       expect(mockDb.insert).toHaveBeenCalled();
     });
+
+    it('rejects commissioner marking themselves as paid (LS-4029)', async () => {
+      const resolver = getMutation('markMemberPaid');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 10, userId: mockContext.user.id },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('cannot mark their own dues as paid'),
+        extensions: { code: 'FORBIDDEN' },
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
   });
 
   // ── markMemberUnpaid ────────────────────────────────────────────────────
@@ -536,6 +552,24 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       expect(result.paid).toBe(false);
       expect(result.paidAt).toBeNull();
       expect(result.username).toBe('testuser');
+    });
+
+    it('rejects commissioner marking themselves as unpaid (LS-4029)', async () => {
+      const resolver = getMutation('markMemberUnpaid');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 10, userId: mockContext.user.id },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining(
+          'cannot mark their own dues as unpaid',
+        ),
+        extensions: { code: 'FORBIDDEN' },
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
     });
   });
 

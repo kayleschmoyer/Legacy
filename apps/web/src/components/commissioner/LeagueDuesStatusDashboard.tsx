@@ -31,6 +31,13 @@ import {
 export interface LeagueDuesStatusDashboardProps {
   leagueId: number;
   isCommissioner: boolean;
+  /**
+   * ID of the currently signed-in user. When provided, the commissioner's
+   * own row will not render a "Mark Paid/Unpaid" action — commissioners
+   * may not self-exempt from dues collection (LS-4029). The server enforces
+   * the same rule; this prop is purely for UX.
+   */
+  currentUserId?: number | null;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -42,6 +49,7 @@ type FilterMode = 'all' | 'paid' | 'unpaid';
 export function LeagueDuesStatusDashboard({
   leagueId,
   isCommissioner,
+  currentUserId,
   onSuccess,
   onError,
 }: LeagueDuesStatusDashboardProps) {
@@ -434,39 +442,46 @@ export function LeagueDuesStatusDashboard({
                 {/* Commissioner Action */}
                 {isCommissioner && (
                   <XStack flex={1} justifyContent="flex-end">
-                    <Button
-                      size="$2"
-                      theme={member.paid ? 'alt2' : 'green'}
-                      disabled={mutating || member.userId == null}
-                      onPress={() => {
-                        if (member.userId == null) {
-                          onError?.(
-                            new Error(
-                              'Cannot toggle dues status: missing userId for member.',
-                            ),
-                          );
-                          return;
-                        }
-                        void handleTogglePaid(
-                          member.userId,
-                          member.paid ?? false,
-                        );
-                      }}
-                      opacity={mutating && !isToggling ? 0.5 : 1}
-                      icon={
-                        isToggling ? (
-                          <Spinner size="small" />
-                        ) : member.paid ? (
-                          <XIcon size={14} />
-                        ) : (
-                          <Check size={14} />
-                        )
-                      }
-                    >
-                      <Text fontSize="$1">
-                        {member.paid ? 'Mark Unpaid' : 'Mark Paid'}
+                    {currentUserId != null &&
+                    member.userId === currentUserId ? (
+                      <Text fontSize="$1" color="$gray10" fontStyle="italic">
+                        Self
                       </Text>
-                    </Button>
+                    ) : (
+                      <Button
+                        size="$2"
+                        theme={member.paid ? 'alt2' : 'green'}
+                        disabled={mutating || member.userId == null}
+                        onPress={() => {
+                          if (member.userId == null) {
+                            onError?.(
+                              new Error(
+                                'Cannot toggle dues status: missing userId for member.',
+                              ),
+                            );
+                            return;
+                          }
+                          void handleTogglePaid(
+                            member.userId,
+                            member.paid ?? false,
+                          );
+                        }}
+                        opacity={mutating && !isToggling ? 0.5 : 1}
+                        icon={
+                          isToggling ? (
+                            <Spinner size="small" />
+                          ) : member.paid ? (
+                            <XIcon size={14} />
+                          ) : (
+                            <Check size={14} />
+                          )
+                        }
+                      >
+                        <Text fontSize="$1">
+                          {member.paid ? 'Mark Unpaid' : 'Mark Paid'}
+                        </Text>
+                      </Button>
+                    )}
                   </XStack>
                 )}
               </XStack>
