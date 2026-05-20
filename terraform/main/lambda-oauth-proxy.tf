@@ -225,7 +225,13 @@ resource "aws_lambda_function" "oauth_proxy" {
       # CORS — comma-separated origins allowed to make credentialed requests.
       # The Lambda code defaults to https://legacy-fantasy.com when not set,
       # but we make it explicit here so staging/PR environments can override it.
-      CORS_ALLOWED_ORIGINS = "https://${var.domain_name},https://www.${var.domain_name}"
+      # In dev, also allow localhost dev-server origins (web app on :4200,
+      # storybook on :4280) so developers can hit dev OAuth endpoints from a
+      # local frontend (LS-4546).
+      CORS_ALLOWED_ORIGINS = join(",", concat(
+        ["https://${var.domain_name}", "https://www.${var.domain_name}"],
+        var.environment == "dev" ? ["http://localhost:4200", "http://localhost:4280"] : []
+      ))
 
       # Cookie domain — scopes ls_jwt and ls_csrf to all subdomains so that
       # the WebSocket Lambda (ws.<domain>) receives the auth cookie.
