@@ -17,8 +17,10 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
+
 export interface MinigamesHubProps {
-  onNavigate: (gameId: 'season-draft' | 'disclosure') => void;
+  onNavigate: (gameId: MinigameId) => void;
 }
 
 const EYEBROW_STYLE: React.CSSProperties = {
@@ -231,7 +233,7 @@ const ArrowRight: React.FC = () => (
 // ── Game card ──────────────────────────────────────────────────────────────
 
 interface GameDef {
-  id: 'season-draft' | 'disclosure';
+  id: MinigameId;
   title: string;
   tag: string;
   desc: string;
@@ -261,6 +263,16 @@ const GAME_TEMPLATES: Omit<GameDef, 'stat'>[] = [
     accent: 'seam',
     icon: <StatsIcon />,
     meta: ['7 clues per player', 'Hall of Famers to deep cuts'],
+    cta: 'Play Now',
+  },
+  {
+    id: 'twenty-questions',
+    title: '20 Questions',
+    tag: 'Solo · 3–5 min',
+    desc: 'Ask up to 20 yes/no questions to identify the mystery player. Fewer questions = more tokens. Pick your difficulty and start swinging.',
+    accent: 'navy',
+    icon: <StatsIcon />,
+    meta: ['Up to 20 questions', 'Easy · Medium · Hard'],
     cta: 'Play Now',
   },
 ];
@@ -540,24 +552,27 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
   const bestScore = bestScoreData?.disclosureGameBestScore ?? null;
   const dbStats = minigamesStatsData?.minigamesStats;
 
-  const games: GameDef[] = GAME_TEMPLATES.map((template) => {
-    if (template.id === 'season-draft') {
-      return {
-        ...template,
-        stat: {
+  const statFor = (id: MinigameId): GameDef['stat'] => {
+    switch (id) {
+      case 'season-draft':
+        return {
           label: 'Games Active',
           value: activeGamesCount !== null ? String(activeGamesCount) : '—',
-        },
-      };
+        };
+      case 'disclosure':
+        return {
+          label: 'Your Best',
+          value: bestScore !== null ? String(bestScore) : '—',
+        };
+      case 'twenty-questions':
+        return { label: 'Questions', value: '20' };
     }
-    return {
-      ...template,
-      stat: {
-        label: 'Your Best',
-        value: bestScore !== null ? String(bestScore) : '—',
-      },
-    };
-  });
+  };
+
+  const games: GameDef[] = GAME_TEMPLATES.map((template) => ({
+    ...template,
+    stat: statFor(template.id),
+  }));
 
   const heroStats: Array<{ n: string; l: string } | null> = [
     {

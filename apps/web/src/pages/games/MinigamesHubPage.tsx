@@ -22,6 +22,8 @@ export const MinigamesHubPage: React.FC = () => {
         onNavigate={(id) => {
           if (id === 'season-draft') navigate('/games/season-draft');
           else if (id === 'disclosure') navigate('/games/disclosure');
+          else if (id === 'twenty-questions')
+            navigate('/games/twenty-questions');
         }}
       />
     </>
