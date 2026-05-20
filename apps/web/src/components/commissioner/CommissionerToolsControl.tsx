@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -403,7 +403,8 @@ function ForceRosterMovesSection({
 
 // ── Sub-section: Edit Matchup Scores ───────────────────────────────────────
 
-function EditMatchupScoresSection({
+// Exported for the LS-4040 double-submit regression guard test.
+export function EditMatchupScoresSection({
   leagueId,
   teams,
   onSuccess,
@@ -425,6 +426,10 @@ function EditMatchupScoresSection({
   const [editScore, { loading }] = useEditMatchupScoreMutation({
     refetchQueries: ['GetMatchupsForLeague', 'GetLeagueStandings'],
   });
+  // Synchronous guard: Apollo's `loading` flag updates via React state, which
+  // can lag a render behind rapid clicks and let a second submit slip through
+  // before the button is disabled.
+  const submittingRef = useRef(false);
 
   const matchups = matchupsData?.getMatchupsForLeague ?? [];
 
@@ -441,6 +446,7 @@ function EditMatchupScoresSection({
   };
 
   const handleEdit = async () => {
+    if (submittingRef.current) return;
     const mid = parseInt(matchupId, 10);
     const t1 = parseFloat(team1Score);
     const t2 = parseFloat(team2Score);
@@ -448,6 +454,7 @@ function EditMatchupScoresSection({
       onError?.(new Error('Valid matchup and scores are required'));
       return;
     }
+    submittingRef.current = true;
     try {
       const result = await editScore({
         variables: {
@@ -466,6 +473,8 @@ function EditMatchupScoresSection({
       setReason('');
     } catch (err) {
       onError?.(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      submittingRef.current = false;
     }
   };
 
