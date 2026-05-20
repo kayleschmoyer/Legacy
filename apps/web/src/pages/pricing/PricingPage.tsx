@@ -832,6 +832,15 @@ export default function PricingPage() {
                 >
                   <FAQQuestion
                     onPress={() => setOpenFaq(openFaq === i ? null : i)}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={openFaq === i}
+                    onKeyDown={(e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setOpenFaq(openFaq === i ? null : i);
+                      }
+                    }}
                   >
                     <H3
                       fontSize="$4"

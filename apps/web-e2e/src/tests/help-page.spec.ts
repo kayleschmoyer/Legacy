@@ -201,6 +201,29 @@ test.describe('Help Page — FAQ accordion @regression', () => {
     await expect(firstFaq).toHaveAttribute('aria-expanded', 'true');
     await expect(secondFaq).toHaveAttribute('aria-expanded', 'true');
   });
+
+  // LS-4019: keyboard-only users must be able to activate FAQ items.
+  test('FAQ question can be expanded with the Enter key', async ({ page }) => {
+    const faqButton = page
+      .getByRole('button')
+      .filter({ hasText: /how do i create a fantasy baseball league/i });
+
+    await faqButton.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(faqButton).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('FAQ question can be expanded with the Space key', async ({ page }) => {
+    const faqButton = page
+      .getByRole('button')
+      .filter({ hasText: /how does the draft work/i });
+
+    await faqButton.focus();
+    await page.keyboard.press(' ');
+
+    await expect(faqButton).toHaveAttribute('aria-expanded', 'true');
+  });
 });
 
 test.describe('Help Page — Historical Stats FAQ @regression', () => {

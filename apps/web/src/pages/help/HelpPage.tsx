@@ -175,6 +175,13 @@ function FaqItem({ question, answer }: FaqItemProps) {
       <FaqQuestion
         onPress={() => setOpen((v) => !v)}
         role="button"
+        tabIndex={0}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
         aria-expanded={open}
         aria-controls={faqId}
       >
