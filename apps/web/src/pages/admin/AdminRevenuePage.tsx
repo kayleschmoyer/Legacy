@@ -194,6 +194,27 @@ export default function AdminRevenuePage(): React.JSX.Element {
         </Card>
       )}
 
+      {!loading && error == null && stats == null && auth.isAuthenticated && (
+        <Card
+          padding="$4"
+          style={{
+            background: SURFACE_PANEL,
+            borderColor: OUTLINE_SUBTLE,
+          }}
+        >
+          <YStack gap="$2">
+            <Paragraph size="$5" fontWeight="600" color="$color">
+              No revenue data available
+            </Paragraph>
+            <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+              Revenue statistics could not be loaded. There may be no
+              subscription activity yet, or the metrics service is temporarily
+              unavailable. Try refreshing in a few minutes.
+            </Paragraph>
+          </YStack>
+        </Card>
+      )}
+
       {stats != null && (
         <>
           {/* KPI Row */}
