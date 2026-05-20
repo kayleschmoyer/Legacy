@@ -1818,48 +1818,8 @@ export function HomePage(): React.JSX.Element {
               >
                 {/* Your Leagues */}
                 <section>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-end',
-                      gap: 16,
-                      marginBottom: 20,
-                    }}
-                  >
+                  <div style={{ marginBottom: 20 }}>
                     <SectionHead eyebrow="Active Season" title="Your Leagues" />
-                    <button
-                      onClick={() => navigate(defaultSportRoute)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontFamily: 'Big Shoulders Display, system-ui',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        letterSpacing: '0.1em',
-                        textTransform: 'uppercase',
-                        color: BRAND_GOLD_LIGHT,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: 0,
-                        flexShrink: 0,
-                      }}
-                    >
-                      View all leagues
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      >
-                        <path d="M5 12h14M13 5l7 7-7 7" />
-                      </svg>
-                    </button>
                   </div>
 
                   {/* Hero card */}
