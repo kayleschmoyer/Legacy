@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  Button,
   H1,
   Paragraph,
   Separator,
@@ -463,7 +464,8 @@ function NotificationPreferencesSection({
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }) {
-  const { data, loading, error } = useGetUserNotificationPreferencesQuery();
+  const { data, loading, error, refetch } =
+    useGetUserNotificationPreferencesQuery();
   const [updatePrefs] = useUpdateNotificationPreferencesMutation();
 
   const prefs = data?.getUserNotificationPreferences;
@@ -594,6 +596,22 @@ function NotificationPreferencesSection({
               There was a problem fetching your notification settings. Please
               try again later.
             </Paragraph>
+            <XStack>
+              <Button
+                size="$3"
+                backgroundColor="$color2"
+                borderWidth={1}
+                borderColor="$borderColor"
+                borderRadius="$4"
+                onPress={() => void refetch()}
+                hoverStyle={{ backgroundColor: '$color3' }}
+                pressStyle={{ backgroundColor: '$color4' }}
+              >
+                <Paragraph size="$3" fontWeight="500">
+                  Retry
+                </Paragraph>
+              </Button>
+            </XStack>
           </SectionBody>
         </CollapsibleBody>
       </SectionCard>
