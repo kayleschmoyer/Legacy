@@ -108,10 +108,18 @@ async function ensureTestFixtures(): Promise<void> {
 
 export async function setupIntegrationTestDatabase(): Promise<void> {
   if (pool) return;
+  const url = connectionString();
+  // Local Postgres (Docker/CI service container) has no TLS — only enable SSL
+  // when talking to a remote managed instance. resolveLocalCredentials() applies
+  // the same gate to the migration pool; without it here, the first test query
+  // fails with a TLS handshake error against the CI postgres service.
+  const isLocal =
+    process.env.USE_LOCAL_CREDENTIALS === 'true' ||
+    /@(localhost|127\.0\.0\.1)[:/]/.test(url);
   pool = new Pool({
-    connectionString: connectionString(),
+    connectionString: url,
     max: 3,
-    ssl: { rejectUnauthorized: false },
+    ssl: isLocal ? false : { rejectUnauthorized: false },
   });
   db = drizzle(pool, { schema: PublicSchema });
   await ensureTestFixtures();
