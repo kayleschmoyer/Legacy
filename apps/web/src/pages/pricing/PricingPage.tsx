@@ -536,11 +536,7 @@ export default function PricingPage() {
                 </Paragraph>
               </PlanHeader>
 
-              <OutlineButton
-                onPress={() => {
-                  window.location.href = '/';
-                }}
-              >
+              <OutlineButton onPress={() => navigate('/')}>
                 Get Started Free
               </OutlineButton>
 
@@ -905,12 +901,7 @@ export default function PricingPage() {
               >
                 Upgrade to Premium
               </ActionButton>
-              <OutlineButton
-                onPress={() => {
-                  window.location.href = '/';
-                }}
-                width={180}
-              >
+              <OutlineButton onPress={() => navigate('/')} width={180}>
                 Get Started Free
               </OutlineButton>
             </XStack>
