@@ -12,7 +12,7 @@ export function StandingsRedirectPage() {
     skip: !isLoggedIn,
   });
 
-  if (authLoading || loading) {
+  if (authLoading || loading || (isLoggedIn && !data)) {
     return (
       <YStack
         flex={1}
