@@ -4,7 +4,7 @@ Load the router via `Skill(skill: "worktree-workflow")`. It describes two flows:
 
 1. **Native ephemeral (primary)** — for single-ticket leaf work. Spawn Claude Code with the launcher `worktree` checkbox checked. The session starts in `.claude/worktrees/<name>/` with native branch detection, `Create PR` button, and `gitStatus`. Follow the native flow steps in `worktree-workflow/SKILL.md` or [AGENTS.md Workflow Step 4](../../AGENTS.md).
 
-2. **Sibling worktree (parallel / batch only)** — for sweep, `work-bugs`, `work-mcp-gaps`, chained branches, or parent-ticket orchestrators that juggle multiple worktrees. Load `worktree-workflow/references/sibling/sibling-worktree-flow.md` for the full guide. Use MCP tools (`make_worktree_create`, `make_wt_setup`, `worktree_set`, `worktree_commit`, `worktree_push`) as the primary interface.
+2. **Sibling worktree (legacy fallback)** — for chained branch stacks (twig parent dependencies) and environments where neither chips (`mcp__ccd_session__spawn_task`) nor `Agent(isolation: "worktree")` are available. The current multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`) dispatch chips and do NOT use sibling worktrees. Load `worktree-workflow/references/sibling/sibling-worktree-flow.md` for the full guide. Use MCP tools (`make_worktree_create`, `make_wt_setup`, `worktree_set`, `worktree_commit`, `worktree_push`) as the primary interface.
 
 Follow the standard workflow for whichever flow applies: Jira ticket → blocker check → worktree creation → setup → code → validate → PR → cleanup.
 

@@ -1,6 +1,6 @@
 # Reference: Sibling Worktree Flow (Parallel / Batch Work)
 
-> **When to load this reference**: you are running a parallel / batch orchestrator — `open-prs` (sweep), `work-bugs`, `work-mcp-gaps`, or a parent ticket iterating through children — and need a sibling worktree under `D:\code\legacy-sports-worktrees\` to isolate each branch from the main repo session.
+> **When to load this reference**: you are running a parallel / batch orchestrator and chips (`mcp__ccd_session__spawn_task`) and `Agent(isolation: "worktree")` are both unavailable. The current multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`) dispatch **chips** instead, and `/work-ticket` Parent Mode dispatches `Agent(isolation: "worktree")` subagents — none of those need sibling worktrees. Load this only for the legacy chained-branch case or environments without chip/subagent isolation, where you need sibling worktrees under `D:\code\legacy-sports-worktrees\` to isolate each branch from the main repo session.
 >
 > **When NOT to load this reference**: you are working a single leaf ticket. Use the **native ephemeral worktree flow** instead — spawn Claude Code with the launcher `worktree` checkbox checked and follow AGENTS.md Workflow Step 4 (native path) + the work-ticket skill. That flow gives you correct branch detection, a working `Create PR` button, and `gitStatus` in the system prompt — none of which sibling worktrees offer.
 

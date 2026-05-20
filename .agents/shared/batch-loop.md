@@ -1,5 +1,7 @@
-<!-- Canonical batch orchestration loop. Imported by work-bugs and work-mcp-gaps command files.
-     Lines marked [client-bugs] / [mcp-gaps] are variant-specific — apply the one matching your orchestrator type. -->
+<!-- OBSOLETE: Canonical batch orchestration loop. Previously imported by work-bugs and work-mcp-gaps.
+     Both orchestrators now dispatch chips (`mcp__ccd_session__spawn_task`) — one chip per ticket —
+     and no longer drain in-flight PRs in their own session. Kept as historical reference only.
+     Lines marked [client-bugs] / [mcp-gaps] are variant-specific. -->
 
 ```
 all_worked     = []      # cumulative across all batches

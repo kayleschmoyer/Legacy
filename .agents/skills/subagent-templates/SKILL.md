@@ -103,7 +103,9 @@ For subagents that explore or modify **MCP server code** (e.g. adding a new tool
 
 ## Work Subagents (Multi-Ticket Orchestrators)
 
-For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-ticket` Parent Mode) via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty.
+> **Note on dispatch model**: `/sweep-prs`, `/work-bugs`, and `/work-mcp-gaps` now dispatch **chips** via `mcp__ccd_session__spawn_task` instead of subagents. Each chip is its own Claude Code session that runs the native worktree flow internally — it does NOT need the setup block below. The work-subagent template here applies to `Agent(isolation: "worktree")` callers (currently `/work-ticket` Parent Mode and any orchestrator falling back when chips are unavailable).
+
+For **work subagents** dispatched via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty.
 
 The canonical setup + tool preferences block lives in [`.agents/shared/subagent-setup.md`](../../shared/subagent-setup.md) (symlinked as `references/subagent-setup.md` in skills that use it):
 
