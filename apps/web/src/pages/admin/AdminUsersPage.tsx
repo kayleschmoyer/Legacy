@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { Card, H1, Input, Paragraph, Spinner, Text } from 'tamagui';
+import { Card, Dialog, H1, Input, Paragraph, Spinner, Text } from 'tamagui';
 import { Navigate } from 'react-router-dom';
 import {
   useGetAllUsersQuery,
@@ -43,6 +43,12 @@ export default function AdminUsersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [accessLevelFilter, setAccessLevelFilter] =
     useState<AccessLevelFilter>('all');
+  const [pendingToggle, setPendingToggle] = useState<{
+    userId: number;
+    currentLevel: string | null | undefined;
+    label: string;
+    isSelf: boolean;
+  } | null>(null);
 
   const isAdmin = user?.accessLevel === 'admin';
 
@@ -373,7 +379,12 @@ export default function AdminUsersPage() {
                     <Button
                       size="$3"
                       onPress={() =>
-                        void handleToggleRole(displayId, u.accessLevel)
+                        setPendingToggle({
+                          userId: displayId,
+                          currentLevel: u.accessLevel,
+                          label: u.username ?? u.email ?? `User #${displayId}`,
+                          isSelf: displayId === user.id,
+                        })
                       }
                       disabled={updating}
                       backgroundColor={
@@ -459,6 +470,97 @@ export default function AdminUsersPage() {
           )}
         </YStack>
       )}
+
+      {/* Confirmation dialog for admin role toggle */}
+      <Dialog
+        modal
+        open={pendingToggle !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingToggle(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="toggle-admin-title"
+            aria-describedby="toggle-admin-description"
+            animateOnly={['transform', 'opacity']}
+            animation={['quick', { opacity: { overshootClamping: true } }]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={500}
+          >
+            {pendingToggle &&
+              (() => {
+                const willRevoke = pendingToggle.currentLevel === 'admin';
+                const titleColor = willRevoke ? '$red11' : '$color';
+                return (
+                  <>
+                    <Dialog.Title id="toggle-admin-title" color={titleColor}>
+                      {willRevoke
+                        ? `Revoke admin from ${pendingToggle.label}?`
+                        : `Promote ${pendingToggle.label} to admin?`}
+                    </Dialog.Title>
+                    <Dialog.Description id="toggle-admin-description">
+                      {willRevoke
+                        ? 'This user will lose access to admin tools.'
+                        : 'This user will gain full access to admin tools, including the ability to change other users’ roles.'}
+                    </Dialog.Description>
+                    {pendingToggle.isSelf && willRevoke && (
+                      <Card
+                        padding="$3"
+                        backgroundColor="$red2"
+                        borderColor="$red6"
+                        borderWidth={1}
+                      >
+                        <Paragraph color="$red11" fontWeight="700">
+                          You are about to revoke your own admin access.
+                        </Paragraph>
+                        <Paragraph color="$red10" size="$3">
+                          You will be locked out of this page and will need
+                          another admin to restore your access.
+                        </Paragraph>
+                      </Card>
+                    )}
+                    <XStack gap="$3" justifyContent="flex-end">
+                      <Button
+                        onPress={() => setPendingToggle(null)}
+                        disabled={updating}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        theme={willRevoke ? 'red' : 'blue'}
+                        onPress={() => {
+                          const { userId, currentLevel } = pendingToggle;
+                          setPendingToggle(null);
+                          void handleToggleRole(userId, currentLevel);
+                        }}
+                        disabled={updating}
+                        icon={updating ? <Spinner /> : undefined}
+                      >
+                        {willRevoke ? 'Revoke admin' : 'Make admin'}
+                      </Button>
+                    </XStack>
+                  </>
+                );
+              })()}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
     </YStack>
   );
 }
