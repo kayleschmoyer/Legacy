@@ -8,8 +8,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import { Input, Spinner, Text, TextArea } from 'tamagui';
-import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
@@ -238,11 +237,17 @@ export function AdminPage(): React.JSX.Element {
 
   // Redirect non-admins
   if (!auth.isLoading && auth.user?.accessLevel !== 'admin') {
-    void navigate('/');
-    return <Spinner />;
+    return <Navigate to="/" replace />;
   }
 
-  const handleImpersonate = async (userId: number) => {
+  const handleImpersonate = async (userId: number, label: string) => {
+    if (
+      !window.confirm(
+        `Impersonate ${label}? You will be signed in as this user until you sign out.`,
+      )
+    ) {
+      return;
+    }
     setImpersonatingId(userId);
     try {
       await auth.impersonateUser(userId);
@@ -404,7 +409,13 @@ export function AdminPage(): React.JSX.Element {
                 {!isYou && !isAdmin && (
                   <Button
                     size="$3"
-                    onPress={() => u.id != null && void handleImpersonate(u.id)}
+                    onPress={() =>
+                      u.id != null &&
+                      void handleImpersonate(
+                        u.id,
+                        u.username ?? u.email ?? `user #${u.id}`,
+                      )
+                    }
                     disabled={impersonatingId !== null}
                     style={{
                       background:
