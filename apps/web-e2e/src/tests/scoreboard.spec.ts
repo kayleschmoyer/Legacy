@@ -542,6 +542,62 @@ test.describe('ScoreboardTicker — global ticker visibility @regression', () =>
     await expect(spacer).not.toBeVisible();
   });
 
+  test('ticker refetches on visibility/focus after a long idle (LS-3680) @regression', async ({
+    page,
+  }) => {
+    // Regression for LS-3680: after a long browser session (e.g. tab left
+    // open overnight) the ticker would get stuck on an empty `games` array
+    // and never recover short of a hard refresh, because polling stops once
+    // all today's games are Final. The fix wires the ticker to refetch when
+    // the tab regains visibility or focus.
+    // Use a mutable flag rather than a call counter so the test is robust to
+    // however many calls Apollo's cache-and-network policy makes on mount.
+    let returnGames = false;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const opName = extractOperationName(route).toLowerCase();
+      if (opName !== 'getscoreboard') {
+        await route.fallback();
+        return;
+      }
+      const games = returnGames ? [MOCK_FINAL_GAME] : [];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            scoreboard: {
+              __typename: 'Scoreboard',
+              date: '2026-04-01',
+              lastUpdated: FIXED_NOW_ISO,
+              games,
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('load');
+
+    // Initially hidden — backend returns empty (the stale post-overnight state)
+    await expect(page.getByTestId('scoreboard-ticker')).not.toBeVisible();
+
+    // Backend now has games available again; simulate the tab regaining
+    // focus after a long idle. The ticker's focus/visibility listener should
+    // refetch and pick up the new data.
+    returnGames = true;
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    // After the focus-triggered refetch, the ticker should re-appear
+    await expect(page.getByTestId('scoreboard-ticker')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('scoreboard-ticker')).toContainText('CHC');
+  });
+
   test('scoreboard link in ticker is clickable from /players @regression', async ({
     page,
   }) => {

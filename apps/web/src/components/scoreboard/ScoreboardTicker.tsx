@@ -270,13 +270,43 @@ function Separator() {
  * Auto-polls every 15 seconds while any game is live.
  */
 export function ScoreboardTicker() {
-  const { data, startPolling, stopPolling } = useGetScoreboardQuery({
+  const { data, startPolling, stopPolling, refetch } = useGetScoreboardQuery({
     fetchPolicy: 'cache-and-network',
     // Scoreboard is a non-critical ambient feature. If the MLB API is
     // unavailable the ticker simply renders nothing — suppress the global
     // error toast so failures here don't pollute unrelated pages.
     context: { suppressGlobalError: true },
   });
+
+  // Refetch when the tab regains visibility or focus after a long idle
+  // (e.g. browser/laptop sleep overnight). Polling is disabled once all of
+  // today's games are Final, so without this the ticker has no path back to
+  // fresh data short of a hard refresh — it ends up stuck on yesterday's
+  // games or, if a stray refetch overwrites the cache with an empty result
+  // after the server-side "today" rolls over, disappears entirely.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    // 0 = no refetch yet this mount; the initial cache-and-network fetch is
+    // handled by Apollo on mount. We want the first visibility/focus event
+    // after that to refetch, but throttle rapid bursts (e.g. focus events
+    // from modal open/close cycles).
+    let lastRefetchedAt = 0;
+    const REFETCH_THROTTLE_MS = 30_000;
+
+    const maybeRefetch = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastRefetchedAt < REFETCH_THROTTLE_MS) return;
+      lastRefetchedAt = Date.now();
+      void refetch();
+    };
+
+    document.addEventListener('visibilitychange', maybeRefetch);
+    window.addEventListener('focus', maybeRefetch);
+    return () => {
+      document.removeEventListener('visibilitychange', maybeRefetch);
+      window.removeEventListener('focus', maybeRefetch);
+    };
+  }, [refetch]);
 
   const games: TickerGame[] = (data?.scoreboard?.games ?? []) as TickerGame[];
   const isAnyGameLive = games.some((g) => g.status === 'Live');
