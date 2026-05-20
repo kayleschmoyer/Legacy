@@ -47,7 +47,9 @@ export function StandingsPage() {
           Error loading standings
         </Text>
         <Text marginTop="$2" color="$gray11">
-          {String(error.message)}
+          {typeof error.message === 'string' && error.message
+            ? error.message
+            : 'An unexpected error occurred'}
         </Text>
         {}
         <Button
