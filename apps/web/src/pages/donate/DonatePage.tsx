@@ -12,6 +12,8 @@ import {
   BRAND_GOLD_PRESS,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  BRAND_SEAM_RED_LIGHT,
   withAlpha,
 } from '../../constants/colors';
 
@@ -69,10 +71,11 @@ const cardStyle: React.CSSProperties = {
 
 const DonatePage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { data, loading } = useGetDonationPaymentLinkQuery();
+  const { data, loading, error } = useGetDonationPaymentLinkQuery();
 
   const donationUrl = data?.donationPaymentLink?.url ?? null;
   const checkoutStatus = searchParams.get('checkout');
+  const hasDonationError = !loading && (error != null || donationUrl == null);
 
   const handleDonate = () => {
     if (!donationUrl) return;
@@ -192,6 +195,34 @@ const DonatePage: React.FC = () => {
                     </XStack>
                   ))}
                 </YStack>
+
+                {hasDonationError && (
+                  <YStack
+                    padding="$3"
+                    borderRadius="$4"
+                    borderWidth={1}
+                    style={
+                      {
+                        backgroundColor: withAlpha(BRAND_SEAM_RED, 0.1),
+                        borderColor: withAlpha(BRAND_SEAM_RED, 0.35),
+                      } as React.CSSProperties
+                    }
+                  >
+                    <Paragraph
+                      size="$3"
+                      fontWeight="600"
+                      style={
+                        { color: BRAND_SEAM_RED_LIGHT } as React.CSSProperties
+                      }
+                    >
+                      Donations are temporarily unavailable
+                    </Paragraph>
+                    <Paragraph size="$2" color="$colorPress">
+                      We couldn't load the secure Stripe checkout link. Please
+                      try again in a few minutes.
+                    </Paragraph>
+                  </YStack>
+                )}
 
                 <CtaButton
                   onPress={handleDonate}
