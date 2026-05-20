@@ -210,7 +210,11 @@ See `.agents/skills/architecture/SKILL.md` for system overview. For a fast capab
 
 ## Design Context
 
-The full design system lives at **https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb** — fetch it before doing any frontend design work. Key guidelines are summarized below for reference.
+The full design system lives at **https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb**. **Local agents cannot fetch this URL** (returns 403); only cloud Claude Code Web sessions can. For local work, read the synced bundle under [`docs/design/`](docs/design/) — it's the same content version-controlled in the repo.
+
+**Design sync process**: synced bundles are pulled in by the `/sync-designs` cloud agent (one Jira ticket per changed design) and consumed by `/implement-design LS-####` locally. Full process: [`docs/dev-process/design-sync.md`](docs/dev-process/design-sync.md). Operator runbook: [`.agents/skills/design-sync/SKILL.md`](.agents/skills/design-sync/SKILL.md).
+
+Key brand guidelines are summarized below for reference.
 
 ### Users
 

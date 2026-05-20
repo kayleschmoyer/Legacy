@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 780" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+  <defs>
+    <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1B3A5C"/>
+    </marker>
+    <style>
+      .title { font-size: 18px; font-weight: 700; fill: #0A0F1A; }
+      .step { fill: #16223A; stroke: #C5A55A; stroke-width: 1.5; }
+      .stepText { fill: #ffffff; font-size: 12px; font-weight: 600; }
+      .stepSub { fill: #cbd5e0; font-size: 10px; }
+      .decision { fill: #C5A55A; stroke: #1B3A5C; stroke-width: 1.5; }
+      .decisionText { fill: #0A0F1A; font-size: 12px; font-weight: 700; }
+      .terminal { fill: #1B3A5C; stroke: #C41E3A; stroke-width: 1.5; }
+      .terminalText { fill: #ffffff; font-size: 12px; font-weight: 700; }
+      .blocked { fill: #C41E3A; stroke: #0A0F1A; stroke-width: 1.5; }
+      .blockedText { fill: #ffffff; font-size: 12px; font-weight: 700; }
+      .arrow { stroke: #1B3A5C; stroke-width: 2; fill: none; }
+      .label { fill: #4a5568; font-size: 11px; }
+      .branchLabel { fill: #C41E3A; font-size: 11px; font-weight: 700; }
+      .branchLabelOk { fill: #1B3A5C; font-size: 11px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <text x="460" y="32" text-anchor="middle" class="title">/implement-design LS-#### — Local Consumer Agent Flow</text>
+  <text x="460" y="52" text-anchor="middle" class="label">Dispatched per design ticket. Either notifies, implements, or slices into chips.</text>
+
+  <!-- 1. Start -->
+  <rect x="320" y="78" width="280" height="44" rx="22" class="terminal"/>
+  <text x="460" y="104" text-anchor="middle" class="terminalText">User dispatches /implement-design LS-####</text>
+
+  <path d="M 460 122 L 460 152" class="arrow" marker-end="url(#arrow3)"/>
+
+  <!-- 2. Load ticket + bundle -->
+  <rect x="260" y="152" width="400" height="76" rx="8" class="step"/>
+  <text x="460" y="174" text-anchor="middle" class="stepText">Read ticket · resolve designId · load bundle</text>
+  <text x="460" y="192" text-anchor="middle" class="stepSub">jira_view · regex designId from description</text>
+  <text x="460" y="208" text-anchor="middle" class="stepSub">read docs/design/&lt;designId&gt;/bundle.json + pages/</text>
+
+  <path d="M 460 228 L 460 258" class="arrow" marker-end="url(#arrow3)"/>
+
+  <!-- 3. Completeness gate -->
+  <polygon points="460,258 620,318 460,378 300,318" class="decision"/>
+  <text x="460" y="308" text-anchor="middle" class="decisionText">Completeness</text>
+  <text x="460" y="324" text-anchor="middle" class="decisionText">gate (see ref)</text>
+  <text x="460" y="346" text-anchor="middle" class="decisionText" font-size="10">bundle · pages · tokens · intent</text>
+
+  <!-- 3a. Fail → notify -->
+  <path d="M 300 318 L 140 318" class="arrow" marker-end="url(#arrow3)"/>
+  <text x="220" y="310" text-anchor="middle" class="branchLabel">missing</text>
+  <rect x="20" y="290" width="200" height="76" rx="8" class="blocked"/>
+  <text x="120" y="312" text-anchor="middle" class="blockedText">NOTIFY + BLOCK</text>
+  <text x="120" y="332" text-anchor="middle" fill="#ffffff" font-size="10">post Jira comment with</text>
+  <text x="120" y="346" text-anchor="middle" fill="#ffffff" font-size="10">gap checklist</text>
+  <text x="120" y="360" text-anchor="middle" fill="#ffffff" font-size="10">transition → Blocked · stop</text>
+
+  <!-- 3b. Pass -->
+  <path d="M 460 378 L 460 410" class="arrow" marker-end="url(#arrow3)"/>
+  <text x="480" y="394" class="branchLabelOk">complete</text>
+
+  <!-- 4. Size decision -->
+  <polygon points="460,410 660,470 460,530 260,470" class="decision"/>
+  <text x="460" y="460" text-anchor="middle" class="decisionText">Slicing heuristic</text>
+  <text x="460" y="478" text-anchor="middle" class="decisionText" font-size="10">pages ≤ 2 AND</text>
+  <text x="460" y="492" text-anchor="middle" class="decisionText" font-size="10">components ≤ 8 AND</text>
+  <text x="460" y="506" text-anchor="middle" class="decisionText" font-size="10">new_tokens == 0 ?</text>
+
+  <!-- 4a. Small → implement -->
+  <path d="M 260 470 L 130 470 L 130 600" class="arrow" marker-end="url(#arrow3)"/>
+  <text x="180" y="462" class="branchLabelOk">small</text>
+
+  <rect x="20" y="600" width="220" height="120" rx="8" class="step"/>
+  <text x="130" y="624" text-anchor="middle" class="stepText">IMPLEMENT in current worktree</text>
+  <text x="130" y="644" text-anchor="middle" class="stepSub">apply tokens · build components</text>
+  <text x="130" y="660" text-anchor="middle" class="stepSub">match brand rules from AGENTS.md</text>
+  <text x="130" y="678" text-anchor="middle" class="stepSub">make pc · self-review · push</text>
+  <text x="130" y="696" text-anchor="middle" class="stepSub">PR · drive to merge</text>
+  <text x="130" y="714" text-anchor="middle" class="stepSub" font-style="italic">closes LS-####</text>
+
+  <!-- 4b. Large → slice -->
+  <path d="M 660 470 L 790 470 L 790 600" class="arrow" marker-end="url(#arrow3)"/>
+  <text x="730" y="462" class="branchLabel">large</text>
+
+  <rect x="660" y="600" width="240" height="140" rx="8" class="step"/>
+  <text x="780" y="624" text-anchor="middle" class="stepText">SLICE into child tickets</text>
+  <text x="780" y="644" text-anchor="middle" class="stepSub">one child per page or major component</text>
+  <text x="780" y="660" text-anchor="middle" class="stepSub">parent = LS-#### · acceptance criteria</text>
+  <text x="780" y="676" text-anchor="middle" class="stepSub">scoped to that slice</text>
+  <text x="780" y="694" text-anchor="middle" class="stepSub">spawn 1 chip per child via</text>
+  <text x="780" y="708" text-anchor="middle" class="stepSub">mcp__ccd_session__spawn_task</text>
+  <text x="780" y="728" text-anchor="middle" class="stepSub" font-style="italic">LS-#### itself → "In Review" as tracker</text>
+
+  <!-- Bottom note -->
+  <text x="460" y="765" text-anchor="middle" class="label">All paths terminate at the consumer agent's drive-to-merge OR explicit hand-off to chips. No silent fallback.</text>
+</svg>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 760" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+  <defs>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1B3A5C"/>
+    </marker>
+    <style>
+      .title { font-size: 18px; font-weight: 700; fill: #0A0F1A; }
+      .step { fill: #16223A; stroke: #C5A55A; stroke-width: 1.5; }
+      .stepText { fill: #ffffff; font-size: 12px; font-weight: 600; }
+      .stepSub { fill: #cbd5e0; font-size: 10px; }
+      .decision { fill: #C5A55A; stroke: #1B3A5C; stroke-width: 1.5; }
+      .decisionText { fill: #0A0F1A; font-size: 12px; font-weight: 700; }
+      .terminal { fill: #1B3A5C; stroke: #C41E3A; stroke-width: 1.5; }
+      .terminalText { fill: #ffffff; font-size: 12px; font-weight: 700; }
+      .arrow { stroke: #1B3A5C; stroke-width: 2; fill: none; }
+      .label { fill: #4a5568; font-size: 11px; }
+      .branchLabel { fill: #C41E3A; font-size: 11px; font-weight: 700; }
+      .branchLabelOk { fill: #1B3A5C; font-size: 11px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <text x="440" y="32" text-anchor="middle" class="title">/sync-designs — Cloud Sync Agent Flow</text>
+  <text x="440" y="52" text-anchor="middle" class="label">Dispatched on Claude Code Web. Drives all design changes into the repo through one PR.</text>
+
+  <!-- 1. Start -->
+  <rect x="340" y="78" width="200" height="44" rx="22" class="terminal"/>
+  <text x="440" y="104" text-anchor="middle" class="terminalText">User dispatches /sync-designs</text>
+
+  <path d="M 440 122 L 440 152" class="arrow" marker-end="url(#arrow2)"/>
+
+  <!-- 2. Auth + worktree setup -->
+  <rect x="280" y="152" width="320" height="56" rx="8" class="step"/>
+  <text x="440" y="174" text-anchor="middle" class="stepText">Auth check + create branch</text>
+  <text x="440" y="192" text-anchor="middle" class="stepSub">auth_check_all · cut chore/design-sync-YYYY-MM-DD</text>
+
+  <path d="M 440 208 L 440 238" class="arrow" marker-end="url(#arrow2)"/>
+
+  <!-- 3. Discover -->
+  <rect x="240" y="238" width="400" height="56" rx="8" class="step"/>
+  <text x="440" y="260" text-anchor="middle" class="stepText">Discover designs</text>
+  <text x="440" y="278" text-anchor="middle" class="stepSub">Try listing endpoint · fallback to manifest URLs · merge sets</text>
+
+  <path d="M 440 294 L 440 324" class="arrow" marker-end="url(#arrow2)"/>
+
+  <!-- 4. For-each-design label -->
+  <rect x="260" y="324" width="360" height="36" rx="8" fill="#0D1526" stroke="#C5A55A" stroke-width="1"/>
+  <text x="440" y="346" text-anchor="middle" class="stepText">For each discovered design id ↓</text>
+
+  <path d="M 440 360 L 440 384" class="arrow" marker-end="url(#arrow2)"/>
+
+  <!-- 5. Fetch + hash -->
+  <rect x="280" y="384" width="320" height="56" rx="8" class="step"/>
+  <text x="440" y="406" text-anchor="middle" class="stepText">WebFetch bundle + compute sha256</text>
+  <text x="440" y="424" text-anchor="middle" class="stepSub">extract zip in memory · hash canonical file list</text>
+
+  <path d="M 440 440 L 440 470" class="arrow" marker-end="url(#arrow2)"/>
+
+  <!-- 6. Decision: changed? -->
+  <polygon points="440,470 580,520 440,570 300,520" class="decision"/>
+  <text x="440" y="515" text-anchor="middle" class="decisionText">Changed vs</text>
+  <text x="440" y="531" text-anchor="middle" class="decisionText">lastSyncedHash?</text>
+
+  <!-- 6a. Unchanged -->
+  <path d="M 580 520 L 760 520" class="arrow" marker-end="url(#arrow2)"/>
+  <text x="670" y="512" text-anchor="middle" class="branchLabelOk">no</text>
+  <rect x="720" y="496" width="140" height="48" rx="8" class="step"/>
+  <text x="790" y="520" text-anchor="middle" class="stepText">Skip</text>
+  <text x="790" y="536" text-anchor="middle" class="stepSub">log "unchanged"</text>
+
+  <!-- 6b. Changed/new -->
+  <path d="M 440 570 L 440 600" class="arrow" marker-end="url(#arrow2)"/>
+  <text x="460" y="588" class="branchLabel">yes</text>
+
+  <!-- 7. Extract + ticket -->
+  <rect x="220" y="600" width="440" height="76" rx="8" class="step"/>
+  <text x="440" y="622" text-anchor="middle" class="stepText">Extract to docs/design/&lt;id&gt;/ · create Jira ticket</text>
+  <text x="440" y="640" text-anchor="middle" class="stepSub">jira_create_ticket(parent: design-sync bucket epic, labels: [design-sync])</text>
+  <text x="440" y="656" text-anchor="middle" class="stepSub">update manifest entry: lastSyncedHash, jiraKey, syncedAt</text>
+
+  <path d="M 220 638 C 100 638, 100 346, 260 346" class="arrow" marker-end="url(#arrow2)"/>
+  <text x="80" y="490" class="label" transform="rotate(-90 80 490)">next design</text>
+
+  <path d="M 760 520 C 860 520, 860 700, 660 700" class="arrow" marker-end="url(#arrow2)"/>
+
+  <!-- 8. After loop -->
+  <rect x="260" y="690" width="360" height="56" rx="8" class="step"/>
+  <text x="440" y="712" text-anchor="middle" class="stepText">Commit · make pc · self-review · push · open PR</text>
+  <text x="440" y="730" text-anchor="middle" class="stepSub">mark ready → bot review → drive to merge</text>
+</svg>
