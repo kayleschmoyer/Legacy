@@ -57,6 +57,23 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 const ENV_LOCAL_PATH = path.join(REPO_ROOT, '.env.local');
+const CLAUDE_SETTINGS_PATH = path.join(
+  REPO_ROOT,
+  '.claude',
+  'settings.local.json',
+);
+
+// Keys mirrored from .env.local into .claude/settings.local.json#/env so that
+// Claude Code spawned from the Claude Desktop app (a GUI process that does
+// not source .env.local) can still resolve `${MCP_*}` substitutions in
+// .mcp.json at MCP server launch (LS-4592). Claude Code merges the top-level
+// `env` block into its process env before MCP variable substitution.
+const CLAUDE_SETTINGS_MIRRORED_KEYS = [
+  'MCP_AUTH_TOKEN',
+  'MCP_JIRA_URL',
+  'MCP_GITHUB_URL',
+  'MCP_CI_URL',
+];
 
 // Local LOGGER stub. The project rule (AGENTS.md) is to use LOGGER from
 // @legacy-sports/logging, but this is a standalone `.mjs` script run via
@@ -143,6 +160,53 @@ function writeEnvLocal(updates) {
   }
 
   fs.writeFileSync(ENV_LOCAL_PATH, content);
+}
+
+// ── .claude/settings.local.json read/write ───────────────────────────────────
+//
+// Dual-write target for MCP_* vars so Claude Code launched from the Claude
+// Desktop app (which doesn't source .env.local) can still resolve `${MCP_*}`
+// substitutions in .mcp.json. The file is git-ignored and may contain
+// user-specific permissions / enabledMcpjsonServers — preserve every key that
+// isn't `env`, and refuse to clobber on malformed JSON.
+function writeClaudeSettingsEnv(updates) {
+  if (Object.keys(updates).length === 0) return;
+
+  let existing = {};
+  if (fs.existsSync(CLAUDE_SETTINGS_PATH)) {
+    const raw = fs.readFileSync(CLAUDE_SETTINGS_PATH, 'utf8');
+    if (raw.trim().length > 0) {
+      try {
+        existing = JSON.parse(raw);
+      } catch (err) {
+        throw new Error(
+          `Refusing to overwrite malformed JSON at ${CLAUDE_SETTINGS_PATH}: ${err instanceof Error ? err.message : String(err)}. Fix or remove the file and re-run.`,
+        );
+      }
+      if (
+        existing === null ||
+        typeof existing !== 'object' ||
+        Array.isArray(existing)
+      ) {
+        throw new Error(
+          `Refusing to overwrite ${CLAUDE_SETTINGS_PATH}: top-level value is not a JSON object.`,
+        );
+      }
+    }
+  } else {
+    fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
+  }
+
+  const currentEnv =
+    existing['env'] &&
+    typeof existing['env'] === 'object' &&
+    !Array.isArray(existing['env'])
+      ? existing['env']
+      : {};
+  const mergedEnv = { ...currentEnv, ...updates };
+  const next = { ...existing, env: mergedEnv };
+
+  fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(next, null, 2) + '\n');
 }
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
@@ -506,9 +570,22 @@ async function main() {
     process.exit(1);
   }
 
+  // ── Step 5: mirror MCP_* into .claude/settings.local.json ────────────────
+  // Claude Desktop launches Claude Code as a GUI subprocess that doesn't
+  // source .env.local; settings.local.json#/env is the supported way to
+  // inject env vars into the MCP server substitution step (LS-4592).
+  const mirrorUpdates = {};
+  for (const key of CLAUDE_SETTINGS_MIRRORED_KEYS) {
+    if (finalEnv[key]) mirrorUpdates[key] = finalEnv[key];
+  }
+  writeClaudeSettingsEnv(mirrorUpdates);
+
   printDivider();
   LOGGER.info(
     `.env.local has MCP_AUTH_TOKEN + MCP_JIRA_URL + MCP_GITHUB_URL + MCP_CI_URL.`,
+  );
+  LOGGER.info(
+    `.claude/settings.local.json#/env mirrors the same 4 vars (for Claude Desktop launches).`,
   );
   LOGGER.info('Done. Restart Claude Code for the new tokens to take effect.');
 }

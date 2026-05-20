@@ -137,6 +137,48 @@ else
   WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --setup' then restart the session.")
 fi
 
+# --- 5. .claude/settings.local.json#/env mirror (LS-4592) -------------------
+# When Claude Code is launched from the Claude Desktop GUI app, .env.local is
+# NOT sourced — the only way ${MCP_*} substitutions in .mcp.json resolve is
+# through settings.local.json#/env. scripts/mcp-auth.mjs mirrors the 4 MCP_*
+# vars there; warn if the mirror is missing or stale.
+SETTINGS_LOCAL="$WORKTREE/.claude/settings.local.json"
+if [ -f "$SETTINGS_LOCAL" ] && command -v python3 >/dev/null 2>&1; then
+  MIRROR_STATUS=$(python3 - "$SETTINGS_LOCAL" <<'PY' 2>/dev/null
+import json, sys
+required = ['MCP_AUTH_TOKEN', 'MCP_JIRA_URL', 'MCP_GITHUB_URL', 'MCP_CI_URL']
+try:
+    with open(sys.argv[1], 'r', encoding='utf-8') as f:
+        data = json.load(f)
+except Exception:
+    print('UNREADABLE')
+    sys.exit(0)
+env_block = data.get('env') if isinstance(data, dict) else None
+if not isinstance(env_block, dict):
+    print('NO_ENV')
+    sys.exit(0)
+missing = [k for k in required if not env_block.get(k)]
+print('MISSING:' + ','.join(missing) if missing else 'OK')
+PY
+)
+  case "$MIRROR_STATUS" in
+    OK) ;;
+    NO_ENV)
+      WARNINGS+=("[MCP WARNING] .claude/settings.local.json has no top-level \"env\" block — Claude Desktop launches will not resolve \${MCP_*} in .mcp.json.")
+      WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' to populate the mirror, then restart the session.")
+      ;;
+    UNREADABLE)
+      WARNINGS+=("[MCP WARNING] .claude/settings.local.json is unreadable or malformed — Claude Desktop launches may fail to resolve \${MCP_*}.")
+      WARNINGS+=("  Fix: repair the JSON or remove the file, then run 'node scripts/mcp-auth.mjs'.")
+      ;;
+    MISSING:*)
+      MISSING_KEYS="${MIRROR_STATUS#MISSING:}"
+      WARNINGS+=("[MCP WARNING] .claude/settings.local.json#/env is missing required keys: $MISSING_KEYS — Claude Desktop launches will fail to resolve those \${MCP_*}.")
+      WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' to refresh the mirror, then restart the session.")
+      ;;
+  esac
+fi
+
 # --- Emit warnings ----------------------------------------------------------
 if [ ${#WARNINGS[@]} -gt 0 ]; then
   echo ""
