@@ -92,6 +92,9 @@ export interface QueryOptions {
     | 'onBasePercentage'
     | 'sluggingPercentage'
     | 'ops'
+    // Fantasy scoring (computed inline via SQL using DEFAULT_BATTING_SCORING weights)
+    | 'totalScore'
+    | 'avgPointsPerGame'
     // Pitching statistics
     | 'wins'
     | 'losses'
@@ -103,6 +106,88 @@ export interface QueryOptions {
   orderDirection?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
+}
+
+/**
+ * Map a `QueryOptions.orderBy` value to the Drizzle SQL ORDER BY clause used
+ * against the `career_batting` view. Exported so the mapping can be unit
+ * tested without a database connection.
+ *
+ * `totalScore` and `avgPointsPerGame` mirror `DEFAULT_BATTING_SCORING` from
+ * lib/scoring/src/baseball/DefaultScoring.ts. The weights are inlined rather
+ * than imported because `@legacy-sports/scoring` depends on
+ * `@legacy-sports/db-client` — pulling the package back in would create a
+ * dependency cycle.
+ */
+export function getCareerBattingOrderByClause(
+  options: QueryOptions,
+): SQL<unknown> {
+  const dir = options.orderDirection === 'desc' ? 'DESC' : 'ASC';
+
+  switch (options.orderBy) {
+    case 'lastName':
+      return sql`${PublicSchema.players.lastName} ${sql.raw(dir)} NULLS LAST, ${PublicSchema.players.firstName} ${sql.raw(dir)} NULLS LAST`;
+
+    case 'games':
+      return sql`${PublicSchema.careerBatting.g} ${sql.raw(dir)} NULLS LAST`;
+    case 'plateAppearances':
+      return sql`${PublicSchema.careerBatting.pa} ${sql.raw(dir)} NULLS LAST`;
+    case 'atBats':
+      return sql`${PublicSchema.careerBatting.ab} ${sql.raw(dir)} NULLS LAST`;
+    case 'runs':
+      return sql`${PublicSchema.careerBatting.r} ${sql.raw(dir)} NULLS LAST`;
+    case 'hits':
+      return sql`${PublicSchema.careerBatting.h} ${sql.raw(dir)} NULLS LAST`;
+    case 'doubles':
+      return sql`${PublicSchema.careerBatting.doubles} ${sql.raw(dir)} NULLS LAST`;
+    case 'triples':
+      return sql`${PublicSchema.careerBatting.triples} ${sql.raw(dir)} NULLS LAST`;
+    case 'homeRuns':
+      return sql`${PublicSchema.careerBatting.hr} ${sql.raw(dir)} NULLS LAST`;
+    case 'rbi':
+      return sql`${PublicSchema.careerBatting.rbi} ${sql.raw(dir)} NULLS LAST`;
+
+    case 'stolenBases':
+      return sql`${PublicSchema.careerBatting.sb} ${sql.raw(dir)} NULLS LAST`;
+    case 'caughtStealing':
+      return sql`${PublicSchema.careerBatting.cs} ${sql.raw(dir)} NULLS LAST`;
+
+    case 'baseOnBalls':
+      return sql`${PublicSchema.careerBatting.bb} ${sql.raw(dir)} NULLS LAST`;
+    case 'strikeouts':
+      return sql`${PublicSchema.careerBatting.so} ${sql.raw(dir)} NULLS LAST`;
+    case 'hitByPitch':
+      return sql`${PublicSchema.careerBatting.hbp} ${sql.raw(dir)} NULLS LAST`;
+    case 'intentionalBaseOnBalls':
+      return sql`${PublicSchema.careerBatting.ibb} ${sql.raw(dir)} NULLS LAST`;
+
+    case 'totalBases':
+      return sql`${PublicSchema.careerBatting.tb} ${sql.raw(dir)} NULLS LAST`;
+    case 'groundedIntoDoublePlays':
+      return sql`${PublicSchema.careerBatting.gidp} ${sql.raw(dir)} NULLS LAST`;
+    case 'sacrificeHits':
+      return sql`${PublicSchema.careerBatting.sh} ${sql.raw(dir)} NULLS LAST`;
+
+    case 'offensiveWAR':
+      return sql`${PublicSchema.careerBatting.offensiveWar} ${sql.raw(dir)} NULLS LAST`;
+
+    case 'battingAverage':
+      return sql`(${PublicSchema.careerBatting.h}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
+    case 'onBasePercentage':
+      return sql`((${PublicSchema.careerBatting.h} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp})::numeric / NULLIF(${PublicSchema.careerBatting.ab} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp} + ${PublicSchema.careerBatting.sh}, 0)) ${sql.raw(dir)} NULLS LAST`;
+    case 'sluggingPercentage':
+      return sql`(${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
+    case 'ops':
+      return sql`((${PublicSchema.careerBatting.h} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp})::numeric / NULLIF(${PublicSchema.careerBatting.ab} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp} + ${PublicSchema.careerBatting.sh}, 0) + ${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
+
+    case 'totalScore':
+      return sql`(COALESCE(${PublicSchema.careerBatting.h}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.doubles}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.triples}, 0) * 3 + COALESCE(${PublicSchema.careerBatting.hr}, 0) * 4 + COALESCE(${PublicSchema.careerBatting.r}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.rbi}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.sb}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.cs}, 0) * -1 + COALESCE(${PublicSchema.careerBatting.hbp}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.so}, 0) * -0.5) ${sql.raw(dir)} NULLS LAST`;
+    case 'avgPointsPerGame':
+      return sql`((COALESCE(${PublicSchema.careerBatting.h}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.doubles}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.triples}, 0) * 3 + COALESCE(${PublicSchema.careerBatting.hr}, 0) * 4 + COALESCE(${PublicSchema.careerBatting.r}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.rbi}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.sb}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.cs}, 0) * -1 + COALESCE(${PublicSchema.careerBatting.hbp}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.so}, 0) * -0.5)::numeric / NULLIF(${PublicSchema.careerBatting.g}, 0)) ${sql.raw(dir)} NULLS LAST`;
+
+    default:
+      return sql`${PublicSchema.careerBatting.hr} DESC NULLS LAST`;
+  }
 }
 
 /**
@@ -410,76 +495,7 @@ export class CareerBattingQueryBuilder {
    * Always puts NULL values last regardless of sort direction
    */
   private getOrderByClause(options: QueryOptions): SQL<unknown> {
-    const dir = options.orderDirection === 'desc' ? 'DESC' : 'ASC';
-
-    // Map orderBy field names to database columns with NULLS LAST
-    switch (options.orderBy) {
-      // Player information (requires join with players table)
-      case 'lastName':
-        return sql`${PublicSchema.players.lastName} ${sql.raw(dir)} NULLS LAST, ${PublicSchema.players.firstName} ${sql.raw(dir)} NULLS LAST`;
-
-      // Basic batting statistics
-      case 'games':
-        return sql`${PublicSchema.careerBatting.g} ${sql.raw(dir)} NULLS LAST`;
-      case 'plateAppearances':
-        return sql`${PublicSchema.careerBatting.pa} ${sql.raw(dir)} NULLS LAST`;
-      case 'atBats':
-        return sql`${PublicSchema.careerBatting.ab} ${sql.raw(dir)} NULLS LAST`;
-      case 'runs':
-        return sql`${PublicSchema.careerBatting.r} ${sql.raw(dir)} NULLS LAST`;
-      case 'hits':
-        return sql`${PublicSchema.careerBatting.h} ${sql.raw(dir)} NULLS LAST`;
-      case 'doubles':
-        return sql`${PublicSchema.careerBatting.doubles} ${sql.raw(dir)} NULLS LAST`;
-      case 'triples':
-        return sql`${PublicSchema.careerBatting.triples} ${sql.raw(dir)} NULLS LAST`;
-      case 'homeRuns':
-        return sql`${PublicSchema.careerBatting.hr} ${sql.raw(dir)} NULLS LAST`;
-      case 'rbi':
-        return sql`${PublicSchema.careerBatting.rbi} ${sql.raw(dir)} NULLS LAST`;
-
-      // Base running
-      case 'stolenBases':
-        return sql`${PublicSchema.careerBatting.sb} ${sql.raw(dir)} NULLS LAST`;
-      case 'caughtStealing':
-        return sql`${PublicSchema.careerBatting.cs} ${sql.raw(dir)} NULLS LAST`;
-
-      // Plate discipline
-      case 'baseOnBalls':
-        return sql`${PublicSchema.careerBatting.bb} ${sql.raw(dir)} NULLS LAST`;
-      case 'strikeouts':
-        return sql`${PublicSchema.careerBatting.so} ${sql.raw(dir)} NULLS LAST`;
-      case 'hitByPitch':
-        return sql`${PublicSchema.careerBatting.hbp} ${sql.raw(dir)} NULLS LAST`;
-      case 'intentionalBaseOnBalls':
-        return sql`${PublicSchema.careerBatting.ibb} ${sql.raw(dir)} NULLS LAST`;
-
-      // Additional statistics
-      case 'totalBases':
-        return sql`${PublicSchema.careerBatting.tb} ${sql.raw(dir)} NULLS LAST`;
-      case 'groundedIntoDoublePlays':
-        return sql`${PublicSchema.careerBatting.gidp} ${sql.raw(dir)} NULLS LAST`;
-      case 'sacrificeHits':
-        return sql`${PublicSchema.careerBatting.sh} ${sql.raw(dir)} NULLS LAST`;
-
-      // Advanced metrics
-      case 'offensiveWAR':
-        return sql`${PublicSchema.careerBatting.offensiveWar} ${sql.raw(dir)} NULLS LAST`;
-
-      // Calculated percentages — computed inline via SQL expressions for sorting
-      case 'battingAverage':
-        return sql`(${PublicSchema.careerBatting.h}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
-      case 'onBasePercentage':
-        return sql`((${PublicSchema.careerBatting.h} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp})::numeric / NULLIF(${PublicSchema.careerBatting.ab} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp} + ${PublicSchema.careerBatting.sh}, 0)) ${sql.raw(dir)} NULLS LAST`;
-      case 'sluggingPercentage':
-        return sql`(${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
-      case 'ops':
-        return sql`((${PublicSchema.careerBatting.h} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp})::numeric / NULLIF(${PublicSchema.careerBatting.ab} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp} + ${PublicSchema.careerBatting.sh}, 0) + ${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
-
-      default:
-        // Default to home runs descending for most interesting results
-        return sql`${PublicSchema.careerBatting.hr} DESC NULLS LAST`;
-    }
+    return getCareerBattingOrderByClause(options);
   }
 
   /**
