@@ -216,6 +216,14 @@ interface MockOptions {
   waiverClaims?: typeof MOCK_WAIVER_CLAIMS | [];
   /** Override team members returned by teammembers */
   teamMembers?: typeof MOCK_TEAM_MEMBERS | [];
+  /** Override the league inviteCode (null simulates a league whose invite code hasn't been generated yet) */
+  inviteCode?: string | null;
+  /** Capture rename mutation calls */
+  onRenameTeam?: (variables: {
+    teamId: number;
+    leagueId: number;
+    newName: string;
+  }) => void;
 }
 
 async function mockLeagueDetailGraphQL(
@@ -227,7 +235,11 @@ async function mockLeagueDetailGraphQL(
     chatMessages = MOCK_CHAT_MESSAGES,
     waiverClaims = [],
     teamMembers = MOCK_TEAM_MEMBERS,
+    inviteCode,
+    onRenameTeam,
   } = opts;
+  const leagueForResponse =
+    inviteCode === undefined ? MOCK_LEAGUE : { ...MOCK_LEAGUE, inviteCode };
 
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
@@ -239,7 +251,40 @@ async function mockLeagueDetailGraphQL(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+        body: JSON.stringify({ data: { league: leagueForResponse } }),
+      });
+    } else if (postData.includes('renameteam')) {
+      const rawBody = route.request().postData() ?? '';
+      try {
+        const parsed = JSON.parse(rawBody) as {
+          variables?: {
+            teamId?: number;
+            leagueId?: number;
+            newName?: string;
+          };
+        };
+        if (parsed.variables && onRenameTeam) {
+          onRenameTeam({
+            teamId: Number(parsed.variables.teamId ?? 0),
+            leagueId: Number(parsed.variables.leagueId ?? 0),
+            newName: String(parsed.variables.newName ?? ''),
+          });
+        }
+      } catch {
+        /* malformed body — let the test see no callback */
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            renameTeam: {
+              __typename: 'Team',
+              ...MOCK_TEAMS[0],
+              name: 'Renamed Squad',
+            },
+          },
+        }),
       });
     } else if (postData.includes('getleagueteams')) {
       await route.fulfill({
@@ -640,5 +685,134 @@ test.describe('Unknown Tab Redirect — LS-1303 regression @regression', () => {
     await page.goBack();
     // We should be back at the pre-league URL (overview from first visit), not stuck on the redirect target
     await expect(page).not.toHaveURL(/not-a-real-tab/);
+  });
+});
+
+// ── LS-4018: Team rename confirmation @regression ────────────────────────────
+
+test.describe('Team rename confirmation — LS-4018 @regression', () => {
+  test('clicking Save Name opens a confirmation dialog and does not call the rename mutation directly', async ({
+    page,
+  }) => {
+    let renameCalled = false;
+    await mockLeagueDetailGraphQL(page, {
+      onRenameTeam: () => {
+        renameCalled = true;
+      },
+    });
+    await page.goto('/baseball/league/1/team-settings');
+    await page.waitForLoadState('load');
+
+    const input = page.locator('#team-name-input');
+    await expect(input).toBeVisible();
+    await input.fill('Brand New Name');
+
+    await page.getByRole('button', { name: /save name/i }).click();
+
+    const dialog = page.getByTestId('rename-team-confirm');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute('role', 'alertdialog');
+    await expect(
+      dialog.getByText(/rename team\?/i, { exact: false }),
+    ).toBeVisible();
+    expect(renameCalled).toBe(false);
+  });
+
+  test('cancel closes the dialog without renaming', async ({ page }) => {
+    let renameCalled = false;
+    await mockLeagueDetailGraphQL(page, {
+      onRenameTeam: () => {
+        renameCalled = true;
+      },
+    });
+    await page.goto('/baseball/league/1/team-settings');
+    await page.waitForLoadState('load');
+
+    await page.locator('#team-name-input').fill('Brand New Name');
+    await page.getByRole('button', { name: /save name/i }).click();
+
+    const dialog = page.getByTestId('rename-team-confirm');
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(renameCalled).toBe(false);
+  });
+
+  test('confirming the dialog submits the rename mutation with the new name', async ({
+    page,
+  }) => {
+    const renameVariables: Array<{
+      teamId: number;
+      leagueId: number;
+      newName: string;
+    }> = [];
+    await mockLeagueDetailGraphQL(page, {
+      onRenameTeam: (v) => renameVariables.push(v),
+    });
+    await page.goto('/baseball/league/1/team-settings');
+    await page.waitForLoadState('load');
+
+    await page.locator('#team-name-input').fill('Brand New Name');
+    await page.getByRole('button', { name: /save name/i }).click();
+
+    const dialog = page.getByTestId('rename-team-confirm');
+    await dialog.getByRole('button', { name: /^rename$/i }).click();
+
+    await expect.poll(() => renameVariables.length).toBeGreaterThan(0);
+    expect(renameVariables[0].newName).toBe('Brand New Name');
+  });
+
+  test('pressing Enter in the input opens the confirmation dialog instead of submitting directly', async ({
+    page,
+  }) => {
+    let renameCalled = false;
+    await mockLeagueDetailGraphQL(page, {
+      onRenameTeam: () => {
+        renameCalled = true;
+      },
+    });
+    await page.goto('/baseball/league/1/team-settings');
+    await page.waitForLoadState('load');
+
+    const input = page.locator('#team-name-input');
+    await input.fill('Enter Submitted Name');
+    await input.press('Enter');
+
+    await expect(page.getByTestId('rename-team-confirm')).toBeVisible();
+    expect(renameCalled).toBe(false);
+  });
+});
+
+// ── LS-4018: QR code loading skeleton @regression ────────────────────────────
+
+test.describe('QR code loading skeleton — LS-4018 @regression', () => {
+  test('shows a skeleton placeholder while inviteCode is unavailable, with accessible loading state', async ({
+    page,
+  }) => {
+    await mockLeagueDetailGraphQL(page, { inviteCode: null });
+    await page.goto('/baseball/league/1/overview');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: /show qr code to invite/i }).click();
+
+    const skeleton = page.getByTestId('qr-code-skeleton');
+    await expect(skeleton).toBeVisible();
+    await expect(skeleton).toHaveAttribute('role', 'status');
+    await expect(skeleton).toHaveAttribute('aria-label', 'Loading QR code');
+    await expect(page.getByTestId('qr-code-svg')).toHaveCount(0);
+  });
+
+  test('renders the QR code (no skeleton) once inviteCode is present', async ({
+    page,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await page.goto('/baseball/league/1/overview');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: /show qr code to invite/i }).click();
+
+    await expect(page.getByTestId('qr-code-svg')).toBeVisible();
+    await expect(page.getByTestId('qr-code-skeleton')).toHaveCount(0);
   });
 });

@@ -536,6 +536,14 @@
     opacity: 0.3;
   }
 }
+@keyframes ls-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
 .ls-pulse {
   animation: ls-pulse 1.4s var(--ease-standard) infinite;
 }

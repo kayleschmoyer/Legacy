@@ -132,7 +132,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
     setCopied(what);
     setTimeout(() => setCopied(null), 1500);
   };
-  if (!league.inviteCode) return null;
+  const inviteReady = Boolean(league.inviteCode);
   return (
     <Section title="Invite Friends" sub="Share your league with new managers.">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -185,7 +185,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             Invite Code
           </div>
           <div className="ls-invite-link">
-            <input readOnly value={league.inviteCode} />
+            <input readOnly value={league.inviteCode ?? ''} />
             <button
               type="button"
               aria-label="Copy invite code"
@@ -220,9 +220,37 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
           <I.QrCode size={12} /> {showQr ? 'Hide' : 'Show'} QR Code to Invite
         </button>
         {showQr ? (
-          <div className="ls-qr-wrap" data-testid="qr-code-svg">
-            <QRCodeSVG value={inviteUrl} size={180} level="M" includeMargin />
-          </div>
+          inviteReady ? (
+            <div className="ls-qr-wrap" data-testid="qr-code-svg">
+              <QRCodeSVG value={inviteUrl} size={180} level="M" includeMargin />
+            </div>
+          ) : (
+            <div
+              className="ls-qr-wrap"
+              data-testid="qr-code-skeleton"
+              role="status"
+              aria-label="Loading QR code"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: 196,
+              }}
+            >
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 180,
+                  height: 180,
+                  background:
+                    'linear-gradient(90deg, var(--bg2, #1a2433) 0%, var(--bg3, #243040) 50%, var(--bg2, #1a2433) 100%)',
+                  backgroundSize: '200% 100%',
+                  borderRadius: 8,
+                  animation: 'ls-shimmer 1.4s linear infinite',
+                }}
+              />
+            </div>
+          )
         ) : null}
       </div>
     </Section>

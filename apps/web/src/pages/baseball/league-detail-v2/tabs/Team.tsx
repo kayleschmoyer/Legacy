@@ -43,6 +43,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
   const teamMembers = teamMembersData?.teamMembers ?? [];
 
   const [name, setName] = useState(myTeam?.name ?? '');
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [primaryColor, setPrimaryColor] = useState(
     normalizeColor(myTeam?.primaryColor, PRESET_COLORS[0]),
   );
@@ -78,15 +79,25 @@ export const TeamTab: React.FC<TeamTabProps> = ({
     useUpdateTeamBrandingMutation();
 
   // Initial values come from teamMembers data context — these mutations are best-effort
+  const currentTeamName = myTeam?.name ?? '';
+  const trimmedName = name.trim();
+  const nameDirty = trimmedName.length > 0 && trimmedName !== currentTeamName;
+
+  const requestRename = () => {
+    if (!myTeamId || !nameDirty || !league.id) return;
+    setConfirmOpen(true);
+  };
+
   const onSaveName = async () => {
-    if (!myTeamId || !name.trim() || !league.id) return;
+    if (!myTeamId || !nameDirty || !league.id) return;
     await renameTeam({
       variables: {
         teamId: myTeamId,
         leagueId: league.id,
-        newName: name.trim(),
+        newName: trimmedName,
       },
     });
+    setConfirmOpen(false);
     setSavedFlash('name');
     setTimeout(() => setSavedFlash(null), 1500);
   };
@@ -135,6 +146,12 @@ export const TeamTab: React.FC<TeamTabProps> = ({
               className="ls-input text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  requestRename();
+                }
+              }}
               placeholder="Enter a memorable name"
               maxLength={40}
             />
@@ -145,10 +162,8 @@ export const TeamTab: React.FC<TeamTabProps> = ({
           <button
             type="button"
             className={`ls-btn ${savedFlash === 'name' ? 'ls-btn-gold' : 'ls-btn-primary'}`}
-            onClick={() => {
-              void onSaveName();
-            }}
-            disabled={Boolean(renaming || !name.trim())}
+            onClick={requestRename}
+            disabled={Boolean(renaming || !nameDirty)}
           >
             {savedFlash === 'name' ? (
               <>
@@ -268,6 +283,85 @@ export const TeamTab: React.FC<TeamTabProps> = ({
           )}
         </button>
       </Section>
+      {confirmOpen && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="rename-team-title"
+          aria-describedby="rename-team-description"
+          data-testid="rename-team-confirm"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !renaming)
+              setConfirmOpen(false);
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--bg1, #14202c)',
+              border: '1px solid var(--fg5, #2a3a4c)',
+              borderRadius: 12,
+              padding: 24,
+              maxWidth: 480,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            <div
+              id="rename-team-title"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 22,
+                fontWeight: 700,
+                color: 'var(--fg1-strong, #fff)',
+              }}
+            >
+              Rename team?
+            </div>
+            <div
+              id="rename-team-description"
+              style={{ color: 'var(--fg2)', lineHeight: 1.5 }}
+            >
+              Rename <strong>{currentTeamName || 'this team'}</strong> to{' '}
+              <strong>{trimmedName}</strong>?
+            </div>
+            <div
+              style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}
+            >
+              <button
+                type="button"
+                className="ls-btn ls-btn-ghost"
+                onClick={() => setConfirmOpen(false)}
+                disabled={renaming}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ls-btn ls-btn-primary"
+                onClick={() => {
+                  void onSaveName();
+                }}
+                disabled={renaming}
+              >
+                {renaming ? 'Renaming…' : 'Rename'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
