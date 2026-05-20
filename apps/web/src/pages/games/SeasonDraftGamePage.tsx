@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { SeasonDraftGame } from '@legacy-sports/shared-components/season-draft';
+import { Text, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 
 /**
@@ -17,8 +18,20 @@ export const SeasonDraftGamePage: React.FC = () => {
 
   const numericGameId = gameId ? parseInt(gameId, 10) : NaN;
 
-  if (!user || isNaN(numericGameId)) {
-    return null;
+  if (isNaN(numericGameId)) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
+        <Text color="$brandSeamRedLight">Invalid game link.</Text>
+      </YStack>
+    );
+  }
+
+  if (!user) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
+        <Text>Please sign in to view this Season Draft Game.</Text>
+      </YStack>
+    );
   }
 
   return (
