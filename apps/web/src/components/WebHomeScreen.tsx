@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -14,6 +14,12 @@ import { LOGGER } from '@legacy-sports/logging';
 
 export function WebHomeScreen(): React.JSX.Element {
   const navigate = useNavigate();
+  const [footballNotifyRequested, setFootballNotifyRequested] = useState(false);
+
+  const handleFootballNotify = () => {
+    LOGGER.info('Football notify requested from home screen');
+    setFootballNotifyRequested(true);
+  };
 
   const handleSportPress = (sportKey: string) => {
     // Map sport keys to routes
@@ -125,8 +131,18 @@ export function WebHomeScreen(): React.JSX.Element {
                     🏈
                   </span>
                 </Paragraph>
-                <Button variant="secondary" size="$4" disabled width="100%">
-                  Coming Soon
+                <Button
+                  variant="secondary"
+                  size="$4"
+                  width="100%"
+                  disabled={footballNotifyRequested}
+                  onPress={
+                    footballNotifyRequested ? undefined : handleFootballNotify
+                  }
+                >
+                  {footballNotifyRequested
+                    ? "Thanks! We'll notify you"
+                    : 'Notify Me When Available'}
                 </Button>
               </YStack>
             </Card>
