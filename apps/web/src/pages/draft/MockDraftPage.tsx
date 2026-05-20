@@ -1,5 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Text } from 'tamagui';
+import {
+  Button,
+  H1,
+  Paragraph,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components/ui';
 import { useInitializeMockDraftMutation } from '../../api/db/graphql.generated';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useIsPremium } from '../../hooks/useIsPremium';
@@ -7,16 +15,12 @@ import { PageMeta } from '../../components/PageMeta';
 import {
   BLACK,
   BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
   EMERALD,
   GRADIENT_BOARD_BG,
   OVERLAY_WHITE_10,
-  SLATE_300,
-  SLATE_400,
-  SLATE_500,
   SURFACE_CARD,
-  TEXT_PRIMARY,
   withAlpha,
 } from '../../constants/colors';
 
@@ -46,37 +50,89 @@ const PLAYER_POOL_OPTIONS: {
   { label: 'AL Only', value: 'al' },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Field section wrapper ───────────────────────────────────────────────────
 
-function renderOptionButtons<T extends string>(
-  options: { label: string; value: T }[],
-  selectedValue: T,
-  onSelect: (value: T) => void,
-): React.ReactNode {
-  return options.map((opt) => (
-    <button
-      key={opt.value}
-      aria-pressed={selectedValue === opt.value}
-      onClick={() => onSelect(opt.value)}
-      style={{
-        padding: '10px 20px',
-        borderRadius: '10px',
-        border: `2px solid ${selectedValue === opt.value ? BRAND_GOLD : OVERLAY_WHITE_10}`,
-        background:
-          selectedValue === opt.value
-            ? withAlpha(BRAND_GOLD, 0.15)
-            : 'transparent',
-        color: selectedValue === opt.value ? TEXT_PRIMARY : SLATE_400,
-        fontSize: '15px',
-        fontWeight: selectedValue === opt.value ? '700' : '400',
-        cursor: 'pointer',
-        transition:
-          'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
-      }}
+interface FieldSectionProps {
+  label: string;
+  labelId: string;
+  children: React.ReactNode;
+  helper?: React.ReactNode;
+}
+
+function FieldSection({
+  label,
+  labelId,
+  children,
+  helper,
+}: FieldSectionProps): React.JSX.Element {
+  return (
+    <YStack
+      tag="section"
+      aria-labelledby={labelId}
+      gap="$2.5"
+      marginBottom="$5"
     >
-      {opt.label}
-    </button>
-  ));
+      <Text
+        id={labelId}
+        fontFamily="$display"
+        fontSize={13}
+        fontWeight="600"
+        color="$gray11"
+        textTransform="uppercase"
+        letterSpacing={1}
+      >
+        {label}
+      </Text>
+      {children}
+      {helper}
+    </YStack>
+  );
+}
+
+// ─── Option button (centered, design-system styling) ─────────────────────────
+
+interface OptionButtonProps {
+  label: string;
+  selected: boolean;
+  accent: string;
+  onPress: () => void;
+  width?: number;
+}
+
+function OptionButton({
+  label,
+  selected,
+  accent,
+  onPress,
+  width,
+}: OptionButtonProps): React.JSX.Element {
+  return (
+    <Button
+      size="$3"
+      variant={selected ? 'primary' : 'outlined'}
+      onPress={onPress}
+      minWidth={width ?? 56}
+      width={width}
+      backgroundColor={selected ? withAlpha(accent, 0.18) : '$color2'}
+      borderColor={selected ? accent : '$borderColor'}
+      borderWidth={selected ? 2 : 1}
+      hoverStyle={{
+        backgroundColor: selected ? withAlpha(accent, 0.28) : '$color3',
+      }}
+      pressStyle={{ scale: 0.96 }}
+      aria-pressed={selected}
+    >
+      <Text
+        fontFamily="$body"
+        fontSize={15}
+        fontWeight={selected ? '700' : '500'}
+        color={selected ? '$color' : '$gray11'}
+        style={{ fontVariantNumeric: 'tabular-nums' }}
+      >
+        {label}
+      </Text>
+    </Button>
+  );
 }
 
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
@@ -106,381 +162,243 @@ function SetupScreen({
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: GRADIENT_BOARD_BG,
-        color: TEXT_PRIMARY,
-        fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-      }}
+    <YStack
+      minHeight="100vh"
+      alignItems="center"
+      justifyContent="center"
+      padding="$5"
+      style={{ background: GRADIENT_BOARD_BG }}
     >
-      <div style={{ maxWidth: '560px', width: '100%' }}>
+      <YStack width="100%" maxWidth={560}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: withAlpha(BRAND_SEAM_RED, 0.15),
-              border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.3)}`,
-              borderRadius: '20px',
-              padding: '6px 16px',
-              marginBottom: '20px',
-              fontSize: '12px',
-              color: BRAND_SEAM_RED,
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-            }}
+        <YStack alignItems="center" gap="$3" marginBottom="$7">
+          <XStack
+            alignItems="center"
+            gap="$2"
+            paddingHorizontal="$3"
+            paddingVertical="$1.5"
+            borderRadius={9999}
+            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
+            borderWidth={1}
+            borderColor={withAlpha(BRAND_SEAM_RED, 0.3)}
           >
-            <span role="img" aria-label="Baseball">
+            <span role="img" aria-label="Baseball" style={{ fontSize: 14 }}>
               ⚾
-            </span>{' '}
-            Practice Mode
-          </div>
-          <h1
-            style={{
-              margin: '0 0 12px 0',
-              fontSize: '36px',
-              fontWeight: '800',
-              color: BRAND_GOLD,
-            }}
+            </span>
+            <Text
+              fontFamily="$display"
+              fontSize={12}
+              fontWeight="700"
+              color={BRAND_SEAM_RED}
+              textTransform="uppercase"
+              letterSpacing={1.5}
+            >
+              Practice Mode
+            </Text>
+          </XStack>
+          <H1
+            fontFamily="$display"
+            fontSize={40}
+            fontWeight="800"
+            color={BRAND_GOLD}
+            letterSpacing={-0.5}
+            textAlign="center"
+            margin={0}
           >
             Mock Draft Simulator
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              color: SLATE_400,
-              fontSize: '16px',
-              lineHeight: 1.5,
-            }}
+          </H1>
+          <Paragraph
+            fontFamily="$body"
+            fontSize={16}
+            color="$gray11"
+            textAlign="center"
+            margin={0}
+            maxWidth={460}
           >
             Practice your draft strategy against AI opponents without affecting
             any real league.
-          </p>
-        </div>
+          </Paragraph>
+        </YStack>
 
         {/* Settings Card */}
-        <div
-          style={{
-            background: SURFACE_CARD,
-            borderRadius: '20px',
-            padding: '32px',
-            border: `1px solid ${OVERLAY_WHITE_10}`,
-            boxShadow: `0 16px 64px ${withAlpha(BLACK, 0.4)}`,
-          }}
+        <YStack
+          backgroundColor={SURFACE_CARD}
+          borderRadius="$6"
+          padding="$6"
+          borderWidth={1}
+          borderColor={OVERLAY_WHITE_10}
+          style={{ boxShadow: `0 16px 64px ${withAlpha(BLACK, 0.4)}` }}
         >
-          {/* Teams */}
-          <section
-            aria-labelledby="teams-label"
-            style={{ marginBottom: '28px' }}
-          >
-            <label
-              id="teams-label"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '600',
-                color: SLATE_300,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: '12px',
-              }}
-            >
-              Number of Teams
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Number of Teams */}
+          <FieldSection label="Number of Teams" labelId="teams-label">
+            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
               {[4, 6, 8, 10, 12].map((n) => (
-                <button
+                <OptionButton
                   key={n}
-                  aria-pressed={numTeams === n}
-                  onClick={() => {
+                  label={String(n)}
+                  selected={numTeams === n}
+                  accent={BRAND_SEAM_RED}
+                  onPress={() => {
                     setNumTeams(n);
                     if (userPickPosition > n) setUserPickPosition(n);
                   }}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '10px',
-                    border: `2px solid ${numTeams === n ? BRAND_SEAM_RED : OVERLAY_WHITE_10}`,
-                    background:
-                      numTeams === n
-                        ? withAlpha(BRAND_SEAM_RED, 0.15)
-                        : 'transparent',
-                    color: numTeams === n ? TEXT_PRIMARY : SLATE_400,
-                    fontSize: '15px',
-                    fontWeight: numTeams === n ? '700' : '400',
-                    cursor: 'pointer',
-                    transition:
-                      'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
-                  }}
-                >
-                  {n}
-                </button>
+                />
               ))}
-            </div>
-          </section>
+            </XStack>
+          </FieldSection>
 
           {/* Rounds / Roster Size */}
-          <section
-            aria-labelledby="roster-label"
-            style={{ marginBottom: '28px' }}
-          >
-            <label
-              id="roster-label"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '600',
-                color: SLATE_300,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: '12px',
-              }}
-            >
-              Rounds (Roster Size)
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <FieldSection label="Rounds (Roster Size)" labelId="roster-label">
+            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
               {[5, 8, 10, 15].map((n) => (
-                <button
+                <OptionButton
                   key={n}
-                  aria-pressed={rosterSize === n}
-                  onClick={() => setRosterSize(n)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '10px',
-                    border: `2px solid ${rosterSize === n ? EMERALD : OVERLAY_WHITE_10}`,
-                    background:
-                      rosterSize === n
-                        ? withAlpha(EMERALD, 0.15)
-                        : 'transparent',
-                    color: rosterSize === n ? TEXT_PRIMARY : SLATE_400,
-                    fontSize: '15px',
-                    fontWeight: rosterSize === n ? '700' : '400',
-                    cursor: 'pointer',
-                    transition:
-                      'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
-                  }}
-                >
-                  {n}
-                </button>
+                  label={String(n)}
+                  selected={rosterSize === n}
+                  accent={EMERALD}
+                  onPress={() => setRosterSize(n)}
+                />
               ))}
-            </div>
-          </section>
+            </XStack>
+          </FieldSection>
 
           {/* Draft Position */}
-          <section
-            aria-labelledby="pick-label"
-            style={{ marginBottom: '36px' }}
+          <FieldSection
+            label="Your Draft Position"
+            labelId="pick-label"
+            helper={
+              <Paragraph
+                fontFamily="$body"
+                fontSize={12}
+                color="$gray10"
+                textAlign="center"
+                margin={0}
+              >
+                {draftOrder === 'snake' ? 'Snake' : 'Linear'} draft — you pick{' '}
+                {draftOrder === 'snake'
+                  ? userPickPosition === 1
+                    ? 'first every odd round'
+                    : userPickPosition === numTeams
+                      ? 'first every even round'
+                      : `at position ${userPickPosition}`
+                  : `at position ${userPickPosition} every round`}
+              </Paragraph>
+            }
           >
-            <label
-              id="pick-label"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '600',
-                color: SLATE_300,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: '12px',
-              }}
-            >
-              Your Draft Position
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
               {Array.from({ length: numTeams }, (_, i) => i + 1).map((pos) => (
-                <button
+                <OptionButton
                   key={pos}
-                  aria-pressed={userPickPosition === pos}
-                  onClick={() => setUserPickPosition(pos)}
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '10px',
-                    border: `2px solid ${userPickPosition === pos ? BRAND_GOLD : OVERLAY_WHITE_10}`,
-                    background:
-                      userPickPosition === pos
-                        ? withAlpha(BRAND_GOLD, 0.2)
-                        : 'transparent',
-                    color:
-                      userPickPosition === pos ? BRAND_GOLD_LIGHT : SLATE_400,
-                    fontSize: '15px',
-                    fontWeight: userPickPosition === pos ? '700' : '400',
-                    cursor: 'pointer',
-                    transition:
-                      'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
-                  }}
-                >
-                  {pos}
-                </button>
+                  label={String(pos)}
+                  selected={userPickPosition === pos}
+                  accent={BRAND_GOLD}
+                  onPress={() => setUserPickPosition(pos)}
+                  width={48}
+                />
               ))}
-            </div>
-            <p
-              style={{
-                margin: '10px 0 0 0',
-                fontSize: '12px',
-                color: SLATE_500,
-              }}
-            >
-              {draftOrder === 'snake' ? 'Snake' : 'Linear'} draft — you pick{' '}
-              {draftOrder === 'snake'
-                ? userPickPosition === 1
-                  ? 'first every odd round'
-                  : userPickPosition === numTeams
-                    ? 'first every even round'
-                    : `at position ${userPickPosition}`
-                : `at position ${userPickPosition} every round`}
-            </p>
-          </section>
+            </XStack>
+          </FieldSection>
 
           {/* Draft Order */}
-          <section
-            aria-labelledby="draft-order-label"
-            style={{ marginBottom: '28px' }}
-          >
-            <label
-              id="draft-order-label"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '600',
-                color: SLATE_300,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: '12px',
-              }}
-            >
-              Draft Order
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {renderOptionButtons(
-                DRAFT_ORDER_OPTIONS,
-                draftOrder,
-                setDraftOrder,
-              )}
-            </div>
-          </section>
+          <FieldSection label="Draft Order" labelId="draft-order-label">
+            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+              {DRAFT_ORDER_OPTIONS.map((opt) => (
+                <OptionButton
+                  key={opt.value}
+                  label={opt.label}
+                  selected={draftOrder === opt.value}
+                  accent={BRAND_GOLD}
+                  onPress={() => setDraftOrder(opt.value)}
+                />
+              ))}
+            </XStack>
+          </FieldSection>
 
           {/* Player Pool */}
-          <section
-            aria-labelledby="player-pool-label"
-            style={{ marginBottom: '36px' }}
-          >
-            <label
-              id="player-pool-label"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '600',
-                color: SLATE_300,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: '12px',
-              }}
+          <FieldSection label="Player Pool" labelId="player-pool-label">
+            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+              {PLAYER_POOL_OPTIONS.map((opt) => (
+                <OptionButton
+                  key={opt.value}
+                  label={opt.label}
+                  selected={playerPool === opt.value}
+                  accent={BRAND_GOLD}
+                  onPress={() => setPlayerPool(opt.value)}
+                />
+              ))}
+            </XStack>
+          </FieldSection>
+
+          {/* Error */}
+          {error && (
+            <YStack
+              backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
+              borderWidth={1}
+              borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
+              borderRadius="$3"
+              paddingHorizontal="$3"
+              paddingVertical="$2"
+              marginBottom="$3"
             >
-              Player Pool
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {renderOptionButtons(
-                PLAYER_POOL_OPTIONS,
-                playerPool,
-                setPlayerPool,
-              )}
-            </div>
-          </section>
+              <Text fontFamily="$body" fontSize={13} color={BRAND_SEAM_RED}>
+                {error}
+              </Text>
+            </YStack>
+          )}
 
           {/* Actions */}
-          {error && (
-            <div
-              style={{
-                background: withAlpha(BRAND_SEAM_RED, 0.15),
-                border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.4)}`,
-                borderRadius: 8,
-                padding: '10px 14px',
-                color: BRAND_SEAM_RED,
-                fontSize: 13,
-                marginBottom: 12,
-              }}
-            >
-              {error}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={handleStart}
+          <XStack gap="$3" marginTop="$2">
+            <Button
+              size="$5"
+              variant="primary"
+              onPress={handleStart}
               disabled={loading}
-              style={{
-                flex: 1,
-                padding: '16px',
-                borderRadius: '12px',
-                border: 'none',
-                background: BRAND_SEAM_RED,
-                color: TEXT_PRIMARY,
-                fontSize: '17px',
-                fontWeight: '700',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1,
-                transition: 'transform 0.1s ease',
-              }}
-              onMouseOver={(e) => {
-                if (!loading)
-                  (e.currentTarget as HTMLButtonElement).style.transform =
-                    'translateY(-1px)';
-              }}
-              onMouseOut={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.transform = '';
-              }}
+              flex={1}
+              backgroundColor={BRAND_SEAM_RED}
+              borderColor={BRAND_SEAM_RED}
+              hoverStyle={{ backgroundColor: '#A8182F' }}
+              pressStyle={{ scale: 0.98 }}
+              opacity={loading ? 0.7 : 1}
             >
-              {loading ? (
-                '⏳ Starting…'
-              ) : (
-                <>
-                  <span role="img" aria-label="Start">
-                    🚀
-                  </span>{' '}
-                  Start Mock Draft
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => navigate('/baseball')}
-              style={{
-                padding: '16px 24px',
-                borderRadius: '12px',
-                border: `1px solid ${OVERLAY_WHITE_10}`,
-                background: 'transparent',
-                color: SLATE_400,
-                fontSize: '15px',
-                cursor: 'pointer',
-              }}
+              <Text
+                fontFamily="$display"
+                fontSize={16}
+                fontWeight="700"
+                color="$color"
+                letterSpacing={0.5}
+              >
+                {loading ? '⏳ Starting…' : '🚀 Start Mock Draft'}
+              </Text>
+            </Button>
+            <Button
+              size="$5"
+              variant="outlined"
+              onPress={() => navigate('/baseball')}
+              backgroundColor="transparent"
+              borderColor={BRAND_NAVY_LIGHT}
+              hoverStyle={{ backgroundColor: '$color3' }}
             >
-              Cancel
-            </button>
-          </div>
-        </div>
+              <Text fontFamily="$body" fontSize={15} color="$gray11">
+                Cancel
+              </Text>
+            </Button>
+          </XStack>
+        </YStack>
 
         {/* Info line */}
-        <p
-          style={{
-            textAlign: 'center',
-            fontSize: '12px',
-            color: SLATE_500,
-            marginTop: '20px',
-          }}
+        <Paragraph
+          fontFamily="$body"
+          fontSize={12}
+          color="$gray10"
+          textAlign="center"
+          marginTop="$4"
+          margin={0}
         >
           Mock drafts don't affect any real leagues • AI opponents use ADP-based
           strategy
-        </p>
-      </div>
-    </div>
+        </Paragraph>
+      </YStack>
+    </YStack>
   );
 }
 
