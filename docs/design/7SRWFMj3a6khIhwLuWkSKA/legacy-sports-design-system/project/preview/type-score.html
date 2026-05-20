@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+        color: var(--fg1);
+      }
+      .wrap {
+        display: flex;
+        gap: 28px;
+        align-items: flex-end;
+      }
+      .item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .lbl {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--fg3);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .score {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--fg1-strong);
+        line-height: 1;
+      }
+      .team {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--fg1);
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="item">
+        <span class="score" style="font-size: 64px">127.5</span
+        ><span class="lbl">Score / 64</span>
+      </div>
+      <div class="item">
+        <span class="score" style="font-size: 36px">8-4</span
+        ><span class="lbl">Record / 36</span>
+      </div>
+      <div class="item">
+        <span class="team" style="font-size: 22px">NYY</span
+        ><span class="lbl">Team Abbr</span>
+      </div>
+      <div class="item">
+        <span class="mono" style="font-size: 16px; color: var(--fg2)"
+          >.327 · 42 HR</span
+        ><span class="lbl">Mono Stats</span>
+      </div>
+    </div>
+  </body>
+</html>

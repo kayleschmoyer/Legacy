@@ -1,0 +1,1714 @@
+/* Players page — editorial player browser, sport-aware
+   --------------------------------------------------
+   Builds on ds/colors_and_type.css + ds/ui_kits.css.
+   Adds:
+   - Football theme tokens & position colors (.sport-football)
+   - Sport switcher chip group inside the nav (.ls-sportswitch)
+   - Viewport-preview bar above the nav (.pp-vpbar)
+   - Container-query responsive layout (.pp-viewport-frame is the container)
+*/
+
+/* ── Extra tokens beyond the design system ──────── */
+:root {
+  /* Football position colors — mirror the baseball palette
+     (amber playmaker, dirt ground game, turf downfield, gold versatility,
+      steel defense, sky special teams). Per DS guide: "swap navy → green
+      and seam-red → amber" for football artifacts. */
+  --pos-qb: #d9a140; /* amber — the playmaker (mirror of pitcher) */
+  --pos-rb: #8b6f47; /* dirt brown — ground game */
+  --pos-wr: #2d6a4f; /* turf green — downfield */
+  --pos-te: #c5a55a; /* aged gold — versatility */
+  --pos-def: #7c8794; /* steel — defensive line */
+  --pos-k: #6b83ad; /* muted sky — special teams */
+}
+
+/* ── Viewport-preview bar (design tool) ─────────── */
+.pp-vpbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 12, 20, 0.92),
+    rgba(10, 15, 26, 0.82)
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px dashed rgba(197, 165, 90, 0.22);
+}
+.pp-vpbar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 24px;
+}
+.pp-vpbar-titleblock {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.pp-vpbar-eyebrow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-gold-light);
+}
+.pp-vpbar-title {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--fg2);
+  line-height: 1;
+}
+.pp-vpbar-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(197, 165, 90, 0.18);
+  padding: 4px;
+  border-radius: 9999px;
+}
+.pp-vpbar-btn {
+  background: transparent;
+  border: 0;
+  color: var(--fg3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding: 7px 12px 5px;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  min-width: 72px;
+  transition: all 150ms var(--ease-standard);
+}
+.pp-vpbar-btn:hover:not(.on) {
+  color: var(--fg1);
+}
+.pp-vpbar-btn.on {
+  background: var(--brand-navy);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(197, 165, 90, 0.45);
+}
+.pp-vpbar-name {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pp-vpbar-w {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 9px;
+  color: var(--fg4);
+  letter-spacing: 0;
+  margin-top: 1px;
+}
+.pp-vpbar-btn.on .pp-vpbar-w {
+  color: var(--brand-gold-light);
+}
+
+/* Backdrop area surrounding a constrained viewport */
+.pp-frame-rail {
+  min-height: calc(100vh - 50px);
+  padding: 20px 0 80px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(27, 58, 92, 0.1), transparent 50%),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 14px,
+      rgba(255, 255, 255, 0.012) 14px 15px
+    );
+}
+
+/* ── Viewport frame ─────────────────────────────── */
+.pp-viewport-frame {
+  /* Container queries respond to this element's inline-size, regardless
+     of the browser viewport. Choose width via JS to preview breakpoints.
+     NOTE: don't transition `width` — CSS can't animate auto↔length; the
+     value gets stuck at the source. Animate the box-shadow flash instead. */
+  container: vp / inline-size;
+  margin: 0 auto;
+  position: relative;
+  background: var(--bg);
+}
+.pp-viewport-frame.vp-fixed {
+  animation: vp-snap 240ms var(--ease-standard);
+}
+@keyframes vp-snap {
+  0% {
+    box-shadow:
+      0 0 0 8px rgba(0, 0, 0, 0.35),
+      0 0 0 0 rgba(197, 165, 90, 0.45),
+      var(--shadow-xl);
+  }
+  40% {
+    box-shadow:
+      0 0 0 8px rgba(0, 0, 0, 0.35),
+      0 0 0 6px rgba(197, 165, 90, 0.35),
+      var(--shadow-xl);
+  }
+  100% {
+    box-shadow:
+      0 0 0 8px rgba(0, 0, 0, 0.35),
+      0 0 0 0 rgba(197, 165, 90, 0),
+      var(--shadow-xl);
+  }
+}
+.pp-viewport-frame.vp-fixed {
+  border: 1px solid rgba(197, 165, 90, 0.22);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 8px rgba(0, 0, 0, 0.35),
+    var(--shadow-xl);
+}
+.pp-viewport-frame.vp-fluid {
+  /* No frame chrome — feels like a normal page */
+  background: transparent;
+}
+/* When fixed, nav sticks below the viewport bar */
+.pp-viewport-frame.vp-fixed .ls-nav {
+  position: relative;
+  top: auto;
+}
+.pp-viewport-frame.vp-fluid .ls-nav {
+  top: 50px;
+}
+
+/* ── Sport switcher (in nav, real product UI) ───── */
+.ls-sportswitch {
+  display: inline-flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--outline-subtle);
+  border-radius: 9999px;
+  padding: 3px;
+}
+.ls-sportswitch-btn {
+  background: transparent;
+  border: 0;
+  color: var(--fg3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 12px 6px 9px;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 150ms var(--ease-standard);
+  white-space: nowrap;
+}
+.ls-sportswitch-btn img {
+  opacity: 0.65;
+  transition:
+    opacity 150ms,
+    filter 150ms;
+}
+.ls-sportswitch-btn:hover:not(.on) {
+  color: var(--fg1);
+}
+.ls-sportswitch-btn:hover:not(.on) img {
+  opacity: 1;
+}
+.ls-sportswitch-btn.on {
+  background: var(--brand-navy);
+  color: var(--fg1-strong);
+}
+.ls-sportswitch-btn.on img {
+  opacity: 1;
+  filter: brightness(1.4) saturate(1.1);
+}
+.ls-sportswitch-btn.sw-football.on {
+  background: linear-gradient(135deg, #1f4a38, #2d6a4f);
+}
+
+/* ── Page shell ─────────────────────────────────── */
+.pp-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+.pp-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.pp-head h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 56px;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--fg1-strong);
+  margin: 6px 0 0;
+}
+.pp-head .ls-eyebrow {
+  color: var(--brand-gold-light);
+}
+.pp-head-meta {
+  font-family: var(--font-body);
+  color: var(--fg3);
+  font-size: 14px;
+  max-width: 56ch;
+  margin-top: 10px;
+  line-height: 1.55;
+}
+
+.pp-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-count {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+.pp-count strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--brand-gold-light);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+/* ── Mock-state switcher (design tool only) ─────── */
+.pp-stateswitch {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(197, 165, 90, 0.25);
+  border-radius: 9999px;
+  align-self: flex-start;
+  width: fit-content;
+  flex-wrap: wrap;
+}
+.pp-stateswitch button {
+  background: transparent;
+  border: 0;
+  color: var(--fg3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 150ms var(--ease-standard);
+}
+.pp-stateswitch button.on {
+  background: var(--brand-navy);
+  color: #fff;
+}
+.pp-stateswitch button:hover:not(.on) {
+  color: var(--fg1);
+}
+.pp-stateswitch-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand-gold-light);
+  padding: 0 10px;
+  align-self: center;
+}
+
+/* ── Featured strip ─────────────────────────────── */
+.pp-featured {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      110deg,
+      rgba(196, 30, 58, 0.18) 0%,
+      rgba(27, 58, 92, 0.45) 38%,
+      rgba(10, 15, 26, 0.95) 78%
+    ),
+    var(--surface-card);
+  border: 1px solid rgba(197, 165, 90, 0.28);
+  border-radius: var(--radius-7);
+  padding: 28px 32px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 32px;
+  box-shadow: var(--shadow-md);
+}
+.pp-featured::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle at 12% 50%,
+    rgba(197, 165, 90, 0.1),
+    transparent 40%
+  );
+  pointer-events: none;
+}
+/* Football re-skin: amber + turf instead of seam-red + navy */
+.sport-football .pp-featured {
+  background:
+    linear-gradient(
+      110deg,
+      rgba(217, 161, 64, 0.2) 0%,
+      rgba(31, 74, 56, 0.55) 38%,
+      rgba(10, 15, 26, 0.95) 80%
+    ),
+    var(--surface-card);
+  border-color: rgba(217, 161, 64, 0.35);
+}
+.sport-football .pp-featured::before {
+  background-image: radial-gradient(
+    circle at 12% 50%,
+    rgba(217, 161, 64, 0.12),
+    transparent 42%
+  );
+}
+
+.pp-featured-mug {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--grad-avatar);
+  border: 2px solid rgba(197, 165, 90, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 32px;
+  color: #fff;
+  letter-spacing: 0.02em;
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+.sport-football .pp-featured-mug {
+  border-color: rgba(217, 161, 64, 0.55);
+}
+
+.pp-featured-body {
+  min-width: 0;
+  position: relative;
+}
+.pp-featured-eyebrow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-gold-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-featured-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--fg1-strong);
+  margin: 6px 0 8px;
+}
+.pp-featured-meta {
+  font-family: var(--font-body);
+  color: var(--fg2);
+  font-size: 14px;
+}
+.pp-featured-meta em {
+  color: var(--fg3);
+  font-style: italic;
+}
+.pp-featured-stats {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 28px;
+  padding-left: 24px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+.pp-fstat-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+.pp-fstat-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  color: var(--fg1-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-top: 4px;
+}
+.pp-fstat-value.gold {
+  color: var(--brand-gold-light);
+}
+
+/* ── Filter rail ────────────────────────────────── */
+.pp-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.pp-search {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pp-search-box {
+  flex: 1 1 320px;
+  min-width: 220px;
+  position: relative;
+}
+.pp-search-box input {
+  width: 100%;
+  padding: 14px 16px 14px 44px;
+  background: var(--surface-panel);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-2);
+  color: var(--fg1);
+  font-family: var(--font-body);
+  font-size: 15px;
+  transition: all 150ms var(--ease-standard);
+}
+.pp-search-box input:focus {
+  outline: 0;
+  border-color: var(--brand-gold);
+  box-shadow: 0 0 0 3px rgba(197, 165, 90, 0.18);
+}
+.pp-search-box input::placeholder {
+  color: var(--fg4);
+  font-style: italic;
+}
+.pp-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg4);
+  pointer-events: none;
+}
+
+.pp-sort {
+  background: var(--surface-panel);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-2);
+  color: var(--fg1);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 36px 12px 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CAAC5' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.pp-view {
+  display: inline-flex;
+  background: var(--surface-panel);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-2);
+  padding: 4px;
+  gap: 2px;
+}
+.pp-view button {
+  background: transparent;
+  border: 0;
+  color: var(--fg3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 120ms var(--ease-standard);
+}
+.pp-view button.on {
+  background: var(--brand-navy);
+  color: #fff;
+}
+.pp-view button:hover:not(.on) {
+  color: var(--fg1);
+}
+
+.pp-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+}
+.pp-rail-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pp-rail-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg4);
+  margin-right: 4px;
+}
+.pp-pill {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 13px;
+  border-radius: 9999px;
+  background: transparent;
+  border: 1px solid var(--outline-subtle);
+  color: var(--fg3);
+  cursor: pointer;
+  transition: all 120ms var(--ease-standard);
+}
+.pp-pill:hover {
+  color: var(--fg1);
+  border-color: var(--outline-default);
+}
+.pp-pill.on {
+  background: rgba(27, 58, 92, 0.55);
+  border-color: rgba(197, 165, 90, 0.45);
+  color: var(--fg1);
+}
+.sport-football .pp-pill.on {
+  background: rgba(31, 74, 56, 0.55);
+  border-color: rgba(217, 161, 64, 0.45);
+}
+.pp-pill .pp-pill-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.pp-rail-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--outline-subtle);
+}
+
+/* ── Active filter summary ─────────────────────── */
+.pp-active {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 0 0;
+}
+.pp-active-label {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--fg3);
+}
+.pp-tag {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 8px 4px 10px;
+  background: rgba(197, 165, 90, 0.1);
+  border: 1px solid rgba(197, 165, 90, 0.25);
+  border-radius: 9999px;
+  color: var(--brand-gold-light);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pp-tag button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+  opacity: 0.7;
+}
+.pp-tag button:hover {
+  opacity: 1;
+}
+.pp-clear {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--fg3);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.pp-clear:hover {
+  color: var(--brand-gold-light);
+}
+
+/* ── Result body wrappers ─────────────────────── */
+.pp-results {
+  margin-top: 8px;
+}
+.pp-section-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 18px 0 12px;
+  border-bottom: 1px solid var(--outline-subtle);
+  margin-bottom: 18px;
+}
+.pp-section-bar h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.005em;
+  color: var(--fg1);
+  margin: 0;
+}
+.pp-section-bar .pp-section-meta {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--fg3);
+  font-size: 13px;
+}
+
+/* ── Card view ────────────────────────────────── */
+.pp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.pp-card {
+  position: relative;
+  background: var(--surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-5);
+  padding: 18px 18px 16px 22px;
+  cursor: pointer;
+  transition: all 200ms var(--ease-standard);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.pp-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--outline-subtle);
+}
+/* Baseball position accents */
+.pp-card.pos-pitcher::before {
+  background: var(--pos-pitcher);
+}
+.pp-card.pos-catcher::before {
+  background: var(--pos-catcher);
+}
+.pp-card.pos-infield::before {
+  background: var(--pos-infield);
+}
+.pp-card.pos-outfield::before {
+  background: var(--pos-outfield);
+}
+.pp-card.pos-utility::before {
+  background: var(--pos-utility);
+}
+/* Football position accents */
+.pp-card.pos-quarterback::before {
+  background: var(--pos-qb);
+}
+.pp-card.pos-runningback::before {
+  background: var(--pos-rb);
+}
+.pp-card.pos-receiver::before {
+  background: var(--pos-wr);
+}
+.pp-card.pos-tightend::before {
+  background: var(--pos-te);
+}
+.pp-card.pos-defense::before {
+  background: var(--pos-def);
+}
+.pp-card.pos-kicker::before {
+  background: var(--pos-k);
+}
+
+.pp-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.pp-card-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.pp-card-mug {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--grad-avatar);
+  border: 1px solid rgba(197, 165, 90, 0.35);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+.pp-card-mug.red {
+  background: linear-gradient(135deg, #8b1a2b, #c41e3a);
+}
+.pp-card-mug.green {
+  background: linear-gradient(135deg, #1f4a38, #2d6a4f);
+}
+.pp-card-mug.gold {
+  background: linear-gradient(135deg, #8b6f47, #c5a55a);
+}
+.pp-card-mug.steel {
+  background: linear-gradient(135deg, #4a555f, #7c8794);
+}
+.pp-card-mug.dirt {
+  background: linear-gradient(135deg, #5a4530, #8b6f47);
+}
+.pp-card-mug.amber {
+  background: linear-gradient(135deg, #8b5a14, #d9a140);
+}
+.pp-card-mug.kicker {
+  background: linear-gradient(135deg, #3a4a6b, #6b83ad);
+}
+
+.pp-card-id {
+  min-width: 0;
+  flex: 1;
+}
+.pp-card-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--fg1-strong);
+  letter-spacing: -0.005em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-card-sub {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--fg3);
+  margin-top: 2px;
+}
+
+.pp-pchip {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: #fff;
+  flex-shrink: 0;
+}
+/* Baseball */
+.pp-pchip.p {
+  background: var(--pos-pitcher);
+}
+.pp-pchip.c {
+  background: var(--pos-catcher);
+}
+.pp-pchip.if {
+  background: var(--pos-infield);
+}
+.pp-pchip.of {
+  background: var(--pos-outfield);
+}
+.pp-pchip.dh,
+.pp-pchip.ut {
+  background: var(--pos-utility);
+  color: #111;
+}
+/* Football */
+.pp-pchip.qb {
+  background: var(--pos-qb);
+  color: #1a1209;
+}
+.pp-pchip.rb {
+  background: var(--pos-rb);
+}
+.pp-pchip.wr {
+  background: var(--pos-wr);
+}
+.pp-pchip.te {
+  background: var(--pos-te);
+  color: #1a1209;
+}
+.pp-pchip.def {
+  background: var(--pos-def);
+}
+.pp-pchip.k {
+  background: var(--pos-k);
+}
+
+.pp-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 10px 4px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius-2);
+}
+.pp-stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.pp-stat-cell + .pp-stat-cell {
+  border-left: 1px solid var(--outline-subtle);
+}
+.pp-stat-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+.pp-stat-val {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--fg1-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+.pp-stat-val.gold {
+  color: var(--brand-gold-light);
+}
+
+.pp-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pp-card-team {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--fg3);
+  text-transform: uppercase;
+}
+.pp-card-team .pp-dot {
+  color: var(--fg4);
+  margin: 0 6px;
+}
+
+.pp-availability {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 9999px;
+}
+.pp-availability.free {
+  background: rgba(74, 174, 124, 0.15);
+  color: var(--success-fg);
+  border: 1px solid var(--success-border);
+}
+.pp-availability.rost {
+  background: rgba(108, 128, 186, 0.12);
+  color: var(--fg3);
+  border: 1px solid var(--outline-subtle);
+}
+.pp-availability.wait {
+  background: rgba(200, 148, 82, 0.14);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning-border);
+}
+
+.pp-card-banner {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--fg3);
+  padding-top: 10px;
+  border-top: 1px solid var(--outline-subtle);
+}
+.pp-card-banner strong {
+  color: var(--brand-gold-light);
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.pp-card-hof {
+  background: rgba(197, 165, 90, 0.15);
+  border: 1px solid rgba(197, 165, 90, 0.5);
+  color: var(--brand-gold-light);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  line-height: 1;
+}
+.pp-card-hof-inline {
+  margin-left: 8px;
+  transform: translateY(-1px);
+}
+
+/* ── List view ────────────────────────────────── */
+.pp-list {
+  display: flex;
+  flex-direction: column;
+}
+.pp-list-row {
+  display: grid;
+  grid-template-columns: 32px 36px 1fr auto auto auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0;
+  cursor: pointer;
+  position: relative;
+  transition: background 120ms var(--ease-standard);
+}
+.pp-list-row:first-child {
+  border-radius: var(--radius-5) var(--radius-5) 0 0;
+}
+.pp-list-row:last-child {
+  border-radius: 0 0 var(--radius-5) var(--radius-5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.pp-list-row:hover {
+  background: var(--surface-raised);
+}
+.pp-list-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--outline-subtle);
+}
+.pp-list-row.pos-pitcher::before {
+  background: var(--pos-pitcher);
+}
+.pp-list-row.pos-catcher::before {
+  background: var(--pos-catcher);
+}
+.pp-list-row.pos-infield::before {
+  background: var(--pos-infield);
+}
+.pp-list-row.pos-outfield::before {
+  background: var(--pos-outfield);
+}
+.pp-list-row.pos-utility::before {
+  background: var(--pos-utility);
+}
+.pp-list-row.pos-quarterback::before {
+  background: var(--pos-qb);
+}
+.pp-list-row.pos-runningback::before {
+  background: var(--pos-rb);
+}
+.pp-list-row.pos-receiver::before {
+  background: var(--pos-wr);
+}
+.pp-list-row.pos-tightend::before {
+  background: var(--pos-te);
+}
+.pp-list-row.pos-defense::before {
+  background: var(--pos-def);
+}
+.pp-list-row.pos-kicker::before {
+  background: var(--pos-k);
+}
+
+.pp-list-rank {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--fg4);
+  font-variant-numeric: tabular-nums;
+}
+.pp-list-mug {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--grad-avatar);
+  border: 1px solid rgba(197, 165, 90, 0.3);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  color: #fff;
+}
+.pp-list-mug.red {
+  background: linear-gradient(135deg, #8b1a2b, #c41e3a);
+}
+.pp-list-mug.green {
+  background: linear-gradient(135deg, #1f4a38, #2d6a4f);
+}
+.pp-list-mug.gold {
+  background: linear-gradient(135deg, #8b6f47, #c5a55a);
+}
+.pp-list-mug.steel {
+  background: linear-gradient(135deg, #4a555f, #7c8794);
+}
+.pp-list-mug.dirt {
+  background: linear-gradient(135deg, #5a4530, #8b6f47);
+}
+.pp-list-mug.amber {
+  background: linear-gradient(135deg, #8b5a14, #d9a140);
+}
+.pp-list-mug.kicker {
+  background: linear-gradient(135deg, #3a4a6b, #6b83ad);
+}
+
+.pp-list-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pp-list-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--fg1-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pp-list-meta {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--fg3);
+}
+.pp-list-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 64px;
+}
+.pp-list-stat-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+.pp-list-stat-val {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--fg1-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.pp-list-stat-val.gold {
+  color: var(--brand-gold-light);
+}
+
+/* ── Stats table view ────────────────────────── */
+.pp-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pp-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-card);
+}
+.pp-table thead th {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg3);
+  text-align: right;
+  padding: 12px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid var(--outline-subtle);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pp-table thead th.sticky-l {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--surface-card);
+  z-index: 1;
+}
+.pp-table thead th.sortable:hover {
+  color: var(--brand-gold-light);
+}
+.pp-table thead th.sorted {
+  color: var(--brand-gold-light);
+}
+.pp-table thead th .pp-arrow {
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.pp-table tbody td {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--fg1);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--outline-subtle);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pp-table tbody td.player-cell {
+  text-align: left;
+  padding-left: 18px;
+  position: sticky;
+  left: 0;
+  background: var(--surface-card);
+}
+.pp-table tbody tr:hover td {
+  background: var(--surface-raised);
+}
+.pp-table tbody tr:hover td.player-cell {
+  background: var(--surface-raised);
+}
+.pp-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.pp-table tbody td.lead {
+  color: var(--brand-gold-light);
+  font-weight: 600;
+}
+.pp-table .ppt-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--fg1-strong);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pp-table .ppt-sub {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--fg3);
+  margin-top: 1px;
+}
+.pp-table .ppt-row-id {
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-table tbody tr {
+  position: relative;
+}
+.pp-table tbody td.player-cell {
+  border-left: 1px solid var(--outline-subtle);
+}
+.pp-table tbody tr.pos-pitcher td.player-cell {
+  border-left-color: var(--pos-pitcher);
+}
+.pp-table tbody tr.pos-catcher td.player-cell {
+  border-left-color: var(--pos-catcher);
+}
+.pp-table tbody tr.pos-infield td.player-cell {
+  border-left-color: var(--pos-infield);
+}
+.pp-table tbody tr.pos-outfield td.player-cell {
+  border-left-color: var(--pos-outfield);
+}
+.pp-table tbody tr.pos-utility td.player-cell {
+  border-left-color: var(--pos-utility);
+}
+.pp-table tbody tr.pos-quarterback td.player-cell {
+  border-left-color: var(--pos-qb);
+}
+.pp-table tbody tr.pos-runningback td.player-cell {
+  border-left-color: var(--pos-rb);
+}
+.pp-table tbody tr.pos-receiver td.player-cell {
+  border-left-color: var(--pos-wr);
+}
+.pp-table tbody tr.pos-tightend td.player-cell {
+  border-left-color: var(--pos-te);
+}
+.pp-table tbody tr.pos-defense td.player-cell {
+  border-left-color: var(--pos-def);
+}
+.pp-table tbody tr.pos-kicker td.player-cell {
+  border-left-color: var(--pos-k);
+}
+
+/* ── Pagination / load more ───────────────────── */
+.pp-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--outline-subtle);
+  flex-wrap: wrap;
+}
+.pp-foot-meta {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--fg3);
+  font-size: 13px;
+}
+.pp-foot-meta strong {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 700;
+  color: var(--brand-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+.pp-loadmore {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 28px;
+  background: transparent;
+  border: 1px solid var(--outline-default);
+  color: var(--fg1);
+  border-radius: var(--radius-4);
+  cursor: pointer;
+  transition: all 150ms var(--ease-standard);
+}
+.pp-loadmore:hover {
+  border-color: rgba(197, 165, 90, 0.5);
+  color: var(--brand-gold-light);
+  transform: translateY(-1px);
+}
+
+/* ── Empty / Error / Loading states ───────────── */
+.pp-state {
+  padding: 56px 32px;
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.pp-state-mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(27, 58, 92, 0.4);
+  border: 1px solid var(--outline-subtle);
+}
+.pp-state-mark.err {
+  background: rgba(196, 30, 58, 0.1);
+  border-color: rgba(196, 30, 58, 0.45);
+}
+.pp-state h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--fg1-strong);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+.pp-state p {
+  font-family: var(--font-body);
+  color: var(--fg3);
+  max-width: 50ch;
+  line-height: 1.55;
+}
+.pp-state .pp-state-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@keyframes pp-shimmer {
+  0% {
+    background-position: -480px 0;
+  }
+  100% {
+    background-position: 480px 0;
+  }
+}
+.pp-sk {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 480px 100%;
+  animation: pp-shimmer 1.4s linear infinite;
+  border-radius: 4px;
+}
+.pp-sk-card {
+  padding: 18px 18px 16px 22px;
+  background: var(--surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 198px;
+}
+.pp-sk-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ═══════════════════════════════════════════════════
+   CONTAINER-QUERY RESPONSIVE LAYOUT
+   The .pp-viewport-frame defines container `vp`. All
+   responsive rules key off its inline-size, so the
+   viewport switcher accurately previews each breakpoint.
+   ═══════════════════════════════════════════════════ */
+
+/* Laptop and below (1024px) — nav goes tight */
+@container vp (max-width: 1100px) {
+  .ls-nav-inner {
+    padding: 12px 18px;
+    gap: 16px;
+  }
+  .ls-tabs a {
+    padding: 7px 11px;
+    font-size: 11px;
+  }
+}
+
+/* Tablet (900px) — hide nav tabs (mobile-style), tighten featured */
+@container vp (max-width: 900px) {
+  .ls-tabs {
+    display: none;
+  }
+  .ls-sportswitch-btn span {
+    display: none;
+  }
+  .ls-sportswitch-btn {
+    padding: 6px 8px;
+  }
+  .pp-page {
+    padding: 24px 16px 60px;
+  }
+  .pp-head h1 {
+    font-size: 44px;
+  }
+  .pp-featured {
+    grid-template-columns: auto 1fr;
+    padding: 22px;
+    gap: 18px;
+  }
+  .pp-featured-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, 1fr);
+    padding-left: 0;
+    padding-top: 14px;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 8px;
+  }
+  .pp-featured-name {
+    font-size: 30px;
+  }
+}
+
+/* Small tablet / large phone (700px) */
+@container vp (max-width: 700px) {
+  .pp-page {
+    padding: 20px 14px 60px;
+  }
+  .pp-head h1 {
+    font-size: 38px;
+  }
+  .pp-grid {
+    grid-template-columns: 1fr;
+  }
+  .pp-list-row {
+    grid-template-columns: 28px 32px 1fr auto auto;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .pp-list-stat.hide-sm {
+    display: none;
+  }
+  .pp-list-stat:not(.hide-sm) {
+    min-width: 50px;
+  }
+  .pp-featured {
+    grid-template-columns: 1fr;
+    padding: 20px;
+    gap: 14px;
+    text-align: left;
+  }
+  .pp-featured-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .pp-rail {
+    gap: 10px;
+  }
+  .pp-rail-divider {
+    display: none;
+  }
+  .pp-search {
+    gap: 10px;
+  }
+  .pp-sort {
+    flex: 1 1 auto;
+  }
+}
+
+/* Phone (520px) */
+@container vp (max-width: 520px) {
+  .ls-brand img {
+    height: 32px;
+  }
+  .ls-wordmark {
+    font-size: 12px;
+  }
+  .ls-wordmark span {
+    font-size: 10px;
+  }
+  .ls-nav-inner {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .ls-nav-right .ls-icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .ls-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+  }
+
+  .pp-page {
+    padding: 18px 12px 56px;
+  }
+  .pp-head h1 {
+    font-size: 32px;
+  }
+  .pp-head-meta {
+    font-size: 13px;
+  }
+  .pp-featured {
+    padding: 16px;
+  }
+  .pp-featured-mug {
+    width: 72px;
+    height: 72px;
+    font-size: 24px;
+  }
+  .pp-featured-name {
+    font-size: 26px;
+  }
+  .pp-featured-stats {
+    gap: 6px;
+  }
+  .pp-fstat-value {
+    font-size: 22px;
+  }
+
+  /* Filter rail — horizontal scroll groups */
+  .pp-rail {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .pp-rail-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -12px;
+    padding: 0 12px 4px;
+    scrollbar-width: none;
+  }
+  .pp-rail-group::-webkit-scrollbar {
+    display: none;
+  }
+  .pp-rail-label {
+    flex-shrink: 0;
+    align-self: center;
+    font-size: 9px;
+  }
+  .pp-pill {
+    flex-shrink: 0;
+    padding: 6px 11px;
+    font-size: 10px;
+  }
+
+  /* Search row stacks */
+  .pp-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pp-search-box {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .pp-sort {
+    width: 100%;
+  }
+  .pp-view {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+  .pp-view button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .pp-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .pp-section-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .pp-stateswitch {
+    overflow-x: auto;
+    max-width: 100%;
+    flex-wrap: nowrap;
+  }
+  .pp-stateswitch::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* List row: super compact at phone */
+  .pp-list-row {
+    grid-template-columns: 26px 32px 1fr auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .pp-list-name {
+    font-size: 14px;
+  }
+  .pp-list-stat-val {
+    font-size: 15px;
+  }
+
+  /* Foot */
+  .pp-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .pp-loadmore {
+    width: 100%;
+    padding: 14px;
+  }
+}
+
+/* ── Viewport bar responsive (responds to actual browser width) ── */
+@media (max-width: 720px) {
+  .pp-vpbar-inner {
+    padding: 8px 14px;
+    gap: 10px;
+  }
+  .pp-vpbar-titleblock {
+    display: none;
+  }
+  .pp-vpbar-pills {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .pp-vpbar-pills::-webkit-scrollbar {
+    display: none;
+  }
+  .pp-vpbar-btn {
+    flex-shrink: 0;
+    min-width: 64px;
+    padding: 6px 9px;
+  }
+  .pp-vpbar-name {
+    font-size: 10px;
+  }
+}

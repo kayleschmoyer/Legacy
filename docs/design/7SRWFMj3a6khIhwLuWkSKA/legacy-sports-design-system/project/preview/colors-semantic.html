@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .sw {
+        flex: 1;
+        min-width: 0;
+        border-radius: var(--radius-4);
+        padding: 14px;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid;
+      }
+      .name {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .hex {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        opacity: 0.8;
+      }
+      .swatch-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div
+        class="sw"
+        style="
+          background: rgba(34, 110, 74, 0.22);
+          border-color: rgba(34, 110, 74, 0.55);
+          color: #6fd39a;
+        "
+      >
+        <div class="name">
+          <span class="swatch-dot" style="background: #4aae7c"></span>Success
+        </div>
+        <div class="hex">#4AAE7C · turf</div>
+      </div>
+      <div
+        class="sw"
+        style="
+          background: rgba(176, 118, 38, 0.22);
+          border-color: rgba(176, 118, 38, 0.55);
+          color: #e3b870;
+        "
+      >
+        <div class="name">
+          <span class="swatch-dot" style="background: #c89452"></span>Warning
+        </div>
+        <div class="hex">#C89452 · amber</div>
+      </div>
+      <div
+        class="sw"
+        style="
+          background: rgba(176, 46, 68, 0.22);
+          border-color: rgba(176, 46, 68, 0.55);
+          color: #e07a8c;
+        "
+      >
+        <div class="name">
+          <span class="swatch-dot" style="background: #c23e54"></span>Danger
+        </div>
+        <div class="hex">#C23E54 · seam</div>
+      </div>
+      <div
+        class="sw"
+        style="
+          background: rgba(70, 110, 176, 0.22);
+          border-color: rgba(70, 110, 176, 0.55);
+          color: #8fb4e8;
+        "
+      >
+        <div class="name">
+          <span class="swatch-dot" style="background: #5b84c4"></span>Info
+        </div>
+        <div class="hex">#5B84C4 · sky</div>
+      </div>
+      <div
+        class="sw"
+        style="
+          background: rgba(78, 142, 214, 0.18);
+          border-color: #4e8ed6;
+          color: #8fb4e8;
+          box-shadow: 0 0 0 2px rgba(78, 142, 214, 0.25);
+        "
+      >
+        <div class="name">
+          <span class="swatch-dot" style="background: #4e8ed6"></span>Focus
+        </div>
+        <div class="hex">#4E8ED6 · ring</div>
+      </div>
+    </div>
+  </body>
+</html>

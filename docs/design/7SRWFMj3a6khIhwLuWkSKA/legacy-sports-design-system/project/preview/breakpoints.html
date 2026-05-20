@@ -1,0 +1,584 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Breakpoints — Legacy Sports</title>
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg1);
+        padding: 24px;
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        max-width: 1180px;
+      }
+      .header .eyebrow {
+        margin-bottom: 6px;
+      }
+      .header h3 {
+        margin-bottom: 4px;
+      }
+      .header .caption {
+        max-width: 760px;
+      }
+
+      /* ── Range bar ───────────────────────────────────────────── */
+      .ruler {
+        position: relative;
+        height: 76px;
+        background: var(--surface-subtle);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-5);
+        padding: 8px 12px 0;
+        overflow: hidden;
+      }
+      .ruler::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 22px;
+        height: 1px;
+        background: var(--outline-default);
+      }
+      .tick {
+        position: absolute;
+        bottom: 6px;
+        transform: translateX(-50%);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--fg4);
+        letter-spacing: 0.04em;
+      }
+      .tick::before {
+        content: '';
+        display: block;
+        width: 1px;
+        height: 8px;
+        background: var(--outline-default);
+        margin: 0 auto 3px;
+      }
+      .band {
+        position: absolute;
+        top: 10px;
+        bottom: 28px;
+        border-radius: var(--radius-2);
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0 10px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg1-strong);
+        border: 1px solid var(--outline-default);
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      /* ── Token table ─────────────────────────────────────────── */
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface-card);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-5);
+        overflow: hidden;
+        font-size: 13px;
+      }
+      .table thead th {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        text-align: left;
+        padding: 12px 16px;
+        background: var(--surface-panel);
+        border-bottom: 1px solid var(--outline-subtle);
+      }
+      .table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--outline-subtle);
+        vertical-align: middle;
+        color: var(--fg2);
+      }
+      .table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .swatch {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+      .token {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--fg1);
+      }
+      .range {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--fg2);
+        font-variant-numeric: tabular-nums;
+      }
+      .label-name {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--fg1);
+      }
+      .desc {
+        color: var(--fg3);
+        font-family: var(--font-body);
+        font-size: 13px;
+      }
+
+      /* ── Behavior matrix ─────────────────────────────────────── */
+      .matrix {
+        display: grid;
+        grid-template-columns: 220px repeat(7, 1fr);
+        background: var(--surface-card);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-5);
+        overflow: hidden;
+        font-size: 12px;
+      }
+      .matrix > div {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--outline-subtle);
+        border-right: 1px solid var(--outline-subtle);
+        color: var(--fg2);
+      }
+      .matrix > div:nth-child(8n) {
+        border-right: none;
+      }
+      .matrix .head {
+        background: var(--surface-panel);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg3);
+      }
+      .matrix .row-head {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--fg1);
+        background: var(--surface-panel);
+      }
+      .matrix .mono {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg2);
+      }
+
+      /* ── Mini sketches ───────────────────────────────────────── */
+      .sketches {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 12px;
+      }
+      .sketch {
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-5);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 180px;
+      }
+      .sketch .name {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--fg1-strong);
+      }
+      .sketch .name small {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--fg3);
+        margin-top: 2px;
+      }
+      .sketch .frame {
+        background: var(--bg);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 6px;
+        flex: 1;
+        padding: 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .bar {
+        height: 5px;
+        background: var(--surface-raised);
+        border-radius: 2px;
+      }
+      .grid-cells {
+        display: grid;
+        gap: 3px;
+        flex: 1;
+      }
+      .cell {
+        background: var(--brand-navy);
+        border-radius: 2px;
+      }
+
+      /* token color tints (cycle thru palette) */
+      .b-xxs {
+        background: rgba(196, 30, 58, 0.2);
+        border-color: rgba(196, 30, 58, 0.5);
+        color: #e07a8c;
+      }
+      .b-xs {
+        background: rgba(176, 118, 38, 0.22);
+        border-color: rgba(176, 118, 38, 0.55);
+        color: #e3b870;
+      }
+      .b-sm {
+        background: rgba(70, 110, 176, 0.22);
+        border-color: rgba(70, 110, 176, 0.55);
+        color: #8fb4e8;
+      }
+      .b-md {
+        background: rgba(34, 110, 74, 0.22);
+        border-color: rgba(34, 110, 74, 0.55);
+        color: #6fd39a;
+      }
+      .b-lg {
+        background: rgba(91, 111, 168, 0.25);
+        border-color: rgba(91, 111, 168, 0.55);
+        color: #a8b6dd;
+      }
+      .b-xl {
+        background: rgba(197, 165, 90, 0.22);
+        border-color: rgba(197, 165, 90, 0.55);
+        color: #d4bb78;
+      }
+      .b-xxl {
+        background: rgba(124, 135, 148, 0.28);
+        border-color: rgba(124, 135, 148, 0.55);
+        color: #c4ccd6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <div class="header">
+        <div class="eyebrow">Layout · Responsive</div>
+        <h3>Breakpoints</h3>
+        <p class="caption">
+          Seven named ranges, mirrored from the Tamagui
+          <span class="mono">media</span> defaults consumed by
+          <span class="mono">@tamagui/config</span>. Use them as
+          <span class="mono">$gtXs</span>, <span class="mono">$gtSm</span>,
+          <span class="mono">$gtMd</span>, <span class="mono">$gtLg</span>,
+          <span class="mono">$gtXl</span> on web (the "greater-than" form is the
+          convention in <span class="mono">web/src</span>) and via
+          <span class="mono">useMedia()</span> in shared components. Dark theme
+          is primary at every size.
+        </p>
+      </div>
+
+      <!-- Visual ruler -->
+      <div class="ruler" id="ruler"></div>
+
+      <!-- Token table -->
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 170px">Token</th>
+            <th style="width: 140px">Range</th>
+            <th style="width: 200px">Device</th>
+            <th>Use it for</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+
+      <!-- Sketches -->
+      <div class="sketches" id="sketches"></div>
+
+      <!-- Behavior matrix -->
+      <div class="matrix" id="matrix"></div>
+
+      <!-- Sport-specific notes -->
+      <div class="header" style="margin-top: 8px">
+        <div class="eyebrow">Sport-specific reflow</div>
+        <h4 style="margin-top: 6px">Conventions for our core surfaces</h4>
+        <p class="caption" style="margin-top: 8px">
+          <span class="mono">scoreboard / matchup grid</span> — three columns at
+          <span class="mono">$gtLg</span>, two at
+          <span class="mono">$gtSm</span>, single stack below. Mirrors
+          <span class="mono">MatchupGrid.tsx</span> (<span class="mono"
+            >$gtSm: 50%</span
+          >, <span class="mono">$gtLg: 33.333%</span>).
+        </p>
+        <p class="caption" style="margin-top: 8px">
+          <span class="mono">stats tables</span> — true
+          <span class="mono">&lt;table&gt;</span> at
+          <span class="mono">$gtSm</span> and above; transform to per-player
+          cards below, with the headline stat (AVG / ERA) pulled into a
+          <span class="mono">.score</span> position.
+        </p>
+        <p class="caption" style="margin-top: 8px">
+          <span class="mono">draft board</span> — full grid only at
+          <span class="mono">$gtLg</span>. Below that, collapse to a single
+          round-by-round timeline with the on-the-clock card pinned to the top.
+        </p>
+        <p class="caption" style="margin-top: 8px">
+          <span class="mono">primary nav</span> — top bar shows full nav at
+          <span class="mono">$gtMd</span>; below that, a hamburger drawer (see
+          <span class="mono">app.tsx</span>). Hit targets stay at
+          <span class="mono">44px</span> on touch.
+        </p>
+        <p class="caption" style="margin-top: 8px">
+          <span class="mono">brackets / fixtures</span> — horizontally scroll
+          within a fixed-height container at <span class="mono">≤ md</span>;
+          never reflow round columns into rows (it breaks the metaphor).
+        </p>
+        <p class="caption" style="margin-top: 8px">
+          <span class="mono">video player</span> — locks 16:9, full-bleed at
+          <span class="mono">≤ sm</span>, capped at
+          <span class="mono">880px</span> at <span class="mono">$gtMd</span>.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // Mirrors @tamagui/config defaults (consumed unchanged by tamagui-config.ts).
+      const BPS = [
+        {
+          token: '$xxs',
+          cls: 'b-xxs',
+          min: 0,
+          max: 659,
+          device: 'Phone · small portrait',
+          use: 'iPhone SE / older Androids. Single column, 12px gutters, sticky bottom CTA.',
+        },
+        {
+          token: '$xs',
+          cls: 'b-xs',
+          min: 660,
+          max: 799,
+          device: 'Phone · standard / large',
+          use: 'Most modern handsets. Single column, gutters bump to 16px.',
+        },
+        {
+          token: '$sm',
+          cls: 'b-sm',
+          min: 800,
+          max: 859,
+          device: 'Phone landscape · small tablet',
+          use: 'Below this, $gtSm secondary content hides. Two-column matchup grid begins at $gtSm.',
+        },
+        {
+          token: '$md',
+          cls: 'b-md',
+          min: 860,
+          max: 979,
+          device: 'Tablet · portrait',
+          use: 'iPad portrait, foldables open. Hamburger drawer; primary nav is $gtMd.',
+        },
+        {
+          token: '$lg',
+          cls: 'b-lg',
+          min: 980,
+          max: 1119,
+          device: 'Tablet landscape',
+          use: 'Top nav appears, dashboard at 8-col grid. Three-column matchup grid begins at $gtLg.',
+        },
+        {
+          token: '$xl',
+          cls: 'b-xl',
+          min: 1120,
+          max: 1279,
+          device: 'Small desktop · laptop',
+          use: 'Sidebar nav option; standings table at full column count.',
+        },
+        {
+          token: '$xxl',
+          cls: 'b-xxl',
+          min: 1280,
+          max: 9999,
+          device: 'Desktop & wide',
+          use: 'Primary marketing & dashboard target — content caps at 1280 (1200 marketing).',
+        },
+      ];
+
+      // Ruler
+      const ruler = document.getElementById('ruler');
+      const RULER_END = 1500;
+      const TICKS = [0, 660, 800, 860, 980, 1120, 1280];
+      TICKS.forEach((v) => {
+        const el = document.createElement('div');
+        el.className = 'tick';
+        el.style.left = (v / RULER_END) * 100 + '%';
+        el.textContent = v;
+        ruler.appendChild(el);
+      });
+      BPS.forEach((b) => {
+        const el = document.createElement('div');
+        el.className = 'band ' + b.cls;
+        const left = (b.min / RULER_END) * 100;
+        const right = (Math.min(b.max, RULER_END) / RULER_END) * 100;
+        el.style.left = left + '%';
+        el.style.width = right - left + '%';
+        el.textContent = b.token;
+        ruler.appendChild(el);
+      });
+
+      // Table
+      const rows = document.getElementById('rows');
+      BPS.forEach((b) => {
+        const tr = document.createElement('tr');
+        const range = b.max >= 9999 ? `${b.min}+ px` : `${b.min}–${b.max} px`;
+        tr.innerHTML = `
+      <td><span class="swatch ${b.cls}"></span><span class="token">${b.token}</span></td>
+      <td><span class="range">${range}</span></td>
+      <td><span class="label-name">${b.device}</span></td>
+      <td><span class="desc">${b.use}</span></td>`;
+        rows.appendChild(tr);
+      });
+      document.querySelectorAll('.swatch').forEach((s) => {
+        s.style.background = getComputedStyle(s).color;
+        s.style.opacity = '0.7';
+      });
+
+      // Sketches — one per token, with cell counts that telegraph layout
+      const sk = document.getElementById('sketches');
+      const SKS = [
+        { token: '$xxs', range: '0–659', cols: 1, rows: 4, headerH: 6 },
+        { token: '$xs', range: '660–799', cols: 1, rows: 4, headerH: 6 },
+        { token: '$sm', range: '800–859', cols: 2, rows: 3, headerH: 6 },
+        { token: '$md', range: '860–979', cols: 2, rows: 3, headerH: 5 },
+        { token: '$lg', range: '980–1119', cols: 3, rows: 2, headerH: 5 },
+        { token: '$xl', range: '1120–1279', cols: 3, rows: 2, headerH: 4 },
+        { token: '$xxl', range: '1280+', cols: 4, rows: 2, headerH: 4 },
+      ];
+      SKS.forEach((s) => {
+        const el = document.createElement('div');
+        el.className = 'sketch';
+        el.innerHTML = `
+      <div class="name">${s.token}<small>${s.range} px</small></div>
+      <div class="frame">
+        <div class="bar" style="height:${s.headerH}px"></div>
+        <div class="grid-cells" style="grid-template-columns:repeat(${s.cols},1fr);grid-template-rows:repeat(${s.rows},1fr)"></div>
+      </div>`;
+        const cells = el.querySelector('.grid-cells');
+        for (let i = 0; i < s.cols * s.rows; i++) {
+          const c = document.createElement('div');
+          c.className = 'cell';
+          c.style.opacity = (0.55 + (i % 3) * 0.15).toFixed(2);
+          cells.appendChild(c);
+        }
+        sk.appendChild(el);
+      });
+
+      // Behavior matrix
+      const M = [
+        {
+          head: 'Aspect',
+          vals: ['$xxs', '$xs', '$sm', '$md', '$lg', '$xl', '$xxl'],
+          headerRow: true,
+        },
+        {
+          head: 'Page padding',
+          vals: [
+            '$3 · 12',
+            '$3 · 12',
+            '$4 · 16',
+            '$4 · 16',
+            '$5 · 20',
+            '$5 · 20',
+            '$6 · 24',
+          ],
+        },
+        {
+          head: 'Grid gutter',
+          vals: [
+            '$3 · 12',
+            '$3 · 12',
+            '$4 · 16',
+            '$4 · 16',
+            '$5 · 20',
+            '$5 · 20',
+            '$5 · 20',
+          ],
+        },
+        { head: 'Grid columns', vals: ['1', '1', '2', '6', '8', '8', '12'] },
+        {
+          head: 'Content max',
+          vals: ['100%', '100%', '100%', '720', '960', '1120', '1280'],
+        },
+        {
+          head: 'Hero H1',
+          vals: ['36 px', '40 px', '44 px', '52 px', '56 px', '60 px', '64 px'],
+        },
+        { head: 'Body size', vals: ['15', '16', '16', '16', '16', '16', '16'] },
+        {
+          head: 'Score · stat-lg',
+          vals: ['40 px', '44 px', '48 px', '56 px', '60 px', '64 px', '64 px'],
+        },
+        {
+          head: 'Nav pattern',
+          vals: [
+            'Tab bar',
+            'Tab bar',
+            'Tab bar',
+            'Drawer',
+            'Top nav',
+            'Top + sidebar',
+            'Top + sidebar',
+          ],
+        },
+        {
+          head: 'Min hit target',
+          vals: ['44 px', '44 px', '44 px', '44 px', '40 px', '40 px', '40 px'],
+        },
+        { head: 'Matchup cols', vals: ['1', '1', '2', '2', '3', '3', '3'] },
+      ];
+      const matrix = document.getElementById('matrix');
+      M.forEach((r) => {
+        if (r.headerRow) {
+          matrix.innerHTML += `<div class="head">${r.head}</div>`;
+          r.vals.forEach(
+            (v) => (matrix.innerHTML += `<div class="head">${v}</div>`),
+          );
+        } else {
+          matrix.innerHTML += `<div class="row-head">${r.head}</div>`;
+          r.vals.forEach(
+            (v) => (matrix.innerHTML += `<div class="mono">${v}</div>`),
+          );
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 8px;
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        max-width: 920px;
+      }
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-5);
+        overflow: hidden;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      th {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        text-align: left;
+        padding: 12px 14px;
+        background: var(--surface-card);
+        border-bottom: 1px solid var(--outline-default);
+      }
+      th.num,
+      td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      td {
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--outline-subtle);
+        color: var(--fg2);
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      tr:hover td {
+        background: var(--bg-hover);
+      }
+      .player {
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--fg1);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .av {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--grad-navy);
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-gold-light);
+      }
+      .lead {
+        color: var(--brand-gold-light);
+      }
+      .sort::after {
+        content: '▾';
+        color: var(--brand-gold-light);
+        margin-left: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <div class="lab">
+          Stats Table — sticky header, hover row, sorted column
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Team</th>
+              <th class="num">PA</th>
+              <th class="num">AVG</th>
+              <th class="num">HR</th>
+              <th class="num sort">OPS</th>
+              <th class="num">WAR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="player"
+                  ><span class="av">BB</span>Barry Bonds</span
+                >
+              </td>
+              <td>SF · 2001</td>
+              <td class="num">664</td>
+              <td class="num">.328</td>
+              <td class="num">73</td>
+              <td class="num lead">1.379</td>
+              <td class="num">11.8</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="player"><span class="av">BR</span>Babe Ruth</span>
+              </td>
+              <td>NYY · 1923</td>
+              <td class="num">697</td>
+              <td class="num">.393</td>
+              <td class="num">41</td>
+              <td class="num lead">1.309</td>
+              <td class="num">14.1</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="player"><span class="av">TC</span>Ty Cobb</span>
+              </td>
+              <td>DET · 1911</td>
+              <td class="num">684</td>
+              <td class="num">.420</td>
+              <td class="num">8</td>
+              <td class="num lead">1.088</td>
+              <td class="num">10.5</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="player"><span class="av">LG</span>Lou Gehrig</span>
+              </td>
+              <td>NYY · 1927</td>
+              <td class="num">717</td>
+              <td class="num">.373</td>
+              <td class="num">47</td>
+              <td class="num lead">1.240</td>
+              <td class="num">11.8</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="player"
+                  ><span class="av">RH</span>Rogers Hornsby</span
+                >
+              </td>
+              <td>STL · 1924</td>
+              <td class="num">640</td>
+              <td class="num">.424</td>
+              <td class="num">25</td>
+              <td class="num lead">1.203</td>
+              <td class="num">12.1</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

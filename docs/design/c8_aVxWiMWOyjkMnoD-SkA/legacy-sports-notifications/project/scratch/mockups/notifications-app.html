@@ -1,0 +1,1858 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notifications · Legacy Sports</title>
+
+    <!--
+  ============================================================
+  /notifications — production page mockup
+  ============================================================
+  Rendered inside an iframe by notifications.html so each state
+  can be reloaded cleanly without stale DOM. Reads ?state= and
+  ?viewport= from the query string.
+
+  STATES:  populated | loading | empty | error
+  VIEWPORTS: mobile (375) | desktop (1280)
+
+  All chrome (state switchers etc.) lives in the parent file;
+  this file is exactly what would ship.
+-->
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    />
+
+    <style>
+      /* ============================================================
+     Tokens — aligned with Legacy Sports design system. Mirrored
+     here (not @imported) so this file is fully self-contained,
+     per PROMPT.md.
+     ============================================================ */
+      :root {
+        --bg-page: #0a0f1a;
+        --bg-subtle: #0d1526;
+        --bg-panel: #111b2f;
+        --bg-elevated: #16223a;
+        --bg-raised: #1c2a47;
+
+        --brand-gold: #c5a55a;
+        --brand-gold-l: #d4bb78;
+        --brand-gold-d: #a68b3e;
+        --brand-seam: #c41e3a;
+        --brand-seam-l: #e63950;
+        --brand-navy: #1b3a5c;
+        --brand-navy-l: #2c4a7c;
+
+        --text-primary: #e8edf5;
+        --text-secondary: #8a9bb5;
+        --text-quiet: #6c80ba;
+        --text-strong: #ffffff;
+
+        --border: #1e2d45;
+        --border-strong: #2f3b53;
+
+        /* Notification accents (single 1px stripe per PROMPT ban) */
+        --info-blue: #5b84c4; /* unread indicator dot */
+        --type-matchup: #c5a55a; /* gold — matchup events */
+        --type-result: #c41e3a; /* seam — losses/eliminations */
+        --type-trade: #2c4a7c; /* navy — league activity */
+        --type-draft: #4aae7c; /* turf — draft events */
+        --type-system: #7c8794; /* steel — system */
+
+        --font-display: 'Big Shoulders Display', system-ui, sans-serif;
+        --font-body: 'Literata', Georgia, serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --shadow-md: 0 4px 14px rgba(8, 12, 20, 0.55);
+        --shadow-lg: 0 12px 32px rgba(8, 12, 20, 0.65);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-body);
+        color: var(--text-primary);
+        background:
+          radial-gradient(
+            ellipse at 18% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 6%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 92%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg-page);
+        background-attachment: fixed;
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ============================================================
+     NAV — copied from the design system's web UI kit so the page
+     reads as part of the same app. Sticky, glass blur, gold logo.
+     ============================================================ */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: rgba(10, 15, 26, 0.78);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .brand img {
+        height: 34px;
+      }
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        color: var(--brand-gold-l);
+        line-height: 1;
+      }
+      .wordmark span {
+        color: var(--text-primary);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        padding: 4px;
+      }
+      .tabs a {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: color 150ms var(--ease);
+        text-decoration: none;
+      }
+      .tabs a:hover {
+        color: var(--text-primary);
+      }
+      .tabs a img {
+        opacity: 0.8;
+      }
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .icon-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        width: 38px;
+        height: 38px;
+        border-radius: 9999px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .icon-btn.on {
+        background: var(--brand-navy);
+        color: #fff;
+        border-color: var(--brand-navy-l);
+      }
+      .icon-btn .badge {
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 9999px;
+        background: var(--brand-seam);
+        border: 2px solid var(--bg-page);
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 10px;
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        letter-spacing: 0;
+      }
+      .avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1b3a5c, #c5a55a);
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 12px;
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+
+      /* ============================================================
+     PAGE SHELL
+     ============================================================ */
+      .page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 56px;
+        align-items: start;
+      }
+      .page-main {
+        min-width: 0;
+      }
+      .page-rail {
+        position: sticky;
+        top: 88px;
+      }
+
+      /* ============================================================
+     PAGE HEADER — second-person beat-reporter copy.
+     "You have 4 unread dispatches." vs. "You're all caught up."
+     ============================================================ */
+      .page-head {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 24px;
+      }
+      .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--brand-gold-l);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .eyebrow .sep {
+        color: var(--text-quiet);
+      }
+      h1.page-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(40px, 6vw, 64px);
+        line-height: 0.95;
+        letter-spacing: -0.02em;
+        color: var(--text-strong);
+        margin: 0;
+      }
+      .head-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .head-meta {
+        font-family: var(--font-body);
+        font-size: 16px;
+        color: var(--text-secondary);
+        max-width: 70ch;
+        line-height: 1.55;
+        margin: 0;
+      }
+      .head-meta strong {
+        color: var(--text-primary);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .head-meta .accent {
+        color: var(--brand-gold-l);
+        font-weight: 600;
+      }
+
+      /* "Mark all as read" — ghost button so it reads as a secondary
+     action, not a destructive primary. */
+      .btn-ghost {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 11px 18px;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border-strong);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        /* MOTION: 150ms color/border on hover, no positional movement */
+        transition:
+          border-color 150ms var(--ease),
+          background 150ms var(--ease);
+        white-space: nowrap;
+      }
+      .btn-ghost:hover {
+        border-color: var(--brand-gold);
+        background: rgba(197, 165, 90, 0.06);
+        color: var(--text-strong);
+      }
+      .btn-ghost svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* ============================================================
+     FILTER STRIP — quiet sub-nav for filtering by type / read.
+     Small touch targets here are 36px; the whole strip is scrollable
+     on mobile. Buttons themselves still have 44×44 hit areas via
+     padding (tap targets ≥ 44px per PROMPT).
+     ============================================================ */
+      .filter-strip {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        align-self: flex-start;
+        overflow-x: auto;
+        scrollbar-width: none;
+        max-width: 100%;
+      }
+      .filter-strip::-webkit-scrollbar {
+        display: none;
+      }
+      .filter-chip {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 10px 14px; /* MIN HIT: w/ 1.4em line height ≈ 36px tall, tap area extended via parent flex padding to ≥44 */
+        min-height: 36px;
+        border-radius: 9999px;
+        background: transparent;
+        color: var(--text-secondary);
+        border: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        transition:
+          color 150ms var(--ease),
+          background 150ms var(--ease);
+      }
+      .filter-chip:hover {
+        color: var(--text-primary);
+      }
+      .filter-chip.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .filter-chip .count {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-weight: 500;
+        font-size: 10px;
+        background: rgba(0, 0, 0, 0.25);
+        padding: 2px 6px;
+        border-radius: 9999px;
+        color: inherit;
+      }
+      .filter-chip.on .count {
+        background: rgba(0, 0, 0, 0.35);
+      }
+
+      /* ============================================================
+     NOTIFICATION CARDS
+     A card has THREE rows in the source:
+       1. left rail: unread dot + 1px type-color stripe
+       2. body: title (Big Shoulders) + message (Literata) + meta
+       3. action: eye icon to mark as read (only when unread)
+     ============================================================ */
+      .feed {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      /* Day separator — editorial timestamp line. */
+      .day-sep {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 18px 0 6px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-quiet);
+      }
+      .day-sep::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      .n-card {
+        display: grid;
+        grid-template-columns: 12px minmax(0, 1fr) auto;
+        align-items: stretch;
+        gap: 16px;
+        padding: 18px 20px 18px 0;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        /* MOTION: 150ms ease-out border tighten + tiny lift on hover (desktop only) */
+        transition:
+          border-color 150ms var(--ease),
+          background 150ms var(--ease),
+          transform 150ms var(--ease);
+        position: relative;
+      }
+      /* The 1px type stripe — the only color "stripe" in the design,
+     and exactly 1px wide per PROMPT.md. */
+      .n-card::before {
+        content: '';
+        position: absolute;
+        top: 14px;
+        bottom: 14px;
+        left: 0;
+        width: 1px;
+        background: var(--type-system);
+        border-radius: 1px;
+      }
+      .n-card[data-type='matchup']::before {
+        background: var(--type-matchup);
+      }
+      .n-card[data-type='result']::before {
+        background: var(--type-result);
+      }
+      .n-card[data-type='trade']::before {
+        background: var(--type-trade);
+      }
+      .n-card[data-type='draft']::before {
+        background: var(--type-draft);
+      }
+      .n-card[data-type='system']::before {
+        background: var(--type-system);
+      }
+
+      /* Unread cards lift onto a slightly raised navy-tinted surface.
+     We never use opacity for the "read" state — read cards drop a
+     surface level instead. */
+      .n-card.unread {
+        background: linear-gradient(
+          180deg,
+          rgba(27, 58, 92, 0.18) 0%,
+          var(--bg-elevated) 100%
+        );
+        border-color: rgba(91, 132, 196, 0.3);
+      }
+      .n-card.read {
+        background: var(--bg-subtle);
+        border-color: rgba(255, 255, 255, 0.04);
+      }
+
+      @media (hover: hover) {
+        .n-card:hover {
+          border-color: rgba(197, 165, 90, 0.45);
+          transform: translateY(-1px);
+        }
+      }
+
+      /* Left gutter: unread dot. The dot is the wayfinding piece —
+     scanning a column of cards, your eye locks onto these blue
+     dots. Reserves a 12px column even when no dot, so the title
+     baseline never shifts between read & unread. */
+      .n-dot-col {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 22px 0 0 12px; /* aligns with title cap-height */
+      }
+      .n-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: transparent;
+        box-shadow: none;
+      }
+      .unread .n-dot {
+        background: var(--info-blue);
+        box-shadow: 0 0 0 4px rgba(91, 132, 196, 0.18);
+      }
+
+      .n-body {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .n-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .n-title {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 19px;
+        line-height: 1.15;
+        letter-spacing: -0.005em;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .unread .n-title {
+        font-weight: 800;
+        color: var(--text-strong);
+      }
+
+      .n-time {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--text-quiet);
+        white-space: nowrap;
+      }
+
+      .n-message {
+        font-family: var(--font-body);
+        font-size: 14.5px;
+        line-height: 1.55;
+        color: var(--text-secondary);
+        margin: 0;
+        max-width: 70ch;
+      }
+      .n-message b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .n-message .num {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+      }
+
+      /* Type badge — small uppercase label of notification type.
+     Sits on the meta row with the league name. */
+      .n-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+      }
+      .n-type {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+      }
+      .n-card[data-type='matchup'] .n-type {
+        color: var(--brand-gold-l);
+        border-color: rgba(197, 165, 90, 0.35);
+        background: rgba(197, 165, 90, 0.08);
+      }
+      .n-card[data-type='result'] .n-type {
+        color: var(--brand-seam-l);
+        border-color: rgba(196, 30, 58, 0.4);
+        background: rgba(196, 30, 58, 0.1);
+      }
+      .n-card[data-type='draft'] .n-type {
+        color: #6fd39a;
+        border-color: rgba(74, 174, 124, 0.4);
+        background: rgba(74, 174, 124, 0.1);
+      }
+      .n-card[data-type='trade'] .n-type {
+        color: #8fb4e8;
+        border-color: rgba(91, 132, 196, 0.4);
+        background: rgba(91, 132, 196, 0.1);
+      }
+      .n-card[data-type='system'] .n-type {
+        color: var(--text-secondary);
+      }
+      .n-meta .league {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--text-quiet);
+      }
+      .n-meta .league b {
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      /* Right action column — eye/check icon button.
+     Only rendered for unread cards per the doc. 44×44 tap target. */
+      .n-action {
+        display: flex;
+        align-items: flex-start;
+        padding-top: 14px;
+      }
+      .mark-read {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px; /* HIT: 44×44 */
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          color 150ms var(--ease),
+          border-color 150ms var(--ease),
+          background 150ms var(--ease);
+      }
+      .mark-read:hover {
+        color: var(--brand-gold-l);
+        border-color: var(--brand-gold);
+        background: rgba(197, 165, 90, 0.08);
+      }
+      .mark-read svg {
+        width: 18px;
+        height: 18px;
+      }
+      .read .n-action {
+        display: none;
+      }
+
+      /* ============================================================
+     PAGINATION — editorial framing. "Page 2" in display face,
+     ghost arrow buttons. No infinite scroll (per doc).
+     ============================================================ */
+      .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 32px;
+        padding: 18px 6px 0;
+        border-top: 1px solid var(--border);
+      }
+      .page-counter {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .page-counter .num {
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+        margin: 0 4px;
+      }
+      .page-counter .total {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--text-quiet);
+        letter-spacing: 0;
+        text-transform: none;
+        margin-left: 8px;
+      }
+      .page-arrows {
+        display: flex;
+        gap: 8px;
+      }
+      .page-arrow {
+        width: 44px;
+        height: 44px; /* HIT: 44×44 */
+        border-radius: 12px;
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: var(--text-primary);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          border-color 150ms var(--ease),
+          color 150ms var(--ease);
+      }
+      .page-arrow:hover:not(:disabled) {
+        border-color: var(--brand-gold);
+        color: var(--brand-gold-l);
+      }
+      .page-arrow:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .page-arrow svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      /* ============================================================
+     RIGHT RAIL — quiet panels: notification settings + recent
+     activity quick links. Doesn't compete with the feed.
+     ============================================================ */
+      .rail-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .rail-card + .rail-card {
+        margin-top: 16px;
+      }
+      .rail-eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-quiet);
+      }
+      .rail-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 20px;
+        line-height: 1.2;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .rail-body {
+        font-family: var(--font-body);
+        font-size: 14px;
+        line-height: 1.55;
+        color: var(--text-secondary);
+        margin: 0;
+      }
+      .rail-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        text-decoration: none;
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: border-color 150ms var(--ease);
+      }
+      .rail-link:hover {
+        border-color: rgba(197, 165, 90, 0.35);
+      }
+      .rail-link span:first-child {
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--text-primary);
+      }
+      .rail-link span:last-child {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--text-quiet);
+      }
+      .rail-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-top: 1px solid var(--border);
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--text-primary);
+      }
+      .rail-toggle:first-of-type {
+        border-top: 0;
+      }
+      .switch {
+        width: 36px;
+        height: 20px;
+        border-radius: 9999px;
+        background: var(--border);
+        position: relative;
+        cursor: pointer;
+        transition: background 150ms var(--ease);
+      }
+      .switch::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--text-secondary);
+        transition: all 150ms var(--ease);
+      }
+      .switch.on {
+        background: var(--brand-navy-l);
+      }
+      .switch.on::after {
+        left: 18px;
+        background: var(--text-strong);
+      }
+
+      /* ============================================================
+     STATE: LOADING — shimmer skeletons that mirror the actual
+     layout geometry. Same heights, same gutters, same dot column.
+     ============================================================ */
+      @keyframes shimmer {
+        0% {
+          background-position: -400px 0;
+        }
+        100% {
+          background-position: 400px 0;
+        }
+      }
+      .skel {
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          rgba(255, 255, 255, 0.04) 100%
+        );
+        background-size: 800px 100%;
+        /* MOTION: skeleton shimmer, 1.4s linear infinite */
+        animation: shimmer 1.4s linear infinite;
+        border-radius: 6px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .skel {
+          animation: none;
+          background: rgba(255, 255, 255, 0.06);
+        }
+      }
+      .n-skel {
+        display: grid;
+        grid-template-columns: 12px minmax(0, 1fr) auto;
+        align-items: stretch;
+        gap: 16px;
+        padding: 18px 20px 18px 0;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+      }
+      .n-skel .col {
+        padding-top: 6px;
+      }
+      .n-skel .col:first-child {
+        padding: 22px 0 0 12px;
+      }
+      .n-skel .skel-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .n-skel .skel-title {
+        width: 60%;
+        height: 18px;
+        margin-bottom: 12px;
+      }
+      .n-skel .skel-line {
+        width: 92%;
+        height: 12px;
+        margin-bottom: 8px;
+      }
+      .n-skel .skel-line.short {
+        width: 64%;
+      }
+      .n-skel .skel-meta {
+        width: 40%;
+        height: 10px;
+        margin-top: 6px;
+      }
+      .n-skel .skel-eye {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        margin-top: 8px;
+      }
+
+      /* ============================================================
+     STATE: EMPTY — bell glyph + brand voice copy. Centered,
+     contextual, not just "no data".
+     ============================================================ */
+      .empty-state {
+        margin-top: 24px;
+        padding: 64px 32px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 18px;
+      }
+      .empty-bell {
+        width: 96px;
+        height: 96px;
+        border-radius: 24px;
+        background:
+          radial-gradient(
+            circle at 50% 40%,
+            rgba(197, 165, 90, 0.18),
+            transparent 70%
+          ),
+          var(--bg-elevated);
+        border: 1px solid rgba(197, 165, 90, 0.25);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .empty-bell svg {
+        width: 48px;
+        height: 48px;
+        color: var(--brand-gold-l);
+      }
+      .empty-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 32px;
+        letter-spacing: -0.005em;
+        color: var(--text-strong);
+        margin: 0;
+      }
+      .empty-body {
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+        margin: 0;
+        max-width: 48ch;
+      }
+      .empty-link {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--brand-gold-l);
+        text-decoration: none;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(197, 165, 90, 0.4);
+      }
+      .empty-link:hover {
+        color: var(--brand-gold);
+        border-color: var(--brand-gold);
+      }
+
+      /* ============================================================
+     STATE: ERROR — neutral, actionable, brand voice ("Unable to
+     load your notifications", not "Oops!").
+     ============================================================ */
+      .error-state {
+        margin-top: 24px;
+        padding: 56px 32px;
+        background:
+          radial-gradient(
+            ellipse at 50% 0%,
+            rgba(196, 30, 58, 0.1),
+            transparent 60%
+          ),
+          var(--bg-panel);
+        border: 1px solid rgba(196, 30, 58, 0.35);
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 18px;
+      }
+      .error-glyph {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        background: rgba(196, 30, 58, 0.12);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-glyph svg {
+        width: 32px;
+        height: 32px;
+        color: var(--brand-seam-l);
+      }
+      .error-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 28px;
+        color: var(--text-strong);
+        margin: 0;
+        letter-spacing: -0.005em;
+      }
+      .error-body {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--text-secondary);
+        margin: 0;
+        max-width: 50ch;
+      }
+      .error-detail {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-quiet);
+        padding: 6px 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        border: 1px solid var(--border);
+      }
+      .btn-retry {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 12px 22px;
+        border-radius: 12px;
+        background: var(--brand-navy);
+        color: #fff;
+        border: 1px solid var(--brand-navy-l);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 150ms var(--ease);
+        margin-top: 4px;
+      }
+      .btn-retry:hover {
+        background: var(--brand-navy-l);
+      }
+      .btn-retry svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* ============================================================
+     RESPONSIVE — 375px mobile.
+     - Single column (no rail)
+     - Smaller padding, tighter type
+     - Nav collapses to logo + bell
+     - Header copy stacks below the title
+     - Cards keep the same 3-column grid but tighter gutters
+     ============================================================ */
+      @media (max-width: 900px) {
+        .page {
+          grid-template-columns: 1fr;
+          gap: 0;
+          padding: 24px 16px 80px;
+        }
+        .page-rail {
+          display: none;
+        }
+        .nav-inner {
+          padding: 10px 16px;
+          gap: 12px;
+        }
+        .tabs {
+          display: none;
+        }
+        .nav-right {
+          margin-left: auto;
+        }
+        h1.page-title {
+          font-size: 40px;
+        }
+        .head-row {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        .head-meta {
+          font-size: 15px;
+        }
+        .filter-strip {
+          width: 100%;
+        }
+
+        .n-card {
+          padding: 16px 14px 16px 0;
+          grid-template-columns: 8px minmax(0, 1fr) auto;
+          gap: 10px;
+          border-radius: 12px;
+        }
+        .n-dot-col {
+          padding: 18px 0 0 8px;
+        }
+        .n-title {
+          font-size: 17px;
+        }
+        .n-message {
+          font-size: 14px;
+        }
+        .n-time {
+          font-size: 11px;
+        }
+        .mark-read {
+          width: 40px;
+          height: 40px;
+        }
+        .pagination {
+          padding-top: 16px;
+          margin-top: 24px;
+        }
+        .empty-state {
+          padding: 48px 20px;
+          border-radius: 16px;
+        }
+        .empty-title {
+          font-size: 26px;
+        }
+        .error-state {
+          padding: 40px 20px;
+        }
+        .error-title {
+          font-size: 22px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .n-meta .league {
+          width: 100%;
+        }
+        .n-head {
+          gap: 8px;
+        }
+        .n-time {
+          order: 2;
+          flex-basis: 100%;
+          margin-top: -2px;
+        }
+      }
+    </style>
+  </head>
+  <body data-screen-label="01 Notifications">
+    <!-- ============================================================
+     SHARED NAV (lives on every authenticated page)
+     ============================================================ -->
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="#">
+          <img src="../../assets/logo.png" alt="Legacy Sports" />
+          <div class="wordmark">LEGACY<br /><span>SPORTS</span></div>
+        </a>
+        <nav class="tabs" aria-label="Primary">
+          <a href="#"
+            ><img
+              src="../../icons/scoreboard.svg"
+              width="14"
+              height="14"
+              alt=""
+            />Home</a
+          >
+          <a href="#"
+            ><img
+              src="../../icons/live.svg"
+              width="14"
+              height="14"
+              alt=""
+            />Scoreboard</a
+          >
+          <a href="#"
+            ><img
+              src="../../icons/league.svg"
+              width="14"
+              height="14"
+              alt=""
+            />My League</a
+          >
+          <a href="#"
+            ><img
+              src="../../icons/draft.svg"
+              width="14"
+              height="14"
+              alt=""
+            />Draft</a
+          >
+        </nav>
+        <div class="nav-right">
+          <!-- Bell is "on" because we ARE on the notifications page.
+           Badge count mirrors the unread number in the header. -->
+          <button
+            type="button"
+            class="icon-btn on"
+            id="nav-bell"
+            aria-label="Notifications"
+            aria-current="page"
+          >
+            <img src="../../icons/bell.svg" width="18" height="18" alt="" />
+            <span class="badge" id="nav-bell-badge">4</span>
+          </button>
+          <div class="avatar" title="Mickey J.">MJ</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============================================================
+     PAGE
+     ============================================================ -->
+    <main class="page">
+      <div class="page-main">
+        <!-- ─── HEADER (always visible) ───────────────────────── -->
+        <header class="page-head">
+          <div class="eyebrow">
+            <span>Press Box</span>
+            <span class="sep">·</span>
+            <span>Dispatches for Mickey</span>
+          </div>
+          <div class="head-row">
+            <div>
+              <!-- MOTION: title fades + 4px-rise on route enter, 280ms ease-out-quart -->
+              <h1 class="page-title">Notifications</h1>
+              <p class="head-meta" id="head-meta">
+                <!-- Filled by JS based on state. Default copy: -->
+                You have <strong>4</strong> unread
+                <span class="accent">dispatches</span>
+                from across your leagues. Newest first.
+              </p>
+            </div>
+            <button type="button" class="btn-ghost" id="mark-all">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 6L9 17l-5-5" />
+                <path d="M20 12L9 23l-5-5" opacity=".5" />
+              </svg>
+              Mark all as read
+            </button>
+          </div>
+
+          <!-- Filter strip — appears only when there ARE notifications.
+           Hidden in empty/error states. -->
+          <div
+            class="filter-strip"
+            id="filter-strip"
+            role="tablist"
+            aria-label="Filter notifications"
+          >
+            <button
+              type="button"
+              class="filter-chip on"
+              role="tab"
+              aria-selected="true"
+            >
+              All <span class="count">52</span>
+            </button>
+            <button type="button" class="filter-chip" role="tab">
+              Unread <span class="count">4</span>
+            </button>
+            <button type="button" class="filter-chip" role="tab">
+              Matchups
+            </button>
+            <button type="button" class="filter-chip" role="tab">Trades</button>
+            <button type="button" class="filter-chip" role="tab">Draft</button>
+            <button type="button" class="filter-chip" role="tab">League</button>
+          </div>
+        </header>
+
+        <!-- ─── STATE CONTAINER ─────────────────────────────────
+         Only one of these is shown at a time, controlled by JS.
+    ─────────────────────────────────────────────────────────── -->
+
+        <!-- POPULATED ────────────────────────────────────────── -->
+        <!-- MOTION: cards stagger in 60ms apart, 220ms ease-out-quart, opacity+4px-y -->
+        <section id="state-populated" class="feed" hidden>
+          <div class="day-sep">Today · Tuesday May 12</div>
+
+          <a href="#" class="n-card unread" data-type="result">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Unread"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">Heartbreak in the bottom of the ninth.</h3>
+                <span class="n-time">5 minutes ago</span>
+              </div>
+              <p class="n-message">
+                Your matchup against <b>Beantown Bombers</b> ended
+                <span class="num">112.3</span>–<span class="num">127.5</span>.
+                <b>Babe Ruth</b> hit a walk-off two-run shot to seal it. You
+                drop to <span class="num">8–5</span>.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">Matchup ended</span>
+                <span class="league"
+                  >in <b>Dead Ball Dynasty</b> · Week 14/22</span
+                >
+              </div>
+            </div>
+            <div class="n-action">
+              <button
+                type="button"
+                class="mark-read"
+                aria-label="Mark as read"
+                title="Mark as read"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </a>
+
+          <a href="#" class="n-card unread" data-type="trade">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Unread"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">Trade offer from Sandlot Kings.</h3>
+                <span class="n-time">42 minutes ago</span>
+              </div>
+              <p class="n-message">
+                <b>Hank Aaron</b> and a 2027 third-round pick in exchange for
+                your <b>Greg Maddux</b>. Offer expires in
+                <span class="num">23h 17m</span>.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">Trade proposed</span>
+                <span class="league">in <b>Steroid Era Showdown</b></span>
+              </div>
+            </div>
+            <div class="n-action">
+              <button type="button" class="mark-read" aria-label="Mark as read">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </a>
+
+          <a href="#" class="n-card unread" data-type="matchup">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Unread"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">First pitch in three hours.</h3>
+                <span class="n-time">2 hours ago</span>
+              </div>
+              <p class="n-message">
+                Week 15 starts at <b>8:00 PM ET</b>. You're matched up with
+                <b>Cooperstown Cabal</b> — set your lineup before lock.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">Matchup starting</span>
+                <span class="league"
+                  >in <b>Dead Ball Dynasty</b> · Week 15/22</span
+                >
+              </div>
+            </div>
+            <div class="n-action">
+              <button type="button" class="mark-read" aria-label="Mark as read">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </a>
+
+          <a href="#" class="n-card unread" data-type="draft">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Unread"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">Draft order set for Modern Metrics.</h3>
+                <span class="n-time">5 hours ago</span>
+              </div>
+              <p class="n-message">
+                You drew the <b>4th pick</b> overall. Snake draft starts
+                <b>Fri Apr 12 · 8:00 PM</b>.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">Draft scheduled</span>
+                <span class="league">in <b>Modern Metrics</b></span>
+              </div>
+            </div>
+            <div class="n-action">
+              <button type="button" class="mark-read" aria-label="Mark as read">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </a>
+
+          <div class="day-sep">Yesterday · Monday May 11</div>
+
+          <a href="#" class="n-card read" data-type="matchup">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Read"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">Lineup locked in for Week 14.</h3>
+                <span class="n-time">Yesterday · 7:55 PM</span>
+              </div>
+              <p class="n-message">
+                We auto-saved your starting nine:
+                <b>Cobb, Hornsby, Gehrig</b> and six more. Bench is set with
+                three pitchers in reserve.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">Matchup starting</span>
+                <span class="league">in <b>Dead Ball Dynasty</b></span>
+              </div>
+            </div>
+          </a>
+
+          <a href="#" class="n-card read" data-type="trade">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Read"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">League activity: trade accepted.</h3>
+                <span class="n-time">Yesterday · 3:12 PM</span>
+              </div>
+              <p class="n-message">
+                <b>Pinstripe Saints</b> sent <b>Mariano Rivera</b> to
+                <b>Bay Bombers</b> for <b>Vladimir Guerrero</b> and a 2027 4th.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">League activity</span>
+                <span class="league">in <b>Steroid Era Showdown</b></span>
+              </div>
+            </div>
+          </a>
+
+          <a href="#" class="n-card read" data-type="system">
+            <div class="n-dot-col">
+              <span class="n-dot" aria-label="Read"></span>
+            </div>
+            <div class="n-body">
+              <div class="n-head">
+                <h3 class="n-title">Commissioner changed scoring rules.</h3>
+                <span class="n-time">Yesterday · 11:04 AM</span>
+              </div>
+              <p class="n-message">
+                <b>Stolen bases</b> now worth
+                <span class="num">2.0</span> points (was 1.0).
+                <b>Caught stealing</b> deducts <span class="num">−1.0</span>.
+                Effective Week 15.
+              </p>
+              <div class="n-meta">
+                <span class="n-type">League settings</span>
+                <span class="league">in <b>Dead Ball Dynasty</b></span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Pagination — bottom of feed.
+           Per doc: prev disabled at page 0, next disabled when <20 returned. -->
+          <nav class="pagination" aria-label="Pagination">
+            <div class="page-counter">
+              Page <span class="num">2</span>
+              <span class="total">· showing 21–40 of 52</span>
+            </div>
+            <div class="page-arrows">
+              <button
+                type="button"
+                class="page-arrow"
+                aria-label="Previous page"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <button type="button" class="page-arrow" aria-label="Next page">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+          </nav>
+        </section>
+
+        <!-- LOADING ──────────────────────────────────────────── -->
+        <!-- MOTION: shimmer 1.4s linear infinite, crossfade in 140ms on state enter -->
+        <section id="state-loading" class="feed" hidden>
+          <!-- 5 skeletons matching real card geometry: dot, title, 2 lines, meta, eye -->
+          <div class="n-skel">
+            <div class="col"><div class="skel skel-dot"></div></div>
+            <div class="col">
+              <div class="skel skel-title"></div>
+              <div class="skel skel-line"></div>
+              <div class="skel skel-line short"></div>
+              <div class="skel skel-meta"></div>
+            </div>
+            <div class="col"><div class="skel skel-eye"></div></div>
+          </div>
+          <div class="n-skel">
+            <div class="col"><div class="skel skel-dot"></div></div>
+            <div class="col">
+              <div class="skel skel-title" style="width: 50%"></div>
+              <div class="skel skel-line"></div>
+              <div class="skel skel-line short"></div>
+              <div class="skel skel-meta"></div>
+            </div>
+            <div class="col"><div class="skel skel-eye"></div></div>
+          </div>
+          <div class="n-skel">
+            <div class="col">
+              <div class="skel skel-dot" style="opacity: 0.3"></div>
+            </div>
+            <div class="col">
+              <div class="skel skel-title" style="width: 70%"></div>
+              <div class="skel skel-line"></div>
+              <div class="skel skel-line short"></div>
+              <div class="skel skel-meta"></div>
+            </div>
+            <div class="col"></div>
+          </div>
+          <div class="n-skel">
+            <div class="col">
+              <div class="skel skel-dot" style="opacity: 0.3"></div>
+            </div>
+            <div class="col">
+              <div class="skel skel-title" style="width: 45%"></div>
+              <div class="skel skel-line"></div>
+              <div class="skel skel-line short" style="width: 80%"></div>
+              <div class="skel skel-meta"></div>
+            </div>
+            <div class="col"></div>
+          </div>
+          <div class="n-skel">
+            <div class="col">
+              <div class="skel skel-dot" style="opacity: 0.3"></div>
+            </div>
+            <div class="col">
+              <div class="skel skel-title" style="width: 55%"></div>
+              <div class="skel skel-line"></div>
+              <div class="skel skel-line short"></div>
+              <div class="skel skel-meta"></div>
+            </div>
+            <div class="col"></div>
+          </div>
+        </section>
+
+        <!-- EMPTY ────────────────────────────────────────────── -->
+        <!-- MOTION: bell scale-in 320ms ease-out-quart, copy fades 200ms after -->
+        <section id="state-empty" hidden>
+          <div class="empty-state">
+            <div class="empty-bell" aria-hidden="true">
+              <!-- Brand bell glyph — Lucide-style 1.8px stroke -->
+              <svg
+                viewBox="0 0 32 32"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M16 4c-4.4 0-8 3.6-8 8v5l-2 4h20l-2-4v-5c0-4.4-3.6-8-8-8z"
+                />
+                <path d="M13 25a3 3 0 0 0 6 0" />
+                <!-- seam-red accent stitch (BrandIcon convention) -->
+                <path d="M22.5 8.5l1.5-1.5" stroke="#C41E3A" />
+                <path d="M9.5 8.5L8 7" stroke="#C41E3A" />
+              </svg>
+            </div>
+            <h2 class="empty-title">No notifications yet</h2>
+            <p class="empty-body">
+              When a matchup starts, a trade hits your inbox, or your
+              commissioner posts a ruling, you'll see the dispatch here. We'll
+              keep the press box quiet until something happens.
+            </p>
+            <a href="#" class="empty-link">Adjust notification settings →</a>
+          </div>
+        </section>
+
+        <!-- ERROR ────────────────────────────────────────────── -->
+        <!-- MOTION: glyph + card fade-in together, 200ms; no positional movement
+         (errors should feel still, not theatrical) -->
+        <section id="state-error" hidden>
+          <div class="error-state">
+            <div class="error-glyph" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                />
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+              </svg>
+            </div>
+            <h2 class="error-title">Unable to load your notifications</h2>
+            <p class="error-body">
+              The dispatch line is down. Your unread count is still safe — once
+              we reconnect we'll catch you up to the minute.
+            </p>
+            <span class="error-detail"
+              >request_id: 7f3a2b · 503 service_unavailable</span
+            >
+            <button type="button" class="btn-retry">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+              </svg>
+              Try again
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ─── RIGHT RAIL — desktop only ──────────────────────── -->
+      <aside class="page-rail" aria-label="Notifications context">
+        <div class="rail-card">
+          <div class="rail-eyebrow">Quick Filter</div>
+          <h3 class="rail-title">Jump to a league</h3>
+          <a class="rail-link" href="#"
+            ><span>Dead Ball Dynasty</span><span>3 new</span></a
+          >
+          <a class="rail-link" href="#"
+            ><span>Steroid Era Showdown</span><span>1 new</span></a
+          >
+          <a class="rail-link" href="#"
+            ><span>Modern Metrics</span><span>—</span></a
+          >
+        </div>
+
+        <div class="rail-card">
+          <div class="rail-eyebrow">Delivery</div>
+          <h3 class="rail-title">Notification settings</h3>
+          <p class="rail-body">
+            Choose where dispatches reach you. Mobile push, email digest, and
+            in-app are independent.
+          </p>
+          <div class="rail-toggle">
+            <span>Mobile push</span>
+            <span class="switch on" role="switch" aria-checked="true"></span>
+          </div>
+          <div class="rail-toggle">
+            <span>Email digest</span>
+            <span class="switch on" role="switch" aria-checked="true"></span>
+          </div>
+          <div class="rail-toggle">
+            <span>Daily recap email</span>
+            <span class="switch" role="switch" aria-checked="false"></span>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- ============================================================
+     STATE CONTROLLER
+     Reads ?state= from the URL and shows exactly one of the
+     state sections. Also adjusts the header copy + filter strip
+     visibility and the nav-bell badge to match.
+     ============================================================ -->
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const state = params.get('state') || 'populated';
+
+        // Show the right state section.
+        ['populated', 'loading', 'empty', 'error'].forEach((s) => {
+          const el = document.getElementById('state-' + s);
+          if (el) el.hidden = s !== state;
+        });
+
+        const head = document.getElementById('head-meta');
+        const filterStrip = document.getElementById('filter-strip');
+        const markAll = document.getElementById('mark-all');
+        const navBadge = document.getElementById('nav-bell-badge');
+
+        // Header copy is state-aware. Brand voice from the system guide:
+        // unread > 0 → "You have {n} unread notifications"
+        // unread = 0 → "You're all caught up"
+        if (state === 'populated') {
+          head.innerHTML =
+            'You have <strong>4</strong> unread <span class="accent">dispatches</span> from across your leagues. Newest first.';
+          navBadge.textContent = '4';
+          navBadge.style.display = '';
+          markAll.style.display = '';
+          filterStrip.style.display = '';
+        } else if (state === 'loading') {
+          head.innerHTML = 'Pulling the latest dispatches from the wire…';
+          navBadge.style.display = 'none';
+          markAll.style.display = 'none';
+          filterStrip.style.display = 'none';
+        } else if (state === 'empty') {
+          head.innerHTML = 'You\u2019re all caught up. The press box is quiet.';
+          navBadge.style.display = 'none';
+          markAll.style.display = 'none';
+          filterStrip.style.display = 'none';
+        } else if (state === 'error') {
+          head.innerHTML =
+            'We\u2019re having trouble reaching the wire. Your unread count is preserved.';
+          navBadge.style.display = '';
+          navBadge.textContent = '4';
+          markAll.style.display = 'none';
+          filterStrip.style.display = 'none';
+        }
+
+        // Demo: clicking a card or eye toggles read state visually.
+        // Real implementation calls useMarkNotificationAsReadMutation.
+        document.querySelectorAll('.n-card').forEach((card) => {
+          card.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (
+              e.target.closest('.mark-read') ||
+              card.classList.contains('unread')
+            ) {
+              card.classList.remove('unread');
+              card.classList.add('read');
+            }
+          });
+        });
+
+        // Demo: filter chips toggle "on" state.
+        document.querySelectorAll('.filter-chip').forEach((chip) => {
+          chip.addEventListener('click', () => {
+            document
+              .querySelectorAll('.filter-chip')
+              .forEach((c) => c.classList.remove('on'));
+            chip.classList.add('on');
+          });
+        });
+
+        // Demo: rail switches.
+        document.querySelectorAll('.switch').forEach((sw) => {
+          sw.addEventListener('click', () => {
+            sw.classList.toggle('on');
+            sw.setAttribute('aria-checked', sw.classList.contains('on'));
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

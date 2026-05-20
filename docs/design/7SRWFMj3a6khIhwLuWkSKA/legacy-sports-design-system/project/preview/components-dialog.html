@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 0;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .scene {
+        position: relative;
+        height: 560px;
+        background: var(--grad-board-bg);
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .bg-content {
+        position: absolute;
+        inset: 0;
+        padding: 24px;
+        opacity: 0.45;
+      }
+      .bg-content h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 32px;
+        color: var(--fg1-strong);
+        margin: 0 0 8px;
+      }
+      .bg-content p {
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--fg3);
+        max-width: 540px;
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 12, 20, 0.7);
+        backdrop-filter: blur(6px);
+      }
+      .dialog {
+        position: relative;
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-6);
+        box-shadow: var(--shadow-xl);
+        max-width: 480px;
+        width: 90%;
+        padding: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .dialog .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+      }
+      .dialog h3 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 24px;
+        color: var(--fg1-strong);
+        margin: 0;
+        letter-spacing: -0.005em;
+      }
+      .dialog p {
+        font-family: var(--font-body);
+        font-size: 15px;
+        color: var(--fg3);
+        margin: 0;
+        line-height: 1.55;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 10px 18px;
+        border-radius: var(--radius-4);
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .primary {
+        background: var(--brand-navy);
+        color: #fff;
+        border-color: var(--brand-navy-light);
+      }
+      .ghost {
+        background: transparent;
+        color: var(--fg2);
+        border-color: var(--outline-default);
+      }
+      .danger {
+        background: var(--brand-seam-red);
+        color: #fff;
+      }
+      .close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 0;
+        background: transparent;
+        color: var(--fg3);
+        cursor: pointer;
+      }
+      .close:hover {
+        background: var(--bg-hover);
+      }
+      .close svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+      }
+      .lab-overlay {
+        position: absolute;
+        top: 14px;
+        left: 18px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        z-index: 5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scene">
+      <div class="lab-overlay">Dialog · destructive confirm</div>
+      <div class="bg-content">
+        <h2>League settings</h2>
+        <p>
+          Manage commissioners, scoring, draft rules and roster slots for your
+          dynasty league.
+        </p>
+      </div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <button class="close">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
+        <div class="eyebrow">Commissioner action</div>
+        <h3>Delete this league?</h3>
+        <p>
+          This will permanently remove
+          <strong style="color: var(--fg1)">Dead Ball Dynasty</strong>, all 12
+          rosters, and 14 weeks of recorded matchups. This cannot be undone.
+        </p>
+        <div class="actions">
+          <button class="btn ghost">Cancel</button>
+          <button class="btn danger">Delete League</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Legacy Sports — Notifications mockup</title>
+
+    <!--
+  ============================================================
+  DESIGN INTENT — /notifications
+  ============================================================
+  Notifications is one of the quietest pages in Legacy Sports.
+  Most of the action is elsewhere — the dugout, the draft board,
+  the scoreboard. This page is the press box: a stack of dispatches
+  written down for you while you were watching the game.
+
+  WHY THIS LAYOUT
+  - We treat each notification as a *dispatch card* with a clear
+    editorial structure: a left-edge type marker (a single 1px
+    color stripe to encode notification type, never wider — see
+    PROMPT.md ban), an unread "blue dot" indicator, a Big Shoulders
+    title, a Literata message paragraph, and time-ago metadata.
+  - Unread items get a subtle navy tint instead of a heavy fill —
+    a card that's *waiting to be read* leans forward, but doesn't
+    shout. This matches the brand voice (anticipation, not hype).
+  - The header reads like a beat-reporter line: "You have 4 unread
+    dispatches" — second-person, period at the end. The "all caught
+    up" copy uses the brand voice from the system guide verbatim.
+  - Pagination is editorial: "Page 2" rendered in the condensed
+    display face, framed by ghost arrow buttons. No infinite scroll,
+    matching the doc's "Page {n}" + 20-per-page contract.
+
+  WHY NOT A GENERIC CARD GRID
+  - Dispatches are a vertical timeline of TIME, not a grid of
+    PEERS. We use a single column even on desktop and let the
+    cards span 720px max — same comfortable column you read prose
+    in. The right rail at desktop shows a quiet "Notification
+    settings" tile so the page doesn't feel like a dead end.
+
+  CONDITIONAL STATES (state switcher at the very top)
+  - populated: ~6 cards, mix of unread + read
+  - loading:   shimmer skeletons in the EXACT geometry of cards
+  - empty:     centered bell + "No notifications yet" + helper copy
+  - error:     centered card w/ warning glyph, message, "Try again"
+  Per the PROMPT, the doc only specifies loading/empty/populated;
+  we add error to satisfy PROMPT.md's checklist (4 states).
+
+  VIEWPORT FRAMES
+  - PROMPT requires both 375px (mobile) and 1280px (desktop) shown
+    together. We render two embedded iframes side-by-side at >=900px
+    viewer width, and stack on narrow viewers. A toggle at the top
+    lets you hide either frame to focus on one.
+-->
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    />
+
+    <style>
+      /* =========================================================
+     CHROME — the wrapper that lets a reviewer switch states
+              and viewports. NOT part of the production UI.
+     ========================================================= */
+      :root {
+        --bg-page: #0a0f1a;
+        --bg-subtle: #0d1526;
+        --bg-panel: #111b2f;
+        --bg-elevated: #16223a;
+        --bg-raised: #1c2a47;
+        --brand-gold: #c5a55a;
+        --brand-gold-l: #d4bb78;
+        --brand-seam: #c41e3a;
+        --brand-seam-l: #e63950;
+        --brand-navy: #1b3a5c;
+        --brand-navy-l: #2c4a7c;
+        --text-primary: #e8edf5;
+        --text-secondary: #8a9bb5;
+        --text-quiet: #6c80ba;
+        --border: #1e2d45;
+        --border-strong: #2f3b53;
+        --info-blue: #5b84c4; /* unread dot */
+        --font-display: 'Big Shoulders Display', system-ui, sans-serif;
+        --font-body: 'Literata', Georgia, serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      /* The chrome itself sits on a slightly different surface so
+     the design framed inside reads as the artifact. */
+      body.chrome {
+        font-family: var(--font-body);
+        background:
+          radial-gradient(
+            ellipse at 50% -10%,
+            rgba(27, 58, 92, 0.35),
+            transparent 55%
+          ),
+          #05080f;
+        color: var(--text-primary);
+        min-height: 100vh;
+      }
+
+      .chrome-bar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px 24px;
+        padding: 14px 20px;
+        background: rgba(5, 8, 15, 0.85);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .chrome-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--brand-gold-l);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .chrome-title small {
+        font-family: var(--font-body);
+        font-weight: 400;
+        color: var(--text-secondary);
+        letter-spacing: 0;
+        text-transform: none;
+        font-size: 13px;
+      }
+      .chrome-group {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+      }
+      .chrome-group label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        padding: 0 12px;
+      }
+      .chrome-btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        padding: 8px 14px;
+        border-radius: 9999px;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        transition:
+          color 150ms var(--ease),
+          background 150ms var(--ease);
+      }
+      .chrome-btn:hover {
+        color: var(--text-primary);
+      }
+      .chrome-btn.on {
+        color: #fff;
+        background: var(--brand-navy);
+        box-shadow: inset 0 0 0 1px var(--brand-navy-l);
+      }
+
+      /* Stage holds the device-frame previews side-by-side. */
+      .chrome-stage {
+        padding: 32px 20px 96px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 32px;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .frame {
+        position: relative;
+        background: #000;
+        border-radius: 28px;
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.6),
+          0 0 0 1px var(--border);
+        transition: opacity 200ms var(--ease);
+      }
+      .frame.off {
+        display: none;
+      }
+      .frame-mobile {
+        width: 396px;
+        padding: 14px 10px;
+        border-radius: 38px;
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.6),
+          0 0 0 1px #1a1f2c,
+          inset 0 0 0 2px #11161f;
+      }
+      .frame-mobile iframe {
+        width: 375px;
+        height: 760px;
+        border: 0;
+        display: block;
+        border-radius: 26px;
+        background: var(--bg-page);
+      }
+      /* Desktop frame: the iframe is PINNED to 1280px logical width so the
+     desktop layout always renders. We then scale the whole frame down
+     via CSS variable --ds (set by JS based on the chrome's available
+     width) so it fits without horizontal scroll. */
+      .frame-desktop {
+        width: 1296px;
+        padding: 28px 8px 8px;
+        border-radius: 14px;
+        transform: scale(var(--ds, 1));
+        transform-origin: top center;
+        /* Reserve only the scaled height in the flow so siblings don't get
+       pushed off-screen when we scale down. */
+        margin-bottom: calc((var(--ds, 1) - 1) * 856px);
+      }
+      .frame-desktop::before {
+        /* macOS-ish window dots so the mockup reads as a desktop view */
+        content: '';
+        position: absolute;
+        top: 12px;
+        left: 14px;
+        width: 60px;
+        height: 12px;
+        background:
+          radial-gradient(circle at 6px 6px, #ff5f57 0 5px, transparent 6px),
+          radial-gradient(circle at 26px 6px, #febc2e 0 5px, transparent 6px),
+          radial-gradient(circle at 46px 6px, #28c840 0 5px, transparent 6px);
+      }
+      .frame-desktop iframe {
+        width: 1280px;
+        height: 820px;
+        border: 0;
+        display: block;
+        border-radius: 8px;
+        background: var(--bg-page);
+      }
+      .frame-label {
+        position: absolute;
+        top: -28px;
+        left: 0;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .frame-label b {
+        color: var(--brand-gold-l);
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body class="chrome">
+    <!-- ============================================================
+     CHROME (state switcher + viewport switcher)
+     ============================================================ -->
+    <div class="chrome-bar">
+      <div class="chrome-title">
+        Legacy Sports · Notifications
+        <small>/notifications · design mockup</small>
+      </div>
+
+      <div class="chrome-group" role="tablist" aria-label="State">
+        <label>State</label>
+        <button type="button" class="chrome-btn on" data-state="populated">
+          Populated
+        </button>
+        <button type="button" class="chrome-btn" data-state="loading">
+          Loading
+        </button>
+        <button type="button" class="chrome-btn" data-state="empty">
+          Empty
+        </button>
+        <button type="button" class="chrome-btn" data-state="error">
+          Error
+        </button>
+      </div>
+
+      <div class="chrome-group" role="tablist" aria-label="Viewport">
+        <label>View</label>
+        <button type="button" class="chrome-btn on" data-view="both">
+          Both
+        </button>
+        <button type="button" class="chrome-btn" data-view="mobile">
+          Mobile · 375
+        </button>
+        <button type="button" class="chrome-btn" data-view="desktop">
+          Desktop · 1280
+        </button>
+      </div>
+    </div>
+
+    <div class="chrome-stage" id="stage">
+      <div class="frame frame-mobile" id="frame-mobile">
+        <span class="frame-label">Mobile · <b>375 × 760</b></span>
+        <iframe
+          id="iframe-mobile"
+          title="Mobile preview"
+          src="notifications-app.html?state=populated&amp;viewport=mobile"
+        ></iframe>
+      </div>
+
+      <div class="frame frame-desktop" id="frame-desktop">
+        <span class="frame-label">Desktop · <b>1280 wide</b></span>
+        <iframe
+          id="iframe-desktop"
+          title="Desktop preview"
+          src="notifications-app.html?state=populated&amp;viewport=desktop"
+        ></iframe>
+      </div>
+    </div>
+
+    <script>
+      // The chrome just swaps the iframe URL params. The actual page
+      // is in notifications-app.html and reads its own ?state=… param.
+      // This keeps the production UI cleanly separated from the
+      // reviewer-only state switcher.
+      const ifMobile = document.getElementById('iframe-mobile');
+      const ifDesktop = document.getElementById('iframe-desktop');
+      const fMobile = document.getElementById('frame-mobile');
+      const fDesktop = document.getElementById('frame-desktop');
+
+      let currentState = 'populated';
+      let currentView = 'both';
+
+      function applyState() {
+        ifMobile.src = `notifications-app.html?state=${currentState}&viewport=mobile`;
+        ifDesktop.src = `notifications-app.html?state=${currentState}&viewport=desktop`;
+      }
+      function applyView() {
+        fMobile.classList.toggle('off', currentView === 'desktop');
+        fDesktop.classList.toggle('off', currentView === 'mobile');
+      }
+
+      document.querySelectorAll('[data-state]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document
+            .querySelectorAll('[data-state]')
+            .forEach((b) => b.classList.remove('on'));
+          btn.classList.add('on');
+          currentState = btn.dataset.state;
+          applyState();
+        });
+      });
+      // Scale the desktop frame down to fit the available chrome width
+      // while keeping its logical width at 1280px so the desktop layout
+      // ALWAYS renders (the inner page's @media(max-width:900px) breakpoint
+      // would otherwise fire and collapse to mobile).
+      function fitDesktop() {
+        const available = document.getElementById('stage').clientWidth - 40;
+        const ideal = 1296;
+        const mobileVisible = currentView !== 'desktop';
+        // When mobile frame is also visible side-by-side, leave room for it (~430px + gap).
+        const budget =
+          currentView === 'both' && available > 1296 + 430 + 32
+            ? available - 430 - 32
+            : available;
+        const ds = Math.min(1, budget / ideal);
+        fDesktop.style.setProperty('--ds', ds.toFixed(3));
+      }
+      window.addEventListener('resize', fitDesktop);
+      setTimeout(fitDesktop, 0);
+
+      document.querySelectorAll('[data-view]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document
+            .querySelectorAll('[data-view]')
+            .forEach((b) => b.classList.remove('on'));
+          btn.classList.add('on');
+          currentView = btn.dataset.view;
+          applyView();
+          fitDesktop();
+        });
+      });
+    </script>
+  </body>
+</html>

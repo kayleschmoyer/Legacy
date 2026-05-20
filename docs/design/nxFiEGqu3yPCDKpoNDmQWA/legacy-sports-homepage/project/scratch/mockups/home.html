@@ -1,0 +1,2836 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Legacy Sports — Home Page Mockup</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <!--
+  ============================================================
+  Legacy Sports — /  (Home page)
+  Design mockup: four states × two variants × two viewports.
+  Single self-contained HTML. No build step. Google Fonts only.
+  ------------------------------------------------------------
+  Design intent in short:
+  - Editorial hierarchy, not a uniform card grid. One league
+    earns the hero slot (the one that demands the manager's
+    attention next — active matchup, live draft, or upcoming
+    draft). The rest live in a denser list below. A right rail
+    carries "On This Day in Baseball" so history is always
+    present without competing with the matchup.
+  - The accent palette is strict. Gold = wins / first place /
+    trophies. Seam red = live draft / losing / errors. Navy =
+    primary action and selected state. Nothing else is colored.
+  - Progressive disclosure: archived leagues start folded; new
+    users see a quieter hero that leads to "Create" / "Join".
+  ============================================================
+-->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ── Tokens — mirrored from design-system colors_and_type.css ──────── */
+      :root {
+        --bg-page: #0a0f1a;
+        --bg-subtle: #0d1526;
+        --bg-panel: #111b2f;
+        --bg-elevated: #16223a;
+        --bg-raised: #1c2a47;
+
+        --brand-navy: #1b3a5c;
+        --brand-navy-light: #2c4a7c;
+        --brand-navy-dark: #143050;
+        --brand-gold: #c5a55a;
+        --brand-gold-light: #d4bb78;
+        --brand-gold-dark: #a68b3e;
+        --brand-seam-red: #c41e3a;
+        --brand-seam-red-lt: #e63950;
+
+        --text-primary: #e8edf5;
+        --text-secondary: #8a9bb5;
+        --text-muted: #6c80ba;
+        --border: #1e2d45;
+        --border-strong: #2f3b53;
+
+        --success: #4aae7c;
+        --warning: #c89452;
+
+        --pos-pitcher: #c41e3a;
+        --pos-infield: #8b6f47;
+        --pos-outfield: #2d6a4f;
+
+        --font-display:
+          'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
+        --font-body: 'Literata', Georgia, 'Times New Roman', serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+        --r-2: 6px;
+        --r-3: 8px;
+        --r-4: 12px;
+        --r-5: 16px;
+        --r-6: 20px;
+        --r-7: 24px;
+        --r-pill: 9999px;
+
+        --shadow-md: 0 4px 14px rgba(8, 12, 20, 0.55);
+        --shadow-lg: 0 12px 32px rgba(8, 12, 20, 0.65);
+        --shadow-gold:
+          0 0 0 1px rgba(197, 165, 90, 0.35),
+          0 6px 24px rgba(197, 165, 90, 0.25);
+        --shadow-seam:
+          0 0 0 1px rgba(196, 30, 58, 0.45), 0 6px 20px rgba(196, 30, 58, 0.3);
+
+        --ease-std: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: #05080f;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      /* ── Mockup reviewer chrome (NOT part of the product) ───────────── */
+      .review-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #05080f;
+        border-bottom: 1px solid #111;
+        padding: 14px 24px;
+        display: flex;
+        gap: 28px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #6c80ba;
+      }
+      .review-bar .rb-title {
+        color: var(--brand-gold-light);
+        letter-spacing: 0.2em;
+      }
+      .review-bar .rb-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .review-bar .rb-group > span:first-child {
+        color: #445676;
+        margin-right: 4px;
+      }
+      .review-bar button {
+        background: transparent;
+        border: 1px solid #1e2d45;
+        color: #8a9bb5;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 7px 13px;
+        border-radius: var(--r-pill);
+        cursor: pointer;
+        transition: all 150ms var(--ease-std);
+      }
+      .review-bar button:hover {
+        color: #e8edf5;
+        border-color: #2f3b53;
+      }
+      .review-bar button.on {
+        background: #1b3a5c;
+        border-color: #2c4a7c;
+        color: #fff;
+      }
+      .review-bar .rb-spacer {
+        flex: 1;
+      }
+      .review-bar .rb-note {
+        font-family: var(--font-body);
+        font-weight: 400;
+        font-size: 12px;
+        letter-spacing: 0;
+        text-transform: none;
+        color: #445676;
+      }
+
+      /* ── Stage — holds desktop + mobile frames side by side ───────────── */
+      .stage {
+        padding: 32px 24px 96px;
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 32px;
+        align-items: flex-start;
+        max-width: 1840px;
+        margin: 0 auto;
+      }
+      @media (max-width: 1500px) {
+        .stage {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .frame {
+        background: var(--bg-page);
+        border: 1px solid #111;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        position: relative;
+      }
+      .frame-label {
+        position: absolute;
+        top: -28px;
+        left: 0;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #445676;
+      }
+      .frame-label b {
+        color: var(--brand-gold-light);
+        font-weight: 700;
+      }
+
+      .frame-desktop {
+        min-height: 1100px;
+      }
+      .frame-mobile {
+        width: 375px;
+        min-height: 812px;
+        margin-left: auto;
+        margin-right: auto;
+        border-radius: 28px;
+      }
+
+      /* ── Night-stadium background wash (page-internal) ───────────────── */
+      .nightstadium {
+        background:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg-page);
+        background-attachment: local;
+        min-height: 100%;
+      }
+
+      /* ── Sticky top nav ──────────────────────────────────────────────── */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: rgba(10, 15, 26, 0.78);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .brand img {
+        height: 36px;
+        width: 36px;
+      }
+      .brand .wordmark {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        color: var(--brand-gold-light);
+      }
+      .brand .wordmark .sub {
+        display: block;
+        color: var(--text-primary);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+      }
+      .nav-tabs {
+        display: flex;
+        gap: 2px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--r-pill);
+        padding: 4px;
+        margin-left: 24px;
+      }
+      .nav-tabs a {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 7px 14px;
+        border-radius: var(--r-pill);
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 150ms var(--ease-std);
+        text-decoration: none;
+      }
+      .nav-tabs a.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .nav-tabs a:hover:not(.on) {
+        color: var(--text-primary);
+      }
+      .nav-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .icon-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--text-secondary);
+        position: relative;
+      }
+      .icon-btn:hover {
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .icon-btn .bell-dot {
+        position: absolute;
+        top: 8px;
+        right: 9px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--brand-seam-red-lt);
+        box-shadow: 0 0 0 2px var(--bg-page);
+      }
+      .avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1b3a5c 0%, #c5a55a 100%);
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 12px;
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+
+      /* ── Page shell ──────────────────────────────────────────────────── */
+      .page {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+      }
+
+      /* ── Compact header (returning user) ─────────────────────────────── */
+      .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 24px;
+        margin-bottom: 36px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .page-head .welcome {
+        display: flex;
+        align-items: baseline;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+      }
+      .h1 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(36px, 4.4vw, 56px);
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+        color: #fff;
+        margin: 6px 0 0;
+      }
+      .h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 32px;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .h3 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 22px;
+        line-height: 1.15;
+        margin: 0;
+        color: var(--text-primary);
+      }
+      .h4 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 18px;
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .lede {
+        font-family: var(--font-body);
+        font-size: 18px;
+        line-height: 1.55;
+        color: var(--text-secondary);
+        max-width: 62ch;
+        margin: 0;
+      }
+      p {
+        font-family: var(--font-body);
+        color: var(--text-secondary);
+        line-height: 1.55;
+        margin: 0;
+        max-width: 70ch;
+      }
+
+      .meta {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .record-line {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .record-line b {
+        color: var(--text-primary);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+      .record-line .sep {
+        color: #445676;
+      }
+
+      .head-ctas {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      /* ── Buttons ─────────────────────────────────────────────────────── */
+      .btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 11px 20px;
+        border-radius: var(--r-4);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 150ms var(--ease-std);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+      }
+      .btn-primary {
+        background: var(--brand-navy);
+        color: #fff;
+        border-color: var(--brand-navy-light);
+      }
+      .btn-primary:hover {
+        background: var(--brand-navy-light);
+        transform: translateY(-1px);
+      }
+      .btn-gold {
+        background: var(--brand-gold);
+        color: #111;
+      }
+      .btn-gold:hover {
+        background: var(--brand-gold-light);
+        transform: translateY(-1px);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border-color: var(--border-strong);
+      }
+      .btn-ghost:hover {
+        border-color: #4d5d80;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .btn-sm {
+        padding: 8px 14px;
+        font-size: 11px;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* ── Section header ──────────────────────────────────────────────── */
+      .section {
+        margin-top: 56px;
+      }
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .section-head .sh-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .section-head .sh-right {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .text-link {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+        cursor: pointer;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .text-link:hover {
+        color: var(--brand-gold);
+      }
+
+      /* ── Chips / badges ──────────────────────────────────────────────── */
+      .chip {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 5px 11px;
+        border-radius: var(--r-pill);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        border: 1px solid transparent;
+      }
+      .chip-live {
+        background: rgba(196, 30, 58, 0.15);
+        color: #e63950;
+        border-color: rgba(196, 30, 58, 0.4);
+      }
+      .chip-active {
+        background: rgba(34, 197, 94, 0.12);
+        color: #6fd39a;
+        border-color: rgba(34, 197, 94, 0.4);
+      }
+      .chip-pre {
+        background: rgba(197, 165, 90, 0.12);
+        color: var(--brand-gold-light);
+        border-color: rgba(197, 165, 90, 0.4);
+      }
+      .chip-off {
+        background: rgba(108, 128, 186, 0.1);
+        color: var(--text-muted);
+        border-color: #1e2d45;
+      }
+      .chip-soon {
+        background: rgba(200, 148, 82, 0.1);
+        color: #e3b870;
+        border-color: rgba(200, 148, 82, 0.35);
+      }
+      .chip-win {
+        background: rgba(197, 165, 90, 0.1);
+        color: var(--brand-gold-light);
+        border-color: rgba(197, 165, 90, 0.35);
+      }
+      .chip-loss {
+        background: rgba(196, 30, 58, 0.1);
+        color: #e07a8c;
+        border-color: rgba(196, 30, 58, 0.3);
+      }
+      .chip-rank-1 {
+        background: rgba(197, 165, 90, 0.12);
+        color: var(--brand-gold-light);
+        border-color: rgba(197, 165, 90, 0.4);
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+        background: currentColor;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.35;
+          transform: scale(0.85);
+        }
+      }
+      .dot-pulse {
+        animation: pulse 1.4s var(--ease-std) infinite;
+      }
+
+      /* ── Hero league card (the "next up" feature card) ───────────────── */
+      /* MOTION: on route enter, hero slides up 12px + crossfade, 300ms ease-out-quart */
+      .league-hero {
+        position: relative;
+        border-radius: var(--r-7);
+        overflow: hidden;
+        background:
+          linear-gradient(
+            135deg,
+            rgba(27, 58, 92, 0.35) 0%,
+            rgba(10, 15, 26, 0) 55%
+          ),
+          linear-gradient(180deg, rgba(197, 165, 90, 0.05), transparent 45%),
+          #0f1a2d;
+        border: 1px solid rgba(197, 165, 90, 0.22);
+        box-shadow: var(--shadow-lg);
+        padding: 32px;
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 32px;
+        align-items: center;
+      }
+      .league-hero::before {
+        /* subtle stadium-lamp glow in the corner */
+        content: '';
+        position: absolute;
+        top: -120px;
+        right: -120px;
+        width: 360px;
+        height: 360px;
+        background: radial-gradient(
+          circle,
+          rgba(197, 165, 90, 0.18) 0%,
+          transparent 65%
+        );
+        pointer-events: none;
+      }
+      .hero-left {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      .hero-head-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hero-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 36px;
+        line-height: 1.05;
+        letter-spacing: -0.01em;
+        color: #fff;
+        margin: 0;
+      }
+      .hero-sub {
+        font-family: var(--font-body);
+        font-style: italic;
+        color: var(--text-secondary);
+        font-size: 15px;
+        margin: 0;
+      }
+      .hero-footer {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .hero-footer .sep {
+        color: #445676;
+      }
+      .hero-footer b {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+
+      /* Hero matchup panel (right side) */
+      .matchup {
+        background: rgba(10, 15, 26, 0.55);
+        border: 1px solid var(--border);
+        border-radius: var(--r-5);
+        padding: 20px 22px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 20px;
+        align-items: center;
+      }
+      .matchup-side {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        text-align: center;
+      }
+      .matchup-side .team-badge {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1b3a5c 0%, #0e1e33 100%);
+        border: 1px solid var(--border-strong);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 18px;
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+      .matchup-side .team-badge.you {
+        background: linear-gradient(135deg, #1b3a5c 0%, #c5a55a 100%);
+        border-color: rgba(197, 165, 90, 0.5);
+      }
+      .matchup-side .team-badge.opp {
+        background: linear-gradient(135deg, #8b1a2b 0%, #4a0f17 100%);
+        border-color: rgba(196, 30, 58, 0.4);
+      }
+      .matchup-side .team-name {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-primary);
+      }
+      .matchup-side .team-rec {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+      }
+      .matchup-side .score {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        font-size: 52px;
+        line-height: 1;
+        color: #fff;
+        margin-top: 2px;
+      }
+      .matchup-side.leading .score {
+        color: var(--brand-gold-light);
+      }
+      .vs {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 15px;
+        letter-spacing: 0.22em;
+        color: var(--text-muted);
+      }
+
+      /* ── League list (secondary) ─────────────────────────────────────── */
+      .league-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: var(--r-5);
+        overflow: hidden;
+      }
+      .league-row {
+        background: var(--bg-elevated);
+        padding: 18px 22px;
+        display: grid;
+        grid-template-columns: minmax(220px, 1.6fr) 1fr 1fr auto;
+        gap: 24px;
+        align-items: center;
+        cursor: pointer;
+        transition: background 150ms var(--ease-std);
+        /* MOTION: on hover, background shifts to --bg-raised over 150ms */
+      }
+      .league-row:hover {
+        background: var(--bg-raised);
+      }
+      .league-row .lr-main {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+      .league-row .lr-name {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--text-primary);
+        letter-spacing: -0.005em;
+      }
+      .league-row .lr-era {
+        font-family: var(--font-body);
+        font-style: italic;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .league-row .lr-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .league-row .lr-score {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--text-secondary);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .league-row .lr-score .big {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        font-size: 22px;
+        color: var(--text-primary);
+        line-height: 1;
+      }
+      .league-row .lr-score .big.win {
+        color: var(--brand-gold-light);
+      }
+      .league-row .lr-score .big.loss {
+        color: #e07a8c;
+      }
+      .league-row .lr-week {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+      }
+      .league-row .lr-chev {
+        color: var(--text-muted);
+      }
+
+      /* Archived toggle */
+      .archive-toggle {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: transparent;
+        border: 1px dashed var(--border);
+        color: var(--text-secondary);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 10px 16px;
+        border-radius: var(--r-pill);
+        cursor: pointer;
+        transition: all 150ms var(--ease-std);
+      }
+      .archive-toggle:hover {
+        color: var(--text-primary);
+        border-color: var(--border-strong);
+      }
+      .archive-toggle svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* ── Right rail: On This Day ─────────────────────────────────────── */
+      .dashboard-split {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 32px;
+        align-items: flex-start;
+        margin-top: 56px;
+      }
+      @media (max-width: 1024px) {
+        .dashboard-split {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .rail {
+        position: sticky;
+        top: 88px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .rail-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--r-5);
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .rail-card .rail-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .rail-card .rail-head .date {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .rail-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 20px;
+        letter-spacing: -0.005em;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .otd-item {
+        padding: 16px 0;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .otd-item:first-of-type {
+        border-top: 0;
+        padding-top: 4px;
+      }
+      .otd-year {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        color: var(--brand-gold-light);
+        font-variant-numeric: tabular-nums;
+      }
+      .otd-headline {
+        font-family: var(--font-body);
+        font-weight: 600;
+        font-size: 15px;
+        line-height: 1.4;
+        color: var(--text-primary);
+        text-wrap: pretty;
+      }
+      .otd-body {
+        font-family: var(--font-body);
+        font-style: italic;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--text-secondary);
+        max-width: 70ch;
+      }
+      .otd-stat {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--text-muted);
+        display: inline-flex;
+        gap: 10px;
+        margin-top: 4px;
+      }
+      .otd-stat b {
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      /* ── Sports section (simple two-card row) ────────────────────────── */
+      .sport-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .sport-card {
+        position: relative;
+        padding: 28px;
+        border-radius: var(--r-6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        color: #fff;
+        cursor: pointer;
+        transition: all 220ms var(--ease-std);
+        text-align: left;
+        text-decoration: none;
+        font-family: inherit;
+        background: inherit;
+      }
+      .sport-bb {
+        background: linear-gradient(
+          135deg,
+          #0a0f1a 0%,
+          #1b3a5c 70%,
+          #143050 100%
+        );
+      }
+      .sport-bb:hover {
+        transform: translateY(-3px);
+        border-color: rgba(197, 165, 90, 0.35);
+        box-shadow: var(--shadow-lg);
+      }
+      .sport-fb {
+        background: linear-gradient(
+          135deg,
+          #0a0f1a 0%,
+          #0f2a1a 65%,
+          #1a3a2a 100%
+        );
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .sport-card .sc-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: var(--r-5);
+        background: rgba(10, 15, 26, 0.55);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sport-card .sc-icon img {
+        width: 36px;
+        height: 36px;
+      }
+      .sport-card .sc-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .sport-card .sc-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        letter-spacing: -0.005em;
+      }
+      .sport-card .sc-sub {
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+      .sport-card .sc-chip {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+      }
+
+      /* ── Explore stats CTA (returning user only) ─────────────────────── */
+      .stats-cta {
+        background:
+          linear-gradient(135deg, rgba(27, 58, 92, 0.2), transparent 65%),
+          var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--r-5);
+        padding: 24px 28px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .stats-cta .sc-badge {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        background: rgba(197, 165, 90, 0.08);
+        border: 1px solid rgba(197, 165, 90, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .stats-cta .sc-copy {
+        flex: 1;
+        min-width: 0;
+      }
+      .stats-cta .sc-copy .h4 {
+        margin-bottom: 4px;
+      }
+      .stats-cta .sc-copy p {
+        font-size: 14px;
+      }
+
+      /* ── Getting Started hero (new user) ─────────────────────────────── */
+      .gs-hero {
+        padding: 48px 0 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 40px;
+      }
+      .gs-hero .gs-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(44px, 5.2vw, 68px);
+        line-height: 0.98;
+        letter-spacing: -0.025em;
+        color: #fff;
+        margin: 0;
+      }
+      .gs-hero .gs-title em {
+        font-style: normal;
+        color: var(--brand-gold-light);
+      }
+      .gs-hero .gs-lede {
+        max-width: 60ch;
+        font-size: 18px;
+      }
+      .gs-hero .gs-ctas {
+        display: flex;
+        gap: 12px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      /* Featured-leagues strip (new-user discovery) */
+      .featured-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 18px;
+      }
+
+      /* ── Error state card ────────────────────────────────────────────── */
+      .error-card {
+        background: var(--bg-panel);
+        border: 1px solid rgba(196, 30, 58, 0.35);
+        border-radius: var(--r-6);
+        padding: 40px;
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        box-shadow: var(--shadow-seam);
+      }
+      .error-card .ec-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(196, 30, 58, 0.15);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: var(--brand-seam-red-lt);
+      }
+      .error-card .ec-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .error-card .ec-body p {
+        max-width: 60ch;
+      }
+      .error-card .ec-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .error-inline-code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.25);
+        padding: 3px 7px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+
+      /* ── Empty state (returning dashboard, no leagues yet) ───────────── */
+      .empty-card {
+        background:
+          radial-gradient(
+            ellipse at 50% 0%,
+            rgba(27, 58, 92, 0.35) 0%,
+            transparent 60%
+          ),
+          var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--r-7);
+        padding: 64px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        text-align: center;
+      }
+      .empty-card .ec-glyph {
+        width: 88px;
+        height: 88px;
+        border-radius: 24px;
+        background: rgba(197, 165, 90, 0.08);
+        border: 1px solid rgba(197, 165, 90, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+      .empty-card .ec-glyph img {
+        width: 52px;
+        height: 52px;
+      }
+      .empty-card .h2 {
+        font-size: 32px;
+      }
+      .empty-card .lede {
+        text-align: center;
+        margin: 0 auto;
+      }
+      .empty-card .ec-ctas {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      /* ── Loading skeletons ───────────────────────────────────────────── */
+      /* MOTION: skeleton shimmer — 1.4s linear infinite; pauses when prefers-reduced-motion */
+      @keyframes shimmer {
+        0% {
+          background-position: -400px 0;
+        }
+        100% {
+          background-position: 400px 0;
+        }
+      }
+      .skel {
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.03) 0%,
+          rgba(255, 255, 255, 0.08) 40%,
+          rgba(255, 255, 255, 0.03) 80%
+        );
+        background-size: 800px 100%;
+        animation: shimmer 1.4s linear infinite;
+        border-radius: 6px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .skel {
+          animation: none;
+        }
+      }
+      .skel-text {
+        height: 14px;
+      }
+      .skel-text.lg {
+        height: 22px;
+      }
+      .skel-text.xl {
+        height: 32px;
+      }
+      .skel-block {
+        border-radius: var(--r-5);
+      }
+
+      .skel-hero {
+        border-radius: var(--r-7);
+        border: 1px solid var(--border);
+        padding: 32px;
+        background: var(--bg-panel);
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 32px;
+        align-items: center;
+      }
+      .skel-hero .skh-left {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .skel-hero .skh-right {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .skel-row {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--r-4);
+        padding: 20px 22px;
+        display: grid;
+        grid-template-columns: 1.6fr 1fr 1fr;
+        gap: 24px;
+        align-items: center;
+      }
+      .skel-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      /* ── Onboarding tutorial modal (overlay, new user first visit) ───── */
+      .modal-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(5, 8, 15, 0.72);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        z-index: 50;
+        /* MOTION: fade+scale 200ms ease-out on mount; fade out 150ms on dismiss */
+      }
+      .modal {
+        width: 100%;
+        max-width: 560px;
+        background: var(--bg-elevated);
+        border: 1px solid rgba(197, 165, 90, 0.25);
+        border-radius: var(--r-7);
+        padding: 36px;
+        box-shadow: var(--shadow-lg);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .modal .step-dots {
+        display: flex;
+        gap: 8px;
+      }
+      .modal .step-dots span {
+        width: 24px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--border);
+      }
+      .modal .step-dots span.on {
+        background: var(--brand-gold);
+      }
+      .modal ol {
+        padding-left: 18px;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-family: var(--font-body);
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+      .modal ol b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .modal .modal-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 8px;
+      }
+
+      /* ── Mobile frame-specific overrides ─────────────────────────────── */
+      .frame-mobile .page {
+        padding: 20px 16px 60px;
+      }
+      .frame-mobile .nav-inner {
+        padding: 10px 16px;
+        gap: 12px;
+      }
+      .frame-mobile .nav-tabs {
+        display: none;
+      } /* tabs collapse to a drawer; not shown in mockup */
+      .frame-mobile .brand img {
+        height: 30px;
+        width: 30px;
+      }
+      .frame-mobile .brand .wordmark {
+        font-size: 12px;
+      }
+      .frame-mobile .brand .wordmark .sub {
+        font-size: 9px;
+      }
+      .frame-mobile .page-head {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        padding-bottom: 18px;
+        margin-bottom: 22px;
+      }
+      .frame-mobile .page-head .welcome {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .frame-mobile .h1 {
+        font-size: 34px;
+      }
+      .frame-mobile .h2 {
+        font-size: 24px;
+      }
+      .frame-mobile .head-ctas {
+        display: flex;
+        gap: 8px;
+      }
+      .frame-mobile .head-ctas .btn {
+        flex: 1;
+        justify-content: center;
+        padding: 10px 12px;
+        font-size: 11px;
+      }
+      .frame-mobile .league-hero {
+        grid-template-columns: 1fr;
+        padding: 22px;
+        gap: 22px;
+      }
+      .frame-mobile .hero-title {
+        font-size: 26px;
+      }
+      .frame-mobile .matchup {
+        padding: 16px 12px;
+        gap: 8px;
+      }
+      .frame-mobile .matchup-side .score {
+        font-size: 38px;
+      }
+      .frame-mobile .matchup-side .team-badge {
+        width: 44px;
+        height: 44px;
+        font-size: 15px;
+      }
+      .frame-mobile .vs {
+        font-size: 12px;
+        letter-spacing: 0.18em;
+      }
+      .frame-mobile .league-row {
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        padding: 16px;
+      }
+      .frame-mobile .league-row .lr-main {
+        grid-column: 1 / span 2;
+      }
+      .frame-mobile .league-row .lr-status {
+        order: 2;
+      }
+      .frame-mobile .league-row .lr-score {
+        order: 3;
+        grid-column: 1;
+        text-align: left;
+      }
+      .frame-mobile .league-row .lr-score .big {
+        font-size: 18px;
+      }
+      .frame-mobile .league-row .lr-week {
+        order: 4;
+        grid-column: 2;
+        text-align: right;
+        align-self: center;
+      }
+      .frame-mobile .league-row .lr-chev {
+        display: none;
+      }
+      .frame-mobile .dashboard-split {
+        grid-template-columns: 1fr;
+        gap: 36px;
+        margin-top: 36px;
+      }
+      .frame-mobile .rail {
+        position: static;
+      }
+      .frame-mobile .sport-grid {
+        grid-template-columns: 1fr;
+      }
+      .frame-mobile .section {
+        margin-top: 36px;
+      }
+      .frame-mobile .gs-hero {
+        padding: 24px 0 16px;
+        margin-bottom: 24px;
+      }
+      .frame-mobile .gs-hero .gs-title {
+        font-size: 40px;
+      }
+      .frame-mobile .gs-hero .gs-ctas .btn {
+        flex: 1 1 140px;
+        justify-content: center;
+      }
+      .frame-mobile .error-card {
+        padding: 24px;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .frame-mobile .empty-card {
+        padding: 40px 22px;
+      }
+      .frame-mobile .stats-cta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 20px;
+      }
+      .frame-mobile .nav-right {
+        gap: 8px;
+      }
+      .frame-mobile .icon-btn,
+      .frame-mobile .avatar {
+        width: 36px;
+        height: 36px;
+      } /* ≥44×44 on real devices — scale ratio preserved here for mockup; annotate below */
+      .frame-mobile .modal-overlay {
+        padding: 20px;
+      }
+      .frame-mobile .modal {
+        padding: 22px;
+        border-radius: var(--r-6);
+      }
+
+      /* ── Visually-hidden (for a11y) ──────────────────────────────────── */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* ── Utility ─────────────────────────────────────────────────────── */
+      .flex {
+        display: flex;
+      }
+      .gap-8 {
+        gap: 8px;
+      }
+      .mt-8 {
+        margin-top: 8px;
+      }
+      .mono-num {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Hide-by-default state containers — JS toggles one on */
+      .state {
+        display: none;
+      }
+      .state.on {
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ═════════════════════════════════════════════════════════════════
+     REVIEW BAR  (mockup chrome only — not part of the product)
+     ───────────────────────────────────────────────────────────────── -->
+    <div class="review-bar">
+      <span class="rb-title">Legacy Sports · Home · /</span>
+
+      <div class="rb-group" role="tablist" aria-label="Variant">
+        <span>Variant</span>
+        <button data-variant="returning" class="on">Returning</button>
+        <button data-variant="new">Getting&nbsp;Started</button>
+      </div>
+
+      <div class="rb-group" role="tablist" aria-label="State">
+        <span>State</span>
+        <button data-state="populated" class="on">Populated</button>
+        <button data-state="loading">Loading</button>
+        <button data-state="error">Error</button>
+        <button data-state="empty">Empty</button>
+      </div>
+
+      <div class="rb-spacer"></div>
+      <span class="rb-note">Desktop 1280&thinsp;· Mobile 375</span>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+     STAGE — desktop frame + mobile frame side-by-side
+     ───────────────────────────────────────────────────────────────── -->
+    <div class="stage">
+      <!-- ──────────── DESKTOP FRAME ──────────── -->
+      <section class="frame frame-desktop" aria-label="Desktop preview">
+        <span class="frame-label"><b>Desktop</b> · 1280px · /</span>
+        <div class="nightstadium" id="desktop-root">
+          <!-- Nav is shared across all states/variants -->
+          <header class="nav">
+            <div class="nav-inner">
+              <a class="brand" href="#">
+                <img
+                  src="../../assets/logo.png"
+                  alt="Legacy Sports"
+                  onerror="this.style.display = 'none'"
+                />
+                <div class="wordmark">
+                  LEGACY<span class="sub">SPORTS</span>
+                </div>
+              </a>
+              <nav class="nav-tabs" aria-label="Primary">
+                <a class="on" href="#">Home</a>
+                <a href="#">Scoreboard</a>
+                <a href="#">My League</a>
+                <a href="#">Draft</a>
+                <a href="#">Stats</a>
+              </nav>
+              <div class="nav-right">
+                <button class="icon-btn" aria-label="Notifications">
+                  <!-- Lucide bell, 18px -->
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                  <span class="bell-dot" aria-hidden="true"></span>
+                </button>
+                <div class="avatar" title="Mickey Jenkins">MJ</div>
+              </div>
+            </div>
+          </header>
+
+          <main class="page" id="desktop-main"><!-- swapped by JS --></main>
+        </div>
+      </section>
+
+      <!-- ──────────── MOBILE FRAME ──────────── -->
+      <section class="frame frame-mobile" aria-label="Mobile preview">
+        <span class="frame-label"><b>Mobile</b> · 375px · /</span>
+        <!-- TOUCH TARGETS: all interactive elements (avatar, icon-btn, buttons, league rows) are ≥44×44 on real devices. In this mockup the icons render smaller for scale but should enforce 44 minima in implementation. -->
+        <div class="nightstadium" id="mobile-root">
+          <header class="nav">
+            <div class="nav-inner">
+              <a class="brand" href="#">
+                <img
+                  src="../../assets/logo.png"
+                  alt=""
+                  onerror="this.style.display = 'none'"
+                />
+                <div class="wordmark">
+                  LEGACY<span class="sub">SPORTS</span>
+                </div>
+              </a>
+              <div class="nav-right">
+                <button class="icon-btn" aria-label="Notifications">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                  <span class="bell-dot" aria-hidden="true"></span>
+                </button>
+                <div class="avatar" title="Mickey Jenkins">MJ</div>
+              </div>
+            </div>
+          </header>
+
+          <main class="page" id="mobile-main"><!-- swapped by JS --></main>
+        </div>
+      </section>
+    </div>
+    <!-- /stage -->
+
+    <!-- ═════════════════════════════════════════════════════════════════
+     CONTENT TEMPLATES — one per (variant × state).  The same HTML
+     is injected into both desktop and mobile shells; CSS scales it.
+     ───────────────────────────────────────────────────────────────── -->
+    <template id="tpl-returning-populated">
+      <!-- MOTION: entire page fades up 12px + crossfade 300ms ease-out-quart on route enter -->
+
+      <!-- Compact header: greeting + aggregate record + actions -->
+      <div class="page-head">
+        <div class="welcome">
+          <div>
+            <div class="eyebrow">Welcome back</div>
+            <h1 class="h1">Welcome, Mickey</h1>
+          </div>
+          <div class="record-line">
+            <span><b>3</b> leagues</span>
+            <span class="sep">·</span>
+            <span>Overall <b>14&#8209;9&#8209;1</b></span>
+            <span class="sep">·</span>
+            <span><b>1</b> first place</span>
+          </div>
+        </div>
+        <div class="head-ctas">
+          <a class="btn btn-ghost" href="#">Browse Stats</a>
+          <a class="btn btn-primary" href="#">My Dashboard</a>
+        </div>
+      </div>
+
+      <!-- ── Main column + right rail ── -->
+      <div class="dashboard-split">
+        <div>
+          <!-- main column -->
+
+          <!-- YOUR LEAGUES -->
+          <section class="section" style="margin-top: 0">
+            <div class="section-head">
+              <div class="sh-left">
+                <div class="eyebrow">Active Season</div>
+                <h2 class="h2">Your Leagues</h2>
+              </div>
+              <div class="sh-right">
+                <button class="text-link" type="button">
+                  View all leagues
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Hero league card: the most urgent one. Here, a live matchup in Week 14. -->
+            <!-- MOTION: card lift -2px on hover, 220ms; border shifts to gold-tinted -->
+            <article
+              class="league-hero"
+              role="link"
+              tabindex="0"
+              aria-label="Open Dead Ball Dynasty"
+            >
+              <div class="hero-left">
+                <div class="hero-head-row">
+                  <span class="chip chip-active"
+                    ><span class="dot dot-pulse"></span>Active · Live</span
+                  >
+                  <span class="chip chip-rank-1">Rank&nbsp;#1</span>
+                </div>
+                <h3 class="hero-title">Dead Ball Dynasty</h3>
+                <p class="hero-sub">
+                  Deadball era · 1901–1919 · twelve managers drafting from a
+                  sepia-toned pool.
+                </p>
+                <div class="hero-footer">
+                  <span>Week <b>14</b>/22</span>
+                  <span class="sep">·</span>
+                  <span>12 teams</span>
+                  <span class="sep">·</span>
+                  <span>Matchup closes <b>Sun&nbsp;8:00&nbsp;PM</b></span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 6px">
+                  <a class="btn btn-gold" href="#"
+                    >View League
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                    >
+                      <path d="M5 12h14M13 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                  <a class="btn btn-ghost" href="#">Set Lineup</a>
+                </div>
+              </div>
+
+              <!-- Matchup panel -->
+              <div class="matchup" aria-label="Current matchup scoreboard">
+                <div class="matchup-side leading">
+                  <div class="team-badge you" aria-hidden="true">MJ</div>
+                  <div class="team-name">Bronx Bombers</div>
+                  <div class="team-rec">8-4 · Rank #1</div>
+                  <div class="score">127.5</div>
+                </div>
+                <div class="vs">VS</div>
+                <div class="matchup-side">
+                  <div class="team-badge opp" aria-hidden="true">BOS</div>
+                  <div class="team-name">Fenway Nine</div>
+                  <div class="team-rec">7-5 · Rank #3</div>
+                  <div class="score">112.3</div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Secondary leagues as a list (not cards) — denser, less noisy. -->
+            <div
+              class="league-list"
+              style="margin-top: 20px"
+              role="list"
+              aria-label="Other leagues"
+            >
+              <!-- ACTIVE league without a matchup shown — uses record + rank instead -->
+              <div
+                class="league-row"
+                role="listitem"
+                tabindex="0"
+                aria-label="Open Steroid Era Showdown"
+              >
+                <div class="lr-main">
+                  <div class="lr-name">Steroid Era Showdown</div>
+                  <div class="lr-era">
+                    1994–2004 · 10 teams · You commission this one
+                  </div>
+                </div>
+                <div class="lr-status">
+                  <span class="chip chip-active">Active</span>
+                </div>
+                <div class="lr-score">
+                  <span class="big">5-3-1</span>
+                  <span>Rank #3 of 10</span>
+                </div>
+                <div class="lr-week">Week<br />9/18</div>
+                <svg
+                  class="lr-chev"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+
+              <!-- PRE-DRAFT league w/ scheduled time -->
+              <div
+                class="league-row"
+                role="listitem"
+                tabindex="0"
+                aria-label="Open Modern Metrics"
+              >
+                <div class="lr-main">
+                  <div class="lr-name">Modern Metrics</div>
+                  <div class="lr-era">
+                    2015–Present · Auction draft · 12 managers
+                  </div>
+                </div>
+                <div class="lr-status">
+                  <span class="chip chip-pre">Pre-Draft</span>
+                </div>
+                <div class="lr-score">
+                  <span class="big" style="color: var(--brand-gold-light)"
+                    >Apr 24</span
+                  >
+                  <span>Draft · Fri 8:00 PM</span>
+                </div>
+                <div class="lr-week">7 of<br />12 ready</div>
+                <svg
+                  class="lr-chev"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </div>
+
+            <!-- Archived leagues toggle. MOTION: chevron rotates 180°; list expands 280ms ease-out-quart. -->
+            <button class="archive-toggle" type="button" aria-expanded="false">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+              Show 4 archived leagues
+            </button>
+          </section>
+
+          <!-- YOUR SPORTS -->
+          <section class="section">
+            <div class="section-head">
+              <div class="sh-left">
+                <div class="eyebrow">Your Sports</div>
+                <h2 class="h2">Pick your sport</h2>
+              </div>
+            </div>
+            <div class="sport-grid">
+              <a
+                class="sport-card sport-bb"
+                href="#"
+                aria-label="Go to Baseball"
+              >
+                <div class="sc-icon">
+                  <img src="../../icons/brand/baseball.svg" alt="" />
+                </div>
+                <div class="sc-text">
+                  <div class="sc-title">Baseball</div>
+                  <div class="sc-sub">
+                    3 leagues · Next up: Dead Ball Dynasty
+                  </div>
+                </div>
+              </a>
+              <div
+                class="sport-card sport-fb"
+                aria-label="Football — coming soon"
+                aria-disabled="true"
+              >
+                <span class="chip chip-soon sc-chip">Coming Soon</span>
+                <div class="sc-icon">
+                  <img src="../../icons/brand/football.svg" alt="" />
+                </div>
+                <div class="sc-text">
+                  <div class="sc-title">Football</div>
+                  <div class="sc-sub">Kickoff for the 2026 season</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Explore stats CTA -->
+          <section class="section">
+            <div class="stats-cta">
+              <div class="sc-badge">
+                <img
+                  src="../../icons/brand/award.svg"
+                  width="32"
+                  height="32"
+                  alt=""
+                />
+              </div>
+              <div class="sc-copy">
+                <div class="h4">Explore player statistics</div>
+                <p>
+                  Every recorded at-bat since 1876. Filter by era, team, or the
+                  night a record fell.
+                </p>
+              </div>
+              <a class="btn btn-ghost" href="#">View All Stats</a>
+            </div>
+          </section>
+        </div>
+        <!-- /main -->
+
+        <!-- RIGHT RAIL: On This Day in Baseball -->
+        <aside class="rail" aria-label="On This Day in Baseball">
+          <div class="rail-card">
+            <div class="rail-head">
+              <h3 class="rail-title">On This Day in Baseball</h3>
+              <span class="date">Apr 20</span>
+            </div>
+            <!-- Three entries, era-diverse -->
+            <div class="otd-item">
+              <span class="otd-year">1912</span>
+              <div class="otd-headline">
+                Fenway Park opens with a Tris Speaker walk-off single in the
+                eleventh.
+              </div>
+              <p class="otd-body">
+                The new ballpark drew 27,000 through its gates — more than had
+                come to see any Red Sox game the season prior.
+              </p>
+              <div class="otd-stat">
+                <b>BOS</b> 7 · <b>NYH</b> 6 &nbsp;|&nbsp; Speaker 2-5, RBI
+              </div>
+            </div>
+            <div class="otd-item">
+              <span class="otd-year">1939</span>
+              <div class="otd-headline">
+                Ted Williams debuts for the Red Sox, goes 1-4 with a double off
+                Red Ruffing.
+              </div>
+              <div class="otd-stat">
+                <b>NYY</b> 2 · <b>BOS</b> 0 &nbsp;|&nbsp; Williams 1-4, 2B
+              </div>
+            </div>
+            <div class="otd-item">
+              <span class="otd-year">2008</span>
+              <div class="otd-headline">
+                Chase Utley hits his 10th home run of April, a Phillies
+                franchise record.
+              </div>
+              <div class="otd-stat">
+                <b>PHI</b> 5 · <b>SDP</b> 2 &nbsp;|&nbsp; Utley 2-4, HR, 3 RBI
+              </div>
+            </div>
+            <button
+              class="text-link"
+              type="button"
+              style="align-self: flex-start"
+            >
+              Full archive
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M5 12h14M13 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </aside>
+      </div>
+    </template>
+
+    <!-- ══════════════════ RETURNING · LOADING ══════════════════ -->
+    <template id="tpl-returning-loading">
+      <!-- Skeleton mirrors the populated geometry so layout does not shift. -->
+      <!-- MOTION: skeleton shimmer 1.4s linear infinite; respects prefers-reduced-motion -->
+      <div class="page-head">
+        <div
+          class="welcome"
+          style="
+            flex: 1;
+            gap: 10px;
+            flex-direction: column;
+            align-items: flex-start;
+          "
+        >
+          <div class="skel skel-text" style="width: 90px; height: 11px"></div>
+          <div
+            class="skel skel-text xl"
+            style="width: 320px; height: 44px"
+          ></div>
+          <div class="skel skel-text" style="width: 260px; height: 13px"></div>
+        </div>
+        <div class="head-ctas">
+          <div
+            class="skel"
+            style="width: 140px; height: 42px; border-radius: 12px"
+          ></div>
+          <div
+            class="skel"
+            style="width: 160px; height: 42px; border-radius: 12px"
+          ></div>
+        </div>
+      </div>
+
+      <div class="dashboard-split">
+        <div>
+          <div class="skel-hero">
+            <div class="skh-left">
+              <div
+                class="skel"
+                style="width: 120px; height: 22px; border-radius: 9999px"
+              ></div>
+              <div
+                class="skel skel-text"
+                style="width: 80%; height: 32px; margin-top: 6px"
+              ></div>
+              <div
+                class="skel skel-text"
+                style="width: 70%; height: 14px"
+              ></div>
+              <div
+                class="skel skel-text"
+                style="width: 60%; height: 14px"
+              ></div>
+              <div style="display: flex; gap: 10px; margin-top: 10px">
+                <div
+                  class="skel"
+                  style="width: 140px; height: 40px; border-radius: 12px"
+                ></div>
+                <div
+                  class="skel"
+                  style="width: 120px; height: 40px; border-radius: 12px"
+                ></div>
+              </div>
+            </div>
+            <div class="skh-right">
+              <div class="skel skel-block" style="height: 180px"></div>
+            </div>
+          </div>
+
+          <div class="skel-list" style="margin-top: 20px">
+            <div class="skel-row">
+              <div>
+                <div
+                  class="skel skel-text"
+                  style="width: 65%; height: 18px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 45%; height: 12px; margin-top: 8px"
+                ></div>
+              </div>
+              <div
+                class="skel"
+                style="
+                  width: 80px;
+                  height: 22px;
+                  border-radius: 9999px;
+                  justify-self: start;
+                "
+              ></div>
+              <div class="skel skel-text lg" style="width: 100px"></div>
+            </div>
+            <div class="skel-row">
+              <div>
+                <div
+                  class="skel skel-text"
+                  style="width: 55%; height: 18px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 70%; height: 12px; margin-top: 8px"
+                ></div>
+              </div>
+              <div
+                class="skel"
+                style="
+                  width: 90px;
+                  height: 22px;
+                  border-radius: 9999px;
+                  justify-self: start;
+                "
+              ></div>
+              <div class="skel skel-text lg" style="width: 120px"></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="rail">
+          <div class="rail-card">
+            <div class="skel skel-text" style="width: 70%; height: 18px"></div>
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                margin-top: 8px;
+              "
+            >
+              <div>
+                <div
+                  class="skel skel-text"
+                  style="width: 56px; height: 12px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 92%; height: 14px; margin-top: 8px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 70%; height: 14px; margin-top: 6px"
+                ></div>
+              </div>
+              <div>
+                <div
+                  class="skel skel-text"
+                  style="width: 56px; height: 12px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 88%; height: 14px; margin-top: 8px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 60%; height: 14px; margin-top: 6px"
+                ></div>
+              </div>
+              <div>
+                <div
+                  class="skel skel-text"
+                  style="width: 56px; height: 12px"
+                ></div>
+                <div
+                  class="skel skel-text"
+                  style="width: 85%; height: 14px; margin-top: 8px"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </template>
+
+    <!-- ══════════════════ RETURNING · ERROR ══════════════════ -->
+    <template id="tpl-returning-error">
+      <div class="page-head">
+        <div class="welcome">
+          <div>
+            <div class="eyebrow">Welcome back</div>
+            <h1 class="h1">Welcome, Mickey</h1>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOTION: error card fades in 200ms ease-out; retry button pulses once on focus -->
+      <section class="error-card" role="alert" aria-live="assertive">
+        <div class="ec-icon" aria-hidden="true">
+          <!-- Warning glyph (BrandIcon-style, 1.8px stroke) -->
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M10.3 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0z"
+            />
+            <path d="M12 9v4" />
+            <path d="M12 17.01V17" />
+          </svg>
+        </div>
+        <div class="ec-body">
+          <h2 class="h2" style="font-size: 26px">
+            Unable to load your leagues
+          </h2>
+          <p>
+            We couldn't reach the league server. Your standings and matchups are
+            safe — this is a display issue only. Try again, or come back in a
+            moment.
+          </p>
+          <div class="meta" style="margin-top: 4px">
+            Reference <span class="error-inline-code">req_8f3a12b9</span> ·
+            <span class="mono-num">14:27:03 UTC</span>
+          </div>
+          <div class="ec-actions">
+            <button class="btn btn-primary" type="button">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              >
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              Retry
+            </button>
+            <a class="btn btn-ghost" href="#">Report this issue</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Even in the error state, keep the rail populated: history doesn't depend on the league feed. -->
+      <section class="section">
+        <div class="section-head">
+          <div class="sh-left">
+            <div class="eyebrow">Still here</div>
+            <h2 class="h2">On This Day in Baseball</h2>
+          </div>
+        </div>
+        <div class="rail-card" style="max-width: 680px">
+          <div class="otd-item">
+            <span class="otd-year">1912</span>
+            <div class="otd-headline">
+              Fenway Park opens with a Tris Speaker walk-off single in the
+              eleventh.
+            </div>
+            <p class="otd-body">
+              The new ballpark drew 27,000 through its gates — more than had
+              come to see any Red Sox game the season prior.
+            </p>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <!-- ══════════════════ RETURNING · EMPTY ══════════════════ -->
+    <!-- Technically this is the shape of "returning=false" per the spec, but we
+     show it in the Returning variant tree as the 'leagues cleared / account
+     reset' edge case the same component must handle gracefully. -->
+    <template id="tpl-returning-empty">
+      <div class="page-head">
+        <div class="welcome">
+          <div>
+            <div class="eyebrow">Welcome back</div>
+            <h1 class="h1">Welcome, Mickey</h1>
+          </div>
+        </div>
+      </div>
+
+      <section class="empty-card">
+        <div class="ec-glyph">
+          <img
+            src="../../icons/brand/trophy.svg"
+            alt=""
+            width="52"
+            height="52"
+          />
+        </div>
+        <div class="eyebrow">No active leagues</div>
+        <h2 class="h2">Your dugout is quiet.</h2>
+        <p class="lede">
+          Create or join your first league. Draft legends from across MLB
+          history and start a dynasty that outlasts the season.
+        </p>
+        <div class="ec-ctas">
+          <a class="btn btn-gold" href="#">Create a League</a>
+          <a class="btn btn-ghost" href="#">Join with Invite Code</a>
+          <a class="btn btn-ghost" href="#">How It Works</a>
+        </div>
+      </section>
+    </template>
+
+    <!-- ══════════════════ NEW USER · POPULATED (Getting Started) ══════════════════ -->
+    <template id="tpl-new-populated">
+      <!-- Hero is quieter than marketing — user is already signed in. -->
+      <div class="gs-hero">
+        <div class="eyebrow">Welcome, Mickey</div>
+        <h1 class="gs-title">
+          Start your dynasty.<br /><em>Draft legends across every era.</em>
+        </h1>
+        <p class="lede gs-lede">
+          Create a league in sixty seconds. Invite ten friends, pick an era, and
+          compete on real archived statistics — from Deadball to today.
+        </p>
+        <div class="gs-ctas">
+          <a class="btn btn-gold" href="#">Create League</a>
+          <a class="btn btn-primary" href="#">Join League</a>
+          <a class="btn btn-ghost" href="#">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 3-3 3" />
+              <path d="M12 17h.01" />
+            </svg>
+            How It Works
+          </a>
+        </div>
+      </div>
+
+      <!-- Choose Your Sport — full-width, no right rail yet (no personal data to show) -->
+      <section class="section" style="margin-top: 0">
+        <div class="section-head">
+          <div class="sh-left">
+            <div class="eyebrow">Step one</div>
+            <h2 class="h2">Choose your sport</h2>
+          </div>
+        </div>
+        <div class="sport-grid">
+          <!-- Expanded baseball card: has inline View Leagues + Create buttons -->
+          <div
+            class="sport-card sport-bb"
+            style="
+              align-items: flex-start;
+              flex-direction: column;
+              padding: 32px;
+              gap: 16px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                width: 100%;
+              "
+            >
+              <div class="sc-icon" style="width: 72px; height: 72px">
+                <img
+                  src="../../icons/brand/baseball.svg"
+                  alt=""
+                  style="width: 40px; height: 40px"
+                />
+              </div>
+              <span class="chip chip-active"
+                ><span class="dot dot-pulse"></span>Live Season</span
+              >
+            </div>
+            <div class="sc-text">
+              <div class="sc-title" style="font-size: 32px">Baseball</div>
+              <div class="sc-sub" style="font-size: 15px; max-width: 48ch">
+                162 games, every era since 1876. Draft Ruth alongside Trout —
+                then watch the archived tape play out.
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: auto">
+              <a class="btn btn-gold" href="#">Create League</a>
+              <a class="btn btn-ghost" href="#">View Public Leagues</a>
+            </div>
+          </div>
+
+          <!-- Football card: disabled, Coming Soon -->
+          <div
+            class="sport-card sport-fb"
+            style="
+              align-items: flex-start;
+              flex-direction: column;
+              padding: 32px;
+              gap: 16px;
+            "
+            aria-disabled="true"
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                width: 100%;
+              "
+            >
+              <div class="sc-icon" style="width: 72px; height: 72px">
+                <img
+                  src="../../icons/brand/football.svg"
+                  alt=""
+                  style="width: 40px; height: 40px"
+                />
+              </div>
+              <span class="chip chip-soon">Coming Soon</span>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title" style="font-size: 32px">Football</div>
+              <div class="sc-sub" style="font-size: 15px; max-width: 48ch">
+                Kickoff for the 2026 season. Same archive-first format, turf
+                green instead of seam red.
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: auto">
+              <button class="btn btn-ghost" disabled>View Leagues</button>
+              <button class="btn btn-ghost" disabled>Create League</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- On This Day — only rendered because defaultSport === 'baseball' -->
+      <section class="section">
+        <div class="section-head">
+          <div class="sh-left">
+            <div class="eyebrow">Try the archive</div>
+            <h2 class="h2">On This Day in Baseball</h2>
+          </div>
+          <div class="sh-right">
+            <button class="text-link" type="button">
+              Full archive
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M5 12h14M13 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- 2-up row using the same OTD item vocab as the returning rail; wider here -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+          <div class="rail-card">
+            <div class="rail-head">
+              <span class="otd-year">1912</span>
+              <span class="date">Apr 20</span>
+            </div>
+            <div class="otd-headline" style="font-size: 18px">
+              Fenway Park opens with a Tris Speaker walk-off single in the
+              eleventh.
+            </div>
+            <p class="otd-body">
+              The new ballpark drew 27,000 through its gates. Speaker's
+              11th-inning single scored Steve Yerkes from second and set the
+              standard for Opening Days thereafter.
+            </p>
+            <div class="otd-stat">
+              <b>BOS</b> 7 · <b>NYH</b> 6 &nbsp;|&nbsp; Speaker 2-5, RBI
+            </div>
+          </div>
+          <div class="rail-card">
+            <div class="rail-head">
+              <span class="otd-year">1939</span>
+              <span class="date">Apr 20</span>
+            </div>
+            <div class="otd-headline" style="font-size: 18px">
+              Ted Williams debuts for Boston, doubles off Red Ruffing in his
+              third at-bat.
+            </div>
+            <p class="otd-body">
+              The 20-year-old from San Diego went 1-4 in the loss. Teammate Jim
+              Tabor watched from the on-deck circle, later recalling the swing
+              as "the quietest thunder I'd ever seen."
+            </p>
+            <div class="otd-stat">
+              <b>NYY</b> 2 · <b>BOS</b> 0 &nbsp;|&nbsp; Williams 1-4, 2B
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Explore stats CTA — same component, slightly reframed for the new user -->
+      <section class="section">
+        <div class="stats-cta">
+          <div class="sc-badge">
+            <img
+              src="../../icons/brand/stats.svg"
+              width="32"
+              height="32"
+              alt=""
+            />
+          </div>
+          <div class="sc-copy">
+            <div class="h4">Or just browse a century of data</div>
+            <p>
+              Not ready to commit to a league yet? Every box score since 1876 is
+              here to read.
+            </p>
+          </div>
+          <a class="btn btn-ghost" href="#">View All Stats</a>
+        </div>
+      </section>
+
+      <!-- Onboarding tutorial modal — auto-shown for first-time users w/ no leagues,
+     dismissed by clicking Skip or Start. Here rendered as overlay for review. -->
+      <!-- MOTION: fade + scale(0.98 -> 1), 200ms ease-out on mount -->
+      <div
+        class="modal-overlay"
+        role="dialog"
+        aria-labelledby="tut-title"
+        aria-modal="true"
+      >
+        <div class="modal">
+          <div class="step-dots" aria-hidden="true">
+            <span class="on"></span><span></span><span></span><span></span>
+          </div>
+          <div class="eyebrow">Step 1 of 4</div>
+          <h3 class="h2" id="tut-title" style="font-size: 28px">
+            How a Legacy league works
+          </h3>
+          <ol>
+            <li>
+              <b>Pick an era.</b> Deadball, Integration, Steroid, Modern — or
+              all-time.
+            </li>
+            <li>
+              <b>Draft your roster.</b> Snake, auction, or keeper — up to you.
+            </li>
+            <li>
+              <b>Play on the archive.</b> Real games from that era decide your
+              week.
+            </li>
+            <li>
+              <b>Lift the pennant.</b> Season ends when you say it does. No
+              blackout dates.
+            </li>
+          </ol>
+          <div class="modal-footer">
+            <button class="text-link" type="button">Skip</button>
+            <div style="display: flex; gap: 10px">
+              <button class="btn btn-ghost" type="button">Back</button>
+              <button class="btn btn-primary" type="button">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ══════════════════ NEW USER · LOADING ══════════════════ -->
+    <template id="tpl-new-loading">
+      <div class="gs-hero" style="gap: 14px">
+        <div class="skel skel-text" style="width: 120px; height: 12px"></div>
+        <div class="skel skel-text" style="width: 70%; height: 56px"></div>
+        <div class="skel skel-text" style="width: 60%; height: 20px"></div>
+        <div style="display: flex; gap: 10px; margin-top: 8px">
+          <div
+            class="skel"
+            style="width: 140px; height: 42px; border-radius: 12px"
+          ></div>
+          <div
+            class="skel"
+            style="width: 140px; height: 42px; border-radius: 12px"
+          ></div>
+          <div
+            class="skel"
+            style="width: 140px; height: 42px; border-radius: 12px"
+          ></div>
+        </div>
+      </div>
+
+      <section class="section" style="margin-top: 0">
+        <div class="skel skel-text" style="width: 140px; height: 12px"></div>
+        <div
+          class="skel skel-text"
+          style="width: 280px; height: 32px; margin: 6px 0 16px"
+        ></div>
+        <div class="sport-grid">
+          <div class="skel skel-block" style="height: 260px"></div>
+          <div class="skel skel-block" style="height: 260px"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div
+          class="skel skel-text"
+          style="width: 240px; height: 32px; margin-bottom: 16px"
+        ></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+          <div class="skel skel-block" style="height: 180px"></div>
+          <div class="skel skel-block" style="height: 180px"></div>
+        </div>
+      </section>
+    </template>
+
+    <!-- ══════════════════ NEW USER · ERROR ══════════════════ -->
+    <template id="tpl-new-error">
+      <div class="gs-hero" style="padding: 32px 0 16px; margin-bottom: 24px">
+        <div class="eyebrow">Welcome, Mickey</div>
+        <h1 class="gs-title">Start your dynasty.</h1>
+      </div>
+
+      <!-- Error surface: the sports/league feed failed, but sign-in succeeded. -->
+      <section class="error-card" role="alert" aria-live="assertive">
+        <div class="ec-icon" aria-hidden="true">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M10.3 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0z"
+            />
+            <path d="M12 9v4" />
+            <path d="M12 17.01V17" />
+          </svg>
+        </div>
+        <div class="ec-body">
+          <h2 class="h2" style="font-size: 26px">
+            We can't list public leagues right now
+          </h2>
+          <p>
+            The league discovery service is temporarily offline. You can still
+            create your own league — that path uses a different backend.
+          </p>
+          <div class="ec-actions">
+            <a class="btn btn-gold" href="#">Create a League</a>
+            <button class="btn btn-ghost" type="button">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              >
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              Retry
+            </button>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <!-- ══════════════════ NEW USER · EMPTY ══════════════════ -->
+    <!-- "Empty" for a new user means: the query succeeded, but no sports are
+     currently available (ultra-edge; e.g. both sports under maintenance). -->
+    <template id="tpl-new-empty">
+      <div class="gs-hero" style="padding: 32px 0 16px; margin-bottom: 24px">
+        <div class="eyebrow">Welcome, Mickey</div>
+        <h1 class="gs-title">Start your dynasty.</h1>
+      </div>
+      <section class="empty-card">
+        <div class="ec-glyph">
+          <img
+            src="../../icons/brand/baseball.svg"
+            alt=""
+            width="52"
+            height="52"
+          />
+        </div>
+        <div class="eyebrow">All sports offline</div>
+        <h2 class="h2">Rain delay.</h2>
+        <p class="lede">
+          Both baseball and football league services are in scheduled
+          maintenance. We'll be back before first pitch — check the status page
+          for an ETA.
+        </p>
+        <div class="ec-ctas">
+          <a class="btn btn-ghost" href="#">Status Page</a>
+          <a class="btn btn-ghost" href="#">Browse Player Stats</a>
+        </div>
+      </section>
+    </template>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+     STATE SWITCHER JS
+     ───────────────────────────────────────────────────────────────── -->
+    <script>
+      (function () {
+        var variant = 'returning';
+        var state = 'populated';
+
+        var desktopMain = document.getElementById('desktop-main');
+        var mobileMain = document.getElementById('mobile-main');
+
+        function render() {
+          var id = 'tpl-' + variant + '-' + state;
+          var tpl = document.getElementById(id);
+          if (!tpl) return;
+          // Clone into each frame. We render the same nodes twice (once per frame)
+          // so the desktop and mobile CSS scoping can style them differently.
+          desktopMain.innerHTML = '';
+          mobileMain.innerHTML = '';
+          desktopMain.appendChild(tpl.content.cloneNode(true));
+          mobileMain.appendChild(tpl.content.cloneNode(true));
+        }
+
+        document
+          .querySelectorAll('.review-bar button[data-variant]')
+          .forEach(function (b) {
+            b.addEventListener('click', function () {
+              document
+                .querySelectorAll('.review-bar button[data-variant]')
+                .forEach(function (x) {
+                  x.classList.remove('on');
+                });
+              b.classList.add('on');
+              variant = b.getAttribute('data-variant');
+              render();
+            });
+          });
+        document
+          .querySelectorAll('.review-bar button[data-state]')
+          .forEach(function (b) {
+            b.addEventListener('click', function () {
+              document
+                .querySelectorAll('.review-bar button[data-state]')
+                .forEach(function (x) {
+                  x.classList.remove('on');
+                });
+              b.classList.add('on');
+              state = b.getAttribute('data-state');
+              render();
+            });
+          });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

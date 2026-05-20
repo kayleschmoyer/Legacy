@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 32px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .scene {
+        position: relative;
+        height: 480px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 40px;
+      }
+      .lab-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+      }
+      .anchor {
+        position: relative;
+        display: inline-block;
+      }
+      .trigger {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        background: var(--surface-card);
+        color: var(--fg2);
+        border: 1px solid var(--outline-default);
+        border-radius: var(--radius-2);
+        padding: 10px 14px;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        cursor: pointer;
+      }
+      .trigger.active {
+        border-color: var(--focus-ring);
+        box-shadow: 0 0 0 3px rgba(78, 142, 214, 0.18);
+      }
+      .popover {
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--surface-card);
+        border: 1px solid var(--outline-default);
+        border-radius: var(--radius-3);
+        box-shadow: var(--shadow-lg);
+        padding: 14px;
+        min-width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .popover::before {
+        content: '';
+        position: absolute;
+        top: -7px;
+        left: 50%;
+        margin-left: -6px;
+        width: 12px;
+        height: 12px;
+        background: var(--surface-card);
+        border-top: 1px solid var(--outline-default);
+        border-left: 1px solid var(--outline-default);
+        transform: rotate(45deg);
+      }
+      .cal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--fg2);
+      }
+      .cal-head svg {
+        width: 14px;
+        height: 14px;
+        stroke: var(--fg3);
+        fill: none;
+        stroke-width: 2;
+        cursor: pointer;
+      }
+      .dow {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        text-align: center;
+      }
+      .days {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      .d {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        color: var(--fg2);
+      }
+      .d.muted {
+        color: var(--fg4);
+      }
+      .d.today {
+        border: 1px solid var(--brand-gold);
+      }
+      .d.sel {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .d:hover {
+        background: var(--bg-hover);
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scene">
+      <div class="lab-overlay">Popover · DatePicker · anchored</div>
+      <div class="anchor">
+        <button class="trigger active">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M16 2v4M8 2v4M3 10h18" /></svg
+          >Apr 12, 2026
+        </button>
+        <div class="popover">
+          <div class="cal-head">
+            <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg
+            ><span>April 2026</span
+            ><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
+          </div>
+          <div class="dow">
+            <span>S</span><span>M</span><span>T</span><span>W</span
+            ><span>T</span><span>F</span><span>S</span>
+          </div>
+          <div class="days">
+            <span class="d muted">29</span><span class="d muted">30</span
+            ><span class="d muted">31</span><span class="d">1</span
+            ><span class="d">2</span><span class="d">3</span
+            ><span class="d">4</span> <span class="d">5</span
+            ><span class="d">6</span><span class="d">7</span
+            ><span class="d">8</span><span class="d">9</span
+            ><span class="d">10</span><span class="d">11</span>
+            <span class="d sel">12</span><span class="d">13</span
+            ><span class="d">14</span><span class="d">15</span
+            ><span class="d today">16</span><span class="d">17</span
+            ><span class="d">18</span> <span class="d">19</span
+            ><span class="d">20</span><span class="d">21</span
+            ><span class="d">22</span><span class="d">23</span
+            ><span class="d">24</span><span class="d">25</span>
+            <span class="d">26</span><span class="d">27</span
+            ><span class="d">28</span><span class="d">29</span
+            ><span class="d">30</span><span class="d muted">1</span
+            ><span class="d muted">2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

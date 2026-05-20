@@ -1,0 +1,1393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Player Detail — Legacy Sports</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ──────────────────────────────────────────────────────────────
+   TOKENS — Legacy Sports DS (subset used here).
+   ────────────────────────────────────────────────────────────── */
+      :root {
+        --bg-page: #0a0f1a;
+        --bg-subtle: #0d1526;
+        --bg-panel: #111b2f;
+        --bg-elevated: #16223a;
+        --bg-raised: #1c2a47;
+        --gold: #c5a55a;
+        --gold-light: #d4bb78;
+        --gold-dark: #a68b3e;
+        --seam: #c41e3a;
+        --seam-light: #e63950;
+        --navy: #1b3a5c;
+        --navy-light: #2c4a7c;
+        --fg-1: #e8edf5;
+        --fg-2: #8a9bb5;
+        --fg-3: #6c80ba;
+        --border: #1e2d45;
+        --border-soft: rgba(255, 255, 255, 0.06);
+        --border-strong: rgba(255, 255, 255, 0.14);
+        --pos-pitcher: #c41e3a;
+        --pos-catcher: #7c8794;
+        --pos-infield: #8b6f47;
+        --pos-outfield: #2d6a4f;
+        --pos-utility: #c5a55a;
+        --radius-inline: 4px;
+        --radius-input: 6px;
+        --radius-badge: 8px;
+        --radius-btn: 12px;
+        --radius-card: 16px;
+        --radius-panel: 20px;
+        --radius-pill: 9999px;
+        --shadow-md: 0 4px 14px rgba(8, 12, 20, 0.55);
+        --shadow-lg: 0 12px 32px rgba(8, 12, 20, 0.65);
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --font-display: 'Big Shoulders Display', system-ui, sans-serif;
+        --font-body: 'Literata', Georgia, serif;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg-page);
+        color: var(--fg-1);
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        background-image:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          );
+        background-attachment: fixed;
+        min-height: 100vh;
+      }
+      td,
+      th,
+      .stat,
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Reviewer chrome ----------------------------------------------- */
+      .reviewer-bar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(10, 15, 26, 0.82);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 20px;
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+      }
+      .reviewer-bar .rb-label {
+        color: var(--fg-3);
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }
+      .reviewer-bar .rb-group {
+        display: flex;
+        gap: 4px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        padding: 4px;
+      }
+      .reviewer-bar .rb-group button {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: 0;
+        padding: 7px 13px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        transition: all 150ms var(--ease);
+      }
+      .reviewer-bar .rb-group button.on {
+        background: var(--navy);
+        color: var(--fg-1);
+        box-shadow: 0 1px 2px rgba(8, 12, 20, 0.4);
+      }
+      .reviewer-bar .rb-group button:hover:not(.on) {
+        color: var(--fg-1);
+      }
+      .reviewer-bar .rb-spacer {
+        flex: 1;
+      }
+      .reviewer-bar .rb-note {
+        font-family: var(--font-body);
+        font-size: 12px;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--fg-3);
+        font-style: italic;
+      }
+
+      /* Stage ---------------------------------------------------------- */
+      .stage {
+        display: grid;
+        gap: 40px;
+        padding: 32px;
+        grid-template-columns: 375px 1fr;
+        align-items: start;
+        max-width: 1720px;
+        margin: 0 auto;
+      }
+      .stage[data-view='mobile'] {
+        grid-template-columns: 375px;
+        justify-content: center;
+      }
+      .stage[data-view='desktop'] {
+        grid-template-columns: 1fr;
+      }
+      .stage[data-view='desktop'] .frame-mobile {
+        display: none;
+      }
+      .stage[data-view='mobile'] .frame-desktop {
+        display: none;
+      }
+      .viewport-heading {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        margin: 0 0 10px 4px;
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .viewport-heading .dim {
+        font-family: var(--font-body);
+        font-weight: 400;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: none;
+      }
+      .frame {
+        background: var(--bg-page);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        background-image:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg-page);
+      }
+      .frame-mobile {
+        width: 375px;
+      }
+      .frame-desktop {
+        width: 100%;
+        max-width: 1280px;
+      }
+      .viewport {
+        overflow: auto;
+        max-height: calc(100vh - 140px);
+      }
+      .frame-mobile .viewport {
+        max-height: 812px;
+      }
+
+      /* Nav shell (compact — detail opens as modal on top of stats route) */
+      .app-nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(10, 15, 26, 0.75);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .app-nav-inner {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 12px 20px;
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+      .brand img {
+        height: 32px;
+      }
+      .brand .wordmark {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        color: var(--gold-light);
+        line-height: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .brand .wordmark span {
+        color: var(--fg-1);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        margin-top: 3px;
+      }
+      .spacer {
+        flex: 1;
+      }
+      .back-btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--fg-1);
+        padding: 8px 14px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .back-btn:hover {
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .frame-mobile .back-btn {
+        min-height: 44px;
+      } /* ≥44px touch target */
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--fg-2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      /* The "modal" — full-width on desktop inside the viewport, full-screen on mobile.
+   The reference doc calls it PlayerDetailModal; we render it as a content pane,
+   not a floating dialog, so reviewers can see the whole thing at once. */
+      .modal-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 24px 80px;
+      }
+      .frame-mobile .modal-shell {
+        padding: 16px 14px 56px;
+      }
+
+      .modal-title-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 16px 0 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      .frame-mobile .modal-title-row {
+        grid-template-columns: auto 1fr;
+        row-gap: 10px;
+      }
+      .frame-mobile .modal-title-row .row-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+      }
+
+      .portrait {
+        width: 92px;
+        height: 92px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1b3a5c 0%, #c5a55a 100%);
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 28px;
+        letter-spacing: 0.04em;
+        color: #fff;
+      }
+      .frame-mobile .portrait {
+        width: 68px;
+        height: 68px;
+        font-size: 22px;
+      }
+      .title-block .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+      .title-block h1 {
+        margin: 4px 0 4px;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 54px;
+        line-height: 0.95;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+      }
+      .frame-mobile .title-block h1 {
+        font-size: 34px;
+      }
+      .title-block .sub {
+        font-family: var(--font-body);
+        color: var(--fg-2);
+        font-style: italic;
+        font-size: 15px;
+        max-width: 70ch;
+      }
+      .frame-mobile .title-block .sub {
+        font-size: 13px;
+      }
+
+      .row-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 10px 14px;
+        border-radius: var(--radius-btn);
+        border: 1px solid var(--border);
+        background: var(--bg-panel);
+        color: var(--fg-1);
+        cursor: pointer;
+        transition: all 150ms var(--ease);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn:hover {
+        border-color: var(--border-strong);
+        background: var(--bg-elevated);
+      }
+      .btn-primary {
+        background: var(--navy);
+        border-color: var(--navy-light);
+      }
+      .btn-primary:hover {
+        background: var(--navy-light);
+      }
+      .btn-gold {
+        background: var(--gold);
+        color: #111;
+        border-color: var(--gold-dark);
+      }
+      .frame-mobile .btn {
+        min-height: 44px;
+      }
+
+      /* Positions band */
+      .positions-band {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 22px;
+      }
+      .positions-band .label-inline {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        margin-right: 4px;
+      }
+      .pos-chip {
+        display: inline-flex;
+        align-items: center;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        padding: 4px 8px;
+        border-radius: var(--radius-inline);
+        color: #fff;
+        min-width: 32px;
+        justify-content: center;
+      }
+      .pos-P {
+        background: var(--pos-pitcher);
+      }
+      .pos-C {
+        background: var(--pos-catcher);
+        color: #111;
+      }
+      .pos-IF {
+        background: var(--pos-infield);
+      }
+      .pos-OF {
+        background: var(--pos-outfield);
+      }
+      .pos-U {
+        background: var(--pos-utility);
+        color: #111;
+      }
+
+      /* Hero stats — 3 chip sizes depending on role (hitter vs pitcher) */
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      .frame-mobile .hero-stats {
+        gap: 8px;
+      }
+      .hero-stat {
+        padding: 20px 22px;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        position: relative;
+      }
+      .hero-stat .label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+      }
+      .hero-stat .value {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 54px;
+        line-height: 1;
+        color: var(--fg-1);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+      }
+      .frame-mobile .hero-stat .value {
+        font-size: 34px;
+      }
+      .hero-stat.accent .value {
+        color: var(--gold-light);
+      }
+      .hero-stat .rank {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg-3);
+        font-style: italic;
+        margin-top: 2px;
+      }
+
+      /* Career summary cards — different treatment than hero (quieter, denser). */
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 36px 0 14px;
+      }
+      .section-head h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--fg-1);
+      }
+      .section-head .meta {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg-3);
+        font-style: italic;
+      }
+
+      .career-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+      }
+      .frame-mobile .career-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .career-stat {
+        padding: 14px 16px;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .career-stat .k {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+      }
+      .career-stat .v {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        color: var(--fg-1);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .career-stat.accent .v {
+        color: var(--gold-light);
+      }
+
+      /* Tabs */
+      .detail-tabs {
+        display: flex;
+        gap: 0;
+        margin-top: 28px;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+      }
+      .detail-tabs button {
+        background: transparent;
+        border: 0;
+        color: var(--fg-2);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 14px 18px;
+        cursor: pointer;
+        position: relative;
+        white-space: nowrap;
+      }
+      .detail-tabs button.on {
+        color: var(--fg-1);
+      }
+      .detail-tabs button.on::after {
+        content: '';
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        bottom: -1px;
+        height: 2px;
+        background: var(--gold);
+        border-radius: 2px;
+      }
+      .frame-mobile .detail-tabs button {
+        min-height: 44px;
+        padding: 12px 14px;
+        font-size: 12px;
+      }
+
+      /* Career Arc chart */
+      .arc-card {
+        margin-top: 22px;
+        padding: 22px 22px 8px;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+      }
+      .arc-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .arc-head .l {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+      }
+      .arc-head .r {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg-2);
+      }
+      .arc-head .r strong {
+        color: var(--gold-light);
+        font-family: var(--font-display);
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+      .arc-toggle {
+        display: inline-flex;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        padding: 3px;
+      }
+      .arc-toggle button {
+        background: transparent;
+        border: 0;
+        color: var(--fg-3);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 6px 11px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+      }
+      .arc-toggle button.on {
+        background: var(--navy);
+        color: var(--fg-1);
+      }
+      .arc-svg {
+        width: 100%;
+        display: block;
+      }
+
+      /* Season table */
+      .table-wrap {
+        margin-top: 24px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        background: var(--bg-elevated);
+        overflow-x: auto;
+      }
+      .season-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 700px;
+      }
+      .season-table thead th {
+        background: var(--bg-panel);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 12px;
+        text-align: right;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+        white-space: nowrap;
+      }
+      .season-table thead th:first-child {
+        text-align: left;
+      }
+      .season-table tbody td {
+        padding: 12px 12px;
+        border-bottom: 1px solid var(--border);
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--fg-1);
+        text-align: right;
+        white-space: nowrap;
+      }
+      .season-table tbody td:first-child {
+        text-align: left;
+        color: var(--gold-light);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+      .season-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      .season-table tbody tr:hover td {
+        background: var(--bg-raised);
+      }
+
+      /* Loading */
+      @keyframes shimmer {
+        0% {
+          background-position: -400px 0;
+        }
+        100% {
+          background-position: 400px 0;
+        }
+      }
+      .skel {
+        display: inline-block;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          rgba(255, 255, 255, 0.04) 100%
+        );
+        background-size: 800px 100%;
+        background-repeat: no-repeat;
+        background-color: rgba(255, 255, 255, 0.04);
+        border-radius: 4px;
+        animation: shimmer 1.4s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .skel {
+          animation: none;
+        }
+      }
+      .skel-line {
+        display: block;
+        height: 14px;
+        border-radius: 4px;
+      }
+
+      /* Error */
+      .error-card {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        padding: 28px;
+        background: var(--bg-elevated);
+        border: 1px solid rgba(196, 30, 58, 0.35);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-md);
+      }
+      .error-card .icon-wrap {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(196, 30, 58, 0.12);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        color: var(--seam-light);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-card h3 {
+        margin: 0 0 6px;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--fg-1);
+      }
+      .error-card p {
+        margin: 0 0 14px;
+        color: var(--fg-2);
+        max-width: 70ch;
+        font-family: var(--font-body);
+      }
+
+      /* Empty */
+      .empty-card {
+        padding: 48px 32px 56px;
+        background: var(--bg-elevated);
+        border: 1px dashed var(--border-strong);
+        border-radius: var(--radius-card);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .empty-card .illus {
+        width: 120px;
+        height: 120px;
+        color: var(--fg-3);
+      }
+      .empty-card h3 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 28px;
+        color: var(--fg-1);
+        letter-spacing: -0.01em;
+      }
+      .empty-card p {
+        margin: 0;
+        max-width: 56ch;
+        color: var(--fg-2);
+        font-style: italic;
+      }
+
+      .sr-only {
+        position: absolute !important;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      @media (max-width: 900px) {
+        .stage {
+          grid-template-columns: 1fr !important;
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- SVG sprite -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol
+          id="i-left"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m14 18-6-6 6-6" />
+        </symbol>
+        <symbol
+          id="i-warning"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M10.3 3.5 2.5 17.5A2 2 0 0 0 4.2 20.5h15.6a2 2 0 0 0 1.7-3L13.7 3.5a2 2 0 0 0-3.4 0Z"
+          />
+          <path d="M12 10v5" />
+          <path d="M12 18.5v.01" />
+        </symbol>
+        <symbol
+          id="i-bell"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 7H4c0-1 2-2 2-7Z" />
+          <path d="M10 19a2 2 0 0 0 4 0" />
+        </symbol>
+        <symbol
+          id="i-scorecard"
+          viewBox="0 0 120 120"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="18" y="14" width="84" height="96" rx="6" />
+          <path d="M26 26h68" />
+          <path d="M26 32h40" opacity=".7" />
+          <g opacity=".55">
+            <path d="M26 44h68" />
+            <path d="M26 56h68" />
+            <path d="M26 68h68" />
+            <path d="M26 80h68" />
+            <path d="M26 92h68" />
+            <path d="M38 40v56" />
+            <path d="M50 40v56" />
+            <path d="M62 40v56" />
+            <path d="M74 40v56" />
+            <path d="M86 40v56" />
+          </g>
+          <circle cx="94" cy="26" r="8" fill="none" stroke="#C41E3A" />
+          <path
+            d="M88.5 22.5c2 1.2 4.5 1.2 6.5 0M88.5 29.5c2-1.2 4.5-1.2 6.5 0"
+            stroke="#C41E3A"
+          />
+        </symbol>
+        <symbol
+          id="i-star"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
+          <path
+            d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9L12 3z"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <!-- Reviewer chrome -->
+    <div
+      class="reviewer-bar"
+      role="toolbar"
+      aria-label="Mockup reviewer controls"
+    >
+      <span class="rb-label">State</span>
+      <div class="rb-group" id="state-switcher">
+        <button data-state="populated" class="on">Populated</button>
+        <button data-state="loading">Loading</button>
+        <button data-state="error">Error</button>
+        <button data-state="empty">Empty</button>
+      </div>
+      <span class="rb-label">Viewport</span>
+      <div class="rb-group" id="view-switcher">
+        <button data-view="both" class="on">Both</button>
+        <button data-view="mobile">Mobile 375</button>
+        <button data-view="desktop">Desktop 1280</button>
+      </div>
+      <span class="rb-spacer"></span>
+      <span class="rb-note"
+        >Route · <strong style="color: var(--fg-2)">/players/:id</strong> ·
+        opens as modal from stats / roster / matchup</span
+      >
+    </div>
+
+    <main class="stage" id="stage" data-view="both" data-state="populated">
+      <section class="frame-column">
+        <h2 class="viewport-heading">
+          Mobile <span class="dim">375 × 812</span>
+        </h2>
+        <div class="frame frame-mobile">
+          <div class="viewport" id="vp-mobile"></div>
+        </div>
+      </section>
+      <section class="frame-column">
+        <h2 class="viewport-heading">
+          Desktop <span class="dim">1280 × flex</span>
+        </h2>
+        <div class="frame frame-desktop">
+          <div class="viewport" id="vp-desktop"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      /* Representative fictional player — Ruben Ortiz-Lang, 12 seasons. */
+      const P = {
+        name: 'Ruben Ortiz-Lang',
+        initials: 'RO',
+        eraRange: '2014–2025',
+        seasons: 12,
+        team: 'New York Yankees',
+        bio: 'Left-handed outfielder · switch-position eligibility through center and left · drafted 2nd overall, 2013 · three-time All-Star · 2023 batting title',
+        positions: ['OF', 'CF', 'LF', 'DH'],
+        career: { G: 1742, AVG: 0.305, HR: 438, RBI: 1284, H: 1926, SB: 121 },
+        seasonsRows: [
+          // YEAR, G, PA, AB, H, HR, RBI, SB, AVG, OBP, SLG
+          [2025, 146, 629, 554, 169, 38, 112, 11, 0.305, 0.368, 0.554],
+          [2024, 152, 648, 571, 178, 41, 121, 14, 0.311, 0.372, 0.571],
+          [2023, 149, 632, 553, 179, 44, 128, 17, 0.324, 0.385, 0.598],
+          [2022, 142, 601, 527, 167, 39, 117, 12, 0.317, 0.374, 0.581],
+          [2021, 138, 574, 508, 152, 32, 98, 15, 0.299, 0.359, 0.528],
+          [2020, 58, 247, 216, 65, 14, 38, 6, 0.301, 0.361, 0.528],
+          [2019, 151, 634, 555, 178, 37, 114, 13, 0.321, 0.376, 0.575],
+          [2018, 148, 618, 544, 167, 36, 108, 10, 0.307, 0.365, 0.547],
+          [2017, 143, 598, 528, 166, 31, 98, 8, 0.314, 0.369, 0.534],
+          [2016, 138, 576, 509, 150, 28, 92, 7, 0.295, 0.354, 0.51],
+          [2015, 127, 521, 462, 131, 24, 78, 6, 0.284, 0.343, 0.472],
+          [2014, 150, 624, 554, 151, 24, 81, 2, 0.273, 0.331, 0.441],
+        ],
+      };
+      const f3 = (n) => n.toFixed(3).replace(/^0/, '');
+      const fi = (n) => n.toLocaleString('en-US');
+
+      function renderApp(state, isMobile) {
+        return `
+    ${renderNav(isMobile)}
+    <div class="modal-shell">
+      ${state === 'loading' ? renderLoading(isMobile) : ''}
+      ${state === 'error' ? renderError() : ''}
+      ${state === 'empty' ? renderEmpty() : ''}
+      ${state === 'populated' ? renderDetail(isMobile) : ''}
+    </div>
+  `;
+      }
+
+      function renderNav(isMobile) {
+        return `
+    <nav class="app-nav" aria-label="Primary">
+      <div class="app-nav-inner">
+        <button class="back-btn" type="button"><svg width="14" height="14"><use href="#i-left"/></svg><span>Back</span></button>
+        <a href="#" class="brand" style="margin-left:4px" aria-label="Legacy Sports home">
+          <img src="../../assets/logo.png" alt="" />
+          ${isMobile ? '' : '<div class="wordmark">LEGACY SPORTS<span>PLAYER ALMANAC</span></div>'}
+        </a>
+        <div class="spacer"></div>
+        <button class="icon-btn" aria-label="Notifications"><svg width="18" height="18"><use href="#i-bell"/></svg></button>
+      </div>
+    </nav>
+  `;
+      }
+
+      function renderDetail(isMobile) {
+        // career arc (AVG by year)
+        const pts = P.seasonsRows.map((r) => r[8]).reverse();
+        const yrs = P.seasonsRows.map((r) => r[0]).reverse();
+        const W = isMobile ? 340 : 1100,
+          H = 180,
+          PAD = 32;
+        const xs = pts.map(
+          (_, i) => PAD + i * ((W - PAD * 2) / (pts.length - 1)),
+        );
+        const minV = Math.min(...pts) - 0.015;
+        const maxV = Math.max(...pts) + 0.015;
+        const ys = pts.map(
+          (v) => PAD + (1 - (v - minV) / (maxV - minV)) * (H - PAD * 2),
+        );
+        const path = xs
+          .map(
+            (x, i) => (i ? 'L' : 'M') + x.toFixed(1) + ' ' + ys[i].toFixed(1),
+          )
+          .join(' ');
+        const area =
+          path +
+          ` L ${xs[xs.length - 1].toFixed(1)} ${H - PAD} L ${xs[0].toFixed(1)} ${H - PAD} Z`;
+        const peakIdx = pts.indexOf(Math.max(...pts));
+
+        const rows = P.seasonsRows
+          .map(
+            (r) => `
+    <tr>
+      <td>${r[0]}</td>
+      <td>${fi(r[1])}</td>
+      <td>${fi(r[2])}</td>
+      <td>${fi(r[3])}</td>
+      <td>${fi(r[4])}</td>
+      <td>${fi(r[5])}</td>
+      <td>${fi(r[6])}</td>
+      <td>${fi(r[7])}</td>
+      <td>${f3(r[8])}</td>
+      <td>${f3(r[9])}</td>
+      <td>${f3(r[10])}</td>
+    </tr>
+  `,
+          )
+          .join('');
+
+        return `
+    <!-- Title row — portrait + editorial lede. Scoreboard-sized display head; serif dek. -->
+    <header class="modal-title-row">
+      <div class="portrait" aria-hidden="true">${P.initials}</div>
+      <div class="title-block">
+        <span class="eyebrow">Player · ${P.seasons} Seasons · ${P.eraRange}</span>
+        <h1>${P.name}</h1>
+        <p class="sub">${P.bio}.</p>
+      </div>
+      <div class="row-actions">
+        <button class="btn" type="button">Compare</button>
+        <button class="btn btn-gold" type="button">Add to Draft List</button>
+      </div>
+    </header>
+
+    <!-- Positions band — eligible positions, all badges. -->
+    <div class="positions-band" aria-label="Eligible positions">
+      <span class="label-inline">Eligible</span>
+      ${P.positions.map((p) => `<span class="pos-chip ${p === 'P' ? 'pos-P' : p === 'C' ? 'pos-C' : ['OF', 'LF', 'CF', 'RF'].includes(p) ? 'pos-OF' : p === 'DH' ? 'pos-U' : 'pos-IF'}">${p}</span>`).join('')}
+      <span style="color:var(--fg-3); font-family:var(--font-body); font-size:13px; margin-left:auto; font-style:italic">Bats L · Throws L · 6'2" · 210 lb</span>
+    </div>
+
+    <!-- Hero stats — AVG / HR / RBI for hitters (pitchers would show W-L · SO). -->
+    <!-- MOTION: scale-up on first paint, 220ms ease-out-quart, staggered 40ms per card. -->
+    <div class="hero-stats" aria-label="Career hero stats">
+      <div class="hero-stat accent">
+        <span class="label">Career AVG</span>
+        <span class="value">${f3(P.career.AVG)}</span>
+        <span class="rank">11th all-time active</span>
+      </div>
+      <div class="hero-stat">
+        <span class="label">Home Runs</span>
+        <span class="value">${fi(P.career.HR)}</span>
+        <span class="rank">T-42 all-time</span>
+      </div>
+      <div class="hero-stat">
+        <span class="label">Runs Batted In</span>
+        <span class="value">${fi(P.career.RBI)}</span>
+        <span class="rank">28 from top 50</span>
+      </div>
+    </div>
+
+    <!-- Career summary cards — dense, quieter row, deliberately not the same template. -->
+    <div class="section-head">
+      <h2>Career Batting</h2>
+      <span class="meta">Aggregated across all ${P.seasons} seasons</span>
+    </div>
+    <div class="career-grid">
+      <div class="career-stat"><span class="k">Games</span><span class="v">${fi(P.career.G)}</span></div>
+      <div class="career-stat accent"><span class="k">AVG</span><span class="v">${f3(P.career.AVG)}</span></div>
+      <div class="career-stat"><span class="k">Home Runs</span><span class="v">${fi(P.career.HR)}</span></div>
+      <div class="career-stat"><span class="k">RBI</span><span class="v">${fi(P.career.RBI)}</span></div>
+      <div class="career-stat"><span class="k">Hits</span><span class="v">${fi(P.career.H)}</span></div>
+      <div class="career-stat"><span class="k">Stolen Bases</span><span class="v">${fi(P.career.SB)}</span></div>
+    </div>
+
+    <!-- Tabs — dynamically built from available data (arc/batting/pitching/fielding). -->
+    <div class="detail-tabs" role="tablist" aria-label="Detail views">
+      <button class="on" role="tab" aria-selected="true">Career Arc</button>
+      <button role="tab">Batting</button>
+      <button role="tab">Fielding</button>
+    </div>
+
+    <!-- Career Arc — line + area, gold. Batting/Pitching toggle present because
+         the player might have both — here we only show Batting since he's a hitter. -->
+    <!-- MOTION: crossfade, 140ms, on tab switch. -->
+    <div class="arc-card">
+      <div class="arc-head">
+        <span class="l">Batting Average by Season · ${yrs[0]}–${yrs[yrs.length - 1]}</span>
+        <div style="display:flex; gap:14px; align-items:center">
+          <span class="r">Peak · <strong>${f3(pts[peakIdx])} (${yrs[peakIdx]})</strong></span>
+          <div class="arc-toggle" role="tablist" aria-label="Chart stat">
+            <button class="on">AVG</button><button>HR</button><button>RBI</button><button>oWAR</button>
+          </div>
+        </div>
+      </div>
+      <svg class="arc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="arcfill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#C5A55A" stop-opacity="0.32"/>
+            <stop offset="100%" stop-color="#C5A55A" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${[0.25, 0.5, 0.75]
+          .map((f) => {
+            const y = PAD + f * (H - PAD * 2);
+            return `<line x1="${PAD}" x2="${W - PAD}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" />`;
+          })
+          .join('')}
+        <path d="${area}" fill="url(#arcfill)"/>
+        <path d="${path}" fill="none" stroke="#C5A55A" stroke-width="1.8"/>
+        ${xs.map((x, i) => `<circle cx="${x}" cy="${ys[i]}" r="${i === peakIdx ? 4.5 : 2.4}" fill="${i === peakIdx ? '#D4BB78' : '#0A0F1A'}" stroke="#C5A55A" stroke-width="1.6"/>`).join('')}
+        ${xs.map((x, i) => (i % 2 === 0 || i === xs.length - 1 ? `<text x="${x}" y="${H - 10}" text-anchor="middle" font-family="Big Shoulders Display" font-size="10" fill="#6C80BA" letter-spacing="0.1em">${yrs[i]}</text>` : '')).join('')}
+        <!-- Peak annotation -->
+        <text x="${xs[peakIdx]}" y="${ys[peakIdx] - 10}" text-anchor="middle" font-family="Big Shoulders Display" font-weight="800" font-size="12" fill="#D4BB78" letter-spacing="0.04em">.324 · ’23</text>
+      </svg>
+    </div>
+
+    <!-- Season batting table — newest first, per spec. Rate stats drop leading zero. -->
+    <div class="section-head">
+      <h2>Season by Season · Batting</h2>
+      <span class="meta">Newest first · tap any year to open the game log</span>
+    </div>
+    <div class="table-wrap">
+      <table class="season-table" aria-label="Season batting statistics">
+        <thead>
+          <tr>
+            <th>Year</th><th>G</th><th>PA</th><th>AB</th><th>H</th><th>HR</th><th>RBI</th><th>SB</th>
+            <th>AVG</th><th>OBP</th><th>SLG</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+      }
+
+      function renderLoading(isMobile) {
+        return `
+    <!-- MOTION: shimmer 1.4s linear infinite; static on prefers-reduced-motion.
+         Apollo previousData means in real usage the PREVIOUS player stays visible
+         while new loads (LS-2308). This skeleton is for the "no prior data" path. -->
+    <div aria-busy="true" aria-live="polite">
+      <div style="display:flex; gap:20px; align-items:center; padding:16px 0 22px; border-bottom:1px solid var(--border)">
+        <span class="skel" style="width:${isMobile ? 68 : 92}px; height:${isMobile ? 68 : 92}px; border-radius:50%"></span>
+        <div style="display:flex; flex-direction:column; gap:10px; flex:1">
+          <span class="skel skel-line" style="width:${isMobile ? 180 : 260}px; height:14px"></span>
+          <span class="skel skel-line" style="width:${isMobile ? 240 : 420}px; height:${isMobile ? 30 : 44}px; border-radius:8px"></span>
+          <span class="skel skel-line" style="width:${isMobile ? 200 : 360}px; height:12px"></span>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; padding:14px 0; border-bottom:1px solid var(--border); margin-bottom:22px">
+        <span class="skel" style="width:40px; height:22px; border-radius:4px"></span>
+        <span class="skel" style="width:40px; height:22px; border-radius:4px"></span>
+        <span class="skel" style="width:40px; height:22px; border-radius:4px"></span>
+        <span class="skel" style="width:40px; height:22px; border-radius:4px"></span>
+      </div>
+      <div class="hero-stats">
+        ${[0, 1, 2]
+          .map(
+            () => `
+          <div class="hero-stat">
+            <span class="skel skel-line" style="width:80px; height:10px"></span>
+            <span class="skel skel-line" style="width:130px; height:${isMobile ? 30 : 46}px; margin-top:8px"></span>
+            <span class="skel skel-line" style="width:110px; height:11px; margin-top:8px"></span>
+          </div>
+        `,
+          )
+          .join('')}
+      </div>
+      <div style="padding:14px 0; display:flex; justify-content:space-between; align-items:center">
+        <span class="skel skel-line" style="width:180px"></span>
+        <span class="skel skel-line" style="width:120px"></span>
+      </div>
+      <div class="career-grid">
+        ${Array.from({ length: 6 })
+          .map(
+            () => `
+          <div class="career-stat">
+            <span class="skel skel-line" style="width:60px; height:10px"></span>
+            <span class="skel skel-line" style="width:80px; height:24px; margin-top:6px"></span>
+          </div>
+        `,
+          )
+          .join('')}
+      </div>
+      <div class="arc-card" style="margin-top:28px">
+        <span class="skel skel-line" style="width:260px; height:12px"></span>
+        <div style="margin-top:18px; height:${isMobile ? 120 : 160}px; border-radius:6px; background:linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%); background-size:800px 100%; background-repeat:no-repeat; background-color:rgba(255,255,255,0.03); animation:shimmer 1.4s linear infinite"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:22px; padding:20px">
+        ${Array.from({ length: isMobile ? 4 : 8 })
+          .map(
+            () => `
+          <div style="display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border)">
+            <span class="skel skel-line" style="width:50px"></span>
+            <span class="skel skel-line" style="flex:1"></span>
+            <span class="skel skel-line" style="width:60px"></span>
+          </div>
+        `,
+          )
+          .join('')}
+      </div>
+      <p style="margin-top:18px; text-align:center; font-family:var(--font-body); color:var(--fg-3); font-style:italic">Loading player statistics…</p>
+    </div>
+  `;
+      }
+
+      function renderError() {
+        return `
+    <div class="error-card" role="alert">
+      <div class="icon-wrap"><svg width="22" height="22" aria-hidden="true"><use href="#i-warning"/></svg></div>
+      <div>
+        <h3>We couldn't load this player</h3>
+        <p>The season archive returned a 503 for this player ID. The rest of the almanac is still responsive — this failure is isolated. If you just arrived from a link, the player may have been redirected; otherwise, retry.</p>
+        <p style="margin:10px 0 14px; font-size:13px; color:var(--fg-3)">Player ID · <code style="font-family:'JetBrains Mono',ui-monospace,monospace; font-size:12px; background:rgba(255,255,255,0.03); border:1px solid var(--border); padding:2px 6px; border-radius:4px">p_9d2f3b</code> · upstream 503 after 2 retries</p>
+        <div style="display:flex; gap:10px">
+          <button class="btn btn-primary" type="button">Retry</button>
+          <button class="btn" type="button">Back to player list</button>
+        </div>
+      </div>
+    </div>
+  `;
+      }
+
+      function renderEmpty() {
+        /* "No season statistics found" — the player exists but has no seasons
+     in the archive (common for minor-league call-ups or recent signees). */
+        return `
+    <header class="modal-title-row" style="padding-bottom:14px">
+      <div class="portrait" aria-hidden="true">NA</div>
+      <div class="title-block">
+        <span class="eyebrow">Player · 0 Seasons</span>
+        <h1>Nico Alfaro</h1>
+        <p class="sub">Signed April 2026 · no major-league at-bats recorded.</p>
+      </div>
+      <div class="row-actions"><button class="btn" type="button">Compare</button></div>
+    </header>
+    <div class="positions-band" aria-label="Eligible positions">
+      <span class="label-inline">Eligible</span>
+      <span class="pos-chip pos-IF">SS</span>
+      <span class="pos-chip pos-IF">2B</span>
+      <span style="color:var(--fg-3); font-family:var(--font-body); font-size:13px; margin-left:auto; font-style:italic">AAA · Scranton · bats R / throws R</span>
+    </div>
+    <div class="empty-card" role="status" style="margin-top:18px">
+      <svg class="illus" aria-hidden="true"><use href="#i-scorecard"/></svg>
+      <h3>No season statistics found.</h3>
+      <p>Nico hasn't made a major-league appearance yet. His minor-league log is tracked separately — flip on the <strong style="color:var(--fg-1); font-style:normal">MiLB</strong> view from the stats page to include him.</p>
+      <div style="display:flex; gap:8px; margin-top:6px">
+        <button class="btn" type="button">Open MiLB view</button>
+        <button class="btn btn-gold" type="button">Watch for call-up</button>
+      </div>
+    </div>
+  `;
+      }
+
+      /* wiring */
+      const stage = document.getElementById('stage');
+      const vpMobile = document.getElementById('vp-mobile');
+      const vpDesktop = document.getElementById('vp-desktop');
+      function renderAll() {
+        const state = stage.dataset.state;
+        vpMobile.innerHTML = renderApp(state, true);
+        vpDesktop.innerHTML = renderApp(state, false);
+      }
+      document
+        .getElementById('state-switcher')
+        .addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-state]');
+          if (!btn) return;
+          document
+            .querySelectorAll('#state-switcher button')
+            .forEach((b) => b.classList.toggle('on', b === btn));
+          stage.dataset.state = btn.dataset.state;
+          renderAll();
+        });
+      document
+        .getElementById('view-switcher')
+        .addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-view]');
+          if (!btn) return;
+          document
+            .querySelectorAll('#view-switcher button')
+            .forEach((b) => b.classList.toggle('on', b === btn));
+          stage.dataset.view = btn.dataset.view;
+        });
+      renderAll();
+    </script>
+  </body>
+</html>

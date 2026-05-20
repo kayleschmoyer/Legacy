@@ -1,0 +1,196 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        max-width: 760px;
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 8px;
+      }
+      .demo {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-5);
+        padding: 18px;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .ib {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        cursor: pointer;
+        border-radius: 14px;
+        color: #fff;
+      }
+      .sm {
+        width: 36px;
+        height: 36px;
+      }
+      .md {
+        width: 44px;
+        height: 44px;
+      }
+      .lg {
+        width: 56px;
+        height: 56px;
+      }
+      .default {
+        background: var(--surface-card);
+        border: 1px solid var(--outline-default);
+        color: var(--fg2);
+      }
+      .primary {
+        background: var(--brand-navy);
+        border: 1px solid var(--brand-navy-light);
+      }
+      .seam {
+        background: var(--brand-seam-red);
+      }
+      .gold {
+        background: var(--brand-gold);
+        color: #111;
+      }
+      .ghost {
+        background: transparent;
+        color: var(--fg2);
+        border: 1px solid transparent;
+      }
+      .ghost:hover {
+        background: rgba(27, 58, 92, 0.22);
+      }
+      svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .lg svg {
+        width: 22px;
+        height: 22px;
+      }
+      .sm svg {
+        width: 14px;
+        height: 14px;
+      }
+      .cap {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg3);
+        margin-left: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <div class="lab">Sizes (sm / md / lg)</div>
+        <div class="demo">
+          <button class="ib default sm">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          <button class="ib default md">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          <button class="ib default lg">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="lab">Variants</div>
+        <div class="demo">
+          <button class="ib default md">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4"
+              />
+            </svg>
+          </button>
+          <button class="ib primary md">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+          </button>
+          <button class="ib seam md">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M5 8c4 4 10 4 14 0M5 16c4-4 10-4 14 0" />
+            </svg>
+          </button>
+          <button class="ib gold md">
+            <svg viewBox="0 0 24 24">
+              <path d="M6 9h12l-1 11H7zM9 9V5h6v4" />
+            </svg>
+          </button>
+          <button class="ib ghost md">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="lab">With label</div>
+        <div class="demo" style="gap: 8px">
+          <button
+            class="ib default md"
+            style="width: auto; padding: 0 14px; gap: 8px; border-radius: 12px"
+          >
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg
+            ><span
+              style="
+                font-family: var(--font-display);
+                font-weight: 700;
+                font-size: 13px;
+                letter-spacing: 0.04em;
+              "
+              >Add Player</span
+            >
+          </button>
+          <button
+            class="ib primary md"
+            style="width: auto; padding: 0 14px; gap: 8px; border-radius: 12px"
+          >
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
+              /></svg
+            ><span
+              style="
+                font-family: var(--font-display);
+                font-weight: 700;
+                font-size: 13px;
+                letter-spacing: 0.04em;
+              "
+              >Export</span
+            >
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

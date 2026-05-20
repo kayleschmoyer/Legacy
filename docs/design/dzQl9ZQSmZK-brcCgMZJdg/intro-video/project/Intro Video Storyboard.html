@@ -1,0 +1,1994 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Legacy Sports — Intro Video Storyboard</title>
+    <link rel="stylesheet" href="design-system/colors_and_type.css" />
+    <style>
+      /* ───── Stage / global ───── */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        overflow: hidden;
+      }
+      body {
+        font-family: var(--font-body);
+        color: var(--fg1);
+      }
+
+      deck-stage {
+        background: #000;
+      }
+
+      /* every slide is the same canvas size */
+      .slide {
+        width: 1920px;
+        height: 1080px;
+        background:
+          radial-gradient(
+            ellipse at 18% 0%,
+            rgba(27, 58, 92, 0.55) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 82% 8%,
+            rgba(196, 30, 58, 0.18) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 100%,
+            rgba(197, 165, 90, 0.14) 0%,
+            transparent 55%
+          ),
+          #0a0f1a;
+        color: var(--fg1);
+        position: relative;
+        overflow: hidden;
+        font-family: var(--font-body);
+      }
+
+      /* subtle vignette */
+      .slide::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at 50% 50%,
+          transparent 55%,
+          rgba(0, 0, 0, 0.45) 100%
+        );
+        pointer-events: none;
+      }
+
+      /* slide chrome — small brand mark + scene number, lower-left */
+      .scene-chrome {
+        position: absolute;
+        left: 56px;
+        bottom: 40px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: var(--fg3);
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        font-size: 24px;
+        text-transform: uppercase;
+        z-index: 5;
+      }
+      .scene-chrome .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand-gold);
+        box-shadow: 0 0 12px var(--brand-gold);
+      }
+      .scene-chrome .sep {
+        color: var(--fg4);
+      }
+
+      .scene-time {
+        position: absolute;
+        right: 56px;
+        bottom: 40px;
+        font-family: var(--font-mono);
+        color: var(--fg4);
+        font-size: 24px;
+        letter-spacing: 0.08em;
+        z-index: 5;
+      }
+
+      /* ── Type recipes used in slides ── */
+      .display {
+        font-family: var(--font-display);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 0.95;
+      }
+      .ed-serif {
+        font-family: var(--font-body);
+      }
+      .eyebrow-gold {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: var(--brand-gold);
+        font-size: 22px;
+      }
+      .eyebrow-muted {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: var(--fg3);
+        font-size: 20px;
+      }
+
+      /* ── Reusable cards ── */
+      .card {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-5);
+        box-shadow: var(--shadow-md);
+      }
+      .panel {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-6);
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 1 — TITLE                                        */
+      /* ─────────────────────────────────────────────────────── */
+      .s-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .s-title .logo-wrap {
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 50% 40%,
+          rgba(197, 165, 90, 0.35) 0%,
+          transparent 70%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 36px;
+        filter: drop-shadow(0 14px 40px rgba(8, 12, 20, 0.7));
+      }
+      .s-title .logo-wrap img {
+        width: 168px;
+        height: 168px;
+      }
+      .s-title h1 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 168px;
+        line-height: 0.92;
+        text-align: center;
+        color: #fff;
+        letter-spacing: -0.025em;
+        margin: 0;
+      }
+      .s-title h1 .gold {
+        color: var(--brand-gold);
+        display: block;
+      }
+      .s-title .tag {
+        margin-top: 28px;
+        font-family: var(--font-body);
+        font-style: italic;
+        font-size: 38px;
+        color: var(--fg2);
+        text-align: center;
+        max-width: 1100px;
+      }
+      .s-title .badges {
+        margin-top: 56px;
+        display: flex;
+        gap: 18px;
+      }
+      .s-title .badge {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 24px;
+        padding: 14px 28px;
+        border-radius: var(--radius-pill);
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        color: var(--brand-gold-light);
+        background: rgba(197, 165, 90, 0.08);
+      }
+      .s-title .badge.red {
+        color: #f2a6b2;
+        border-color: rgba(196, 30, 58, 0.55);
+        background: rgba(196, 30, 58, 0.1);
+      }
+      .s-title .badge.navy {
+        color: #b7c8e6;
+        border-color: rgba(91, 132, 196, 0.55);
+        background: rgba(91, 132, 196, 0.12);
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 2 — DIFFERENTIATOR                               */
+      /* ─────────────────────────────────────────────────────── */
+      .s-diff {
+        padding: 100px;
+        display: flex;
+        flex-direction: column;
+      }
+      .s-diff h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 88px;
+        line-height: 1;
+        color: #fff;
+        letter-spacing: -0.02em;
+        margin: 0 0 12px 0;
+      }
+      .s-diff h2 em {
+        color: var(--brand-gold);
+        font-style: normal;
+      }
+      .s-diff .sub {
+        font-family: var(--font-body);
+        font-size: 30px;
+        color: var(--fg3);
+        margin: 0 0 60px 0;
+      }
+      .s-diff .cols {
+        display: grid;
+        grid-template-columns: 1fr 80px 1fr;
+        gap: 0;
+        flex: 1;
+        align-items: stretch;
+      }
+      .vs {
+        align-self: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        color: var(--fg4);
+        font-size: 56px;
+        text-align: center;
+        letter-spacing: 0.04em;
+      }
+      .col {
+        border-radius: var(--radius-7);
+        padding: 48px;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--glass-border);
+      }
+      .col.legacy {
+        background:
+          linear-gradient(
+            135deg,
+            rgba(197, 165, 90, 0.16) 0%,
+            rgba(27, 58, 92, 0.2) 100%
+          ),
+          var(--surface-card);
+        border-color: rgba(197, 165, 90, 0.45);
+        box-shadow: var(--shadow-gold);
+      }
+      .col.normal {
+        background: var(--surface-panel);
+        opacity: 0.92;
+      }
+      .col .col-eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 26px;
+        margin-bottom: 14px;
+      }
+      .col.normal .col-eyebrow {
+        color: var(--fg4);
+      }
+      .col.legacy .col-eyebrow {
+        color: var(--brand-gold);
+      }
+      .col h3 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 56px;
+        color: #fff;
+        line-height: 1;
+        margin: 0 0 32px 0;
+        letter-spacing: -0.01em;
+      }
+      .col.normal h3 {
+        color: var(--fg2);
+      }
+      .col ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .col li {
+        font-family: var(--font-body);
+        font-size: 28px;
+        line-height: 1.4;
+        color: var(--fg2);
+        padding-left: 36px;
+        position: relative;
+      }
+      .col li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 14px;
+        width: 18px;
+        height: 2px;
+        background: var(--fg4);
+      }
+      .col.legacy li::before {
+        background: var(--brand-gold);
+        height: 3px;
+        top: 13px;
+      }
+      .col li b {
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 3 — CROSS-ERA                                    */
+      /* ─────────────────────────────────────────────────────── */
+      .s-era {
+        padding: 90px 100px 140px;
+        display: flex;
+        flex-direction: column;
+      }
+      .s-era .head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 56px;
+      }
+      .s-era h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 92px;
+        line-height: 0.95;
+        color: #fff;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .s-era h2 .gold {
+        color: var(--brand-gold);
+      }
+      .s-era .head .sub {
+        font-family: var(--font-body);
+        color: var(--fg3);
+        font-size: 26px;
+        max-width: 480px;
+        text-align: right;
+      }
+      .era-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 28px;
+        flex: 1;
+      }
+      .pcard {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-6);
+        padding: 28px 26px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+      }
+      .pcard::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        background: var(--accent, var(--brand-gold));
+      }
+      .pcard .yr {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 64px;
+        color: var(--accent, var(--brand-gold));
+        line-height: 1;
+        letter-spacing: 0.02em;
+      }
+      .pcard .nm {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 38px;
+        color: #fff;
+        margin-top: 14px;
+        line-height: 1.05;
+        letter-spacing: -0.01em;
+      }
+      .pcard .meta {
+        font-family: var(--font-body);
+        color: var(--fg3);
+        font-size: 24px;
+        margin-top: 6px;
+      }
+      .pcard .pos {
+        margin-top: 18px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 24px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent, var(--brand-gold));
+      }
+      .pcard .stats {
+        margin-top: auto;
+        padding-top: 22px;
+        border-top: 1px solid var(--outline-subtle);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .pcard .stat-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .pcard .stat-cell .v {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 36px;
+        color: #fff;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .pcard .stat-cell .k {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 24px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg4);
+      }
+
+      .timeline {
+        margin-top: 32px;
+        margin-bottom: 24px;
+        position: relative;
+        height: 80px;
+      }
+      .timeline .bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 28px;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          var(--brand-seam-red) 0%,
+          var(--brand-navy-light) 50%,
+          var(--brand-gold) 100%
+        );
+        border-radius: 2px;
+      }
+      .timeline .tick {
+        position: absolute;
+        top: 18px;
+        transform: translateX(-50%);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--surface-card);
+        border: 3px solid #fff;
+      }
+      .timeline .yr {
+        position: absolute;
+        top: 48px;
+        transform: translateX(-50%);
+        font-family: var(--font-mono);
+        font-size: 24px;
+        color: var(--fg3);
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 4 — CREATE LEAGUE                                */
+      /* ─────────────────────────────────────────────────────── */
+      .s-create {
+        padding: 80px 100px;
+        display: flex;
+        flex-direction: column;
+      }
+      .s-create h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 84px;
+        color: #fff;
+        line-height: 0.95;
+        letter-spacing: -0.02em;
+        margin: 0 0 52px 0;
+      }
+      .s-create h2 .gold {
+        color: var(--brand-gold);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+        flex: 1;
+      }
+      .step {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-6);
+        padding: 36px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .step.active {
+        border-color: rgba(197, 165, 90, 0.55);
+        box-shadow: var(--shadow-gold);
+        background:
+          linear-gradient(180deg, rgba(197, 165, 90, 0.08), transparent 50%),
+          var(--surface-card);
+      }
+      .step .num {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 28px;
+        color: var(--brand-gold);
+        letter-spacing: 0.14em;
+      }
+      .step .num .total {
+        color: var(--fg4);
+      }
+      .step h3 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 40px;
+        color: #fff;
+        margin: 8px 0 28px 0;
+        line-height: 1.05;
+        letter-spacing: -0.01em;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 22px;
+      }
+      .field .lbl {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 24px;
+        color: var(--fg3);
+      }
+      .field .input {
+        background: var(--bg);
+        border: 1px solid var(--outline-default);
+        border-radius: var(--radius-2);
+        padding: 14px 16px;
+        font-family: var(--font-body);
+        color: var(--fg1);
+        font-size: 26px;
+      }
+      .field .input.ghost {
+        color: var(--fg4);
+      }
+      .chips {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 24px;
+        padding: 12px 22px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--outline-default);
+        color: var(--fg2);
+        background: var(--surface-raised);
+      }
+      .chip.on {
+        background: rgba(197, 165, 90, 0.18);
+        border-color: rgba(197, 165, 90, 0.55);
+        color: var(--brand-gold-light);
+      }
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--outline-subtle);
+      }
+      .toggle-row:last-child {
+        border-bottom: 0;
+      }
+      .toggle-row .nm {
+        font-family: var(--font-body);
+        color: var(--fg2);
+        font-size: 24px;
+      }
+      .switch {
+        width: 52px;
+        height: 28px;
+        border-radius: 14px;
+        background: var(--surface-raised);
+        border: 1px solid var(--outline-default);
+        position: relative;
+      }
+      .switch.on {
+        background: var(--brand-gold);
+        border-color: var(--brand-gold-dark);
+      }
+      .switch::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        transition: left 0.2s var(--ease-standard);
+      }
+      .switch.on::after {
+        left: 27px;
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 5 — DRAFT                                        */
+      /* ─────────────────────────────────────────────────────── */
+      .s-draft {
+        padding: 60px 80px 90px;
+        display: flex;
+        flex-direction: column;
+      }
+      .draft-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+      }
+      .draft-head h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 64px;
+        color: #fff;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .draft-head h2 .live {
+        color: var(--brand-seam-red-light);
+        margin-right: 14px;
+        font-size: 28px;
+        vertical-align: middle;
+        padding: 8px 14px;
+        border: 1px solid var(--brand-seam-red);
+        border-radius: var(--radius-pill);
+        background: rgba(196, 30, 58, 0.18);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .timer-card {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        padding: 14px 24px;
+        border-radius: var(--radius-5);
+        background: var(--surface-card);
+        border: 1px solid var(--brand-seam-red);
+        box-shadow: var(--shadow-seam);
+      }
+      .timer-card .lbl {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--fg3);
+        font-size: 24px;
+      }
+      .timer-card .v {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 56px;
+        color: var(--brand-seam-red-light);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .draft-grid {
+        display: grid;
+        grid-template-columns: 1.7fr 1fr;
+        gap: 28px;
+        flex: 1;
+      }
+      .pool {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-6);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+      }
+      .pool-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .pool-head .ttl {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        color: var(--fg2);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+      }
+      .filter {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 24px;
+        padding: 10px 20px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--outline-default);
+        color: var(--fg3);
+      }
+      .filter.on {
+        background: var(--brand-navy);
+        border-color: var(--brand-navy-light);
+        color: #fff;
+      }
+      .pool-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        flex: 1;
+      }
+      .prow {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-4);
+        padding: 14px 18px;
+        display: grid;
+        grid-template-columns: 56px 1fr auto;
+        align-items: center;
+        gap: 14px;
+        position: relative;
+        overflow: hidden;
+      }
+      .prow::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--accent, var(--brand-gold));
+      }
+      .prow .pos-tag {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 24px;
+        color: #fff;
+        background: var(--accent);
+        border-radius: var(--radius-2);
+        padding: 8px 0;
+        text-align: center;
+        letter-spacing: 0.06em;
+      }
+      .prow .nm {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 26px;
+        color: #fff;
+        line-height: 1.1;
+      }
+      .prow .sub {
+        font-family: var(--font-body);
+        font-size: 24px;
+        color: var(--fg3);
+        margin-top: 4px;
+      }
+      .prow .num {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        color: var(--brand-gold);
+        font-variant-numeric: tabular-nums;
+      }
+      .prow .num .k {
+        font-family: var(--font-display);
+        font-size: 24px;
+        letter-spacing: 0.18em;
+        color: var(--fg4);
+        display: block;
+        text-transform: uppercase;
+      }
+
+      .picklog {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-6);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+      }
+      .picklog .ttl {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        color: var(--fg2);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 16px;
+      }
+      .pl-row {
+        display: grid;
+        grid-template-columns: 60px 40px 1fr;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--outline-subtle);
+      }
+      .pl-row:last-child {
+        border-bottom: 0;
+      }
+      .pl-row .pk {
+        font-family: var(--font-mono);
+        font-size: 24px;
+        color: var(--fg4);
+      }
+      .pl-row .pos {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 24px;
+        text-align: center;
+        padding: 6px 0;
+        border-radius: var(--radius-2);
+        color: #fff;
+      }
+      .pl-row .nm {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 26px;
+        color: #fff;
+      }
+      .pl-row .sub {
+        font-family: var(--font-body);
+        font-size: 24px;
+        color: var(--fg3);
+      }
+      .pl-row.now {
+        background: linear-gradient(
+          90deg,
+          rgba(196, 30, 58, 0.18),
+          transparent 80%
+        );
+        border-radius: var(--radius-3);
+        padding-left: 10px;
+        padding-right: 10px;
+        border-bottom-color: transparent;
+      }
+      .pl-row.now .pk {
+        color: var(--brand-seam-red-light);
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 6 — MATCHUP                                      */
+      /* ─────────────────────────────────────────────────────── */
+      .s-match {
+        padding: 70px 100px 140px;
+        display: flex;
+        flex-direction: column;
+      }
+      .s-match .scoreboard {
+        padding: 36px 56px;
+        margin-bottom: 28px;
+      }
+      .s-match .roster {
+        padding: 18px 22px;
+      }
+      .match-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        margin-bottom: 36px;
+      }
+      .match-head h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 72px;
+        color: #fff;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .match-head .week {
+        font-family: var(--font-mono);
+        color: var(--fg3);
+        font-size: 24px;
+      }
+      .scoreboard {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-7);
+        padding: 44px 56px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        margin-bottom: 36px;
+        box-shadow: var(--shadow-md);
+      }
+      .team-side {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      .team-side.right {
+        justify-content: end;
+        flex-direction: row-reverse;
+      }
+      .team-shield {
+        width: 96px;
+        height: 96px;
+        border-radius: var(--radius-5);
+        background: var(--grad-avatar);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 36px;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+      .team-shield.b {
+        background: linear-gradient(
+          135deg,
+          var(--brand-seam-red-dark) 0%,
+          var(--brand-navy) 100%
+        );
+      }
+      .team-side .name {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 38px;
+        color: #fff;
+        line-height: 1;
+      }
+      .team-side .rec {
+        font-family: var(--font-body);
+        color: var(--fg3);
+        font-size: 26px;
+        margin-top: 4px;
+      }
+      .scores {
+        display: flex;
+        align-items: baseline;
+        gap: 26px;
+        padding: 0 30px;
+      }
+      .scores .v {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 132px;
+        line-height: 1;
+        color: #fff;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+      .scores .v.win {
+        color: var(--brand-gold);
+      }
+      .scores .dash {
+        font-family: var(--font-display);
+        color: var(--fg4);
+        font-size: 64px;
+      }
+      .roster-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        flex: 1;
+      }
+      .roster {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-6);
+        padding: 22px 24px;
+      }
+      .roster .ttl {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        color: var(--fg2);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        margin-bottom: 12px;
+      }
+      .rrow {
+        display: grid;
+        grid-template-columns: 56px 1fr 80px;
+        align-items: center;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--outline-subtle);
+        gap: 14px;
+      }
+      .rrow:last-child {
+        border-bottom: 0;
+      }
+      .rrow .pos {
+        font-family: var(--font-display);
+        font-weight: 800;
+        color: var(--fg3);
+        font-size: 24px;
+        letter-spacing: 0.14em;
+      }
+      .rrow .nm {
+        font-family: var(--font-body);
+        color: var(--fg1);
+        font-size: 24px;
+      }
+      .rrow .sc {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        color: #fff;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .rrow.live .sc {
+        color: var(--brand-gold);
+      }
+
+      /* ─────────────────────────────────────────────────────── */
+      /*  SCENE 7 — CTA                                          */
+      /* ─────────────────────────────────────────────────────── */
+      .s-cta {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 80px;
+      }
+      .s-cta .stats-row {
+        display: flex;
+        gap: 80px;
+        margin-bottom: 52px;
+      }
+      .s-cta .sblock {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .s-cta .sblock .v {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 96px;
+        color: var(--brand-gold);
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+      }
+      .s-cta .sblock .k {
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 24px;
+        color: var(--fg3);
+        margin-top: 10px;
+      }
+      .s-cta h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 144px;
+        line-height: 0.92;
+        color: #fff;
+        letter-spacing: -0.025em;
+        margin: 0 0 22px 0;
+        max-width: 1500px;
+      }
+      .s-cta h2 .gold {
+        color: var(--brand-gold);
+      }
+      .s-cta .lede {
+        font-family: var(--font-body);
+        font-style: italic;
+        font-size: 32px;
+        color: var(--fg2);
+        max-width: 1100px;
+        margin: 0 0 56px 0;
+      }
+      .s-cta .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 18px;
+        padding: 26px 52px;
+        border-radius: var(--radius-6);
+        background: var(--grad-gold);
+        color: #14223a;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 38px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        box-shadow: var(--shadow-gold);
+      }
+      .s-cta .url {
+        margin-top: 36px;
+        font-family: var(--font-mono);
+        color: var(--brand-gold-light);
+        font-size: 26px;
+        letter-spacing: 0.12em;
+      }
+
+      /* ── small util ── */
+      .ico {
+        width: 1em;
+        height: 1em;
+        display: inline-block;
+      }
+
+      /* simple slide entry: handled by deck-stage's CSS, but add subtle inner element rise */
+      section[data-label] .rise {
+        animation: rise 600ms var(--ease-standard) both;
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* progress bar (auto-advance) */
+      #progress {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: var(--brand-gold);
+        width: 0%;
+        z-index: 999;
+        transition: width 0.1s linear;
+        box-shadow: 0 0 12px rgba(197, 165, 90, 0.6);
+      }
+      #autoplay-toggle {
+        position: fixed;
+        right: 18px;
+        top: 18px;
+        background: rgba(10, 15, 26, 0.7);
+        border: 1px solid var(--glass-border);
+        color: var(--fg2);
+        font-family: var(--font-display);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 11px;
+        padding: 8px 14px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        z-index: 1000;
+        backdrop-filter: blur(10px);
+      }
+      #autoplay-toggle.on {
+        background: rgba(197, 165, 90, 0.18);
+        color: var(--brand-gold);
+        border-color: rgba(197, 165, 90, 0.5);
+      }
+    </style>
+  </head>
+
+  <body>
+    <script type="application/json" id="speaker-notes">
+      [
+        "Welcome to Legacy Fantasy Baseball — the only fantasy platform built around a hundred and fifty years of MLB history. In the next minute we'll show you what makes it different, and how to get started.",
+        "Most fantasy leagues only let you draft today's players, and your season lives or dies with live games. Legacy is different. Draft from any era — and your matchups run on real archived box scores. No injuries, no rainouts, no waiting.",
+        "That means in your league, 1927 Babe Ruth can step into the batter's box against 2019 Mike Trout. Over fifty thousand player-seasons, scored on the actual numbers they put up.",
+        "Setting up a league takes about two minutes. Pick your basics, choose the eras you want in the player pool, and dial in your draft settings. Hall of Fame only, post-2000, every era — your call.",
+        "When draft day comes, the board lights up. Live timer, the full historical pool, position filters, and a running pick log. Every league gets the same draft tools the pros use.",
+        "Then the season begins. Each week is a matchup against another team in your league, scored on real historical performance — with full roster comparison and a clean, honest scoreboard.",
+        "Build your dynasty. Dominate your league. It's free to play, no credit card required. Head to legacy dot sports and create your first league today."
+      ]
+    </script>
+
+    <deck-stage width="1920" height="1080">
+      <!-- ============== 1 · TITLE ============== -->
+      <section data-label="01 Title" class="slide s-title">
+        <div class="logo-wrap rise">
+          <img src="design-system/logo.png" alt="Legacy Sports" />
+        </div>
+        <h1 class="rise">
+          LEGACY
+          <span class="gold">FANTASY BASEBALL</span>
+        </h1>
+        <div class="tag rise">
+          Year-round fantasy baseball, powered by 150 years of history.
+        </div>
+        <div class="badges rise">
+          <div class="badge">Cross-Era Drafting</div>
+          <div class="badge red">Historical Stats</div>
+          <div class="badge navy">Free to Play</div>
+        </div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 01 <span class="sep">/</span> Title
+        </div>
+        <div class="scene-time">00:00 — 00:04</div>
+      </section>
+
+      <!-- ============== 2 · DIFFERENTIATOR ============== -->
+      <section data-label="02 Differentiator" class="slide s-diff">
+        <div class="eyebrow-gold rise">What makes us different</div>
+        <h2 class="rise" style="margin-top: 18px">
+          Not just another <em>fantasy platform.</em>
+        </h2>
+        <p class="sub rise">
+          Today's apps lock you to today's season. Legacy opens 150 years of
+          baseball.
+        </p>
+
+        <div class="cols">
+          <div class="col normal rise">
+            <div class="col-eyebrow">Normal Fantasy</div>
+            <h3>Live games only.</h3>
+            <ul>
+              <li>Draft pool capped to <b>active rosters</b></li>
+              <li>Scoring depends on <b>tonight's game</b></li>
+              <li>Injuries, rainouts, lineup changes</li>
+              <li>Off-season? <b>League goes dark.</b></li>
+            </ul>
+          </div>
+          <div class="vs rise">VS</div>
+          <div class="col legacy rise">
+            <div class="col-eyebrow">Legacy Fantasy</div>
+            <h3>The whole archive.</h3>
+            <ul>
+              <li>Draft <b>any player, any era</b> — 1876 → today</li>
+              <li>Scored on <b>real archived box scores</b></li>
+              <li>No live-game dependency, no rainouts</li>
+              <li>Play <b>year-round</b>, at your own pace</li>
+            </ul>
+          </div>
+        </div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 02
+          <span class="sep">/</span> Differentiator
+        </div>
+        <div class="scene-time">00:04 — 00:12</div>
+      </section>
+
+      <!-- ============== 3 · CROSS-ERA ============== -->
+      <section data-label="03 Cross-Era" class="slide s-era">
+        <div class="head">
+          <h2 class="rise">
+            Ruth in '27.<br /><span class="gold">Trout in '19.</span><br />Same
+            lineup card.
+          </h2>
+          <p class="sub rise">
+            Pick from over <b style="color: #fff">50,000 player-seasons</b> —
+            every name in the history of the game, scored on the numbers they
+            actually posted.
+          </p>
+        </div>
+        <div class="era-grid rise">
+          <div class="pcard" style="--accent: var(--pos-outfield)">
+            <div class="yr">1927</div>
+            <div class="nm">Babe Ruth</div>
+            <div class="meta">New York Yankees</div>
+            <div class="pos">OF · Outfield</div>
+            <div class="stats">
+              <div class="stat-cell">
+                <div class="v">.356</div>
+                <div class="k">AVG</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">60</div>
+                <div class="k">HR</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">165</div>
+                <div class="k">RBI</div>
+              </div>
+            </div>
+          </div>
+          <div class="pcard" style="--accent: var(--pos-pitcher)">
+            <div class="yr">1968</div>
+            <div class="nm">Bob Gibson</div>
+            <div class="meta">St. Louis Cardinals</div>
+            <div class="pos">P · Pitcher</div>
+            <div class="stats">
+              <div class="stat-cell">
+                <div class="v">1.12</div>
+                <div class="k">ERA</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">22</div>
+                <div class="k">W</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">268</div>
+                <div class="k">K</div>
+              </div>
+            </div>
+          </div>
+          <div class="pcard" style="--accent: var(--pos-utility)">
+            <div class="yr">2001</div>
+            <div class="nm">Barry Bonds</div>
+            <div class="meta">San Francisco Giants</div>
+            <div class="pos">OF · Outfield</div>
+            <div class="stats">
+              <div class="stat-cell">
+                <div class="v">.328</div>
+                <div class="k">AVG</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">73</div>
+                <div class="k">HR</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">137</div>
+                <div class="k">RBI</div>
+              </div>
+            </div>
+          </div>
+          <div class="pcard" style="--accent: var(--pos-infield)">
+            <div class="yr">2019</div>
+            <div class="nm">Mike Trout</div>
+            <div class="meta">Los Angeles Angels</div>
+            <div class="pos">CF · Outfield</div>
+            <div class="stats">
+              <div class="stat-cell">
+                <div class="v">.291</div>
+                <div class="k">AVG</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">45</div>
+                <div class="k">HR</div>
+              </div>
+              <div class="stat-cell">
+                <div class="v">104</div>
+                <div class="k">RBI</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="timeline rise">
+          <div class="bar"></div>
+          <div
+            class="tick"
+            style="left: 8%; border-color: var(--pos-outfield)"
+          ></div>
+          <div class="yr" style="left: 8%">1927</div>
+          <div
+            class="tick"
+            style="left: 35%; border-color: var(--pos-pitcher)"
+          ></div>
+          <div class="yr" style="left: 35%">1968</div>
+          <div
+            class="tick"
+            style="left: 65%; border-color: var(--pos-utility)"
+          ></div>
+          <div class="yr" style="left: 65%">2001</div>
+          <div
+            class="tick"
+            style="left: 92%; border-color: var(--pos-infield)"
+          ></div>
+          <div class="yr" style="left: 92%">2019</div>
+        </div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 03
+          <span class="sep">/</span> Cross-Era
+        </div>
+        <div class="scene-time">00:12 — 00:20</div>
+      </section>
+
+      <!-- ============== 4 · CREATE LEAGUE ============== -->
+      <section data-label="04 Create League" class="slide s-create">
+        <div class="eyebrow-gold rise">Set up a league in three steps</div>
+        <h2 class="rise" style="margin-top: 14px">
+          Your league. <span class="gold">Your rules.</span>
+        </h2>
+
+        <div class="steps">
+          <!-- Step 1 -->
+          <div class="step active rise">
+            <div class="num">STEP 01 <span class="total">/ 03</span></div>
+            <h3>Basic Settings</h3>
+            <div class="field">
+              <div class="lbl">League Name</div>
+              <div class="input">The Old Guard</div>
+            </div>
+            <div class="field">
+              <div class="lbl">Teams</div>
+              <div class="input">12 teams · Head-to-head</div>
+            </div>
+            <div class="field" style="margin-bottom: 0">
+              <div class="lbl">Season Length</div>
+              <div class="input">22 weeks · Playoffs in W19</div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step rise">
+            <div class="num">STEP 02 <span class="total">/ 03</span></div>
+            <h3>Era &amp; History</h3>
+            <div class="field">
+              <div class="lbl">Eras Included</div>
+              <div class="chips">
+                <div class="chip on">Dead-ball</div>
+                <div class="chip on">Live-ball</div>
+                <div class="chip on">Integration</div>
+                <div class="chip on">Expansion</div>
+                <div class="chip on">Steroid</div>
+                <div class="chip on">Modern</div>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom: 0">
+              <div class="lbl">Filters</div>
+              <div class="toggle-row">
+                <div class="nm">Hall of Fame only</div>
+                <div class="switch"></div>
+              </div>
+              <div class="toggle-row">
+                <div class="nm">All-Star seasons only</div>
+                <div class="switch on"></div>
+              </div>
+              <div class="toggle-row">
+                <div class="nm">Pre-1947 included</div>
+                <div class="switch on"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step rise">
+            <div class="num">STEP 03 <span class="total">/ 03</span></div>
+            <h3>Draft Settings</h3>
+            <div class="field">
+              <div class="lbl">Draft Type</div>
+              <div class="chips">
+                <div class="chip on">Snake</div>
+                <div class="chip">Auction</div>
+                <div class="chip">Linear</div>
+              </div>
+            </div>
+            <div class="field">
+              <div class="lbl">Pick Timer</div>
+              <div class="input">90 seconds per pick</div>
+            </div>
+            <div class="field" style="margin-bottom: 0">
+              <div class="lbl">Date</div>
+              <div class="input">Fri, Apr 12 · 8:00 PM ET</div>
+            </div>
+          </div>
+        </div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 04 <span class="sep">/</span> Create
+          League
+        </div>
+        <div class="scene-time">00:20 — 00:31</div>
+      </section>
+
+      <!-- ============== 5 · DRAFT ============== -->
+      <section data-label="05 Draft" class="slide s-draft">
+        <div class="draft-head rise">
+          <h2><span class="live">▶ LIVE DRAFT</span> Round 4 · Pick 41</h2>
+          <div class="timer-card">
+            <div>
+              <div class="lbl">On the clock</div>
+              <div
+                style="
+                  font-family: var(--font-display);
+                  font-weight: 700;
+                  color: #fff;
+                  font-size: 24px;
+                "
+              >
+                The Old Guard
+              </div>
+            </div>
+            <div class="v">0:47</div>
+          </div>
+        </div>
+
+        <div class="draft-grid rise">
+          <!-- Available pool -->
+          <div class="pool">
+            <div class="pool-head">
+              <div class="ttl">Available · Top 8</div>
+              <div class="filters">
+                <div class="filter on">All</div>
+                <div class="filter">P</div>
+                <div class="filter">C</div>
+                <div class="filter">IF</div>
+                <div class="filter">OF</div>
+              </div>
+            </div>
+            <div class="pool-grid">
+              <div class="prow" style="--accent: var(--pos-pitcher)">
+                <div class="pos-tag" style="background: var(--pos-pitcher)">
+                  P
+                </div>
+                <div>
+                  <div class="nm">Pedro Martínez</div>
+                  <div class="sub">2000 · Boston Red Sox</div>
+                </div>
+                <div class="num">98.4 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-outfield)">
+                <div class="pos-tag" style="background: var(--pos-outfield)">
+                  OF
+                </div>
+                <div>
+                  <div class="nm">Ted Williams</div>
+                  <div class="sub">1941 · Boston Red Sox</div>
+                </div>
+                <div class="num">96.2 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-infield)">
+                <div class="pos-tag" style="background: var(--pos-infield)">
+                  SS
+                </div>
+                <div>
+                  <div class="nm">Honus Wagner</div>
+                  <div class="sub">1908 · Pittsburgh Pirates</div>
+                </div>
+                <div class="num">94.7 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-catcher)">
+                <div class="pos-tag" style="background: var(--pos-catcher)">
+                  C
+                </div>
+                <div>
+                  <div class="nm">Johnny Bench</div>
+                  <div class="sub">1972 · Cincinnati Reds</div>
+                </div>
+                <div class="num">93.1 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-pitcher)">
+                <div class="pos-tag" style="background: var(--pos-pitcher)">
+                  P
+                </div>
+                <div>
+                  <div class="nm">Sandy Koufax</div>
+                  <div class="sub">1965 · LA Dodgers</div>
+                </div>
+                <div class="num">92.8 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-infield)">
+                <div class="pos-tag" style="background: var(--pos-infield)">
+                  2B
+                </div>
+                <div>
+                  <div class="nm">Joe Morgan</div>
+                  <div class="sub">1976 · Cincinnati Reds</div>
+                </div>
+                <div class="num">91.3 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-outfield)">
+                <div class="pos-tag" style="background: var(--pos-outfield)">
+                  CF
+                </div>
+                <div>
+                  <div class="nm">Willie Mays</div>
+                  <div class="sub">1965 · SF Giants</div>
+                </div>
+                <div class="num">90.6 <span class="k">VAL</span></div>
+              </div>
+              <div class="prow" style="--accent: var(--pos-utility)">
+                <div class="pos-tag" style="background: var(--pos-utility)">
+                  UT
+                </div>
+                <div>
+                  <div class="nm">Rickey Henderson</div>
+                  <div class="sub">1990 · Oakland A's</div>
+                </div>
+                <div class="num">89.4 <span class="k">VAL</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pick log -->
+          <div class="picklog">
+            <div class="ttl">Recent Picks</div>
+            <div class="pl-row now">
+              <div class="pk">4.41</div>
+              <div class="pos" style="background: var(--brand-seam-red)">—</div>
+              <div>
+                <div class="nm" style="color: var(--brand-seam-red-light)">
+                  On the clock…
+                </div>
+                <div class="sub">The Old Guard</div>
+              </div>
+            </div>
+            <div class="pl-row">
+              <div class="pk">4.40</div>
+              <div class="pos" style="background: var(--pos-outfield)">OF</div>
+              <div>
+                <div class="nm">Hank Aaron, '57</div>
+                <div class="sub">Bronx Bombers</div>
+              </div>
+            </div>
+            <div class="pl-row">
+              <div class="pk">4.39</div>
+              <div class="pos" style="background: var(--pos-pitcher)">P</div>
+              <div>
+                <div class="nm">Greg Maddux, '95</div>
+                <div class="sub">Diamond Cutters</div>
+              </div>
+            </div>
+            <div class="pl-row">
+              <div class="pk">4.38</div>
+              <div class="pos" style="background: var(--pos-infield)">3B</div>
+              <div>
+                <div class="nm">Mike Schmidt, '80</div>
+                <div class="sub">Liberty Bells</div>
+              </div>
+            </div>
+            <div class="pl-row">
+              <div class="pk">4.37</div>
+              <div class="pos" style="background: var(--pos-catcher)">C</div>
+              <div>
+                <div class="nm">Yogi Berra, '54</div>
+                <div class="sub">River Avenue</div>
+              </div>
+            </div>
+            <div class="pl-row">
+              <div class="pk">4.36</div>
+              <div class="pos" style="background: var(--pos-infield)">1B</div>
+              <div>
+                <div class="nm">Lou Gehrig, '36</div>
+                <div class="sub">Iron Horsemen</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 05 <span class="sep">/</span> Live
+          Draft
+        </div>
+        <div class="scene-time">00:31 — 00:41</div>
+      </section>
+
+      <!-- ============== 6 · MATCHUP ============== -->
+      <section data-label="06 Matchup" class="slide s-match">
+        <div class="match-head rise">
+          <h2>Week 14 Matchup</h2>
+          <div class="week">Week 14 / 22 · Sep 8 — Sep 14</div>
+        </div>
+
+        <div class="scoreboard rise">
+          <div class="team-side">
+            <div class="team-shield">OG</div>
+            <div>
+              <div class="name">The Old Guard</div>
+              <div class="rec">9-4-0 · 1st place · East</div>
+            </div>
+          </div>
+          <div class="scores">
+            <div class="v win">142.7</div>
+            <div class="dash">–</div>
+            <div class="v">128.3</div>
+          </div>
+          <div class="team-side right">
+            <div class="team-shield b">DC</div>
+            <div style="text-align: right">
+              <div class="name">Diamond Cutters</div>
+              <div class="rec">8-5-0 · 2nd place · East</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="roster-grid rise">
+          <div class="roster">
+            <div class="ttl">The Old Guard · Starters</div>
+            <div class="rrow live">
+              <div class="pos">C</div>
+              <div class="nm">
+                Yogi Berra <i style="color: var(--fg4)">'54</i>
+              </div>
+              <div class="sc">14.2</div>
+            </div>
+            <div class="rrow live">
+              <div class="pos">1B</div>
+              <div class="nm">
+                Lou Gehrig <i style="color: var(--fg4)">'36</i>
+              </div>
+              <div class="sc">22.8</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">2B</div>
+              <div class="nm">
+                Joe Morgan <i style="color: var(--fg4)">'76</i>
+              </div>
+              <div class="sc">11.4</div>
+            </div>
+            <div class="rrow live">
+              <div class="pos">SS</div>
+              <div class="nm">
+                Honus Wagner <i style="color: var(--fg4)">'08</i>
+              </div>
+              <div class="sc">18.6</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">3B</div>
+              <div class="nm">
+                Mike Schmidt <i style="color: var(--fg4)">'80</i>
+              </div>
+              <div class="sc">15.0</div>
+            </div>
+            <div class="rrow live">
+              <div class="pos">OF</div>
+              <div class="nm">
+                Babe Ruth <i style="color: var(--fg4)">'27</i>
+              </div>
+              <div class="sc">28.4</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">OF</div>
+              <div class="nm">
+                Hank Aaron <i style="color: var(--fg4)">'57</i>
+              </div>
+              <div class="sc">19.7</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">P</div>
+              <div class="nm">
+                Bob Gibson <i style="color: var(--fg4)">'68</i>
+              </div>
+              <div class="sc">12.6</div>
+            </div>
+          </div>
+          <div class="roster">
+            <div class="ttl">Diamond Cutters · Starters</div>
+            <div class="rrow">
+              <div class="pos">C</div>
+              <div class="nm">
+                Johnny Bench <i style="color: var(--fg4)">'72</i>
+              </div>
+              <div class="sc">13.1</div>
+            </div>
+            <div class="rrow live">
+              <div class="pos">1B</div>
+              <div class="nm">
+                Albert Pujols <i style="color: var(--fg4)">'09</i>
+              </div>
+              <div class="sc">21.4</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">2B</div>
+              <div class="nm">
+                Rogers Hornsby <i style="color: var(--fg4)">'24</i>
+              </div>
+              <div class="sc">17.2</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">SS</div>
+              <div class="nm">
+                Cal Ripken Jr. <i style="color: var(--fg4)">'91</i>
+              </div>
+              <div class="sc">12.8</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">3B</div>
+              <div class="nm">
+                George Brett <i style="color: var(--fg4)">'80</i>
+              </div>
+              <div class="sc">14.5</div>
+            </div>
+            <div class="rrow live">
+              <div class="pos">OF</div>
+              <div class="nm">
+                Ted Williams <i style="color: var(--fg4)">'41</i>
+              </div>
+              <div class="sc">23.6</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">OF</div>
+              <div class="nm">
+                Mike Trout <i style="color: var(--fg4)">'19</i>
+              </div>
+              <div class="sc">16.3</div>
+            </div>
+            <div class="rrow">
+              <div class="pos">P</div>
+              <div class="nm">
+                Pedro Martínez <i style="color: var(--fg4)">'00</i>
+              </div>
+              <div class="sc">9.4</div>
+            </div>
+          </div>
+        </div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 06 <span class="sep">/</span> Weekly
+          Matchup
+        </div>
+        <div class="scene-time">00:41 — 00:51</div>
+      </section>
+
+      <!-- ============== 7 · CTA ============== -->
+      <section data-label="07 CTA" class="slide s-cta">
+        <div class="stats-row rise">
+          <div class="sblock">
+            <div class="v">150</div>
+            <div class="k">Years of Baseball</div>
+          </div>
+          <div class="sblock">
+            <div class="v">50K+</div>
+            <div class="k">Player-Seasons</div>
+          </div>
+          <div class="sblock">
+            <div class="v">12</div>
+            <div class="k">Team Leagues</div>
+          </div>
+          <div class="sblock">
+            <div class="v">$0</div>
+            <div class="k">To Start</div>
+          </div>
+        </div>
+
+        <h2 class="rise">
+          Build your dynasty.<br /><span class="gold"
+            >Dominate your league.</span
+          >
+        </h2>
+        <p class="lede rise">Free to play · No credit card · Year-round play</p>
+
+        <a class="button rise" href="https://legacy.sports">
+          Create Your League — It's Free
+          <span style="font-size: 32px">→</span>
+        </a>
+        <div class="url rise">legacy.sports</div>
+        <div class="scene-chrome">
+          <span class="dot"></span> Scene 07 <span class="sep">/</span> Call to
+          Action
+        </div>
+        <div class="scene-time">00:51 — 01:00</div>
+      </section>
+    </deck-stage>
+
+    <div id="progress"></div>
+    <button id="autoplay-toggle" class="on">▶ Auto-play On</button>
+
+    <script src="deck-stage.js"></script>
+    <script>
+      (() => {
+        // Real Remotion timings (frames @ 30fps), in milliseconds.
+        const SCENE_MS = [
+          4_000, // Title
+          8_000, // Differentiator
+          8_000, // Cross-Era
+          11_000, // Create League
+          10_000, // Draft
+          10_000, // Matchup
+          9_000, // CTA
+        ];
+
+        const stage = document.querySelector('deck-stage');
+        const progress = document.getElementById('progress');
+        const toggle = document.getElementById('autoplay-toggle');
+
+        let auto = true;
+        let raf = null;
+        let sceneStart = performance.now();
+
+        function currentIndex() {
+          // deck-stage's slide index — stored on the host. Fall back to URL hash.
+          const sections = stage.querySelectorAll(':scope > section');
+          // Use the visible one — deck-stage hides others
+          for (let i = 0; i < sections.length; i++) {
+            const s = sections[i];
+            const cs = getComputedStyle(s);
+            if (
+              cs.opacity !== '0' &&
+              cs.display !== 'none' &&
+              cs.visibility !== 'hidden'
+            )
+              return i;
+          }
+          return 0;
+        }
+
+        function step() {
+          if (!auto) return;
+          const idx = currentIndex();
+          const dur = SCENE_MS[idx] || 6000;
+          const elapsed = performance.now() - sceneStart;
+          const pct = Math.min(100, (elapsed / dur) * 100);
+          progress.style.width = pct + '%';
+          if (elapsed >= dur) {
+            const next = (idx + 1) % SCENE_MS.length;
+            stage.goTo(next);
+            sceneStart = performance.now();
+          }
+          raf = requestAnimationFrame(step);
+        }
+
+        function resetOnNav() {
+          sceneStart = performance.now();
+          progress.style.width = '0%';
+          // re-trigger entry animations on the active section
+          const sections = stage.querySelectorAll(':scope > section');
+          const i = currentIndex();
+          const active = sections[i];
+          if (active) {
+            active.querySelectorAll('.rise').forEach((el, k) => {
+              el.style.animation = 'none';
+              // staggered restart
+              // eslint-disable-next-line no-unused-expressions
+              el.offsetWidth;
+              el.style.animation = `rise 600ms ${k * 60}ms var(--ease-standard) both`;
+            });
+          }
+        }
+
+        // Listen for slide-changes broadcast by deck-stage's postMessage
+        window.addEventListener('message', (e) => {
+          if (e.data && typeof e.data.slideIndexChanged === 'number') {
+            resetOnNav();
+          }
+        });
+
+        toggle.addEventListener('click', () => {
+          auto = !auto;
+          toggle.classList.toggle('on', auto);
+          toggle.textContent = auto ? '▶ Auto-play On' : '⏸ Auto-play Off';
+          if (auto) {
+            sceneStart = performance.now();
+            step();
+          } else {
+            cancelAnimationFrame(raf);
+            progress.style.width = '0%';
+          }
+        });
+
+        // Pause on user keyboard nav (arrow keys still work via deck-stage; just reset timer)
+        document.addEventListener('keydown', (e) => {
+          if (
+            ['ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', ' '].includes(
+              e.key,
+            )
+          ) {
+            sceneStart = performance.now();
+            progress.style.width = '0%';
+          }
+        });
+
+        // Start autoplay once deck mounts
+        setTimeout(() => {
+          resetOnNav();
+          step();
+        }, 250);
+      })();
+    </script>
+  </body>
+</html>

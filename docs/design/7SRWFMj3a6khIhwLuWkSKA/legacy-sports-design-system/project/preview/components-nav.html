@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+        color: var(--fg1);
+      }
+      .nav {
+        display: flex;
+        gap: 4px;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 9999px;
+        padding: 6px;
+        width: fit-content;
+      }
+      .nav a {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 9px 16px;
+        border-radius: 9999px;
+        color: var(--fg3);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: all var(--dur-fast);
+      }
+      .nav a.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .nav a:hover:not(.on) {
+        color: var(--fg1);
+      }
+      .nav img {
+        width: 16px;
+        height: 16px;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <a class="on" href="#"><img src="../icons/brand/scoreboard.svg" />Home</a>
+      <a href="#"><img src="../icons/brand/league.svg" />Leagues</a>
+      <a href="#"><img src="../icons/brand/draft.svg" />Draft</a>
+      <a href="#"><img src="../icons/brand/matchup.svg" />Matchup</a>
+      <a href="#"><img src="../icons/brand/stats.svg" />Stats</a>
+    </div>
+  </body>
+</html>

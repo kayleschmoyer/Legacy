@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        max-width: 760px;
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 8px;
+      }
+      .demo {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-5);
+        padding: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        min-height: 120px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .sp {
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.12);
+        border-top-color: var(--brand-gold);
+        animation: spin 0.9s linear infinite;
+      }
+      .sp.sm {
+        width: 18px;
+        height: 18px;
+        border-width: 2px;
+      }
+      .sp.md {
+        width: 28px;
+        height: 28px;
+        border-width: 3px;
+      }
+      .sp.lg {
+        width: 42px;
+        height: 42px;
+        border-width: 3px;
+      }
+      .sp.seam {
+        border-top-color: var(--brand-seam-red);
+      }
+      .lp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .lp .msg {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <div class="lab">Spinner · sizes</div>
+        <div class="demo">
+          <div class="sp sm"></div>
+          <div class="sp md"></div>
+          <div class="sp lg"></div>
+        </div>
+      </div>
+      <div>
+        <div class="lab">Spinner · color variants</div>
+        <div class="demo">
+          <div class="sp md"></div>
+          <div class="sp md seam"></div>
+          <div class="sp md" style="border-top-color: #4aae7c"></div>
+        </div>
+      </div>
+      <div>
+        <div class="lab">LoadingPanel · default</div>
+        <div class="demo">
+          <div class="lp">
+            <div class="sp lg"></div>
+            <div class="msg">Loading roster…</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="lab">LoadingPanel · inline</div>
+        <div class="demo">
+          <div class="lp" style="flex-direction: row">
+            <div class="sp md"></div>
+            <div class="msg">Pulling latest stats</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

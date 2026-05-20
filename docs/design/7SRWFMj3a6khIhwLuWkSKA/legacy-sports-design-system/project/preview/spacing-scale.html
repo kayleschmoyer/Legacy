@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+        color: var(--fg1);
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      .box {
+        background: var(--brand-navy);
+        border-radius: var(--radius-2);
+      }
+      .lbl {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg3);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="item">
+        <div class="box" style="width: 4px; height: 32px"></div>
+        <div class="lbl">$1 · 4</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 8px; height: 32px"></div>
+        <div class="lbl">$2 · 8</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 12px; height: 32px"></div>
+        <div class="lbl">$3 · 12</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 16px; height: 32px"></div>
+        <div class="lbl">$4 · 16</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 20px; height: 32px"></div>
+        <div class="lbl">$5 · 20</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 24px; height: 32px"></div>
+        <div class="lbl">$6 · 24</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 32px; height: 32px"></div>
+        <div class="lbl">$7 · 32</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 40px; height: 32px"></div>
+        <div class="lbl">$8 · 40</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 56px; height: 32px"></div>
+        <div class="lbl">$9 · 56</div>
+      </div>
+      <div class="item">
+        <div class="box" style="width: 72px; height: 32px"></div>
+        <div class="lbl">$10 · 72</div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+        color: var(--fg1);
+      }
+      .f {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        max-width: 420px;
+      }
+      label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 6px;
+        display: block;
+      }
+      .inp {
+        width: 100%;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-default);
+        border-radius: var(--radius-2);
+        padding: 11px 14px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+        font-size: 15px;
+        box-sizing: border-box;
+        outline: none;
+        transition: all var(--dur-fast);
+      }
+      .inp:focus {
+        border-color: var(--focus-ring);
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+      }
+      .toggle {
+        display: flex;
+        gap: 0;
+        border: 1px solid var(--outline-default);
+        border-radius: var(--radius-2);
+        padding: 3px;
+        background: var(--surface-panel);
+        width: fit-content;
+      }
+      .toggle button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 7px 14px;
+        border: 0;
+        background: transparent;
+        color: var(--fg3);
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      .toggle button.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="f">
+      <div>
+        <label>League Name</label
+        ><input class="inp" value="Dead Ball Dynasty" />
+      </div>
+      <div><label>Season</label><input class="inp" value="1920 – 1930" /></div>
+      <div>
+        <label>Scoring</label>
+        <div class="toggle">
+          <button class="on">Head-to-Head</button><button>Rotisserie</button
+          ><button>Points</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

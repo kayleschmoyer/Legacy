@@ -1,0 +1,2545 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Scoreboard — Mockup</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="../../ds/colors_and_type.css" />
+    <style>
+      /* =====================================================================
+   Mockup chrome — only used to present the design, NOT part of the page.
+   The actual scoreboard lives inside `.sb-page`.
+   ===================================================================== */
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg1);
+        font-family: var(--font-body);
+        /* Signature "night stadium" page wash — three-blob radial gradient,
+     fixed-attached so it doesn't scroll away. Pulled directly from the
+     design system's --grad-hero recipe. */
+        background-image:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          );
+        background-attachment: fixed;
+        min-height: 100vh;
+      }
+
+      /* ─── Mockup toolbar (NOT part of product) ─────────────────────────── */
+      .mock-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(10, 15, 26, 0.85);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--outline-subtle);
+        padding: 12px 24px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        align-items: center;
+      }
+      .mock-label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg3);
+      }
+      .mock-tabs {
+        display: inline-flex;
+        gap: 2px;
+        padding: 4px;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 9999px;
+      }
+      .mock-tab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: transparent;
+        border: 0;
+        color: var(--fg3);
+        padding: 8px 14px;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: all 150ms var(--ease-standard);
+      }
+      .mock-tab:hover {
+        color: var(--fg1);
+      }
+      .mock-tab.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .mock-spacer {
+        flex: 1;
+      }
+      .mock-note {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg4);
+        font-style: italic;
+      }
+
+      /* ─── Stage: now a single-viewport stage with a sized device frame ── */
+      .stage {
+        margin: 0 auto;
+        padding: 32px 24px 80px;
+        display: flex;
+        justify-content: center;
+      }
+
+      .frame-cap {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg4);
+        margin-bottom: 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .frame-cap::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand-gold);
+        opacity: 0.6;
+      }
+
+      .frame-wrap {
+        width: 100%;
+      }
+      .frame {
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-6);
+        overflow: hidden;
+        background: var(--bg);
+        box-shadow: var(--shadow-lg);
+        background-image:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          );
+        /* The frame is sized by JS based on viewport choice. Internal
+     content uses its own responsive rules driven by container width. */
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      /* The frame becomes a responsive container — content adapts to the
+   width we hand it via container queries. */
+      .frame {
+        container-type: inline-size;
+        container-name: sb;
+      }
+
+      /* =====================================================================
+   SCOREBOARD — the actual page design.
+   All class names are prefixed `sb-` to keep them self-contained.
+   ===================================================================== */
+
+      .sb-page {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 40px 32px 80px;
+      }
+
+      /* ─── Container-driven responsive rules ────────────────────────────
+   We size by the frame container (not the viewport) so a 375px-wide
+   frame on a 1440px monitor still renders the mobile layout. The
+   design system spec says padding $3 (12px) below ~800px. */
+      @container sb (max-width: 800px) {
+        .sb-page {
+          padding: 28px 20px 64px;
+        }
+      }
+      @container sb (max-width: 540px) {
+        .sb-page {
+          padding: 24px 16px 56px;
+        }
+        .sb-title {
+          font-size: 40px !important;
+        }
+      }
+      @container sb (max-width: 420px) {
+        .sb-page {
+          padding: 22px 14px 48px;
+        }
+        .sb-title {
+          font-size: 34px !important;
+        }
+        .sb-card {
+          padding: 16px !important;
+        }
+        .sb-team-score {
+          font-size: 30px !important;
+        }
+        .sb-team-logo {
+          width: 34px !important;
+          height: 34px !important;
+          font-size: 11px !important;
+        }
+        .sb-header-top {
+          flex-direction: column;
+          align-items: stretch !important;
+        }
+        .sb-header-controls {
+          width: 100%;
+          justify-content: space-between;
+        }
+      }
+
+      /* ─── Header ───────────────────────────────────────────────────────── */
+      .sb-header {
+        margin-bottom: 32px;
+      }
+
+      .sb-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 24px;
+        flex-wrap: wrap;
+        padding-bottom: 20px;
+        /* 1px hairline only — explicitly no thicker accent stripe per brand
+     rules (no border-left/right > 1px on cards/callouts). */
+        border-bottom: 1px solid var(--outline-subtle);
+      }
+
+      .sb-eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+        margin-bottom: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sb-eyebrow .dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--brand-gold);
+        opacity: 0.7;
+      }
+      .sb-eyebrow .sep {
+        color: var(--fg4);
+        opacity: 0.6;
+      }
+
+      .sb-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(40px, 5.6vw, 64px);
+        line-height: 0.95;
+        letter-spacing: -0.015em;
+        color: var(--fg1-strong);
+        margin: 0;
+        /* Why so big: the page is a *board*. The title is the marquee.
+     Treating it as quiet is the Yahoo Sports trap we're avoiding. */
+      }
+
+      .sb-formatted-date {
+        font-family: var(--font-body);
+        font-style: italic;
+        font-size: 16px;
+        color: var(--fg3);
+        margin-top: 4px;
+        letter-spacing: 0.01em;
+      }
+
+      /* Right-side cluster: sport filter + date nav. We stack them so they
+   align right-edge with the header. */
+      .sb-header-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 10px;
+      }
+
+      /* ─── Sport filter (segmented pill) ────────────────────────────────
+   This is the new product affordance. Three options:
+     All Sports · MLB · NFL
+   Lives in the header, scoreboard-styled, distinct from generic
+   filter chips because it's a *primary* control. */
+      .sb-sport-filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-pill);
+        padding: 4px;
+      }
+      .sb-sport-btn {
+        /* TOUCH-TARGET: 40+ tall, comfortable hit area */
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        color: var(--fg3);
+        padding: 10px 14px;
+        min-height: 40px;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: all 150ms var(--ease-standard);
+        font-variant-numeric: tabular-nums;
+      }
+      .sb-sport-btn:hover {
+        color: var(--fg1);
+      }
+      .sb-sport-btn .glyph {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        opacity: 0.85;
+      }
+      .sb-sport-btn .glyph svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .sb-sport-btn .count {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 11px;
+        letter-spacing: 0;
+        color: var(--fg4);
+        padding: 2px 6px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .sb-sport-btn.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .sb-sport-btn.on .count {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.88);
+      }
+      .sb-sport-btn.on.is-nfl {
+        background: #1f5a3a;
+      } /* turf — when NFL is exclusive */
+      .sb-sport-btn:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+
+      /* Date navigator — three controls, scoreboard-styled */
+      .sb-datenav {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-pill);
+        padding: 6px;
+      }
+      .sb-datenav-btn {
+        /* 44×44 hit target — annotated for accessibility. */
+        /* TOUCH-TARGET: 44×44 minimum */
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 9999px;
+        cursor: pointer;
+        background: transparent;
+        color: var(--fg2);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 20px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 150ms var(--ease-standard);
+      }
+      .sb-datenav-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--fg1);
+      }
+      .sb-datenav-btn:disabled {
+        color: var(--fg4);
+        cursor: not-allowed;
+      }
+      .sb-datenav-btn:disabled:hover {
+        background: transparent;
+      }
+      .sb-datenav-btn:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+      .sb-date-input {
+        /* Native <input type="date"> — restyled to feel like part of the
+     scoreboard. Min height 44 for touch. */
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        color: var(--fg1);
+        background: transparent;
+        border: 0;
+        padding: 0 12px;
+        min-height: 44px;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+        color-scheme: dark;
+      }
+      .sb-date-input:focus {
+        outline: 0;
+      }
+
+      /* Status counters row — the "scorebug" beneath the title.
+   Editorial decision: these aren't generic chips. They're a single
+   horizontal rule of three counts, each with its own quiet color
+   semantic (green=live, blue=upcoming, gray=final), separated by
+   middle dots. Reads like a stadium info-strip, not a filter bar. */
+      .sb-meta-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 18px;
+        margin-top: 18px;
+      }
+      .sb-count {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        font-family: var(--font-body);
+      }
+      .sb-count-num {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        color: var(--fg1-strong);
+      }
+      .sb-count-label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg3);
+      }
+      .sb-count.live .sb-count-num {
+        color: var(--success-fg);
+      }
+      .sb-count.live .sb-count-label {
+        color: var(--success-fg);
+      }
+      .sb-count.final .sb-count-num {
+        color: var(--fg2);
+      }
+      .sb-count.upcoming .sb-count-num {
+        color: var(--info-fg);
+      }
+      .sb-count.upcoming .sb-count-label {
+        color: var(--info-fg);
+      }
+
+      .sb-meta-sep {
+        color: var(--fg4);
+        font-size: 14px;
+        user-select: none;
+      }
+
+      /* Last-updated row — quieter; secondary metadata. */
+      .sb-updated {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg4);
+      }
+      .sb-updated .mono {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--fg3);
+      }
+      .sb-refresh {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--success-fg);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .sb-refresh-pulse {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--success-fg);
+        /* MOTION: 1.4s pulse, infinite — signals live polling */
+        animation: sb-pulse 1.4s var(--ease-standard) infinite;
+      }
+
+      /* ─── Section headers ──────────────────────────────────────────────── */
+      .sb-section {
+        margin-top: 40px;
+      }
+      .sb-section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+      .sb-section-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 20px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg1);
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sb-section-title .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--brand-gold);
+      }
+      .sb-section.live .sb-section-title .lamp {
+        background: var(--success-fg);
+        /* MOTION: pulse 1.4s ease-standard infinite — live games "on the air" */
+        animation: sb-pulse 1.4s var(--ease-standard) infinite;
+        box-shadow: 0 0 12px rgba(111, 211, 154, 0.55);
+      }
+      .sb-section.final .sb-section-title .lamp {
+        background: var(--fg4);
+      }
+      .sb-section.upcoming .sb-section-title .lamp {
+        background: var(--info-fg);
+      }
+      .sb-section-count {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        color: var(--fg4);
+        font-variant-numeric: tabular-nums;
+      }
+      /* Section breakdown — "3 MLB · 2 NFL" when filter=all. Tiny meta. */
+      .sb-section-breakdown {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg4);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .sb-section-breakdown .pip {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .sb-section-breakdown .pip.mlb {
+        background: var(--brand-navy-light);
+      }
+      .sb-section-breakdown .pip.nfl {
+        background: #2d6a4f;
+      }
+      .sb-section-rule {
+        flex: 1;
+        height: 1px;
+        background: var(--outline-subtle);
+        align-self: center;
+      }
+
+      /* ─── Game grid ────────────────────────────────────────────────────── */
+      .sb-game-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 14px;
+      }
+      @container sb (max-width: 540px) {
+        .sb-game-grid {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+      }
+
+      /* ─── Game card — the editorial workhorse ──────────────────────────── */
+      .sb-card {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-5);
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        transition: all 220ms var(--ease-standard);
+        cursor: default;
+        text-align: left;
+        width: 100%;
+        font-family: inherit;
+        color: inherit;
+        position: relative;
+      }
+      button.sb-card {
+        cursor: pointer;
+      }
+      button.sb-card:hover {
+        border-color: var(--glass-border-hover);
+        /* MOTION: translateY(-2px), 220ms ease-standard, on hover */
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+      button.sb-card:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+
+      /* Live state — the card gets a quiet seam-red 1px border and a deeper
+   shadow so it feels lit. No accent stripe, no neon glow. */
+      .sb-card.live {
+        border-color: rgba(196, 30, 58, 0.32);
+        box-shadow: var(--shadow-md);
+        background:
+          linear-gradient(180deg, rgba(196, 30, 58, 0.04) 0%, transparent 30%),
+          var(--surface-card);
+      }
+
+      /* Top strip: status badge | middle (outs/down) | start time / sport tag */
+      .sb-card-top {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 12px;
+        min-height: 22px;
+      }
+      .sb-status {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        justify-self: start;
+        min-width: 0;
+      }
+      .sb-status.live {
+        color: var(--success-fg);
+      }
+      .sb-status.final {
+        color: var(--fg3);
+      }
+      .sb-status.scheduled {
+        color: var(--info-fg);
+      }
+      .sb-status .arrow {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 10px;
+        line-height: 1;
+      }
+      .sb-status .sport-tag {
+        /* Subtle sport identifier appended to status. Lives in the same
+     micro-line so it doesn't add visual weight. */
+        color: var(--fg4);
+        letter-spacing: 0.14em;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .sb-status .sport-tag::before {
+        content: '·';
+        color: var(--fg4);
+        margin: 0 1px;
+      }
+      .sb-status.live .sport-tag {
+        color: rgba(111, 211, 154, 0.6);
+      }
+      .sb-status.live .sport-tag::before {
+        color: rgba(111, 211, 154, 0.4);
+      }
+
+      /* Sport mark (small circular glyph). Used inside chips/badges. */
+      .sb-sport-mark {
+        width: 12px;
+        height: 12px;
+        display: inline-flex;
+      }
+      .sb-sport-mark svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      /* Outs — three diamond pips. Filled = recorded out. (Baseball only.) */
+      .sb-outs {
+        justify-self: center;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg4);
+      }
+      .sb-outs-pips {
+        display: inline-flex;
+        gap: 3px;
+      }
+      .sb-out-pip {
+        width: 7px;
+        height: 7px;
+        background: transparent;
+        border: 1px solid var(--fg4);
+        transform: rotate(45deg);
+      }
+      .sb-out-pip.on {
+        background: var(--success-fg);
+        border-color: var(--success-fg);
+      }
+
+      /* Down & distance — NFL equivalent of outs, lives in the same slot.
+   Single text expression: "2nd & 7 · KC 38" */
+      .sb-down {
+        justify-self: center;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg2);
+        font-variant-numeric: tabular-nums;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .sb-down .yardline {
+        color: var(--fg4);
+      }
+
+      /* Start time — Upcoming only. Mono, tabular, quiet. */
+      .sb-starttime {
+        justify-self: end;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--fg3);
+        letter-spacing: 0.04em;
+      }
+
+      /* ─── Score block ──────────────────────────────────────────────────── */
+      .sb-score-block {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .sb-team-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: var(--radius-3);
+        transition: background 150ms var(--ease-standard);
+        position: relative;
+      }
+      .sb-team-row + .sb-team-row {
+        margin-top: 2px;
+      }
+
+      /* Possession indicator — small gold pip on the row whose team has the
+   ball. NFL only, live state only. Lives flush-left, doesn't shift
+   layout. Aged-gold per brand rules: scarce, intentional. */
+      .sb-team-row.has-possession::before {
+        content: '';
+        position: absolute;
+        left: -4px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 22px;
+        background: var(--brand-gold);
+        border-radius: 9999px;
+        box-shadow: 0 0 8px rgba(197, 165, 90, 0.45);
+      }
+
+      .sb-team-logo {
+        /* Placeholder team mark — circular tile with abbreviation. In
+     production this becomes a real cap mark / helmet. */
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          var(--brand-navy) 0%,
+          var(--brand-navy-dark) 100%
+        );
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 12px;
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+      /* NFL team mark — turf-green gradient. Visually distinguishes sport
+   at a glance even when sport tag is off-screen. */
+      .sb-card.is-nfl .sb-team-logo {
+        background: linear-gradient(135deg, #1f5a3a 0%, #143824 100%);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+      .sb-team-info {
+        min-width: 0;
+      }
+      .sb-team-abbr {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: 0.04em;
+        color: var(--fg1);
+        line-height: 1.1;
+      }
+      .sb-team-name {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg3);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sb-team-record {
+        /* NFL records ("4-2") rendered as caption text. */
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg4);
+        margin-left: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Score numeral — the loudest element on the card. */
+      .sb-team-score {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 36px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+        color: var(--fg1-strong);
+        min-width: 40px;
+        text-align: right;
+      }
+      .sb-team-score.leading {
+        color: var(--success-fg);
+      }
+      .sb-team-score.trailing {
+        color: var(--fg3);
+      }
+      .sb-team-score.tied {
+        color: var(--fg1-strong);
+      }
+      .sb-team-score.upcoming {
+        color: var(--fg4);
+        font-weight: 700;
+      }
+      /* On Final cards, the winning team's score gets gold treatment —
+   trophy-aged. Subtle, dignified. */
+      .sb-card.final .sb-team-row.winner .sb-team-score {
+        color: var(--brand-gold-light);
+      }
+      .sb-card.final .sb-team-row.winner .sb-team-abbr {
+        color: var(--brand-gold-light);
+      }
+      .sb-card.final .sb-team-row.loser .sb-team-abbr {
+        color: var(--fg3);
+      }
+
+      /* ─── Card footer (Live + Final) ───────────────────────────────────── */
+      .sb-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding-top: 12px;
+        border-top: 1px solid var(--outline-subtle);
+      }
+      .sb-stats {
+        display: inline-flex;
+        gap: 14px;
+        align-items: baseline;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--fg3);
+      }
+      .sb-stats .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--fg4);
+        margin-right: 4px;
+        font-size: 11px;
+      }
+      .sb-linescore-toggle {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        color: var(--info-fg);
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 0;
+      }
+      .sb-linescore-toggle:hover {
+        color: var(--brand-gold-light);
+      }
+
+      /* Subtle context line — "ALCS · Game 4" or "Week 7 · Sunday Night".
+   Lives between the score block and the footer; provides league/series
+   context that's especially important when both sports mix. */
+      .sb-context {
+        font-family: var(--font-body);
+        font-style: italic;
+        font-size: 12px;
+        color: var(--fg4);
+        letter-spacing: 0.01em;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: -4px;
+      }
+
+      /* ─── Linescore (expanded) ─────────────────────────────────────────── */
+      .sb-linescore {
+        margin-top: 12px;
+        padding: 12px;
+        background: var(--surface-subtle);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-3);
+        overflow-x: auto;
+        /* Custom thin scrollbar — per spec */
+        scrollbar-width: thin;
+        scrollbar-color: var(--outline-default) transparent;
+      }
+      .sb-linescore::-webkit-scrollbar {
+        height: 6px;
+      }
+      .sb-linescore::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .sb-linescore::-webkit-scrollbar-thumb {
+        background: var(--outline-default);
+        border-radius: 9999px;
+      }
+      .sb-linescore-table {
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--fg2);
+        min-width: 100%;
+      }
+      .sb-linescore-table th,
+      .sb-linescore-table td {
+        padding: 6px 9px;
+        text-align: center;
+        border: 0;
+      }
+      .sb-linescore-table thead th {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg4);
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--outline-subtle);
+      }
+      .sb-linescore-table .label {
+        text-align: left;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--fg2);
+        padding-right: 14px;
+      }
+      .sb-linescore-table .total {
+        font-family: var(--font-display);
+        font-weight: 800;
+        color: var(--fg1-strong);
+        border-left: 1px solid var(--outline-subtle);
+        padding-left: 12px;
+      }
+      .sb-linescore-table tbody tr + tr td {
+        padding-top: 6px;
+      }
+      .sb-linescore-table .current {
+        background: rgba(111, 211, 154, 0.08);
+        color: var(--success-fg);
+        border-radius: var(--radius-1);
+      }
+
+      /* ─── Skeleton (loading) ───────────────────────────────────────────── */
+      /* Skeletons match real geometry — same paddings, same column widths.
+   Shimmer is a moving navy gradient (not gray) so it fits the night-
+   stadium palette. */
+      .sk {
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: var(--radius-2);
+        position: relative;
+        overflow: hidden;
+      }
+      .sk::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.05) 50%,
+          transparent 100%
+        );
+        /* MOTION: skeleton shimmer, 1.4s linear infinite */
+        animation: sb-shimmer 1.4s linear infinite;
+      }
+      @keyframes sb-shimmer {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+      @keyframes sb-pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      .sk-line {
+        height: 12px;
+      }
+      .sk-h1 {
+        height: 56px;
+        width: 60%;
+      }
+      .sk-meta {
+        height: 14px;
+        width: 240px;
+      }
+      .sk-pill {
+        height: 56px;
+        width: 280px;
+        border-radius: 9999px;
+      }
+      .sk-pill-sm {
+        height: 40px;
+        width: 220px;
+        border-radius: 9999px;
+      }
+      .sk-section-title {
+        height: 18px;
+        width: 180px;
+      }
+      .sk-card {
+        background: var(--surface-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-5);
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .sk-card-top {
+        display: flex;
+        justify-content: space-between;
+      }
+      .sk-card-team {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: var(--radius-3);
+      }
+      .sk-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+      }
+      .sk-card-team-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .sk-card-score {
+        width: 44px;
+        height: 32px;
+      }
+
+      /* ─── Error state ──────────────────────────────────────────────────── */
+      .sb-error {
+        margin-top: 24px;
+        padding: 28px 32px;
+        background: var(--surface-card);
+        border: 1px solid var(--danger-border);
+        border-radius: var(--radius-5);
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        /* Why no left-stripe accent: brand rule prohibits stripes wider than
+     1px. The danger semantic comes from the full 1px border + soft
+     fill behind the icon, not a slab on the side. */
+      }
+      @container sb (max-width: 540px) {
+        .sb-error {
+          padding: 20px;
+          gap: 14px;
+        }
+      }
+      .sb-error-icon {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--danger-soft);
+        border: 1px solid var(--danger-border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .sb-error-icon svg {
+        width: 22px;
+        height: 22px;
+        stroke: var(--danger-fg);
+      }
+      .sb-error-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .sb-error-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: -0.005em;
+        color: var(--fg1-strong);
+        margin: 0 0 6px;
+      }
+      .sb-error-text {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 60ch;
+      }
+      .sb-error-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+      .sb-btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 11px 18px;
+        border-radius: var(--radius-4);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 150ms var(--ease-standard);
+        /* TOUCH-TARGET: 44×44 minimum (height 41 + line-height tweak) */
+        min-height: 44px;
+      }
+      .sb-btn-primary {
+        background: var(--brand-navy);
+        color: #fff;
+        border-color: var(--brand-navy-light);
+      }
+      .sb-btn-primary:hover {
+        background: var(--brand-navy-light);
+        transform: translateY(-1px);
+      }
+      .sb-btn-ghost {
+        background: transparent;
+        color: var(--fg1);
+        border-color: var(--outline-default);
+      }
+      .sb-btn-ghost:hover {
+        border-color: var(--outline-strong);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      /* ─── Empty / no-data states ───────────────────────────────────────── */
+      .sb-empty {
+        margin-top: 32px;
+        padding: 56px 32px;
+        background: var(--surface-card);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-6);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      .sb-empty-art {
+        /* Editorial illustration: a stylized empty diamond. NOT a generic
+     "nothing here" graphic — it ties directly to the product's sport.
+     Drawn with the brand-icon stroke vocabulary (1.8px navy, gold accent).
+     Annotated as a placeholder; the implementation can swap in the
+     production BrandIcon `dugout` or `field-empty` glyph. */
+        width: 120px;
+        height: 120px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .sb-empty-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 28px;
+        letter-spacing: -0.005em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .sb-empty-text {
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.55;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 50ch;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ───────────────────── Mockup toolbar (NOT product) ───────────────────── -->
+    <div class="mock-bar" role="toolbar" aria-label="Mockup state controls">
+      <span class="mock-label">State</span>
+      <div class="mock-tabs" id="state-tabs">
+        <button class="mock-tab on" data-state="populated">Populated</button>
+        <button class="mock-tab" data-state="loading">Loading</button>
+        <button class="mock-tab" data-state="error">Error</button>
+        <button class="mock-tab" data-state="empty">Empty Schedule</button>
+        <button class="mock-tab" data-state="nodata">No Data</button>
+      </div>
+
+      <span class="mock-label" style="margin-left: 12px">Viewport</span>
+      <div class="mock-tabs" id="view-tabs">
+        <button class="mock-tab" data-view="mobile">Mobile · 375</button>
+        <button class="mock-tab" data-view="tablet">Tablet · 768</button>
+        <button class="mock-tab" data-view="laptop">Laptop · 1024</button>
+        <button class="mock-tab on" data-view="desktop">Desktop · 1280</button>
+        <button class="mock-tab" data-view="wide">Wide · 1440</button>
+      </div>
+
+      <span class="mock-spacer"></span>
+      <span class="mock-note"
+        >/scoreboard · Multi-sport (MLB + NFL) · dark-only</span
+      >
+    </div>
+
+    <!-- ───────────────────── Stage ───────────────────── -->
+    <div class="stage" id="stage">
+      <div class="frame-wrap" id="frame-wrap">
+        <div class="frame-cap" id="frame-cap">Desktop · 1280 × auto</div>
+        <div class="frame" id="frame">
+          <div
+            id="sb-root"
+            class="sb-page"
+            data-screen-label="Scoreboard"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────────────────
+     Scoreboard renderer — single page, one frame at a time.
+     Plain DOM + small templates so this file is self-contained per spec.
+     ──────────────────────────────────────────────────────────────────── -->
+    <script>
+      /* ───────────────────────────────────────────────────────────────────
+   Representative fictional data — Sunday, October 19, 2025.
+   Why this date: it's a Sunday during NFL Week 7 and the MLB
+   postseason (LCS round), so both sports are credibly active on the
+   same day. The product spans both leagues now, so the scoreboard
+   has to as well.
+   ─────────────────────────────────────────────────────────────────── */
+      const TODAY = 'Sunday, October 19, 2025';
+      const TODAY_ISO = '2025-10-19';
+      const LAST_UPDATED = '4:18 PM';
+
+      const GAMES = [
+        /* ─── MLB (postseason) ──────────────────────────────────────────── */
+        {
+          id: 'b1',
+          sport: 'MLB',
+          status: 'Live',
+          inning: 6,
+          inningHalf: 'Top',
+          outs: 1,
+          context: 'NLCS · Game 3',
+          away: {
+            abbr: 'LAD',
+            name: 'Dodgers',
+            runs: 3,
+            hits: 7,
+            errors: 0,
+            line: [0, 1, 0, 2, 0, 0],
+          },
+          home: {
+            abbr: 'MIL',
+            name: 'Brewers',
+            runs: 4,
+            hits: 6,
+            errors: 1,
+            line: [1, 0, 2, 0, 1, 0],
+          },
+          hasLinescore: true,
+        },
+        {
+          id: 'b2',
+          sport: 'MLB',
+          status: 'Live',
+          inning: 3,
+          inningHalf: 'Bot',
+          outs: 0,
+          context: 'ALCS · Game 4',
+          away: {
+            abbr: 'NYY',
+            name: 'Yankees',
+            runs: 1,
+            hits: 3,
+            errors: 0,
+            line: [1, 0, 0],
+          },
+          home: {
+            abbr: 'HOU',
+            name: 'Astros',
+            runs: 1,
+            hits: 4,
+            errors: 0,
+            line: [0, 1, '·'],
+          },
+          hasLinescore: true,
+        },
+        {
+          id: 'b3',
+          sport: 'MLB',
+          status: 'Scheduled',
+          startTime: '8:08 PM',
+          context: 'NLCS · Game 3',
+          away: { abbr: 'PHI', name: 'Phillies' },
+          home: { abbr: 'NYM', name: 'Mets' },
+        },
+        {
+          id: 'b4',
+          sport: 'MLB',
+          status: 'Final',
+          context: 'ALDS · Game 5',
+          away: {
+            abbr: 'BOS',
+            name: 'Red Sox',
+            runs: 5,
+            hits: 11,
+            errors: 0,
+            line: [2, 0, 0, 1, 0, 0, 2, 0, 0],
+          },
+          home: {
+            abbr: 'TOR',
+            name: 'Blue Jays',
+            runs: 2,
+            hits: 6,
+            errors: 1,
+            line: [0, 0, 1, 0, 0, 1, 0, 0, 0],
+          },
+          hasLinescore: true,
+        },
+
+        /* ─── NFL (Week 7) ──────────────────────────────────────────────── */
+        {
+          id: 'f1',
+          sport: 'NFL',
+          status: 'Live',
+          quarter: 3,
+          clock: '8:42',
+          possession: 'home',
+          downDistance: '2nd & 7',
+          yardLine: 'KC 38',
+          context: 'Week 7 · 4:25 ET',
+          away: {
+            abbr: 'KC',
+            name: 'Chiefs',
+            record: '5-1',
+            score: 17,
+            totalYds: 241,
+            turnovers: 0,
+            line: [7, 3, 7],
+          },
+          home: {
+            abbr: 'BUF',
+            name: 'Bills',
+            record: '4-2',
+            score: 14,
+            totalYds: 198,
+            turnovers: 1,
+            line: [0, 7, 7],
+          },
+          hasLinescore: true,
+        },
+        {
+          id: 'f2',
+          sport: 'NFL',
+          status: 'Live',
+          quarter: 2,
+          clock: '1:14',
+          possession: 'away',
+          downDistance: '3rd & 4',
+          yardLine: 'SF 22',
+          context: 'Week 7 · 4:25 ET',
+          away: {
+            abbr: 'SF',
+            name: '49ers',
+            record: '3-3',
+            score: 10,
+            totalYds: 152,
+            turnovers: 0,
+            line: [3, 7],
+          },
+          home: {
+            abbr: 'DAL',
+            name: 'Cowboys',
+            record: '2-4',
+            score: 13,
+            totalYds: 189,
+            turnovers: 0,
+            line: [10, 3],
+          },
+          hasLinescore: true,
+        },
+        {
+          id: 'f3',
+          sport: 'NFL',
+          status: 'Live',
+          quarter: 4,
+          clock: '2:00',
+          possession: 'home',
+          downDistance: '1st & 10',
+          yardLine: 'GB 41',
+          context: 'Week 7 · 1:00 ET',
+          away: {
+            abbr: 'MIN',
+            name: 'Vikings',
+            record: '5-1',
+            score: 24,
+            totalYds: 312,
+            turnovers: 2,
+            line: [7, 7, 3, 7],
+          },
+          home: {
+            abbr: 'GB',
+            name: 'Packers',
+            record: '4-2',
+            score: 21,
+            totalYds: 298,
+            turnovers: 1,
+            line: [0, 14, 0, 7],
+          },
+          hasLinescore: true,
+        },
+        {
+          id: 'f4',
+          sport: 'NFL',
+          status: 'Scheduled',
+          startTime: '8:20 PM',
+          context: 'Sunday Night · Week 7',
+          away: { abbr: 'PHI', name: 'Eagles', record: '5-1' },
+          home: { abbr: 'NYG', name: 'Giants', record: '2-4' },
+        },
+        {
+          id: 'f5',
+          sport: 'NFL',
+          status: 'Final',
+          context: 'Week 7 · 1:00 ET',
+          away: {
+            abbr: 'BAL',
+            name: 'Ravens',
+            record: '5-2',
+            score: 34,
+            totalYds: 412,
+            turnovers: 0,
+            line: [7, 14, 7, 6],
+          },
+          home: {
+            abbr: 'CIN',
+            name: 'Bengals',
+            record: '2-5',
+            score: 20,
+            totalYds: 289,
+            turnovers: 3,
+            line: [0, 3, 10, 7],
+          },
+          hasLinescore: true,
+        },
+        {
+          id: 'f6',
+          sport: 'NFL',
+          status: 'Final',
+          context: 'Week 7 · 1:00 ET',
+          away: {
+            abbr: 'DET',
+            name: 'Lions',
+            record: '5-1',
+            score: 27,
+            totalYds: 355,
+            turnovers: 1,
+            line: [3, 14, 7, 3],
+          },
+          home: {
+            abbr: 'CHI',
+            name: 'Bears',
+            record: '3-3',
+            score: 23,
+            totalYds: 301,
+            turnovers: 2,
+            line: [7, 3, 7, 6],
+          },
+          hasLinescore: true,
+        },
+      ];
+
+      /* Sport metadata — labels + small inline glyphs. The glyphs are
+   simplified inline versions of the BrandIcon `baseball` and
+   `football` marks: 1.8px stroke, two-tone, 16px target. */
+      const SPORTS = {
+        MLB: {
+          label: 'MLB',
+          longLabel: 'Major League Baseball',
+          context: 'MLB Postseason',
+          glyph: `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.4" stroke="currentColor" stroke-width="1.4" fill="none"/>
+      <path d="M3.6 4.6Q5.2 6 5.4 8.0Q5.6 10.2 3.4 11.4" stroke="#C41E3A" stroke-width="1.2"/>
+      <path d="M12.4 4.6Q10.8 6 10.6 8.0Q10.4 10.2 12.6 11.4" stroke="#C41E3A" stroke-width="1.2"/>
+    </svg>`,
+        },
+        NFL: {
+          label: 'NFL',
+          longLabel: 'National Football League',
+          context: 'NFL Week 7',
+          glyph: `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5.2 10.8C3.8 9.4 3.8 6.6 5.2 5.2L6.6 3.8C8 2.4 10.8 2.4 12.2 3.8C13.6 5.2 13.6 8 12.2 9.4L10.8 10.8C9.4 12.2 6.6 12.2 5.2 10.8Z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+      <path d="M6.6 9.4L9.4 6.6" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M7.6 8.4H9" stroke="#C5A55A" stroke-width="1.2"/>
+      <path d="M7 7.8H8.4" stroke="#C5A55A" stroke-width="1.2"/>
+      <path d="M8.2 7.2H9.6" stroke="#C5A55A" stroke-width="1.2"/>
+    </svg>`,
+        },
+      };
+
+      /* ─── Filter state ──────────────────────────────────────────────── */
+      let CURRENT_FILTER = 'all'; // 'all' | 'mlb' | 'nfl'
+      let CURRENT_STATE = 'populated';
+
+      function filteredGames() {
+        if (CURRENT_FILTER === 'all') return GAMES;
+        return GAMES.filter((g) => g.sport.toLowerCase() === CURRENT_FILTER);
+      }
+
+      /* ─── Helpers ───────────────────────────────────────────────────── */
+      function el(tag, props = {}, children = []) {
+        const n = document.createElement(tag);
+        for (const [k, v] of Object.entries(props)) {
+          if (k === 'class') n.className = v;
+          else if (k === 'html') n.innerHTML = v;
+          else if (k === 'on' && typeof v === 'object') {
+            for (const [ev, fn] of Object.entries(v))
+              n.addEventListener(ev, fn);
+          } else if (
+            k.startsWith('aria-') ||
+            k === 'role' ||
+            k === 'type' ||
+            k === 'disabled' ||
+            k === 'value' ||
+            k === 'min' ||
+            k === 'max' ||
+            k.startsWith('data-')
+          ) {
+            if (v === true) n.setAttribute(k, '');
+            else if (v !== false && v != null) n.setAttribute(k, v);
+          } else {
+            n[k] = v;
+          }
+        }
+        for (const c of [].concat(children)) {
+          if (c == null || c === false) continue;
+          n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        }
+        return n;
+      }
+
+      function sportMark(sport) {
+        return el('span', {
+          class: 'sb-sport-mark',
+          html: SPORTS[sport].glyph,
+          'aria-hidden': 'true',
+        });
+      }
+
+      /* ─── Header ────────────────────────────────────────────────────── */
+      function titleForFilter() {
+        if (CURRENT_FILTER === 'mlb') return 'MLB Scoreboard';
+        if (CURRENT_FILTER === 'nfl') return 'NFL Scoreboard';
+        return 'Scoreboard';
+      }
+      function eyebrowForFilter() {
+        if (CURRENT_FILTER === 'mlb') return ['Today', SPORTS.MLB.context];
+        if (CURRENT_FILTER === 'nfl') return ['Today', SPORTS.NFL.context];
+        return ['Today', SPORTS.MLB.context, SPORTS.NFL.context];
+      }
+
+      function renderHeader({ live, upcoming, final, showRefresh }) {
+        // Eyebrow segments — joined with ·
+        const eb = eyebrowForFilter();
+        const eyebrowChildren = [el('span', { class: 'dot' })];
+        eb.forEach((seg, i) => {
+          if (i > 0) eyebrowChildren.push(el('span', { class: 'sep' }, '·'));
+          eyebrowChildren.push(document.createTextNode(seg));
+        });
+
+        return el('header', { class: 'sb-header' }, [
+          el('div', { class: 'sb-header-top' }, [
+            el('div', {}, [
+              el('div', { class: 'sb-eyebrow' }, eyebrowChildren),
+              // MOTION: title fades up 8px on route enter, 280ms ease-out-quart
+              el('h1', { class: 'sb-title' }, titleForFilter()),
+              el('div', { class: 'sb-formatted-date' }, TODAY),
+            ]),
+            el('div', { class: 'sb-header-controls' }, [
+              renderSportFilter(),
+              // Date navigator — three controls
+              el(
+                'div',
+                {
+                  class: 'sb-datenav',
+                  role: 'group',
+                  'aria-label': 'Change date',
+                },
+                [
+                  // TOUCH-TARGET: 44×44
+                  el(
+                    'button',
+                    { class: 'sb-datenav-btn', 'aria-label': 'Previous day' },
+                    '←',
+                  ),
+                  el('input', {
+                    class: 'sb-date-input',
+                    type: 'date',
+                    value: TODAY_ISO,
+                    max: TODAY_ISO,
+                    'aria-label': 'Pick a date',
+                  }),
+                  // TOUCH-TARGET: 44×44 — disabled when date ≥ today
+                  el(
+                    'button',
+                    {
+                      class: 'sb-datenav-btn',
+                      'aria-label': 'Next day',
+                      disabled: true,
+                    },
+                    '→',
+                  ),
+                ],
+              ),
+            ]),
+          ]),
+          // Status counters — only render counts that are nonzero, dot-separated
+          el(
+            'div',
+            { class: 'sb-meta-row' },
+            [
+              live > 0 && counter('live', live, 'Live'),
+              live > 0 &&
+                (upcoming > 0 || final > 0) &&
+                el('span', { class: 'sb-meta-sep' }, '·'),
+              upcoming > 0 && counter('upcoming', upcoming, 'Upcoming'),
+              upcoming > 0 &&
+                final > 0 &&
+                el('span', { class: 'sb-meta-sep' }, '·'),
+              final > 0 && counter('final', final, 'Final'),
+            ].filter(Boolean),
+          ),
+          // Updated row
+          el(
+            'div',
+            { class: 'sb-updated' },
+            [
+              el('span', {}, [
+                'Updated ',
+                el('span', { class: 'mono' }, LAST_UPDATED),
+              ]),
+              showRefresh &&
+                el('span', { class: 'sb-refresh' }, [
+                  el('span', { class: 'sb-refresh-pulse' }),
+                  'Auto-refreshing every 15s',
+                ]),
+            ].filter(Boolean),
+          ),
+        ]);
+      }
+
+      function renderSportFilter() {
+        const mlbCount = GAMES.filter((g) => g.sport === 'MLB').length;
+        const nflCount = GAMES.filter((g) => g.sport === 'NFL').length;
+        const allCount = GAMES.length;
+
+        function btn(value, label, count, klass = '') {
+          return el(
+            'button',
+            {
+              class:
+                'sb-sport-btn' +
+                (CURRENT_FILTER === value ? ' on' : '') +
+                (klass ? ' ' + klass : ''),
+              'aria-pressed': CURRENT_FILTER === value ? 'true' : 'false',
+              on: {
+                click: () => {
+                  CURRENT_FILTER = value;
+                  render();
+                },
+              },
+            },
+            [
+              value !== 'all' &&
+                el('span', {
+                  class: 'glyph',
+                  html: SPORTS[value.toUpperCase()].glyph,
+                }),
+              label,
+              el('span', { class: 'count' }, String(count)),
+            ].filter(Boolean),
+          );
+        }
+        return el(
+          'div',
+          {
+            class: 'sb-sport-filter',
+            role: 'tablist',
+            'aria-label': 'Filter by sport',
+          },
+          [
+            btn('all', 'All', allCount),
+            btn('mlb', 'MLB', mlbCount),
+            btn('nfl', 'NFL', nflCount, 'is-nfl'),
+          ],
+        );
+      }
+
+      function counter(kind, n, label) {
+        return el('span', { class: `sb-count ${kind}` }, [
+          el('span', { class: 'sb-count-num' }, String(n)),
+          el('span', { class: 'sb-count-label' }, label),
+        ]);
+      }
+
+      /* ─── Section header ────────────────────────────────────────────── */
+      function sectionHead(kind, title, games) {
+        const mlb = games.filter((g) => g.sport === 'MLB').length;
+        const nfl = games.filter((g) => g.sport === 'NFL').length;
+        // Only show breakdown when filter=all AND both sports present in section.
+        const showBreakdown = CURRENT_FILTER === 'all' && mlb > 0 && nfl > 0;
+        return el(
+          'div',
+          { class: 'sb-section-head' },
+          [
+            el('div', { class: 'sb-section-title' }, [
+              el('span', { class: 'lamp' }),
+              title,
+              el('span', { class: 'sb-section-count' }, `(${games.length})`),
+            ]),
+            showBreakdown &&
+              el('div', { class: 'sb-section-breakdown' }, [
+                el('span', { class: 'pip mlb' }),
+                `${mlb} MLB`,
+                el('span', { class: 'pip nfl', style: 'margin-left:8px' }),
+                `${nfl} NFL`,
+              ]),
+            el('div', { class: 'sb-section-rule' }),
+          ].filter(Boolean),
+        );
+      }
+
+      /* ─── Game card — sport-aware ───────────────────────────────────── */
+      function gameCard(g) {
+        if (g.sport === 'NFL') return nflCard(g);
+        return mlbCard(g);
+      }
+
+      function mlbCard(g) {
+        const isLive = g.status === 'Live';
+        const isFinal = g.status === 'Final';
+        const isUpcoming = g.status === 'Scheduled';
+
+        const aR = g.away.runs,
+          hR = g.home.runs;
+        const tied = isLive && aR === hR;
+        function scoreCls(side) {
+          if (isUpcoming) return 'upcoming';
+          if (tied) return 'tied';
+          if (isLive)
+            return (side === 'away' ? aR > hR : hR > aR)
+              ? 'leading'
+              : 'trailing';
+          return '';
+        }
+        const winnerSide =
+          isFinal && aR !== hR ? (aR > hR ? 'away' : 'home') : null;
+
+        const statusEl = isLive
+          ? el('span', { class: 'sb-status live' }, [
+              el('span', { class: 'arrow' }, '▶'),
+              `${g.inningHalf} ${g.inning}`,
+              el('span', { class: 'sport-tag' }, 'MLB'),
+            ])
+          : isFinal
+            ? el('span', { class: 'sb-status final' }, [
+                'Final',
+                el('span', { class: 'sport-tag' }, 'MLB'),
+              ])
+            : el('span', { class: 'sb-status scheduled' }, [
+                'Scheduled',
+                el('span', { class: 'sport-tag' }, 'MLB'),
+              ]);
+
+        const outsEl = isLive
+          ? el(
+              'span',
+              {
+                class: 'sb-outs',
+                'aria-label': `${g.outs} ${g.outs === 1 ? 'out' : 'outs'}`,
+              },
+              [
+                el('span', { class: 'sb-outs-pips' }, [
+                  el('span', {
+                    class: 'sb-out-pip' + (g.outs >= 1 ? ' on' : ''),
+                  }),
+                  el('span', {
+                    class: 'sb-out-pip' + (g.outs >= 2 ? ' on' : ''),
+                  }),
+                  el('span', {
+                    class: 'sb-out-pip' + (g.outs >= 3 ? ' on' : ''),
+                  }),
+                ]),
+                `${g.outs} ${g.outs === 1 ? 'out' : 'outs'}`,
+              ],
+            )
+          : el('span', {}, '');
+
+        const startEl = isUpcoming
+          ? el('span', { class: 'sb-starttime' }, g.startTime)
+          : el('span', {}, '');
+
+        function teamRow(side) {
+          const t = g[side];
+          const winnerCls = winnerSide
+            ? winnerSide === side
+              ? 'winner'
+              : 'loser'
+            : '';
+          return el('div', { class: `sb-team-row ${winnerCls}` }, [
+            el(
+              'span',
+              { class: 'sb-team-logo', 'aria-hidden': 'true' },
+              t.abbr.slice(0, 2),
+            ),
+            el('div', { class: 'sb-team-info' }, [
+              el('div', { class: 'sb-team-abbr' }, t.abbr),
+              el('div', { class: 'sb-team-name' }, t.name),
+            ]),
+            el(
+              'span',
+              { class: `sb-team-score ${scoreCls(side)}` },
+              isUpcoming ? '–' : String(t.runs),
+            ),
+          ]);
+        }
+
+        const footer =
+          isLive || isFinal
+            ? el(
+                'div',
+                { class: 'sb-card-footer' },
+                [
+                  el('div', { class: 'sb-stats' }, [
+                    el('span', {}, [
+                      el('span', { class: 'lab' }, 'H'),
+                      `${g.away.hits}/${g.home.hits}`,
+                    ]),
+                    el('span', {}, [
+                      el('span', { class: 'lab' }, 'E'),
+                      `${g.away.errors}/${g.home.errors}`,
+                    ]),
+                  ]),
+                  g.hasLinescore &&
+                    el(
+                      'button',
+                      {
+                        class: 'sb-linescore-toggle',
+                        'aria-expanded': 'false',
+                        on: {
+                          click: (e) => toggleLinescore(e.currentTarget, g),
+                        },
+                      },
+                      ['Linescore ', el('span', { class: 'caret' }, '▼')],
+                    ),
+                ].filter(Boolean),
+              )
+            : null;
+
+        return assembleCard(g, statusEl, outsEl, startEl, teamRow, footer);
+      }
+
+      function nflCard(g) {
+        const isLive = g.status === 'Live';
+        const isFinal = g.status === 'Final';
+        const isUpcoming = g.status === 'Scheduled';
+
+        const aS = g.away.score,
+          hS = g.home.score;
+        const tied = isLive && aS === hS;
+        function scoreCls(side) {
+          if (isUpcoming) return 'upcoming';
+          if (tied) return 'tied';
+          if (isLive)
+            return (side === 'away' ? aS > hS : hS > aS)
+              ? 'leading'
+              : 'trailing';
+          return '';
+        }
+        const winnerSide =
+          isFinal && aS !== hS ? (aS > hS ? 'away' : 'home') : null;
+
+        // Top strip — replace "Top 7" with "Q3 8:42"
+        const statusEl = isLive
+          ? el('span', { class: 'sb-status live' }, [
+              el('span', { class: 'arrow' }, '▶'),
+              `Q${g.quarter} ${g.clock}`,
+              el('span', { class: 'sport-tag' }, 'NFL'),
+            ])
+          : isFinal
+            ? el('span', { class: 'sb-status final' }, [
+                'Final',
+                el('span', { class: 'sport-tag' }, 'NFL'),
+              ])
+            : el('span', { class: 'sb-status scheduled' }, [
+                'Scheduled',
+                el('span', { class: 'sport-tag' }, 'NFL'),
+              ]);
+
+        // Middle slot — down & distance + yard line (live only)
+        const middleEl = isLive
+          ? el(
+              'span',
+              {
+                class: 'sb-down',
+                'aria-label': `${g.downDistance} at ${g.yardLine}`,
+              },
+              [
+                g.downDistance,
+                el('span', { class: 'yardline' }, '· ' + g.yardLine),
+              ],
+            )
+          : el('span', {}, '');
+
+        const startEl = isUpcoming
+          ? el('span', { class: 'sb-starttime' }, g.startTime)
+          : el('span', {}, '');
+
+        function teamRow(side) {
+          const t = g[side];
+          const winnerCls = winnerSide
+            ? winnerSide === side
+              ? 'winner'
+              : 'loser'
+            : '';
+          const possessionCls =
+            isLive && g.possession === side ? 'has-possession' : '';
+          return el(
+            'div',
+            { class: `sb-team-row ${winnerCls} ${possessionCls}` },
+            [
+              el(
+                'span',
+                { class: 'sb-team-logo', 'aria-hidden': 'true' },
+                t.abbr.slice(0, 3),
+              ),
+              el('div', { class: 'sb-team-info' }, [
+                el(
+                  'div',
+                  { class: 'sb-team-abbr' },
+                  [
+                    t.abbr,
+                    t.record &&
+                      el('span', { class: 'sb-team-record' }, t.record),
+                  ].filter(Boolean),
+                ),
+                el('div', { class: 'sb-team-name' }, t.name),
+              ]),
+              el(
+                'span',
+                { class: `sb-team-score ${scoreCls(side)}` },
+                isUpcoming ? '–' : String(t.score),
+              ),
+            ],
+          );
+        }
+
+        const footer =
+          isLive || isFinal
+            ? el(
+                'div',
+                { class: 'sb-card-footer' },
+                [
+                  el('div', { class: 'sb-stats' }, [
+                    el('span', {}, [
+                      el('span', { class: 'lab' }, 'YDS'),
+                      `${g.away.totalYds}/${g.home.totalYds}`,
+                    ]),
+                    el('span', {}, [
+                      el('span', { class: 'lab' }, 'TO'),
+                      `${g.away.turnovers}/${g.home.turnovers}`,
+                    ]),
+                  ]),
+                  g.hasLinescore &&
+                    el(
+                      'button',
+                      {
+                        class: 'sb-linescore-toggle',
+                        'aria-expanded': 'false',
+                        on: {
+                          click: (e) => toggleLinescore(e.currentTarget, g),
+                        },
+                      },
+                      ['Box score ', el('span', { class: 'caret' }, '▼')],
+                    ),
+                ].filter(Boolean),
+              )
+            : null;
+
+        return assembleCard(g, statusEl, middleEl, startEl, teamRow, footer);
+      }
+
+      function assembleCard(g, statusEl, middleEl, startEl, teamRow, footer) {
+        const tag = g.hasLinescore ? 'button' : 'div';
+        // MOTION: hover translateY(-2px), 220ms ease-standard
+        const card = el(
+          tag,
+          {
+            class: `sb-card ${g.status.toLowerCase()} is-${g.sport.toLowerCase()}`,
+            type: tag === 'button' ? 'button' : null,
+            'aria-expanded': g.hasLinescore ? 'false' : null,
+            'data-sport': g.sport,
+            on: g.hasLinescore
+              ? {
+                  click: (e) => {
+                    if (e.target.closest('.sb-linescore-toggle')) return;
+                    const inner = card.querySelector('.sb-linescore-toggle');
+                    if (inner) toggleLinescore(inner, g, card);
+                  },
+                }
+              : {},
+          },
+          [
+            el('div', { class: 'sb-card-top' }, [statusEl, middleEl, startEl]),
+            el('div', { class: 'sb-score-block' }, [
+              teamRow('away'),
+              teamRow('home'),
+            ]),
+            g.context && el('div', { class: 'sb-context' }, g.context),
+            footer,
+          ].filter(Boolean),
+        );
+
+        return card;
+      }
+
+      /* ─── Linescore toggle (inline expand) ─────────────────────────── */
+      function toggleLinescore(btn, g, cardEl) {
+        // MOTION: linescore expand — 200ms ease-out-quart (height + opacity).
+        // (Mockup uses an instant toggle for clarity.)
+        cardEl = cardEl || btn.closest('.sb-card');
+        const existing = cardEl.querySelector('.sb-linescore');
+        const isMlb = g.sport === 'MLB';
+        const labelHide = isMlb ? 'Linescore' : 'Box score';
+        if (existing) {
+          existing.remove();
+          btn.setAttribute('aria-expanded', 'false');
+          cardEl.setAttribute('aria-expanded', 'false');
+          btn.innerHTML = labelHide + ' <span class="caret">▼</span>';
+          return;
+        }
+        cardEl.appendChild(linescoreTable(g));
+        btn.setAttribute('aria-expanded', 'true');
+        cardEl.setAttribute('aria-expanded', 'true');
+        btn.innerHTML = 'Hide <span class="caret">▲</span>';
+      }
+
+      function linescoreTable(g) {
+        const wrap = el('div', { class: 'sb-linescore' });
+        const tbl = el('table', { class: 'sb-linescore-table' });
+
+        if (g.sport === 'MLB') {
+          const innings = Math.max(g.away.line.length, g.home.line.length);
+          const headers = [];
+          for (let i = 1; i <= innings; i++) headers.push(i);
+          tbl.appendChild(
+            el('thead', {}, [
+              el('tr', {}, [
+                el('th', { class: 'label' }, ''),
+                ...headers.map((h) => el('th', {}, String(h))),
+                el('th', { class: 'total' }, 'R'),
+                el('th', { class: 'total' }, 'H'),
+                el('th', { class: 'total' }, 'E'),
+              ]),
+            ]),
+          );
+          function row(side) {
+            const t = g[side];
+            const isCurrentInning =
+              side === 'away' ? g.inningHalf === 'Top' : g.inningHalf === 'Bot';
+            return el('tr', {}, [
+              el('td', { class: 'label' }, t.abbr),
+              ...headers.map((h, i) => {
+                const v = t.line[i];
+                const cls =
+                  g.status === 'Live' && i === g.inning - 1 && isCurrentInning
+                    ? 'current'
+                    : '';
+                return el('td', { class: cls }, v == null ? '' : String(v));
+              }),
+              el('td', { class: 'total' }, String(t.runs)),
+              el('td', { class: 'total' }, String(t.hits)),
+              el('td', { class: 'total' }, String(t.errors)),
+            ]);
+          }
+          tbl.appendChild(el('tbody', {}, [row('away'), row('home')]));
+        } else {
+          // NFL — quarters (Q1 Q2 Q3 Q4 OT) + total
+          const quarters = Math.max(g.away.line.length, g.home.line.length);
+          const headers = [];
+          for (let i = 1; i <= quarters; i++)
+            headers.push(i <= 4 ? `Q${i}` : 'OT');
+          tbl.appendChild(
+            el('thead', {}, [
+              el('tr', {}, [
+                el('th', { class: 'label' }, ''),
+                ...headers.map((h) => el('th', {}, h)),
+                el('th', { class: 'total' }, 'T'),
+              ]),
+            ]),
+          );
+          function row(side) {
+            const t = g[side];
+            return el('tr', {}, [
+              el('td', { class: 'label' }, t.abbr),
+              ...headers.map((h, i) => {
+                const v = t.line[i];
+                const cls =
+                  g.status === 'Live' && i === g.quarter - 1 ? 'current' : '';
+                return el('td', { class: cls }, v == null ? '' : String(v));
+              }),
+              el('td', { class: 'total' }, String(t.score)),
+            ]);
+          }
+          tbl.appendChild(el('tbody', {}, [row('away'), row('home')]));
+        }
+        wrap.appendChild(tbl);
+        return wrap;
+      }
+
+      /* ─── Sections ──────────────────────────────────────────────────── */
+      function gameSection(kind, title, games) {
+        if (games.length === 0) return null;
+        return el('section', { class: `sb-section ${kind}` }, [
+          sectionHead(kind, title, games),
+          el('div', { class: 'sb-game-grid' }, games.map(gameCard)),
+        ]);
+      }
+
+      /* ─── State renderers ───────────────────────────────────────────── */
+      function renderPopulated(root) {
+        const games = filteredGames();
+        const live = games.filter((g) => g.status === 'Live');
+        const upcoming = games.filter((g) => g.status === 'Scheduled');
+        const final = games.filter((g) => g.status === 'Final');
+
+        root.appendChild(
+          renderHeader({
+            live: live.length,
+            upcoming: upcoming.length,
+            final: final.length,
+            showRefresh: live.length > 0,
+          }),
+        );
+
+        if (games.length === 0) {
+          // Filter narrowed to nothing — distinct from "league empty schedule".
+          // Show an inline empty state below the header.
+          const which = CURRENT_FILTER === 'mlb' ? 'MLB' : 'NFL';
+          root.appendChild(
+            el('div', { class: 'sb-empty' }, [
+              el('h2', { class: 'sb-empty-title' }, `No ${which} games today`),
+              el(
+                'p',
+                { class: 'sb-empty-text' },
+                `${which === 'MLB' ? 'Major League Baseball' : 'The NFL'} isn\u2019t scheduled on ${TODAY}. Switch to the other sport or jump to another date.`,
+              ),
+              el('div', { class: 'sb-error-actions' }, [
+                el(
+                  'button',
+                  {
+                    class: 'sb-btn sb-btn-primary',
+                    on: {
+                      click: () => {
+                        CURRENT_FILTER = 'all';
+                        render();
+                      },
+                    },
+                  },
+                  'Show all sports',
+                ),
+                el('button', { class: 'sb-btn sb-btn-ghost' }, '← Yesterday'),
+              ]),
+            ]),
+          );
+          return;
+        }
+
+        // MOTION: section blocks stagger-fade-up 60ms apart, 280ms ease-out-quart
+        const liveSec = gameSection('live', 'Live Now', live);
+        const upcomingSec = gameSection('upcoming', 'Upcoming', upcoming);
+        const finalSec = gameSection('final', 'Final', final);
+        if (liveSec) root.appendChild(liveSec);
+        if (upcomingSec) root.appendChild(upcomingSec);
+        if (finalSec) root.appendChild(finalSec);
+      }
+
+      function renderLoading(root) {
+        // Skeleton mirrors the populated geometry: header → meta → 2 sections
+        // of 3 cards each. Same paddings, same column widths.
+        // MOTION: skeleton shimmer, 1.4s linear infinite (defined in CSS)
+        root.appendChild(
+          el('header', { class: 'sb-header' }, [
+            el('div', { class: 'sb-header-top' }, [
+              el('div', {}, [
+                el('div', {
+                  class: 'sk sk-line',
+                  style: 'width:200px; margin-bottom:14px',
+                }),
+                el('div', { class: 'sk sk-h1' }),
+                el('div', {
+                  class: 'sk sk-line',
+                  style: 'width:280px; margin-top:14px',
+                }),
+              ]),
+              el('div', { class: 'sb-header-controls' }, [
+                el('div', { class: 'sk sk-pill-sm' }),
+                el('div', { class: 'sk sk-pill' }),
+              ]),
+            ]),
+            el('div', { class: 'sk sk-meta', style: 'margin-top:18px' }),
+          ]),
+        );
+        for (const sec of ['Live Now', 'Final']) {
+          root.appendChild(
+            el('section', { class: 'sb-section' }, [
+              el('div', { class: 'sb-section-head' }, [
+                el('div', { class: 'sk sk-section-title' }),
+                el('div', { class: 'sb-section-rule' }),
+              ]),
+              el(
+                'div',
+                { class: 'sb-game-grid' },
+                Array.from({ length: 3 }, () =>
+                  el('div', { class: 'sk-card' }, [
+                    el('div', { class: 'sk-card-top' }, [
+                      el('div', { class: 'sk sk-line', style: 'width:80px' }),
+                      el('div', { class: 'sk sk-line', style: 'width:60px' }),
+                    ]),
+                    el('div', { class: 'sk-card-team' }, [
+                      el('div', { class: 'sk sk-circle' }),
+                      el('div', { class: 'sk-card-team-info' }, [
+                        el('div', { class: 'sk sk-line', style: 'width:50%' }),
+                        el('div', {
+                          class: 'sk sk-line',
+                          style: 'width:70%; height:10px',
+                        }),
+                      ]),
+                      el('div', { class: 'sk sk-card-score' }),
+                    ]),
+                    el('div', { class: 'sk-card-team' }, [
+                      el('div', { class: 'sk sk-circle' }),
+                      el('div', { class: 'sk-card-team-info' }, [
+                        el('div', { class: 'sk sk-line', style: 'width:55%' }),
+                        el('div', {
+                          class: 'sk sk-line',
+                          style: 'width:65%; height:10px',
+                        }),
+                      ]),
+                      el('div', { class: 'sk sk-card-score' }),
+                    ]),
+                  ]),
+                ),
+              ),
+            ]),
+          );
+        }
+      }
+
+      function renderError(root) {
+        root.appendChild(
+          renderHeader({ live: 0, upcoming: 0, final: 0, showRefresh: false }),
+        );
+        // Error voice: neutral, actionable. No "Oops!". Retry is primary.
+        // MOTION: error card fades+slides up 8px, 300ms ease-out-quart
+        root.appendChild(
+          el('div', { class: 'sb-error', role: 'alert' }, [
+            el('div', { class: 'sb-error-icon' }, [
+              // Lucide-style "alert-triangle" — 1.8px stroke, no fill
+              el('span', {
+                html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+              }),
+            ]),
+            el('div', { class: 'sb-error-body' }, [
+              el(
+                'h2',
+                { class: 'sb-error-title' },
+                'Unable to load the scoreboard',
+              ),
+              el(
+                'p',
+                { class: 'sb-error-text' },
+                'We can\u2019t reach the live data feed right now. Your connection may be offline, or the upstream service is having a moment. Try again in a few seconds.',
+              ),
+              el('div', { class: 'sb-error-actions' }, [
+                el('button', { class: 'sb-btn sb-btn-primary' }, 'Retry'),
+                el(
+                  'button',
+                  { class: 'sb-btn sb-btn-ghost' },
+                  'View yesterday\u2019s games',
+                ),
+              ]),
+            ]),
+          ]),
+        );
+      }
+
+      function renderEmpty(root) {
+        root.appendChild(
+          renderHeader({ live: 0, upcoming: 0, final: 0, showRefresh: false }),
+        );
+        // Empty schedule — zero games for this date across all sports.
+        // Illustration combines a small diamond + football laces — signals
+        // "both sports dark" rather than only baseball.
+        root.appendChild(
+          el('div', { class: 'sb-empty' }, [
+            el('div', {
+              class: 'sb-empty-art',
+              html: `<svg viewBox="0 0 120 120" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+         <!-- diamond -->
+         <path d="M60 22 L98 60 L60 98 L22 60 Z" stroke="#2C4A7C" stroke-width="1.8" />
+         <rect x="55" y="17" width="10" height="10" transform="rotate(45 60 22)" stroke="#2C4A7C" stroke-width="1.8" fill="#0D1526"/>
+         <rect x="93" y="55" width="10" height="10" transform="rotate(45 98 60)" stroke="#2C4A7C" stroke-width="1.8" fill="#0D1526"/>
+         <rect x="55" y="93" width="10" height="10" transform="rotate(45 60 98)" stroke="#C5A55A" stroke-width="1.8" fill="#0D1526"/>
+         <rect x="17" y="55" width="10" height="10" transform="rotate(45 22 60)" stroke="#2C4A7C" stroke-width="1.8" fill="#0D1526"/>
+         <!-- football laces tucked in the center -->
+         <path d="M48 60 L72 60" stroke="#2D6A4F" stroke-width="1.8"/>
+         <path d="M52 56 L52 64 M58 56 L58 64 M64 56 L64 64 M70 56 L70 64" stroke="#C5A55A" stroke-width="1.4"/>
+       </svg>`,
+            }),
+            el('h2', { class: 'sb-empty-title' }, 'No games scheduled'),
+            el(
+              'p',
+              { class: 'sb-empty-text' },
+              'Neither league is on the schedule for ' +
+                TODAY +
+                '. Check yesterday\u2019s finals or jump ahead to tomorrow.',
+            ),
+            el('div', { class: 'sb-error-actions' }, [
+              el('button', { class: 'sb-btn sb-btn-primary' }, '← Yesterday'),
+              el('button', { class: 'sb-btn sb-btn-ghost' }, 'Tomorrow →'),
+            ]),
+          ]),
+        );
+      }
+
+      function renderNoData(root) {
+        root.appendChild(
+          renderHeader({ live: 0, upcoming: 0, final: 0, showRefresh: false }),
+        );
+        root.appendChild(
+          el('div', { class: 'sb-empty' }, [
+            el('div', {
+              class: 'sb-empty-art',
+              html: `<svg viewBox="0 0 120 120" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+         <circle cx="60" cy="60" r="42" stroke="#2C4A7C" stroke-width="1.8" />
+         <path d="M28 48 Q 60 60 92 48" stroke="#C41E3A" stroke-width="1.8" />
+         <path d="M28 72 Q 60 60 92 72" stroke="#C41E3A" stroke-width="1.8" />
+         <path d="M60 38 L60 60 L74 60" stroke="#C5A55A" stroke-width="1.8" />
+       </svg>`,
+            }),
+            el(
+              'h2',
+              { class: 'sb-empty-title' },
+              'Scoreboard isn\u2019t available yet',
+            ),
+            el(
+              'p',
+              { class: 'sb-empty-text' },
+              'Today\u2019s schedule hasn\u2019t been published. Check back closer to first pitch and kickoff.',
+            ),
+            el('div', { class: 'sb-error-actions' }, [
+              el('button', { class: 'sb-btn sb-btn-primary' }, 'Refresh'),
+              el('button', { class: 'sb-btn sb-btn-ghost' }, 'View yesterday'),
+            ]),
+          ]),
+        );
+      }
+
+      /* ─── Mount + state switching ───────────────────────────────────── */
+      const RENDERERS = {
+        populated: renderPopulated,
+        loading: renderLoading,
+        error: renderError,
+        empty: renderEmpty,
+        nodata: renderNoData,
+      };
+
+      function render() {
+        const root = document.getElementById('sb-root');
+        root.innerHTML = '';
+        RENDERERS[CURRENT_STATE](root);
+      }
+
+      document.getElementById('state-tabs').addEventListener('click', (e) => {
+        const btn = e.target.closest('.mock-tab');
+        if (!btn) return;
+        for (const t of document.querySelectorAll('#state-tabs .mock-tab'))
+          t.classList.remove('on');
+        btn.classList.add('on');
+        CURRENT_STATE = btn.dataset.state;
+        render();
+      });
+
+      /* ─── Viewport switcher ─────────────────────────────────────────────
+   Each option sets the frame to a specific pixel width. The internal
+   scoreboard responds via container queries (not viewport media queries),
+   so it adapts purely based on the frame width — no global media-query
+   thrash. */
+      const VIEWPORTS = {
+        mobile: { width: 375, label: 'Mobile · 375 × auto' },
+        tablet: { width: 768, label: 'Tablet · 768 × auto' },
+        laptop: { width: 1024, label: 'Laptop · 1024 × auto' },
+        desktop: { width: 1280, label: 'Desktop · 1280 × auto' },
+        wide: { width: 1440, label: 'Wide · 1440 × auto' },
+      };
+      function applyViewport(name) {
+        const v = VIEWPORTS[name];
+        const wrap = document.getElementById('frame-wrap');
+        document.getElementById('frame-cap').textContent = v.label;
+        wrap.style.maxWidth = v.width + 'px';
+      }
+
+      document.getElementById('view-tabs').addEventListener('click', (e) => {
+        const btn = e.target.closest('.mock-tab');
+        if (!btn) return;
+        for (const t of document.querySelectorAll('#view-tabs .mock-tab'))
+          t.classList.remove('on');
+        btn.classList.add('on');
+        applyViewport(btn.dataset.view);
+      });
+
+      applyViewport('desktop');
+      render();
+    </script>
+  </body>
+</html>

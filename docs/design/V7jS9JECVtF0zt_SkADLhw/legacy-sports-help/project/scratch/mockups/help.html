@@ -1,0 +1,3277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Help & Support — Legacy Sports — Mockup</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="../../assets/favicon.ico" />
+
+    <!-- Google Fonts: Big Shoulders Display + Literata + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ==========================================================
+   Legacy Sports — Help & Support mockup
+   Tokens mirrored from /design-system/colors_and_type.css
+   ========================================================== */
+      :root {
+        --brand-navy: #1b3a5c;
+        --brand-navy-light: #2c4a7c;
+        --brand-navy-dark: #143050;
+        --brand-seam-red: #c41e3a;
+        --brand-seam-red-light: #e63950;
+        --brand-gold: #c5a55a;
+        --brand-gold-light: #d4bb78;
+        --brand-gold-dark: #a68b3e;
+
+        --bg: #0a0f1a;
+        --bg-subtle: #0d1526;
+        --bg-panel: #111b2f;
+        --bg-elevated: #16223a;
+        --bg-raised: #1c2a47;
+
+        --fg1: #e8edf5;
+        --fg1-strong: #ffffff;
+        --fg2: #c9d2e2;
+        --fg3: #8a9bb5;
+        --fg4: #6c80ba;
+
+        --border: #1e2d45;
+        --border-strong: #2f3b53;
+
+        --font-display:
+          'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
+        --font-body: 'Literata', Georgia, serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+        --shadow-md: 0 4px 14px rgba(8, 12, 20, 0.55);
+        --shadow-lg: 0 12px 32px rgba(8, 12, 20, 0.65);
+        --shadow-gold:
+          0 0 0 1px rgba(197, 165, 90, 0.35),
+          0 6px 24px rgba(197, 165, 90, 0.25);
+      }
+
+      *,
+      *:before,
+      *:after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg1);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Reviewer chrome (lives ABOVE the mockup, not part of product) ── */
+      .review-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #070b14;
+        border-bottom: 1px solid #1e2d45;
+        padding: 14px 22px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 18px;
+      }
+      .review-bar .rb-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+      }
+      .review-bar .rb-meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg3);
+      }
+      .review-bar .rb-spacer {
+        flex: 1;
+      }
+      .rb-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: #0d1526;
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+      }
+      .rb-tabs button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        background: transparent;
+        color: var(--fg3);
+        border: 0;
+        cursor: pointer;
+        transition: all 150ms var(--ease);
+      }
+      .rb-tabs button:hover {
+        color: var(--fg1);
+      }
+      .rb-tabs button.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .rb-vp {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: #0d1526;
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+      }
+      .rb-vp button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        background: transparent;
+        color: var(--fg3);
+        border: 0;
+        cursor: pointer;
+      }
+      .rb-vp button.on {
+        background: var(--brand-gold);
+        color: #111;
+      }
+
+      /* Stage holds either the desktop bleed or the mobile device frame */
+      .stage {
+        background:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg);
+        background-attachment: fixed;
+        min-height: calc(100vh - 60px);
+      }
+      .stage-mobile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 32px 16px 64px;
+        gap: 18px;
+      }
+      .bp-bar {
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        background: #0d1526;
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+      }
+      .bp-bar button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        background: transparent;
+        color: var(--fg3);
+        border: 0;
+        cursor: pointer;
+        transition: all 150ms var(--ease);
+      }
+      .bp-bar button:hover {
+        color: var(--fg1);
+      }
+      .bp-bar button.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .bp-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg3);
+        letter-spacing: 0.06em;
+      }
+      /* Device width is driven by --bp set on the stage; defaults to 375 */
+      .device {
+        width: var(--bp, 375px);
+        max-width: 100%;
+        flex-shrink: 0;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 36px;
+        padding: 14px 8px 8px;
+        box-shadow:
+          var(--shadow-lg),
+          0 0 0 8px #06090f;
+        overflow: hidden;
+        /* Width animates so reviewers can SEE the layout reflow as they scrub */
+        transition: width 240ms var(--ease);
+      }
+      /* Tablet+ frames lose the rounded "phone" look in favor of a flatter
+   tablet bezel — keeps the visual cue accurate to the breakpoint. */
+      .stage-mobile[data-bp='768'] .device,
+      .stage-mobile[data-bp='1024'] .device {
+        border-radius: 22px;
+        padding: 10px 6px 6px;
+      }
+      .device-screen {
+        width: 100%;
+        background:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg);
+        border-radius: 24px;
+        overflow: hidden;
+        max-height: 780px;
+        overflow-y: auto;
+      }
+      .stage-mobile[data-bp='768'] .device-screen,
+      .stage-mobile[data-bp='1024'] .device-screen {
+        border-radius: 14px;
+        max-height: 820px;
+      }
+      .device-status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 18px 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg2);
+      }
+      .device-status .right {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+
+      /* ── Top app nav (desktop) ─────────────────────────────────── */
+      .ls-nav {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: rgba(10, 15, 26, 0.78);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .ls-nav-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .ls-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .ls-brand img {
+        height: 38px;
+      }
+      .ls-wordmark {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        color: var(--brand-gold-light);
+        line-height: 1;
+      }
+      .ls-wordmark span {
+        display: block;
+        color: var(--fg1);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+      }
+
+      .ls-tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        padding: 5px;
+      }
+      .ls-tabs a {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        color: var(--fg3);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 150ms var(--ease);
+        text-decoration: none;
+      }
+      .ls-tabs a:hover {
+        color: var(--fg1);
+      }
+      .ls-tabs a.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .ls-nav-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .ls-icon-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--fg2);
+        width: 38px;
+        height: 38px;
+        border-radius: 9999px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ls-icon-btn:hover {
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .ls-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1b3a5c 0%, #c5a55a 100%);
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      /* ── Mobile nav ─────────────────────────────────────────────── */
+      .m-nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(10, 15, 26, 0.78);
+        backdrop-filter: blur(14px);
+      }
+      .m-nav .back {
+        width: 36px;
+        height: 36px;
+        border-radius: 9999px;
+        background: transparent;
+        color: var(--fg1);
+        border: 1px solid var(--border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .m-nav .title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: 0.04em;
+        color: var(--fg1);
+      }
+      .m-nav .ls-avatar {
+        margin-left: auto;
+      }
+
+      /* ── Page shell ─────────────────────────────────────────────── */
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 48px 24px 96px;
+      }
+      .page-mobile {
+        padding: 24px 16px 80px;
+      }
+
+      /* MOTION: fade-in-up 240ms ease-out-quart on route enter */
+      .page-head {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 40px;
+        max-width: 70ch; /* editorial copy width */
+      }
+      .page-mobile .page-head {
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+      }
+      .page-h1 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(40px, 5vw, 56px);
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .page-mobile .page-h1 {
+        font-size: 38px;
+      }
+      .page-lede {
+        font-family: var(--font-body);
+        font-size: 18px;
+        line-height: 1.6;
+        color: var(--fg2);
+        margin: 8px 0 0;
+        max-width: 62ch;
+      }
+
+      /* ── Section pattern ────────────────────────────────────────── */
+      .section {
+        padding: 40px 0;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .page-mobile .section {
+        padding: 28px 0;
+        gap: 16px;
+      }
+      .section:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .section-head {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-width: 70ch;
+      }
+      .section-h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 30px;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+        color: var(--fg1);
+        margin: 0;
+      }
+      .page-mobile .section-h2 {
+        font-size: 24px;
+      }
+      .section-sub {
+        font-family: var(--font-body);
+        font-size: 15px;
+        color: var(--fg3);
+        margin: 0;
+      }
+
+      /* ── Tutorial hero card ─────────────────────────────────────── */
+      /* DESIGN INTENT: tutorial is the most valuable affordance for new users.
+   Treat it as an editorial feature, not a generic card.
+   Gold-bordered split layout with a "scorecard preview" on the right -
+   alludes to the brand's "scorecard before first pitch" vibe. */
+      .tutorial {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 0;
+        background: linear-gradient(
+          135deg,
+          #0f1a30 0%,
+          #16223a 60%,
+          #1b3a5c 100%
+        );
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: var(--shadow-gold);
+      }
+      .page-mobile .tutorial {
+        grid-template-columns: 1fr;
+      }
+      .tutorial-l {
+        padding: 36px 40px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .page-mobile .tutorial-l {
+        padding: 24px 20px;
+        gap: 14px;
+      }
+      .tutorial-eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tutorial-h {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 36px;
+        line-height: 1;
+        letter-spacing: -0.01em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .page-mobile .tutorial-h {
+        font-size: 28px;
+      }
+      .tutorial-p {
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 50ch;
+      }
+      .tutorial-meta {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+      }
+      .tutorial-meta .dot {
+        color: var(--fg4);
+      }
+      .tutorial-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+
+      /* MOTION: button press → scale(0.98) 100ms; hover → translateY(-1px) 150ms */
+      .btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 13px 22px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 150ms var(--ease);
+        /* TOUCH: ≥44px tall */
+      }
+      .btn-primary {
+        background: var(--brand-navy);
+        color: #fff;
+        border-color: var(--brand-navy-light);
+      }
+      .btn-primary:hover {
+        background: var(--brand-navy-light);
+        transform: translateY(-1px);
+      }
+      .btn-gold {
+        background: var(--brand-gold);
+        color: #111;
+      }
+      .btn-gold:hover {
+        background: var(--brand-gold-light);
+        transform: translateY(-1px);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--fg1);
+        border-color: var(--border-strong);
+      }
+      .btn-ghost:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: #4d5d80;
+      }
+
+      /* Tutorial right side: "the 6 cards laid out like a stat sheet" */
+      .tutorial-r {
+        background: rgba(10, 15, 26, 0.45);
+        border-left: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .page-mobile .tutorial-r {
+        border-left: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 20px;
+      }
+      .tutorial-r .step {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 14px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .tutorial-r .step-n {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 14px;
+        width: 30px;
+        height: 30px;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(197, 165, 90, 0.12);
+        color: var(--brand-gold-light);
+        border: 1px solid rgba(197, 165, 90, 0.35);
+        font-variant-numeric: tabular-nums;
+      }
+      .tutorial-r .step-t {
+        font-family: var(--font-body);
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--fg1);
+      }
+      .tutorial-r .step-d {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg3);
+      }
+      .tutorial-r .step-x {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--fg4);
+        letter-spacing: 0.04em;
+      }
+
+      /* ── Quick links (chips, not card grid — info density appropriate) ── */
+      .chips {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--fg1);
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 150ms var(--ease);
+        /* TOUCH: 44px tall */
+      }
+      .chip:hover {
+        border-color: rgba(197, 165, 90, 0.45);
+        background: var(--bg-elevated);
+        transform: translateY(-1px);
+      }
+      .chip img {
+        width: 18px;
+        height: 18px;
+        opacity: 0.85;
+      }
+      .chip .arrow {
+        color: var(--fg3);
+        font-family: var(--font-mono);
+        font-size: 14px;
+      }
+
+      /* ── FAQ accordion ─────────────────────────────────────────── */
+      /* DESIGN INTENT: not a card grid. A single column, hairline dividers,
+   so the eye reads down a column like an editorial Q&A. */
+      .faq {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .faq-item {
+        border-bottom: 1px solid var(--border);
+      }
+      .faq-item:last-child {
+        border-bottom: 0;
+      }
+      .faq-q {
+        width: 100%;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 18px;
+        align-items: center;
+        padding: 22px 24px;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+        color: var(--fg1);
+        /* TOUCH: 44px tall */
+      }
+      .page-mobile .faq-q {
+        padding: 18px 18px;
+        gap: 14px;
+      }
+      .faq-q:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .faq-q .num {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--fg4);
+        letter-spacing: 0.06em;
+        font-variant-numeric: tabular-nums;
+        width: 32px;
+      }
+      .faq-q .q-text {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: 0.01em;
+        color: var(--fg1);
+      }
+      .page-mobile .faq-q .q-text {
+        font-size: 15px;
+      }
+      .faq-q .chev {
+        font-family: var(--font-mono);
+        color: var(--fg3);
+        font-size: 14px;
+        transition: transform 150ms var(--ease);
+      }
+      .faq-item.open .faq-q .chev {
+        transform: rotate(180deg);
+        color: var(--brand-gold-light);
+      }
+      .faq-item.open .faq-q .q-text {
+        color: var(--brand-gold-light);
+      }
+
+      .faq-a {
+        display: none;
+        padding: 0 24px 26px 74px;
+      }
+      .page-mobile .faq-a {
+        padding: 0 18px 22px 64px;
+      }
+      .faq-item.open .faq-a {
+        display: block;
+      }
+      .faq-a p {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--fg2);
+        margin: 0 0 10px;
+        max-width: 65ch;
+      }
+      .faq-a p:last-child {
+        margin: 0;
+      }
+      .faq-a a {
+        color: var(--brand-gold-light);
+      }
+      .faq-a code {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        background: rgba(255, 255, 255, 0.04);
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: var(--fg1);
+      }
+
+      /* MOTION: accordion expand → max-height auto, 200ms ease-out;
+   content fade-in 100ms after height settles */
+
+      /* ── Contact grid ─────────────────────────────────────────── */
+      .contact-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+      .page-mobile .contact-grid {
+        grid-template-columns: 1fr;
+      }
+      .contact-card {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 18px;
+        align-items: center;
+        padding: 22px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        cursor: pointer;
+        text-decoration: none;
+        color: var(--fg1);
+        transition: all 200ms var(--ease);
+        /* TOUCH: 44px tall by virtue of padding */
+      }
+      .contact-card:hover {
+        border-color: rgba(197, 165, 90, 0.35);
+        background: var(--bg-elevated);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+      .contact-card .ico {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(27, 58, 92, 0.4);
+        border: 1px solid var(--border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-gold-light);
+      }
+      .contact-card .ico svg {
+        width: 24px;
+        height: 24px;
+      }
+      .contact-card .t {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: 0.04em;
+        color: var(--fg1);
+        margin: 0 0 4px;
+      }
+      .contact-card .d {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+        margin: 0;
+        line-height: 1.45;
+      }
+      .contact-card .ext {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--fg4);
+        /* External link affordance — replaced w/ BrandIcon arrow-up-right in prod */
+      }
+
+      /* ── Urgent / Discord callout ─────────────────────────────── */
+      /* DESIGN INTENT: this is a special-case, time-critical CTA.
+   Use seam-red restraint - a 1px hairline border in seam-red, not a
+   full red banner. Keeps the page calm but flags the urgency. */
+      .urgent {
+        margin-top: 18px;
+        padding: 22px 26px;
+        background:
+          linear-gradient(
+            135deg,
+            rgba(196, 30, 58, 0.08),
+            rgba(196, 30, 58, 0.02)
+          ),
+          var(--bg-panel);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        border-radius: 16px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 18px;
+        align-items: center;
+      }
+      .page-mobile .urgent {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .urgent .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: rgba(196, 30, 58, 0.15);
+        color: var(--brand-seam-red-light);
+        border: 1px solid rgba(196, 30, 58, 0.5);
+        border-radius: 9999px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .urgent .badge .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 9999px;
+        background: var(--brand-seam-red-light);
+        animation: pulse 1.4s var(--ease) infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      /* MOTION: live-pulse dot → 1.4s ease-standard infinite */
+      .urgent .urgent-text {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 62ch;
+      }
+      .urgent .urgent-text strong {
+        color: var(--fg1);
+        font-weight: 600;
+      }
+
+      /* ── Footer ─────────────────────────────────────────────── */
+      .footer {
+        margin-top: 64px;
+        padding-top: 32px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+        font-variant-numeric: tabular-nums;
+      }
+      .page-mobile .footer {
+        margin-top: 48px;
+        padding-top: 20px;
+      }
+      .footer .copy {
+        color: var(--fg2);
+      }
+      .footer .meta {
+        font-size: 12px;
+        color: var(--fg4);
+      }
+
+      /* ── Skeleton (shimmer) ─────────────────────────────────── */
+      /* MOTION: skeleton shimmer 1.4s linear infinite, paused under prefers-reduced-motion */
+      @keyframes shimmer {
+        0% {
+          background-position: -450px 0;
+        }
+        100% {
+          background-position: 450px 0;
+        }
+      }
+      .sk {
+        background:
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.02) 0%,
+            rgba(255, 255, 255, 0.06) 50%,
+            rgba(255, 255, 255, 0.02) 100%
+          ),
+          rgba(255, 255, 255, 0.03);
+        background-size: 450px 100%;
+        background-repeat: no-repeat;
+        background-color: rgba(255, 255, 255, 0.03);
+        border-radius: 6px;
+        animation: shimmer 1.4s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sk {
+          animation: none;
+        }
+        .urgent .badge .dot {
+          animation: none;
+        }
+      }
+
+      /* Skeleton matches actual layout shape (NOT generic gray bars) */
+      .sk-h1 {
+        height: 48px;
+        width: 60%;
+        max-width: 520px;
+        border-radius: 10px;
+      }
+      .sk-lede {
+        height: 18px;
+        width: 80%;
+        max-width: 560px;
+        border-radius: 6px;
+      }
+
+      .sk-tutorial {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        overflow: hidden;
+        height: 280px;
+      }
+      .page-mobile .sk-tutorial {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .sk-tutorial-l {
+        padding: 36px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .sk-tutorial-l .sk {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+      .sk-tutorial-r {
+        background: rgba(10, 15, 26, 0.4);
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sk-step {
+        display: grid;
+        grid-template-columns: 30px 1fr 40px;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .sk-chips {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .sk-chip {
+        height: 44px;
+        width: 160px;
+        border-radius: 9999px;
+      }
+
+      .sk-faq {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+      }
+      .sk-faq-row {
+        display: grid;
+        grid-template-columns: 32px 1fr 16px;
+        gap: 18px;
+        align-items: center;
+        padding: 22px 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .sk-faq-row:last-child {
+        border-bottom: 0;
+      }
+
+      .sk-contact {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .page-mobile .sk-contact {
+        grid-template-columns: 1fr;
+      }
+      .sk-contact-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+        display: grid;
+        grid-template-columns: 48px 1fr 24px;
+        gap: 18px;
+        align-items: center;
+      }
+
+      /* ── Error state ─────────────────────────────────────────── */
+      .err-card {
+        margin-top: 32px;
+        background:
+          linear-gradient(135deg, rgba(196, 30, 58, 0.06), transparent 70%),
+          var(--bg-panel);
+        border: 1px solid rgba(196, 30, 58, 0.45);
+        border-radius: 20px;
+        padding: 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        align-items: flex-start;
+        max-width: 680px;
+      }
+      .page-mobile .err-card {
+        padding: 28px;
+      }
+      .err-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: rgba(196, 30, 58, 0.14);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-seam-red-light);
+      }
+      .err-h {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 28px;
+        letter-spacing: -0.01em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .err-p {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 55ch;
+      }
+      .err-meta {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--fg4);
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 6px;
+        border: 1px solid var(--border);
+      }
+      .err-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      /* ── Empty state ─────────────────────────────────────────── */
+      .empty {
+        margin-top: 32px;
+        border: 1px dashed var(--border-strong);
+        border-radius: 20px;
+        padding: 64px 48px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        align-items: center;
+      }
+      .page-mobile .empty {
+        padding: 48px 24px;
+      }
+      .empty-illus {
+        width: 120px;
+        height: 120px;
+        border-radius: 9999px;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(197, 165, 90, 0.18),
+          rgba(27, 58, 92, 0.4) 70%
+        );
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(197, 165, 90, 0.3);
+        position: relative;
+      }
+      .empty-illus svg {
+        width: 56px;
+        height: 56px;
+        opacity: 0.85;
+      }
+      .empty-h {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 32px;
+        letter-spacing: -0.01em;
+        color: var(--fg1-strong);
+        margin: 8px 0 0;
+      }
+      .empty-p {
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--fg3);
+        max-width: 46ch;
+        margin: 0;
+      }
+
+      /* ── State visibility toggle ─────────────────────────────── */
+      [data-state] {
+        display: none;
+      }
+      [data-state].on {
+        display: block;
+      }
+
+      /* ── Annotation comments visible in dev ─────────────────── */
+
+      @media (max-width: 900px) {
+        .ls-tabs {
+          display: none;
+        }
+        .tutorial {
+          grid-template-columns: 1fr;
+        }
+        .tutorial-r {
+          border-left: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .contact-grid {
+          grid-template-columns: 1fr;
+        }
+        .urgent {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+      }
+
+      /* ── Mobile-stage breakpoint reflow ──────────────────────────
+   At ≥768 the page-mobile rendering switches to a tablet/desktop
+   shape: split tutorial, 2-col contact grid, larger headings.
+   This only applies INSIDE the mobile stage, since the page-mobile
+   class is what we use there. */
+      /* Hide tutorial right-rail on phone widths to keep hero compact */
+      .stage-mobile[data-bp='320'] .page-mobile .tutorial-r,
+      .stage-mobile[data-bp='375'] .page-mobile .tutorial-r,
+      .stage-mobile[data-bp='414'] .page-mobile .tutorial-r {
+        display: none;
+      }
+      .stage-mobile[data-bp='320'] .device-screen .page-mobile {
+        padding: 20px 12px 64px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .page-h1 {
+        font-size: 32px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .section-h2 {
+        font-size: 22px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .tutorial-h {
+        font-size: 24px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .chips {
+        gap: 8px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .chip {
+        padding: 11px 14px;
+        font-size: 12px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .faq-q {
+        padding: 16px 14px;
+        gap: 10px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .faq-q .q-text {
+        font-size: 14px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .faq-a {
+        padding: 0 14px 18px 50px;
+      }
+      .stage-mobile[data-bp='320'] .page-mobile .contact-card {
+        padding: 18px;
+        gap: 14px;
+      }
+
+      .stage-mobile[data-bp='414'] .page-mobile .page-h1 {
+        font-size: 42px;
+      }
+      .stage-mobile[data-bp='414'] .page-mobile .section-h2 {
+        font-size: 26px;
+      }
+
+      /* Tablet shape (768 / 1024): bring back desktop split + 2-col grids */
+      .stage-mobile[data-bp='768'] .device-screen .page-mobile,
+      .stage-mobile[data-bp='1024'] .device-screen .page-mobile {
+        padding: 36px 32px 80px;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .page-h1,
+      .stage-mobile[data-bp='1024'] .page-mobile .page-h1 {
+        font-size: 48px;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .section-h2,
+      .stage-mobile[data-bp='1024'] .page-mobile .section-h2 {
+        font-size: 28px;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .tutorial,
+      .stage-mobile[data-bp='1024'] .page-mobile .tutorial {
+        grid-template-columns: 1.2fr 1fr;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .tutorial-r,
+      .stage-mobile[data-bp='1024'] .page-mobile .tutorial-r {
+        display: flex;
+        border-left: 1px solid rgba(255, 255, 255, 0.06);
+        border-top: 0;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .tutorial-h,
+      .stage-mobile[data-bp='1024'] .page-mobile .tutorial-h {
+        font-size: 34px;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .contact-grid,
+      .stage-mobile[data-bp='1024'] .page-mobile .contact-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .stage-mobile[data-bp='768'] .page-mobile .urgent,
+      .stage-mobile[data-bp='1024'] .page-mobile .urgent {
+        grid-template-columns: auto 1fr auto;
+        gap: 18px;
+      }
+      .stage-mobile[data-bp='1024'] .page-mobile .page-h1 {
+        font-size: 56px;
+      }
+      .stage-mobile[data-bp='1024'] .page-mobile .tutorial-h {
+        font-size: 36px;
+      }
+
+      /* Tablet stages get a tablet-style nav (back button hidden, app tabs shown) */
+      .stage-mobile[data-bp='768'] .m-nav,
+      .stage-mobile[data-bp='1024'] .m-nav {
+        padding: 14px 28px;
+      }
+      .stage-mobile[data-bp='768'] .m-nav .title,
+      .stage-mobile[data-bp='1024'] .m-nav .title {
+        font-size: 18px;
+      }
+
+      /* Render the tutorial right-rail (hidden by default on mobile narrow) at tablet */
+      .stage-mobile[data-bp='768'] .page-mobile .tutorial-r,
+      .stage-mobile[data-bp='1024'] .page-mobile .tutorial-r {
+        flex-direction: column;
+        gap: 10px;
+        padding: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── Reviewer chrome (NOT part of product) ──────────────── -->
+    <div class="review-bar">
+      <div class="rb-title">Help &amp; Support</div>
+      <div class="rb-meta">apps/web/src/pages/help/HelpPage.tsx · /help</div>
+      <div class="rb-spacer"></div>
+      <div class="rb-tabs" id="state-tabs">
+        <button data-tab="populated" class="on">Populated</button>
+        <button data-tab="loading">Loading</button>
+        <button data-tab="error">Error</button>
+        <button data-tab="empty">Empty</button>
+      </div>
+      <div class="rb-vp" id="vp-tabs">
+        <button data-vp="desktop" class="on">Desktop · 1280</button>
+        <button data-vp="mobile">Mobile / Tablet</button>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────
+     STAGE — desktop view
+     ─────────────────────────────────────────────────────────── -->
+    <div class="stage stage-desktop" id="stage-desktop">
+      <!-- App nav -->
+      <nav class="ls-nav">
+        <div class="ls-nav-inner">
+          <div class="ls-brand">
+            <img src="../../assets/logo.png" alt="" />
+            <div class="ls-wordmark">LEGACY<span>SPORTS</span></div>
+          </div>
+          <div class="ls-tabs">
+            <a
+              ><img
+                src="../../icons/league.svg"
+                width="14"
+                height="14"
+                alt=""
+              />My Leagues</a
+            >
+            <a
+              ><img
+                src="../../icons/scoreboard.svg"
+                width="14"
+                height="14"
+                alt=""
+              />Scoreboard</a
+            >
+            <a
+              ><img
+                src="../../icons/roster.svg"
+                width="14"
+                height="14"
+                alt=""
+              />Players</a
+            >
+            <a
+              ><img
+                src="../../icons/stats.svg"
+                width="14"
+                height="14"
+                alt=""
+              />Stats</a
+            >
+            <a class="on">Help</a>
+          </div>
+          <div class="ls-nav-right">
+            <button class="ls-icon-btn" aria-label="Notifications">
+              <!-- Lucide bell — 18px, 1.8 stroke -->
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+            </button>
+            <div class="ls-avatar">MM</div>
+          </div>
+        </div>
+      </nav>
+
+      <!-- ── POPULATED ─────────────────────────────────────── -->
+      <div class="page" data-state="populated">
+        <!-- Header -->
+        <!-- MOTION: page enter — fade-in-up 280ms ease-out-quart -->
+        <div class="page-head">
+          <div class="eyebrow">The Clubhouse</div>
+          <h1 class="page-h1">Help &amp; Support.</h1>
+          <p class="page-lede">
+            Whether you're drafting your first dynasty or wrangling a 12-team
+            commissioner gig, the answers are here. If you don't find what you
+            need, we're a Discord message away.
+          </p>
+        </div>
+
+        <!-- Tutorial -->
+        <section class="section">
+          <!-- DESIGN INTENT: hero placement signals "start here" without resorting
+           to a generic onboarding banner. Right rail previews the 6 steps
+           so the modal isn't a black box before you click. -->
+          <div class="tutorial">
+            <div class="tutorial-l">
+              <div class="tutorial-eyebrow">
+                <img
+                  src="../../icons/baseball.svg"
+                  width="18"
+                  height="18"
+                  alt=""
+                />
+                New to Legacy Sports?
+              </div>
+              <h2 class="tutorial-h">Take the clubhouse tour.</h2>
+              <p class="tutorial-p">
+                A six-step walkthrough of every surface you'll touch — from
+                drafting Walter Johnson out of the 1913 pool to setting your
+                weekly lineup. You'll know your way around before first pitch.
+              </p>
+              <div class="tutorial-meta">
+                <span>Runs in under 2 minutes</span>
+                <span class="dot">·</span>
+                <span>Skip or resume any time</span>
+              </div>
+              <div class="tutorial-actions">
+                <!-- MOTION: opens OnboardingTutorial modal — modal slides up 240ms ease-out -->
+                <button class="btn btn-gold">Launch Tutorial</button>
+                <button class="btn btn-ghost">Watch the Highlights ▸</button>
+              </div>
+            </div>
+            <div class="tutorial-r" aria-hidden="true">
+              <!-- Visual preview of the 6 modal steps (illustrative, not interactive) -->
+              <div class="step">
+                <div class="step-n">01</div>
+                <div>
+                  <div class="step-t">Pick your era</div>
+                  <div class="step-d">Modern, Dead-Ball, or All-Time</div>
+                </div>
+                <div class="step-x">~ 12s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">02</div>
+                <div>
+                  <div class="step-t">Build your roster</div>
+                  <div class="step-d">Draft 23 across all positions</div>
+                </div>
+                <div class="step-x">~ 25s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">03</div>
+                <div>
+                  <div class="step-t">Set your lineup</div>
+                  <div class="step-d">Bench, DH, and rotation</div>
+                </div>
+                <div class="step-x">~ 18s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">04</div>
+                <div>
+                  <div class="step-t">Read the scoreboard</div>
+                  <div class="step-d">Live archived stats explained</div>
+                </div>
+                <div class="step-x">~ 20s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">05</div>
+                <div>
+                  <div class="step-t">Trade &amp; waivers</div>
+                  <div class="step-d">Commissioner approvals</div>
+                </div>
+                <div class="step-x">~ 22s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">06</div>
+                <div>
+                  <div class="step-t">Win the pennant</div>
+                  <div class="step-d">Playoffs &amp; the championship</div>
+                </div>
+                <div class="step-x">~ 15s</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick Links -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-h2">Jump back in.</h2>
+            <p class="section-sub">Five spots most managers head to first.</p>
+          </div>
+          <!-- DESIGN INTENT: chips, not a card grid. Five short labels read
+           naturally in a row — uniform card grid would over-design them. -->
+          <nav class="chips" aria-label="Quick links">
+            <a class="chip"
+              ><img src="../../icons/league.svg" alt="" />My Leagues<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/roster.svg" alt="" />Players<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/stats.svg" alt="" />Player Stats<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/draft.svg" alt="" />Create League<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/commissioner.svg" alt="" />Profile
+              Settings<span class="arrow">→</span></a
+            >
+          </nav>
+        </section>
+
+        <!-- FAQ -->
+        <section class="section">
+          <div class="section-head">
+            <div class="eyebrow">01 / Common Questions</div>
+            <h2 class="section-h2">Frequently asked questions.</h2>
+            <p class="section-sub">
+              Eight of the most-pulled threads from our Discord, answered.
+            </p>
+          </div>
+
+          <div class="faq" id="faq-common">
+            <div class="faq-item open">
+              <button class="faq-q" aria-expanded="true">
+                <span class="num">01</span>
+                <span class="q-text">How do I create my first league?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  From <strong>My Leagues</strong>, tap <em>+ New League</em>.
+                  You'll pick an era — Dead-Ball (1900-1919), Live-Ball
+                  (1920-1941), Integration (1947-1968), Free Agency (1976-1993),
+                  Steroid (1994-2004), or Modern (2005-Present) — set roster
+                  size and scoring, and invite up to 11 other managers by email
+                  or share-link.
+                </p>
+                <p>
+                  Drafts can be live (snake or auction) or asynchronous over 7
+                  days. Most first-time commissioners pick a 12-team Modern era
+                  snake draft to start.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">02</span>
+                <span class="q-text"
+                  >Where do the historical stats come from?</span
+                >
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Game-by-game and play-by-play archives sourced from the
+                  official MLB statistics feed and Retrosheet. Modern-season
+                  games refresh throughout the day; historical seasons
+                  (1901-2024) are static and verified.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">03</span>
+                <span class="q-text">How does drafting across eras work?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Every player in your league's era window is in the pool. Pick
+                  Babe Ruth (1927) and Mike Trout (2019) on the same roster —
+                  their performance is scored against the actual season they
+                  played, not normalized.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">04</span>
+                <span class="q-text"
+                  >Can I change scoring rules mid-season?</span
+                >
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Commissioners can amend rules with a majority vote of active
+                  managers. Changes take effect the following Monday at 12:00 PM
+                  ET. Categories (BA, HR, RBI, SB, OBP, SLG, etc.) are locked
+                  from week 14 onward.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">05</span>
+                <span class="q-text">What happens if I miss the draft?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Auto-draft kicks in based on your pre-ranked queue. If you
+                  didn't rank, the system picks from a default era-balanced
+                  list. You can edit the queue right up until your first pick is
+                  on the clock.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">06</span>
+                <span class="q-text">How do trades and waivers work?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Trades require both managers to accept and pass a 24-hour
+                  league veto window. Waivers run on a FAAB (free-agent
+                  acquisition budget) of $100 per season, processed Wednesday at
+                  3:00 AM ET.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">07</span>
+                <span class="q-text">Is there a mobile app?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Yes — iOS and Android apps share your account, your roster,
+                  and your draft queue. Same login (Google or Discord). The web
+                  app and the mobile app stay in sync second-by-second during
+                  live drafts.
+                </p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">08</span>
+                <span class="q-text">How do I delete my account?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Profile Settings → Account → Delete. Active leagues will keep
+                  your team as <em>Manager Departed</em> until the season ends,
+                  then archive everything. Account deletion is permanent after a
+                  14-day cooling-off period.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Historical Stats — How It Works -->
+        <section class="section">
+          <div class="section-head">
+            <div class="eyebrow">02 / The Archive</div>
+            <h2 class="section-h2">Historical stats — how it works.</h2>
+            <p class="section-sub">
+              A few of the deeper questions about era play, era-adjusted
+              scoring, and the records we count.
+            </p>
+          </div>
+
+          <div class="faq" id="faq-historical">
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">01</span>
+                <span class="q-text">Are stats era-adjusted?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  By default, no. A 1968 Bob Gibson start scores against his
+                  actual line — 1.12 ERA and all. League settings let
+                  commissioners enable <em>era-normalized</em> scoring that
+                  adjusts to the league average of each season; this evens the
+                  playing field but feels less honest to the history. Most
+                  leagues run un-adjusted.
+                </p>
+              </div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">02</span>
+                <span class="q-text">What about Negro Leagues players?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Negro Leagues statistics (1920-1948) were officially
+                  recognized as Major League records in 2020. We include all
+                  qualified players — Josh Gibson, Satchel Paige, Cool Papa Bell
+                  — with the same eligibility as their AL/NL contemporaries.
+                  Stats are sourced from the Seamheads Negro Leagues Database.
+                </p>
+              </div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">03</span>
+                <span class="q-text"
+                  >Why is my player's score different than the box score?</span
+                >
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Your league's scoring rules apply on top of the raw line. A
+                  3-for-4 with a HR scores differently in points leagues vs.
+                  categories leagues vs. roto. Tap any score to see the
+                  breakdown — the math is always shown.
+                </p>
+              </div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">04</span>
+                <span class="q-text">How recent is "Modern era"?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  2005-Present. Live games update within 90 seconds of the
+                  official MLB feed. Off-day stats and lineup changes refresh
+                  hourly.
+                </p>
+              </div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-q" aria-expanded="false">
+                <span class="num">05</span>
+                <span class="q-text">Postseason stats — included?</span>
+                <span class="chev">▾</span>
+              </button>
+              <div class="faq-a">
+                <p>
+                  Optional. Default leagues run regular-season-only.
+                  Commissioners can enable a <em>October bonus week</em> that
+                  scores LDS, LCS, and World Series games at 1.5× weight.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Contact & Support -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-h2">Talk to a real person.</h2>
+            <p class="section-sub">
+              Pick the channel that fits. We read everything.
+            </p>
+          </div>
+
+          <div class="contact-grid">
+            <!-- MOTION: hover translateY(-2px) 200ms; press scale(.98) 100ms -->
+            <a class="contact-card">
+              <div class="ico" aria-hidden="true">
+                <!-- Lucide bug -->
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m8 2 1.88 1.88" />
+                  <path d="M14.12 3.88 16 2" />
+                  <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />
+                  <path
+                    d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"
+                  />
+                  <path d="M12 20v-9" />
+                  <path d="M6.53 9C4.6 8.8 3 7.1 3 5" />
+                  <path d="M6 13H2" />
+                  <path d="M3 21c0-2.1 1.7-3.9 3.8-4" />
+                  <path d="M20.97 5c0 2.1-1.6 3.8-3.5 4" />
+                  <path d="M22 13h-4" />
+                  <path d="M17.2 17c2.1.1 3.8 1.9 3.8 4" />
+                </svg>
+              </div>
+              <div>
+                <div class="t">Bug or feature request</div>
+                <div class="d">
+                  Opens our Jira form. We triage daily and respond within 48
+                  hours on weekdays.
+                </div>
+              </div>
+              <span class="ext">↗</span>
+            </a>
+
+            <a class="contact-card">
+              <div class="ico" aria-hidden="true">
+                <!-- Lucide lightbulb -->
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+                  />
+                  <path d="M9 18h6" />
+                  <path d="M10 22h4" />
+                </svg>
+              </div>
+              <div>
+                <div class="t">Idea or suggestion</div>
+                <div class="d">
+                  Got a feature in mind? Drop it in the public roadmap and other
+                  managers can vote it up.
+                </div>
+              </div>
+              <span class="ext">↗</span>
+            </a>
+
+            <a class="contact-card">
+              <div class="ico" aria-hidden="true">
+                <!-- Lucide message-circle -->
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                </svg>
+              </div>
+              <div>
+                <div class="t">General feedback</div>
+                <div class="d">
+                  What's working, what's not, what you'd love. Free-form, no
+                  template.
+                </div>
+              </div>
+              <span class="ext">↗</span>
+            </a>
+
+            <a class="contact-card">
+              <div class="ico" aria-hidden="true">
+                <!-- Lucide gamepad-2 -->
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="6" y1="11" x2="10" y2="11" />
+                  <line x1="8" y1="9" x2="8" y2="13" />
+                  <line x1="15" y1="12" x2="15.01" y2="12" />
+                  <line x1="18" y1="10" x2="18.01" y2="10" />
+                  <path
+                    d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="t">Something else</div>
+                <div class="d">
+                  Account, billing, partnership, or anything that doesn't fit
+                  the others above.
+                </div>
+              </div>
+              <span class="ext">↗</span>
+            </a>
+          </div>
+
+          <!-- Urgent / Discord -->
+          <!-- DESIGN INTENT: this isn't ANOTHER contact card — that would dilute
+           the urgency. Hairline seam-red border + pulse dot signals "this
+           one is different" without going full alarm-bell red banner. -->
+          <div class="urgent">
+            <div class="badge"><span class="dot"></span>Urgent Support</div>
+            <p class="urgent-text">
+              <strong
+                >Locked out, missed a draft, or your account isn't
+                loading?</strong
+              >
+              Hop into our Discord and post in
+              <code
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  background: rgba(255, 255, 255, 0.05);
+                  padding: 1px 6px;
+                  border-radius: 4px;
+                "
+                >#urgent-support</code
+              >
+              — we respond much faster there than over email.
+            </p>
+            <button class="btn btn-primary">Join Discord →</button>
+          </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+          <div class="copy">
+            © 2026 Legacy Sports · Fantasy Baseball Management
+          </div>
+          <div class="meta">
+            Powered by official MLB statistics · Data refreshed throughout each
+            game day
+          </div>
+        </footer>
+      </div>
+
+      <!-- ── LOADING ─────────────────────────────────────────── -->
+      <div class="page" data-state="loading" aria-busy="true">
+        <!-- MOTION: skeleton shimmer 1.4s linear infinite; respects prefers-reduced-motion -->
+        <div class="page-head">
+          <!-- Skeleton mirrors actual layout: eyebrow → H1 → lede -->
+          <div
+            class="sk"
+            style="height: 14px; width: 140px; margin-bottom: 12px"
+          ></div>
+          <div class="sk sk-h1"></div>
+          <div class="sk sk-lede" style="margin-top: 14px"></div>
+          <div class="sk sk-lede" style="width: 62%; margin-top: 8px"></div>
+        </div>
+
+        <!-- Tutorial skeleton matches the split layout -->
+        <section class="section">
+          <div class="sk-tutorial">
+            <div class="sk-tutorial-l">
+              <div class="sk" style="height: 14px; width: 180px"></div>
+              <div
+                class="sk"
+                style="height: 34px; width: 80%; border-radius: 8px"
+              ></div>
+              <div class="sk" style="height: 14px; width: 90%"></div>
+              <div class="sk" style="height: 14px; width: 70%"></div>
+              <div style="display: flex; gap: 10px; margin-top: 8px">
+                <div
+                  class="sk"
+                  style="height: 46px; width: 160px; border-radius: 12px"
+                ></div>
+                <div
+                  class="sk"
+                  style="height: 46px; width: 180px; border-radius: 12px"
+                ></div>
+              </div>
+            </div>
+            <div class="sk-tutorial-r">
+              <div class="sk-step">
+                <div
+                  class="sk"
+                  style="height: 30px; border-radius: 9999px"
+                ></div>
+                <div class="sk" style="height: 14px"></div>
+                <div class="sk" style="height: 10px"></div>
+              </div>
+              <div class="sk-step">
+                <div
+                  class="sk"
+                  style="height: 30px; border-radius: 9999px"
+                ></div>
+                <div class="sk" style="height: 14px"></div>
+                <div class="sk" style="height: 10px"></div>
+              </div>
+              <div class="sk-step">
+                <div
+                  class="sk"
+                  style="height: 30px; border-radius: 9999px"
+                ></div>
+                <div class="sk" style="height: 14px"></div>
+                <div class="sk" style="height: 10px"></div>
+              </div>
+              <div class="sk-step">
+                <div
+                  class="sk"
+                  style="height: 30px; border-radius: 9999px"
+                ></div>
+                <div class="sk" style="height: 14px"></div>
+                <div class="sk" style="height: 10px"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick links skeleton: 5 pill chips -->
+        <section class="section">
+          <div
+            class="sk"
+            style="height: 24px; width: 200px; margin-bottom: 12px"
+          ></div>
+          <div class="sk-chips">
+            <div class="sk sk-chip"></div>
+            <div class="sk sk-chip"></div>
+            <div class="sk sk-chip" style="width: 140px"></div>
+            <div class="sk sk-chip" style="width: 170px"></div>
+            <div class="sk sk-chip" style="width: 180px"></div>
+          </div>
+        </section>
+
+        <!-- FAQ skeleton: 5 collapsed rows -->
+        <section class="section">
+          <div
+            class="sk"
+            style="height: 28px; width: 340px; margin-bottom: 12px"
+          ></div>
+          <div class="sk-faq">
+            <div class="sk-faq-row">
+              <div class="sk" style="height: 12px; width: 24px"></div>
+              <div class="sk" style="height: 18px"></div>
+              <div class="sk" style="height: 14px; width: 14px"></div>
+            </div>
+            <div class="sk-faq-row">
+              <div class="sk" style="height: 12px; width: 24px"></div>
+              <div class="sk" style="height: 18px; width: 90%"></div>
+              <div class="sk" style="height: 14px; width: 14px"></div>
+            </div>
+            <div class="sk-faq-row">
+              <div class="sk" style="height: 12px; width: 24px"></div>
+              <div class="sk" style="height: 18px; width: 75%"></div>
+              <div class="sk" style="height: 14px; width: 14px"></div>
+            </div>
+            <div class="sk-faq-row">
+              <div class="sk" style="height: 12px; width: 24px"></div>
+              <div class="sk" style="height: 18px; width: 80%"></div>
+              <div class="sk" style="height: 14px; width: 14px"></div>
+            </div>
+            <div class="sk-faq-row">
+              <div class="sk" style="height: 12px; width: 24px"></div>
+              <div class="sk" style="height: 18px; width: 60%"></div>
+              <div class="sk" style="height: 14px; width: 14px"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Contact skeleton: 4 cards + urgent -->
+        <section class="section">
+          <div
+            class="sk"
+            style="height: 28px; width: 280px; margin-bottom: 12px"
+          ></div>
+          <div class="sk-contact">
+            <div class="sk-contact-card">
+              <div class="sk" style="height: 48px; border-radius: 12px"></div>
+              <div>
+                <div
+                  class="sk"
+                  style="height: 16px; width: 60%; margin-bottom: 8px"
+                ></div>
+                <div class="sk" style="height: 12px"></div>
+              </div>
+              <div class="sk" style="height: 14px"></div>
+            </div>
+            <div class="sk-contact-card">
+              <div class="sk" style="height: 48px; border-radius: 12px"></div>
+              <div>
+                <div
+                  class="sk"
+                  style="height: 16px; width: 60%; margin-bottom: 8px"
+                ></div>
+                <div class="sk" style="height: 12px"></div>
+              </div>
+              <div class="sk" style="height: 14px"></div>
+            </div>
+            <div class="sk-contact-card">
+              <div class="sk" style="height: 48px; border-radius: 12px"></div>
+              <div>
+                <div
+                  class="sk"
+                  style="height: 16px; width: 60%; margin-bottom: 8px"
+                ></div>
+                <div class="sk" style="height: 12px"></div>
+              </div>
+              <div class="sk" style="height: 14px"></div>
+            </div>
+            <div class="sk-contact-card">
+              <div class="sk" style="height: 48px; border-radius: 12px"></div>
+              <div>
+                <div
+                  class="sk"
+                  style="height: 16px; width: 60%; margin-bottom: 8px"
+                ></div>
+                <div class="sk" style="height: 12px"></div>
+              </div>
+              <div class="sk" style="height: 14px"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ── ERROR ──────────────────────────────────────────── -->
+      <div class="page" data-state="error">
+        <div class="page-head">
+          <div class="eyebrow">The Clubhouse</div>
+          <h1 class="page-h1">Help &amp; Support.</h1>
+          <p class="page-lede">
+            Whether you're drafting your first dynasty or wrangling a 12-team
+            commissioner gig, the answers are here.
+          </p>
+        </div>
+
+        <!-- DESIGN INTENT: error voice is neutral and actionable, not apologetic.
+         Tutorial section can still load (it's static), so we render it.
+         Only the FAQ content failed - error card replaces THAT section,
+         not the whole page. Other static surfaces (chips, contact, urgent)
+         render as normal beneath. -->
+        <section class="section">
+          <div class="tutorial">
+            <div class="tutorial-l">
+              <div class="tutorial-eyebrow">
+                <img
+                  src="../../icons/baseball.svg"
+                  width="18"
+                  height="18"
+                  alt=""
+                />New to Legacy Sports?
+              </div>
+              <h2 class="tutorial-h">Take the clubhouse tour.</h2>
+              <p class="tutorial-p">
+                A six-step walkthrough of every surface you'll touch. You'll
+                know your way around before first pitch.
+              </p>
+              <div class="tutorial-meta">
+                <span>Runs in under 2 minutes</span><span class="dot">·</span
+                ><span>Skip or resume any time</span>
+              </div>
+              <div class="tutorial-actions">
+                <button class="btn btn-gold">Launch Tutorial</button>
+              </div>
+            </div>
+            <div class="tutorial-r" aria-hidden="true">
+              <div class="step">
+                <div class="step-n">01</div>
+                <div>
+                  <div class="step-t">Pick your era</div>
+                  <div class="step-d">Modern, Dead-Ball, or All-Time</div>
+                </div>
+                <div class="step-x">~ 12s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">02</div>
+                <div>
+                  <div class="step-t">Build your roster</div>
+                  <div class="step-d">Draft 23 across all positions</div>
+                </div>
+                <div class="step-x">~ 25s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">03</div>
+                <div>
+                  <div class="step-t">Set your lineup</div>
+                  <div class="step-d">Bench, DH, and rotation</div>
+                </div>
+                <div class="step-x">~ 18s</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <div class="eyebrow">01 / Common Questions</div>
+            <h2 class="section-h2">Frequently asked questions.</h2>
+          </div>
+
+          <div class="err-card" role="alert">
+            <div class="err-icon" aria-hidden="true">
+              <!-- Lucide alert-triangle -->
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
+                />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 class="err-h">Unable to load the FAQ.</h3>
+            <p class="err-p">
+              Our help-content service didn't respond in time. The tutorial
+              above and your quick links below still work — and you can always
+              reach the team directly on Discord.
+            </p>
+            <div class="err-meta">
+              help-content/v1 · 504 Gateway Timeout · req_8f3a91c0
+            </div>
+            <div class="err-actions">
+              <button class="btn btn-primary">Retry</button>
+              <button class="btn btn-ghost">Skip to Discord</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick links + contact still render under the error -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-h2">Jump back in.</h2>
+          </div>
+          <nav class="chips">
+            <a class="chip"
+              ><img src="../../icons/league.svg" alt="" />My Leagues<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/roster.svg" alt="" />Players<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/stats.svg" alt="" />Player Stats<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/draft.svg" alt="" />Create League<span
+                class="arrow"
+                >→</span
+              ></a
+            >
+            <a class="chip"
+              ><img src="../../icons/commissioner.svg" alt="" />Profile
+              Settings<span class="arrow">→</span></a
+            >
+          </nav>
+        </section>
+
+        <section class="section">
+          <div class="urgent">
+            <div class="badge"><span class="dot"></span>Urgent Support</div>
+            <p class="urgent-text">
+              <strong>Account access problems or missed draft?</strong> Hop into
+              our Discord and post in
+              <code
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  background: rgba(255, 255, 255, 0.05);
+                  padding: 1px 6px;
+                  border-radius: 4px;
+                "
+                >#urgent-support</code
+              >
+              — we respond much faster there.
+            </p>
+            <button class="btn btn-primary">Join Discord →</button>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <div class="copy">
+            © 2026 Legacy Sports · Fantasy Baseball Management
+          </div>
+          <div class="meta">
+            Powered by official MLB statistics · Data refreshed throughout each
+            game day
+          </div>
+        </footer>
+      </div>
+
+      <!-- ── EMPTY ──────────────────────────────────────────── -->
+      <!-- DESIGN INTENT: a help page is rarely "empty" - the FAQ is static.
+       The realistic empty case: a brand-new account where the tutorial
+       hasn't been launched yet AND no FAQ items match the user's locale.
+       Show the tutorial as the primary path forward; below it, an
+       editorial empty card invites them to ask. -->
+      <div class="page" data-state="empty">
+        <div class="page-head">
+          <div class="eyebrow">The Clubhouse</div>
+          <h1 class="page-h1">Help &amp; Support.</h1>
+          <p class="page-lede">
+            It's quiet in here. Start with the tour — most of what you'll wonder
+            about, you'll learn in two minutes.
+          </p>
+        </div>
+
+        <section class="section">
+          <div class="tutorial">
+            <div class="tutorial-l">
+              <div class="tutorial-eyebrow">
+                <img
+                  src="../../icons/baseball.svg"
+                  width="18"
+                  height="18"
+                  alt=""
+                />New to Legacy Sports?
+              </div>
+              <h2 class="tutorial-h">Take the clubhouse tour.</h2>
+              <p class="tutorial-p">
+                A six-step walkthrough of every surface you'll touch — from
+                drafting Walter Johnson out of the 1913 pool to setting your
+                weekly lineup. You'll know your way around before first pitch.
+              </p>
+              <div class="tutorial-meta">
+                <span>Runs in under 2 minutes</span><span class="dot">·</span
+                ><span>Skip or resume any time</span>
+              </div>
+              <div class="tutorial-actions">
+                <button class="btn btn-gold">Launch Tutorial</button>
+                <button class="btn btn-ghost">Watch the Highlights ▸</button>
+              </div>
+            </div>
+            <div class="tutorial-r" aria-hidden="true">
+              <div class="step">
+                <div class="step-n">01</div>
+                <div>
+                  <div class="step-t">Pick your era</div>
+                  <div class="step-d">Modern, Dead-Ball, or All-Time</div>
+                </div>
+                <div class="step-x">~ 12s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">02</div>
+                <div>
+                  <div class="step-t">Build your roster</div>
+                  <div class="step-d">Draft 23 across all positions</div>
+                </div>
+                <div class="step-x">~ 25s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">03</div>
+                <div>
+                  <div class="step-t">Set your lineup</div>
+                  <div class="step-d">Bench, DH, and rotation</div>
+                </div>
+                <div class="step-x">~ 18s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">04</div>
+                <div>
+                  <div class="step-t">Read the scoreboard</div>
+                  <div class="step-d">Live archived stats explained</div>
+                </div>
+                <div class="step-x">~ 20s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">05</div>
+                <div>
+                  <div class="step-t">Trade &amp; waivers</div>
+                  <div class="step-d">Commissioner approvals</div>
+                </div>
+                <div class="step-x">~ 22s</div>
+              </div>
+              <div class="step">
+                <div class="step-n">06</div>
+                <div>
+                  <div class="step-t">Win the pennant</div>
+                  <div class="step-d">Playoffs &amp; the championship</div>
+                </div>
+                <div class="step-x">~ 15s</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-h2">No matches yet.</h2>
+          </div>
+          <div class="empty">
+            <div class="empty-illus" aria-hidden="true">
+              <!-- Brand baseball glyph as illustration -->
+              <img
+                src="../../icons/baseball.svg"
+                alt=""
+                style="width: 64px; height: 64px; opacity: 0.95"
+              />
+            </div>
+            <h3 class="empty-h">All caught up.</h3>
+            <p class="empty-p">
+              No FAQ entries match your filter. Try clearing it, browse the full
+              archive, or ask us a fresh question — every Discord post becomes
+              the next entry on this page.
+            </p>
+            <div
+              style="
+                display: flex;
+                gap: 10px;
+                margin-top: 8px;
+                flex-wrap: wrap;
+                justify-content: center;
+              "
+            >
+              <button class="btn btn-ghost">Clear Filter</button>
+              <button class="btn btn-gold">Ask on Discord</button>
+            </div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <div class="copy">
+            © 2026 Legacy Sports · Fantasy Baseball Management
+          </div>
+          <div class="meta">
+            Powered by official MLB statistics · Data refreshed throughout each
+            game day
+          </div>
+        </footer>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────
+     STAGE — mobile view (375px device frame)
+     ─────────────────────────────────────────────────────────── -->
+    <div
+      class="stage stage-mobile"
+      id="stage-mobile"
+      data-bp="375"
+      style="display: none"
+    >
+      <div
+        class="bp-bar"
+        id="bp-tabs"
+        role="tablist"
+        aria-label="Mobile breakpoints"
+      >
+        <button data-bp="320" type="button">320 · iPhone SE</button>
+        <button data-bp="375" type="button" class="on">375 · iPhone</button>
+        <button data-bp="414" type="button">414 · iPhone Plus</button>
+        <button data-bp="768" type="button">768 · iPad</button>
+        <button data-bp="1024" type="button">1024 · iPad Pro</button>
+      </div>
+      <div class="bp-label" id="bp-label">
+        375 × 760 · default phone breakpoint
+      </div>
+      <div class="device" style="--bp: 375px">
+        <div class="device-status">
+          <span>9:41</span>
+          <span class="right">●●●●● ●● 100%</span>
+        </div>
+        <div class="device-screen">
+          <!-- Mobile nav -->
+          <div class="m-nav">
+            <button class="back" aria-label="Back">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div class="title">Help &amp; Support</div>
+            <div class="ls-avatar">MM</div>
+          </div>
+
+          <!-- POPULATED -->
+          <div class="page page-mobile" data-state="populated">
+            <div class="page-head">
+              <div class="eyebrow">The Clubhouse</div>
+              <h1 class="page-h1">Help &amp; Support.</h1>
+              <p class="page-lede">
+                Drafting your first dynasty? Wrangling a 12-team commish gig?
+                The answers are here.
+              </p>
+            </div>
+
+            <section class="section">
+              <div class="tutorial">
+                <div class="tutorial-l">
+                  <div class="tutorial-eyebrow">
+                    <img
+                      src="../../icons/baseball.svg"
+                      width="16"
+                      height="16"
+                      alt=""
+                    />New to Legacy Sports?
+                  </div>
+                  <h2 class="tutorial-h">Take the clubhouse tour.</h2>
+                  <p class="tutorial-p">
+                    Six steps. Two minutes. You'll know the place by first
+                    pitch.
+                  </p>
+                  <div class="tutorial-meta">
+                    <span>Under 2 min</span><span class="dot">·</span
+                    ><span>Skip anytime</span>
+                  </div>
+                  <div class="tutorial-actions">
+                    <button class="btn btn-gold">Launch Tutorial</button>
+                  </div>
+                </div>
+                <!-- Right rail hidden < 768; CSS reveals it at tablet+ -->
+                <div class="tutorial-r" aria-hidden="true">
+                  <div class="step">
+                    <div class="step-n">01</div>
+                    <div>
+                      <div class="step-t">Pick your era</div>
+                      <div class="step-d">Modern, Dead-Ball, or All-Time</div>
+                    </div>
+                    <div class="step-x">~ 12s</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-n">02</div>
+                    <div>
+                      <div class="step-t">Build your roster</div>
+                      <div class="step-d">Draft 23 across all positions</div>
+                    </div>
+                    <div class="step-x">~ 25s</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-n">03</div>
+                    <div>
+                      <div class="step-t">Set your lineup</div>
+                      <div class="step-d">Bench, DH, and rotation</div>
+                    </div>
+                    <div class="step-x">~ 18s</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-n">04</div>
+                    <div>
+                      <div class="step-t">Read the scoreboard</div>
+                      <div class="step-d">Live archived stats explained</div>
+                    </div>
+                    <div class="step-x">~ 20s</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-n">05</div>
+                    <div>
+                      <div class="step-t">Trade &amp; waivers</div>
+                      <div class="step-d">Commissioner approvals</div>
+                    </div>
+                    <div class="step-x">~ 22s</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-n">06</div>
+                    <div>
+                      <div class="step-t">Win the pennant</div>
+                      <div class="step-d">Playoffs &amp; the championship</div>
+                    </div>
+                    <div class="step-x">~ 15s</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-h2">Jump back in.</h2>
+              </div>
+              <nav class="chips">
+                <a class="chip"
+                  ><img src="../../icons/league.svg" alt="" />My Leagues</a
+                >
+                <a class="chip"
+                  ><img src="../../icons/roster.svg" alt="" />Players</a
+                >
+                <a class="chip"
+                  ><img src="../../icons/stats.svg" alt="" />Stats</a
+                >
+                <a class="chip"
+                  ><img src="../../icons/draft.svg" alt="" />New League</a
+                >
+                <a class="chip"
+                  ><img src="../../icons/commissioner.svg" alt="" />Profile</a
+                >
+              </nav>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <div class="eyebrow">01 / Common</div>
+                <h2 class="section-h2">FAQ.</h2>
+              </div>
+              <div class="faq">
+                <div class="faq-item open">
+                  <button class="faq-q" aria-expanded="true">
+                    <span class="num">01</span
+                    ><span class="q-text">How do I create my first league?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      From <strong>My Leagues</strong>, tap
+                      <em>+ New League</em>. Pick an era, set roster size,
+                      invite up to 11 managers. First-timers usually run a
+                      12-team Modern snake draft.
+                    </p>
+                  </div>
+                </div>
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">02</span
+                    ><span class="q-text"
+                      >Where do historical stats come from?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Official MLB feed and Retrosheet. Modern games refresh
+                      through the day; historical seasons (1901-2024) are
+                      static.
+                    </p>
+                  </div>
+                </div>
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">03</span
+                    ><span class="q-text"
+                      >How does drafting across eras work?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Pick Babe Ruth (1927) and Mike Trout (2019) on the same
+                      roster. Each player scores against their actual season —
+                      no normalization by default.
+                    </p>
+                  </div>
+                </div>
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">04</span
+                    ><span class="q-text">What if I miss the draft?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Auto-draft picks from your queue. No queue? Era-balanced
+                      default. Edit up until you're on the clock.
+                    </p>
+                  </div>
+                </div>
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">05</span
+                    ><span class="q-text">Trades and waivers?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Trades = both managers + 24h veto window. Waivers = $100
+                      FAAB, runs Wed 3 AM ET.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <div class="eyebrow">02 / The Archive</div>
+                <h2 class="section-h2">Historical stats.</h2>
+              </div>
+              <div class="faq">
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">01</span
+                    ><span class="q-text">Are stats era-adjusted?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Not by default. Gibson's 1968 season scores at 1.12 ERA.
+                      Era-normalized scoring is opt-in.
+                    </p>
+                  </div>
+                </div>
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">02</span
+                    ><span class="q-text">Negro Leagues players?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Officially recognized as Major League records since 2020.
+                      Gibson, Paige, Bell — all included via Seamheads.
+                    </p>
+                  </div>
+                </div>
+                <div class="faq-item">
+                  <button class="faq-q" aria-expanded="false">
+                    <span class="num">03</span
+                    ><span class="q-text">Postseason stats?</span
+                    ><span class="chev">▾</span>
+                  </button>
+                  <div class="faq-a">
+                    <p>
+                      Optional. Commissioners can enable an October bonus week —
+                      playoff games at 1.5×.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-h2">Talk to a real person.</h2>
+              </div>
+              <div class="contact-grid">
+                <a class="contact-card">
+                  <div class="ico">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      width="22"
+                      height="22"
+                    >
+                      <path d="m8 2 1.88 1.88" />
+                      <path d="M14.12 3.88 16 2" />
+                      <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />
+                      <path
+                        d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"
+                      />
+                      <path d="M12 20v-9" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="t">Bug or feature</div>
+                    <div class="d">Triaged daily, 48h response.</div>
+                  </div>
+                  <span class="ext">↗</span>
+                </a>
+                <a class="contact-card">
+                  <div class="ico">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      width="22"
+                      height="22"
+                    >
+                      <path
+                        d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+                      />
+                      <path d="M9 18h6" />
+                      <path d="M10 22h4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="t">Idea or suggestion</div>
+                    <div class="d">Public roadmap, votable.</div>
+                  </div>
+                  <span class="ext">↗</span>
+                </a>
+                <a class="contact-card">
+                  <div class="ico">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      width="22"
+                      height="22"
+                    >
+                      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="t">General feedback</div>
+                    <div class="d">Free-form, no template.</div>
+                  </div>
+                  <span class="ext">↗</span>
+                </a>
+                <a class="contact-card">
+                  <div class="ico">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      width="22"
+                      height="22"
+                    >
+                      <line x1="6" y1="11" x2="10" y2="11" />
+                      <line x1="8" y1="9" x2="8" y2="13" />
+                      <circle cx="15" cy="12" r="1" fill="currentColor" />
+                      <circle cx="18" cy="10" r="1" fill="currentColor" />
+                      <path
+                        d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258A4 4 0 0 0 17.32 5z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="t">Something else</div>
+                    <div class="d">Account, billing, partnership.</div>
+                  </div>
+                  <span class="ext">↗</span>
+                </a>
+              </div>
+
+              <div class="urgent">
+                <div class="badge"><span class="dot"></span>Urgent</div>
+                <p class="urgent-text">
+                  <strong>Locked out or missed draft?</strong> Discord
+                  <code
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 12px;
+                      background: rgba(255, 255, 255, 0.05);
+                      padding: 1px 5px;
+                      border-radius: 4px;
+                    "
+                    >#urgent-support</code
+                  >
+                  is fastest.
+                </p>
+                <button class="btn btn-primary">Join Discord →</button>
+              </div>
+            </section>
+
+            <footer class="footer">
+              <div class="copy">© 2026 Legacy Sports</div>
+              <div class="meta">
+                Fantasy Baseball Management · Powered by official MLB statistics
+              </div>
+            </footer>
+          </div>
+
+          <!-- LOADING (mobile) -->
+          <div class="page page-mobile" data-state="loading" aria-busy="true">
+            <div class="page-head">
+              <div
+                class="sk"
+                style="height: 12px; width: 120px; margin-bottom: 10px"
+              ></div>
+              <div
+                class="sk"
+                style="height: 38px; width: 80%; border-radius: 8px"
+              ></div>
+              <div
+                class="sk sk-lede"
+                style="margin-top: 12px; width: 90%"
+              ></div>
+              <div class="sk sk-lede" style="margin-top: 6px; width: 60%"></div>
+            </div>
+            <section class="section">
+              <div class="sk" style="height: 200px; border-radius: 24px"></div>
+            </section>
+            <section class="section">
+              <div
+                class="sk"
+                style="height: 22px; width: 160px; margin-bottom: 8px"
+              ></div>
+              <div class="sk-chips">
+                <div class="sk sk-chip" style="width: 130px"></div>
+                <div class="sk sk-chip" style="width: 100px"></div>
+                <div class="sk sk-chip" style="width: 90px"></div>
+                <div class="sk sk-chip" style="width: 130px"></div>
+              </div>
+            </section>
+            <section class="section">
+              <div
+                class="sk"
+                style="height: 24px; width: 120px; margin-bottom: 8px"
+              ></div>
+              <div class="sk-faq">
+                <div class="sk-faq-row">
+                  <div class="sk" style="height: 12px; width: 24px"></div>
+                  <div class="sk" style="height: 16px"></div>
+                  <div class="sk" style="height: 12px; width: 12px"></div>
+                </div>
+                <div class="sk-faq-row">
+                  <div class="sk" style="height: 12px; width: 24px"></div>
+                  <div class="sk" style="height: 16px; width: 80%"></div>
+                  <div class="sk" style="height: 12px; width: 12px"></div>
+                </div>
+                <div class="sk-faq-row">
+                  <div class="sk" style="height: 12px; width: 24px"></div>
+                  <div class="sk" style="height: 16px; width: 70%"></div>
+                  <div class="sk" style="height: 12px; width: 12px"></div>
+                </div>
+                <div class="sk-faq-row">
+                  <div class="sk" style="height: 12px; width: 24px"></div>
+                  <div class="sk" style="height: 16px; width: 65%"></div>
+                  <div class="sk" style="height: 12px; width: 12px"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- ERROR (mobile) -->
+          <div class="page page-mobile" data-state="error">
+            <div class="page-head">
+              <div class="eyebrow">The Clubhouse</div>
+              <h1 class="page-h1">Help &amp; Support.</h1>
+            </div>
+            <section class="section">
+              <div class="tutorial">
+                <div class="tutorial-l">
+                  <div class="tutorial-eyebrow">
+                    <img
+                      src="../../icons/baseball.svg"
+                      width="16"
+                      height="16"
+                      alt=""
+                    />New here?
+                  </div>
+                  <h2 class="tutorial-h">Take the tour.</h2>
+                  <p class="tutorial-p">Six steps, under two minutes.</p>
+                  <div class="tutorial-actions">
+                    <button class="btn btn-gold">Launch Tutorial</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="section">
+              <div class="err-card" role="alert">
+                <div class="err-icon" aria-hidden="true">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
+                    />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <h3 class="err-h" style="font-size: 22px">
+                  Unable to load the FAQ.
+                </h3>
+                <p class="err-p" style="font-size: 14px">
+                  Help-content service didn't respond. Tutorial above still
+                  works, and Discord is one tap away.
+                </p>
+                <div class="err-meta">help-content/v1 · 504 · req_8f3a91c0</div>
+                <div class="err-actions">
+                  <button class="btn btn-primary">Retry</button>
+                  <button class="btn btn-ghost">Discord</button>
+                </div>
+              </div>
+            </section>
+            <section class="section">
+              <div class="urgent">
+                <div class="badge"><span class="dot"></span>Urgent</div>
+                <p class="urgent-text">
+                  <strong>Need help now?</strong> Discord
+                  <code
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 12px;
+                      background: rgba(255, 255, 255, 0.05);
+                      padding: 1px 5px;
+                      border-radius: 4px;
+                    "
+                    >#urgent-support</code
+                  >.
+                </p>
+                <button class="btn btn-primary">Join Discord →</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- EMPTY (mobile) -->
+          <div class="page page-mobile" data-state="empty">
+            <div class="page-head">
+              <div class="eyebrow">The Clubhouse</div>
+              <h1 class="page-h1">Help &amp; Support.</h1>
+              <p class="page-lede">It's quiet in here. Start with the tour.</p>
+            </div>
+            <section class="section">
+              <div class="tutorial">
+                <div class="tutorial-l">
+                  <div class="tutorial-eyebrow">
+                    <img
+                      src="../../icons/baseball.svg"
+                      width="16"
+                      height="16"
+                      alt=""
+                    />New here?
+                  </div>
+                  <h2 class="tutorial-h">Take the tour.</h2>
+                  <p class="tutorial-p">
+                    Six steps. Two minutes. You'll know the place.
+                  </p>
+                  <div class="tutorial-actions">
+                    <button class="btn btn-gold">Launch Tutorial</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="section">
+              <div class="empty">
+                <div class="empty-illus" aria-hidden="true">
+                  <img
+                    src="../../icons/baseball.svg"
+                    alt=""
+                    style="width: 48px; height: 48px; opacity: 0.95"
+                  />
+                </div>
+                <h3 class="empty-h" style="font-size: 24px">All caught up.</h3>
+                <p class="empty-p" style="font-size: 14px">
+                  No FAQ entries match. Clear the filter or ask on Discord —
+                  every post becomes the next entry here.
+                </p>
+                <div
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 6px;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                  "
+                >
+                  <button class="btn btn-ghost">Clear Filter</button>
+                  <button class="btn btn-gold">Ask on Discord</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+        <!-- /device-screen -->
+      </div>
+      <!-- /device -->
+    </div>
+
+    <script>
+      // ── State + viewport switcher (reviewer chrome only) ──────────
+      (function () {
+        const stateTabs = document.querySelectorAll('#state-tabs button');
+        const vpTabs = document.querySelectorAll('#vp-tabs button');
+        const stageDesktop = document.getElementById('stage-desktop');
+        const stageMobile = document.getElementById('stage-mobile');
+
+        function setState(name) {
+          document.querySelectorAll('[data-state]').forEach((el) => {
+            el.classList.toggle('on', el.getAttribute('data-state') === name);
+          });
+          stateTabs.forEach((b) =>
+            b.classList.toggle('on', b.dataset.tab === name),
+          );
+          try {
+            localStorage.setItem('help-mockup-state', name);
+          } catch (e) {}
+        }
+        function setVp(name) {
+          if (name === 'mobile') {
+            stageDesktop.style.display = 'none';
+            stageMobile.style.display = 'flex';
+          } else {
+            stageDesktop.style.display = '';
+            stageMobile.style.display = 'none';
+          }
+          vpTabs.forEach((b) =>
+            b.classList.toggle('on', b.dataset.vp === name),
+          );
+          try {
+            localStorage.setItem('help-mockup-vp', name);
+          } catch (e) {}
+        }
+
+        stateTabs.forEach((b) =>
+          b.addEventListener('click', () => setState(b.dataset.tab)),
+        );
+        vpTabs.forEach((b) =>
+          b.addEventListener('click', () => setVp(b.dataset.vp)),
+        );
+
+        // Breakpoint switcher inside mobile stage
+        const bpTabs = document.querySelectorAll('#bp-tabs button');
+        const bpLabel = document.getElementById('bp-label');
+        const bpDevice = stageMobile.querySelector('.device');
+        const BP_INFO = {
+          320: '320 × 760 · iPhone SE · narrowest supported phone',
+          375: '375 × 760 · iPhone 13/14/15 · default phone breakpoint',
+          414: '414 × 760 · iPhone Plus / Pro Max',
+          768: '768 × 820 · iPad portrait · split layouts return',
+          1024: '1024 × 820 · iPad Pro / small desktop · full split layouts',
+        };
+        function setBp(bp) {
+          stageMobile.setAttribute('data-bp', bp);
+          bpDevice.style.setProperty('--bp', bp + 'px');
+          bpTabs.forEach((b) => b.classList.toggle('on', b.dataset.bp === bp));
+          if (bpLabel) bpLabel.textContent = BP_INFO[bp] || bp + 'px';
+          try {
+            localStorage.setItem('help-mockup-bp', bp);
+          } catch (e) {}
+        }
+        bpTabs.forEach((b) =>
+          b.addEventListener('click', () => setBp(b.dataset.bp)),
+        );
+        try {
+          setBp(localStorage.getItem('help-mockup-bp') || '375');
+        } catch (e) {
+          setBp('375');
+        }
+
+        // Restore last selection (persistent across reload during review sessions)
+        try {
+          setState(localStorage.getItem('help-mockup-state') || 'populated');
+          setVp(localStorage.getItem('help-mockup-vp') || 'desktop');
+        } catch (e) {
+          setState('populated');
+          setVp('desktop');
+        }
+      })();
+
+      // ── FAQ accordion ─────────────────────────────────────────────
+      // MOTION: open/close → 200ms ease-out-quart on max-height + opacity
+      document.querySelectorAll('.faq-item').forEach((item) => {
+        const btn = item.querySelector('.faq-q');
+        btn.addEventListener('click', () => {
+          const wasOpen = item.classList.contains('open');
+          // Single-open accordion within each FAQ group
+          const group = item.closest('.faq');
+          if (group)
+            group
+              .querySelectorAll('.faq-item')
+              .forEach((i) => i.classList.remove('open'));
+          if (!wasOpen) item.classList.add('open');
+          btn.setAttribute('aria-expanded', String(!wasOpen));
+        });
+      });
+    </script>
+  </body>
+</html>

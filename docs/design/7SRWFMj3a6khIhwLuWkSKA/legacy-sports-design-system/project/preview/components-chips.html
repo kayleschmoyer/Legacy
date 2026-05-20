@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+        color: var(--fg1);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .chip {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 6px 12px;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .live {
+        background: rgba(196, 30, 58, 0.15);
+        color: #e63950;
+        border: 1px solid rgba(196, 30, 58, 0.4);
+      }
+      .pre {
+        background: rgba(197, 165, 90, 0.12);
+        color: var(--brand-gold-light);
+        border: 1px solid rgba(197, 165, 90, 0.4);
+      }
+      .active {
+        background: rgba(34, 197, 94, 0.12);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      .soon {
+        background: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+      }
+      .fin {
+        background: rgba(127, 144, 174, 0.15);
+        color: var(--fg3);
+        border: 1px solid var(--outline-default);
+      }
+      @keyframes p {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .pulse {
+        animation: p 1.4s var(--ease-standard) infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <span class="chip live"
+        ><span class="dot pulse" style="background: #e63950"></span>Draft
+        Live</span
+      >
+      <span class="chip pre">Pre-Draft</span>
+      <span class="chip active">Active</span>
+      <span class="chip soon">Coming Soon</span>
+      <span class="chip fin">Final</span>
+    </div>
+  </body>
+</html>

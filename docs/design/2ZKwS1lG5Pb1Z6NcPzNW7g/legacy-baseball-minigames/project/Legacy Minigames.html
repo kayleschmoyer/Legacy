@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Legacy Sports — Minigames</title>
+    <link rel="icon" href="assets/favicon.ico" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-hub.css" />
+    <link rel="stylesheet" href="styles-disclosure.css" />
+    <link rel="stylesheet" href="styles-lobby.css" />
+    <link rel="stylesheet" href="styles-create.css" />
+    <link rel="stylesheet" href="styles-join.css" />
+    <link rel="stylesheet" href="styles-game.css" />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" src="components/Hub.jsx"></script>
+    <script type="text/babel" src="components/Disclosure.jsx"></script>
+    <script type="text/babel" src="components/SeasonDraftLobby.jsx"></script>
+    <script type="text/babel" src="components/SeasonDraftCreate.jsx"></script>
+    <script type="text/babel" src="components/SeasonDraftJoin.jsx"></script>
+    <script type="text/babel" src="components/SeasonDraftGame.jsx"></script>
+
+    <script type="text/babel">
+      const TWEAKS_DEFAULTS = /*EDITMODE-BEGIN*/ {
+        startRoute: 'hub',
+        showBothFrames: true,
+        accentMode: 'gold',
+      }; /*EDITMODE-END*/
+
+      const ROUTES = {
+        hub: { label: 'Minigames', crumbs: [] },
+        disclosure: { label: 'Who Am I?', crumbs: ['Minigames'] },
+        'draft-lobby': { label: 'Season Draft', crumbs: ['Minigames'] },
+        'draft-create': {
+          label: 'New Game',
+          crumbs: ['Minigames', 'Season Draft'],
+        },
+        'draft-join': {
+          label: 'Join Game',
+          crumbs: ['Minigames', 'Season Draft'],
+        },
+        'draft-game': {
+          label: 'Live Draft',
+          crumbs: ['Minigames', 'Season Draft'],
+        },
+      };
+
+      const AppBar = ({ route, onHome, onCrumb }) => {
+        const meta = ROUTES[route] || ROUTES.hub;
+        return (
+          <header className="appbar">
+            <div className="appbar-inner">
+              <div className="appbar-brand" onClick={onHome}>
+                <img src="assets/logo.png" alt="Legacy Sports" />
+                <div className="appbar-wordmark">
+                  Legacy Sports<small>MINIGAMES</small>
+                </div>
+              </div>
+              {meta.crumbs.length > 0 && (
+                <nav className="appbar-crumbs">
+                  {meta.crumbs.map((c, i) => (
+                    <React.Fragment key={i}>
+                      <a onClick={i === 0 ? onHome : () => onCrumb(i)}>{c}</a>
+                      <span className="sep">/</span>
+                    </React.Fragment>
+                  ))}
+                  <b>{meta.label}</b>
+                </nav>
+              )}
+              <div className="appbar-right">
+                <div className="appbar-avatar">MR</div>
+              </div>
+            </div>
+          </header>
+        );
+      };
+
+      const App = () => {
+        const [route, setRoute] = React.useState(() => {
+          const hash = window.location.hash.replace('#', '');
+          return ROUTES[hash] ? hash : 'hub';
+        });
+
+        React.useEffect(() => {
+          window.location.hash = route;
+        }, [route]);
+
+        React.useEffect(() => {
+          const onHash = () => {
+            const h = window.location.hash.replace('#', '');
+            if (ROUTES[h]) setRoute(h);
+          };
+          window.addEventListener('hashchange', onHash);
+          return () => window.removeEventListener('hashchange', onHash);
+        }, []);
+
+        const nav = (to) => setRoute(to);
+        const home = () => setRoute('hub');
+
+        let page;
+        switch (route) {
+          case 'disclosure':
+            page = <Disclosure onBack={home} />;
+            break;
+          case 'draft-lobby':
+            page = (
+              <SeasonDraftLobby
+                onBack={home}
+                onCreate={() => nav('draft-create')}
+                onOpenGame={() => nav('draft-game')}
+                onJoin={() => nav('draft-join')}
+              />
+            );
+            break;
+          case 'draft-create':
+            page = (
+              <SeasonDraftCreate
+                onBack={() => nav('draft-lobby')}
+                onCreated={() => nav('draft-game')}
+              />
+            );
+            break;
+          case 'draft-join':
+            page = (
+              <SeasonDraftJoin
+                onBack={() => nav('draft-lobby')}
+                onJoined={() => nav('draft-game')}
+              />
+            );
+            break;
+          case 'draft-game':
+            page = <SeasonDraftGame onBack={() => nav('draft-lobby')} />;
+            break;
+          default:
+            page = (
+              <Hub
+                onNavigate={(id) => {
+                  if (id === 'season-draft') nav('draft-lobby');
+                  else if (id === 'disclosure') nav('disclosure');
+                }}
+              />
+            );
+        }
+
+        return (
+          <div className="app-root">
+            <AppBar route={route} onHome={home} onCrumb={() => home()} />
+            {page}
+          </div>
+        );
+      };
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>

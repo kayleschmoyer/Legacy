@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        max-width: 840px;
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 8px;
+      }
+      .es {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-5);
+        padding: 32px 24px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        min-height: 240px;
+        justify-content: center;
+      }
+      .icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--surface-card);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--fg3);
+        border: 1px solid var(--outline-default);
+      }
+      .icon svg {
+        width: 26px;
+        height: 26px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.6;
+      }
+      .title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--fg1);
+        letter-spacing: -0.005em;
+      }
+      .sub {
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--fg3);
+        max-width: 280px;
+        line-height: 1.5;
+      }
+      .btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        background: var(--brand-navy);
+        color: #fff;
+        border: 1px solid var(--brand-navy-light);
+        border-radius: var(--radius-4);
+        padding: 10px 18px;
+        cursor: pointer;
+        margin-top: 6px;
+      }
+      .error .icon {
+        color: var(--danger-fg);
+        background: var(--danger-soft);
+        border-color: var(--danger-border);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <div class="lab">EmptyState · default</div>
+        <div class="es">
+          <div class="icon">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+          </div>
+          <div class="title">No leagues yet</div>
+          <div class="sub">
+            Create or join your first league. Draft legends from across MLB
+            history.
+          </div>
+          <button class="btn">Create a League</button>
+        </div>
+      </div>
+      <div>
+        <div class="lab">EmptyState · search</div>
+        <div class="es">
+          <div class="icon">
+            <svg viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </div>
+          <div class="title">No players found</div>
+          <div class="sub">Try a different era, position, or team.</div>
+        </div>
+      </div>
+      <div>
+        <div class="lab">ErrorState</div>
+        <div class="es error">
+          <div class="icon">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+          </div>
+          <div class="title">Unable to load your leagues</div>
+          <div class="sub">We hit an error talking to the server.</div>
+          <button
+            class="btn"
+            style="background: transparent; border-color: var(--outline-strong)"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="lab">EmptyState · compact</div>
+        <div class="es" style="min-height: 160px; padding: 20px">
+          <div class="title" style="font-size: 15px">No activity yet</div>
+          <div class="sub" style="font-size: 13px">
+            Once your draft starts, picks will appear here.
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

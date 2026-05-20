@@ -1,0 +1,262 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 32px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        flex-wrap: wrap;
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        text-align: center;
+        margin-top: 14px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .holo {
+        width: 240px;
+        height: 340px;
+        border-radius: 18px;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(
+          135deg,
+          #1b3a5c 0%,
+          #143050 50%,
+          #c5a55a 100%
+        );
+        box-shadow: var(--shadow-gold);
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid rgba(197, 165, 90, 0.5);
+        transform: perspective(800px) rotateY(-8deg) rotateX(4deg);
+        transition: transform 400ms var(--ease-standard);
+      }
+      .holo:hover {
+        transform: perspective(800px) rotateY(0) rotateX(0);
+      }
+      .holo::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          120deg,
+          transparent 30%,
+          rgba(255, 255, 255, 0.18) 50%,
+          transparent 70%
+        );
+        mix-blend-mode: overlay;
+        pointer-events: none;
+      }
+      .holo::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          circle at 50% 0%,
+          rgba(255, 255, 255, 0.15),
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+      .holo .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        color: var(--fg1-strong);
+        position: relative;
+      }
+      .holo .num {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 48px;
+        line-height: 1;
+        color: var(--brand-gold-light);
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+      .holo .pos {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        background: var(--brand-seam-red);
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+      .holo .bot {
+        position: relative;
+        color: var(--fg1-strong);
+      }
+      .holo .name {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        line-height: 1.05;
+        letter-spacing: -0.01em;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      }
+      .holo .meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg2);
+        margin-top: 4px;
+      }
+      .holo .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 6px;
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .holo .stat {
+        font-family: var(--font-display);
+      }
+      .holo .sv {
+        font-weight: 800;
+        font-size: 14px;
+        color: var(--brand-gold-light);
+        font-variant-numeric: tabular-nums;
+      }
+      .holo .sl {
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg2);
+      }
+      .holo.legend {
+        background: linear-gradient(
+          135deg,
+          #0a0f1a 0%,
+          #1b3a5c 50%,
+          #c41e3a 100%
+        );
+        box-shadow:
+          0 0 0 2px rgba(196, 30, 58, 0.4),
+          0 12px 32px rgba(196, 30, 58, 0.35);
+      }
+      .holo.legend .num {
+        color: #fff;
+      }
+      .holo.rookie {
+        background: linear-gradient(
+          135deg,
+          #2d6a4f 0%,
+          #143050 50%,
+          #0a0f1a 100%
+        );
+        box-shadow: 0 12px 32px rgba(45, 106, 79, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="col">
+      <div class="holo">
+        <div class="top">
+          <div class="num">714</div>
+          <div class="pos">P</div>
+        </div>
+        <div class="bot">
+          <div class="name">Babe Ruth</div>
+          <div class="meta">1923 · NYY · Outfield</div>
+          <div class="stats">
+            <div class="stat">
+              <div class="sv">.393</div>
+              <div class="sl">AVG</div>
+            </div>
+            <div class="stat">
+              <div class="sv">41</div>
+              <div class="sl">HR</div>
+            </div>
+            <div class="stat">
+              <div class="sv">14.1</div>
+              <div class="sl">WAR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lab">Default · Gold</div>
+    </div>
+    <div class="col">
+      <div class="holo legend">
+        <div class="top">
+          <div class="num">762</div>
+          <div class="pos">OF</div>
+        </div>
+        <div class="bot">
+          <div class="name">Barry Bonds</div>
+          <div class="meta">2001 · SF · Outfield</div>
+          <div class="stats">
+            <div class="stat">
+              <div class="sv">.328</div>
+              <div class="sl">AVG</div>
+            </div>
+            <div class="stat">
+              <div class="sv">73</div>
+              <div class="sl">HR</div>
+            </div>
+            <div class="stat">
+              <div class="sv">11.8</div>
+              <div class="sl">WAR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lab">Legend · Seam glow</div>
+    </div>
+    <div class="col">
+      <div class="holo rookie">
+        <div class="top">
+          <div class="num">001</div>
+          <div class="pos" style="background: var(--success); color: #fff">
+            RK
+          </div>
+        </div>
+        <div class="bot">
+          <div class="name">Ronald Acuña Jr.</div>
+          <div class="meta">2018 · ATL · Outfield</div>
+          <div class="stats">
+            <div class="stat">
+              <div class="sv">.293</div>
+              <div class="sl">AVG</div>
+            </div>
+            <div class="stat">
+              <div class="sv">26</div>
+              <div class="sl">HR</div>
+            </div>
+            <div class="stat">
+              <div class="sv">3.7</div>
+              <div class="sl">WAR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lab">Rookie · Turf</div>
+    </div>
+  </body>
+</html>

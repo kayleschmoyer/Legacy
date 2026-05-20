@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Legacy Sports — Login Page Breakpoints</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="ds/logo.png" />
+    <link rel="stylesheet" href="ds/colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0a0f1a;
+      }
+      body {
+        font-family: var(--font-body);
+        color: var(--fg1);
+      }
+
+      /* Breakpoint frame styles */
+      .bp-frame {
+        background: var(--bg);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        position: relative;
+      }
+      .bp-frame iframe {
+        border: 0;
+        display: block;
+        background: var(--bg);
+      }
+
+      /* Caption strip with width / breakpoint label sitting below the frame */
+      .bp-meta {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 14px;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        font-family: var(--font-display);
+        color: var(--fg3);
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .bp-meta .bp-label {
+        color: var(--brand-gold-light);
+        font-weight: 700;
+      }
+      .bp-meta .bp-dim {
+        color: var(--fg4);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .bp-meta .bp-rule {
+        flex: 1;
+        height: 1px;
+        background: var(--outline-subtle);
+        align-self: center;
+      }
+
+      /* Tag chips */
+      .bp-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border: 1px solid var(--outline-subtle);
+        border-radius: 9999px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg3);
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .bp-tag .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand-gold);
+      }
+    </style>
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="text/babel" src="design-canvas.jsx"></script>
+    <script type="text/babel">
+      /*
+  Breakpoint preview
+  ──────────────────
+  The login route ships four responsive states, driven by media queries in
+  src/LoginRoute.css:
+    • Desktop      ≥ 961px   — split layout, full brand pane + ledger marquee
+    • Tablet       ≤ 960px   — single column, stat strip stacks
+    • Mobile       ≤ 640px   — edge-aligned card, marquee hidden, tightened scale
+    • Small phone  ≤ 380px   — third stat cell drops, headline tightens further
+
+  Each artboard embeds the LIVE Login Page in an iframe sized to that
+  breakpoint's canonical width — what you see is the actual responsive
+  CSS reacting to the iframe's viewport, not a redrawn mock.
+*/
+
+      const { useMemo } = React;
+
+      // One artboard per viewport. width = iframe viewport, height = enough to
+      // show the page in full at that width without inner scroll.
+      const VIEWPORTS = [
+        {
+          id: 'desktop',
+          label: 'Desktop · ≥ 961px',
+          width: 1280,
+          height: 880,
+          tag: 'split layout · full brand pane',
+          note: '1280×880 · base styles',
+        },
+        {
+          id: 'tablet',
+          label: 'Tablet · ≤ 960px',
+          width: 820,
+          height: 1180,
+          tag: 'single column · stacked stats',
+          note: '820×1180 · @media (max-width: 960px)',
+        },
+        {
+          id: 'mobile',
+          label: 'Mobile · ≤ 640px',
+          width: 414,
+          height: 1100,
+          tag: 'edge card · marquee hidden',
+          note: '414×1100 · @media (max-width: 640px)',
+        },
+        {
+          id: 'small-phone',
+          label: 'Small phone · ≤ 380px',
+          width: 360,
+          height: 1040,
+          tag: '3rd stat dropped · type tightens',
+          note: '360×1040 · @media (max-width: 380px)',
+        },
+      ];
+
+      const Frame = ({ vp }) => {
+        // Cache-bust the src per width so the iframe re-evaluates media queries
+        // cleanly when the artboard remounts. Same underlying file either way.
+        const src = useMemo(
+          () => `Login Page.html?bp=${vp.id}&v=mobile-trim`,
+          [vp.id],
+        );
+        return (
+          <div
+            className="bp-frame"
+            style={{ width: vp.width, height: vp.height }}
+          >
+            <iframe
+              src={src}
+              title={vp.label}
+              width={vp.width}
+              height={vp.height}
+              loading="lazy"
+            />
+            <div className="bp-meta">
+              <span className="bp-label">{vp.label}</span>
+              <span className="bp-tag">
+                <span className="dot" />
+                {vp.tag}
+              </span>
+              <span className="bp-rule" />
+              <span className="bp-dim">{vp.note}</span>
+            </div>
+          </div>
+        );
+      };
+
+      const App = () => (
+        <DesignCanvas
+          title="Legacy Sports — Login Page"
+          subtitle="Four responsive breakpoints, each rendering the live page at that viewport width"
+        >
+          <DCSection id="breakpoints" title="Responsive Breakpoints">
+            {VIEWPORTS.map((vp) => (
+              <DCArtboard
+                key={vp.id}
+                id={vp.id}
+                label={vp.label}
+                width={vp.width}
+                // Add headroom under the frame so the caption sits inside the artboard.
+                height={vp.height + 56}
+              >
+                <Frame vp={vp} />
+              </DCArtboard>
+            ))}
+          </DCSection>
+        </DesignCanvas>
+      );
+
+      ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    </script>
+  </body>
+</html>

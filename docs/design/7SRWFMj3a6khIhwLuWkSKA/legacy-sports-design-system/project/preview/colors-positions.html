@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 20px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .sw {
+        flex: 1;
+        min-width: 0;
+        border-radius: var(--radius-4);
+        padding: 14px;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .sw .name {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .sw .tag {
+        font-family: var(--font-body);
+        font-size: 11px;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="sw" style="background: #c41e3a">
+        <div class="name">Pitcher</div>
+        <div class="tag">Seam Red · P</div>
+      </div>
+      <div class="sw" style="background: #7c8794">
+        <div class="name">Catcher</div>
+        <div class="tag">Steel · C</div>
+      </div>
+      <div class="sw" style="background: #8b6f47">
+        <div class="name">Infield</div>
+        <div class="tag">Dirt · 1B/2B/SS/3B</div>
+      </div>
+      <div class="sw" style="background: #2d6a4f">
+        <div class="name">Outfield</div>
+        <div class="tag">Grass · OF</div>
+      </div>
+      <div class="sw" style="background: #c5a55a; color: #111">
+        <div class="name">Utility</div>
+        <div class="tag">Gold · UTIL</div>
+      </div>
+    </div>
+  </body>
+</html>

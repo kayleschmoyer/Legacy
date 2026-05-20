@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Legacy Sports — Nav Bar System</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="assets/logo.png" />
+    <link rel="stylesheet" href="assets/colors_and_type.css?v=7" />
+    <link rel="stylesheet" href="styles.css?v=7" />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const TWEAKS_DEFAULTS = /*EDITMODE-BEGIN*/ {
+        theme: 'dark',
+      }; /*EDITMODE-END*/
+    </script>
+
+    <script type="text/babel" src="NavParts.jsx"></script>
+    <script type="text/babel" src="NavPopovers.jsx"></script>
+    <script type="text/babel" src="NavBars.jsx"></script>
+    <script type="text/babel" data-presets="react">
+      // Mini helper: place a popover into a nav with proper active state tracking
+      const openPop = (pop) => {
+        const fn = (kind) => App._setPop && App._setPop(kind);
+        fn._ = pop;
+        return fn;
+      };
+
+      // Callout labels for anatomy drawing
+      const Callout = ({ children, style }) => (
+        <div className="anatomy-label" style={style}>
+          {children}
+        </div>
+      );
+
+      // ── The top-level canvas ──────────────────────────────────
+      const App = () => {
+        const initial =
+          JSON.parse(localStorage.getItem('ls-tweaks') || 'null') ||
+          TWEAKS_DEFAULTS;
+        const [theme, setTheme] = React.useState(initial.theme || 'dark');
+        const [editMode, setEditMode] = React.useState(false);
+        const [pop, setPop] = React.useState(null);
+        App._setPop = setPop;
+
+        React.useEffect(() => {
+          document.documentElement.setAttribute('data-theme', theme);
+          localStorage.setItem('ls-tweaks', JSON.stringify({ theme }));
+          if (window.parent !== window) {
+            window.parent.postMessage(
+              { type: '__edit_mode_set_keys', edits: { theme } },
+              '*',
+            );
+          }
+        }, [theme]);
+
+        // Tweaks protocol
+        React.useEffect(() => {
+          const handler = (e) => {
+            const d = e.data;
+            if (!d || !d.type) return;
+            if (d.type === '__activate_edit_mode') setEditMode(true);
+            if (d.type === '__deactivate_edit_mode') setEditMode(false);
+          };
+          window.addEventListener('message', handler);
+          window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+          return () => window.removeEventListener('message', handler);
+        }, []);
+
+        const popFn = (kind) => setPop(pop === kind ? null : kind);
+        popFn._ = pop;
+
+        // Mobile drawer toggle per-frame
+        const [drawerA, setDrawerA] = React.useState(false);
+
+        return (
+          <div className="canvas" data-screen-label="Nav System">
+            <div className="canvas-head">
+              <div>
+                <span className="eyebrow">The Clubhouse — UI Navigation</span>
+                <h1>Nav Bar System</h1>
+                <p>
+                  Night-stadium glass, pill tabs, league-switcher, ticker, and a
+                  commissioner's keychain of menus — worked across desktop,
+                  tablet, mobile web, and native iOS. Every surface uses the
+                  same tokens so the Dugout feels like one room.
+                </p>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  alignItems: 'flex-end',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 11,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: 'var(--fg3)',
+                  }}
+                >
+                  4 surfaces · 9 states · 1 system
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <span className="ls-chip ls-chip-live">
+                    <span className="ls-dot-pulse" /> Baseball · Live
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §01 — DESKTOP · ANATOMY
+          ═══════════════════════════════════════════════════ */}
+            <div className="section">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 01</span>
+                  <h2>Desktop · Anatomy</h2>
+                </div>
+                <p>
+                  Glass-blur strip, 56px tall. Logo + league-switcher on the
+                  left, pill tabs centered, search + utilities on the right.
+                  Ticker slides in underneath.
+                </p>
+              </div>
+
+              <p className="caption">
+                <span className="dot" />
+                Logged-in default · 1280px
+                <span className="hint">
+                  The everyday state — one league selected, ticker on
+                </span>
+              </p>
+              <div className="slab anatomy-wrap">
+                <NavDesktop
+                  current="players"
+                  openPop={null}
+                  showTicker={true}
+                />
+                <div
+                  className="slab-content fake-content-wrap"
+                  style={{ padding: '32px' }}
+                >
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 800,
+                      fontSize: 14,
+                      letterSpacing: '0.16em',
+                      color: 'var(--fg3)',
+                    }}
+                  >
+                    WELCOME, MIGUEL
+                  </div>
+                  <div className="fake-pagetitle">
+                    Week 14 · Legends of Summer
+                  </div>
+                  <div className="fake-card-row">
+                    <div className="fake-card" />
+                    <div className="fake-card" />
+                    <div className="fake-card" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="spec-grid">
+                <div className="spec-card">
+                  <span className="k">Height</span>
+                  <span className="v">56 px</span>
+                  <span className="desc">
+                    Sticky, top:0, z:20. 12px vertical padding, glass blur 16px.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Surface</span>
+                  <span className="v">rgba(10,15,26,.78)</span>
+                  <span className="desc">
+                    Night stadium glass + 140% saturate. 1px border-bottom in
+                    panel-border.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Tabs</span>
+                  <span className="v">Pill group · 12px</span>
+                  <span className="desc">
+                    Big Shoulders 700, 0.08em tracking. Active pill = brand-navy
+                    + inner gold seam.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Ticker</span>
+                  <span className="v">36 px · ↔ 40s loop</span>
+                  <span className="desc">
+                    Linear CSS scroll. Seam-red label when at least one game is
+                    live.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §02 — DESKTOP STATES
+          ═══════════════════════════════════════════════════ */}
+            <div className="section">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 02</span>
+                  <h2>Desktop · States</h2>
+                </div>
+                <p>
+                  Every open-menu, live-draft, scrolled, and search-focused
+                  state the nav steps through.
+                </p>
+              </div>
+
+              <p className="caption">
+                <span className="dot" />
+                Logged out · marketing
+                <span className="hint">
+                  No league context — gold CTA dominates
+                </span>
+              </p>
+              <div className="slab">
+                <NavDesktopLoggedOut />
+                <div className="slab-content">
+                  <div className="placeholder">
+                    Landing hero — "Build Your Dynasty. Dominate Your League."
+                  </div>
+                </div>
+              </div>
+
+              <p className="caption">
+                <span className="dot" style={{ background: '#E63950' }} />
+                Draft live · seam-red glow
+                <span className="hint">
+                  League switcher crest pulses; ticker label turns seam-red
+                </span>
+              </p>
+              <div className="slab">
+                <NavDesktop
+                  current="players"
+                  draftLive={true}
+                  openPop={null}
+                  showTicker={true}
+                />
+                <div className="slab-content">
+                  <div
+                    style={{ display: 'flex', gap: 14, alignItems: 'center' }}
+                  >
+                    <span className="ls-chip ls-chip-live">
+                      <span className="ls-dot-pulse" /> Draft Live
+                    </span>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        color: 'var(--fg2)',
+                        fontSize: 14,
+                      }}
+                    >
+                      Round 4 · Pick 7 of 12 ·{' '}
+                      <span
+                        style={{
+                          color: 'var(--brand-gold-light)',
+                          fontFamily: 'var(--font-display)',
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        YOU'RE ON THE CLOCK IN 2 PICKS
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <p className="caption">
+                <span className="dot" />
+                Scrolled · compact
+                <span className="hint">
+                  Wordmark hides, logo shrinks to 30px — content takes the
+                  foreground
+                </span>
+              </p>
+              <div className="slab">
+                <NavDesktop
+                  current="players"
+                  compact={true}
+                  openPop={null}
+                  showTicker={false}
+                />
+                <div className="slab-content">
+                  <div className="placeholder">
+                    Page has scrolled 80px — nav condenses, ticker retracts.
+                  </div>
+                </div>
+              </div>
+
+              <div className="slab-grid-2">
+                <div>
+                  <p className="caption">
+                    <span className="dot" />
+                    Notification tray open
+                  </p>
+                  <div className="slab slab-tall">
+                    <NavDesktopStatic stateKind="notif" />
+                    <div className="slab-content">
+                      <div className="placeholder">
+                        Press the bell — mark all read, or dive into any single
+                        event.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="caption">
+                    <span className="dot" />
+                    Profile menu open
+                  </p>
+                  <div className="slab slab-tall">
+                    <NavDesktopStatic stateKind="profile" />
+                    <div className="slab-content">
+                      <div className="placeholder">
+                        Commissioner shortcut lives here when applicable.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="slab-grid-2">
+                <div>
+                  <p className="caption">
+                    <span className="dot" />
+                    League switcher open
+                  </p>
+                  <div className="slab slab-tall">
+                    <NavDesktopStatic stateKind="league" />
+                    <div className="slab-content">
+                      <div className="placeholder">
+                        Drop the crest, swap leagues, or create a new one.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="caption">
+                    <span className="dot" />
+                    Help & support open
+                  </p>
+                  <div className="slab slab-tall">
+                    <NavDesktopStatic stateKind="help" />
+                    <div className="slab-content">
+                      <div className="placeholder">
+                        Rules, support, bug reports and shortcuts — one
+                        keystroke from any screen.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §03 — TABLET
+          ═══════════════════════════════════════════════════ */}
+            <div className="section">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 03</span>
+                  <h2>Tablet · Collapsed</h2>
+                </div>
+                <p>
+                  900–1100px. Search retracts to an icon; wordmark folds to just
+                  the shield. Pills stay.
+                </p>
+              </div>
+
+              <div
+                className="slab"
+                style={{ maxWidth: 960, margin: '0 auto 24px' }}
+              >
+                <div className="frame-label">
+                  <div className="fl-left">
+                    <span>iPad · Landscape</span>
+                    <span className="sz">1024 × 768</span>
+                    <span className="tag">Logged in</span>
+                  </div>
+                </div>
+                <NavTablet current="players" />
+                <div className="slab-content">
+                  <div className="placeholder">
+                    Same pill group, tighter right cluster. No inline search —
+                    opens palette.
+                  </div>
+                </div>
+              </div>
+
+              <div className="slab" style={{ maxWidth: 960, margin: '0 auto' }}>
+                <div className="frame-label">
+                  <div className="fl-left">
+                    <span>iPad · Draft Room</span>
+                    <span className="sz">1024 × 768</span>
+                    <span className="tag live">Draft Live</span>
+                  </div>
+                </div>
+                <NavTablet current="stats" draftLive={true} />
+                <div className="slab-content">
+                  <div className="placeholder">
+                    Seam-red glow follows the user into smaller viewports.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §04 — MOBILE WEB
+          ═══════════════════════════════════════════════════ */}
+            <div className="section">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 04</span>
+                  <h2>Mobile Web · Bottom Bar + Drawer</h2>
+                </div>
+                <p>
+                  5 tabs in the dugout rail. Menu drawer holds league context,
+                  deeper routes, and bug-report.
+                </p>
+              </div>
+
+              <div className="slab-grid-3" style={{ justifyItems: 'center' }}>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Players · default
+                  </p>
+                  <PhoneMock current="players" />
+                </div>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Draft live
+                  </p>
+                  <PhoneMock current="stats" draftLive={true} />
+                </div>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Drawer open
+                  </p>
+                  <PhoneMock current="players" drawer />
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §05 — NATIVE MOBILE (iOS)
+          ═══════════════════════════════════════════════════ */}
+            <div className="section">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 05</span>
+                  <h2>Native · iOS</h2>
+                </div>
+                <p>
+                  Status bar + home indicator live on the device chrome. Our
+                  header lives inside the safe area.
+                </p>
+              </div>
+
+              <div className="slab-grid-3" style={{ justifyItems: 'center' }}>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Players
+                  </p>
+                  <NativePhoneMock current="players" />
+                </div>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Alerts
+                  </p>
+                  <NativePhoneMock current="alerts" />
+                </div>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Minigames · Live
+                  </p>
+                  <NativePhoneMock current="minigames" draftLive={true} />
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §06 — TOKENS
+          ═══════════════════════════════════════════════════ */}
+            <div className="section">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 06</span>
+                  <h2>Tokens · Anatomy</h2>
+                </div>
+                <p>
+                  Every pixel is a token pulled from the Legacy Sports
+                  foundation. No new colors or type scales were invented for the
+                  nav.
+                </p>
+              </div>
+
+              <div className="spec-grid">
+                <div className="spec-card">
+                  <span className="k">Nav height</span>
+                  <span className="v">56 px</span>
+                  <span className="desc">
+                    Desktop + tablet. Mobile header: 58px. Mobile bottom bar:
+                    72px incl. safe area.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Pill radius</span>
+                  <span className="v">9999 px</span>
+                  <span className="desc">
+                    Per the design system — chips and navigation pills are fully
+                    round.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Tab label</span>
+                  <span className="v">Big Shoulders · 12/700</span>
+                  <span className="desc">
+                    Uppercase, 0.08em tracking. Icons always 14px, 0.7 opacity
+                    at rest.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Glass surface</span>
+                  <span className="v">rgba(10,15,26,.78)</span>
+                  <span className="desc">
+                    backdrop-filter: blur(16px) saturate(140%). Light theme
+                    flips to rgba white.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Active pill</span>
+                  <div className="swatch-row">
+                    <span
+                      className="swatch"
+                      style={{ background: '#1B3A5C' }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        color: 'var(--fg2)',
+                      }}
+                    >
+                      #1B3A5C
+                    </span>
+                  </div>
+                  <span className="desc">
+                    Brand navy. Inner 1px gold seam gives it a helmet-shell
+                    depth.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Draft live</span>
+                  <div className="swatch-row">
+                    <span
+                      className="swatch"
+                      style={{ background: '#C41E3A' }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        color: 'var(--fg2)',
+                      }}
+                    >
+                      #C41E3A
+                    </span>
+                  </div>
+                  <span className="desc">
+                    Seam red. Glow applied to the Games pill and the nav's lower
+                    border.
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Notif badge</span>
+                  <div className="swatch-row">
+                    <span
+                      className="swatch"
+                      style={{ background: '#C41E3A' }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        color: 'var(--fg2)',
+                      }}
+                    >
+                      18 px · pill
+                    </span>
+                  </div>
+                  <span className="desc">
+                    Seam red dot with 2px ring in the current surface color
+                    (masks the border).
+                  </span>
+                </div>
+                <div className="spec-card">
+                  <span className="k">Z-index</span>
+                  <span className="v">20 / 40 / 60</span>
+                  <span className="desc">
+                    Nav: 20. Drawer scrim: 40. Dynamic island / safe area: 60.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          TWEAKS
+          ═══════════════════════════════════════════════════ */}
+            {editMode && (
+              <div className="tweaks-panel">
+                <div className="tweaks-head">
+                  <span className="dot" />
+                  <span className="title">Tweaks</span>
+                </div>
+                <div className="tweaks-body">
+                  <div className="tweak-row">
+                    <label>Theme</label>
+                    <div className="toggle-group">
+                      <button
+                        className={theme === 'dark' ? 'on' : ''}
+                        onClick={() => setTheme('dark')}
+                      >
+                        Dark
+                      </button>
+                      <button
+                        className={theme === 'light' ? 'on' : ''}
+                        onClick={() => setTheme('light')}
+                      >
+                        Light
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 11,
+                      color: 'var(--fg4)',
+                      lineHeight: 1.5,
+                      paddingTop: 4,
+                      borderTop: '1px solid var(--outline-subtle)',
+                    }}
+                  >
+                    Theme persists in localStorage and syncs to the host for
+                    reloads.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // ── A nav where the pop menu is forced open (for the screenshots) ──
+      const NavDesktopStatic = ({ stateKind }) => {
+        const fakePop = (k) => {};
+        fakePop._ = stateKind;
+        return (
+          <NavDesktop current="players" openPop={fakePop} showTicker={false} />
+        );
+      };
+
+      // ── iOS status bar (shared) ──
+      const IosStatusBar = () => (
+        <div
+          style={{
+            height: 48,
+            background: 'transparent',
+            position: 'relative',
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 14,
+              left: 26,
+              fontFamily: '-apple-system, system-ui',
+              fontSize: 15,
+              fontWeight: 600,
+              color: 'var(--fg1)',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            9:41
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: 14,
+              right: 22,
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+            }}
+          >
+            <svg width="17" height="11" viewBox="0 0 17 11">
+              <rect
+                x="0"
+                y="7"
+                width="3"
+                height="4"
+                rx="0.6"
+                fill="currentColor"
+                style={{ color: 'var(--fg1)' }}
+              />
+              <rect
+                x="4.5"
+                y="5"
+                width="3"
+                height="6"
+                rx="0.6"
+                fill="currentColor"
+                style={{ color: 'var(--fg1)' }}
+              />
+              <rect
+                x="9"
+                y="3"
+                width="3"
+                height="8"
+                rx="0.6"
+                fill="currentColor"
+                style={{ color: 'var(--fg1)' }}
+              />
+              <rect
+                x="13.5"
+                y="0"
+                width="3"
+                height="11"
+                rx="0.6"
+                fill="currentColor"
+                style={{ color: 'var(--fg1)' }}
+              />
+            </svg>
+            <svg
+              width="14"
+              height="11"
+              viewBox="0 0 14 11"
+              style={{ color: 'var(--fg1)' }}
+            >
+              <path
+                d="M7 2.5C8.8 2.5 10.5 3.2 11.6 4.3L12.5 3.5C11 2 9 1 7 1S3 2 1.5 3.5L2.4 4.3C3.5 3.2 5.2 2.5 7 2.5Z"
+                fill="currentColor"
+              />
+              <circle cx="7" cy="9" r="1.2" fill="currentColor" />
+            </svg>
+            <svg width="24" height="11" viewBox="0 0 24 11">
+              <rect
+                x="0.5"
+                y="0.5"
+                width="21"
+                height="10"
+                rx="3"
+                stroke="currentColor"
+                fill="none"
+                style={{ color: 'var(--fg1)', opacity: 0.4 }}
+              />
+              <rect
+                x="2"
+                y="2"
+                width="17"
+                height="7"
+                rx="1.5"
+                fill="currentColor"
+                style={{ color: 'var(--fg1)' }}
+              />
+              <path
+                d="M22 3v5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                style={{ color: 'var(--fg1)', opacity: 0.4 }}
+              />
+            </svg>
+          </div>
+        </div>
+      );
+
+      // ── Mobile web phone mock ──
+      const PhoneMock = ({ current, draftLive, drawer }) => (
+        <div className="phone-frame" style={{ height: 720 }}>
+          <IosStatusBar />
+          <div className="phone-content" style={{ flex: 1 }}>
+            <MobileHeader draftLive={draftLive} />
+            <div className="phone-fake-content">
+              <div className="card" />
+              <div className="card" />
+              <div className="card" />
+              <div className="card" />
+            </div>
+            {drawer && <MobileDrawer current={current} />}
+          </div>
+          <MobileBottomBar current={current} draftLive={draftLive} />
+        </div>
+      );
+
+      // ── Native iOS mock (adds status bar / island) ──
+      const NativePhoneMock = ({ current, draftLive }) => (
+        <div className="phone-frame" style={{ height: 720 }}>
+          <IosStatusBar />
+          <MobileHeader draftLive={draftLive} showLeague={true} />
+          <div className="phone-content" style={{ flex: 1 }}>
+            <div className="phone-fake-content">
+              <div className="card" />
+              <div className="card" />
+              <div className="card" />
+              <div className="card" />
+            </div>
+          </div>
+          <MobileBottomBar current={current} draftLive={draftLive} />
+          {/* Home indicator */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 24,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-end',
+              paddingBottom: 7,
+              pointerEvents: 'none',
+              zIndex: 70,
+            }}
+          >
+            <div
+              style={{
+                width: 120,
+                height: 4,
+                borderRadius: 9999,
+                background: 'rgba(255,255,255,0.6)',
+              }}
+            />
+          </div>
+        </div>
+      );
+
+      window.App = App;
+      ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    </script>
+  </body>
+</html>

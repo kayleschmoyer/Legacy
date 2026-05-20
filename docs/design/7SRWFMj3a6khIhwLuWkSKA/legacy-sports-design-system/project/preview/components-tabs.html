@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        max-width: 760px;
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 8px;
+      }
+      .demo {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-5);
+        padding: 0;
+        overflow: hidden;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--outline-default);
+        gap: 0;
+      }
+      .tab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 14px 18px;
+        border: 0;
+        background: transparent;
+        color: var(--fg3);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        position: relative;
+      }
+      .tab.on {
+        color: var(--fg1);
+        border-bottom-color: var(--brand-gold);
+      }
+      .tab .ct {
+        margin-left: 6px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        background: var(--surface-card);
+        color: var(--fg2);
+        padding: 1px 6px;
+        border-radius: 9999px;
+      }
+      .tab.on .ct {
+        background: rgba(197, 165, 90, 0.18);
+        color: var(--brand-gold-light);
+      }
+      .body {
+        padding: 18px;
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--fg3);
+        line-height: 1.55;
+      }
+      .pillset {
+        display: inline-flex;
+        background: var(--surface-card);
+        border: 1px solid var(--outline-default);
+        border-radius: 9999px;
+        padding: 3px;
+      }
+      .pillset button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 7px 14px;
+        border: 0;
+        background: transparent;
+        color: var(--fg3);
+        cursor: pointer;
+        border-radius: 9999px;
+      }
+      .pillset button.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <div class="lab">Underline tabs · with counts</div>
+        <div class="demo">
+          <div class="tabs">
+            <button class="tab on">Roster<span class="ct">12</span></button>
+            <button class="tab">Matchup</button>
+            <button class="tab">Trades<span class="ct">3</span></button>
+            <button class="tab">Waivers<span class="ct">7</span></button>
+            <button class="tab">Activity</button>
+          </div>
+          <div class="body">
+            12 active players · 4 pitchers · 2 catchers · 4 infielders · 2
+            outfielders.
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="lab">Pill tabs (sub-nav)</div>
+        <div
+          class="demo"
+          style="background: transparent; border: 0; padding: 0"
+        >
+          <div class="pillset">
+            <button class="on">All Eras</button><button>Dead Ball</button
+            ><button>Live Ball</button><button>Modern</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

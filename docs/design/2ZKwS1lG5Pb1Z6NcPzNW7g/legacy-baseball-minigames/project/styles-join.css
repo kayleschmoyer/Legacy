@@ -1,0 +1,247 @@
+/* Season Draft Join - invite ticket */
+.sdj {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+.sdj-card {
+  background: var(--surface-card);
+  border: 1px solid rgba(197, 165, 90, 0.35);
+  border-radius: var(--radius-6);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+}
+.sdj-card::before,
+.sdj-card::after {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid rgba(197, 165, 90, 0.35);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+.sdj-card::before {
+  top: 132px;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  transform: translate(-50%, -50%);
+}
+.sdj-card::after {
+  display: none;
+}
+
+.sdj-ticket-top {
+  padding: 28px 32px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(
+    135deg,
+    rgba(27, 58, 92, 0.55) 0%,
+    rgba(17, 27, 47, 0.2) 100%
+  );
+}
+.sdj-ticket-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--fg1-strong);
+  margin-top: 6px;
+}
+.sdj-ticket-logo {
+  opacity: 0.85;
+}
+.sdj-ticket-perf {
+  height: 20px;
+  background-image: radial-gradient(
+    circle at 10px 10px,
+    var(--bg) 5px,
+    transparent 5.5px
+  );
+  background-size: 20px 20px;
+  background-repeat: repeat-x;
+  background-position: center center;
+  border-top: 1px dashed var(--outline-subtle);
+  border-bottom: 1px dashed var(--outline-subtle);
+}
+
+.sdj-ticket-body {
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.sdj-game-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--fg1-strong);
+}
+.sdj-host {
+  font-family: 'Literata', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--fg3);
+  margin-top: -8px;
+}
+.sdj-host b {
+  color: var(--brand-gold-light);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.sdj-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px;
+  background: rgba(10, 15, 26, 0.35);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-4);
+}
+.sdj-detail-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sdj-detail-grid b {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--fg1);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sdj-seats-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.sdj-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: var(--radius-3);
+  border: 1px dashed var(--outline-default);
+  background: rgba(255, 255, 255, 0.02);
+}
+.sdj-seat.filled {
+  border-style: solid;
+  background: rgba(27, 58, 92, 0.25);
+  border-color: rgba(78, 142, 214, 0.35);
+}
+.sdj-seat-you {
+  border-style: solid;
+  border-color: rgba(197, 165, 90, 0.6);
+  background: rgba(197, 165, 90, 0.12);
+}
+.sdj-seat-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  background: var(--grad-avatar);
+  color: #fff;
+  border: 1px solid rgba(197, 165, 90, 0.3);
+}
+.sdj-seat-you .sdj-seat-avatar {
+  background: var(--brand-gold);
+  color: #111;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+.sdj-seat:not(.filled):not(.sdj-seat-you) .sdj-seat-avatar {
+  background: transparent;
+  border-style: dashed;
+  color: var(--fg4);
+}
+.sdj-seat-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+
+.sdj-code-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-3);
+}
+.sdj-code {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  letter-spacing: 0.15em;
+  color: var(--brand-gold-light);
+}
+
+.sdj-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.sdj-loading {
+  padding: 60px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--fg3);
+}
+.sdj-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--outline-subtle);
+  border-top-color: var(--brand-gold);
+  animation: sdj-spin 900ms linear infinite;
+}
+@keyframes sdj-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 560px) {
+  .sdj {
+    padding: 20px 14px 60px;
+  }
+  .sdj-ticket-top,
+  .sdj-ticket-body {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .sdj-game-name {
+    font-size: 28px;
+  }
+  .sdj-detail-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sdj-seats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

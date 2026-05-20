@@ -1,0 +1,1911 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preferences — Legacy Sports</title>
+
+    <!--
+  PREFERENCES — Mobile breakpoints
+  ================================
+  Per page reference doc: /preferences. Sections collapsible, auto-save
+  banner appears on change for 2s, notifications shown only when authed.
+
+  Editorial decision: this page is settings, not a scoreboard — so the
+  scoreboard-condensed display face is reserved for section *headers*
+  and ON/OFF state labels. Body copy and the actual setting names sit
+  in Literata, where they read like an encyclopedia of toggles, not a
+  control panel. We use seam-red ONLY for destructive (none here) and
+  errors; gold ONLY for the save-confirmation tick (a positive outcome).
+
+  We render THREE mobile breakpoints in one canvas:
+    · 360px (small Android)
+    · 375px (iPhone primary, per PROMPT)
+    · 414px (iPhone Plus / Pro Max)
+  Toggle the four conditional states with the tabs at the very top.
+
+  No build step. Open file directly. -->
+
+    <link rel="stylesheet" href="../../design-system/colors_and_type.css" />
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: #060912;
+        color: var(--fg1);
+        font-family: var(--font-body);
+        min-height: 100vh;
+      }
+
+      /* ── Canvas chrome ────────────────────────────────────────── */
+      .canvas {
+        min-height: 100vh;
+        padding: 28px 20px 80px;
+        background:
+          radial-gradient(
+            ellipse at 18% 0%,
+            rgba(27, 58, 92, 0.18) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 82% 8%,
+            rgba(196, 30, 58, 0.07) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.05) 0%,
+            transparent 50%
+          ),
+          #060912;
+        background-attachment: fixed;
+      }
+
+      .canvas-head {
+        max-width: 1500px;
+        margin: 0 auto 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .canvas-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .canvas-title .badge {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 4px 9px;
+        border-radius: 4px;
+        background: rgba(197, 165, 90, 0.12);
+        color: var(--brand-gold-light);
+        border: 1px solid rgba(197, 165, 90, 0.4);
+      }
+      .canvas-title h1 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: -0.005em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .canvas-title .meta {
+        font-family: var(--font-body);
+        color: var(--fg3);
+        font-size: 13px;
+      }
+
+      /* State switcher */
+      .state-tabs {
+        display: inline-flex;
+        gap: 4px;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 9999px;
+        padding: 5px;
+        align-self: flex-start;
+      }
+      .state-tabs button {
+        background: transparent;
+        border: 0;
+        color: var(--fg3);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: all 150ms var(--ease-standard);
+      }
+      .state-tabs button.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .state-tabs button:hover:not(.on) {
+        color: var(--fg1);
+      }
+
+      /* Frame strip */
+      .frame-row {
+        max-width: 1500px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, max-content);
+        gap: 32px;
+        justify-content: center;
+        align-items: start;
+      }
+      @media (max-width: 1280px) {
+        .frame-row {
+          grid-template-columns: repeat(2, max-content);
+        }
+      }
+      @media (max-width: 880px) {
+        .frame-row {
+          grid-template-columns: 1fr;
+          justify-content: stretch;
+        }
+      }
+
+      .frame {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .frame-label {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .frame-label .name {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+      }
+      .frame-label .px {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg4);
+      }
+
+      .device {
+        background: #0a0f1a;
+        border-radius: 36px;
+        padding: 10px;
+        border: 1px solid #1a233a;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.02),
+          var(--shadow-xl);
+      }
+      .device-screen {
+        border-radius: 28px;
+        overflow: hidden;
+        background: var(--bg);
+        height: 760px;
+        width: var(--w);
+        position: relative;
+        isolation: isolate;
+      }
+
+      /* ── In-app shell ────────────────────────────────────────── */
+      .app {
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        position: relative;
+        background:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg);
+        background-attachment: local;
+      }
+      /* Hide scrollbars in mocks for cleanliness */
+      .app::-webkit-scrollbar {
+        width: 4px;
+      }
+      .app::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 2px;
+      }
+
+      /* Status bar (iOS faux) */
+      .statusbar {
+        height: 44px;
+        padding: 0 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: var(--fg1);
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+      .statusbar .icons {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .statusbar svg {
+        fill: var(--fg1);
+      }
+
+      /* Mobile nav */
+      .mnav {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        height: 52px;
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: rgba(10, 15, 26, 0.82);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--panel-border);
+      }
+      .mnav-back {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: transparent;
+        border: 1px solid var(--outline-subtle);
+        color: var(--fg2);
+        cursor: pointer;
+      }
+      .mnav-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        font-size: 14px;
+        color: var(--brand-gold-light);
+        text-transform: uppercase;
+      }
+      .mnav-title span {
+        color: var(--fg1);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        display: block;
+        line-height: 1;
+      }
+      .mnav-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .mnav .av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--grad-avatar);
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 11px;
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+
+      /* Page header */
+      .ph {
+        padding: 22px 20px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .ph .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--brand-gold-light);
+      }
+      .ph h1 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 36px;
+        letter-spacing: -0.015em;
+        line-height: 1;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .ph .sub {
+        font-family: var(--font-body);
+        font-size: 14px;
+        color: var(--fg3);
+        line-height: 1.5;
+        max-width: 56ch;
+        margin-top: 6px;
+      }
+
+      /* Sections */
+      .sections {
+        padding: 14px 16px 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .sec {
+        background: var(--surface-card);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: var(--radius-5);
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+      }
+      /* MOTION: section open/close — height transitions 200ms ease-out, chevron rotates 180deg */
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px;
+        background: transparent;
+        border: 0;
+        width: 100%;
+        cursor: pointer;
+        text-align: left;
+        color: var(--fg1);
+        /* Touch target ≥ 44px ✓ — actual hit-area 56px */
+        min-height: 56px;
+      }
+      .sec-head-l {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .sec-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-3);
+        background: rgba(27, 58, 92, 0.5);
+        border: 1px solid var(--outline-subtle);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sec-icon svg {
+        width: 18px;
+        height: 18px;
+      }
+      .sec-titles {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .sec-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: 0.005em;
+        color: var(--fg1);
+        line-height: 1.15;
+      }
+      .sec-meta {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg3);
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chev {
+        width: 24px;
+        height: 24px;
+        color: var(--fg3);
+        transition: transform 200ms var(--ease-standard);
+        flex-shrink: 0;
+      }
+      .sec.collapsed .chev {
+        transform: rotate(-90deg);
+      }
+      .sec.collapsed .sec-body {
+        display: none;
+      }
+
+      .sec-body {
+        border-top: 1px solid var(--outline-subtle);
+        padding: 6px 0 4px;
+      }
+
+      /* Setting row */
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 18px;
+        min-height: 56px; /* Touch target ≥ 44px ✓ */
+      }
+      .row + .row {
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .row-l {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .row-label {
+        font-family: var(--font-body);
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--fg1);
+        line-height: 1.3;
+      }
+      .row-help {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg3);
+        line-height: 1.45;
+        max-width: 32ch;
+        text-wrap: pretty;
+      }
+
+      /* Toggle */
+      .toggle {
+        flex-shrink: 0;
+        position: relative;
+        width: 48px;
+        height: 28px;
+        border-radius: 9999px;
+        background: var(--surface-raised);
+        border: 1px solid var(--outline-default);
+        cursor: pointer;
+        transition:
+          background 150ms var(--ease-standard),
+          border-color 150ms var(--ease-standard);
+        /* Touch target ≥ 44px ✓ — wrapped in 44px hit pad below */
+      }
+      .toggle::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--fg2);
+        transition:
+          transform 180ms var(--ease-standard),
+          background 150ms;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+      }
+      .toggle.on {
+        background: var(--brand-navy);
+        border-color: var(--brand-navy-light);
+      }
+      .toggle.on::after {
+        transform: translateX(20px);
+        background: #fff;
+      }
+      .toggle-pad {
+        /* Invisible 44px hit area around the visible toggle */
+        padding: 8px;
+        margin: -8px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      /* Segmented control */
+      .seg {
+        display: inline-flex;
+        background: var(--bg-press);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 9999px;
+        padding: 3px;
+        gap: 2px;
+        flex-shrink: 0;
+      }
+      .seg button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        background: transparent;
+        border: 0;
+        padding: 7px 12px;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: all 150ms var(--ease-standard);
+        min-height: 30px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .seg button.on {
+        background: var(--brand-navy);
+        color: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+      .seg button:not(.on):hover {
+        color: var(--fg1);
+      }
+      .seg button .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      /* Theme picker — bigger tactile cards (it's a deliberate choice, not a switch) */
+      .theme-pick {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        padding: 6px 18px 14px;
+      }
+      .theme-card {
+        background: var(--bg-press);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-4);
+        padding: 10px 8px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+        cursor: pointer;
+        transition: all 150ms var(--ease-standard);
+        /* Touch target ≥ 44px ✓ */
+        min-height: 96px;
+        color: inherit;
+      }
+      .theme-card:hover {
+        border-color: var(--outline-default);
+      }
+      .theme-card.on {
+        border-color: var(--brand-gold);
+        background: rgba(197, 165, 90, 0.06);
+        box-shadow: 0 0 0 1px rgba(197, 165, 90, 0.35);
+      }
+      .theme-swatch {
+        width: 100%;
+        height: 44px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .theme-swatch.system {
+        background: linear-gradient(90deg, #0a0f1a 50%, #f5f7fa 50%);
+      }
+      .theme-swatch.light {
+        background: #f5f7fa;
+      }
+      .theme-swatch.dark {
+        background: #0a0f1a;
+        position: relative;
+      }
+      .theme-swatch.dark::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        background: linear-gradient(
+          135deg,
+          transparent 30%,
+          rgba(27, 58, 92, 0.4) 70%
+        );
+        border-radius: 3px;
+      }
+      .theme-card-name {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg2);
+      }
+      .theme-card.on .theme-card-name {
+        color: var(--fg1-strong);
+      }
+
+      /* Number stepper */
+      .stepper-row {
+        padding: 8px 18px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .stepper-row .row-l {
+        padding: 0;
+      }
+      .stepper {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        background: var(--bg-press);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-4);
+        overflow: hidden;
+        width: 100%;
+        max-width: 100%;
+      }
+      .stepper button {
+        width: 44px;
+        background: transparent;
+        border: 0;
+        color: var(--fg2);
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        cursor: pointer;
+        transition: background 100ms;
+        /* Touch target ≥ 44px ✓ */
+      }
+      .stepper button:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--fg1);
+      }
+      .stepper-val {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        font-size: 22px;
+        color: var(--fg1-strong);
+        border-left: 1px solid var(--outline-subtle);
+        border-right: 1px solid var(--outline-subtle);
+      }
+      .stepper-val small {
+        font-family: var(--font-body);
+        font-weight: 400;
+        font-size: 12px;
+        color: var(--fg3);
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .stepper-help {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg3);
+        line-height: 1.45;
+      }
+
+      /* Notification subgroup heading */
+      .subhead {
+        padding: 14px 18px 6px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .sec-body > .subhead:first-child {
+        border-top: 0;
+      }
+
+      /* Auth gate hint (if you switch to unauthed empty state) */
+      .gate {
+        margin: 8px 18px 18px;
+        padding: 14px 16px;
+        background: rgba(27, 58, 92, 0.18);
+        border: 1px solid rgba(91, 132, 196, 0.25);
+        border-radius: var(--radius-3);
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg2);
+        line-height: 1.5;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .gate svg {
+        flex-shrink: 0;
+        color: var(--info-fg);
+        margin-top: 2px;
+      }
+      .gate strong {
+        color: var(--fg1);
+        font-weight: 600;
+      }
+
+      /* Auto-save banner */
+      .save-banner {
+        position: absolute;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        background: rgba(10, 15, 26, 0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(197, 165, 90, 0.5);
+        box-shadow:
+          0 0 0 1px rgba(197, 165, 90, 0.18),
+          0 12px 28px rgba(8, 12, 20, 0.6);
+        border-radius: 9999px;
+        padding: 10px 18px 10px 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 50;
+        /* MOTION: rises 12px from below + fades in 220ms ease-out, dismisses after 2s with reverse */
+      }
+      .save-banner .check {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--brand-gold);
+        color: #1a1408;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .save-banner .check svg {
+        width: 14px;
+        height: 14px;
+      }
+      .save-banner .txt {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg1-strong);
+      }
+      .save-banner .lbl {
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--fg3);
+        margin-left: 4px;
+      }
+
+      /* ── Skeleton (loading state) ────────────────────────────── */
+      /* MOTION: skeleton shimmer, 1.4s linear infinite */
+      .skel {
+        position: relative;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+      }
+      .skel::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.06) 50%,
+          transparent 100%
+        );
+        animation: shimmer 1.4s linear infinite;
+      }
+      @keyframes shimmer {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+      .skel.title {
+        height: 36px;
+        width: 65%;
+        border-radius: 4px;
+      }
+      .skel.sub {
+        height: 14px;
+        width: 80%;
+        margin-top: 8px;
+      }
+      .skel.row-label-s {
+        height: 14px;
+        width: 55%;
+      }
+      .skel.row-help-s {
+        height: 11px;
+        width: 75%;
+        margin-top: 6px;
+      }
+      .skel.toggle-s {
+        width: 48px;
+        height: 28px;
+        border-radius: 9999px;
+      }
+      .skel.seg-s {
+        width: 130px;
+        height: 30px;
+        border-radius: 9999px;
+      }
+      .skel.icon-s {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-3);
+      }
+      .skel.sec-title-s {
+        height: 17px;
+        width: 60%;
+      }
+
+      /* ── Error state (inside notifications section) ─────────── */
+      .err {
+        margin: 8px 18px 16px;
+        padding: 16px;
+        background: rgba(176, 46, 68, 0.12);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        border-radius: var(--radius-3);
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .err svg {
+        flex-shrink: 0;
+        color: var(--danger-fg);
+        margin-top: 2px;
+      }
+      .err-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+      }
+      .err-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        color: var(--fg1-strong);
+      }
+      .err-msg {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg2);
+        line-height: 1.5;
+      }
+      .err-retry {
+        align-self: flex-start;
+        margin-top: 8px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        border-radius: var(--radius-2);
+        background: transparent;
+        color: var(--fg1);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        cursor: pointer;
+        min-height: 36px;
+      }
+      .err-retry:hover {
+        border-color: var(--brand-gold);
+        color: var(--brand-gold-light);
+      }
+
+      /* ── Empty state (auth-gated) ─────────────────────────────
+     Shown when the user is not signed in and lands on /preferences:
+     they still get appearance + sports preferences (localStorage),
+     but the notifications section becomes a sign-in prompt. */
+      .empty {
+        margin: 8px 18px 18px;
+        padding: 24px 18px;
+        background:
+          radial-gradient(
+            ellipse at 50% 0%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 70%
+          ),
+          var(--bg-press);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-4);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        text-align: center;
+      }
+      .empty .glyph {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(27, 58, 92, 0.35);
+        border: 1px solid var(--outline-subtle);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-gold-light);
+      }
+      .empty .glyph svg {
+        width: 24px;
+        height: 24px;
+      }
+      .empty-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: 0.005em;
+        color: var(--fg1-strong);
+        margin-top: 4px;
+      }
+      .empty-msg {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+        line-height: 1.5;
+        max-width: 30ch;
+      }
+      .empty-cta {
+        margin-top: 6px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 10px 16px;
+        border-radius: var(--radius-4);
+        background: var(--brand-navy);
+        color: #fff;
+        border: 1px solid var(--brand-navy-light);
+        cursor: pointer;
+        min-height: 40px;
+      }
+
+      /* ── State visibility toggling ──────────────────────────── */
+      .state-only {
+        display: none;
+      }
+      body[data-state='loading'] .state-loading {
+        display: block;
+      }
+      body[data-state='loading'] .state-loaded {
+        display: none;
+      }
+
+      body[data-state='populated'] .state-populated {
+        display: block;
+      }
+      body[data-state='populated'] .state-not-populated {
+        display: none;
+      }
+
+      body[data-state='empty'] .state-empty {
+        display: flex;
+      }
+      body[data-state='empty'] .state-not-empty {
+        display: none;
+      }
+
+      body[data-state='error'] .state-error {
+        display: block;
+      }
+      body[data-state='error'] .state-not-error {
+        display: none;
+      }
+    </style>
+  </head>
+  <body data-state="populated">
+    <!-- ════════════════════════════════════════════════════════════
+     Canvas chrome: state switcher + breakpoint-labelled frames
+     ════════════════════════════════════════════════════════════ -->
+    <div class="canvas">
+      <header class="canvas-head">
+        <div class="canvas-title">
+          <span class="badge">Mockup</span>
+          <h1>Preferences · /preferences</h1>
+          <span class="meta">Mobile breakpoints · 360 / 375 / 414 px</span>
+        </div>
+        <div class="state-tabs" role="tablist" aria-label="Conditional state">
+          <button data-state-btn="populated" class="on">Populated</button>
+          <button data-state-btn="loading">Loading</button>
+          <button data-state-btn="error">Error</button>
+          <button data-state-btn="empty">Empty · Unauthed</button>
+        </div>
+      </header>
+
+      <div class="frame-row">
+        <!-- ═══════════ FRAME 1 — 360px (small Android) ═══════════ -->
+        <div class="frame">
+          <div class="frame-label">
+            <span class="name">Small · Galaxy / Pixel A</span>
+            <span class="px">360 × 760</span>
+          </div>
+          <div class="device">
+            <div class="device-screen" style="--w: 360px" id="screen-360"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════ FRAME 2 — 375px (iPhone primary) ═══════════ -->
+        <div class="frame">
+          <div class="frame-label">
+            <span class="name">Primary · iPhone</span>
+            <span class="px">375 × 760</span>
+          </div>
+          <div class="device">
+            <div class="device-screen" style="--w: 375px" id="screen-375"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════ FRAME 3 — 414px (iPhone Plus) ═══════════ -->
+        <div class="frame">
+          <div class="frame-label">
+            <span class="name">Large · iPhone Pro Max</span>
+            <span class="px">414 × 760</span>
+          </div>
+          <div class="device">
+            <div class="device-screen" style="--w: 414px" id="screen-414"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+     The actual page content. We render it into each device frame
+     via cloneNode below so all three breakpoints stay in sync.
+     ════════════════════════════════════════════════════════════ -->
+    <template id="tpl-app">
+      <div class="app">
+        <!-- Status bar (faux iOS) -->
+        <div class="statusbar" aria-hidden="true">
+          <span>9:41</span>
+          <div class="icons">
+            <!-- signal -->
+            <svg width="18" height="11" viewBox="0 0 18 11">
+              <rect x="0" y="7" width="3" height="4" rx="0.5" />
+              <rect x="5" y="5" width="3" height="6" rx="0.5" />
+              <rect x="10" y="2" width="3" height="9" rx="0.5" />
+              <rect x="15" y="0" width="3" height="11" rx="0.5" />
+            </svg>
+            <!-- wifi -->
+            <svg width="16" height="11" viewBox="0 0 16 11">
+              <path
+                d="M8 11l2-2.2c-1.1-1-2.9-1-4 0L8 11zm5-5.5c-2.8-2.5-7.2-2.5-10 0L4.5 7c2-1.8 5-1.8 7 0L13 5.5zM16 2.5C11.6-1.5 4.4-1.5 0 2.5L1.5 4C5.1.7 10.9.7 14.5 4L16 2.5z"
+              />
+            </svg>
+            <!-- battery -->
+            <svg width="25" height="11" viewBox="0 0 25 11">
+              <rect
+                x="0.5"
+                y="0.5"
+                width="21"
+                height="10"
+                rx="2.5"
+                fill="none"
+                stroke="currentColor"
+                opacity=".5"
+              />
+              <rect x="2" y="2" width="18" height="7" rx="1.2" />
+              <rect x="22" y="3.5" width="2" height="4" rx="0.5" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Sticky in-app nav with back chevron — preferences is a sub-route -->
+        <header class="mnav">
+          <button class="mnav-back" aria-label="Back">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <div class="mnav-title">LEGACY<span>SPORTS</span></div>
+          <div class="mnav-right">
+            <div class="av">MJ</div>
+          </div>
+        </header>
+
+        <!-- ───── Page header ───── -->
+        <!-- MOTION: page enters from right, 300ms ease-out-quart, on route change -->
+        <section class="ph">
+          <!-- LOADED -->
+          <div class="state-loaded">
+            <span class="eyebrow">Settings</span>
+            <h1>Preferences</h1>
+            <p class="sub">
+              Tune the app to your taste. All changes save automatically — no
+              submit button, no fuss.
+            </p>
+          </div>
+          <!-- LOADING — skeleton mirrors actual layout -->
+          <div class="state-only state-loading">
+            <span class="eyebrow">Settings</span>
+            <div class="skel title"></div>
+            <div class="skel sub"></div>
+          </div>
+        </section>
+
+        <!-- ───── Sections ───── -->
+        <div class="sections">
+          <!-- ═════ APPEARANCE ═════ -->
+          <div class="sec" data-section="appearance">
+            <button class="sec-head" aria-expanded="true">
+              <div class="sec-head-l">
+                <span class="sec-icon">
+                  <!-- sun-moon glyph (Lucide-style 1.8px stroke, custom drawn to match BrandIcon) -->
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#C5A55A"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="4" />
+                    <path
+                      d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M5.6 18.4l.7-.7M17.7 6.3l.7-.7"
+                    />
+                  </svg>
+                </span>
+                <div class="sec-titles">
+                  <div class="sec-title state-loaded">Appearance</div>
+                  <div class="sec-title state-only state-loading">
+                    <div class="skel sec-title-s"></div>
+                  </div>
+                  <div class="sec-meta state-loaded">Theme · Animations</div>
+                </div>
+              </div>
+              <svg
+                class="chev"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div class="sec-body">
+              <!-- Theme picker — three-up because the choice is qualitative (not on/off) -->
+              <div class="row" style="padding-bottom: 0">
+                <div class="row-l">
+                  <div class="row-label state-loaded">Theme</div>
+                  <div class="row-help state-loaded">
+                    Match your phone or pick your own. Dark is the default —
+                    easier on the eyes during a Sunday slate.
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel row-label-s"></div>
+                    <div class="skel row-help-s"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="theme-pick state-loaded">
+                <button class="theme-card" data-theme="system">
+                  <div class="theme-swatch system"></div>
+                  <span class="theme-card-name">System</span>
+                </button>
+                <button class="theme-card" data-theme="light">
+                  <div class="theme-swatch light"></div>
+                  <span class="theme-card-name">Light</span>
+                </button>
+                <button class="theme-card on" data-theme="dark">
+                  <div class="theme-swatch dark"></div>
+                  <span class="theme-card-name">Dark</span>
+                </button>
+              </div>
+              <!-- Skeleton equivalent for theme cards -->
+              <div class="theme-pick state-only state-loading">
+                <div
+                  class="skel"
+                  style="height: 96px; border-radius: 12px"
+                ></div>
+                <div
+                  class="skel"
+                  style="height: 96px; border-radius: 12px"
+                ></div>
+                <div
+                  class="skel"
+                  style="height: 96px; border-radius: 12px"
+                ></div>
+              </div>
+
+              <div
+                class="row"
+                style="border-top: 1px solid rgba(255, 255, 255, 0.04)"
+              >
+                <div class="row-l">
+                  <div class="row-label state-loaded">Animations</div>
+                  <div class="row-help state-loaded">
+                    Page transitions and micro-motion. Disable for reduced
+                    motion.
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel row-label-s"></div>
+                    <div class="skel row-help-s"></div>
+                  </div>
+                </div>
+                <div class="state-loaded">
+                  <div class="toggle-pad" data-toggle="enableAnimations">
+                    <div
+                      class="toggle on"
+                      role="switch"
+                      aria-checked="true"
+                    ></div>
+                  </div>
+                </div>
+                <div class="state-only state-loading">
+                  <div class="skel toggle-s"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═════ SPORTS & STATS ═════ -->
+          <div class="sec" data-section="sports">
+            <button class="sec-head" aria-expanded="true">
+              <div class="sec-head-l">
+                <span class="sec-icon">
+                  <!-- baseball glyph -->
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#C5A55A"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M5.5 6.5c2.4 1.4 4 4 4 7s-1.6 5.6-4 7" />
+                    <path d="M18.5 6.5c-2.4 1.4-4 4-4 7s1.6 5.6 4 7" />
+                  </svg>
+                </span>
+                <div class="sec-titles">
+                  <div class="sec-title state-loaded">Sports &amp; Stats</div>
+                  <div class="sec-title state-only state-loading">
+                    <div class="skel sec-title-s"></div>
+                  </div>
+                  <div class="sec-meta state-loaded">
+                    Default sport · Format · Totals
+                  </div>
+                </div>
+              </div>
+              <svg
+                class="chev"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div class="sec-body">
+              <div class="row">
+                <div class="row-l">
+                  <div class="row-label state-loaded">Default sport</div>
+                  <div class="row-help state-loaded">
+                    Where the app lands when you open it.
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel row-label-s"></div>
+                    <div class="skel row-help-s"></div>
+                  </div>
+                </div>
+                <div class="state-loaded">
+                  <div class="seg" data-seg="defaultSport">
+                    <button class="on" data-val="baseball">
+                      <span
+                        class="dot"
+                        style="background: var(--brand-seam-red)"
+                      ></span
+                      >Baseball
+                    </button>
+                    <button data-val="football">
+                      <span
+                        class="dot"
+                        style="background: var(--success)"
+                      ></span
+                      >Football
+                    </button>
+                  </div>
+                </div>
+                <div class="state-only state-loading">
+                  <div class="skel seg-s"></div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="row-l">
+                  <div class="row-label state-loaded">Stats format</div>
+                  <div class="row-help state-loaded">
+                    Standard shows the headlines. Expanded adds advanced metrics
+                    like wRC+, BABIP, and split splits.
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel row-label-s"></div>
+                    <div class="skel row-help-s"></div>
+                  </div>
+                </div>
+                <div class="state-loaded">
+                  <div class="seg" data-seg="statsFormat">
+                    <button class="on" data-val="standard">Standard</button>
+                    <button data-val="expanded">Expanded</button>
+                  </div>
+                </div>
+                <div class="state-only state-loading">
+                  <div class="skel seg-s"></div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="row-l">
+                  <div class="row-label state-loaded">Show season totals</div>
+                  <div class="row-help state-loaded">
+                    Append running season numbers next to the weekly box score.
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel row-label-s"></div>
+                    <div class="skel row-help-s"></div>
+                  </div>
+                </div>
+                <div class="state-loaded">
+                  <div class="toggle-pad" data-toggle="showSeasonTotals">
+                    <div
+                      class="toggle on"
+                      role="switch"
+                      aria-checked="true"
+                    ></div>
+                  </div>
+                </div>
+                <div class="state-only state-loading">
+                  <div class="skel toggle-s"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═════ NOTIFICATIONS ═════ -->
+          <!-- Authenticated only. In Empty state, this whole section is replaced
+         by an auth-gate empty card. -->
+          <div class="sec state-not-empty" data-section="notifications">
+            <button class="sec-head" aria-expanded="true">
+              <div class="sec-head-l">
+                <span class="sec-icon">
+                  <!-- bell glyph -->
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#C5A55A"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M6 8a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 12 6 8z"
+                    />
+                    <path d="M10 19a2 2 0 0 0 4 0" />
+                  </svg>
+                </span>
+                <div class="sec-titles">
+                  <div class="sec-title state-loaded state-not-error">
+                    Notifications
+                  </div>
+                  <div class="sec-title state-only state-loading">
+                    <div class="skel sec-title-s"></div>
+                  </div>
+                  <div class="sec-title state-only state-error">
+                    Notifications
+                  </div>
+                  <div class="sec-meta state-loaded state-not-error">
+                    Push &amp; email · Matchup alerts
+                  </div>
+                  <div
+                    class="sec-meta state-only state-error"
+                    style="color: var(--danger-fg)"
+                  >
+                    Couldn't load · tap to retry
+                  </div>
+                </div>
+              </div>
+              <svg
+                class="chev"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div class="sec-body">
+              <!-- ─── ERROR sub-state for notifications ─── -->
+              <div class="state-only state-error">
+                <div class="err">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 8v5" />
+                    <path d="M12 16.5v.01" />
+                  </svg>
+                  <div class="err-body">
+                    <div class="err-title">Unable to load preferences</div>
+                    <div class="err-msg">
+                      We couldn't reach the notification service. Your other
+                      settings are saved locally and unaffected.
+                    </div>
+                    <button class="err-retry">Retry</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ─── LOADED / POPULATED ─── -->
+              <div class="state-not-error">
+                <!-- Delivery channels -->
+                <div class="subhead">Delivery</div>
+                <div class="row">
+                  <div class="row-l">
+                    <div class="row-label state-loaded">Push notifications</div>
+                    <div class="row-help state-loaded">
+                      On this device. Game alerts in your hand.
+                    </div>
+                    <div class="state-only state-loading">
+                      <div class="skel row-label-s"></div>
+                      <div class="skel row-help-s"></div>
+                    </div>
+                  </div>
+                  <div class="state-loaded">
+                    <div class="toggle-pad" data-toggle="push">
+                      <div
+                        class="toggle on"
+                        role="switch"
+                        aria-checked="true"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel toggle-s"></div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="row-l">
+                    <div class="row-label state-loaded">
+                      Email notifications
+                    </div>
+                    <div class="row-help state-loaded">
+                      Sent to mickey.mantle@example.com.
+                    </div>
+                    <div class="state-only state-loading">
+                      <div class="skel row-label-s"></div>
+                      <div class="skel row-help-s"></div>
+                    </div>
+                  </div>
+                  <div class="state-loaded">
+                    <div class="toggle-pad" data-toggle="email">
+                      <div
+                        class="toggle"
+                        role="switch"
+                        aria-checked="false"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel toggle-s"></div>
+                  </div>
+                </div>
+
+                <!-- Matchup alerts -->
+                <div class="subhead">Matchup alerts</div>
+                <div class="row">
+                  <div class="row-l">
+                    <div class="row-label state-loaded">Matchup started</div>
+                    <div class="row-help state-loaded">
+                      First pitch in any matchup you're a part of.
+                    </div>
+                    <div class="state-only state-loading">
+                      <div class="skel row-label-s"></div>
+                      <div class="skel row-help-s"></div>
+                    </div>
+                  </div>
+                  <div class="state-loaded">
+                    <div class="toggle-pad" data-toggle="started">
+                      <div
+                        class="toggle on"
+                        role="switch"
+                        aria-checked="true"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel toggle-s"></div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="row-l">
+                    <div class="row-label state-loaded">Matchup ended</div>
+                    <div class="row-help state-loaded">
+                      Final scores when the inning is in the books.
+                    </div>
+                    <div class="state-only state-loading">
+                      <div class="skel row-label-s"></div>
+                      <div class="skel row-help-s"></div>
+                    </div>
+                  </div>
+                  <div class="state-loaded">
+                    <div class="toggle-pad" data-toggle="ended">
+                      <div
+                        class="toggle on"
+                        role="switch"
+                        aria-checked="true"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel toggle-s"></div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="row-l">
+                    <div class="row-label state-loaded">Close game alerts</div>
+                    <div class="row-help state-loaded">
+                      Ping me when a matchup is within the threshold below.
+                    </div>
+                    <div class="state-only state-loading">
+                      <div class="skel row-label-s"></div>
+                      <div class="skel row-help-s"></div>
+                    </div>
+                  </div>
+                  <div class="state-loaded">
+                    <div class="toggle-pad" data-toggle="closeGame">
+                      <div
+                        class="toggle on"
+                        role="switch"
+                        aria-checked="true"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel toggle-s"></div>
+                  </div>
+                </div>
+
+                <!-- Stepper for closeGameThreshold — appears as nested control under Close game alerts -->
+                <div class="stepper-row state-loaded">
+                  <div class="row-l">
+                    <div class="row-label" style="font-size: 13px">
+                      Close game threshold
+                    </div>
+                    <div class="row-help">
+                      How tight is "close"? Margin in fantasy points.
+                    </div>
+                  </div>
+                  <div
+                    class="stepper"
+                    role="group"
+                    aria-label="Close game threshold"
+                  >
+                    <button data-step="-10" aria-label="Decrease 10">−</button>
+                    <button
+                      data-step="-1"
+                      aria-label="Decrease 1"
+                      style="font-size: 16px"
+                    >
+                      −1
+                    </button>
+                    <div class="stepper-val">
+                      <span data-threshold>50</span><small>pts</small>
+                    </div>
+                    <button
+                      data-step="1"
+                      aria-label="Increase 1"
+                      style="font-size: 16px"
+                    >
+                      +1
+                    </button>
+                    <button data-step="10" aria-label="Increase 10">+</button>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="row-l">
+                    <div class="row-label state-loaded">Matchup reminders</div>
+                    <div class="row-help state-loaded">
+                      Heads-up the night before lineups lock.
+                    </div>
+                    <div class="state-only state-loading">
+                      <div class="skel row-label-s"></div>
+                      <div class="skel row-help-s"></div>
+                    </div>
+                  </div>
+                  <div class="state-loaded">
+                    <div class="toggle-pad" data-toggle="reminders">
+                      <div
+                        class="toggle"
+                        role="switch"
+                        aria-checked="false"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="state-only state-loading">
+                    <div class="skel toggle-s"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═════ EMPTY (unauthed) — replaces notifications when no session ═════ -->
+          <div
+            class="sec state-only state-empty"
+            data-section="notifications-empty"
+            style="flex-direction: column"
+          >
+            <button
+              class="sec-head"
+              aria-expanded="true"
+              style="cursor: default"
+            >
+              <div class="sec-head-l">
+                <span class="sec-icon">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#C5A55A"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M6 8a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 12 6 8z"
+                    />
+                    <path d="M10 19a2 2 0 0 0 4 0" />
+                  </svg>
+                </span>
+                <div class="sec-titles">
+                  <div class="sec-title">Notifications</div>
+                  <div class="sec-meta">Sign in to manage</div>
+                </div>
+              </div>
+            </button>
+            <div class="sec-body">
+              <div class="empty">
+                <div class="glyph">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <div class="empty-title">Sign in to set alerts</div>
+                <div class="empty-msg">
+                  Push, email, and matchup alerts live with your account.
+                  Appearance and stat preferences above are saved on this
+                  device.
+                </div>
+                <button class="empty-cta">Sign In</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═════ AUTO-SAVE BANNER ═════ -->
+        <!-- MOTION: rises 12px from below + fades in 220ms ease-out, holds 2s, fades out 180ms -->
+        <div
+          class="save-banner"
+          id="save-banner"
+          aria-live="polite"
+          aria-hidden="true"
+          style="display: none"
+        >
+          <span class="check">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+          </span>
+          <span class="txt">Saved</span>
+          <span class="lbl">just now</span>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      // ══════════════════════════════════════════════════════════
+      // Inject the same app template into all three frames
+      // ══════════════════════════════════════════════════════════
+      (function mount() {
+        const tpl = document.getElementById('tpl-app');
+        ['screen-360', 'screen-375', 'screen-414'].forEach((id) => {
+          const host = document.getElementById(id);
+          const node = tpl.content.cloneNode(true);
+          host.appendChild(node);
+        });
+      })();
+
+      // ══════════════════════════════════════════════════════════
+      // State switcher — shows loading / error / empty / populated
+      // ══════════════════════════════════════════════════════════
+      document.querySelectorAll('[data-state-btn]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document
+            .querySelectorAll('[data-state-btn]')
+            .forEach((b) => b.classList.remove('on'));
+          btn.classList.add('on');
+          document.body.dataset.state = btn.dataset.stateBtn;
+        });
+      });
+
+      // ══════════════════════════════════════════════════════════
+      // Demo interactivity — only inside populated state
+      //   · Toggles flip
+      //   · Segmented controls switch
+      //   · Theme cards swap
+      //   · Section collapse
+      //   · Save banner shows for 2s on any change
+      //   · Stepper updates threshold
+      // Operates across ALL three frames so the reviewer can watch
+      // a change ripple in unison.
+      // ══════════════════════════════════════════════════════════
+      function flashSaveBanners() {
+        document
+          .querySelectorAll('#save-banner, [id="save-banner"]')
+          .forEach((b) => {
+            // Each frame has its own banner (cloned id collisions are harmless here)
+            b.style.display = 'inline-flex';
+            b.style.opacity = '0';
+            b.style.transform = 'translateX(-50%) translateY(12px)';
+            requestAnimationFrame(() => {
+              b.style.transition =
+                'opacity 220ms cubic-bezier(0.2,0.8,0.2,1), transform 220ms cubic-bezier(0.2,0.8,0.2,1)';
+              b.style.opacity = '1';
+              b.style.transform = 'translateX(-50%) translateY(0)';
+            });
+            clearTimeout(b._t);
+            b._t = setTimeout(() => {
+              b.style.opacity = '0';
+              b.style.transform = 'translateX(-50%) translateY(12px)';
+              setTimeout(() => {
+                b.style.display = 'none';
+              }, 220);
+            }, 2000);
+          });
+      }
+
+      // Toggles
+      document.addEventListener('click', (e) => {
+        const pad = e.target.closest('[data-toggle]');
+        if (pad) {
+          const key = pad.dataset.toggle;
+          const next = !pad.querySelector('.toggle').classList.contains('on');
+          // Sync across all frames
+          document
+            .querySelectorAll(`[data-toggle="${key}"] .toggle`)
+            .forEach((t) => {
+              t.classList.toggle('on', next);
+              t.setAttribute('aria-checked', String(next));
+            });
+          flashSaveBanners();
+          return;
+        }
+        const segBtn = e.target.closest('.seg button');
+        if (segBtn) {
+          const seg = segBtn.closest('.seg');
+          const key = seg.dataset.seg;
+          const val = segBtn.dataset.val;
+          document.querySelectorAll(`.seg[data-seg="${key}"]`).forEach((s) => {
+            s.querySelectorAll('button').forEach((b) =>
+              b.classList.toggle('on', b.dataset.val === val),
+            );
+          });
+          flashSaveBanners();
+          return;
+        }
+        const themeBtn = e.target.closest('.theme-card');
+        if (themeBtn) {
+          const val = themeBtn.dataset.theme;
+          document.querySelectorAll('.theme-pick').forEach((p) => {
+            p.querySelectorAll('.theme-card').forEach((c) =>
+              c.classList.toggle('on', c.dataset.theme === val),
+            );
+          });
+          flashSaveBanners();
+          return;
+        }
+        const stepBtn = e.target.closest('[data-step]');
+        if (stepBtn) {
+          const delta = parseInt(stepBtn.dataset.step, 10);
+          document.querySelectorAll('[data-threshold]').forEach((el) => {
+            const v = Math.max(
+              1,
+              Math.min(200, (parseInt(el.textContent, 10) || 50) + delta),
+            );
+            el.textContent = v;
+          });
+          flashSaveBanners();
+          return;
+        }
+        const head = e.target.closest('.sec-head');
+        if (head && !head.closest('[data-section="notifications-empty"]')) {
+          const sec = head.closest('.sec');
+          // Sync collapse state across frames by section id
+          const key = sec.dataset.section;
+          const next = !sec.classList.contains('collapsed');
+          document
+            .querySelectorAll(`.sec[data-section="${key}"]`)
+            .forEach((s) => {
+              s.classList.toggle('collapsed', next);
+              const h = s.querySelector('.sec-head');
+              if (h) h.setAttribute('aria-expanded', String(!next));
+            });
+        }
+      });
+    </script>
+  </body>
+</html>

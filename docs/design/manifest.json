@@ -1,11 +1,203 @@
 {
   "version": 1,
+  "lastSyncedAt": "2026-05-20T16:35:54.669Z",
+  "bucketEpic": "LS-4568",
   "designs": [
     {
       "id": "670f7892-5193-4b8a-a54c-20b112ad11bb",
       "url": "https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb",
       "title": "Legacy Sports Design System",
-      "status": "active"
+      "status": "archived"
+    },
+    {
+      "id": "1tmNnzBvKmDjeJOie3JNkg",
+      "url": "https://api.anthropic.com/v1/design/h/1tmNnzBvKmDjeJOie3JNkg",
+      "title": "Public Leagues",
+      "slug": "legacy-sports-public-leagues",
+      "status": "active",
+      "lastSyncedHash": "b5c72bab0b806f2495256ec5fcadaa3c4a8be07447b8231ccde522d0de79c3e8",
+      "lastSyncedAt": "2026-05-20T16:35:54.669Z",
+      "jiraKey": "LS-4569"
+    },
+    {
+      "id": "2ZKwS1lG5Pb1Z6NcPzNW7g",
+      "url": "https://api.anthropic.com/v1/design/h/2ZKwS1lG5Pb1Z6NcPzNW7g",
+      "title": "Legacy Baseball Minigames",
+      "slug": "legacy-baseball-minigames",
+      "status": "active",
+      "lastSyncedHash": "6edadff6a09d5b73036a80963a10c40a67f701139f92b375451a3ed551ba1855",
+      "lastSyncedAt": "2026-05-20T16:35:54.679Z",
+      "jiraKey": "LS-4581"
+    },
+    {
+      "id": "4k4RdTqqAbEop0ZqmEDuOg",
+      "url": "https://api.anthropic.com/v1/design/h/4k4RdTqqAbEop0ZqmEDuOg",
+      "title": "Login Page",
+      "slug": "legacy-sports-login-page",
+      "status": "active",
+      "lastSyncedHash": "66dc788c5a266938370ea6d07ec4e9331b7be1bea5d97b8937db789ad365698a",
+      "lastSyncedAt": "2026-05-20T16:35:54.861Z",
+      "jiraKey": "LS-4570"
+    },
+    {
+      "id": "7SRWFMj3a6khIhwLuWkSKA",
+      "url": "https://api.anthropic.com/v1/design/h/7SRWFMj3a6khIhwLuWkSKA",
+      "title": "Design System",
+      "slug": "legacy-sports-design-system",
+      "status": "active",
+      "lastSyncedHash": "5af5d7f88b1c9e26b32de91cdc106b04957b89c790907ed34f50aa1f77f19774",
+      "lastSyncedAt": "2026-05-20T16:35:55.106Z",
+      "jiraKey": "LS-4571"
+    },
+    {
+      "id": "B8P9BQz8s6NZ9Q-FqWI_yA",
+      "url": "https://api.anthropic.com/v1/design/h/B8P9BQz8s6NZ9Q-FqWI_yA",
+      "title": "Draft Board",
+      "slug": "legacy-sports-draft-board",
+      "status": "active",
+      "lastSyncedHash": "f400b798371d0a876dc090de93cc903581d91389b18bcc565942593a70d773ac",
+      "lastSyncedAt": "2026-05-20T16:35:55.113Z",
+      "jiraKey": "LS-4572"
+    },
+    {
+      "id": "F89Q4j6WFCFqqsZpQ4VhlQ",
+      "url": "https://api.anthropic.com/v1/design/h/F89Q4j6WFCFqqsZpQ4VhlQ",
+      "title": "Players Page",
+      "slug": "legacy-sports-players-page",
+      "status": "active",
+      "lastSyncedHash": "1fa0628cea69c954b6c77af34351628a1f3d3fce4aa49de0fb298b0232b0d75b",
+      "lastSyncedAt": "2026-05-20T16:35:55.213Z",
+      "jiraKey": "LS-4573"
+    },
+    {
+      "id": "HI6N3yPYUzeh981B5SkXmw",
+      "url": "https://api.anthropic.com/v1/design/h/HI6N3yPYUzeh981B5SkXmw",
+      "title": "Create League",
+      "slug": "legacy-sports-create-league",
+      "status": "active",
+      "lastSyncedHash": "8b562db2cc79f7a258fac85abad82ca8805362610d01e06b4b995ae1d2bfdf65",
+      "lastSyncedAt": "2026-05-20T16:35:55.221Z",
+      "jiraKey": "LS-4587"
+    },
+    {
+      "id": "QjHjpBJxAbmU7Xcc8HWarw",
+      "url": "https://api.anthropic.com/v1/design/h/QjHjpBJxAbmU7Xcc8HWarw",
+      "title": "Account Management",
+      "slug": "legacy-sports-account-management",
+      "status": "active",
+      "lastSyncedHash": "e561667210fa665bc33e6683712b9bb6bb09cfe4334e9af4be4818fe5ab6b353",
+      "lastSyncedAt": "2026-05-20T16:35:55.226Z",
+      "jiraKey": "LS-4574"
+    },
+    {
+      "id": "UUCswUjg_28Xzcqii7Rt2Q",
+      "url": "https://api.anthropic.com/v1/design/h/UUCswUjg_28Xzcqii7Rt2Q",
+      "title": "Preferences",
+      "slug": "legacy-sports-preferences",
+      "status": "active",
+      "lastSyncedHash": "64096434e764584a0a1940aa2c5b9800ece0bc71f14c46afa4722ba54c0c3dae",
+      "lastSyncedAt": "2026-05-20T16:35:55.236Z",
+      "jiraKey": "LS-4576"
+    },
+    {
+      "id": "V7jS9JECVtF0zt_SkADLhw",
+      "url": "https://api.anthropic.com/v1/design/h/V7jS9JECVtF0zt_SkADLhw",
+      "title": "Help",
+      "slug": "legacy-sports-help",
+      "status": "active",
+      "lastSyncedHash": "564894d973bbc0a9e76e10d9821dba433f441d87e5b6a1e1f6994cbf8bef9335",
+      "lastSyncedAt": "2026-05-20T16:35:55.292Z",
+      "jiraKey": "LS-4577"
+    },
+    {
+      "id": "c8_aVxWiMWOyjkMnoD-SkA",
+      "url": "https://api.anthropic.com/v1/design/h/c8_aVxWiMWOyjkMnoD-SkA",
+      "title": "Notifications",
+      "slug": "legacy-sports-notifications",
+      "status": "active",
+      "lastSyncedHash": "0bc21b7a9754eead84725111f2bd51113650bd7727f94d796517f83d4c8c674d",
+      "lastSyncedAt": "2026-05-20T16:35:55.293Z",
+      "jiraKey": "LS-4583"
+    },
+    {
+      "id": "dNpCFgIxoT5OnLy71wHjrg",
+      "url": "https://api.anthropic.com/v1/design/h/dNpCFgIxoT5OnLy71wHjrg",
+      "title": "Nav Bar",
+      "slug": "legacy-sports-nav-bar",
+      "status": "active",
+      "lastSyncedHash": "4e6fdf1e36d3edbdf584154b36f1a6190308dea09b1a4aa6c98911adc447a810",
+      "lastSyncedAt": "2026-05-20T16:35:55.299Z",
+      "jiraKey": "LS-4582"
+    },
+    {
+      "id": "dzQl9ZQSmZK-brcCgMZJdg",
+      "url": "https://api.anthropic.com/v1/design/h/dzQl9ZQSmZK-brcCgMZJdg",
+      "title": "Intro Video",
+      "slug": "intro-video",
+      "status": "active",
+      "lastSyncedHash": "60d11a1f3e599d4187bf53bf3d57857bd9601678bd4eb6d9dd12b4d2d0209020",
+      "lastSyncedAt": "2026-05-20T16:35:55.343Z",
+      "jiraKey": "LS-4578"
+    },
+    {
+      "id": "kXxk3B29-DRvoJthw6UifA",
+      "url": "https://api.anthropic.com/v1/design/h/kXxk3B29-DRvoJthw6UifA",
+      "title": "Player Details",
+      "slug": "legacy-sports-player-details",
+      "status": "active",
+      "lastSyncedHash": "26aa670ff2d8ff83ce6a82ecfc1dd213167fb34981da9eb2b96bf12322872920",
+      "lastSyncedAt": "2026-05-20T16:35:55.345Z",
+      "jiraKey": "LS-4586"
+    },
+    {
+      "id": "lMe_Ka278wF48IaGC7FOWw",
+      "url": "https://api.anthropic.com/v1/design/h/lMe_Ka278wF48IaGC7FOWw",
+      "title": "Scoreboard Page",
+      "slug": "scoreboard-page",
+      "status": "active",
+      "lastSyncedHash": "19fa30c709b60775d40fd83a045a01e90116304ee2889c59415baa681a1d1519",
+      "lastSyncedAt": "2026-05-20T16:35:55.350Z",
+      "jiraKey": "LS-4584"
+    },
+    {
+      "id": "nxFiEGqu3yPCDKpoNDmQWA",
+      "url": "https://api.anthropic.com/v1/design/h/nxFiEGqu3yPCDKpoNDmQWA",
+      "title": "Homepage",
+      "slug": "legacy-sports-homepage",
+      "status": "active",
+      "lastSyncedHash": "e1db976e6b61ed2b444c6bed755f5f939a3e8cfe23b28ef7e3d9a7b7882af075",
+      "lastSyncedAt": "2026-05-20T16:35:55.355Z",
+      "jiraKey": "LS-4579"
+    },
+    {
+      "id": "qDGBVlOyaV-306Id0kWq0Q",
+      "url": "https://api.anthropic.com/v1/design/h/qDGBVlOyaV-306Id0kWq0Q",
+      "title": "League Detail Page",
+      "slug": "league-detail-page",
+      "status": "active",
+      "lastSyncedHash": "6c6859b0ba44abd9142714c4a96ed04d7296569c75d297d1114f66cd6bdc1b8d",
+      "lastSyncedAt": "2026-05-20T16:35:55.364Z",
+      "jiraKey": "LS-4588"
+    },
+    {
+      "id": "qtqqKYxMFf1A8GY5NL9GNQ",
+      "url": "https://api.anthropic.com/v1/design/h/qtqqKYxMFf1A8GY5NL9GNQ",
+      "title": "Stats Page",
+      "slug": "legacy-sports-stats-page",
+      "status": "active",
+      "lastSyncedHash": "3e7ea17c02c49145813c3bbfe739677e4f2be48a0d626066b7fa411fa6c789d6",
+      "lastSyncedAt": "2026-05-20T16:35:55.369Z",
+      "jiraKey": "LS-4585"
+    },
+    {
+      "id": "r09ipdRY07dJXR9hh4J1Ug",
+      "url": "https://api.anthropic.com/v1/design/h/r09ipdRY07dJXR9hh4J1Ug",
+      "title": "Admin",
+      "slug": "legacy-sports-admin",
+      "status": "active",
+      "lastSyncedHash": "9a61976a288210f38325b96318d58dfee52b2b53e75938fc034f179e4c4a11d1",
+      "lastSyncedAt": "2026-05-20T16:35:55.380Z",
+      "jiraKey": "LS-4580"
     }
   ]
 }

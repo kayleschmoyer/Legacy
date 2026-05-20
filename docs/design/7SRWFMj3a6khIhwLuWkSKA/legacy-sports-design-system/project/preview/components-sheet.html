@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 0;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .scene {
+        position: relative;
+        height: 560px;
+        background: var(--grad-board-bg);
+        overflow: hidden;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 12, 20, 0.55);
+        backdrop-filter: blur(4px);
+      }
+      .sheet {
+        position: relative;
+        background: var(--surface-panel);
+        border-top: 1px solid var(--panel-border);
+        border-radius: var(--radius-6) var(--radius-6) 0 0;
+        box-shadow: var(--shadow-xl);
+        width: 100%;
+        max-width: 560px;
+        padding: 18px 20px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .handle {
+        width: 40px;
+        height: 4px;
+        background: var(--outline-default);
+        border-radius: 2px;
+        align-self: center;
+        margin-bottom: 6px;
+      }
+      .sheet h3 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 20px;
+        color: var(--fg1);
+        margin: 0;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--outline-subtle);
+      }
+      .row:last-of-type {
+        border-bottom: 0;
+      }
+      .row .lbl {
+        font-family: var(--font-body);
+        font-size: 15px;
+        color: var(--fg1);
+      }
+      .row .val {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--fg3);
+      }
+      .row .check {
+        width: 18px;
+        height: 18px;
+        border-radius: 9999px;
+        border: 2px solid var(--outline-default);
+        display: inline-block;
+      }
+      .row.on .check {
+        background: var(--brand-gold);
+        border-color: var(--brand-gold);
+      }
+      .lab-overlay {
+        position: absolute;
+        top: 14px;
+        left: 18px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        z-index: 5;
+      }
+      .btn {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 12px 18px;
+        border-radius: var(--radius-4);
+        background: var(--brand-navy);
+        color: #fff;
+        border: 1px solid var(--brand-navy-light);
+        cursor: pointer;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scene">
+      <div class="lab-overlay">Sheet · bottom · filter picker (mobile)</div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="handle"></div>
+        <h3>Filter players</h3>
+        <div class="row on">
+          <span class="lbl">Pitchers (P)</span><span class="check"></span>
+        </div>
+        <div class="row">
+          <span class="lbl">Catchers (C)</span><span class="check"></span>
+        </div>
+        <div class="row on">
+          <span class="lbl">Outfielders (OF)</span><span class="check"></span>
+        </div>
+        <div class="row">
+          <span class="lbl">Era</span><span class="val">Live Ball ›</span>
+        </div>
+        <div class="row">
+          <span class="lbl">Min PA</span><span class="val">200 ›</span>
+        </div>
+        <button class="btn">Apply · 124 players</button>
+      </div>
+    </div>
+  </body>
+</html>

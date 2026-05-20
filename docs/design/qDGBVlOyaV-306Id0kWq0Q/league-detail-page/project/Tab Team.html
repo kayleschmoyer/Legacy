@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>My Team · Dead Ball Archive</title>
+
+    <link rel="stylesheet" href="ds/colors_and_type.css" />
+    <link rel="stylesheet" href="league-styles.css?v=3" />
+
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+
+    <style>
+      .role-switch-bar {
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        background: rgba(10, 15, 26, 0.86);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--panel-border);
+      }
+      .role-switch-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 10px 24px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .role-switch-inner .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--brand-gold-light);
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .role-switch-inner .brand .sub {
+        color: var(--fg3);
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        border-left: 1px solid var(--outline-subtle);
+        padding-left: 10px;
+        margin-left: 4px;
+      }
+      .role-switch-inner .spacer {
+        flex: 1;
+      }
+      .role-switch {
+        display: inline-flex;
+        padding: 3px;
+        background: var(--surface-panel);
+        border: 1px solid var(--outline-subtle);
+        border-radius: 9999px;
+      }
+      .role-switch button {
+        background: transparent;
+        border: 0;
+        color: var(--fg3);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 6px 12px;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .role-switch button.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .role-switch button:hover:not(.on) {
+        color: var(--fg1);
+      }
+      .season-select {
+        background: var(--surface-subtle);
+        border: 1px solid var(--outline-subtle);
+        color: var(--fg1);
+        font-family: var(--font-body);
+        font-size: 12px;
+        padding: 7px 12px;
+        border-radius: var(--radius-3);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" src="Icons.jsx"></script>
+    <script type="text/babel" src="Data.jsx"></script>
+    <script type="text/babel" src="Shared.jsx"></script>
+    <script type="text/babel" src="LeagueHero.jsx"></script>
+    <script type="text/babel" src="TabPageShell.jsx"></script>
+    <script type="text/babel" src="TabTeam.jsx"></script>
+
+    <script type="text/babel" data-presets="env,react">
+      const Page = () => (
+        <window.TabPageShell activeTab="team">
+          {({ league, isCommish, isMember, onTab, onTeam }) =>
+            isMember ? (
+              <window.TabTeam />
+            ) : (
+              <div className="ls-card" style={{ padding: 24 }}>
+                Member access required.
+              </div>
+            )
+          }
+        </window.TabPageShell>
+      );
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<Page />);
+    </script>
+  </body>
+</html>

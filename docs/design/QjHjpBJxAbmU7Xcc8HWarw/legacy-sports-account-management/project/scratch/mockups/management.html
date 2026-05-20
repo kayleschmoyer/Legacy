@@ -1,0 +1,2079 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>League Management — Legacy Sports Mockup</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <!-- DESIGN INTENT
+  This file is a static design mockup for /management.
+  It shows the page in two viewports side-by-side:
+    • Mobile  (375px wide)  — the primary canvas, since most owners delete
+                              from a phone after deciding mid-commute.
+    • Desktop (1280px wide) — the secondary canvas; commissioners reviewing
+                              with a coffee at the kitchen table.
+  Four conditional states (loading / error / empty / populated) and two
+  access-level warning variants (admin / non-admin) are togglable via the
+  state switcher at the top. Two confirmation dialogs can be opened over
+  the populated state — these are not modals over the toggle UI; they are
+  scoped to a single canvas at a time so reviewers see how the dialog
+  composes with the underlying page.
+
+  Why two cards (Danger Zone + Information) instead of one large form:
+    The reference doc separates a destructive ACTION from REFERENCE
+    material a user reads while deciding. Combining them encourages
+    misclicks. A red-bordered Danger Zone above a navy Information card
+    matches the convention used in serious tools (GitHub repo settings,
+    Stripe account closures) — a register users already trust here.
+
+  Why the warning is rendered as a single sentence with consequence list
+  underneath, rather than nested:
+    Read order on mobile is purely vertical. The sentence answers
+    "what will happen?", the list answers "what data is in scope?".
+    Splitting them keeps each scannable in under a second.
+-->
+
+    <link rel="icon" href="../../assets/logo.png" />
+
+    <!-- Fonts: Big Shoulders Display (display/scoreboard) + Literata (body/editorial).
+     Loaded from Google CDN per mockup contract — no @font-face self-host. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ============================================================
+     Tokens — verbatim from Legacy Sports design system
+     ============================================================ */
+      :root {
+        --brand-navy: #1b3a5c;
+        --brand-navy-light: #2c4a7c;
+        --brand-navy-dark: #143050;
+        --brand-seam-red: #c41e3a;
+        --brand-seam-red-dark: #8b1a2b;
+        --brand-seam-red-light: #e63950;
+        --brand-gold: #c5a55a;
+        --brand-gold-light: #d4bb78;
+
+        --bg-page: #0a0f1a;
+        --bg-subtle: #0d1526;
+        --bg-panel: #111b2f;
+        --bg-elevated: #16223a;
+        --bg-raised: #1c2a47;
+
+        --fg1: #e8edf5;
+        --fg1-strong: #ffffff;
+        --fg2: #dee6ff;
+        --fg3: #8a9bb5;
+        --fg4: #6c80ba;
+
+        --border: #1e2d45;
+        --border-strong: #2f3b53;
+        --glass-border: rgba(255, 255, 255, 0.08);
+
+        --danger: #c23e54;
+        --danger-fg: #e07a8c;
+        --danger-soft: rgba(176, 46, 68, 0.16);
+        --danger-border: rgba(196, 30, 58, 0.45);
+
+        --shadow-sm: 0 1px 2px rgba(8, 12, 20, 0.4);
+        --shadow-md: 0 4px 14px rgba(8, 12, 20, 0.55);
+        --shadow-lg: 0 12px 32px rgba(8, 12, 20, 0.65);
+        --shadow-xl: 0 20px 48px rgba(8, 12, 20, 0.75);
+        --shadow-seam:
+          0 0 0 1px rgba(196, 30, 58, 0.35), 0 6px 24px rgba(196, 30, 58, 0.2);
+
+        --font-display: 'Big Shoulders Display', system-ui, sans-serif;
+        --font-body: 'Literata', Georgia, serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+        --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: var(--bg-page);
+        color: var(--fg1);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      /* Reviewer chrome — outside the design itself.
+     The "stage" is the reviewer's workbench; the "canvas" inside it is
+     the actual product. Stage is intentionally drab so it doesn't pollute. */
+      .stage {
+        min-height: 100vh;
+        background: #06090f;
+        padding: 24px 24px 64px;
+      }
+
+      .stage-head {
+        max-width: 1700px;
+        margin: 0 auto 24px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .stage-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: var(--fg1-strong);
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+      .stage-title small {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      .stage-toggles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+      }
+      .toggle-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .toggle-group .label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-right: 4px;
+      }
+      .toggle-group .seg {
+        display: inline-flex;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        padding: 4px;
+        gap: 2px;
+      }
+      .toggle-group button {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: transparent;
+        color: var(--fg3);
+        border: 0;
+        padding: 6px 12px;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: all 150ms var(--ease-standard);
+      }
+      .toggle-group button:hover {
+        color: var(--fg1);
+      }
+      .toggle-group button[aria-pressed='true'] {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .toggle-group .seg.danger button[aria-pressed='true'] {
+        background: var(--brand-seam-red-dark);
+      }
+
+      /* Canvas grid: mobile + desktop side-by-side, stacks under 1100px. */
+      .canvases {
+        max-width: 1700px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 375px minmax(0, 1fr);
+        gap: 32px;
+        align-items: start;
+      }
+      @media (max-width: 1100px) {
+        .canvases {
+          grid-template-columns: 1fr;
+        }
+      }
+      .canvas-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .canvas-label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .canvas-label .px {
+        font-family: var(--font-mono);
+        color: var(--fg4);
+        letter-spacing: 0;
+      }
+      .canvas-frame {
+        position: relative;
+        background: var(--bg-page);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+      }
+      .canvas-frame.mobile {
+        width: 375px;
+      }
+      .canvas-frame.desktop {
+        width: 100%;
+      }
+
+      /* The signature "night stadium" wash — three radial blobs over navy. */
+      .canvas-inner {
+        background:
+          radial-gradient(
+            ellipse at 20% 0%,
+            rgba(27, 58, 92, 0.22) 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            ellipse at 80% 10%,
+            rgba(196, 30, 58, 0.1) 0%,
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 50% 90%,
+            rgba(197, 165, 90, 0.08) 0%,
+            transparent 50%
+          ),
+          var(--bg-page);
+        min-height: 720px;
+        position: relative;
+      }
+
+      /* ============================================================
+     NAV — sticky top header, simplified for mockup
+     ============================================================ */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: rgba(10, 15, 26, 0.78);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 10px 24px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+      .brand img {
+        height: 32px;
+        display: block;
+      }
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        color: var(--brand-gold-light);
+        line-height: 1;
+      }
+      .wordmark span {
+        display: block;
+        color: var(--fg1);
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        margin-top: 2px;
+      }
+      .nav-tabs {
+        margin-left: auto;
+        display: flex;
+        gap: 2px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        padding: 4px;
+      }
+      .nav-tabs a {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        padding: 8px 14px;
+        border-radius: 9999px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 150ms var(--ease-standard);
+      }
+      .nav-tabs a:hover {
+        color: var(--fg1);
+      }
+      .nav-tabs a.on {
+        background: var(--brand-navy);
+        color: #fff;
+      }
+      .nav-right {
+        margin-left: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .icon-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--fg2);
+        width: 36px;
+        height: 36px;
+        border-radius: 9999px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .icon-btn img {
+        width: 18px;
+        height: 18px;
+        opacity: 0.85;
+      }
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          var(--brand-navy) 0%,
+          var(--brand-gold) 100%
+        );
+        border: 1px solid rgba(197, 165, 90, 0.45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 12px;
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+
+      /* Mobile nav: hide tab pills, show hamburger placeholder. */
+      .nav-mobile-menu {
+        display: none;
+      }
+      .canvas-frame.mobile .nav-tabs {
+        display: none;
+      }
+      .canvas-frame.mobile .nav-mobile-menu {
+        display: inline-flex;
+        margin-left: auto;
+      }
+      .canvas-frame.mobile .nav-right {
+        margin-left: 0;
+      }
+      .canvas-frame.mobile .nav-inner {
+        padding: 10px 16px;
+        gap: 10px;
+      }
+      .canvas-frame.mobile .brand img {
+        height: 28px;
+      }
+
+      /* ============================================================
+     PAGE — the management page itself
+     ============================================================ */
+      .page {
+        max-width: 880px; /* narrower than dashboard — this is a settings page,
+                                     not a content surface; reads more like a form */
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+      }
+      .canvas-frame.mobile .page {
+        padding: 24px 16px 56px;
+      }
+
+      .crumb {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .crumb a {
+        color: var(--brand-gold-light);
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .crumb a:hover {
+        color: var(--brand-gold);
+      }
+      .crumb .sep {
+        color: var(--fg4);
+      }
+
+      .page-head {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .page-head h1 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 44px;
+        line-height: 1.05;
+        letter-spacing: -0.015em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .canvas-frame.mobile .page-head h1 {
+        font-size: 32px;
+      }
+      .page-head .subtitle {
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.55;
+        color: var(--fg3);
+        max-width: 70ch;
+        margin: 0;
+      }
+
+      /* Stack of cards. Two cards: Danger Zone, Information.
+     Gap is 20px — gives them breathing room without disconnecting. */
+      .card-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* ============================================================
+     CARDS
+     ============================================================ */
+      .card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 22px 24px 14px;
+      }
+      .canvas-frame.mobile .card-head {
+        padding: 18px 18px 12px;
+        gap: 12px;
+      }
+      .card-head .icon-badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .card-head h2 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        line-height: 1.1;
+        letter-spacing: 0.01em;
+        color: var(--fg1-strong);
+        margin: 0;
+        text-transform: uppercase;
+      }
+      .card-head .eyebrow-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 4px;
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+      }
+      .card-body {
+        padding: 8px 24px 24px;
+      }
+      .canvas-frame.mobile .card-body {
+        padding: 6px 18px 18px;
+      }
+
+      /* Danger Zone — seam-red treatment.
+     The "border-left accent stripe wider than 1px" rule from the prompt is
+     respected: the card uses a 1px solid border on all sides, then a tinted
+     fill (rgba seam red) and a top hairline accent that uses the seam-red
+     gradient. No 4px left stripe. */
+      .card.danger {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(196, 30, 58, 0.06) 0%,
+            rgba(196, 30, 58, 0.02) 100%
+          ),
+          var(--bg-elevated);
+        border-color: var(--danger-border);
+        box-shadow: var(--shadow-seam);
+      }
+      .card.danger .icon-badge {
+        background: rgba(196, 30, 58, 0.15);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        color: var(--brand-seam-red-light);
+      }
+      .card.danger .eyebrow-row .eyebrow {
+        color: var(--brand-seam-red-light);
+      }
+
+      /* Information / navy-themed card. */
+      .card.info {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(27, 58, 92, 0.1) 0%,
+            rgba(27, 58, 92, 0.02) 100%
+          ),
+          var(--bg-elevated);
+        border-color: rgba(44, 74, 124, 0.5);
+      }
+      .card.info .icon-badge {
+        background: rgba(27, 58, 92, 0.45);
+        border: 1px solid rgba(44, 74, 124, 0.6);
+        color: var(--brand-gold-light);
+      }
+      .card.info .eyebrow-row .eyebrow {
+        color: var(--brand-gold-light);
+      }
+
+      .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      /* Warning text — body Literata, full sentence, max 70ch. */
+      .warning-text {
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--fg2);
+        max-width: 70ch;
+        margin: 0 0 18px;
+      }
+      .warning-text strong {
+        font-weight: 600;
+        color: var(--fg1-strong);
+      }
+      .canvas-frame.mobile .warning-text {
+        font-size: 15px;
+      }
+
+      /* Consequence list — what gets deleted.
+     Uses chevrons rather than bullets; chevrons feel more "transactional".
+     The last item is gold + italic — it's the one positive note ("you can
+     create new leagues after"), set apart so users see it before clicking. */
+      .consequence-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .consequence-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--fg2);
+      }
+      .consequence-list li .marker {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-seam-red-light);
+      }
+      .consequence-list li.positive {
+        padding-top: 10px;
+        margin-top: 6px;
+        border-top: 1px solid var(--border);
+        color: var(--brand-gold-light);
+        font-style: italic;
+      }
+      .consequence-list li.positive .marker {
+        color: var(--brand-gold);
+      }
+
+      /* Action row — danger button right-aligned on desktop, full-width on mobile. */
+      .action-row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 14px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+      }
+      .canvas-frame.mobile .action-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .action-row .helper {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+        margin-right: auto;
+      }
+      .canvas-frame.mobile .action-row .helper {
+        margin-right: 0;
+        text-align: center;
+      }
+
+      /* Buttons — danger filled, ghost.
+     Min height 44px for touch target compliance.
+     INTERACTION: hover lightens fill + translateY(-1px); press scale(0.98).
+     Annotated only, not implemented. */
+      .btn {
+        /* INTERACTION: hover translateY(-1px) + lighten; press scale(0.98). 150ms ease-standard. */
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 12px 22px;
+        min-height: 44px; /* TOUCH TARGET: 44px min — applies to all .btn */
+        border-radius: 12px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: all 150ms var(--ease-standard);
+      }
+      .btn-danger {
+        background: var(--brand-seam-red);
+        color: #fff;
+        border-color: var(--brand-seam-red-light);
+        box-shadow:
+          0 0 0 1px rgba(196, 30, 58, 0),
+          var(--shadow-md);
+      }
+      .btn-danger:hover {
+        background: var(--brand-seam-red-light);
+        transform: translateY(-1px);
+      }
+      .btn-danger:disabled {
+        background: var(--brand-seam-red-dark);
+        border-color: var(--brand-seam-red-dark);
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--fg2);
+        border-color: var(--border-strong);
+      }
+      .btn-ghost:hover {
+        color: var(--fg1);
+        border-color: var(--fg4);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      /* Spinner shown when isDeleting. */
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #fff;
+        /* MOTION: rotate 360deg, 800ms linear infinite. */
+        animation: spin 800ms linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ============================================================
+     ERROR INLINE CARD — appears above Danger Zone when mutation errors
+     ============================================================ */
+      .error-card {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(196, 30, 58, 0.18) 0%,
+            rgba(196, 30, 58, 0.06) 100%
+          ),
+          var(--bg-elevated);
+        border: 1px solid var(--brand-seam-red);
+        border-radius: 12px;
+        padding: 16px 20px;
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        box-shadow: var(--shadow-seam);
+      }
+      .error-card .icon-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--brand-seam-red);
+        color: #fff;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-card .e-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--fg1-strong);
+        margin: 0 0 4px;
+      }
+      .error-card .e-msg {
+        font-family: var(--font-body);
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 70ch;
+      }
+      .error-card .e-actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 10px;
+      }
+      .error-card .e-actions .btn {
+        padding: 8px 14px;
+        min-height: 36px;
+        font-size: 11px;
+      }
+
+      /* ============================================================
+     LOADING — skeleton screens that match real geometry
+     ============================================================ */
+      .skel {
+        /* MOTION: shimmer 1.4s linear infinite, prefers-reduced-motion: pulse opacity instead. */
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          rgba(255, 255, 255, 0.04) 100%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.4s linear infinite;
+        border-radius: 6px;
+        display: block;
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .skel {
+          animation: pulse 1.6s ease-in-out infinite;
+        }
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
+
+      /* ============================================================
+     EMPTY STATE — "no leagues to delete"
+     ============================================================ */
+      .empty {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(27, 58, 92, 0.1) 0%,
+            rgba(27, 58, 92, 0.02) 100%
+          ),
+          var(--bg-elevated);
+        border: 1px dashed var(--border-strong);
+        border-radius: 16px;
+        padding: 48px 28px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .canvas-frame.mobile .empty {
+        padding: 36px 18px;
+      }
+      .empty .ill {
+        /* DESIGN: contextual SVG illustration — empty scoreboard panel.
+       Drawn in BrandIcon style: 1.8px stroke, navy + gold accent. */
+        width: 72px;
+        height: 72px;
+        margin-bottom: 6px;
+      }
+      .empty h3 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 22px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .empty p {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--fg3);
+        margin: 0;
+        max-width: 50ch;
+      }
+
+      /* ============================================================
+     DIALOG — two confirmation steps
+     ============================================================ */
+      /* The dialog is scoped to a single .canvas-frame (overlay covers the
+     frame, not the page), so reviewers can compare desktop and mobile
+     dialogs independently. */
+      .dialog-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 12, 20, 0.72);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 20;
+        /* MOTION: overlay fades in 180ms ease-standard; dialog scale 0.97→1.0 + fade. */
+      }
+      .canvas-frame.mobile .dialog-overlay {
+        align-items: flex-end; /* mobile: dialog slides from bottom (action sheet feel) */
+        padding: 0;
+      }
+      .dialog {
+        width: 100%;
+        max-width: 460px;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border-strong);
+        border-radius: 16px;
+        box-shadow: var(--shadow-xl);
+        overflow: hidden;
+      }
+      .canvas-frame.mobile .dialog {
+        border-radius: 16px 16px 0 0;
+        max-width: 100%;
+        /* MOTION: slide up from bottom, 280ms ease-out-quart on open. */
+      }
+      .dialog.confirm-final {
+        box-shadow:
+          var(--shadow-xl),
+          0 0 0 1px rgba(196, 30, 58, 0.4);
+      }
+      .dialog-body {
+        padding: 28px 28px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .dialog-body .icon-badge {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(196, 30, 58, 0.18);
+        border: 1px solid rgba(196, 30, 58, 0.4);
+        color: var(--brand-seam-red-light);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .dialog h3 {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 26px;
+        letter-spacing: -0.005em;
+        line-height: 1.15;
+        color: var(--fg1-strong);
+        margin: 0;
+      }
+      .dialog p {
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--fg2);
+        margin: 0;
+        max-width: 60ch;
+      }
+      .dialog .inline-list {
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--fg3);
+        line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .dialog .inline-list strong {
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: var(--fg1);
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .dialog-actions {
+        padding: 18px 24px 24px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        border-top: 1px solid var(--border);
+        margin-top: 16px;
+        background: rgba(0, 0, 0, 0.15);
+      }
+      .canvas-frame.mobile .dialog-actions {
+        flex-direction: column-reverse; /* mobile: stack, primary on top, cancel below */
+      }
+      .canvas-frame.mobile .dialog-actions .btn {
+        width: 100%;
+      }
+
+      .dialog-aria {
+        /* aria-live="polite" announcement region — hidden visually but present in DOM */
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* ============================================================
+     STATE TOGGLERS — show/hide views
+     ============================================================ */
+      [data-view] {
+        display: none;
+      }
+      [data-view].on {
+        display: block;
+      }
+
+      /* When dialog is shown, slightly fade the page content beneath. */
+      .canvas-inner.has-dialog .page {
+        filter: brightness(0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="stage-head">
+        <div class="stage-title">
+          League Management
+          <small>· /management — design mockup, not implementation</small>
+        </div>
+
+        <!-- Two-axis switcher: STATE × ACCESS LEVEL.
+         Reviewers can flip between four states and toggle admin warning text. -->
+        <div class="stage-toggles">
+          <div class="toggle-group">
+            <span class="label">State</span>
+            <div class="seg" id="state-seg">
+              <button data-state="loading">Loading</button>
+              <button data-state="empty">Empty</button>
+              <button data-state="error">Error</button>
+              <button data-state="populated" aria-pressed="true">
+                Populated
+              </button>
+            </div>
+          </div>
+          <div class="toggle-group">
+            <span class="label">Access</span>
+            <div class="seg" id="access-seg">
+              <button data-access="admin" aria-pressed="true">Admin</button>
+              <button data-access="member">Non-admin</button>
+            </div>
+          </div>
+          <div class="toggle-group">
+            <span class="label">Dialog</span>
+            <div class="seg danger" id="dialog-seg">
+              <button data-dialog="none" aria-pressed="true">None</button>
+              <button data-dialog="confirm1">Step 1</button>
+              <button data-dialog="confirm2">Step 2</button>
+              <button data-dialog="deleting">Deleting</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="canvases">
+        <!-- ═════════════════════════════════════════════════════════
+         MOBILE CANVAS — 375px
+         The primary canvas. Designed first, shown first.
+         ═════════════════════════════════════════════════════════ -->
+        <div class="canvas-wrap">
+          <div class="canvas-label">
+            Mobile <span class="px">375 × 720</span>
+          </div>
+          <div
+            class="canvas-frame mobile"
+            data-screen-label="management-mobile"
+          >
+            <!-- The frame deliberately doesn't scroll-lock; on 375 the content
+             flows past the visible window. Reviewers scroll inside the frame. -->
+
+            <div class="canvas-inner" data-canvas="mobile">
+              <!-- NAV (mobile variant: hamburger replaces tab pills) -->
+              <header class="nav">
+                <div class="nav-inner">
+                  <a class="brand">
+                    <img src="../../assets/logo.png" alt="Legacy Sports" />
+                    <div class="wordmark">LEGACY<span>SPORTS</span></div>
+                  </a>
+                  <button class="icon-btn nav-mobile-menu" aria-label="Menu">
+                    <!-- Lucide-style hamburger -->
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="3" y1="6" x2="21" y2="6" />
+                      <line x1="3" y1="12" x2="21" y2="12" />
+                      <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                  </button>
+                  <div class="nav-right">
+                    <div class="avatar" title="You">MJ</div>
+                  </div>
+                </div>
+              </header>
+
+              <!-- PAGE -->
+              <main class="page">
+                <!-- Breadcrumb back to settings — gold link, gives users an obvious escape -->
+                <div class="crumb">
+                  <a>← Settings</a>
+                </div>
+
+                <!-- MOTION: slide in from right, 300ms ease-out-quart, on route enter -->
+                <div class="page-head">
+                  <h1>League Management</h1>
+                  <p class="subtitle">Manage your leagues and data.</p>
+                </div>
+
+                <!-- Live region for screen readers, tracks liveMsg state. -->
+                <div
+                  class="dialog-aria"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  id="live-mobile"
+                ></div>
+
+                <!-- ═══ STATE: POPULATED (default) ═══ -->
+                <div data-view="populated" class="on">
+                  <div class="card-stack">
+                    <ManagementCards prefix="m" />
+                  </div>
+                </div>
+
+                <!-- ═══ STATE: LOADING ═══ -->
+                <div data-view="loading">
+                  <div class="card-stack">
+                    <SkeletonCards />
+                  </div>
+                </div>
+
+                <!-- ═══ STATE: ERROR ═══ -->
+                <div data-view="error">
+                  <div class="card-stack">
+                    <ErrorBlock prefix="m" />
+                    <DangerZoneCard prefix="m" disabled="true" />
+                    <InformationCard />
+                  </div>
+                </div>
+
+                <!-- ═══ STATE: EMPTY ═══ -->
+                <div data-view="empty">
+                  <EmptyState />
+                </div>
+              </main>
+
+              <!-- DIALOG OVERLAY — mobile -->
+              <div
+                class="dialog-overlay"
+                data-dialog-host="mobile"
+                style="display: none"
+              >
+                <DialogContent />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═════════════════════════════════════════════════════════
+         DESKTOP CANVAS — 1280px
+         ═════════════════════════════════════════════════════════ -->
+        <div class="canvas-wrap">
+          <div class="canvas-label">
+            Desktop <span class="px">1280 × 800+</span>
+          </div>
+          <div
+            class="canvas-frame desktop"
+            data-screen-label="management-desktop"
+          >
+            <div class="canvas-inner" data-canvas="desktop">
+              <!-- NAV (desktop variant: full pill tabs) -->
+              <header class="nav">
+                <div class="nav-inner">
+                  <a class="brand">
+                    <img src="../../assets/logo.png" alt="Legacy Sports" />
+                    <div class="wordmark">LEGACY<span>SPORTS</span></div>
+                  </a>
+                  <nav class="nav-tabs">
+                    <a
+                      ><img
+                        src="../../icons/scoreboard.svg"
+                        width="14"
+                        height="14"
+                      />
+                      Home</a
+                    >
+                    <a
+                      ><img src="../../icons/live.svg" width="14" height="14" />
+                      Scoreboard</a
+                    >
+                    <a class="on"
+                      ><img
+                        src="../../icons/league.svg"
+                        width="14"
+                        height="14"
+                      />
+                      My League</a
+                    >
+                    <a
+                      ><img
+                        src="../../icons/draft.svg"
+                        width="14"
+                        height="14"
+                      />
+                      Draft</a
+                    >
+                  </nav>
+                  <div class="nav-right">
+                    <button class="icon-btn" aria-label="Notifications">
+                      <img src="../../icons/bell.svg" alt="" />
+                    </button>
+                    <div class="avatar" title="You">MJ</div>
+                  </div>
+                </div>
+              </header>
+
+              <!-- PAGE -->
+              <main class="page">
+                <div class="crumb">
+                  <a>Settings</a>
+                  <span class="sep">/</span>
+                  <span>Management</span>
+                </div>
+
+                <!-- MOTION: fade + 8px translateY, 280ms ease-out-quart on route enter -->
+                <div class="page-head">
+                  <h1>League Management</h1>
+                  <p class="subtitle">
+                    Manage your leagues and data. Destructive operations are
+                    gated behind a two-step confirmation.
+                  </p>
+                </div>
+
+                <div
+                  class="dialog-aria"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  id="live-desktop"
+                ></div>
+
+                <div data-view="populated" class="on">
+                  <div class="card-stack">
+                    <ManagementCards prefix="d" />
+                  </div>
+                </div>
+
+                <div data-view="loading">
+                  <div class="card-stack">
+                    <SkeletonCards />
+                  </div>
+                </div>
+
+                <div data-view="error">
+                  <div class="card-stack">
+                    <ErrorBlock prefix="d" />
+                    <DangerZoneCard prefix="d" disabled="true" />
+                    <InformationCard />
+                  </div>
+                </div>
+
+                <div data-view="empty">
+                  <EmptyState />
+                </div>
+              </main>
+
+              <div
+                class="dialog-overlay"
+                data-dialog-host="desktop"
+                style="display: none"
+              >
+                <DialogContent />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+     TEMPLATES — shared markup written once, cloned into both canvases.
+     This keeps the file small AND ensures mobile/desktop stay in sync
+     so review feedback applies to both at once.
+     ============================================================ -->
+
+    <template id="tpl-management-cards">
+      <!-- DANGER ZONE CARD -->
+      <section class="card danger" aria-labelledby="dz-title-{P}">
+        <div class="card-head">
+          <div class="icon-badge">
+            <!-- Lucide alert-triangle, BrandIcon-weight stroke (1.8) -->
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+              />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <div>
+            <span class="eyebrow">Irreversible</span>
+            <h2 id="dz-title-{P}">Danger Zone</h2>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Warning sentence — varies by access level. Both rendered, one hidden. -->
+          <p class="warning-text" data-warning="admin">
+            <strong>All leagues you are a member of will be deleted</strong> —
+            both the leagues you own and the leagues you have joined. As an
+            admin, this purge is absolute and applies across every era and
+            division on your account.
+          </p>
+          <p class="warning-text" data-warning="member" hidden>
+            <strong>Only leagues you own will be deleted.</strong> Leagues you
+            have joined as a manager but do not own will remain intact — your
+            spot in those leagues stays open.
+          </p>
+
+          <!-- Action row -->
+          <div class="action-row">
+            <span class="helper"
+              >This action triggers a two-step confirmation.</span
+            >
+            <button class="btn btn-ghost" type="button">Cancel</button>
+            <button
+              class="btn btn-danger"
+              type="button"
+              data-action="open-confirm-{P}"
+            >
+              <!-- Lucide trash-2 -->
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+              </svg>
+              Delete All Leagues
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- INFORMATION CARD -->
+      <section class="card info" aria-labelledby="info-title-{P}">
+        <div class="card-head">
+          <div class="icon-badge">
+            <!-- Lucide info -->
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+          </div>
+          <div>
+            <span class="eyebrow">What gets deleted</span>
+            <h2 id="info-title-{P}">Information</h2>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="consequence-list">
+            <li>
+              <span class="marker">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              All teams in those leagues
+            </li>
+            <li>
+              <span class="marker">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              All roster data — drafted players, lineups, bench
+            </li>
+            <li>
+              <span class="marker">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              All league positions and standings history
+            </li>
+            <li>
+              <span class="marker">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              All league members and invitations
+            </li>
+            <li class="positive">
+              <span class="marker">
+                <!-- Lucide rotate-cw — denotes "you can do this again" -->
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+              </span>
+              You can create new leagues after deletion
+            </li>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-skeleton-cards">
+      <!-- Skeletons mirror real layout geometry: same card heights, same internal block sizes -->
+      <section class="card" aria-busy="true" aria-label="Loading danger zone">
+        <div class="card-head">
+          <span
+            class="skel"
+            style="width: 40px; height: 40px; border-radius: 10px"
+          ></span>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+            <span class="skel" style="width: 88px; height: 11px"></span>
+            <span class="skel" style="width: 160px; height: 24px"></span>
+          </div>
+        </div>
+        <div class="card-body">
+          <span
+            class="skel"
+            style="width: 100%; height: 14px; margin-bottom: 10px"
+          ></span>
+          <span
+            class="skel"
+            style="width: 92%; height: 14px; margin-bottom: 10px"
+          ></span>
+          <span
+            class="skel"
+            style="width: 64%; height: 14px; margin-bottom: 24px"
+          ></span>
+          <div
+            style="
+              display: flex;
+              gap: 10px;
+              justify-content: flex-end;
+              padding-top: 18px;
+              border-top: 1px solid var(--border);
+            "
+          >
+            <span
+              class="skel"
+              style="width: 96px; height: 44px; border-radius: 12px"
+            ></span>
+            <span
+              class="skel"
+              style="width: 184px; height: 44px; border-radius: 12px"
+            ></span>
+          </div>
+        </div>
+      </section>
+      <section class="card" aria-busy="true" aria-label="Loading information">
+        <div class="card-head">
+          <span
+            class="skel"
+            style="width: 40px; height: 40px; border-radius: 10px"
+          ></span>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+            <span class="skel" style="width: 120px; height: 11px"></span>
+            <span class="skel" style="width: 130px; height: 24px"></span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <span class="skel" style="width: 75%; height: 14px"></span>
+            <span class="skel" style="width: 88%; height: 14px"></span>
+            <span class="skel" style="width: 70%; height: 14px"></span>
+            <span class="skel" style="width: 80%; height: 14px"></span>
+            <span
+              class="skel"
+              style="
+                width: 62%;
+                height: 14px;
+                margin-top: 6px;
+                padding-top: 6px;
+              "
+            ></span>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-error-block">
+      <!-- Inline error card. Sits ABOVE the Danger Zone (closest to the action that failed).
+       Appears with mutation error per the reference doc.
+       Voice: neutral, actionable. No "Oops!". -->
+      <div class="error-card" role="alert" aria-live="assertive">
+        <div class="icon-badge" aria-hidden="true">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <div style="flex: 1; min-width: 0">
+          <p class="e-title">Unable to delete leagues</p>
+          <p class="e-msg">
+            The server returned an error while processing your request. Your
+            leagues are still intact. Try again, or contact your commissioner if
+            the problem persists.
+          </p>
+          <div class="e-actions">
+            <button class="btn btn-ghost" type="button">Dismiss</button>
+            <button class="btn btn-danger" type="button">Retry</button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="tpl-empty">
+      <div class="empty">
+        <!-- Contextual illustration: empty scoreboard panel with a baseball glyph.
+         Drawn in BrandIcon style (1.8px stroke, navy + gold accent).
+         Why this and not a generic empty box: the page is about deleting
+         leagues — when there are none, the visual metaphor is "empty stadium". -->
+        <svg
+          class="ill"
+          viewBox="0 0 96 96"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <!-- empty scoreboard frame -->
+          <rect
+            x="14"
+            y="22"
+            width="68"
+            height="44"
+            rx="6"
+            stroke="#2C4A7C"
+            stroke-width="1.8"
+            fill="rgba(27,58,92,0.10)"
+          />
+          <line
+            x1="14"
+            y1="38"
+            x2="82"
+            y2="38"
+            stroke="#2C4A7C"
+            stroke-width="1.4"
+          />
+          <line
+            x1="48"
+            y1="38"
+            x2="48"
+            y2="66"
+            stroke="#2C4A7C"
+            stroke-width="1.4"
+          />
+          <!-- dashes for blank score readouts -->
+          <line
+            x1="26"
+            y1="52"
+            x2="38"
+            y2="52"
+            stroke="#6C80BA"
+            stroke-width="2.2"
+          />
+          <line
+            x1="58"
+            y1="52"
+            x2="70"
+            y2="52"
+            stroke="#6C80BA"
+            stroke-width="2.2"
+          />
+          <!-- baseball at top with seam (gold accent) -->
+          <circle
+            cx="72"
+            cy="22"
+            r="7"
+            stroke="#C5A55A"
+            stroke-width="1.8"
+            fill="rgba(197,165,90,0.10)"
+          />
+          <path
+            d="M67 19 q5 3 10 0"
+            stroke="#C41E3A"
+            stroke-width="1.4"
+            fill="none"
+          />
+          <path
+            d="M67 25 q5 -3 10 0"
+            stroke="#C41E3A"
+            stroke-width="1.4"
+            fill="none"
+          />
+          <!-- legs/stand -->
+          <line
+            x1="28"
+            y1="66"
+            x2="28"
+            y2="74"
+            stroke="#2C4A7C"
+            stroke-width="1.8"
+          />
+          <line
+            x1="68"
+            y1="66"
+            x2="68"
+            y2="74"
+            stroke="#2C4A7C"
+            stroke-width="1.8"
+          />
+          <line
+            x1="20"
+            y1="74"
+            x2="76"
+            y2="74"
+            stroke="#2C4A7C"
+            stroke-width="1.8"
+          />
+        </svg>
+        <h3>No leagues to manage</h3>
+        <p>
+          You're not a member of any leagues yet. Once you create or join one,
+          this is where you'll come to manage your data.
+        </p>
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+          "
+        >
+          <button class="btn btn-ghost" type="button">
+            Browse public leagues
+          </button>
+          <button
+            class="btn btn-danger"
+            type="button"
+            style="
+              background: var(--brand-navy);
+              border-color: var(--brand-navy-light);
+            "
+          >
+            Create a league
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <template id="tpl-dialog">
+      <!-- Step 1: "Are you sure?" — generic gating prompt -->
+      <div
+        class="dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dlg-h"
+        data-dialog-step="confirm1"
+      >
+        <div class="dialog-body">
+          <div class="icon-badge">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+              />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <h3 id="dlg-h">Are you sure?</h3>
+          <p>
+            You're about to delete all leagues you're a member of. This is the
+            first of two confirmations.
+          </p>
+        </div>
+        <div class="dialog-actions">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            data-dialog-action="cancel"
+          >
+            Cancel
+          </button>
+          <button
+            class="btn btn-danger"
+            type="button"
+            data-dialog-action="continue"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2 — final, auto-focused destructive button -->
+      <div
+        class="dialog confirm-final"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dlg-h2"
+        data-dialog-step="confirm2"
+      >
+        <div class="dialog-body">
+          <div class="icon-badge">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" />
+              <path d="M14 11v6" />
+              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+            </svg>
+          </div>
+          <h3 id="dlg-h2">This cannot be undone.</h3>
+          <p>
+            Your leagues, rosters, and standings will be permanently removed.
+            There is no recovery — not even from a backup.
+          </p>
+          <div class="inline-list" aria-label="Summary">
+            <strong>You will lose</strong>
+            <span>· 3 leagues you own and 4 you've joined</span>
+            <span>· 7 teams · 168 drafted players</span>
+            <span>· 2 active drafts in progress</span>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            data-dialog-action="cancel"
+          >
+            Cancel
+          </button>
+          <!-- AUTOFOCUS: the destructive button gets focus per the reference doc.
+           Counterintuitive but matches the spec — keyboard users see the
+           explicit destructive verb before they hit Enter. -->
+          <button
+            class="btn btn-danger"
+            type="button"
+            data-dialog-action="confirm"
+            autofocus
+          >
+            Yes, Delete Everything
+          </button>
+        </div>
+      </div>
+
+      <!-- Deleting state — spinner inside the destructive button, both buttons disabled -->
+      <div
+        class="dialog confirm-final"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dlg-h3"
+        data-dialog-step="deleting"
+      >
+        <div class="dialog-body">
+          <div class="icon-badge">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+            </svg>
+          </div>
+          <h3 id="dlg-h3">Deleting your leagues…</h3>
+          <p>
+            Hang tight. We're removing your teams, rosters, and standings. Don't
+            close this window.
+          </p>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" type="button" disabled>Cancel</button>
+          <button class="btn btn-danger" type="button" disabled>
+            <span class="spinner" aria-hidden="true"></span>
+            Deleting…
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      // ============================================================
+      // Mockup glue — clones templates, wires the state switcher.
+      // No app logic, no API calls, no real state machine.
+      // ============================================================
+
+      function fillTemplate(tplId, prefix) {
+        const tpl = document.getElementById(tplId);
+        const html = tpl.innerHTML.replace(/\{P\}/g, prefix || 'x');
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        return wrapper.children;
+      }
+
+      // Replace JSX-like placeholder tags with their template contents.
+      function expand(root) {
+        // ManagementCards prefix="..."
+        root.querySelectorAll('ManagementCards').forEach((el) => {
+          const p = el.getAttribute('prefix') || 'x';
+          const frag = document.createDocumentFragment();
+          Array.from(fillTemplate('tpl-management-cards', p)).forEach((c) =>
+            frag.appendChild(c),
+          );
+          el.replaceWith(frag);
+        });
+        // SkeletonCards
+        root.querySelectorAll('SkeletonCards').forEach((el) => {
+          const frag = document.createDocumentFragment();
+          Array.from(fillTemplate('tpl-skeleton-cards', '')).forEach((c) =>
+            frag.appendChild(c),
+          );
+          el.replaceWith(frag);
+        });
+        // ErrorBlock prefix="..."
+        root.querySelectorAll('ErrorBlock').forEach((el) => {
+          const p = el.getAttribute('prefix') || 'x';
+          const frag = document.createDocumentFragment();
+          Array.from(fillTemplate('tpl-error-block', p)).forEach((c) =>
+            frag.appendChild(c),
+          );
+          el.replaceWith(frag);
+        });
+        // DangerZoneCard + InformationCard, used in error view (just full management cards)
+        root
+          .querySelectorAll('DangerZoneCard, InformationCard')
+          .forEach((el) => {
+            // Replace BOTH with a single management-cards expansion at the FIRST occurrence,
+            // and remove the SECOND. Easier than re-templating.
+          });
+        // Strategy: wherever DangerZoneCard appears, expand to the same content as ManagementCards.
+        root.querySelectorAll('DangerZoneCard').forEach((el) => {
+          const p = el.getAttribute('prefix') || 'x';
+          const cards = fillTemplate('tpl-management-cards', p);
+          // cards[0] = danger, cards[1] = info. Replace this node with the danger card.
+          el.replaceWith(cards[0]);
+        });
+        root.querySelectorAll('InformationCard').forEach((el) => {
+          const cards = fillTemplate('tpl-management-cards', 'x');
+          el.replaceWith(cards[0] && cards[1] ? cards[1] : cards[0]);
+        });
+        // EmptyState
+        root.querySelectorAll('EmptyState').forEach((el) => {
+          const frag = document.createDocumentFragment();
+          Array.from(fillTemplate('tpl-empty', '')).forEach((c) =>
+            frag.appendChild(c),
+          );
+          el.replaceWith(frag);
+        });
+        // DialogContent
+        root.querySelectorAll('DialogContent').forEach((el) => {
+          const frag = document.createDocumentFragment();
+          Array.from(fillTemplate('tpl-dialog', '')).forEach((c) =>
+            frag.appendChild(c),
+          );
+          el.replaceWith(frag);
+        });
+      }
+
+      expand(document);
+
+      // After expansion, disable the "Delete All Leagues" button in the error-state
+      // copy of the danger zone (per the reference: button disabled while error or loading).
+      document
+        .querySelectorAll('[data-view="error"] .btn-danger')
+        .forEach((b) => {
+          if (b.closest('.error-card')) return; // keep Retry enabled
+          b.setAttribute('disabled', 'true');
+        });
+
+      // ============================================================
+      // STATE switcher
+      // ============================================================
+      function setSeg(segId, key, value) {
+        const seg = document.getElementById(segId);
+        seg.querySelectorAll('button').forEach((b) => {
+          b.setAttribute(
+            'aria-pressed',
+            String(b.getAttribute('data-' + key) === value),
+          );
+        });
+      }
+
+      function applyState(state) {
+        document.querySelectorAll('[data-view]').forEach((v) => {
+          v.classList.toggle('on', v.getAttribute('data-view') === state);
+        });
+        setSeg('state-seg', 'state', state);
+      }
+
+      function applyAccess(access) {
+        document.querySelectorAll('[data-warning]').forEach((p) => {
+          p.hidden = p.getAttribute('data-warning') !== access;
+        });
+        setSeg('access-seg', 'access', access);
+      }
+
+      function applyDialog(which) {
+        document.querySelectorAll('[data-dialog-host]').forEach((host) => {
+          const inner = host.parentElement;
+          if (which === 'none') {
+            host.style.display = 'none';
+            inner.classList.remove('has-dialog');
+          } else {
+            host.style.display = 'flex';
+            inner.classList.add('has-dialog');
+            host.querySelectorAll('[data-dialog-step]').forEach((d) => {
+              d.style.display =
+                d.getAttribute('data-dialog-step') === which ? '' : 'none';
+            });
+          }
+        });
+        setSeg('dialog-seg', 'dialog', which);
+      }
+
+      // Wire toggles
+      document.getElementById('state-seg').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-state]');
+        if (b) applyState(b.getAttribute('data-state'));
+      });
+      document.getElementById('access-seg').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-access]');
+        if (b) applyAccess(b.getAttribute('data-access'));
+      });
+      document.getElementById('dialog-seg').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-dialog]');
+        if (b) applyDialog(b.getAttribute('data-dialog'));
+      });
+
+      // Wire dialog open/close from page buttons (mockup convenience only)
+      document.addEventListener('click', (e) => {
+        const open = e.target.closest('[data-action^="open-confirm-"]');
+        if (open) {
+          applyDialog('confirm1');
+          return;
+        }
+        const a = e.target.closest('[data-dialog-action]');
+        if (!a) return;
+        const action = a.getAttribute('data-dialog-action');
+        if (action === 'cancel') applyDialog('none');
+        if (action === 'continue') applyDialog('confirm2');
+        if (action === 'confirm') applyDialog('deleting');
+      });
+
+      // Initial state
+      applyState('populated');
+      applyAccess('admin');
+      applyDialog('none');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+        font-family: var(--font-body);
+      }
+      .wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        max-width: 780px;
+      }
+      .lab {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        margin-bottom: 8px;
+      }
+      .demo {
+        background: var(--surface-panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-5);
+        padding: 16px;
+      }
+      .cell {
+        background: var(--brand-navy);
+        color: #fff;
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        border-radius: var(--radius-2);
+        padding: 10px 14px;
+        font-size: 13px;
+        text-align: center;
+        border: 1px solid var(--brand-navy-light);
+      }
+      .x {
+        display: flex;
+        flex-direction: row;
+        gap: 12px;
+        align-items: center;
+      }
+      .y {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fg3);
+        display: block;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <div class="lab">XStack · row</div>
+        <div class="demo">
+          <div class="x">
+            <div class="cell">A</div>
+            <div class="cell">B</div>
+            <div class="cell">C</div>
+          </div>
+          <code>&lt;XStack gap="$3" /&gt;</code>
+        </div>
+      </div>
+      <div>
+        <div class="lab">YStack · column</div>
+        <div class="demo">
+          <div class="y">
+            <div class="cell">A</div>
+            <div class="cell">B</div>
+            <div class="cell">C</div>
+          </div>
+          <code>&lt;YStack gap="$2" /&gt;</code>
+        </div>
+      </div>
+      <div>
+        <div class="lab">XStack · justify space-between</div>
+        <div class="demo">
+          <div class="x" style="justify-content: space-between">
+            <div class="cell">Start</div>
+            <div class="cell">End</div>
+          </div>
+          <code>justifyContent="space-between"</code>
+        </div>
+      </div>
+      <div>
+        <div class="lab">XStack · with separator</div>
+        <div class="demo">
+          <div class="x">
+            <div class="cell">12 Teams</div>
+            <div
+              style="
+                width: 1px;
+                height: 32px;
+                background: var(--outline-default);
+              "
+            ></div>
+            <div class="cell">Week 14</div>
+            <div
+              style="
+                width: 1px;
+                height: 32px;
+                background: var(--outline-default);
+              "
+            ></div>
+            <div class="cell">Live</div>
+          </div>
+          <code>&lt;XStack separator={&lt;Separator vertical /&gt;} /&gt;</code>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

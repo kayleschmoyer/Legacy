@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Create League — Legacy Sports</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="assets/favicon.ico" />
+    <link rel="stylesheet" href="colors_and_type.css" />
+    <link rel="stylesheet" href="shared.css?v=6" />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="text/babel" src="CreateForm.jsx"></script>
+    <script type="text/babel" data-presets="react">
+      // ── Full-page Create League route — sport-aware.
+      // Uses an accordion to manage the long form without overwhelming. The Sport selector
+      // sits *above* the H1 so it's the first decision: Baseball or Football. Switching
+      // retitles the page, retones the theme, and resets sport-specific defaults.
+
+      const { useState, useEffect, useMemo } = React;
+
+      // MOTION:
+      //   - section expand/collapse — height crossfade 220ms ease-out-quart
+      //   - sport switch — page header crossfade + theme tokens animate via transition
+      //   - viewport resize — frame width transitions 280ms
+
+      const VIEWPORTS = [
+        { id: 'mobile', label: 'Mobile', w: 390 },
+        { id: 'tablet', label: 'Tablet', w: 768 },
+        { id: 'laptop', label: 'Laptop', w: 1024 },
+        { id: 'desktop', label: 'Desktop', w: 1280 },
+        { id: 'full', label: 'Full', w: null },
+      ];
+
+      const LoadingSkeleton = () => (
+        <div className="ls-create-grid" aria-busy="true">
+          <div className="ls-create-main">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="ls-section">
+                <div
+                  style={{
+                    padding: '22px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                  }}
+                >
+                  <div className="ls-skel" style={{ width: 28, height: 14 }} />
+                  <div style={{ flex: 1 }}>
+                    <div
+                      className="ls-skel"
+                      style={{ width: 180, height: 18, marginBottom: 6 }}
+                    />
+                    <div
+                      className="ls-skel"
+                      style={{ width: 240, height: 12 }}
+                    />
+                  </div>
+                  <div
+                    className="ls-skel"
+                    style={{ width: 14, height: 14, borderRadius: '50%' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="ls-create-side">
+            <div className="ls-side-card">
+              <div
+                className="ls-skel"
+                style={{ width: 120, height: 14, marginBottom: 4 }}
+              />
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '8px 0',
+                  }}
+                >
+                  <div className="ls-skel" style={{ width: 90, height: 10 }} />
+                  <div className="ls-skel" style={{ width: 70, height: 12 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+
+      const ErrorState = ({ onRetry }) => (
+        <div className="ls-error" role="alert" style={{ marginBottom: 20 }}>
+          <div className="ls-error-icon">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+            >
+              <line x1="12" y1="8" x2="12" y2="13" />
+              <circle cx="12" cy="17" r="1.1" />
+            </svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div className="ls-error-title">Unable to save league</div>
+            <div className="ls-error-msg">
+              We couldn't reach the commissioner service. Your settings are
+              still filled in — try again or come back later.
+            </div>
+          </div>
+          <button className="ls-btn ls-btn-ghost ls-btn-sm" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      );
+
+      const EmptyState = ({ sport }) => (
+        <div className="ls-empty-state">
+          <img
+            src={`icons/brand/${sport === 'football' ? 'football' : 'league'}.svg`}
+            width="56"
+            height="56"
+            alt=""
+            style={{ opacity: 0.7 }}
+          />
+          <div className="ls-empty-title">Start a fresh league</div>
+          <div className="ls-empty-sub">
+            Every Legacy Sports league begins with a name, a team count, and an
+            era. Pick "Basic Settings" to get going — the rest has good
+            defaults.
+          </div>
+          <button className="ls-btn ls-btn-gold" style={{ marginTop: 8 }}>
+            Begin Setup
+          </button>
+        </div>
+      );
+
+      // ── Summary side-card ─────────────────────────────
+      const SummarySide = ({ f }) => {
+        const sportName = sportLabel(f);
+        return (
+          <>
+            <div className="ls-side-card">
+              <div className="ls-side-head">
+                <div className="ls-eyebrow">Your League</div>
+                <span className="ls-chip ls-chip-muted">
+                  {sportName} · Draft
+                </span>
+              </div>
+              <div>
+                <div
+                  className="ls-h3"
+                  style={{
+                    color: f.leagueName ? 'var(--fg1-strong)' : 'var(--fg4)',
+                    fontStyle: f.leagueName ? 'normal' : 'italic',
+                    fontWeight: f.leagueName ? 800 : 400,
+                    fontSize: 22,
+                    fontFamily: 'var(--font-display)',
+                  }}
+                >
+                  {f.leagueName || 'Untitled League'}
+                </div>
+                <div className="ls-meta" style={{ marginTop: 4 }}>
+                  {eraLabel(f)} · {f.numberOfTeams} teams ·{' '}
+                  {f.isPublic ? 'Public' : 'Private'}
+                </div>
+              </div>
+              <div className="ls-summary-list">
+                <Row k="Sport" v={`${sportName} (${sportLeague(f)})`} gold />
+                <Row k="Teams" v={`${f.numberOfTeams}`} />
+                <Row k="Divisions" v={`${f.numberOfDivisions}`} />
+                <Row k="Schedule" v={scheduleLabel(f.schedulingStrategy)} />
+                <Row k="Roster" v={`${f.maxRosterSize} players`} />
+                <Row k="Pool" v={poolLabel(f)} />
+                <Row k="Era" v={eraLabel(f)} gold={f.eraFilter !== 'all'} />
+                {f.hofOnly && <Row k="HOF Only" v="On" gold />}
+                <Row
+                  k="Draft"
+                  v={`${f.draftMode === 'live' ? 'Live' : 'Auto'} · ${f.selectionMethod === 'standard' ? 'Std' : f.selectionMethod === 'auction' ? 'Auction' : 'Random'}`}
+                />
+                <Row
+                  k="Waivers"
+                  v={
+                    f.waiverType === 'faab'
+                      ? `FAAB · $${f.faabBudgetDefault}`
+                      : 'Standard'
+                  }
+                />
+                {f.salaryCapEnabled && (
+                  <Row k="Cap" v={`$${f.salaryCap}M`} gold />
+                )}
+              </div>
+            </div>
+
+            <div className="ls-next-card">
+              <div
+                className="ls-eyebrow"
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <img src="icons/brand/zap.svg" width="14" height="14" />
+                What happens next
+              </div>
+              <ul className="ls-next-list">
+                <li>Your league is created and you're set as Commissioner.</li>
+                <li>
+                  Send invite links to up to {f.numberOfTeams - 1} managers.
+                </li>
+                <li>
+                  Draft{' '}
+                  {f.draftDate
+                    ? `opens ${formatDraftDate(f.draftDate, f.draftTime)}`
+                    : 'opens whenever you schedule it'}
+                  .
+                </li>
+                <li>
+                  Tune lineups, settings, and waivers right up to first{' '}
+                  {f.sport === 'football' ? 'kickoff' : 'pitch'}.
+                </li>
+              </ul>
+            </div>
+          </>
+        );
+      };
+      const Row = ({ k, v, gold, empty }) => (
+        <div className="ls-summary-row">
+          <span className="ls-summary-key">{k}</span>
+          <span
+            className={`ls-summary-val ${gold ? 'gold' : ''} ${empty ? 'empty' : ''}`}
+          >
+            {v}
+          </span>
+        </div>
+      );
+      const formatDraftDate = (d, t) => {
+        try {
+          const dt = new Date(`${d}T${t || '00:00'}`);
+          return (
+            dt.toLocaleString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            }) +
+            ' · ' +
+            dt.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+          );
+        } catch (e) {
+          return 'scheduled date';
+        }
+      };
+
+      // ── Premium upgrade modal ─────────────────────────
+      const UpgradeModal = ({ feature, onClose, onUnlock, frameRef }) =>
+        ReactDOM.createPortal(
+          <div className="ls-backdrop" onClick={onClose}>
+            <div
+              className="ls-modal"
+              style={{ maxWidth: 480 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="ls-modal-head"
+                style={{
+                  background:
+                    'linear-gradient(180deg, rgba(197,165,90,.18), transparent)',
+                }}
+              >
+                <div className="ico">
+                  <img src="icons/brand/trophy.svg" width="26" height="26" />
+                </div>
+                <div className="ls-modal-title-wrap">
+                  <div className="ls-modal-title">Unlock Premium</div>
+                  <div className="ls-modal-sub">
+                    {feature} is a premium feature.
+                  </div>
+                </div>
+                <button
+                  className="ls-modal-close"
+                  onClick={onClose}
+                  aria-label="Close"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                  >
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="ls-modal-body" style={{ gap: 12 }}>
+                <div className="ls-lede">
+                  Premium leagues get historical eras, FAAB bidding, salary
+                  caps, and keeper rules — the tools serious commissioners use
+                  to run year-round dynasties.
+                </div>
+                <div className="ls-premium-banner">
+                  <div className="ls-premium-icon">
+                    <img src="icons/brand/award.svg" width="18" height="18" />
+                  </div>
+                  <div className="ls-premium-body">
+                    <div className="ls-premium-title">Legacy Commissioner</div>
+                    <div className="ls-premium-sub">
+                      $49 / season · unlimited leagues
+                    </div>
+                  </div>
+                  <span className="ls-chip ls-chip-premium">Save 20%</span>
+                </div>
+              </div>
+              <div className="ls-modal-foot">
+                <div className="progress" />
+                <button className="ls-btn ls-btn-ghost" onClick={onClose}>
+                  Not now
+                </button>
+                <button className="ls-btn ls-btn-gold" onClick={onUnlock}>
+                  Unlock Premium
+                </button>
+              </div>
+            </div>
+          </div>,
+          frameRef.current || document.body,
+        );
+
+      // ── Top nav ───────────────────────────────────────
+      const TopNav = ({ sport }) => (
+        <header className="ls-nav">
+          <div className="ls-nav-inner">
+            <a className="ls-brand">
+              <img src="assets/logo.png" alt="" />
+              <div className="ls-wordmark">
+                LEGACY
+                <br />
+                <span>SPORTS</span>
+              </div>
+            </a>
+            <div className="ls-breadcrumb">
+              <a>{sport === 'football' ? 'Football' : 'Baseball'}</a>
+              <span className="sep">/</span>
+              <a>Leagues</a>
+              <span className="sep">/</span>
+              <span className="cur">New</span>
+            </div>
+            <div className="ls-nav-right">
+              <button className="ls-icon-btn" title="Notifications">
+                <img src="icons/brand/bell.svg" width="20" height="20" />
+              </button>
+              <div className="ls-avatar" title="Mickey J.">
+                MJ
+              </div>
+            </div>
+          </div>
+        </header>
+      );
+
+      // ── Design tools strip (state + viewport) ─────────
+      const DesignTools = ({ state, setState, viewport, setViewport }) => {
+        const states = [
+          { id: 'populated', label: 'Populated' },
+          { id: 'loading', label: 'Loading' },
+          { id: 'empty', label: 'Empty' },
+          { id: 'error', label: 'Error' },
+        ];
+        return (
+          <div className="ls-design-tools">
+            <span className="ls-design-tools-title">
+              Design · Create League
+            </span>
+            <div className="ls-tools-divider" />
+            <div className="ls-tools-group">
+              <span className="ls-tools-label">Viewport</span>
+              <div
+                className="ls-tools-pills"
+                role="tablist"
+                aria-label="Viewport"
+              >
+                {VIEWPORTS.map((v) => (
+                  <button
+                    key={v.id}
+                    className={viewport === v.id ? 'on' : ''}
+                    onClick={() => setViewport(v.id)}
+                  >
+                    {v.label}
+                    {v.w && <span className="vp-w">{v.w}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ls-tools-divider" />
+            <div className="ls-tools-group">
+              <span className="ls-tools-label">State</span>
+              <div className="ls-tools-pills" role="tablist" aria-label="State">
+                {states.map((s) => (
+                  <button
+                    key={s.id}
+                    className={state === s.id ? 'on' : ''}
+                    onClick={() => setState(s.id)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ls-tools-spacer" />
+            <a className="ls-tools-link" href="Create League - Modal.html">
+              Modal version →
+            </a>
+          </div>
+        );
+      };
+
+      const App = () => {
+        const [state, setState] = useState('populated');
+        const [viewport, setViewport] = useState('desktop');
+        const [sport, setSport] = useState('baseball');
+        const frameRef = React.useRef(null);
+        const vp = VIEWPORTS.find((v) => v.id === viewport) || VIEWPORTS[3];
+
+        return (
+          <div data-screen-label="01 Create League (Page)">
+            <DesignTools
+              state={state}
+              setState={setState}
+              viewport={viewport}
+              setViewport={setViewport}
+            />
+            <div className="ls-vp-stage">
+              <div className="ls-vp-meta">
+                <span className="lbl">{vp.label}</span>
+                <span className="dot" />
+                <span>{vp.w ? `${vp.w}px` : 'fluid · 100%'}</span>
+                <span className="dot" />
+                <span>Sport: {sport}</span>
+              </div>
+              <div
+                ref={frameRef}
+                className={`ls-vp-frame size-${viewport}`}
+                data-sport={sport}
+                style={
+                  vp.w ? { width: vp.w, maxWidth: '100%' } : { width: '100%' }
+                }
+              >
+                <TopNav sport={sport} />
+                <CreatePageWrap
+                  state={state}
+                  sport={sport}
+                  setSport={setSport}
+                  frameRef={frameRef}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // Bridge — CreatePageInner owns `f` (the form), but App's `sport` state drives
+      // the viewport frame theme tokens. Keep them in sync.
+      const CreatePageWrap = ({ state, sport, setSport, frameRef }) => {
+        const [f, setF] = useState(() => {
+          const url = new URLSearchParams(location.search);
+          return { ...DEFAULT_FORM, sport, leagueName: url.get('name') || '' };
+        });
+        const set = (patch) => setF((prev) => ({ ...prev, ...patch }));
+        const switchSport = (next) => {
+          setSport(next);
+          setF((prev) => applySportSwitch(prev, next));
+        };
+        return (
+          <CreatePageInner
+            f={f}
+            set={set}
+            switchSport={switchSport}
+            state={state}
+            frameRef={frameRef}
+          />
+        );
+      };
+
+      const CreatePageInner = ({ f, set, switchSport, state, frameRef }) => {
+        const [open, setOpen] = useState({
+          basic: true,
+          roster: false,
+          era: false,
+          draft: false,
+          waivers: false,
+        });
+        const [submitting, setSubmitting] = useState(false);
+        const [upgrade, setUpgrade] = useState(null);
+        const [showServerError, setShowServerError] = useState(
+          state === 'error',
+        );
+
+        useEffect(() => {
+          setShowServerError(state === 'error');
+        }, [state]);
+
+        const toggle = (key) => setOpen((p) => ({ ...p, [key]: !p[key] }));
+        const openAll = () =>
+          setOpen({
+            basic: true,
+            roster: true,
+            era: true,
+            draft: true,
+            waivers: true,
+          });
+        const collapseAll = () =>
+          setOpen({
+            basic: true,
+            roster: false,
+            era: false,
+            draft: false,
+            waivers: false,
+          });
+
+        const errs = useMemo(() => validateForm(f), [f]);
+        const disabled = state === 'loading' || submitting;
+        const sportName = sportLabel(f);
+
+        if (state === 'loading') {
+          return (
+            <div className="ls-page">
+              <div className="ls-page-head">
+                <div>
+                  <div className="ls-eyebrow">New League</div>
+                  <div
+                    className="ls-skel"
+                    style={{
+                      width: 'min(360px, 80%)',
+                      height: 52,
+                      marginTop: 8,
+                    }}
+                  />
+                  <div
+                    className="ls-skel"
+                    style={{
+                      width: 'min(420px, 90%)',
+                      height: 14,
+                      marginTop: 10,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="ls-page-sport">
+                <div
+                  className="ls-skel"
+                  style={{ width: '100%', height: 78, borderRadius: 14 }}
+                />
+              </div>
+              <LoadingSkeleton />
+            </div>
+          );
+        }
+        if (state === 'empty') {
+          return (
+            <div className="ls-page">
+              <div className="ls-page-head">
+                <div>
+                  <div className="ls-eyebrow">New League</div>
+                  <h1 className="ls-h1">Create {sportName} League</h1>
+                  <div className="ls-lede" style={{ marginTop: 10 }}>
+                    Configure your league settings and draft rules.
+                  </div>
+                </div>
+              </div>
+              <div className="ls-page-sport">
+                <div
+                  className="ls-eyebrow"
+                  style={{ marginBottom: 8, color: 'var(--fg3)' }}
+                >
+                  Sport
+                </div>
+                <SportSwitcher value={f.sport} onChange={switchSport} />
+              </div>
+              <EmptyState sport={f.sport} />
+            </div>
+          );
+        }
+
+        return (
+          <div className="ls-page">
+            <div className="ls-page-head">
+              <div>
+                <div className="ls-eyebrow">New League</div>
+                <h1 className="ls-h1">Create {sportName} League</h1>
+                <div className="ls-lede" style={{ marginTop: 10 }}>
+                  {f.sport === 'football'
+                    ? 'Football is in beta — same Legacy Sports DNA, retuned for the gridiron. You can adjust everything except team count after the draft.'
+                    : 'Configure your league settings and draft rules. You can adjust everything except team count after the draft.'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-end' }}>
+                <button
+                  className="ls-btn ls-btn-ghost ls-btn-sm"
+                  onClick={openAll}
+                >
+                  Expand all
+                </button>
+                <button
+                  className="ls-btn ls-btn-ghost ls-btn-sm"
+                  onClick={collapseAll}
+                >
+                  Collapse
+                </button>
+              </div>
+            </div>
+
+            <div className="ls-page-sport">
+              <div
+                className="ls-eyebrow"
+                style={{ marginBottom: 8, color: 'var(--fg3)' }}
+              >
+                Sport
+              </div>
+              <SportSwitcher
+                value={f.sport}
+                onChange={switchSport}
+                disabled={disabled}
+              />
+            </div>
+
+            {showServerError && (
+              <ErrorState onRetry={() => setShowServerError(false)} />
+            )}
+
+            <div className="ls-create-grid">
+              <div className="ls-create-main">
+                <Section
+                  num={1}
+                  title="Basic Settings"
+                  sub="The essentials — name, size, and who gets in."
+                  summary={
+                    <span>
+                      <strong>{f.numberOfTeams}</strong> teams ·{' '}
+                      {f.numberOfDivisions} div
+                      {f.numberOfDivisions > 1 ? 's' : ''} ·{' '}
+                      {f.isPublic ? 'Public' : 'Private'}
+                    </span>
+                  }
+                  open={open.basic}
+                  onToggle={() => toggle('basic')}
+                  twoCol
+                >
+                  <BasicSection f={f} set={set} disabled={disabled} />
+                </Section>
+
+                <Section
+                  num={2}
+                  title="Roster & Schedule"
+                  sub="How the season runs and what the rosters look like."
+                  summary={
+                    <span>
+                      {scheduleLabel(f.schedulingStrategy)} · {f.maxRosterSize}{' '}
+                      roster · {poolLabel(f)}
+                    </span>
+                  }
+                  open={open.roster}
+                  onToggle={() => toggle('roster')}
+                  twoCol
+                >
+                  <RosterSection f={f} set={set} disabled={disabled} />
+                </Section>
+
+                <Section
+                  num={3}
+                  title="Era & History"
+                  sub="The signature Legacy Sports control — which decades are in play."
+                  summary={
+                    <span>
+                      <strong>{eraLabel(f)}</strong>
+                      {f.hofOnly ? ' · HOF only' : ''}
+                    </span>
+                  }
+                  open={open.era}
+                  onToggle={() => toggle('era')}
+                  twoCol
+                >
+                  {!window.__premium && (
+                    <div
+                      className="ls-premium-banner"
+                      style={{ gridColumn: '1 / -1' }}
+                    >
+                      <div className="ls-premium-icon">
+                        <img
+                          src="icons/brand/trophy.svg"
+                          width="18"
+                          height="18"
+                        />
+                      </div>
+                      <div className="ls-premium-body">
+                        <div className="ls-premium-title">
+                          Historical eras are premium
+                        </div>
+                        <div className="ls-premium-sub">
+                          All Eras is free. Pick a specific era or
+                          Hall-of-Fame-only pool with Legacy Commissioner.
+                        </div>
+                      </div>
+                      <button
+                        className="ls-btn ls-btn-gold ls-btn-sm"
+                        onClick={() => setUpgrade('Historical eras')}
+                      >
+                        Unlock
+                      </button>
+                    </div>
+                  )}
+                  <EraSection f={f} set={set} disabled={disabled} />
+                </Section>
+
+                <Section
+                  num={4}
+                  title="Draft Settings"
+                  sub="Live or automated, snake or linear — and when it all kicks off."
+                  summary={
+                    <span>
+                      {f.draftMode === 'live' ? 'Live' : 'Automated'} ·{' '}
+                      {f.selectionMethod} · {f.draftOrder}
+                    </span>
+                  }
+                  open={open.draft}
+                  onToggle={() => toggle('draft')}
+                  twoCol
+                >
+                  <DraftSection f={f} set={set} disabled={disabled} />
+                </Section>
+
+                <Section
+                  num={5}
+                  title="Waivers, Budget & Salary Cap"
+                  sub="In-season free-agent rules and optional cap enforcement."
+                  summary={
+                    <span>
+                      {f.waiverType === 'faab'
+                        ? `FAAB · $${f.faabBudgetDefault}`
+                        : 'Standard waivers'}
+                      {f.salaryCapEnabled ? ` · $${f.salaryCap}M cap` : ''}
+                    </span>
+                  }
+                  open={open.waivers}
+                  onToggle={() => toggle('waivers')}
+                  twoCol
+                >
+                  <WaiversSection
+                    f={f}
+                    set={set}
+                    disabled={disabled}
+                    onUpgrade={(feat) => setUpgrade(feat)}
+                  />
+                </Section>
+
+                <div className="ls-action-bar">
+                  <div className="ls-action-status">
+                    {Object.keys(errs).length === 0 ? (
+                      <>
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          className="ok"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span className="ok">All settings look good.</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--danger-fg)"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                        >
+                          <line x1="12" y1="8" x2="12" y2="13" />
+                          <circle cx="12" cy="17" r="1.1" />
+                        </svg>
+                        <span style={{ color: 'var(--danger-fg)' }}>
+                          {Object.keys(errs).length} item
+                          {Object.keys(errs).length > 1 ? 's' : ''} need
+                          attention · {Object.values(errs)[0]}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <div className="ls-action-btns">
+                    <button className="ls-btn ls-btn-ghost" disabled={disabled}>
+                      Cancel
+                    </button>
+                    <button
+                      className="ls-btn ls-btn-primary"
+                      disabled={disabled || Object.keys(errs).length > 0}
+                      onClick={() => {
+                        setSubmitting(true);
+                        setTimeout(() => {
+                          setSubmitting(false);
+                          setShowServerError(true);
+                        }, 1600);
+                      }}
+                    >
+                      {submitting ? (
+                        <>
+                          <span className="ls-spinner" /> Creating…
+                        </>
+                      ) : (
+                        'Create League'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <aside className="ls-create-side">
+                <SummarySide f={f} />
+              </aside>
+            </div>
+
+            {upgrade && (
+              <UpgradeModal
+                feature={upgrade}
+                frameRef={frameRef}
+                onClose={() => setUpgrade(null)}
+                onUnlock={() => {
+                  window.__premium = true;
+                  setUpgrade(null);
+                }}
+              />
+            )}
+          </div>
+        );
+      };
+
+      ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    </script>
+  </body>
+</html>

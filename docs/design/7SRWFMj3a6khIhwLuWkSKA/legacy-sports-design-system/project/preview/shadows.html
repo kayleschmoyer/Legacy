@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        padding: 24px;
+        color: var(--fg1);
+      }
+      .row {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .c {
+        width: 140px;
+        height: 88px;
+        background: var(--surface-card);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--fg3);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="c" style="box-shadow: var(--shadow-sm)">shadow-sm</div>
+      <div class="c" style="box-shadow: var(--shadow-md)">shadow-md</div>
+      <div class="c" style="box-shadow: var(--shadow-lg)">shadow-lg</div>
+      <div class="c" style="box-shadow: var(--shadow-gold)">shadow-gold</div>
+      <div class="c" style="box-shadow: var(--shadow-seam)">shadow-seam</div>
+    </div>
+  </body>
+</html>
