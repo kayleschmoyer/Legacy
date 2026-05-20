@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { SeasonDraftGameLobby } from '@legacy-sports/shared-components/season-draft';
+import { Text, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 
 /**
@@ -15,7 +16,11 @@ export const SeasonDraftGamesPage: React.FC = () => {
   const { user } = useAuth();
 
   if (!user) {
-    return null;
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
+        <Text>Please sign in to view your Season Draft Games.</Text>
+      </YStack>
+    );
   }
 
   return (
