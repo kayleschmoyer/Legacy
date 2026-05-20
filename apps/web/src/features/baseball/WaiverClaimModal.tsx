@@ -174,16 +174,28 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
     parsedFaabBid,
   ]);
 
+  const playerName =
+    `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim();
+
   const handleClose = useCallback(() => {
+    // If the user closes the modal while a claim error is still showing,
+    // surface it on the underlying list via the global ApolloErrorToast so
+    // the failure isn't silently dismissed (LS-4031).
+    if (submitError) {
+      window.dispatchEvent(
+        new CustomEvent('apollo:error', {
+          detail: {
+            message: `Waiver claim for ${playerName || 'player'} failed: ${submitError}`,
+          },
+        }),
+      );
+    }
     setDropPlayerId(null);
     setSubmitError(null);
     setSuccess(false);
     setFaabBidInput('');
     onClose();
-  }, [onClose]);
-
-  const playerName =
-    `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim();
+  }, [onClose, submitError, playerName]);
 
   return (
     <Dialog
