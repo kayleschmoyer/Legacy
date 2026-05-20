@@ -594,8 +594,14 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     setPage(0);
   }, []);
 
-  const { takenPlayerIds, loading: takenLoading } =
-    useLeagueTakenPlayers(leagueId);
+  // Pass page+filters as refreshKey so the rostered-player set is re-fetched
+  // on every pagination/sort/filter tick. Without this, a player claimed by
+  // another team after first mount can appear as available on subsequent
+  // pages until the component remounts (LS-4032).
+  const { takenPlayerIds, loading: takenLoading } = useLeagueTakenPlayers(
+    leagueId,
+    `${page}|${playerType}|${positionFilter}|${sortBy}|${sortDirection}|${debouncedSearch}`,
+  );
 
   const players = data?.players ?? [];
 

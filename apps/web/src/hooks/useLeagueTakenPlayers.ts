@@ -8,7 +8,16 @@ import {
   useGetLeagueTeamsQuery,
 } from '../api/db/graphql.generated';
 
-export function useLeagueTakenPlayers(leagueId: number) {
+/**
+ * @param leagueId
+ * @param refreshKey Bump to force a fresh roster fetch even when teamsData is
+ *   unchanged. Callers that paginate a separate "available players" query
+ *   should pass their page (or page+sort+filter) so the taken-player set is
+ *   re-pulled on every page change — without this, the set stays frozen for
+ *   the lifetime of the teams query and pagination can surface players who
+ *   have already been rostered by another team since first mount (LS-4032).
+ */
+export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
   const client = useApolloClient();
   const { data: teamsData, loading: teamsLoading } = useGetLeagueTeamsQuery({
     variables: { leagueId },
@@ -64,10 +73,13 @@ export function useLeagueTakenPlayers(leagueId: number) {
       }
     };
 
-    fetchMembers().catch((err) => {
-      LOGGER.error('Error fetching members:', String(err));
+    fetchMembers().catch((err: unknown) => {
+      LOGGER.error(
+        'Error fetching members:',
+        err instanceof Error ? err : String(err),
+      );
     });
-  }, [teamsData, teamsLoading, client]);
+  }, [teamsData, teamsLoading, client, refreshKey]);
 
   return { takenPlayerIds, loading: loading || teamsLoading };
 }
