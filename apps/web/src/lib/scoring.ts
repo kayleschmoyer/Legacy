@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   DEFAULT_BATTING_SCORING,
   DEFAULT_FIELDING_SCORING,
@@ -102,6 +102,22 @@ export function useLeagueScoringSettings(leagueId?: number) {
     skip: shouldSkip,
     fetchPolicy: 'cache-and-network',
   });
+
+  // Refetch when the tab becomes visible again. `cache-and-network` only fetches
+  // on initial mount, so a commissioner editing multipliers in another tab or
+  // session would otherwise leave a long-mounted MatchupScoreboard showing
+  // stale projections until the user manually reloaded the page (LS-4039).
+  const { refetch } = query;
+  useEffect(() => {
+    if (shouldSkip || typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [shouldSkip, refetch]);
 
   const settings = useMemo(
     () =>
