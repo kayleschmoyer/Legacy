@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Card, Spinner, Text, XStack } from 'tamagui';
 import {
   type MatchupPlayerData,
@@ -131,6 +131,15 @@ export function MatchupRosterEditor({
 
   // ── Mutation callbacks ──────────────────────────────────────────────────
 
+  // Track `locked` via a ref so the async mutation callbacks always observe
+  // the latest value. Without this, a click registered while the matchup was
+  // unlocked could still fire the mutation after the matchup locked mid-flow
+  // (e.g. status flips to InProgress between selection and submission).
+  const lockedRef = useRef(locked);
+  useEffect(() => {
+    lockedRef.current = locked;
+  }, [locked]);
+
   const handleSwapPositions = useCallback(
     async (
       player1Id: string,
@@ -138,6 +147,7 @@ export function MatchupRosterEditor({
       player2Id: string,
       newPosition2Id: number | null,
     ) => {
+      if (lockedRef.current) return;
       await swapPositions(
         parseId(player1Id),
         newPosition1Id,
@@ -151,6 +161,7 @@ export function MatchupRosterEditor({
 
   const handleMoveToPosition = useCallback(
     async (playerId: string, positionId: number | null) => {
+      if (lockedRef.current) return;
       await updatePosition(parseId(playerId), positionId);
       await refetchPlayers();
     },
