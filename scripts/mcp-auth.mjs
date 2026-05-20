@@ -50,6 +50,13 @@
  *                                            safety net for Claude Desktop
  *                                            (LS-4592).
  *
+ * Also mirrors the three HTTP-transport MCP server definitions
+ * (legacy-sports-github/jira/ci) into ~/.claude.json#/mcpServers (user-scope,
+ * top-level). Claude Code 2.1.100 silently drops HTTP entries from project
+ * .mcp.json and from ~/.claude.json#/projects.<path>.mcpServers; the
+ * top-level user-scope block is the only working surface as of that release
+ * (LS-4595).
+ *
  * Why Cognito (and not IAM Identity Center direct)?
  *   See terraform/main/lambda-mcp-api-gateway.tf header comment. Short
  *   version: IC's idToken `aud` claim is AWS-internal, so API Gateway's
@@ -84,6 +91,13 @@ const USER_HOME = process.env['HOME'] ?? process.env['USERPROFILE'] ?? '';
 const USER_CLAUDE_SETTINGS_PATH = USER_HOME
   ? path.join(USER_HOME, '.claude', 'settings.json')
   : '';
+// User-scope ~/.claude.json. Top-level mcpServers entries here are the only
+// surface that Claude Code 2.1.100 still honors for HTTP-transport servers —
+// the same definitions placed in project .mcp.json or in
+// ~/.claude.json#/projects.<path>.mcpServers are silently dropped (LS-4595).
+const USER_CLAUDE_JSON_PATH = USER_HOME
+  ? path.join(USER_HOME, '.claude.json')
+  : '';
 
 // Keys mirrored from .env.local into Claude Code settings#/env so that Claude
 // Code spawned from the Claude Desktop GUI (which does not source .env.local)
@@ -104,6 +118,31 @@ const CLAUDE_SETTINGS_MIRRORED_KEYS = [
   'MCP_JIRA_URL',
   'MCP_GITHUB_URL',
   'MCP_CI_URL',
+];
+
+// HTTP-transport MCP server definitions mirrored into
+// ~/.claude.json#/mcpServers (LS-4595). Each entry is the server name and the
+// .env.local key holding its API Gateway invoke URL. The URLs themselves
+// live in terraform/main/lambda-mcp-api-gateway.tf and are also published to
+// SSM (/legacy-sports-<env>/mcp/<name>/api-url). We prefer the values
+// resolved from SSM into .env.local, but keep the production-dev defaults as
+// a fallback so a refresh-only run still writes a usable definition.
+const HTTP_MCP_SERVERS = [
+  {
+    name: 'legacy-sports-github',
+    envKey: 'MCP_GITHUB_URL',
+    fallbackUrl: 'https://lhnqee219k.execute-api.us-east-1.amazonaws.com',
+  },
+  {
+    name: 'legacy-sports-jira',
+    envKey: 'MCP_JIRA_URL',
+    fallbackUrl: 'https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com',
+  },
+  {
+    name: 'legacy-sports-ci',
+    envKey: 'MCP_CI_URL',
+    fallbackUrl: 'https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com',
+  },
 ];
 
 // Local LOGGER stub. The project rule (AGENTS.md) is to use LOGGER from
@@ -237,6 +276,58 @@ function mergeEnvIntoSettingsFile(settingsPath, updates) {
   const next = { ...existing, env: mergedEnv };
 
   fs.writeFileSync(settingsPath, JSON.stringify(next, null, 2) + '\n');
+}
+
+// Merges HTTP-transport MCP server definitions into the top-level mcpServers
+// block of ~/.claude.json. Preserves every other top-level key (projects map,
+// numStartups, model, statusLine, …) and every other mcpServers entry. Writes
+// atomically via temp-file + rename so a partial write can't corrupt the
+// thousands-of-keys state file. Refuses to clobber on malformed JSON or
+// non-object top level.
+function mergeMcpServersIntoUserClaudeJson(claudeJsonPath, entries) {
+  if (entries.length === 0) return;
+
+  let existing = {};
+  if (fs.existsSync(claudeJsonPath)) {
+    const raw = fs.readFileSync(claudeJsonPath, 'utf8');
+    if (raw.trim().length > 0) {
+      try {
+        existing = JSON.parse(raw);
+      } catch (err) {
+        throw new Error(
+          `Refusing to overwrite malformed JSON at ${claudeJsonPath}: ${err instanceof Error ? err.message : String(err)}. Fix or remove the file and re-run.`,
+        );
+      }
+      if (
+        existing === null ||
+        typeof existing !== 'object' ||
+        Array.isArray(existing)
+      ) {
+        throw new Error(
+          `Refusing to overwrite ${claudeJsonPath}: top-level value is not a JSON object.`,
+        );
+      }
+    }
+  } else {
+    fs.mkdirSync(path.dirname(claudeJsonPath), { recursive: true });
+  }
+
+  const currentMcpServers =
+    existing['mcpServers'] &&
+    typeof existing['mcpServers'] === 'object' &&
+    !Array.isArray(existing['mcpServers'])
+      ? existing['mcpServers']
+      : {};
+
+  const mergedMcpServers = { ...currentMcpServers };
+  for (const { name, definition } of entries) {
+    mergedMcpServers[name] = definition;
+  }
+  const next = { ...existing, mcpServers: mergedMcpServers };
+
+  const tmpPath = `${claudeJsonPath}.tmp-mcp-auth-${process.pid}`;
+  fs.writeFileSync(tmpPath, JSON.stringify(next, null, 2) + '\n');
+  fs.renameSync(tmpPath, claudeJsonPath);
 }
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
@@ -625,6 +716,31 @@ async function main() {
   }
   mergeEnvIntoSettingsFile(CLAUDE_SETTINGS_PATH, mirrorUpdates);
 
+  // ── Step 6: mirror HTTP MCP server defs into ~/.claude.json ──────────────
+  // Claude Code 2.1.100 silently drops HTTP-transport entries from project
+  // .mcp.json and from ~/.claude.json#/projects.<path>.mcpServers; the
+  // top-level user-scope mcpServers block is the only surface that still
+  // works (LS-4595). Mirror with the JWT inlined so a fresh session can
+  // connect without depending on `${MCP_*}` substitution at MCP launch.
+  if (USER_CLAUDE_JSON_PATH) {
+    const token = finalEnv['MCP_AUTH_TOKEN'];
+    if (token) {
+      const entries = HTTP_MCP_SERVERS.map(({ name, envKey, fallbackUrl }) => ({
+        name,
+        definition: {
+          type: 'http',
+          url: finalEnv[envKey] ?? fallbackUrl,
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      }));
+      mergeMcpServersIntoUserClaudeJson(USER_CLAUDE_JSON_PATH, entries);
+    }
+  } else {
+    LOGGER.warn(
+      'Could not resolve HOME/USERPROFILE — skipping ~/.claude.json#/mcpServers mirror. URL-based MCP servers will fail to connect on Claude Code 2.1.100+.',
+    );
+  }
+
   printDivider();
   LOGGER.info(
     `.env.local has MCP_AUTH_TOKEN + MCP_JIRA_URL + MCP_GITHUB_URL + MCP_CI_URL.`,
@@ -634,6 +750,9 @@ async function main() {
   );
   LOGGER.info(
     `.claude/settings.local.json#/env mirrors the same 4 vars (project-local; transitional safety net for Claude Desktop).`,
+  );
+  LOGGER.info(
+    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci} HTTP defs with inlined JWT (Claude Code 2.1.100+ workaround).`,
   );
   LOGGER.info('Done. Restart Claude Code for the new tokens to take effect.');
 }
