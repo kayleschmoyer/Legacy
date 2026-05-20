@@ -409,8 +409,12 @@ export function MockDraftPage(): React.JSX.Element {
   const isPremium = useIsPremium();
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
+  const [missingLeagueIdError, setMissingLeagueIdError] = React.useState<
+    string | null
+  >(null);
 
   const handleStart = async (s: MockDraftSettings) => {
+    setMissingLeagueIdError(null);
     const result = await initializeMockDraft({
       variables: {
         numTeams: s.numTeams,
@@ -424,6 +428,8 @@ export function MockDraftPage(): React.JSX.Element {
     const leagueId = result.data?.initializeMockDraft?.leagueId;
     if (leagueId) {
       navigate(`/baseball/league/${leagueId}/draft`);
+    } else {
+      setMissingLeagueIdError("Couldn't start mock draft — please try again.");
     }
   };
 
@@ -442,7 +448,7 @@ export function MockDraftPage(): React.JSX.Element {
           void handleStart(s);
         }}
         loading={loading}
-        error={error?.message ?? null}
+        error={error?.message ?? missingLeagueIdError}
       />
     </PremiumGate>
   );
