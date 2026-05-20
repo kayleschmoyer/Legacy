@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
+  Dialog,
   H3,
   Input,
+  Paragraph,
   Separator,
   Spinner,
   Text,
@@ -61,6 +63,9 @@ export function TeamDetailPage() {
   const [bannerImgError, setBannerImgError] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
+  const [pendingClear, setPendingClear] = useState<'logo' | 'banner' | null>(
+    null,
+  );
 
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
@@ -608,7 +613,7 @@ export function TeamDetailPage() {
                       <Button
                         size="$2"
                         chromeless
-                        onPress={handleClearAvatar}
+                        onPress={() => setPendingClear('logo')}
                         disabled={brandingLoading || avatarUploading}
                         style={{ color: BRAND_SEAM_RED }}
                       >
@@ -664,7 +669,7 @@ export function TeamDetailPage() {
                       <Button
                         size="$2"
                         chromeless
-                        onPress={handleClearBanner}
+                        onPress={() => setPendingClear('banner')}
                         disabled={brandingLoading || bannerUploading}
                         style={{ color: BRAND_SEAM_RED }}
                       >
@@ -737,6 +742,76 @@ export function TeamDetailPage() {
           </YStack>
         </>
       )}
+
+      {/* Confirmation dialog for clearing logo / banner (LS-4017) */}
+      <Dialog
+        modal
+        open={pendingClear !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingClear(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="clear-branding-title"
+            aria-describedby="clear-branding-description"
+            animateOnly={['transform', 'opacity']}
+            animation={['quick', { opacity: { overshootClamping: true } }]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={500}
+          >
+            <Dialog.Title id="clear-branding-title" color="$red11">
+              {pendingClear === 'banner'
+                ? 'Clear team banner?'
+                : 'Clear team logo?'}
+            </Dialog.Title>
+            <Dialog.Description id="clear-branding-description">
+              <Paragraph>
+                {pendingClear === 'banner'
+                  ? 'The current banner image will be removed from your team.'
+                  : 'The current logo will be removed from your team.'}{' '}
+                You can upload a new one at any time.
+              </Paragraph>
+            </Dialog.Description>
+            <XStack gap="$3" justifyContent="flex-end">
+              <Button
+                onPress={() => setPendingClear(null)}
+                disabled={brandingLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                theme="red"
+                onPress={() => {
+                  const target = pendingClear;
+                  setPendingClear(null);
+                  if (target === 'banner') void handleClearBanner();
+                  else if (target === 'logo') void handleClearAvatar();
+                }}
+                disabled={brandingLoading}
+                icon={brandingLoading ? <Spinner /> : undefined}
+              >
+                {pendingClear === 'banner' ? 'Clear banner' : 'Clear logo'}
+              </Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
     </YStack>
   );
 }
