@@ -15,6 +15,7 @@ import {
   Zap,
 } from '@tamagui/lucide-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import {
   useCreateBillingPortalSessionMutation,
@@ -589,17 +590,31 @@ const SubscriptionPage: React.FC = () => {
     sessionStorage.setItem('upgrade_billing_cycle', billingCycle);
 
     const origin = window.location.origin;
-    const result = await createCheckoutSession({
-      variables: {
-        priceId,
-        successUrl: `${origin}/profile/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${origin}/profile/subscription?checkout=canceled`,
-      },
-    });
+    try {
+      const result = await createCheckoutSession({
+        variables: {
+          priceId,
+          successUrl: `${origin}/profile/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${origin}/profile/subscription?checkout=canceled`,
+        },
+      });
 
-    const url = result.data?.createCheckoutSession?.url;
-    if (url) {
-      window.location.href = url;
+      const url = result.data?.createCheckoutSession?.url;
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      alert(
+        'Could not start checkout. Please try again later or contact support.',
+      );
+    } catch (error) {
+      LOGGER.error(
+        'Failed to create checkout session',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      alert(
+        'Could not start checkout. Please try again later or contact support.',
+      );
     }
   };
 

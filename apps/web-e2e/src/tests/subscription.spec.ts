@@ -430,4 +430,85 @@ test.describe('Subscription upgrade flow @critical', () => {
     // The guard message should mention unavailability or contact support.
     expect(alertMessages[0]).toMatch(/unavailable|support/i);
   });
+
+  test('upgrade button shows error alert when createCheckoutSession fails', async ({
+    page,
+  }) => {
+    const alertMessages: string[] = [];
+    await page.addInitScript(() => {
+      window.alert = (msg: string) => {
+        (window as unknown as { __alertMessages: string[] }).__alertMessages =
+          (window as unknown as { __alertMessages: string[] })
+            .__alertMessages ?? [];
+        (
+          window as unknown as { __alertMessages: string[] }
+        ).__alertMessages.push(msg);
+      };
+    });
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = route.request().postData()?.toLowerCase() ?? '';
+      if (op.includes('mysubscription') || op.includes('getmysubscription')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(myFreeSubscriptionResponse()),
+        });
+        return;
+      }
+      if (op.includes('getstripeprices') || op.includes('stripeprices')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              stripePrices: {
+                monthlyPriceCents: 499,
+                annualTotalCents: 3999,
+                monthlyPriceId: 'price_monthly_test',
+                annualPriceId: 'price_annual_test',
+              },
+            },
+          }),
+        });
+        return;
+      }
+      if (op.includes('createcheckoutsession')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Stripe is down' }],
+          }),
+        });
+        return;
+      }
+      await unmockedGraphQLFallback(route);
+    });
+
+    await page.goto('/profile/subscription');
+    await page.waitForLoadState('load');
+
+    const upgradeBtn = page
+      .getByRole('button', { name: /upgrade|get premium/i })
+      .first();
+    await expect(upgradeBtn).toBeVisible();
+    await upgradeBtn.click();
+
+    await expect
+      .poll(async () => {
+        const msgs = await page.evaluate(
+          () =>
+            (window as unknown as { __alertMessages?: string[] })
+              .__alertMessages ?? [],
+        );
+        alertMessages.push(...msgs);
+        return msgs.length;
+      })
+      .toBeGreaterThan(0);
+
+    expect(alertMessages[0]).toMatch(/checkout|try again|support/i);
+    // Button should be re-enabled after the error so the user can retry.
+    await expect(upgradeBtn).toBeEnabled();
+  });
 });
