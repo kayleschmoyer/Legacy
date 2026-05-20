@@ -86,6 +86,7 @@ When a PR is authored by an agent and reviewed by the Code Reviewer Bot, the age
 
 - Open the PR as a **draft**. Work locally; push freely — pushes do NOT fire bot reviews while in draft.
 - When initial code is complete: mark the PR **ready_for_review**. This fires **Cycle 1**.
+- Immediately after marking ready, apply the **`bot:ready-for-review`** label via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. The `ready_for_review` event alone fires Cycle 1, but `Reviewer (W1)` only honors subsequent `synchronize` events while this label is present — without it, any push made before the bot finishes reviewing (or any later fix-push) starts no reviewer run. The reviewer preserves the label while a review cycle is still in progress (non-APPROVED verdicts) so later pushes auto-trigger the next cycle, and removes it only on APPROVED. You generally do not need to re-apply between cycles; the only case requiring re-application is if a prior cycle was rate-limited (`review-bot-degraded` label applied with no review) — see [fix-reviews.md](.agents/skills/pr-lifecycle/references/fix-reviews.md) step 8.
 
 ### 2. Response to Cycle 1 Review
 
