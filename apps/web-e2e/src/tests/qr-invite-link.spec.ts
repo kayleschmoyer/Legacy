@@ -210,7 +210,7 @@ test.describe('QR Invite Link @critical', () => {
       page.getByRole('button', { name: 'Invite', exact: true }),
     ).toBeVisible({ timeout: 15_000 });
 
-    // V2 InviteCard returns null when inviteCode is null — no "Invite Friends" section
+    // OverviewTab only renders InviteCard for the commissioner — no "Invite Friends" section for others.
     await expect(page.getByText('Invite Friends')).not.toBeVisible();
 
     // Invite code should NOT be visible

@@ -464,7 +464,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             onViewAll={() => onTab('standings')}
             weekNumber={league.currentWeekNumber}
           />
-          <InviteCard league={league} />
+          {isCommissioner ? <InviteCard league={league} /> : null}
         </div>
       </div>
     </div>
