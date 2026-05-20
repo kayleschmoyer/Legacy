@@ -40,6 +40,16 @@
  *   MCP_GITHUB_URL           — API Gateway invoke URL for legacy-sports-github
  *   MCP_CI_URL               — API Gateway invoke URL for legacy-sports-ci
  *
+ * Also mirrors MCP_AUTH_TOKEN + MCP_{JIRA,GITHUB,CI}_URL into Claude Code
+ * settings#/env at two paths so `${MCP_*}` substitution in .mcp.json resolves
+ * for sessions that don't source .env.local:
+ *   ~/.claude/settings.json                — user-scope; covers every session
+ *                                            on this machine including
+ *                                            worktrees (LS-4593).
+ *   <repo>/.claude/settings.local.json     — project-local; transitional
+ *                                            safety net for Claude Desktop
+ *                                            (LS-4592).
+ *
  * Why Cognito (and not IAM Identity Center direct)?
  *   See terraform/main/lambda-mcp-api-gateway.tf header comment. Short
  *   version: IC's idToken `aud` claim is AWS-internal, so API Gateway's
@@ -62,12 +72,33 @@ const CLAUDE_SETTINGS_PATH = path.join(
   '.claude',
   'settings.local.json',
 );
+// User-scope Claude Code settings — merged into every Claude Code session
+// regardless of project root, so worktree sessions (which have their own
+// .claude/ directory with no settings.local.json) still see the MCP_* vars
+// here. LS-4593: writing only to the project-local mirror above is not
+// enough — Claude Code reads project settings from the project root only
+// (no upward walk), so a worktree session never sees the main repo's
+// .claude/settings.local.json. Writing to ~/.claude/settings.json#/env
+// fixes that for all sessions on this machine.
+const USER_HOME = process.env['HOME'] ?? process.env['USERPROFILE'] ?? '';
+const USER_CLAUDE_SETTINGS_PATH = USER_HOME
+  ? path.join(USER_HOME, '.claude', 'settings.json')
+  : '';
 
-// Keys mirrored from .env.local into .claude/settings.local.json#/env so that
-// Claude Code spawned from the Claude Desktop app (a GUI process that does
-// not source .env.local) can still resolve `${MCP_*}` substitutions in
-// .mcp.json at MCP server launch (LS-4592). Claude Code merges the top-level
-// `env` block into its process env before MCP variable substitution.
+// Keys mirrored from .env.local into Claude Code settings#/env so that Claude
+// Code spawned from the Claude Desktop GUI (which does not source .env.local)
+// — and Claude Code sessions running in a worktree (which has no project-local
+// settings.local.json) — can still resolve `${MCP_*}` substitutions in
+// .mcp.json at MCP server launch. Claude Code merges the top-level `env`
+// block into its process env before MCP variable substitution.
+//
+// We mirror to BOTH the user-scope file (~/.claude/settings.json — primary
+// fix, LS-4593) and the project-local file (.claude/settings.local.json —
+// transitional, LS-4592). The project-local mirror is retained during the
+// rollout because Claude Desktop has historically been observed reading
+// project-local settings before user-scope; once the user-scope path is
+// confirmed sufficient across both Claude Code CLI and Claude Desktop, the
+// project-local mirror can be removed.
 const CLAUDE_SETTINGS_MIRRORED_KEYS = [
   'MCP_AUTH_TOKEN',
   'MCP_JIRA_URL',
@@ -162,25 +193,24 @@ function writeEnvLocal(updates) {
   fs.writeFileSync(ENV_LOCAL_PATH, content);
 }
 
-// ── .claude/settings.local.json read/write ───────────────────────────────────
+// ── Claude Code settings read/write ──────────────────────────────────────────
 //
-// Dual-write target for MCP_* vars so Claude Code launched from the Claude
-// Desktop app (which doesn't source .env.local) can still resolve `${MCP_*}`
-// substitutions in .mcp.json. The file is git-ignored and may contain
-// user-specific permissions / enabledMcpjsonServers — preserve every key that
-// isn't `env`, and refuse to clobber on malformed JSON.
-function writeClaudeSettingsEnv(updates) {
+// Generic helper that merges `updates` into the top-level `env` block of a
+// Claude Code settings JSON file, preserving every other key (permissions,
+// enabledMcpjsonServers, model, statusLine, hooks, …). Refuses to clobber on
+// malformed JSON or non-object top level.
+function mergeEnvIntoSettingsFile(settingsPath, updates) {
   if (Object.keys(updates).length === 0) return;
 
   let existing = {};
-  if (fs.existsSync(CLAUDE_SETTINGS_PATH)) {
-    const raw = fs.readFileSync(CLAUDE_SETTINGS_PATH, 'utf8');
+  if (fs.existsSync(settingsPath)) {
+    const raw = fs.readFileSync(settingsPath, 'utf8');
     if (raw.trim().length > 0) {
       try {
         existing = JSON.parse(raw);
       } catch (err) {
         throw new Error(
-          `Refusing to overwrite malformed JSON at ${CLAUDE_SETTINGS_PATH}: ${err instanceof Error ? err.message : String(err)}. Fix or remove the file and re-run.`,
+          `Refusing to overwrite malformed JSON at ${settingsPath}: ${err instanceof Error ? err.message : String(err)}. Fix or remove the file and re-run.`,
         );
       }
       if (
@@ -189,12 +219,12 @@ function writeClaudeSettingsEnv(updates) {
         Array.isArray(existing)
       ) {
         throw new Error(
-          `Refusing to overwrite ${CLAUDE_SETTINGS_PATH}: top-level value is not a JSON object.`,
+          `Refusing to overwrite ${settingsPath}: top-level value is not a JSON object.`,
         );
       }
     }
   } else {
-    fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   }
 
   const currentEnv =
@@ -206,7 +236,7 @@ function writeClaudeSettingsEnv(updates) {
   const mergedEnv = { ...currentEnv, ...updates };
   const next = { ...existing, env: mergedEnv };
 
-  fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(next, null, 2) + '\n');
+  fs.writeFileSync(settingsPath, JSON.stringify(next, null, 2) + '\n');
 }
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
@@ -570,22 +600,40 @@ async function main() {
     process.exit(1);
   }
 
-  // ── Step 5: mirror MCP_* into .claude/settings.local.json ────────────────
-  // Claude Desktop launches Claude Code as a GUI subprocess that doesn't
-  // source .env.local; settings.local.json#/env is the supported way to
-  // inject env vars into the MCP server substitution step (LS-4592).
+  // ── Step 5: mirror MCP_* into Claude Code settings files ────────────────
+  // Two write targets, both keyed on settings#/env (Claude Code merges this
+  // block into the MCP server's process env before `${VAR}` substitution in
+  // .mcp.json).
+  //
+  //   1. ~/.claude/settings.json   — user-scope; merged into EVERY session
+  //      regardless of project root, including worktree sessions whose own
+  //      .claude/ directory has no settings.local.json (LS-4593).
+  //   2. <repo>/.claude/settings.local.json  — project-local; retained as a
+  //      transitional safety net for Claude Desktop launches that may still
+  //      prefer project-local over user-scope (LS-4592). Remove once the
+  //      user-scope path is confirmed sufficient.
   const mirrorUpdates = {};
   for (const key of CLAUDE_SETTINGS_MIRRORED_KEYS) {
     if (finalEnv[key]) mirrorUpdates[key] = finalEnv[key];
   }
-  writeClaudeSettingsEnv(mirrorUpdates);
+  if (USER_CLAUDE_SETTINGS_PATH) {
+    mergeEnvIntoSettingsFile(USER_CLAUDE_SETTINGS_PATH, mirrorUpdates);
+  } else {
+    LOGGER.warn(
+      'Could not resolve HOME/USERPROFILE — skipping user-scope ~/.claude/settings.json mirror. Worktree sessions launched from Claude Desktop may fail to connect to URL-based MCP servers.',
+    );
+  }
+  mergeEnvIntoSettingsFile(CLAUDE_SETTINGS_PATH, mirrorUpdates);
 
   printDivider();
   LOGGER.info(
     `.env.local has MCP_AUTH_TOKEN + MCP_JIRA_URL + MCP_GITHUB_URL + MCP_CI_URL.`,
   );
   LOGGER.info(
-    `.claude/settings.local.json#/env mirrors the same 4 vars (for Claude Desktop launches).`,
+    `~/.claude/settings.json#/env mirrors the same 4 vars (user-scope; merged into every session, including worktrees).`,
+  );
+  LOGGER.info(
+    `.claude/settings.local.json#/env mirrors the same 4 vars (project-local; transitional safety net for Claude Desktop).`,
   );
   LOGGER.info('Done. Restart Claude Code for the new tokens to take effect.');
 }
