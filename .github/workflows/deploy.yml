@@ -93,6 +93,8 @@ jobs:
             lambdas:
               - 'lambdas/**'
               - 'lib/**'
+              - 'tools/mcp/**'
+              - 'tools/vite-configs/**'
               - '.github/workflows/upload-lambdas.yml'
               - '.github/workflows/deploy.yml'
             web:
