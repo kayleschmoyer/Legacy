@@ -30,7 +30,11 @@ export {
   clearLeagueTierFreezes,
   FREE_TIER_LEAGUE_LIMIT,
 } from './SubscriptionDowngradeService';
-export { SeasonDraftGameService } from './SeasonDraftGameService';
+export {
+  SeasonDraftGameService,
+  SeasonDraftJoinError,
+} from './SeasonDraftGameService';
+export type { SeasonDraftJoinErrorCode } from './SeasonDraftGameService';
 export { TwentyQuestionsService } from './TwentyQuestionsService';
 export type {
   QuestionCategory,

@@ -75,13 +75,7 @@ export const SeasonDraftJoin: React.FC<SeasonDraftJoinProps> = ({
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       LOGGER.error('Failed to join season draft game', err);
-      setJoinError(
-        err.message.includes('already started')
-          ? 'This game has already started and is no longer accepting players.'
-          : err.message.includes('full')
-            ? 'This game is already full.'
-            : 'Failed to join game. Please try again.',
-      );
+      setJoinError(joinErrorMessageFor(error));
     }
   };
 
@@ -305,6 +299,38 @@ export const SeasonDraftJoin: React.FC<SeasonDraftJoinProps> = ({
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Map a join-game failure to a user-facing message using the GraphQL error
+ * code (`extensions.code`) returned by the backend. Falls back to a generic
+ * message when no code is present, e.g. for network errors. We intentionally
+ * do NOT inspect the error message string — those are subject to change.
+ */
+export function joinErrorMessageFor(error: unknown): string {
+  const code = extractGraphQLErrorCode(error);
+  switch (code) {
+    case 'SEASON_DRAFT_GAME_ALREADY_STARTED':
+      return 'This game has already started and is no longer accepting players.';
+    case 'SEASON_DRAFT_GAME_FULL':
+      return 'This game is already full.';
+    default:
+      return 'Failed to join game. Please try again.';
+  }
+}
+
+function extractGraphQLErrorCode(error: unknown): string | undefined {
+  if (error == null || typeof error !== 'object') return undefined;
+  const graphQLErrors = (error as { graphQLErrors?: unknown }).graphQLErrors;
+  if (!Array.isArray(graphQLErrors)) return undefined;
+  for (const gqlError of graphQLErrors as ReadonlyArray<unknown>) {
+    if (gqlError == null || typeof gqlError !== 'object') continue;
+    const extensions = (gqlError as { extensions?: unknown }).extensions;
+    if (extensions == null || typeof extensions !== 'object') continue;
+    const code = (extensions as Record<string, unknown>)['code'];
+    if (typeof code === 'string') return code;
+  }
+  return undefined;
+}
 
 function Eyebrow({
   children,

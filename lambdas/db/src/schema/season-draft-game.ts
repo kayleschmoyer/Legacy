@@ -3,7 +3,9 @@ import {
   HITTER_STAT_KEYS,
   PITCHER_STAT_KEYS,
   SeasonDraftGameService,
+  SeasonDraftJoinError,
 } from '@legacy-sports/db-client';
+import { GraphQLError } from 'graphql';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { eq } from 'drizzle-orm';
@@ -576,12 +578,21 @@ builder.mutationFields((t) => ({
       const playerName =
         context.user.username ?? context.user.email ?? 'Player';
 
-      return await SeasonDraftGameService.joinGameByInviteCode(
-        context.db,
-        args.inviteCode,
-        context.user.id,
-        playerName,
-      );
+      try {
+        return await SeasonDraftGameService.joinGameByInviteCode(
+          context.db,
+          args.inviteCode,
+          context.user.id,
+          playerName,
+        );
+      } catch (error) {
+        if (error instanceof SeasonDraftJoinError) {
+          throw new GraphQLError(error.message, {
+            extensions: { code: error.code },
+          });
+        }
+        throw error;
+      }
     },
   }),
 

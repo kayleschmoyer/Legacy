@@ -27,6 +27,24 @@ import type { PublicDb } from '../client/PublicDbClient';
  */
 export const SEASON_DRAFT_MAX_PLAYERS = 6;
 
+/**
+ * Stable error codes for join-game failures. Surfaced to GraphQL clients via
+ * `extensions.code` so they can render localized messages without parsing
+ * the human-readable error string.
+ */
+export type SeasonDraftJoinErrorCode =
+  | 'SEASON_DRAFT_GAME_ALREADY_STARTED'
+  | 'SEASON_DRAFT_GAME_FULL';
+
+export class SeasonDraftJoinError extends Error {
+  readonly code: SeasonDraftJoinErrorCode;
+  constructor(code: SeasonDraftJoinErrorCode, message: string) {
+    super(message);
+    this.name = 'SeasonDraftJoinError';
+    this.code = code;
+  }
+}
+
 /** Valid stat keys for hitter drafts */
 export const HITTER_STAT_KEYS = [
   'hr',
@@ -297,7 +315,10 @@ export class SeasonDraftGameService {
     }
 
     if (game.status !== 'setup') {
-      throw new Error('This game has already started or been cancelled');
+      throw new SeasonDraftJoinError(
+        'SEASON_DRAFT_GAME_ALREADY_STARTED',
+        'This game has already started or been cancelled',
+      );
     }
 
     const existingPlayers = await db
@@ -305,8 +326,11 @@ export class SeasonDraftGameService {
       .from(PublicSchema.seasonDraftPlayers)
       .where(eq(PublicSchema.seasonDraftPlayers.gameId, game.id));
 
-    if (existingPlayers.length >= 6) {
-      throw new Error('This game is already full (maximum 6 players)');
+    if (existingPlayers.length >= SEASON_DRAFT_MAX_PLAYERS) {
+      throw new SeasonDraftJoinError(
+        'SEASON_DRAFT_GAME_FULL',
+        `This game is already full (maximum ${SEASON_DRAFT_MAX_PLAYERS} players)`,
+      );
     }
 
     const alreadyJoined = await db

@@ -1,4 +1,5 @@
 import type { GraphQLSchema } from 'graphql';
+import { SeasonDraftJoinError } from '@legacy-sports/db-client';
 
 describe('Season Draft Game Resolver', () => {
   let schema: GraphQLSchema;
@@ -75,6 +76,7 @@ describe('Season Draft Game Resolver', () => {
         awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
       })),
       SeasonDraftGameService: mockSeasonDraftGameService,
+      SeasonDraftJoinError,
       HITTER_STAT_KEYS: ['hr', 'rbi', 'avg', 'r', 'sb'],
       PITCHER_STAT_KEYS: ['w', 'era', 'so', 'sv', 'whip'],
       PublicSchema: {
@@ -431,6 +433,50 @@ describe('Season Draft Game Resolver', () => {
       expect(
         mockSeasonDraftGameService.joinGameByInviteCode,
       ).toHaveBeenCalledWith(mockDb, 'abc123', 1, 'Player');
+    });
+
+    it('translates SeasonDraftJoinError into a GraphQLError with extensions.code (game already started)', async () => {
+      mockSeasonDraftGameService.joinGameByInviteCode.mockRejectedValueOnce(
+        new SeasonDraftJoinError(
+          'SEASON_DRAFT_GAME_ALREADY_STARTED',
+          'This game has already started or been cancelled',
+        ),
+      );
+
+      const resolver = getMutation('joinSeasonDraftGame');
+      await expect(
+        resolver({}, { inviteCode: 'abc123' }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'This game has already started or been cancelled',
+        extensions: { code: 'SEASON_DRAFT_GAME_ALREADY_STARTED' },
+      });
+    });
+
+    it('translates SeasonDraftJoinError into a GraphQLError with extensions.code (game full)', async () => {
+      mockSeasonDraftGameService.joinGameByInviteCode.mockRejectedValueOnce(
+        new SeasonDraftJoinError(
+          'SEASON_DRAFT_GAME_FULL',
+          'This game is already full (maximum 6 players)',
+        ),
+      );
+
+      const resolver = getMutation('joinSeasonDraftGame');
+      await expect(
+        resolver({}, { inviteCode: 'abc123' }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        extensions: { code: 'SEASON_DRAFT_GAME_FULL' },
+      });
+    });
+
+    it('rethrows unknown errors unchanged', async () => {
+      mockSeasonDraftGameService.joinGameByInviteCode.mockRejectedValueOnce(
+        new Error('boom'),
+      );
+
+      const resolver = getMutation('joinSeasonDraftGame');
+      await expect(
+        resolver({}, { inviteCode: 'abc123' }, mockContext, undefined as never),
+      ).rejects.toThrow('boom');
     });
   });
 
