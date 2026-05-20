@@ -101,6 +101,20 @@ describe('useStripePrices', () => {
     );
   });
 
+  it('does NOT warn on "Failed to fetch" — network noise filtered upstream', () => {
+    useGetStripePricesQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: { message: 'Failed to fetch' },
+    });
+
+    const { result } = renderHook(() => useStripePrices());
+
+    expect(result.current.pricesFailed).toBe(true);
+    expect(result.current.monthlyPriceDisplay).toBe('$4.99');
+    expect(captureWarning).not.toHaveBeenCalled();
+  });
+
   it('warns when query completes but returns null prices', () => {
     useGetStripePricesQuery.mockReturnValue({
       data: { stripePrices: null },

@@ -42,6 +42,17 @@ export function useStripePrices() {
     // cache-and-network, error can coexist with valid cached stripePrices —
     // in that case the hook returns live cached values, not the fallback.
     if (error && isUsingFallback) {
+      // "Failed to fetch" / "Network request failed" are transient network noise
+      // already filtered by the central Rollbar checkIgnore (LS-900). Wrapping
+      // them in a custom Error would bypass that filter, so suppress here too.
+      // Apollo RetryLink already retries these; the fallback display still renders.
+      if (
+        error.message === 'Failed to fetch' ||
+        error.message === 'Network request failed'
+      ) {
+        warnedRef.current = true;
+        return;
+      }
       warnedRef.current = true;
       captureWarning(
         new Error('Stripe prices query failed — using hardcoded fallback'),

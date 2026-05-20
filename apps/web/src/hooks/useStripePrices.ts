@@ -31,6 +31,15 @@ export function useStripePrices() {
   useEffect(() => {
     if (warnedRef.current) return;
     if (error) {
+      // "Failed to fetch" is transient browser-network noise (connectivity drops,
+      // extension interference, tab backgrounding) that the central Rollbar
+      // checkIgnore already filters (LS-900). Wrapping it in a custom Error
+      // would bypass that filter, so suppress it here too. Apollo RetryLink
+      // already retries these requests; the fallback display still renders.
+      if (error.message === 'Failed to fetch') {
+        warnedRef.current = true;
+        return;
+      }
       warnedRef.current = true;
       captureWarning(
         new Error('Stripe prices query failed — using hardcoded fallback'),

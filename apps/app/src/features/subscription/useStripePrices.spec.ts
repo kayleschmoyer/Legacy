@@ -172,6 +172,26 @@ describe('useStripePrices', () => {
     });
   });
 
+  describe('error — transient network noise ("Failed to fetch" / "Network request failed")', () => {
+    // These messages are already filtered by the central Rollbar checkIgnore
+    // (LS-900). Wrapping them in a custom warning would bypass that filter, so
+    // the hook must suppress captureWarning for these specific messages while
+    // still serving fallback prices.
+    it.each([['Failed to fetch'], ['Network request failed']])(
+      'does NOT call captureWarning for %s',
+      async (errorMessage) => {
+        mockUseGetStripePricesQuery.mockReturnValue({
+          data: undefined,
+          loading: false,
+          error: { message: errorMessage },
+        });
+        const { result } = renderHook(() => useStripePrices());
+        expect(result.current.monthlyPriceDisplay).toBe('$4.99');
+        await waitFor(() => expect(mockCaptureWarning).not.toHaveBeenCalled());
+      },
+    );
+  });
+
   describe('stripePrices: null — backend returned null', () => {
     beforeEach(() => {
       mockUseGetStripePricesQuery.mockReturnValue({
