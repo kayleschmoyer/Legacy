@@ -51,6 +51,15 @@ import { useThemeContext } from '../../context/ThemeContext';
 /* ─── Constants ─── */
 
 const CREATE_BASEBALL_LEAGUE_ROUTE = '/baseball/league/create';
+const JOIN_BASEBALL_LEAGUE_ROUTE = '/baseball/league/join';
+
+// Centralized so the sport prefix can be derived from the summary
+// once non-baseball leagues exist.
+function leagueDetailRoute(
+  summary: Pick<UserLeagueSummaryFragment, 'leagueId'>,
+): string {
+  return `/baseball/league/${summary.leagueId}`;
+}
 
 /* ─── Urgency sort ─── */
 
@@ -1856,9 +1865,7 @@ export function HomePage(): React.JSX.Element {
                   {/* Hero card */}
                   <LeagueHeroCard
                     summary={heroLeague}
-                    onPress={() =>
-                      navigate(`/baseball/league/${heroLeague.leagueId}`)
-                    }
+                    onPress={() => navigate(leagueDetailRoute(heroLeague))}
                     userInits={userInits}
                   />
 
@@ -1882,9 +1889,7 @@ export function HomePage(): React.JSX.Element {
                         <LeagueListRow
                           key={s.leagueId}
                           summary={s}
-                          onPress={() =>
-                            navigate(`/baseball/league/${s.leagueId}`)
-                          }
+                          onPress={() => navigate(leagueDetailRoute(s))}
                         />
                       ))}
                     </div>
@@ -1973,9 +1978,7 @@ export function HomePage(): React.JSX.Element {
                           <LeagueListRow
                             key={s.leagueId}
                             summary={s}
-                            onPress={() =>
-                              navigate(`/baseball/league/${s.leagueId}`)
-                            }
+                            onPress={() => navigate(leagueDetailRoute(s))}
                           />
                         ))}
                       </div>
@@ -2238,7 +2241,7 @@ export function HomePage(): React.JSX.Element {
                   Create League
                 </button>
                 <button
-                  onClick={() => navigate('/baseball/league/join')}
+                  onClick={() => navigate(JOIN_BASEBALL_LEAGUE_ROUTE)}
                   style={{
                     fontFamily: 'Big Shoulders Display, system-ui',
                     fontWeight: 700,
