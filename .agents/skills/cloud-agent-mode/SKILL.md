@@ -55,7 +55,10 @@ The "cloud agent" label covers three distinct configurations with very different
 6. **Self-review (MANDATORY gate)**: `make_run({ target: "lint-review-patterns" })`, then read every changed file in full and manually check patterns **#3, #4, #7, #8, #9, #19, #20** from `../pr-lifecycle/references/common-review-patterns.md`. Also scan for dead code, unsafe casts, missing/null guards, async correctness, stale comments, misleading success logs, and missing tests for changed behavior. Produce a **Self-Review Summary** before proceeding. If you find issues, fix them, re-run Step 5, then repeat this Step 6 on the updated diff and update the **Self-Review Summary** before proceeding.
    - **Copilot Coding Agent note**: there may be no `/review` slash-command support in this environment. That does **not** waive the gate — inline the checklist from `../pr-lifecycle/references/self-review.md` yourself.
 7. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
-8. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` → `github_mark_pr_ready({ number: <PR#> })` (apply label while still a draft, before marking ready — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud))
+8. **PR**: choose the create/mark-ready path based on environment, then label:
+   - **Claude Code on the web (built-in available)**: `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })` → `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` → `mcp__github__update_pull_request({ owner, repo, pullNumber: <PR#>, draft: false })`. Built-in tools authenticate via Claude's native GitHub connector so the PR is authored under the bot identity, not the user's personal token.
+   - **Copilot Coding Agent (built-in unavailable)**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` → `github_mark_pr_ready({ number: <PR#> })`. The custom server uses the Agent Author app token provisioned by `copilot-setup-steps.yml`, which is also a bot identity (not a user PAT).
+   - Apply the label while still a draft, before marking ready — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud). `github_manage_labels` has no built-in equivalent, so the label call is the same in both environments.
 9. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
 
 10. **Review lifecycle**: monitor PR → fix Copilot comments → self-review changed files → fix code → validate before every push → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)
@@ -216,25 +219,25 @@ If you do want regex alternation, the operator differs by regex flavor: with `-E
 
 Always use MCP tools instead of raw shell commands. The MCP tools provide structured output, error handling, and are permission-controlled.
 
-| Instead of (Bash)                  | Use (MCP)                                                      |
-| ---------------------------------- | -------------------------------------------------------------- |
-| `make format`                      | `make_run({ target: "format" })`                               |
-| `make pc`                          | `make_run({ target: "pc" })`                                   |
-| `make lint-fix`                    | `make_run({ target: "lint-fix" })`                             |
-| `make build`                       | `make_run({ target: "build" })`                                |
-| `npx nx run proj:target`           | `nx_run({ project: "proj", target: "target" })`                |
-| `npx nx affected -t target`        | `nx_run_affected({ target: "target" })`                        |
-| `git add . && git commit -m "msg"` | `worktree_commit({ message: "msg" })`                          |
-| `git push`                         | `worktree_push()`                                              |
-| `git status`                       | `worktree_status()`                                            |
-| `git diff`                         | `worktree_diff()`                                              |
-| `git log`                          | `worktree_log()`                                               |
-| `gh pr create`                     | `github_create_pr({ title: "...", body: "...", draft: true })` |
-| `gh pr view`                       | `github_view_pr({ number: N })`                                |
+| Instead of (Bash)                  | Use (MCP)                                                                                                                                                                                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make format`                      | `make_run({ target: "format" })`                                                                                                                                                                                                             |
+| `make pc`                          | `make_run({ target: "pc" })`                                                                                                                                                                                                                 |
+| `make lint-fix`                    | `make_run({ target: "lint-fix" })`                                                                                                                                                                                                           |
+| `make build`                       | `make_run({ target: "build" })`                                                                                                                                                                                                              |
+| `npx nx run proj:target`           | `nx_run({ project: "proj", target: "target" })`                                                                                                                                                                                              |
+| `npx nx affected -t target`        | `nx_run_affected({ target: "target" })`                                                                                                                                                                                                      |
+| `git add . && git commit -m "msg"` | `worktree_commit({ message: "msg" })`                                                                                                                                                                                                        |
+| `git push`                         | `worktree_push()`                                                                                                                                                                                                                            |
+| `git status`                       | `worktree_status()`                                                                                                                                                                                                                          |
+| `git diff`                         | `worktree_diff()`                                                                                                                                                                                                                            |
+| `git log`                          | `worktree_log()`                                                                                                                                                                                                                             |
+| `gh pr create`                     | CC web: `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })` (built-in, bot identity). Copilot: `github_create_pr({ title: "...", body: "...", draft: true })` (custom server, Agent Author app token). |
+| `gh pr view`                       | CC web: `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })` (built-in). Copilot: `github_view_pr({ number: N })` (custom server).                                                                                   |
 
 ## Review Lifecycle in Cloud
 
-On **Claude Code on the web**, use the built-in `mcp__github__*` tools for authorship-sensitive PR operations (replies, Copilot review requests) — these tools authenticate via the platform's own token, ensuring agent comments appear under a bot identity rather than the user's GitHub username. However, **use the custom `legacy-sports-github` server for reading and resolving review threads** — the built-in `pull_request_read` does not return GraphQL thread node IDs, which are required for thread resolution (see "Which operations MUST use the custom MCP server" below).
+On **Claude Code on the web**, the built-in `mcp__github__*` tools are the **authoritative path for every PR operation that has a built-in equivalent** — create PR, mark ready, reply to threads, request Copilot review, read PR/reviews. The built-in surface authenticates via Claude's native GitHub connector, so PRs and comments are authored under a bot identity rather than the user's personal GitHub account. The custom `legacy-sports-github` server is reserved for the gaps the built-in surface does not cover: **fetching review thread node IDs** (`github_get_review_threads`), **batch-resolving threads with bot-review recheck** (`github_resolve_threads`), and **label management** (`github_manage_labels`). See "Which operations MUST use the custom MCP server" below for the full gap list.
 
 ### Cloud review workflow
 
@@ -275,12 +278,17 @@ Three strategies, in preference order:
 
    Do not silently leave the PR in a stuck state and do not loop-retry or attempt the same fallback again — wait for the user to respond before continuing.
 
-**Which operations MUST use built-in tools** (authorship is visible to users):
+**Which operations MUST use built-in tools on Claude Code on the web** (authorship is visible to users; built-in routes through Claude's native GitHub connector with a bot identity, custom server would route through the user's PAT if `GH_TOKEN` is set in cloud env settings):
 
-| Operation              | Why built-in                                    | Built-in tool                                    |
-| ---------------------- | ----------------------------------------------- | ------------------------------------------------ |
-| Reply to review thread | Comment appears under bot identity, not user    | `mcp__github__add_reply_to_pull_request_comment` |
-| Request Copilot review | App tokens silently fail; platform handles auth | `mcp__github__request_copilot_review`            |
+| Operation              | Why built-in                                                                   | Built-in tool                                        | Custom equivalent (do NOT use on CC web) |
+| ---------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- | ---------------------------------------- |
+| Create PR              | PR author appears as bot, not user                                             | `mcp__github__create_pull_request`                   | `github_create_pr`                       |
+| Mark PR ready          | `ready_for_review` event attributed to bot                                     | `mcp__github__update_pull_request({ draft: false })` | `github_mark_pr_ready`                   |
+| Reply to review thread | Comment appears under bot identity, not user                                   | `mcp__github__add_reply_to_pull_request_comment`     | `github_reply_to_review_thread`          |
+| Request Copilot review | App tokens silently fail; platform handles auth                                | `mcp__github__request_copilot_review`                | `github_request_review`                  |
+| View PR / list reviews | Read-only, but routing through built-in avoids waking the custom server's auth | `mcp__github__pull_request_read`                     | `github_view_pr`, `github_list_reviews`  |
+
+> **On Copilot Coding Agent**: the built-in `mcp__github__*` surface is not available. Use the custom `legacy-sports-github` server for the same operations — it authenticates via the Agent Author GitHub App installation token (provisioned by `.github/copilot-setup-steps.yml`), which is itself a bot identity, so PR/comment authorship is still bot-attributed, not user-attributed. The rule "built-in is authoritative" applies only where built-in is loaded.
 
 **Which operations MUST use the custom MCP server** (built-in lacks required data):
 
