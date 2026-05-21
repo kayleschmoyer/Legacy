@@ -78,16 +78,18 @@ export function DeleteLeagueControl({
         awaitRefetchQueries: true,
       });
 
-      setLoading(false);
       setShowConfirmDialog(false);
       onSuccess?.();
 
-      // Redirect to home after successful deletion. Track the timer so we
-      // can cancel it on unmount (the parent may remove us from the tree
-      // inside onSuccess — or the user may navigate away — before the
-      // 2-second window elapses).
-      // Clear any prior pending timer first in case handleConfirm runs
-      // multiple times, so we don't leak a stale timeout.
+      // Redirect to home after successful deletion. Keep `loading` true
+      // through the redirect so the outer "Delete League" button stays
+      // disabled — otherwise the user can re-open the dialog and fire a
+      // second delete during the 2-second window.
+      // Track the timer so we can cancel it on unmount (the parent may
+      // remove us from the tree inside onSuccess — or the user may navigate
+      // away — before the 2-second window elapses). Clear any prior pending
+      // timer first in case handleConfirm runs multiple times, so we don't
+      // leak a stale timeout.
       if (redirectTimeoutRef.current !== null) {
         clearTimeout(redirectTimeoutRef.current);
         redirectTimeoutRef.current = null;
@@ -102,6 +104,10 @@ export function DeleteLeagueControl({
       }, 2000);
       redirectTimeoutRef.current = timeoutId;
     } catch (err) {
+      // `setLoading(false)` lives ONLY in this catch (error path) — there is
+      // no `finally` block on purpose. On the success path we deliberately
+      // keep `loading` true through the 2-second redirect so the outer
+      // "Delete League" button stays disabled until the component unmounts.
       setLoading(false);
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error occurred';
