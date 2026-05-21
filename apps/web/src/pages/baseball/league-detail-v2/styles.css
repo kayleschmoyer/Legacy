@@ -1393,6 +1393,21 @@
 .ls-player-row.utility {
   border-left-color: var(--pos-utility);
 }
+/* RosterBoardV2 slot states (LS-4674) */
+.ls-player-row.ls-roster-slot-selected {
+  background: rgba(27, 58, 92, 0.22);
+  border-color: rgba(197, 165, 90, 0.45);
+  box-shadow: inset 0 0 24px rgba(27, 58, 92, 0.18);
+}
+.ls-player-row.ls-roster-slot-target {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.ls-player-row.ls-roster-slot-swap {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: inset 0 0 24px rgba(34, 197, 94, 0.14);
+}
 .ls-player-slot {
   font-family: var(--font-display);
   font-weight: 800;

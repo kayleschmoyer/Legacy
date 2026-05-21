@@ -9,7 +9,7 @@ import {
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
 import { PendingWaiverClaims } from '../../../../features/roster';
-import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
+import { RosterBoardV2 } from '../RosterBoardV2';
 import { Banner, Empty } from '../Shared';
 import { I } from '../Icons';
 
@@ -178,7 +178,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
 
       {isCurrent && <PendingWaiverClaims teamId={myTeamId} />}
 
-      <LeagueRosterManagement
+      <RosterBoardV2
         positions={positions}
         teamPlayers={teamPlayers}
         onPlayerAssign={(player, position) => {
@@ -193,9 +193,6 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         loading={loading}
         error={error ?? null}
         readOnly={isPast}
-        leagueId={league.id ?? undefined}
-        minCareerGames={league.minCareerGames ?? undefined}
-        minCareerSeasons={league.minCareerSeasons ?? undefined}
       />
     </div>
   );
