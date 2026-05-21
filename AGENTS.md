@@ -54,7 +54,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 
 ### Code Quality (Tier 3)
 
-- **No `console.*`** — use `LOGGER` from `@legacy-sports/logging`. Exceptions: `lib/logging/`, `apps/cli/`, migration files, and build-time scripts.
+- **No `console.*`** — use `LOGGER` from `@legacy-sports/logging`. Exceptions: `lib/logging/`, `apps/cli/`, `lib/db-client/src/cli/`, `lib/db-client/src/scripts/`, migration files, and build-time scripts. (The `db-client` CLI/script exceptions match the `no-console: off` override already configured in `lib/db-client/.eslintrc.json`; those tools print user-facing output that must be copy-paste-clean without log prefixes.)
 - **No suppression** — fix root causes; never use `@ts-ignore` or `eslint-disable` (see `.agents/skills/standards/SKILL.md`)
 - **E2E tests are hermetic** — never use `route.continue()` in `apps/web-e2e/src/tests/`. Use `route.fulfill()` for unmatched operations. **Exception**: `apps/web-e2e/src/integration/tests/` is a live-backend integration suite (config: `playwright.integration.config.ts`, `baseURL: api.legacy-fantasy.com`) — direct API calls via `page.request` are expected there and are not hermeticity violations. See `.agents/skills/testing/SKILL.md`.
 - **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`.

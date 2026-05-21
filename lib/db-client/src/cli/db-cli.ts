@@ -69,6 +69,35 @@ interface CliOptions {
   production?: boolean;
 }
 
+/**
+ * Returns true when `sql` is a read-only statement that is safe to run
+ * against production without an explicit confirmation flag.
+ *
+ * Recognises SELECT, EXPLAIN, WITH (CTE-led reads), and SHOW. CTEs that
+ * embed DML (e.g. `WITH x AS (DELETE ...) SELECT ...`) are intentionally
+ * not allow-listed — the caller must pass `--confirm` for those.
+ */
+export const isReadOnlyQuery = (sql: string): boolean => {
+  const stripped = sql
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\n]*/g, ' ')
+    .trim()
+    .toUpperCase();
+  if (
+    stripped.startsWith('SELECT') ||
+    stripped.startsWith('EXPLAIN') ||
+    stripped.startsWith('SHOW')
+  ) {
+    return true;
+  }
+  if (stripped.startsWith('WITH')) {
+    return !/\b(INSERT|UPDATE|DELETE|MERGE|TRUNCATE|DROP|ALTER|CREATE|GRANT|REVOKE)\b/.test(
+      stripped,
+    );
+  }
+  return false;
+};
+
 const program = new Command();
 
 program
@@ -118,10 +147,14 @@ program
       });
 
       const client = await pool.connect();
-      const result = await client.query(
-        'SELECT version(), current_database(), current_user',
-      );
-      client.release();
+      let result;
+      try {
+        result = await client.query(
+          'SELECT version(), current_database(), current_user',
+        );
+      } finally {
+        client.release();
+      }
       await pool.end();
 
       const row = result.rows[0] as PostgresVersionResult;
@@ -240,14 +273,29 @@ program
   .description('Execute a SQL query against the database')
   .argument('<query>', 'SQL query to execute')
   .option('--production', 'Use production credentials')
+  .option(
+    '--confirm',
+    'Required to run non-SELECT/EXPLAIN/WITH/SHOW queries against production',
+  )
   .option('--json', 'Output results as JSON')
   .option('--table', 'Output results as a formatted table (default)')
   .action(
     async (
       query: string,
-      options: CliOptions & { json?: boolean; table?: boolean },
+      options: CliOptions & {
+        confirm?: boolean;
+        json?: boolean;
+        table?: boolean;
+      },
     ) => {
       try {
+        if (options.production && !isReadOnlyQuery(query) && !options.confirm) {
+          throw new Error(
+            'Refusing to run a non-read-only query against production without --confirm. ' +
+              'Re-run with --confirm if you are certain.',
+          );
+        }
+
         // Default to AWS Secrets Manager unless explicitly using local
         const useLocal = process.env.USE_LOCAL_CREDENTIALS === 'true';
         const config = options.production
@@ -315,4 +363,6 @@ program
     },
   );
 
-program.parse();
+if (require.main === module) {
+  program.parse();
+}
