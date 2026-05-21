@@ -78,6 +78,34 @@ test.describe('Football Hub — primary nav @smoke', () => {
 // Football Hub — mobile nav opens and shows navigation items
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Football routes — smoke coverage for /football/league/create and /football/leagues
+// ---------------------------------------------------------------------------
+
+test.describe('Football routes — smoke @critical', () => {
+  test('loads /football/league/create without a full-page error', async ({
+    page,
+  }) => {
+    await page.goto('/football/league/create');
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL('/football/league/create');
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
+  });
+
+  test('loads /football/leagues without a full-page error', async ({
+    page,
+  }) => {
+    await page.goto('/football/leagues');
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL('/football/leagues');
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
+  });
+});
+
 test.describe('Football Hub — mobile nav @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });

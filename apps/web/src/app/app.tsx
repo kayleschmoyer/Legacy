@@ -470,6 +470,16 @@ function App() {
             <Route path="/" element={<NavigableHomeScreen />} />
             <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/football" element={<FootballScreen />} />
+            <Route
+              path="/football/league/create"
+              element={<LeagueCreatePage />}
+            />
+            <Route path="/football/leagues" element={<LeagueDiscoveryPage />} />
+            <Route path="/football/league/:id" element={<LeagueDetailPage />} />
+            <Route
+              path="/football/league/:id/:tab"
+              element={<LeagueDetailPage />}
+            />
             <Route path="/baseball" element={<BaseballScreen />} />
             <Route
               path="/baseball/league/:id/draft"
