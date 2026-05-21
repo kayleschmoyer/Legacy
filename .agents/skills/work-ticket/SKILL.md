@@ -370,6 +370,10 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
    d. **Stop at two levels.** Do not recurse further; the design assumption is that bucket-epic → child-epic → story/task is the deepest realistic shape and deeper trees should be flattened in Jira, not papered over by the skill.
 
+   e. **Check blockers on every To Do descendant.** Before presenting the list (Step 4) or dispatching chips (Step 5 / batch Step 3), call `jira_check_blockers(key: "LS-####")` on each candidate **in parallel** — batch all calls into a single tool-call message rather than awaiting them sequentially. For each ticket, record whether blockers are clear or capture the blocking keys.
+
+   > **Why this matters**: chips dispatched to a ticket with an unresolved blocker fail their first `jira_claim_ticket` call (which atomically re-checks blockers) and exit — wasting a chip session and leaving the user without visibility into _why_ a "To Do" ticket is not actually ready to work. Surfacing blocker state up front lets the user defer blocked tickets in Parent Dispatch Mode, and lets batch mode filter them out cleanly. This was noticed during LS-4568 dispatch when the user had to ask "Are any of these tickets blocked?" — the orchestrator should answer that question without prompting.
+
 3. **Zero-To-Do branch**: if the To Do descendant set is empty, surface the breakdown by status so the user can decide whether to fall back to In Progress work:
 
    ```
@@ -381,7 +385,17 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
    Then **stop**. Do not auto-claim an In Progress ticket — ask the user what to do.
 
-4. **Present the To Do descendants to the user** with a single `AskUserQuestion` call. Include each To Do descendant's key + summary in the prompt body (above the question) so the user has full visibility before choosing. Use these three options (and let "Other" surface via the standard mechanism for a custom subset):
+4. **Present the To Do descendants to the user** with a single `AskUserQuestion` call. Include each To Do descendant's key + summary in the prompt body (above the question), **annotated with its blocker status from Step 2e** — `✓ clear` if blockers are all Done (or none exist), or `⚠ blocked by LS-####[, LS-####]` if any blocker is still open. The user must see blocker status before choosing dispatch so they can defer or deselect blocked tickets via the `subset` option.
+
+   Example list rendering (annotate inline; align columns for scannability):
+
+   ```
+   LS-4603  feat(design): implement Stats Page header            ✓ clear
+   LS-4604  feat(design): implement Stats Page filters           ⚠ blocked by LS-4603
+   LS-4613  feat(design): implement Standings page redesign      ✓ clear
+   ```
+
+   Use these three options (and let "Other" surface via the standard mechanism for a custom subset):
    - **Spawn chips for all** (Recommended) — one chip per To Do descendant, each runs in its own worktree
    - **Pick one to work in-session** — orchestrator works that single ticket via Leaf Mode
    - **Spawn chips for a subset** — user names the subset in free-form `Other`
@@ -454,16 +468,17 @@ Enumerating descendants…
   Direct children: 6 (2 child epics, 4 stories)
   Recursing into child epics LS-4570, LS-4571…
   Grandchildren found: 12
+  Checking blockers on 8 To Do descendants (parallel)…
 
 To Do descendants (8 total):
-  LS-4603  feat(design): implement Stats Page header
-  LS-4604  feat(design): implement Stats Page filters
-  LS-4613  feat(design): implement Standings page redesign
-  LS-4614  feat(design): empty-state illustrations pack
-  LS-4622  feat(design): mobile drawer interactions
-  LS-4623  feat(design): tabular-figures alignment fix
-  LS-4631  feat(design): notifications redesign — list view
-  LS-4632  feat(design): notifications redesign — detail view
+  LS-4603  feat(design): implement Stats Page header            ✓ clear
+  LS-4604  feat(design): implement Stats Page filters           ⚠ blocked by LS-4603
+  LS-4613  feat(design): implement Standings page redesign      ✓ clear
+  LS-4614  feat(design): empty-state illustrations pack         ✓ clear
+  LS-4622  feat(design): mobile drawer interactions             ✓ clear
+  LS-4623  feat(design): tabular-figures alignment fix          ✓ clear
+  LS-4631  feat(design): notifications redesign — list view     ⚠ blocked by LS-4622
+  LS-4632  feat(design): notifications redesign — detail view   ⚠ blocked by LS-4631
 
 AskUserQuestion → user picks "Spawn chips for all"
 
@@ -487,17 +502,23 @@ Used **only** when `--batch` is passed (or implied by user phrasing like "work a
    jira_transition(key: "LS-####", status: "In Progress")
    ```
 
-2. **Enumerate ALL To Do descendants two levels deep** using the same gathering procedure as Parent Dispatch Mode step 2 (direct children via `jira_list_children`, then `jira_search` with `parent in (...)` for container-shaped children). Paginate.
+2. **Enumerate ALL To Do descendants two levels deep** using the same gathering procedure as Parent Dispatch Mode step 2 (direct children via `jira_list_children`, then `jira_search` with `parent in (...)` for container-shaped children, then the parallel `jira_check_blockers` pass in step 2e). Paginate.
 
 3. **Dispatch every unblocked To Do descendant** (do **not** claim upfront — chips claim themselves):
 
    For each ticket:
-   - Re-verify via `jira_view` — if no longer "To Do" (race with another agent), skip.
+   - Re-verify via `jira_view` — if no longer "To Do" (race with another agent), skip and record in the `skipped (status changed)` set.
+   - **Check the blocker status captured in step 2e — if blockers are not all Done, skip the ticket and record it in the `skipped (blocked)` set along with the blocking keys.** Re-check via `jira_check_blockers` only if step 2e ran more than a minute ago (otherwise trust the cached result). Skipping blocked tickets prevents the chip from immediately failing inside its first `jira_claim_ticket` call.
    - Spawn a chip via `mcp__ccd_session__spawn_task` using the Parent Dispatch Mode chip template (step 5). Inject parent-derived context where applicable (design bundle path, etc.).
 
    **Do NOT transition the child to "In Progress" yourself** — each chip calls `jira_claim_ticket` as its first action and claims atomically. Claiming upfront here would strand the ticket "In Progress" with no active worker if the chip fails to start, and the ticket would silently fall off the "To Do" queue for the next batch run. Spawn all chips in a single pass. Do **not** wait between them.
 
-4. **Stop after dispatch.** Do not wait on chips, track their state, or shepherd their PRs. Parent status will mirror children as their PRs merge (see Status Transition Rules) — Jira Branch Sync handles the cascade; chips also re-verify and transition the parent when they finish. Report the dispatched chip set to the user and exit.
+4. **Stop after dispatch.** Do not wait on chips, track their state, or shepherd their PRs. Parent status will mirror children as their PRs merge (see Status Transition Rules) — Jira Branch Sync handles the cascade; chips also re-verify and transition the parent when they finish. Report to the user:
+   - The dispatched chip set (one line per chip).
+   - The `skipped (blocked)` set with each ticket's blocking keys — these will be eligible for the next batch run once their blockers move to Done.
+   - The `skipped (status changed)` set, if any.
+
+   Then exit.
 
 ### Step 3: MCP gap audit
 
