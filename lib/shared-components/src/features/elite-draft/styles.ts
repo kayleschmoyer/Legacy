@@ -35,6 +35,66 @@ export const CSS = `
   --d-radius-lg: 16px;
   --d-radius-xl: 20px;
   --d-radius-pill: 100px;
+
+  /* ===== Mockup-aligned tokens (B8P9BQz8s6NZ9Q-FqWI_yA) =====
+     Foundation tokens consumed by sibling Draft Board children
+     (LS-4640 grid, LS-4642 PlayerCard, LS-4647 skeleton). Names
+     match docs/design/.../mockups/draft.html 1:1. */
+  --f-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --f-body: 'Literata', Georgia, 'Times New Roman', serif;
+  /* Position accents — 1px edges only, never wider per brief. */
+  --pos-p: #C41E3A;
+  --pos-c: #7C8794;
+  --pos-if: #8B6F47;
+  --pos-of: #2D6A4F;
+  --pos-u: #C5A55A;
+}
+
+/* ===== Typography recipes (mockup-aligned) =====
+   Class-prefixed to avoid leaking into the app-wide heading scale.
+   Sizes/weights/letter-spacing taken verbatim from the mockup. */
+.d-eyebrow {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--d-text-secondary);
+}
+.d-h1, .d-h2, .d-h3, .d-h4 {
+  font-family: var(--f-display);
+  margin: 0;
+  color: var(--d-text);
+  letter-spacing: -0.005em;
+}
+.d-h1 {
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+.d-h2 {
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.d-h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.15;
+}
+.d-h4 {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--d-text-secondary);
+}
+/* Generic stat-row helper — apply to any numeric cell that needs to
+   line up on the decimal. Sibling tickets will consume this. */
+.d-tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ===== Animations ===== */
@@ -782,6 +842,7 @@ export const CSS = `
 .d-stat { text-align: center; }
 .d-stat-val {
   display: block; font-size: 15px; font-weight: 700; line-height: 1.3;
+  font-variant-numeric: tabular-nums;
 }
 .d-stat-lbl {
   display: block; font-size: 9px; color: var(--d-text-muted);
@@ -1100,6 +1161,7 @@ export const CSS = `
 }
 .d-announce-stat-val {
   font-size: 16px; font-weight: 700; display: block; line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 .d-announce-stat-lbl {
   font-size: 9px; font-weight: 600; color: var(--d-text-muted);
@@ -1377,6 +1439,7 @@ export const CSS = `
 }
 .d-intel-stat-val {
   font-size: 11px; font-weight: 700; color: var(--d-text);
+  font-variant-numeric: tabular-nums;
 }
 .d-intel-stat-lbl {
   font-size: 9px; font-weight: 600; color: var(--d-text-muted); letter-spacing: 0.3px;
