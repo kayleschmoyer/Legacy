@@ -31,6 +31,7 @@ import './account-merge';
 import './scoreboard';
 import './disclosure-game';
 import './twenty-questions';
+import './sports';
 
 // Export the final schema
 export const schema = builder.toSchema();

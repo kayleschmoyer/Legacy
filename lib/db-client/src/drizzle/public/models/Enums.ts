@@ -8,7 +8,16 @@ export const selectionMethod = pgEnum('selection_method', [
   'auction',
   'random',
 ]);
-export const playerPool = pgEnum('player_pool', ['all', 'nl', 'al']);
+export const playerPool = pgEnum('player_pool', [
+  // Baseball
+  'all',
+  'nl',
+  'al',
+  // Football (LS-4633)
+  'nfl',
+  'afc',
+  'nfc',
+]);
 
 /**
  * Sport kind — discriminator for multi-sport leagues. Baseball is the
@@ -32,6 +41,7 @@ export const sportKind = pgEnum('sport_kind', ['baseball', 'football']);
  * All         : no restriction (default)
  */
 export const eraFilter = pgEnum('era_filter', [
+  // Baseball
   'all',
   'dead_ball',
   'golden_age',
@@ -40,6 +50,13 @@ export const eraFilter = pgEnum('era_filter', [
   'steroid_era',
   'modern',
   'custom',
+  // Football (LS-4633)
+  'pioneer',
+  'single_platoon',
+  'super_bowl_era',
+  'west_coast',
+  'salary_cap_era',
+  'spread_offense',
 ]);
 
 export const draftStatus = pgEnum('draft_status', [

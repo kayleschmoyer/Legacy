@@ -2515,6 +2515,10 @@ export type Query = {
   seasonDraftGames?: Maybe<Array<SeasonDraftGameSummary>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  /** List the available era windows for a sport with their start/end year ranges. */
+  sportEras: Array<SportEra>;
+  /** List the available player pool keys for a sport (e.g. baseball, football). */
+  sportPlayerPools: Array<SportPlayerPool>;
   /** Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes. */
   stripePrices?: Maybe<StripePriceInfo>;
   /** Return earned badges for a team in a league */
@@ -3027,6 +3031,14 @@ export type QuerySeasonPitchingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QuerySportErasArgs = {
+  sport: Scalars['String']['input'];
+};
+
+export type QuerySportPlayerPoolsArgs = {
+  sport: Scalars['String']['input'];
+};
+
 export type QueryTeamBadgesArgs = {
   leagueId: Scalars['Int']['input'];
   teamId: Scalars['Int']['input'];
@@ -3529,6 +3541,26 @@ export enum Sport {
   Baseball = 'baseball',
   Football = 'football',
 }
+
+/** A historical era window for a sport. startYear/endYear may be null when unbounded. */
+export type SportEra = {
+  __typename?: 'SportEra';
+  endYear?: Maybe<Scalars['Int']['output']>;
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  sortOrder: Scalars['Int']['output'];
+  sport: Scalars['String']['output'];
+  startYear?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player pool option available for a given sport (e.g. AL/NL for baseball, AFC/NFC for football). */
+export type SportPlayerPool = {
+  __typename?: 'SportPlayerPool';
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  sortOrder: Scalars['Int']['output'];
+  sport: Scalars['String']['output'];
+};
 
 /** Result of starting a new disclosure game session */
 export type StartDisclosureGameResult = {

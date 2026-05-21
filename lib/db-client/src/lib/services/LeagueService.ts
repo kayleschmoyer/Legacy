@@ -51,6 +51,7 @@ const DEFAULT_TEAM_NAMES = [
 export type SportKind = 'baseball' | 'football';
 
 export type EraFilterValue =
+  // Baseball
   | 'all'
   | 'dead_ball'
   | 'golden_age'
@@ -58,7 +59,19 @@ export type EraFilterValue =
   | 'free_agency'
   | 'steroid_era'
   | 'modern'
-  | 'custom';
+  | 'custom'
+  // Football (LS-4633)
+  | 'pioneer'
+  | 'single_platoon'
+  | 'super_bowl_era'
+  | 'west_coast'
+  | 'salary_cap_era'
+  | 'spread_offense';
+
+/** Player pool keys persisted to `leagues.player_pool`. Mirrors the
+ *  `player_pool` Postgres enum. Baseball uses all/nl/al, football uses
+ *  nfl/afc/nfc (LS-4633). */
+export type PlayerPoolValue = 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
 
 export interface CreateLeagueOptions {
   name: string;
@@ -70,7 +83,7 @@ export interface CreateLeagueOptions {
   numberOfTeams?: number;
   numberOfDivisions?: number;
   schedulingStrategy?: 'round-robin' | 'divisional' | 'random';
-  playerPool?: 'all' | 'nl' | 'al';
+  playerPool?: PlayerPoolValue;
   /** Era-based player pool filter. Default 'all' (no restriction). */
   eraFilter?: EraFilterValue;
   /** When true, only Hall of Fame inductees appear in the draft pool. */
@@ -117,7 +130,7 @@ export interface CreateLeagueResult {
       | 'completed';
     leaguePhase: 'pre-draft' | 'active' | 'offseason';
     inviteCode: string;
-    playerPool: 'all' | 'nl' | 'al';
+    playerPool: PlayerPoolValue;
     eraFilter?: EraFilterValue;
     hofOnly?: boolean;
     customEraStartYear?: number | null;

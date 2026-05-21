@@ -299,6 +299,23 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
+      // ── playerPool input validation ─────────────────────────────────────
+      const VALID_PLAYER_POOLS = [
+        'all',
+        'nl',
+        'al',
+        'nfl',
+        'afc',
+        'nfc',
+      ] as const;
+      if (!(VALID_PLAYER_POOLS as readonly string[]).includes(playerPool)) {
+        throw UserInputError(
+          `Invalid playerPool: "${playerPool}". Allowed values: ${VALID_PLAYER_POOLS.join(', ')}.`,
+        );
+      }
+      const validatedPlayerPool =
+        playerPool as (typeof VALID_PLAYER_POOLS)[number];
+
       // ── Custom era year-range validation ────────────────────────────────
       if (inputEraFilter === 'custom') {
         if (inputCustomEraStartYear == null || inputCustomEraEndYear == null) {
@@ -329,7 +346,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               | 'random'
               | null
               | undefined) ?? 'divisional',
-          playerPool: playerPool as 'all' | 'nl' | 'al',
+          playerPool: validatedPlayerPool,
           draftMode: draftMode as 'live' | 'automated',
           selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
           draftOrder: draftOrder as 'snake' | 'linear',

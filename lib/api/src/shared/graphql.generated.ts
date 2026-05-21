@@ -431,6 +431,7 @@ export type CreateLeagueAndTeamsInput = {
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -883,6 +884,8 @@ export type League = {
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
+  /** Sport for this league (baseball or football). (LS-4628) */
+  sport?: Maybe<Sport>;
   /** ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues. */
   tierFrozenAt?: Maybe<Scalars['String']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
@@ -1577,6 +1580,7 @@ export type MutationCreateCheckoutSessionArgs = {
 export type MutationCreateLeagueArgs = {
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   name: Scalars['String']['input'];
+  sport?: InputMaybe<Sport>;
 };
 
 export type MutationCreateLeagueAndTeamsArgs = {
@@ -2505,6 +2509,10 @@ export type Query = {
   seasonDraftGames?: Maybe<Array<SeasonDraftGameSummary>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  /** List the available era windows for a sport with their start/end year ranges. */
+  sportEras: Array<SportEra>;
+  /** List the available player pool keys for a sport (e.g. baseball, football). */
+  sportPlayerPools: Array<SportPlayerPool>;
   /** Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes. */
   stripePrices?: Maybe<StripePriceInfo>;
   /** Return earned badges for a team in a league */
@@ -3017,6 +3025,14 @@ export type QuerySeasonPitchingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QuerySportErasArgs = {
+  sport: Scalars['String']['input'];
+};
+
+export type QuerySportPlayerPoolsArgs = {
+  sport: Scalars['String']['input'];
+};
+
 export type QueryTeamBadgesArgs = {
   leagueId: Scalars['Int']['input'];
   teamId: Scalars['Int']['input'];
@@ -3512,6 +3528,32 @@ export type SetTeamLockInput = {
   locked: Scalars['Boolean']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
+};
+
+/** Sport for a league (baseball or football). */
+export enum Sport {
+  Baseball = 'baseball',
+  Football = 'football',
+}
+
+/** A historical era window for a sport. startYear/endYear may be null when unbounded. */
+export type SportEra = {
+  __typename?: 'SportEra';
+  endYear?: Maybe<Scalars['Int']['output']>;
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  sortOrder: Scalars['Int']['output'];
+  sport: Scalars['String']['output'];
+  startYear?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player pool option available for a given sport (e.g. AL/NL for baseball, AFC/NFC for football). */
+export type SportPlayerPool = {
+  __typename?: 'SportPlayerPool';
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  sortOrder: Scalars['Int']['output'];
+  sport: Scalars['String']['output'];
 };
 
 /** Result of starting a new disclosure game session */

@@ -2889,6 +2889,16 @@ type Query {
   ): [SeasonPitching!]
 
   """
+  List the available era windows for a sport with their start/end year ranges.
+  """
+  sportEras(sport: String!): [SportEra!]!
+
+  """
+  List the available player pool keys for a sport (e.g. baseball, football).
+  """
+  sportPlayerPools(sport: String!): [SportPlayerPool!]!
+
+  """
   Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes.
   """
   stripePrices: StripePriceInfo
@@ -3445,6 +3455,28 @@ Sport for a league (baseball or football).
 enum Sport {
   baseball
   football
+}
+
+"""
+A historical era window for a sport. startYear/endYear may be null when unbounded.
+"""
+type SportEra {
+  endYear: Int
+  key: String!
+  label: String!
+  sortOrder: Int!
+  sport: String!
+  startYear: Int
+}
+
+"""
+A player pool option available for a given sport (e.g. AL/NL for baseball, AFC/NFC for football).
+"""
+type SportPlayerPool {
+  key: String!
+  label: String!
+  sortOrder: Int!
+  sport: String!
 }
 
 """

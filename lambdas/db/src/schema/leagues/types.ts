@@ -68,7 +68,7 @@ export const League = builder.objectRef<{
   /** Lifecycle phase: pre-draft, active, or offseason */
   leaguePhase: 'pre-draft' | 'active' | 'offseason';
   inviteCode: string;
-  playerPool: 'all' | 'nl' | 'al';
+  playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
   waiverType?: 'standard' | 'faab';
   waiverEnabled?: boolean;

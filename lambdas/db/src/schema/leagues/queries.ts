@@ -17,7 +17,18 @@ import {
   TeamMember,
 } from './types';
 import { builder } from '../builder';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../graphql-errors';
+
+const VALID_PLAYER_POOLS = ['all', 'nl', 'al', 'nfl', 'afc', 'nfc'] as const;
+type ValidPlayerPool = (typeof VALID_PLAYER_POOLS)[number];
+
+function isValidPlayerPool(v: string): v is ValidPlayerPool {
+  return (VALID_PLAYER_POOLS as readonly string[]).includes(v);
+}
 
 // Query fields
 builder.queryField('league', (t) =>
@@ -949,12 +960,12 @@ builder.queryField('publicLeagues', (t) =>
         }
 
         if (args.playerPool) {
-          conditions.push(
-            eq(
-              PublicSchema.leagues.playerPool,
-              args.playerPool as 'all' | 'nl' | 'al',
-            ),
-          );
+          if (!isValidPlayerPool(args.playerPool)) {
+            throw UserInputError(
+              `Invalid playerPool: "${args.playerPool}". Allowed values: ${VALID_PLAYER_POOLS.join(', ')}.`,
+            );
+          }
+          conditions.push(eq(PublicSchema.leagues.playerPool, args.playerPool));
         }
 
         if (args.search) {
