@@ -70,6 +70,10 @@ export function getPositionColor(position: string): string {
 export const TEXT_HIGH_CONTRAST = '#F5F7FA';
 export const TEXT_PRIMARY = '#F8FAFC';
 export const TEXT_MUTED = '#9CAAC5';
+/** Interface text — high-contrast on dark backgrounds (lighter than TEXT_PRIMARY). */
+export const TEXT_INTERFACE = '#E8EDF5';
+/** Secondary text — labels, subtitles, less-prominent content. */
+export const TEXT_SECONDARY = '#8A9BB5';
 
 // -- Blues (primary accent / links) -----------------------------------
 
@@ -161,3 +165,26 @@ export const OVERLAY_WHITE_10 = 'rgba(255, 255, 255, 0.1)';
 export const INJURY_HEALTHY = '#22C55E';
 export const INJURY_QUESTIONABLE = '#FBBF24';
 export const INJURY_OUT = '#EF4444';
+
+// -- Stats Page Brand Tokens (LS-4612) --------------------------------
+// Design source: docs/design/qtqqKYxMFf1A8GY5NL9GNQ/legacy-sports-stats-page/
+// project/ds/colors_and_type.css. Subsequent Stats Page slices
+// (LS-4613/4614/4615/4616) consume these by name so the redesign stays
+// consistent without re-importing the same literals. Values reuse the
+// tokens above where possible — only STATS_BORDER is a new literal.
+
+/** Stats Page border — design-spec shade between PANEL_BORDER and OUTLINE_SUBTLE. */
+export const STATS_BORDER = '#1E2D45';
+
+export const STATS_PAGE_TOKENS = {
+  BG_PAGE: BG_DARK,
+  BG_SUBTLE: SURFACE_SUBTLE,
+  BG_PANEL: SURFACE_PANEL,
+  BG_ELEVATED: SURFACE_CARD,
+  BRAND_GOLD,
+  BRAND_SEAM_RED,
+  BRAND_NAVY,
+  TEXT_PRIMARY: TEXT_INTERFACE,
+  TEXT_SECONDARY,
+  BORDER: STATS_BORDER,
+} as const;

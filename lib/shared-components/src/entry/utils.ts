@@ -12,6 +12,7 @@ export * from '../utils/scoreFormatting';
 export * from '../utils/playerFormatting';
 export * from '../utils/draftStatus';
 export * from '../utils/colors';
+export * from '../utils/typography';
 export * from '../utils/mapGraphQLToScoringFormat';
 export * from '../utils/SecureStorage';
 export * from '../constants/presets';

@@ -210,3 +210,26 @@ export const TEXT_INTERFACE = '#E8EDF5';
 export const SCORE_LOSS = '#E07A8C';
 /** Warm amber text — "coming soon" labels and soft warning states. */
 export const AMBER_WARM = '#E3B870';
+
+// ─── Stats Page Brand Tokens (LS-4612) ──────────────────────
+// Design source: docs/design/qtqqKYxMFf1A8GY5NL9GNQ/legacy-sports-stats-page/
+// project/ds/colors_and_type.css. Subsequent Stats Page slices
+// (LS-4613/4614/4615/4616) consume these by name so the redesign stays
+// consistent without re-importing the same literals. Values reuse the
+// tokens above where possible — only STATS_BORDER is a new literal.
+
+/** Stats Page border — design-spec shade between PANEL_BORDER and OUTLINE_SUBTLE. */
+export const STATS_BORDER = '#1E2D45';
+
+export const STATS_PAGE_TOKENS = {
+  BG_PAGE: BG_DARK,
+  BG_SUBTLE: SURFACE_SUBTLE,
+  BG_PANEL: SURFACE_PANEL,
+  BG_ELEVATED: SURFACE_CARD,
+  BRAND_GOLD,
+  BRAND_SEAM_RED,
+  BRAND_NAVY,
+  TEXT_PRIMARY: TEXT_INTERFACE,
+  TEXT_SECONDARY,
+  BORDER: STATS_BORDER,
+} as const;
