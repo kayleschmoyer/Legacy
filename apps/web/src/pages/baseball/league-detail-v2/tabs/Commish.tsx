@@ -27,6 +27,7 @@ interface AccordSection {
   label: string;
   iconClass?: 'gold' | 'red' | '';
   icon: React.ReactNode;
+  badge?: React.ReactNode;
   content: React.ReactNode;
   testId?: string;
 }
@@ -49,6 +50,7 @@ const Accord: React.FC<{
           {section.icon}
         </div>
         <span className="label">{section.label}</span>
+        {section.badge}
       </div>
       <I.ChevronDown className="ls-chev" size={16} />
     </button>
@@ -75,7 +77,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   onSettingsError,
 }) => {
   const navigate = useNavigate();
-  const [openId, setOpenId] = useState<string>('announcements');
+  const [openId, setOpenId] = useState<string>('next-step');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
   const [waiverSuccess, setWaiverSuccess] = useState<string | null>(null);
   const [waiverError, setWaiverError] = useState<string | null>(null);
@@ -117,6 +119,39 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   });
 
   const sections: AccordSection[] = [
+    {
+      id: 'next-step',
+      label: 'Next Step',
+      iconClass: 'gold',
+      icon: <I.Zap size={16} />,
+      badge: (
+        <span
+          className="ls-chip ls-chip-active"
+          style={{ marginLeft: 8, fontSize: 9 }}
+        >
+          Ready
+        </span>
+      ),
+      content: leagueId ? (
+        <NextStepControl
+          leagueId={leagueId}
+          currentMatchup={currentMatchup}
+          gamesPerMatchup={league.gamesPerMatchup ?? 1}
+          draftStatus={league.draftStatus}
+          leagueName={league.name ?? ''}
+          frozenAt={league.frozenAt}
+          totalMatchups={league.totalMatchups ?? undefined}
+          onError={(err) => setNextStepError(err.message)}
+          onSuccess={() => setNextStepError(null)}
+          onNavigateToDraftBoard={() =>
+            navigate(`/baseball/league/${leagueId}/draft`)
+          }
+          onNavigateToLeague={(newLeagueId) =>
+            navigate(`/baseball/league/${newLeagueId}`)
+          }
+        />
+      ) : null,
+    },
     {
       id: 'announcements',
       label: 'Announcements',
@@ -250,27 +285,6 @@ export const CommishTab: React.FC<CommishTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {leagueId ? (
-        <section aria-label="Next Step">
-          <NextStepControl
-            leagueId={leagueId}
-            currentMatchup={currentMatchup}
-            gamesPerMatchup={league.gamesPerMatchup ?? 1}
-            draftStatus={league.draftStatus}
-            leagueName={league.name ?? ''}
-            frozenAt={league.frozenAt}
-            totalMatchups={league.totalMatchups ?? undefined}
-            onError={(err) => setNextStepError(err.message)}
-            onSuccess={() => setNextStepError(null)}
-            onNavigateToDraftBoard={() =>
-              navigate(`/baseball/league/${leagueId}/draft`)
-            }
-            onNavigateToLeague={(newLeagueId) =>
-              navigate(`/baseball/league/${newLeagueId}`)
-            }
-          />
-        </section>
-      ) : null}
       {nextStepError ? (
         <div
           role="alert"
