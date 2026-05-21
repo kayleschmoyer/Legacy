@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Card, styled, Text, XStack, YStack } from 'tamagui';
 import {
   Activity,
+  AlertTriangle,
   Clock,
   Swords,
   TrendingUp,
@@ -385,6 +386,30 @@ export function MatchupScoreboard({
       role="region"
       aria-label={`Week ${weekNumber} scoreboard: ${team1Name} vs ${team2Name}`}
     >
+      {/* Stale-data warning: surfaced when the live player-stats query errors
+          and we've fallen back to the matchup's server-stored scores. Without
+          this banner the fallback is silent and users can't tell the numbers
+          may be out of date (LS-4038). */}
+      {playersError != null && (
+        <XStack
+          role="status"
+          aria-live="polite"
+          alignItems="center"
+          gap="$2"
+          paddingHorizontal="$5"
+          paddingVertical="$2"
+          backgroundColor="$orange3"
+          borderBottomWidth={1}
+          borderBottomColor="$orange7"
+          $sm={{ paddingHorizontal: '$3' }}
+        >
+          <AlertTriangle size={14} color="var(--orange11)" />
+          <Text fontSize="$2" fontWeight="600" color="$orange11">
+            Live stats unavailable — showing last saved scores.
+          </Text>
+        </XStack>
+      )}
+
       {/* Top Bar */}
       <TopBar>
         <XStack alignItems="center" gap="$2">

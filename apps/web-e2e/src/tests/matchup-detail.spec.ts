@@ -10,7 +10,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -299,5 +302,74 @@ test.describe('Matchup Detail – error state @regression', () => {
       .getByText(/error loading matchup|matchup not found/i)
       .first();
     await expect(errorOrNotFound).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests – scoreboard stale-scores warning (LS-4038)
+// ---------------------------------------------------------------------------
+
+test.describe('Matchup Detail – stale-scores warning @regression', () => {
+  test('shows warning banner when getMatchupPlayers query errors', async ({
+    page,
+  }) => {
+    // Mock everything normally except getMatchupPlayers, which returns an
+    // error so MatchupScoreboard falls back to the matchup's stored scores
+    // and must surface a visible warning to the user (LS-4038).
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route);
+
+      if (op === 'GetMatchupPlayers') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupPlayers: null },
+            errors: [{ message: 'Failed to load player stats' }],
+          }),
+        });
+      } else if (op === 'GetMatchupById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
+        });
+      } else if (op === 'GetMatchupsForLeague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupsForLeague: MOCK_MATCHUPS_FOR_LEAGUE },
+          }),
+        });
+      } else if (op === 'GetLeagueTeams') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+        });
+      } else if (op === 'GetCurrentWeekForLeague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
+        });
+      } else if (op === 'GetUserTeamId') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userTeamId: 1 } }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await page.goto(MATCHUP_URL);
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByText(/live stats unavailable.*last saved scores/i),
+    ).toBeVisible();
   });
 });
