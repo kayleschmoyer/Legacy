@@ -459,15 +459,29 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     // has no required checks configured.
     const requiredCheckNames = await getRequiredChecks(baseBranch);
 
-    const [checks, statuses] = await Promise.all([
-      github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 }),
-      github.rest.repos.listCommitStatusesForRef({
+    // Paginate both endpoints — popular PRs accumulate >100 check runs (CI
+    // reruns, security scans, etc.) and >100 commit statuses. Without
+    // pagination, required checks living on later pages (e.g. "No Merge
+    // Conflicts", which posts early and gets pushed off page 1 by later runs)
+    // appear absent and are spuriously flagged as "(not yet registered)",
+    // blocking the merge queue. See LS-4672.
+    const [checkRuns, commitStatuses] = await Promise.all([
+      github.paginate(github.rest.checks.listForRef, {
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+      github.paginate(github.rest.repos.listCommitStatusesForRef, {
         owner,
         repo,
         ref: sha,
         per_page: 100,
       }),
     ]);
+    // Preserve the downstream call sites that read .data.check_runs / .data.
+    const checks = { data: { check_runs: checkRuns } };
+    const statuses = { data: commitStatuses };
 
     const failingChecks = [];
     const pendingChecks = [];

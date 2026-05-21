@@ -61,6 +61,14 @@ function makeGithub({
     // paginate dispatches on the endpoint function reference
     paginate: async (fn, args) => {
       if (fn === github.rest.pulls.listReviews) return reviews;
+      if (fn === github.rest.checks.listForRef) {
+        const res = await github.rest.checks.listForRef(args);
+        return res.data.check_runs;
+      }
+      if (fn === github.rest.repos.listCommitStatusesForRef) {
+        const res = await github.rest.repos.listCommitStatusesForRef(args);
+        return res.data;
+      }
       // default: PR list
       return [pr];
     },
