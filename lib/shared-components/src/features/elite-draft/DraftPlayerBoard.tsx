@@ -8,6 +8,8 @@ import type {
 import { DraftGrid } from './DraftGrid';
 import { PlayerCard } from './PlayerCard';
 import { getPositionColor } from './utils';
+import { STAT_COLUMNS_BY_SPORT } from './statColumns';
+import type { SportKind } from '../../config/sports';
 // PlayerDetailModal is web-specific; consumers can provide their own via composition.
 // Inline a no-op stub so the component compiles in all environments.
 const PlayerDetailModal: React.FC<{
@@ -35,6 +37,8 @@ type ViewMode = 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
 
 interface DraftPlayerBoardProps {
   viewMode: ViewMode;
+  /** Active league sport — drives data-table stat headers. Defaults to 'baseball' upstream. */
+  sport: SportKind;
   selectedPosition: string;
   searchTerm: string;
   availablePlayersLoading: boolean;
@@ -77,6 +81,7 @@ const VIEW_TABS: Array<{ mode: ViewMode; label: string }> = [
 
 export function DraftPlayerBoard({
   viewMode,
+  sport,
   selectedPosition,
   searchTerm,
   availablePlayersLoading,
@@ -344,11 +349,11 @@ export function DraftPlayerBoard({
                   <th>Player</th>
                   <th>Pos</th>
                   <th className="num">ADP</th>
-                  <th className="num">AVG</th>
-                  <th className="num">HR</th>
-                  <th className="num">RBI</th>
-                  <th className="num">SB</th>
-                  <th className="num">WAR</th>
+                  {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
+                    <th key={col.label} className="num">
+                      {col.label}
+                    </th>
+                  ))}
                   <th />
                 </tr>
               </thead>
@@ -397,25 +402,11 @@ export function DraftPlayerBoard({
                           player as DraftPlayer & { adp?: number }
                         ).adp?.toFixed(1) ?? '—'}
                       </td>
-                      <td className="num">
-                        {(
-                          player as DraftPlayer & { avg?: number }
-                        ).avg?.toFixed(3) ?? '—'}
-                      </td>
-                      <td className="num">
-                        {(player as DraftPlayer & { hr?: number }).hr ?? '—'}
-                      </td>
-                      <td className="num">
-                        {(player as DraftPlayer & { rbi?: number }).rbi ?? '—'}
-                      </td>
-                      <td className="num">
-                        {(player as DraftPlayer & { sb?: number }).sb ?? '—'}
-                      </td>
-                      <td className="num">
-                        {(
-                          player as DraftPlayer & { war?: number }
-                        ).war?.toFixed(1) ?? '—'}
-                      </td>
+                      {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
+                        <td key={col.label} className="num">
+                          {col.render(player)}
+                        </td>
+                      ))}
                       <td>
                         {(commPickMode ? isOwner : isMyPick) && (
                           <button

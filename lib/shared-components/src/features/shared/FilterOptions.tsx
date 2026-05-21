@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { Select, Text, YStack } from 'tamagui';
-
-// Sport-kind discriminator. Aligns with ADR 0011 §2; will be replaced by the
-// shared `SportKind` type from the position-model split (LS-4659) once that
-// lands.
-export type SportKind = 'baseball' | 'football';
+import type { SportKind } from '../../config/sports';
 
 export interface FilterPosition {
   label: string;

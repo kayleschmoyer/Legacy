@@ -28,6 +28,7 @@ import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import { useAuth } from '../../features/auth';
+import type { SportKind } from '../../config/sports';
 
 export interface EliteDraftBoardScreenProps {
   /** League ID to load (replaces route param). */
@@ -42,6 +43,12 @@ export interface EliteDraftBoardScreenProps {
   renderChat?: DraftChatRenderer;
   /** Optional callback fired when a player is drafted (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
+  /**
+   * Active sport for this league. Drives stat-table headers, lobby copy, and
+   * the `data-sport` attribute on the root. Defaults to `'baseball'` until
+   * callers can read `league.sport` (ADR 0011 / LS-4658).
+   */
+  sport?: SportKind;
 }
 
 export function EliteDraftBoardScreen({
@@ -51,6 +58,7 @@ export function EliteDraftBoardScreen({
   token,
   renderChat,
   onPlayerDrafted,
+  sport = 'baseball',
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
@@ -375,6 +383,7 @@ export function EliteDraftBoardScreen({
     return (
       <PreDraftLobby
         league={queries.league}
+        sport={sport}
         leagueTeams={queries.leagueTeams}
         myTeamId={queries.myTeamId}
         isOwner={queries.isOwner}
@@ -406,7 +415,7 @@ export function EliteDraftBoardScreen({
 
   // ---- Main Live Draft UI ----
   return (
-    <div className="d-root">
+    <div className="d-root" data-sport={sport}>
       <style>{CSS}</style>
       <div className="d-bg-fx" />
       <div className="d-layout">
@@ -441,6 +450,7 @@ export function EliteDraftBoardScreen({
 
         <DraftPlayerBoard
           viewMode={ui.viewMode}
+          sport={sport}
           selectedPosition={ui.selectedPosition}
           searchTerm={ui.searchTerm}
           availablePlayersLoading={queries.availablePlayersLoading}

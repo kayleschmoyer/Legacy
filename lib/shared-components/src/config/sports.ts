@@ -1,5 +1,14 @@
 import { SportConfig } from '../types';
 
+/**
+ * Draft-surface sport kinds. Matches the ADR 0011 `sport_kind` enum and the
+ * forthcoming `Sport` GraphQL enum. Restricted to the two sports the draft
+ * surface supports; the broader `SPORT_CONFIGS` map keeps entries for
+ * basketball and hockey for future reach, but `SportKind` is the type that
+ * components accept as their `sport` prop.
+ */
+export type SportKind = 'baseball' | 'football';
+
 export const SPORT_CONFIGS: Record<string, SportConfig> = {
   baseball: {
     name: 'Baseball',

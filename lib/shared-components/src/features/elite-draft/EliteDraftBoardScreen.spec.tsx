@@ -31,13 +31,17 @@ jest.mock('./auction/AuctionDraftRoom', () => ({
   AuctionDraftRoom: () => <div data-testid="auction-draft-room" />,
 }));
 jest.mock('./PreDraftLobby', () => ({
-  PreDraftLobby: () => <div data-testid="pre-draft-lobby" />,
+  PreDraftLobby: ({ sport }: { sport: string }) => (
+    <div data-testid="pre-draft-lobby" data-sport={sport} />
+  ),
 }));
 jest.mock('./DraftCompleteView', () => ({
   DraftCompleteView: () => <div data-testid="draft-complete-view" />,
 }));
 jest.mock('./DraftPlayerBoard', () => ({
-  DraftPlayerBoard: () => <div data-testid="draft-player-board" />,
+  DraftPlayerBoard: ({ sport }: { sport: string }) => (
+    <div data-testid="draft-player-board" data-sport={sport} />
+  ),
 }));
 jest.mock('./DraftTopBand', () => ({
   DraftTopBand: () => <div data-testid="draft-top-band" />,
@@ -241,6 +245,51 @@ describe('AutomatedDraftScreen', () => {
     expect(
       getByText('Results will appear when the automated draft is complete.'),
     ).toBeTruthy();
+  });
+});
+
+// LS-4662 — sport prop drills through to DraftPlayerBoard, PreDraftLobby,
+// and the root data-sport attribute. Baseball is the default.
+describe('EliteDraftBoardScreen — sport prop (LS-4662)', () => {
+  it('defaults to baseball and passes it to DraftPlayerBoard', () => {
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+    expect(getByTestId('draft-player-board').getAttribute('data-sport')).toBe(
+      'baseball',
+    );
+  });
+
+  it('passes football sport down to DraftPlayerBoard and sets data-sport on root', () => {
+    const { getByTestId, container } = render(
+      <EliteDraftBoardScreen {...defaultProps} sport="football" />,
+    );
+    expect(getByTestId('draft-player-board').getAttribute('data-sport')).toBe(
+      'football',
+    );
+    expect(container.querySelector('.d-root')?.getAttribute('data-sport')).toBe(
+      'football',
+    );
+  });
+
+  it('passes sport down to PreDraftLobby when the league has no active draft', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'pre_draft',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueDraft: null,
+        draftId: null,
+      }),
+    );
+    const { getByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} sport="football" />,
+    );
+    expect(getByTestId('pre-draft-lobby').getAttribute('data-sport')).toBe(
+      'football',
+    );
   });
 });
 

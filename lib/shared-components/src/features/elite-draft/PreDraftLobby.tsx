@@ -1,12 +1,15 @@
 import React from 'react';
 import type { LeagueTeam } from './types';
 import { CSS } from './styles';
+import type { SportKind } from '../../config/sports';
 
 interface PreDraftLobbyProps {
   league:
     | { name?: string | null; draftStatus?: string | null }
     | null
     | undefined;
+  /** Active league sport — drives lobby copy and icon. */
+  sport: SportKind;
   leagueTeams: LeagueTeam[];
   myTeamId: number | null;
   isOwner: boolean;
@@ -18,8 +21,25 @@ interface PreDraftLobbyProps {
   onInitializeDraft: (order: 'snake' | 'linear') => Promise<void>;
 }
 
+const LOBBY_CHROME: Record<
+  SportKind,
+  { icon: string; iconLabel: string; strapline: string }
+> = {
+  baseball: {
+    icon: '⚾',
+    iconLabel: 'baseball',
+    strapline: 'Dead Ball Dynasty',
+  },
+  football: {
+    icon: '🏈',
+    iconLabel: 'football',
+    strapline: 'Gridiron Dynasty',
+  },
+};
+
 export function PreDraftLobby({
   league,
+  sport,
   leagueTeams,
   myTeamId,
   isOwner,
@@ -30,15 +50,29 @@ export function PreDraftLobby({
   initDraftLoading,
   onInitializeDraft,
 }: PreDraftLobbyProps): React.JSX.Element {
+  const chrome = LOBBY_CHROME[sport];
   return (
-    <div className="d-root">
+    <div className="d-root" data-sport={sport}>
       <style>{CSS}</style>
       <div className="d-bg-fx" />
       <div className="d-state-center">
         <div className="d-state-icon">
-          <span role="img" aria-label="baseball">
-            ⚾
+          <span role="img" aria-label={chrome.iconLabel}>
+            {chrome.icon}
           </span>
+        </div>
+        <div
+          className="d-state-eyebrow"
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            color: 'var(--d-accent)',
+            marginBottom: 4,
+          }}
+        >
+          {chrome.strapline}
         </div>
         <div className="d-state-title">
           {league?.name ? `${league.name} — Live Draft` : 'Live Draft Lobby'}
