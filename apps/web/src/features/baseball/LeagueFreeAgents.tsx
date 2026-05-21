@@ -1280,14 +1280,16 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                         scale: 1.05,
                       }}
                       pressStyle={{ scale: 0.95 }}
-                      onPress={() =>
+                      disabled={player.id == null}
+                      onPress={() => {
+                        if (player.id == null) return;
                         setClaimPlayer({
-                          id: player.id ?? 0,
+                          id: player.id,
                           firstName: player.firstName,
                           lastName: player.lastName,
                           eligiblePositions: player.eligiblePositions,
-                        })
-                      }
+                        });
+                      }}
                       aria-label={buildFreeAgentAriaLabel(
                         player.firstName,
                         player.lastName,
