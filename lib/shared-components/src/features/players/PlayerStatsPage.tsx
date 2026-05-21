@@ -11,10 +11,13 @@ import type {
 import type { PlayerCareerStats } from './services/CareerStatsService';
 import { Platform } from '../../platform-components';
 import {
-  BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  STATS_BORDER,
+  STATS_PAGE_TOKENS,
   SURFACE_CARD,
   SURFACE_PANEL,
   TEXT_MUTED,
@@ -31,6 +34,11 @@ const OUTLINE_SUBTLE = '#1C2740';
 const OUTLINE_DEFAULT = '#2F3B53';
 const FG3 = '#9CAAC5';
 const FG4 = '#6C80BA';
+
+// Stats Page surfaces (LS-4612 tokens). Re-exported here for clarity at call sites.
+const BG_PAGE = STATS_PAGE_TOKENS.BG_PAGE;
+const BG_PANEL = STATS_PAGE_TOKENS.BG_PANEL;
+const BG_ELEVATED = STATS_PAGE_TOKENS.BG_ELEVATED;
 
 // Export / Share gold-accent button — matches the BRAND_GOLD heritage treatment
 // from the Stats Page design (project/stats.css `.sp-btn-ghost` + toast border).
@@ -105,6 +113,52 @@ const MLB_TEAMS = [
   'WSN',
 ];
 
+/**
+ * Shell-level conditional state. When omitted, the data grid renders and
+ * handles its own internal loading/error/empty fallbacks. Setting this prop
+ * (e.g. from an integrator that fetches above the shell) replaces the grid
+ * with the design-spec state card.
+ */
+export type PlayerStatsShellState = 'loading' | 'error' | 'empty';
+
+/**
+ * Setters consumed by {@link createClearFiltersHandler}. Extracted so the
+ * EmptyCard's clear-all-filters affordance can be unit-tested without
+ * mounting the full page shell (LS-4613).
+ */
+export interface ClearFiltersSetters {
+  setSearch: (v: string) => void;
+  setPosition: (v: string) => void;
+  setTeam: (v: string) => void;
+  setMinHR: (v: number) => void;
+  setMinAVG: (v: number) => void;
+  setMaxERA: (v: number) => void;
+}
+
+/**
+ * Builds the EmptyCard `onClear` handler. Resets every filter draft to its
+ * page default (empty search, "All Positions"/"All Teams", zeroed sliders,
+ * MaxERA back to the off-sentinel), commits the snapshot via `applyFilters`,
+ * then forwards to the integrator's optional `onClearFilters` callback so
+ * URL/query state can be mirrored.
+ */
+export function createClearFiltersHandler(
+  setters: ClearFiltersSetters,
+  applyFilters: () => void,
+  onClearFilters?: () => void,
+): () => void {
+  return () => {
+    setters.setSearch('');
+    setters.setPosition('All Positions');
+    setters.setTeam('All Teams');
+    setters.setMinHR(0);
+    setters.setMinAVG(0);
+    setters.setMaxERA(ERA_MAX_OFF);
+    applyFilters();
+    onClearFilters?.();
+  };
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -114,6 +168,12 @@ export interface PlayerStatsPageProps {
   showActions?: boolean;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+  /** Force a shell-level state card (loading / error / empty) instead of the data grid. */
+  state?: PlayerStatsShellState;
+  /** Retry handler used by the error state. */
+  onRetry?: () => void;
+  /** Clear-filters handler used by the empty state. Defaults to resetting local filter draft. */
+  onClearFilters?: () => void;
   onPlayerDetails?: (player: PlayerWithStats) => void;
   onExport?: (
     filters: PlayerStatsFilters,
@@ -168,6 +228,9 @@ export function PlayerStatsPage({
   showHeader = true,
   showActions = true,
   statsFormat = 'expanded',
+  state,
+  onRetry,
+  onClearFilters,
   onPlayerDetails,
   onExport,
   onShare,
@@ -374,8 +437,8 @@ export function PlayerStatsPage({
   }, [viewMode, pageSize, search, position, team, minHR, minAVG, maxERA]);
 
   return (
-    <YStack flex={1} style={{ backgroundColor: BG_DARK }}>
-      {/* ── Web-only CSS: crossfade tab transitions, slider track ── */}
+    <YStack flex={1} style={{ backgroundColor: BG_PAGE }}>
+      {/* ── Web-only CSS: crossfade tab transitions, slider track, state shimmer ── */}
       {Platform.OS === 'web' && (
         <style>{`
           @keyframes ps-fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -383,6 +446,7 @@ export function PlayerStatsPage({
             from { opacity: 0; transform: translateY(-6px); }
             to { opacity: 1; transform: translateY(0); }
           }
+          @keyframes ps-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
           @media (prefers-reduced-motion: no-preference) {
             .ps-tabContent { animation: ps-fadeIn 140ms ease forwards; }
             .ps-adv-panel { animation: ps-advSlide 180ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
@@ -394,14 +458,18 @@ export function PlayerStatsPage({
             background: linear-gradient(to right, ${BRAND_GOLD} 0%, ${BRAND_GOLD} var(--pct,0%), rgba(255,255,255,0.08) var(--pct,0%), rgba(255,255,255,0.08) 100%);
             border-radius: 9999px; outline: 0; cursor: pointer; }
           .ps-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px;
-            border-radius: 50%; background: ${BRAND_GOLD}; border: 2px solid ${BG_DARK}; cursor: pointer; }
+            border-radius: 50%; background: ${BRAND_GOLD}; border: 2px solid ${BG_PAGE}; cursor: pointer; }
           .ps-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%;
-            background: ${BRAND_GOLD}; border: 2px solid ${BG_DARK}; cursor: pointer; }
+            background: ${BRAND_GOLD}; border: 2px solid ${BG_PAGE}; cursor: pointer; }
           .ps-select-native { appearance: none; background: transparent; border: 0; outline: 0;
             color: ${TEXT_PRIMARY}; font-family: ${FONT_BODY}; font-size: 14px; padding: 0; cursor: pointer; width: 100%; }
           .ps-select-native option { background: ${SURFACE_PANEL}; color: ${TEXT_PRIMARY}; }
+          .ps-sk-bar { display: inline-block; height: 10px; border-radius: 3px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.04) 100%);
+            background-size: 400px 100%; animation: ps-shimmer 1.4s linear infinite; }
           @media (prefers-reduced-motion: reduce) {
             .ps-tabContent { animation: none; }
+            .ps-sk-bar { animation: none; background: rgba(255,255,255,0.08); }
           }
         `}</style>
       )}
@@ -590,14 +658,19 @@ export function PlayerStatsPage({
         }}
       >
         {/* ── View mode tabs: Combined / Hitters / Pitchers ─────────── */}
-        {/* MOTION: crossfade 140ms on tab switch; no layout shift */}
+        {/* Pill cluster (BRAND_NAVY selected fill) per design `.sp-tabs`.    */}
+        {/* MOTION: crossfade 140ms on tab switch; no layout shift.           */}
         <XStack
           role="tablist"
           accessibilityRole="tablist"
           aria-label="Player stats view mode"
           style={{
-            borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-            gap: 2,
+            alignSelf: 'flex-start',
+            gap: 4,
+            padding: 5,
+            background: BG_PANEL,
+            border: `1px solid ${STATS_BORDER}`,
+            borderRadius: 9999,
           }}
         >
           {(
@@ -606,51 +679,42 @@ export function PlayerStatsPage({
               ['hitters', 'Hitters'],
               ['pitchers', 'Pitchers'],
             ] as const
-          ).map(([id, label]) => (
-            <Pressable
-              key={id}
-              onPress={() => setViewMode(id)}
-              role="tab"
-              accessibilityRole="tab"
-              aria-selected={viewMode === id}
-              accessibilityState={{ selected: viewMode === id }}
-              style={{
-                paddingVertical: 14,
-                paddingHorizontal: 22,
-                backgroundColor: 'transparent',
-                position: 'relative',
-                minHeight: 48,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Text
+          ).map(([id, label]) => {
+            const selected = viewMode === id;
+            return (
+              <Pressable
+                key={id}
+                onPress={() => setViewMode(id)}
+                role="tab"
+                accessibilityRole="tab"
+                aria-selected={selected}
+                accessibilityState={{ selected }}
                 style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: '700',
-                  fontSize: 13,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: viewMode === id ? TEXT_PRIMARY : FG3,
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  borderRadius: 9999,
+                  backgroundColor: selected ? BRAND_NAVY : 'transparent',
+                  minHeight: 44,
+                  minWidth: 44,
+                  justifyContent: 'center',
+                  alignItems: 'center',
                 }}
               >
-                {label}
-              </Text>
-              {viewMode === id && (
-                <YStack
+                <Text
                   style={{
-                    position: 'absolute',
-                    left: 18,
-                    right: 18,
-                    bottom: -1,
-                    height: 3,
-                    backgroundColor: BRAND_GOLD,
-                    borderRadius: 2,
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '700',
+                    fontSize: 12,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: selected ? '#FFFFFF' : FG3,
                   }}
-                />
-              )}
-            </Pressable>
-          ))}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </XStack>
 
         {/* ── Toolbar: search, position, page size, advanced ─────────── */}
@@ -1064,44 +1128,389 @@ export function PlayerStatsPage({
           </YStack>
         )}
 
-        {/* ── Batting table ─────────────────────────────────────────── */}
-        {showBatting && (
-          <YStack
-            key={battingKey}
-            className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
+        {/* ── ARIA live region: announces shell-level state changes ─── */}
+        {Platform.OS === 'web' && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: 'hidden',
+              clip: 'rect(0,0,0,0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
           >
-            <PlayerStatsDataGrid
-              title="MLB Career Batting Leaders"
-              initialParams={battingParams}
-              onPlayerSelect={handleBattingPlayerClick}
-              showSearch={false}
-              showFilters={false}
-              showSorting={true}
-              showPagination={true}
-              statsFormat={statsFormat}
-            />
-          </YStack>
+            {state ? STATE_ANNOUNCEMENTS[state] : ''}
+          </div>
         )}
 
-        {/* ── Pitching table ────────────────────────────────────────── */}
-        {showPitching && (
-          <YStack
-            key={pitchingKey}
-            className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
-          >
-            <PitchingStatsDataGrid
-              title="MLB Career Pitching Leaders"
-              initialParams={pitchingParams}
-              onPlayerSelect={handlePitchingPlayerClick}
-              showSearch={false}
-              showFilters={false}
-              showSorting={true}
-              showPagination={true}
-              statsFormat={statsFormat}
-            />
-          </YStack>
+        {/* ── Content: state card OR populated data grid ────────────── */}
+        {state === 'loading' ? (
+          <LoadingSkeleton viewMode={viewMode} />
+        ) : state === 'error' ? (
+          <ErrorCard onRetry={onRetry} />
+        ) : state === 'empty' ? (
+          <EmptyCard
+            onClear={createClearFiltersHandler(
+              {
+                setSearch,
+                setPosition,
+                setTeam,
+                setMinHR,
+                setMinAVG,
+                setMaxERA,
+              },
+              applyFilters,
+              onClearFilters,
+            )}
+          />
+        ) : (
+          <>
+            {/* ── Batting table ─────────────────────────────────────── */}
+            {showBatting && (
+              <YStack
+                key={battingKey}
+                className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
+              >
+                <PlayerStatsDataGrid
+                  title="MLB Career Batting Leaders"
+                  initialParams={battingParams}
+                  onPlayerSelect={handleBattingPlayerClick}
+                  showSearch={false}
+                  showFilters={false}
+                  showSorting={true}
+                  showPagination={true}
+                  statsFormat={statsFormat}
+                />
+              </YStack>
+            )}
+
+            {/* ── Pitching table ────────────────────────────────────── */}
+            {showPitching && (
+              <YStack
+                key={pitchingKey}
+                className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
+              >
+                <PitchingStatsDataGrid
+                  title="MLB Career Pitching Leaders"
+                  initialParams={pitchingParams}
+                  onPlayerSelect={handlePitchingPlayerClick}
+                  showSearch={false}
+                  showFilters={false}
+                  showSorting={true}
+                  showPagination={true}
+                  statsFormat={statsFormat}
+                />
+              </YStack>
+            )}
+          </>
         )}
       </YStack>
+    </YStack>
+  );
+}
+
+// ── Conditional state primitives ───────────────────────────────────────────────
+
+const STATE_ANNOUNCEMENTS: Record<PlayerStatsShellState, string> = {
+  loading: 'Loading player statistics.',
+  error: 'Unable to load player statistics.',
+  empty: 'No players match the current filters.',
+};
+
+const SKELETON_ROWS = 8;
+const SKELETON_COLS_BY_MODE: Record<
+  'combined' | 'hitters' | 'pitchers',
+  number
+> = {
+  combined: 12,
+  hitters: 10,
+  pitchers: 9,
+};
+
+interface LoadingSkeletonProps {
+  viewMode: 'combined' | 'hitters' | 'pitchers';
+}
+
+function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
+  const colCount = SKELETON_COLS_BY_MODE[viewMode];
+  return (
+    <YStack
+      testID="player-stats-loading-skeleton"
+      role="presentation"
+      aria-hidden={true}
+      style={{
+        background: BG_ELEVATED,
+        border: `1px solid ${STATS_BORDER}`,
+        borderRadius: 12,
+        padding: 18,
+        gap: 14,
+      }}
+    >
+      <XStack justifyContent="space-between" alignItems="center">
+        <YStack gap={6}>
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: BRAND_GOLD_LIGHT,
+            }}
+          >
+            Loading
+          </Text>
+          <Text style={{ fontFamily: FONT_BODY, fontSize: 13, color: FG4 }}>
+            Fetching archived seasons…
+          </Text>
+        </YStack>
+      </XStack>
+      <YStack gap={10}>
+        {Array.from({ length: SKELETON_ROWS }).map((_, r) => (
+          <XStack
+            key={r}
+            alignItems="center"
+            style={{
+              gap: 12,
+              padding: '10px 8px',
+              borderBottom: `1px solid ${withAlpha(BRAND_GOLD, 0.06)}`,
+            }}
+          >
+            <SkeletonBar width={140} />
+            <SkeletonBar width={40} />
+            <SkeletonBar width={40} />
+            {Array.from({ length: colCount }).map((_, c) => (
+              <SkeletonBar key={c} width={48} />
+            ))}
+          </XStack>
+        ))}
+      </YStack>
+    </YStack>
+  );
+}
+
+function SkeletonBar({ width }: { width: number }) {
+  if (Platform.OS === 'web') {
+    return (
+      <span
+        className="ps-sk-bar"
+        style={{ width, flex: '0 0 auto' } as React.CSSProperties}
+      />
+    );
+  }
+  return (
+    <YStack
+      style={{
+        width,
+        height: 10,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+      }}
+    />
+  );
+}
+
+interface ErrorCardProps {
+  onRetry?: () => void;
+}
+
+function ErrorCard({ onRetry }: ErrorCardProps) {
+  return (
+    <YStack
+      testID="player-stats-error-card"
+      role="alert"
+      aria-live="assertive"
+      style={{
+        alignSelf: 'center',
+        maxWidth: 520,
+        width: '100%',
+        margin: '32px auto',
+        padding: '40px 28px',
+        background: BG_ELEVATED,
+        border: `1px solid ${BRAND_SEAM_RED}`,
+        borderRadius: 12,
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      {Platform.OS === 'web' && (
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={BRAND_SEAM_RED}
+          strokeWidth="1.6"
+          aria-hidden="true"
+        >
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      )}
+      <Text
+        tag="h3"
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '800',
+          fontSize: 24,
+          color: TEXT_PRIMARY,
+          margin: 0,
+          textAlign: 'center',
+        }}
+      >
+        Unable to load player stats
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 14,
+          color: TEXT_MUTED,
+          textAlign: 'center',
+          maxWidth: '60ch',
+          lineHeight:
+            Platform.OS === 'web' ? ('1.55' as unknown as number) : 22,
+          margin: 0,
+        }}
+      >
+        We couldn't reach the archive service. Your filters are safe — we'll
+        restore them when the connection returns.
+      </Text>
+      {onRetry && (
+        <Pressable
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading player statistics"
+          style={{
+            marginTop: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 22,
+            borderRadius: 9999,
+            backgroundColor: BRAND_NAVY,
+            minHeight: 44,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 12,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#FFFFFF',
+            }}
+          >
+            Retry
+          </Text>
+        </Pressable>
+      )}
+    </YStack>
+  );
+}
+
+interface EmptyCardProps {
+  onClear?: () => void;
+}
+
+function EmptyCard({ onClear }: EmptyCardProps) {
+  return (
+    <YStack
+      testID="player-stats-empty-card"
+      role="status"
+      style={{
+        alignSelf: 'center',
+        maxWidth: 520,
+        width: '100%',
+        margin: '32px auto',
+        padding: '40px 28px',
+        background: BG_ELEVATED,
+        border: `1px solid ${STATS_BORDER}`,
+        borderRadius: 12,
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      {Platform.OS === 'web' && (
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={FG4}
+          strokeWidth="1.4"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          <line x1="8" y1="11" x2="14" y2="11" />
+        </svg>
+      )}
+      <Text
+        tag="h3"
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '800',
+          fontSize: 24,
+          color: TEXT_PRIMARY,
+          margin: 0,
+          textAlign: 'center',
+        }}
+      >
+        No players found
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 14,
+          color: TEXT_MUTED,
+          textAlign: 'center',
+          maxWidth: '60ch',
+          lineHeight:
+            Platform.OS === 'web' ? ('1.55' as unknown as number) : 22,
+          margin: 0,
+        }}
+      >
+        No players match the current filters. Try widening your search, relaxing
+        a range, or clearing filters entirely.
+      </Text>
+      {onClear && (
+        <Pressable
+          onPress={onClear}
+          accessibilityRole="button"
+          accessibilityLabel="Clear all filters"
+          style={{
+            marginTop: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 22,
+            borderRadius: 9999,
+            backgroundColor: BRAND_NAVY,
+            minHeight: 44,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 12,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#FFFFFF',
+            }}
+          >
+            Clear all filters
+          </Text>
+        </Pressable>
+      )}
     </YStack>
   );
 }
