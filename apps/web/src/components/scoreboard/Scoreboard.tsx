@@ -21,6 +21,7 @@ import {
   LiveLamp,
   type ScoreboardGame,
 } from '@legacy-sports/shared-components';
+import { SportFilter, type SportKey } from './SportFilter';
 import { useGetScoreboardQuery } from '../../api/db/graphql.generated';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
@@ -300,11 +301,16 @@ function SkeletonBar({
 
 export function Scoreboard() {
   const [date, setDate] = useState(todayISO());
+  const [sport, setSport] = useState<SportKey>('all');
 
   const { data, loading, error, startPolling, stopPolling } =
     useGetScoreboardQuery({
       variables: { date },
       fetchPolicy: 'cache-and-network',
+      // Skip the network round-trip while NFL is selected — there is no NFL
+      // backend yet, and reusing MLB data under an "NFL" label would be
+      // misleading.
+      skip: sport === 'nfl',
     });
 
   // The generated `GetScoreboardQuery` shape is structurally compatible with
@@ -343,6 +349,8 @@ export function Scoreboard() {
       <Header
         date={date}
         onDateChange={setDate}
+        sport={sport}
+        onSportChange={setSport}
         liveCount={liveGames.length}
         upcomingCount={upcomingGames.length}
         finalCount={finalGames.length}
@@ -350,32 +358,41 @@ export function Scoreboard() {
         isAnyGameLive={isAnyGameLive}
       />
 
-      {loading && !data && <LoadingState />}
+      {sport === 'nfl' ? (
+        <NflComingSoonView />
+      ) : (
+        <>
+          {loading && !data && <LoadingState />}
 
-      {error && <ErrorView />}
+          {error && <ErrorView />}
 
-      {!loading && !error && data && data.scoreboard === null && <NoDataView />}
-
-      {!loading && !error && data?.scoreboard != null && games.length === 0 && (
-        <EmptyView date={date} />
-      )}
-
-      {games.length > 0 && (
-        <YStack gap="$6" marginTop="$5">
-          {liveGames.length > 0 && (
-            <SectionGrid kind="live" label="Live Now" games={liveGames} />
+          {!loading && !error && data && data.scoreboard === null && (
+            <NoDataView />
           )}
-          {upcomingGames.length > 0 && (
-            <SectionGrid
-              kind="upcoming"
-              label="Upcoming"
-              games={upcomingGames}
-            />
+
+          {!loading &&
+            !error &&
+            data?.scoreboard != null &&
+            games.length === 0 && <EmptyView date={date} />}
+
+          {games.length > 0 && (
+            <YStack gap="$6" marginTop="$5">
+              {liveGames.length > 0 && (
+                <SectionGrid kind="live" label="Live Now" games={liveGames} />
+              )}
+              {upcomingGames.length > 0 && (
+                <SectionGrid
+                  kind="upcoming"
+                  label="Upcoming"
+                  games={upcomingGames}
+                />
+              )}
+              {finalGames.length > 0 && (
+                <SectionGrid kind="final" label="Final" games={finalGames} />
+              )}
+            </YStack>
           )}
-          {finalGames.length > 0 && (
-            <SectionGrid kind="final" label="Final" games={finalGames} />
-          )}
-        </YStack>
+        </>
       )}
     </YStack>
   );
@@ -386,6 +403,8 @@ export function Scoreboard() {
 function Header({
   date,
   onDateChange,
+  sport,
+  onSportChange,
   liveCount,
   upcomingCount,
   finalCount,
@@ -394,6 +413,8 @@ function Header({
 }: {
   date: string;
   onDateChange: (d: string) => void;
+  sport: SportKey;
+  onSportChange: (s: SportKey) => void;
   liveCount: number;
   upcomingCount: number;
   finalCount: number;
@@ -467,7 +488,7 @@ function Header({
             fontSize={40}
             lineHeight={40}
           >
-            MLB Scoreboard
+            {sport === 'nfl' ? 'NFL Scoreboard' : 'MLB Scoreboard'}
           </H1>
           <Text
             fontStyle="italic"
@@ -479,7 +500,10 @@ function Header({
           </Text>
         </YStack>
 
-        <DateNav date={date} onChange={onDateChange} />
+        <YStack alignItems="flex-end" gap="$2">
+          <SportFilter value={sport} onChange={onSportChange} />
+          <DateNav date={date} onChange={onDateChange} />
+        </YStack>
       </XStack>
 
       {counters.length > 0 && (
@@ -670,6 +694,51 @@ function EmptyView({ date }: { date: string }) {
         >
           The league is dark on {formatDisplayDate(date)}. Try yesterday’s
           finals or jump ahead to tomorrow’s slate.
+        </Text>
+      </YStack>
+    </Card>
+  );
+}
+
+function NflComingSoonView() {
+  return (
+    <Card
+      bordered
+      backgroundColor="$surfaceCard"
+      borderColor="$borderColor"
+      padding="$8"
+      marginTop="$5"
+      data-testid="scoreboard-nfl-coming-soon"
+    >
+      <YStack alignItems="center" gap="$3">
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          letterSpacing={2.5}
+          textTransform="uppercase"
+          color="$brandGoldLight"
+          fontFamily={FONT_DISPLAY}
+        >
+          National Football League
+        </Text>
+        <Text
+          fontSize={28}
+          fontWeight="800"
+          color="$color12"
+          fontFamily={FONT_DISPLAY}
+          textAlign="center"
+        >
+          NFL scoreboard coming soon
+        </Text>
+        <Text
+          fontSize={16}
+          color="$color11"
+          fontFamily={FONT_BODY}
+          textAlign="center"
+          maxWidth={520}
+        >
+          Live football scores and linescores will land here once the NFL feed
+          is wired up. In the meantime, switch back to MLB for live baseball.
         </Text>
       </YStack>
     </Card>

@@ -430,6 +430,154 @@ test.describe('Scoreboard — error state @regression', () => {
   });
 });
 
+// ─── Sport filter pill (LS-4584) — MLB/All show games, NFL shows placeholder ─
+
+test.describe('Scoreboard — sport filter @regression', () => {
+  test('renders the All / MLB / NFL sport filter pill', async ({ page }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+
+    // All three options are present and accessible as radio buttons.
+    const group = page.getByRole('radiogroup', {
+      name: /filter scoreboard by sport/i,
+    });
+    await expect(group).toBeVisible();
+    await expect(page.getByTestId('scoreboard-sport-all')).toBeVisible();
+    await expect(page.getByTestId('scoreboard-sport-mlb')).toBeVisible();
+    await expect(page.getByTestId('scoreboard-sport-nfl')).toBeVisible();
+
+    // Default selection is "All".
+    await expect(page.getByTestId('scoreboard-sport-all')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByTestId('scoreboard-sport-mlb')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await expect(page.getByTestId('scoreboard-sport-nfl')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  test('selecting NFL renders the coming-soon placeholder and skips MLB data', async ({
+    page,
+  }) => {
+    // Track GetScoreboard request count so we can confirm the query is
+    // skipped while NFL is active. Apollo's cache-and-network policy fires
+    // an initial request on mount; switching to NFL must not fire another.
+    let scoreboardRequestCount = 0;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const opName = extractOperationName(route).toLowerCase();
+      if (opName !== 'getscoreboard') {
+        await route.fallback();
+        return;
+      }
+      scoreboardRequestCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            scoreboard: {
+              __typename: 'Scoreboard',
+              date: '2026-04-01',
+              lastUpdated: FIXED_NOW_ISO,
+              games: [MOCK_LIVE_GAME, MOCK_FINAL_GAME],
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+    await expect(page.getByTestId('scoreboard-heading')).toContainText(
+      'MLB Scoreboard',
+    );
+    const requestsAfterMount = scoreboardRequestCount;
+    expect(requestsAfterMount).toBeGreaterThan(0);
+
+    // Switch to NFL — heading flips, placeholder shows, MLB cards hide.
+    await page.getByTestId('scoreboard-sport-nfl').click();
+    await expect(page.getByTestId('scoreboard-heading')).toContainText(
+      'NFL Scoreboard',
+    );
+    await expect(page.getByTestId('scoreboard-nfl-coming-soon')).toBeVisible();
+    await expect(page.getByTestId('scoreboard-nfl-coming-soon')).toContainText(
+      'coming soon',
+    );
+    await expect(page.getByTestId('game-card-1001')).not.toBeVisible();
+
+    // No new GetScoreboard requests should fire while NFL is selected.
+    await page.waitForTimeout(300);
+    expect(scoreboardRequestCount).toBe(requestsAfterMount);
+
+    // Switch back to MLB — placeholder hides, MLB cards return.
+    await page.getByTestId('scoreboard-sport-mlb').click();
+    await expect(page.getByTestId('scoreboard-heading')).toContainText(
+      'MLB Scoreboard',
+    );
+    await expect(
+      page.getByTestId('scoreboard-nfl-coming-soon'),
+    ).not.toBeVisible();
+    await expect(page.getByTestId('game-card-1001')).toBeVisible();
+  });
+
+  test('clicking MLB updates aria-checked and keeps MLB games visible', async ({
+    page,
+  }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+
+    await page.getByTestId('scoreboard-sport-mlb').click();
+    await expect(page.getByTestId('scoreboard-sport-mlb')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByTestId('scoreboard-sport-all')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    // MLB cards remain visible (the "MLB" selection behaves like "All" today
+    // since there's only one sport in the data).
+    await expect(page.getByTestId('game-card-1001')).toBeVisible();
+  });
+
+  test('arrow keys move selection per radiogroup pattern', async ({ page }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+
+    // Focus the currently-selected radio (default: All), then arrow right.
+    const all = page.getByTestId('scoreboard-sport-all');
+    await all.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByTestId('scoreboard-sport-mlb')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    // ArrowRight again lands on NFL and shows the placeholder.
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByTestId('scoreboard-sport-nfl')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByTestId('scoreboard-nfl-coming-soon')).toBeVisible();
+
+    // ArrowLeft wraps back to MLB.
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByTestId('scoreboard-sport-mlb')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+});
+
 // ─── Public access — unauthenticated user can view /scoreboard (LS-3563) ──────
 
 unauthTest.describe('Scoreboard — unauthenticated access @critical', () => {
