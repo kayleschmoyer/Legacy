@@ -71,8 +71,14 @@ export function getTestPlayers(): TestPlayer[] {
   return _testPlayers;
 }
 
-// Upsert test users so they exist before any test runs.
-// Players are real data already in the DB — no insert needed.
+// Minimum players required for 4-team × 2-round snake-draft tests (4 × 2 = 8).
+const MIN_TEST_PLAYERS = 8;
+
+// Upsert test users and ensure enough player rows exist for draft tests.
+// In environments backed by real data (dev RDS via SSM tunnel), the players
+// table is already populated and the seed insert is a no-op via ON CONFLICT.
+// In CI's ephemeral postgres service container, migrations create an empty
+// schema — this seed makes the suite self-sufficient there.
 async function ensureTestFixtures(): Promise<void> {
   await db!.execute(sql`
     INSERT INTO app_internal.users (id, email, username, access_level)
@@ -86,8 +92,29 @@ async function ensureTestFixtures(): Promise<void> {
       access_level = EXCLUDED.access_level
   `);
 
-  // Load real players from the DB for use in tests
   const { players } = PublicSchema;
+  const [{ count: playerCount }] = await db!
+    .select({ count: sql<number>`count(*)::int` })
+    .from(players);
+
+  if (playerCount < MIN_TEST_PLAYERS) {
+    // bref_id is varchar(10) with a unique constraint. Test fixtures use the
+    // `test_` prefix to make them obvious in any DB they leak into.
+    await db!.execute(sql`
+      INSERT INTO players (first_name, last_name, bref_id)
+      VALUES
+        ('Test', 'Player01', 'test_p01'),
+        ('Test', 'Player02', 'test_p02'),
+        ('Test', 'Player03', 'test_p03'),
+        ('Test', 'Player04', 'test_p04'),
+        ('Test', 'Player05', 'test_p05'),
+        ('Test', 'Player06', 'test_p06'),
+        ('Test', 'Player07', 'test_p07'),
+        ('Test', 'Player08', 'test_p08')
+      ON CONFLICT (bref_id) DO NOTHING
+    `);
+  }
+
   const rows = await db!
     .select({
       id: players.id,
@@ -98,9 +125,9 @@ async function ensureTestFixtures(): Promise<void> {
     .from(players)
     .limit(20);
 
-  if (rows.length < 8) {
+  if (rows.length < MIN_TEST_PLAYERS) {
     throw new Error(
-      `DB integration tests require at least 8 players in the players table (found ${rows.length})`,
+      `DB integration tests require at least ${MIN_TEST_PLAYERS} players in the players table (found ${rows.length})`,
     );
   }
   _testPlayers = rows;

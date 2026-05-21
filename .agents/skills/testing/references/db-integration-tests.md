@@ -18,7 +18,7 @@ Use these as league owners, team members, etc. **Do not re-insert them** in spec
 
 ### Real Players via `getTestPlayers()`
 
-Player rows are real data already in the DB. Never insert test players. Use `getTestPlayers()` (exported from `integration-test-setup.ts`) to get a slice of real player rows:
+Player rows come from the DB. In environments backed by real data (dev RDS via SSM tunnel), `getTestPlayers()` returns real players. In CI's ephemeral postgres service container, `ensureTestFixtures()` seeds 8 `Test Player##` rows (bref_id `test_p01`–`test_p08`) when the table is empty, so the suite is self-sufficient. Never insert additional test players in spec files. Use `getTestPlayers()` (exported from `integration-test-setup.ts`) to get a slice of player rows:
 
 ```typescript
 import { getTestPlayers } from '../../integration-test-setup';
@@ -168,4 +168,4 @@ import { getLeague, getTeam, getUser } from '../__fixtures__';
 DB integration tests require at least 8 players in the players table (found N)
 ```
 
-Fix: restore the DB from backup (`make db-restore`) or seed player data.
+This is unreachable in practice: `ensureTestFixtures()` seeds 8 `Test Player##` rows when the table starts empty (CI), and any real backup has thousands of players (local/dev RDS). If you do see it, the seed insert itself failed — check Postgres logs.
