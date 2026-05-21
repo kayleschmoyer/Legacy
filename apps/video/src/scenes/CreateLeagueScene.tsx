@@ -9,9 +9,11 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
+  BRAND_GOLD_DARK,
   BRAND_GOLD_LIGHT,
   FONT_BODY,
   FONT_DISPLAY,
+  FONT_MONO,
   GLASS_BORDER,
   OUTLINE_DEFAULT,
   OUTLINE_SUBTLE,
@@ -19,6 +21,8 @@ import {
   SURFACE_RAISED,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  TEXT_QUIETEST,
+  TEXT_SECONDARY,
 } from '../theme';
 
 // ─── Small field components ──────────────────────────────────────────────────
@@ -77,7 +81,7 @@ const Chip: React.FC<{ label: string; on?: boolean }> = ({
       padding: '12px 22px',
       borderRadius: 9999,
       border: `1px solid ${on ? 'rgba(197,165,90,0.55)' : OUTLINE_DEFAULT}`,
-      color: on ? BRAND_GOLD_LIGHT : TEXT_MUTED,
+      color: on ? BRAND_GOLD_LIGHT : TEXT_SECONDARY,
       background: on ? 'rgba(197,165,90,0.18)' : SURFACE_RAISED,
     }}
   >
@@ -102,7 +106,7 @@ const ToggleRow: React.FC<{ label: string; on?: boolean; last?: boolean }> = ({
     <div
       style={{
         fontFamily: FONT_BODY,
-        color: TEXT_MUTED,
+        color: TEXT_SECONDARY,
         fontSize: 24,
       }}
     >
@@ -115,7 +119,7 @@ const ToggleRow: React.FC<{ label: string; on?: boolean; last?: boolean }> = ({
         height: 28,
         borderRadius: 14,
         background: on ? BRAND_GOLD : SURFACE_RAISED,
-        border: `1px solid ${on ? '#A68B3E' : OUTLINE_DEFAULT}`,
+        border: `1px solid ${on ? BRAND_GOLD_DARK : OUTLINE_DEFAULT}`,
         position: 'relative',
         flexShrink: 0,
       }}
@@ -397,7 +401,7 @@ export const CreateLeagueScene: React.FC = () => {
                   marginBottom: 0,
                 }}
               >
-                {step.num} <span style={{ color: '#6C80BA' }}>/ 03</span>
+                {step.num} <span style={{ color: TEXT_QUIETEST }}>/ 03</span>
               </div>
 
               {/* Title */}
@@ -452,15 +456,15 @@ export const CreateLeagueScene: React.FC = () => {
             boxShadow: `0 0 12px ${BRAND_GOLD}`,
           }}
         />
-        Scene 04<span style={{ color: '#6C80BA' }}>/</span>Create League
+        Scene 04<span style={{ color: TEXT_QUIETEST }}>/</span>Create League
       </div>
       <div
         style={{
           position: 'absolute',
           right: 56,
           bottom: 40,
-          fontFamily: "'Roboto Mono', monospace",
-          color: '#6C80BA',
+          fontFamily: FONT_MONO,
+          color: TEXT_QUIETEST,
           fontSize: 24,
           letterSpacing: '0.08em',
           opacity: interpolate(frame, [60, 80], [0, 1], {
