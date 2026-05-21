@@ -34,17 +34,22 @@ import {
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
 import { getPageRange } from './paginationUtils';
+import {
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  getPositionColor,
+  OUTLINE_SUBTLE,
+  POS_UTILITY,
+  TEXT_HIGH_CONTRAST,
+  TEXT_MUTED,
+} from '../../utils/colors';
 
-// ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
-const BRAND_NAVY = '#1B3A5C';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
-const BRAND_NAVY_DARK = '#143050';
-const BRAND_GOLD = '#C5A55A';
-const BRAND_GOLD_LIGHT = '#D4BB78';
-const TEXT_HIGH_CONTRAST = '#F5F7FA';
-const TEXT_MUTED = '#9CAAC5';
 const BG_PAGE = '#0A0F1A';
-const OUTLINE_SUBTLE = '#1C2740';
+const BG_ELEVATED = '#16223A';
+const SURFACE_CARD_ROW = 'rgba(17,27,47,0.92)';
 
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
@@ -193,45 +198,47 @@ export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
 };
 
 /**
- * Predefined column configuration for career batting statistics
- * Ordered by importance and responsive priority
+ * Predefined column configuration for career batting (hitter) statistics.
+ * Order mirrors docs/design/.../legacy-sports-stats-page/project/uploads/stats.md
+ * (Hitter Columns section). Position is rendered as a chip inside the Player
+ * cell, so it is not a separate column. Team is not available on the underlying
+ * PlayerCareerStats data model and is omitted from this slice.
  */
-export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
+const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
   {
     key: 'displayName',
     label: 'Player',
     sortable: true,
-    width: '200px',
-    minWidth: 150,
+    width: '240px',
+    minWidth: 200,
     align: 'left',
     priority: 'high',
-    description: 'Player name and identifier',
-  },
-  {
-    key: 'formattedPositions',
-    label: 'Positions',
-    sortable: false,
-    width: '150px',
-    minWidth: 120,
-    align: 'left',
-    priority: 'medium',
-    description: 'Positions played with games count, sorted by most played',
+    description: 'Player name with position chip',
   },
   {
     key: 'games',
     label: 'G',
     sortable: true,
-    width: '60px',
-    align: 'center',
+    width: '56px',
+    align: 'right',
     priority: 'medium',
     description: 'Games played',
+  },
+  {
+    key: 'plateAppearances',
+    label: 'PA',
+    sortable: true,
+    width: '64px',
+    align: 'right',
+    priority: 'medium',
+    description: 'Plate appearances',
   },
   {
     key: 'atBats',
     label: 'AB',
     sortable: true,
-    width: '60px',
-    align: 'center',
+    width: '64px',
+    align: 'right',
     priority: 'medium',
     description: 'At bats',
   },
@@ -239,8 +246,8 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     key: 'hits',
     label: 'H',
     sortable: true,
-    width: '60px',
-    align: 'center',
+    width: '56px',
+    align: 'right',
     priority: 'high',
     description: 'Hits',
   },
@@ -248,8 +255,8 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     key: 'homeRuns',
     label: 'HR',
     sortable: true,
-    width: '60px',
-    align: 'center',
+    width: '56px',
+    align: 'right',
     priority: 'high',
     description: 'Home runs',
   },
@@ -258,16 +265,70 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     label: 'RBI',
     sortable: true,
     width: '60px',
-    align: 'center',
+    align: 'right',
     priority: 'high',
     description: 'Runs batted in',
+  },
+  {
+    key: 'stolenBases',
+    label: 'SB',
+    sortable: true,
+    width: '52px',
+    align: 'right',
+    priority: 'medium',
+    description: 'Stolen bases',
+  },
+  {
+    key: 'runs',
+    label: 'R',
+    sortable: true,
+    width: '52px',
+    align: 'right',
+    priority: 'medium',
+    description: 'Runs scored',
+  },
+  {
+    key: 'doubles',
+    label: '2B',
+    sortable: true,
+    width: '56px',
+    align: 'right',
+    priority: 'low',
+    description: 'Doubles',
+  },
+  {
+    key: 'triples',
+    label: '3B',
+    sortable: true,
+    width: '56px',
+    align: 'right',
+    priority: 'low',
+    description: 'Triples',
+  },
+  {
+    key: 'baseOnBalls',
+    label: 'BB',
+    sortable: true,
+    width: '56px',
+    align: 'right',
+    priority: 'low',
+    description: 'Base on balls (walks)',
+  },
+  {
+    key: 'strikeouts',
+    label: 'SO',
+    sortable: true,
+    width: '56px',
+    align: 'right',
+    priority: 'low',
+    description: 'Strikeouts',
   },
   {
     key: 'formattedBattingAverage',
     label: 'AVG',
     sortable: true,
-    width: '70px',
-    align: 'center',
+    width: '68px',
+    align: 'right',
     priority: 'high',
     description: 'Batting average',
   },
@@ -275,79 +336,30 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     key: 'formattedOnBasePercentage',
     label: 'OBP',
     sortable: true,
-    width: '70px',
-    align: 'center',
-    priority: 'medium',
+    width: '68px',
+    align: 'right',
+    priority: 'high',
     description: 'On-base percentage',
   },
   {
     key: 'formattedSluggingPercentage',
     label: 'SLG',
     sortable: true,
-    width: '70px',
-    align: 'center',
-    priority: 'medium',
+    width: '68px',
+    align: 'right',
+    priority: 'high',
     description: 'Slugging percentage',
-  },
-  {
-    key: 'formattedOPS',
-    label: 'OPS',
-    sortable: true,
-    width: '70px',
-    align: 'center',
-    priority: 'high',
-    description: 'On-base plus slugging',
-  },
-  {
-    key: 'fantasyPoints',
-    label: 'FPTS',
-    sortable: true,
-    width: '80px',
-    align: 'center',
-    priority: 'high',
-    description: 'Career fantasy points using default scoring settings',
-    formatter: (v: unknown) =>
-      v != null ? Math.round(v as number).toLocaleString() : '—',
-  },
-  {
-    key: 'fantasyPointsPerGame',
-    label: 'FPTS/G',
-    sortable: true,
-    width: '80px',
-    align: 'center',
-    priority: 'high',
-    description:
-      'Average fantasy points per game using default scoring settings',
-    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
   },
   {
     key: 'offensiveWAR',
     label: 'oWAR',
     sortable: true,
-    width: '70px',
-    align: 'center',
+    width: '72px',
+    align: 'right',
     priority: 'high',
     description:
       'Offensive WAR from Baseball Reference. Shown as — for players with fewer than 10 career plate appearances.',
     formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
-  },
-  {
-    key: 'stolenBases',
-    label: 'SB',
-    sortable: true,
-    width: '50px',
-    align: 'center',
-    priority: 'low',
-    description: 'Stolen bases',
-  },
-  {
-    key: 'strikeouts',
-    label: 'SO',
-    sortable: true,
-    width: '60px',
-    align: 'center',
-    priority: 'low',
-    description: 'Strikeouts',
   },
 ] as const;
 
@@ -826,13 +838,15 @@ export function PlayerStatsDataGrid({
             COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
           const isActiveSortColumn = queryParams.orderBy === sortField;
           const isDescending = queryParams.orderDirection === 'desc';
+          const isPlayerCol = column.key === 'displayName';
 
           return (
             <XStack
               key={column.key}
               width={column.width || 'auto'}
               minWidth={column.minWidth}
-              flexGrow={1}
+              flexGrow={isPlayerCol ? 0 : 1}
+              flexShrink={0}
               justifyContent={
                 column.align === 'center'
                   ? 'center'
@@ -841,14 +855,23 @@ export function PlayerStatsDataGrid({
                     : 'flex-start'
               }
               alignItems="center"
-              paddingHorizontal="$1"
+              paddingHorizontal="$2"
               paddingVertical="$1"
               borderRadius="$2"
               style={{
                 background: isActiveSortColumn
                   ? 'rgba(196,165,90,0.18)'
-                  : 'transparent',
+                  : isPlayerCol
+                    ? BRAND_NAVY_DARK
+                    : 'transparent',
                 transition: 'background 0.15s ease',
+                ...(isPlayerCol
+                  ? {
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 2,
+                    }
+                  : {}),
               }}
               hoverStyle={
                 column.sortable
@@ -906,19 +929,101 @@ export function PlayerStatsDataGrid({
       {/* Table Body */}
       <YStack flex={1} style={{ overflowX: 'auto' }}>
         {loading ? (
-          <XStack
+          <YStack
             testID="loading-indicator"
-            justifyContent="center"
-            alignItems="center"
-            padding="$6"
-            gap="$3"
+            aria-busy
+            aria-label="Loading player statistics..."
             style={{ background: 'transparent' }}
           >
-            <Spinner size="large" color={BRAND_NAVY_LIGHT as never} />
-            <Text style={{ color: TEXT_MUTED }}>
-              Loading player statistics...
-            </Text>
-          </XStack>
+            {/* Skeleton rows that mirror populated row geometry */}
+            {Array.from({ length: 8 }).map((_, rowIdx) => (
+              <XStack
+                key={`skel-${rowIdx}`}
+                style={{
+                  background: rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
+                  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+                }}
+                paddingVertical="$2"
+                paddingHorizontal="$3"
+              >
+                {visibleColumns.map((column) => {
+                  const isNameCol = column.key === 'displayName';
+                  return (
+                    <XStack
+                      key={column.key}
+                      width={column.width || 'auto'}
+                      minWidth={column.minWidth}
+                      flexGrow={isNameCol ? 0 : 1}
+                      flexShrink={0}
+                      alignItems="center"
+                      gap="$2"
+                      paddingHorizontal="$2"
+                      justifyContent={
+                        column.align === 'center'
+                          ? 'center'
+                          : column.align === 'right'
+                            ? 'flex-end'
+                            : 'flex-start'
+                      }
+                      style={
+                        isNameCol
+                          ? {
+                              position: 'sticky',
+                              left: 0,
+                              zIndex: 1,
+                              background:
+                                rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
+                              borderLeft: `1px solid ${OUTLINE_SUBTLE}`,
+                            }
+                          : undefined
+                      }
+                    >
+                      {isNameCol ? (
+                        <>
+                          <YStack
+                            style={{
+                              width: 32,
+                              height: 18,
+                              borderRadius: 4,
+                              background: 'rgba(255,255,255,0.08)',
+                            }}
+                          />
+                          <YStack
+                            style={{
+                              flex: 1,
+                              height: 12,
+                              borderRadius: 3,
+                              background: 'rgba(255,255,255,0.08)',
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <YStack
+                          style={{
+                            width: '70%',
+                            height: 10,
+                            borderRadius: 3,
+                            background: 'rgba(255,255,255,0.08)',
+                          }}
+                        />
+                      )}
+                    </XStack>
+                  );
+                })}
+              </XStack>
+            ))}
+            <XStack
+              justifyContent="center"
+              alignItems="center"
+              padding="$3"
+              gap="$2"
+            >
+              <Spinner size="small" color={BRAND_NAVY_LIGHT as never} />
+              <Text style={{ color: TEXT_MUTED, fontSize: 12 }}>
+                Loading player statistics...
+              </Text>
+            </XStack>
+          </YStack>
         ) : data.length === 0 ? (
           <YStack
             justifyContent="center"
@@ -976,13 +1081,12 @@ export function PlayerStatsDataGrid({
               key={player.id}
               data-testid={`player-row-${player.playerId}`}
               style={{
-                background: index % 2 === 0 ? BG_PAGE : 'rgba(17,27,47,0.8)',
+                background: index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
                 borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
                 transition: 'background 0.12s ease',
-                cursor: 'pointer',
               }}
               hoverStyle={{
-                backgroundColor: `rgba(27,58,92,0.3)` as never,
+                backgroundColor: BG_ELEVATED as never,
               }}
               pressStyle={{ scale: 0.998 }}
               paddingVertical="$2"
@@ -995,17 +1099,25 @@ export function PlayerStatsDataGrid({
                 const raw = player[column.key];
                 const cellValue = column.formatter
                   ? column.formatter(raw)
-                  : typeof raw === 'string' ||
-                      typeof raw === 'number' ||
-                      typeof raw === 'boolean'
-                    ? String(raw)
-                    : '—';
+                  : raw == null
+                    ? '—'
+                    : typeof raw === 'string' ||
+                        typeof raw === 'number' ||
+                        typeof raw === 'boolean'
+                      ? String(raw)
+                      : '—';
+                const rowBg = index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW;
+                const posKey = player.primaryPosition;
+                const posColor = posKey
+                  ? getPositionColor(posKey)
+                  : POS_UTILITY;
                 return (
                   <XStack
                     key={column.key}
                     width={column.width || 'auto'}
                     minWidth={column.minWidth}
-                    flexGrow={1}
+                    flexGrow={isNameCol ? 0 : 1}
+                    flexShrink={0}
                     justifyContent={
                       column.align === 'center'
                         ? 'center'
@@ -1014,7 +1126,45 @@ export function PlayerStatsDataGrid({
                           : 'flex-start'
                     }
                     alignItems="center"
+                    paddingHorizontal="$2"
+                    gap="$2"
+                    style={
+                      isNameCol
+                        ? {
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 1,
+                            background: rowBg,
+                            borderLeft: `1px solid ${posColor}`,
+                          }
+                        : undefined
+                    }
                   >
+                    {isNameCol && posKey ? (
+                      <XStack
+                        alignItems="center"
+                        justifyContent="center"
+                        paddingHorizontal={7}
+                        paddingVertical={3}
+                        style={{
+                          minWidth: 32,
+                          borderRadius: 4,
+                          background: posColor,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontFamily: FONT_DISPLAY,
+                            fontWeight: '800',
+                            fontSize: 10,
+                            letterSpacing: '0.08em',
+                            color: '#fff',
+                          }}
+                        >
+                          {posKey}
+                        </Text>
+                      </XStack>
+                    ) : null}
                     <Text
                       numberOfLines={1}
                       style={{

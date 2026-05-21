@@ -10,7 +10,13 @@
  */
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { MockedResponse } from '@apollo/client/testing/react';
 import {
   PlayerStatsDataGrid,
@@ -993,7 +999,7 @@ describe('PlayerStatsDataGrid - Integration', () => {
 
     // Verify data transformation worked correctly
     expect(screen.getByText('0.305')).toBeInTheDocument(); // Formatted batting average
-    expect(screen.getByText('0.932')).toBeInTheDocument(); // Computed OPS (0.377 + 0.555)
+    expect(screen.getByText('0.377')).toBeInTheDocument(); // Formatted on-base percentage
   });
 
   test('should maintain state consistency across operations', async () => {
@@ -1018,5 +1024,92 @@ describe('PlayerStatsDataGrid - Integration', () => {
     // Verify both states are maintained
     expect((searchInput as HTMLInputElement).value).toBe('test search');
     // Page size change should be reflected in the component state
+  });
+});
+
+// =============================================================================
+// Editorial Reskin Tests (LS-4615)
+// =============================================================================
+
+/**
+ * Walks up from a DOM element until a matching ancestor is found, or null.
+ * Used to assert styles on row containers that wrap the rendered text nodes.
+ */
+function findAncestor(
+  el: HTMLElement | null,
+  predicate: (node: HTMLElement) => boolean,
+): HTMLElement | null {
+  let current = el;
+  while (current) {
+    if (predicate(current)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+describe('PlayerStatsDataGrid - Editorial reskin (LS-4615)', () => {
+  test('renders a position chip with the player primary position', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    // Player 1486 has primaryPosition: '1B' (see mockPlayerData) — the chip
+    // should render that abbreviation inside the player row.
+    const row = screen.getByTestId('player-row-1486');
+    expect(within(row).getByText('1B')).toBeInTheDocument();
+  });
+
+  test('applies position-colored accent rule to the sticky player cell', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    const nameNode = screen.getByText('Player 1486');
+    // The player cell wraps the name in a sticky XStack with a 1px left border
+    // colored by the player's position. POS_INFIELD = '#8B6F47' (rgb 139,111,71).
+    const stickyCell = findAncestor(
+      nameNode,
+      (n) => n.style.position === 'sticky',
+    );
+    expect(stickyCell).not.toBeNull();
+    expect(stickyCell?.style.left).toBe('0px');
+    expect(stickyCell?.style.borderLeft.replace(/\s+/g, '')).toContain(
+      '1pxsolid',
+    );
+  });
+
+  test('renders skeleton rows that mirror the data row geometry while loading', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    // Before the GraphQL mock resolves, the grid is in its loading state.
+    // The skeleton block is announced with aria-busy + aria-label; locate it
+    // via the spinner-adjacent loading caption inside the same container.
+    const loadingCaption = screen.getByText('Loading player statistics...');
+    expect(loadingCaption).toBeInTheDocument();
+    const loadingRegion = findAncestor(
+      loadingCaption,
+      (n) => n.getAttribute('aria-busy') !== null,
+    );
+    expect(loadingRegion).not.toBeNull();
+    expect(loadingRegion).toHaveAttribute(
+      'aria-label',
+      'Loading player statistics...',
+    );
   });
 });
