@@ -74,6 +74,9 @@ export const TEXT_MUTED = '#9CAAC5';
 export const TEXT_INTERFACE = '#E8EDF5';
 /** Secondary text — labels, subtitles, less-prominent content. */
 export const TEXT_SECONDARY = '#8A9BB5';
+/** Editorial-shell neutral foreground (FG3) — eyebrow/lede/meta text on dark
+ * canvases. Shared across the Players/Stats redesign slices. */
+export const TEXT_NEUTRAL_FG3 = '#9CAAC5';
 
 // -- Blues (primary accent / links) -----------------------------------
 
