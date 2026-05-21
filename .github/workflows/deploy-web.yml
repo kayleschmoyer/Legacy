@@ -4,6 +4,15 @@ name: Deploy Web to GitHub Pages
 #   - Primary: called from the umbrella Deploy workflow via workflow_call
 #     (push to main is handled there so all deploys report under a single run)
 #   - Manual: workflow_dispatch for targeted one-off deploys
+#
+# Looking at deploy history? Don't use `gh run list --workflow=deploy-web.yml`
+# — that only surfaces direct triggers and is empty/stale for the current
+# deploy path. workflow_call invocations appear under the umbrella. Use:
+#   gh run list --workflow="Deploy"
+# and inspect jobs named `Deploy Web / *` within each run. The umbrella
+# refactor landed 2026-04-07 (commit 74a5c6c70, LS-2505); any standalone
+# runs of this workflow predate that and are not representative of the
+# live deploy pipeline.
 
 on:
   workflow_call:
