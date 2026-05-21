@@ -129,6 +129,7 @@ function FilterPill({
   return (
     <button
       onClick={onClick}
+      className={`ls-discovery-pill${active ? ' is-active' : ''}`}
       style={{
         fontFamily: FONT_DISPLAY,
         fontWeight: 700,
@@ -424,7 +425,7 @@ function LeagueCard({
   };
 
   return (
-    <article style={cardStyle}>
+    <article className="ls-discovery-card" style={cardStyle}>
       {/* Member ribbon */}
       {isMember && (
         <div
@@ -728,6 +729,7 @@ function LeagueCard({
                 <button
                   onClick={() => void onSubmitJoin()}
                   disabled={submitting || !teamName.trim()}
+                  className="ls-discovery-btn-lift"
                   style={{
                     fontFamily: FONT_DISPLAY,
                     fontWeight: 700,
@@ -797,6 +799,7 @@ function LeagueCard({
               {isMember ? (
                 <button
                   onClick={onViewLeague}
+                  className="ls-discovery-btn-lift"
                   style={{
                     fontFamily: FONT_DISPLAY,
                     fontWeight: 700,
@@ -847,6 +850,7 @@ function LeagueCard({
                       ? `league-card-${lg.id}-join-button`
                       : undefined
                   }
+                  className="ls-discovery-btn-lift"
                   style={{
                     fontFamily: FONT_DISPLAY,
                     fontWeight: 700,
@@ -1003,6 +1007,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
 
   return (
     <YStack
+      className="ls-discovery-bg"
       flex={1}
       padding="$6"
       $sm={{ padding: '$4' }}
@@ -1085,6 +1090,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
         </div>
         <button
           onClick={() => navigate('/baseball/league/create')}
+          className="ls-discovery-btn-lift"
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: 700,
@@ -1128,6 +1134,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           </span>
           <input
             aria-label="Search leagues"
+            className="ls-discovery-search"
             style={searchInputStyle}
             placeholder="Search leagues by name…"
             value={search}
@@ -1281,6 +1288,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
         <button
           onClick={handleRefresh}
           disabled={refreshing || loading}
+          className="ls-discovery-refresh"
           style={{
             background: 'transparent',
             border: 0,
@@ -1425,6 +1433,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             <div>
               <button
                 onClick={handleRefresh}
+                className="ls-discovery-btn-lift"
                 style={{
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 700,
@@ -1507,6 +1516,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           </p>
           <button
             onClick={() => navigate('/baseball/league/create')}
+            className="ls-discovery-btn-lift"
             style={{
               marginTop: 8,
               fontFamily: FONT_DISPLAY,
@@ -1632,6 +1642,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 setDraftFilter('all');
                 setPoolFilter('all');
               }}
+              className="ls-discovery-btn-lift"
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 700,
@@ -1650,6 +1661,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             </button>
             <button
               onClick={() => navigate('/baseball/league/create')}
+              className="ls-discovery-btn-lift"
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 700,
@@ -1766,6 +1778,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             </div>
             <button
               onClick={() => navigate('/baseball/league/create')}
+              className="ls-discovery-btn-lift"
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 700,

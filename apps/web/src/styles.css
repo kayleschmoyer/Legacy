@@ -178,6 +178,104 @@ body {
 }
 
 /* ────────────────────────────────────────────────────────
+ * League Discovery page — interaction polish
+ *
+ * Matches the design at docs/design/1tmNnzBvKmDjeJOie3JNkg/.
+ * Lives in CSS (not inline styles) because hover/focus
+ * pseudo-classes can't be expressed as inline style props.
+ * ──────────────────────────────────────────────────────── */
+
+/* Layered radial gradients establish the stadium-at-dusk
+   backdrop the design specifies. Rendered as a fixed pseudo-
+   element behind the content so it spans the full viewport
+   regardless of the centered page column's width. */
+.ls-discovery-bg {
+  position: relative;
+}
+.ls-discovery-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at 20% 0%,
+      rgba(27, 58, 92, 0.22) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 80% 10%,
+      rgba(196, 30, 58, 0.1) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 50% 90%,
+      rgba(197, 165, 90, 0.08) 0%,
+      transparent 50%
+    );
+}
+
+.ls-discovery-card {
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+.ls-discovery-card:hover {
+  border-color: rgba(197, 165, 90, 0.3);
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(197, 165, 90, 0.1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-discovery-card,
+  .ls-discovery-card:hover {
+    transform: none;
+    transition: border-color 220ms ease;
+  }
+}
+
+.ls-discovery-btn-lift {
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+.ls-discovery-btn-lift:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-discovery-btn-lift,
+  .ls-discovery-btn-lift:hover {
+    transform: none;
+  }
+}
+
+.ls-discovery-search:focus {
+  border-color: rgba(78, 142, 214, 0.7);
+  box-shadow: 0 0 0 3px rgba(78, 142, 214, 0.18);
+  outline: none;
+}
+
+.ls-discovery-pill {
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.ls-discovery-pill:hover:not(.is-active) {
+  color: rgba(232, 237, 245, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ls-discovery-refresh:hover:not(:disabled) {
+  color: rgba(232, 237, 245, 0.95);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ────────────────────────────────────────────────────────
  * Responsive utilities
  * ──────────────────────────────────────────────────────── */
 
