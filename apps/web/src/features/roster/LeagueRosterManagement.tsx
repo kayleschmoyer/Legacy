@@ -49,7 +49,6 @@ import { trackRosterAction } from '../../utils/analytics';
 const pitchingPositions = new Set(['SP', 'RP']);
 const infieldPositions = new Set(['C', '1B', '2B', '3B', 'SS']);
 const outfieldPositions = new Set(['LF', 'CF', 'RF', 'OF']);
-const utilityPositions = new Set(['IF', 'XDH', 'DH']);
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +145,37 @@ const POSITION_DISPLAY_NAMES: Record<string, string> = {
 
 const getPositionDisplayName = (positionType: string): string =>
   POSITION_DISPLAY_NAMES[positionType] ?? positionType;
+
+// ── Lineup grouping: Hitters vs Pitchers (design TabRoster.jsx) ───────────────
+
+export type LineupGroup = 'hitters' | 'pitchers';
+
+export const getLineupGroup = (positionType: string): LineupGroup =>
+  pitchingPositions.has(positionType) ? 'pitchers' : 'hitters';
+
+// ── Pace coloring (mirrors Shared.tsx paceColorStyle) ────────────────────────
+// Green when actual/target ≥ +10%, red when ≤ −10%.
+// target = projection * (gamesPlayed / totalGames); falls back to projection
+// when no games-played data is present.
+
+export const PACE_GREEN = '#22c55e';
+export const PACE_RED = '#ef4444';
+
+export const getPaceColor = (
+  matchupData: PlayerMatchupData | undefined,
+): string | undefined => {
+  if (!matchupData) return undefined;
+  const { score, projection, gamesPlayed, totalGames } = matchupData;
+  if (score == null || projection == null) return undefined;
+  const frac = totalGames > 0 ? gamesPlayed / totalGames : 1;
+  if (frac === 0) return undefined;
+  const target = projection * frac;
+  if (target <= 0) return undefined;
+  const ratio = (score - target) / target;
+  if (ratio >= 0.1) return PACE_GREEN;
+  if (ratio <= -0.1) return PACE_RED;
+  return undefined;
+};
 
 // ── Move-flash CSS keyframe (injected once) ───────────────────────────────────
 
@@ -592,7 +622,11 @@ function RosterRow({
             >
               Score
             </Text>
-            <Text fontSize="$3" fontWeight="700" color="$color12">
+            <Text
+              fontSize="$3"
+              fontWeight="700"
+              color={getPaceColor(matchupData) ?? '$color12'}
+            >
               {formatMatchupStat(matchupData?.score ?? null)}
             </Text>
           </YStack>
@@ -985,7 +1019,11 @@ function BenchPlayerCard({
             >
               Score
             </Text>
-            <Text fontSize="$2" fontWeight="700" color="$color12">
+            <Text
+              fontSize="$2"
+              fontWeight="700"
+              color={getPaceColor(matchupData) ?? '$color12'}
+            >
               {formatMatchupStat(matchupData.score)}
             </Text>
           </YStack>
@@ -1389,48 +1427,36 @@ export function LeagueRosterManagement({
     }, FLASH_DURATION_MS);
   }, []);
 
-  // ── Split positions into groups ──────────────────────────────────────────
+  // ── Split positions into Hitters / Pitchers (design TabRoster.jsx) ──────
 
   const groupedPositions = useMemo(() => {
-    const pitching = positions.filter((p) =>
-      pitchingPositions.has(p.positionType ?? ''),
+    const hitters = positions.filter(
+      (p) => getLineupGroup(p.positionType ?? '') === 'hitters',
     );
-    const infield = positions.filter((p) =>
-      infieldPositions.has(p.positionType ?? ''),
+    const pitchers = positions.filter(
+      (p) => getLineupGroup(p.positionType ?? '') === 'pitchers',
     );
-    const outfield = positions.filter((p) =>
-      outfieldPositions.has(p.positionType ?? ''),
-    );
-    const utility = positions.filter((p) =>
-      utilityPositions.has(p.positionType ?? ''),
-    );
-    return { pitching, infield, outfield, utility };
+    return { hitters, pitchers };
   }, [positions]);
 
-  // ── Split bench into pitchers vs fielders ────────────────────────────────
+  // ── Split bench into Hitters vs Pitchers ─────────────────────────────────
+  // Pitcher-eligible-only players go to "Bench Pitchers"; everyone else
+  // (batters, dual-eligible, and unclassified) goes to "Bench Hitters".
+  // Dual-eligible follow the design's first-match rule for hitters.
 
   const benchPlayers = useMemo(
     () => teamPlayers.filter((p) => !p.positionId),
     [teamPlayers],
   );
 
-  const bullpenPlayers = useMemo(
+  const benchPitchers = useMemo(
     () => benchPlayers.filter((p) => isPlayerPitcher(p) && !isPlayerBatter(p)),
     [benchPlayers],
   );
 
-  const benchFielders = useMemo(
-    () => benchPlayers.filter((p) => isPlayerBatter(p) && !isPlayerPitcher(p)),
-    [benchPlayers],
-  );
-
-  const dualEligiblePlayers = useMemo(
-    () => benchPlayers.filter((p) => isDualEligible(p)),
-    [benchPlayers],
-  );
-
-  const unclassifiedPlayers = useMemo(
-    () => benchPlayers.filter((p) => getEligiblePositions(p).length === 0),
+  const benchHitters = useMemo(
+    () =>
+      benchPlayers.filter((p) => !(isPlayerPitcher(p) && !isPlayerBatter(p))),
     [benchPlayers],
   );
 
@@ -1506,8 +1532,8 @@ export function LeagueRosterManagement({
     Boolean(getAssignedPlayer(p)),
   ).length;
   const emptyCount = positions.length - filledCount;
-  const totalBench = benchFielders.length + unclassifiedPlayers.length;
-  const totalBullpen = bullpenPlayers.length + dualEligiblePlayers.length;
+  const totalBenchHitters = benchHitters.length;
+  const totalBenchPitchers = benchPitchers.length;
 
   // In read-only mode, use a no-op for player selection
   const noopPlayerSelect = useCallback((_player: TeamMemberFragment | null) => {
@@ -1586,8 +1612,8 @@ export function LeagueRosterManagement({
               label="Lineup"
               value={`${filledCount}/${positions.length}`}
             />
-            <QuickStat label="Bench" value={totalBench} />
-            <QuickStat label="Bullpen" value={totalBullpen} />
+            <QuickStat label="Hitters" value={totalBenchHitters} />
+            <QuickStat label="Pitchers" value={totalBenchPitchers} />
             <QuickStat
               label="Open"
               value={emptyCount}
@@ -1606,208 +1632,160 @@ export function LeagueRosterManagement({
           </YStack>
         )}
 
-        {/* ── Main content: lineup table + bench sidebar ─────────── */}
-        <XStack
-          gap="$4"
-          paddingHorizontal="$3"
-          flexDirection="column"
-          $gtMd={{ flexDirection: 'row' }}
-          alignItems="flex-start"
-        >
+        {/* ── Main content: lineup + bench stacked single column ──── */}
+        <YStack gap="$4" paddingHorizontal="$3" width="100%">
           {/* ── Lineup Table ──────────────────────────────────────── */}
-          <YStack flex={3} minWidth={0}>
-            <YStack
-              backgroundColor="$surfacePanel"
-              borderColor="$surfacePanelBorder"
-              borderWidth={1}
-              borderRadius="$5"
-              overflow="hidden"
-            >
-              {/* Gradient accent bar */}
-              <YStack
-                height={3}
-                width="100%"
-                style={{
-                  background: GRADIENT_ACCENT_BRAND,
-                }}
-              />
-              {/* Column headers */}
-              <TableHeaderRow
-                backgroundColor="$surfaceSubtle"
-                borderBottomWidth={1}
-                borderBottomColor="$outlineSubtle"
-              >
-                <Text
-                  width={56}
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$color12"
-                  textTransform="uppercase"
-                  letterSpacing={0.6}
-                >
-                  Pos
-                </Text>
-                <Text
-                  flex={1}
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$color12"
-                  textTransform="uppercase"
-                  letterSpacing={0.6}
-                >
-                  Player
-                </Text>
-                <Text
-                  width={50}
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$color12"
-                  textTransform="uppercase"
-                  letterSpacing={0.6}
-                  textAlign="center"
-                >
-                  Score
-                </Text>
-                <Text
-                  width={50}
-                  fontSize="$1"
-                  fontWeight="700"
-                  color={BRAND_GOLD_LIGHT}
-                  textTransform="uppercase"
-                  letterSpacing={0.6}
-                  textAlign="center"
-                >
-                  Proj
-                </Text>
-                <Text
-                  width={60}
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$color12"
-                  textTransform="uppercase"
-                  letterSpacing={0.6}
-                  textAlign="right"
-                >
-                  Status
-                </Text>
-              </TableHeaderRow>
-
-              {/* Roster sections */}
-              <RosterSection
-                title="Pitching"
-                positions={groupedPositions.pitching}
-                getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={readOnly ? null : selectedPlayer}
-                onPlayerAssign={handlePlayerAssign}
-                onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={handlePlayerSelect}
-                recentlyMovedIds={recentlyMovedIds}
-                playerMatchupData={playerMatchupData}
-                minCareerGames={minCareerGames}
-                minCareerSeasons={minCareerSeasons}
-                onViewDetails={handleViewDetails}
-                onSetNickname={readOnly ? undefined : onSetNickname}
-              />
-
-              <RosterSection
-                title="Infield"
-                positions={groupedPositions.infield}
-                getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={readOnly ? null : selectedPlayer}
-                onPlayerAssign={handlePlayerAssign}
-                onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={handlePlayerSelect}
-                recentlyMovedIds={recentlyMovedIds}
-                playerMatchupData={playerMatchupData}
-                minCareerGames={minCareerGames}
-                minCareerSeasons={minCareerSeasons}
-                onViewDetails={handleViewDetails}
-                onSetNickname={readOnly ? undefined : onSetNickname}
-              />
-
-              <RosterSection
-                title="Outfield"
-                positions={groupedPositions.outfield}
-                getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={readOnly ? null : selectedPlayer}
-                onPlayerAssign={handlePlayerAssign}
-                onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={handlePlayerSelect}
-                recentlyMovedIds={recentlyMovedIds}
-                playerMatchupData={playerMatchupData}
-                minCareerGames={minCareerGames}
-                minCareerSeasons={minCareerSeasons}
-                onViewDetails={handleViewDetails}
-                onSetNickname={readOnly ? undefined : onSetNickname}
-              />
-
-              <RosterSection
-                title="Utility"
-                positions={groupedPositions.utility}
-                getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={readOnly ? null : selectedPlayer}
-                onPlayerAssign={handlePlayerAssign}
-                onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={handlePlayerSelect}
-                recentlyMovedIds={recentlyMovedIds}
-                playerMatchupData={playerMatchupData}
-                minCareerGames={minCareerGames}
-                minCareerSeasons={minCareerSeasons}
-                onViewDetails={handleViewDetails}
-                onSetNickname={readOnly ? undefined : onSetNickname}
-              />
-            </YStack>
-          </YStack>
-
-          {/* ── Bench & Bullpen Sidebar ───────────────────────────── */}
           <YStack
-            flex={2}
-            minWidth={260}
-            maxWidth={420}
-            gap="$4"
-            width="100%"
-            $gtMd={{ width: 'auto' }}
+            backgroundColor="$surfacePanel"
+            borderColor="$surfacePanelBorder"
+            borderWidth={1}
+            borderRadius="$5"
+            overflow="hidden"
           >
-            <BenchPanel
-              players={[...bullpenPlayers, ...dualEligiblePlayers]}
+            {/* Gradient accent bar */}
+            <YStack
+              height={3}
+              width="100%"
+              style={{
+                background: GRADIENT_ACCENT_BRAND,
+              }}
+            />
+            {/* Column headers */}
+            <TableHeaderRow
+              backgroundColor="$surfaceSubtle"
+              borderBottomWidth={1}
+              borderBottomColor="$outlineSubtle"
+            >
+              <Text
+                width={56}
+                fontSize="$1"
+                fontWeight="700"
+                color="$color12"
+                textTransform="uppercase"
+                letterSpacing={0.6}
+              >
+                Pos
+              </Text>
+              <Text
+                flex={1}
+                fontSize="$1"
+                fontWeight="700"
+                color="$color12"
+                textTransform="uppercase"
+                letterSpacing={0.6}
+              >
+                Player
+              </Text>
+              <Text
+                width={50}
+                fontSize="$1"
+                fontWeight="700"
+                color="$color12"
+                textTransform="uppercase"
+                letterSpacing={0.6}
+                textAlign="center"
+              >
+                Score
+              </Text>
+              <Text
+                width={50}
+                fontSize="$1"
+                fontWeight="700"
+                color={BRAND_GOLD_LIGHT}
+                textTransform="uppercase"
+                letterSpacing={0.6}
+                textAlign="center"
+              >
+                Proj
+              </Text>
+              <Text
+                width={60}
+                fontSize="$1"
+                fontWeight="700"
+                color="$color12"
+                textTransform="uppercase"
+                letterSpacing={0.6}
+                textAlign="right"
+              >
+                Status
+              </Text>
+            </TableHeaderRow>
+
+            {/* Starting Hitters / Starting Pitchers — only render groups with positions */}
+            <RosterSection
+              title="Starting Hitters"
+              positions={groupedPositions.hitters}
+              getAssignedPlayer={getAssignedPlayer}
               selectedPlayer={readOnly ? null : selectedPlayer}
+              onPlayerAssign={handlePlayerAssign}
+              onPlayerSwap={handlePlayerSwap}
               onPlayerSelect={handlePlayerSelect}
-              title="Bullpen"
-              titleId="bullpen-title"
-              emptyLabel="Bullpen is empty"
-              emptyHint={
-                readOnly
-                  ? 'No pitchers on the bullpen.'
-                  : 'Add pitchers or move them from the rotation.'
-              }
-              accentColor={BRAND_NAVY_LIGHT}
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
+              minCareerGames={minCareerGames}
+              minCareerSeasons={minCareerSeasons}
               onViewDetails={handleViewDetails}
               onSetNickname={readOnly ? undefined : onSetNickname}
             />
 
-            <BenchPanel
-              players={[...benchFielders, ...unclassifiedPlayers]}
+            <RosterSection
+              title="Starting Pitchers"
+              positions={groupedPositions.pitchers}
+              getAssignedPlayer={getAssignedPlayer}
               selectedPlayer={readOnly ? null : selectedPlayer}
+              onPlayerAssign={handlePlayerAssign}
+              onPlayerSwap={handlePlayerSwap}
               onPlayerSelect={handlePlayerSelect}
-              onBench={readOnly ? undefined : handleBenchPlayer}
-              title="Bench"
-              titleId="bench-title"
-              emptyLabel="Bench is empty"
-              emptyHint={
-                readOnly
-                  ? 'No players on the bench.'
-                  : 'Add free agents or move players from the lineup.'
-              }
-              accentColor="$green9"
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
+              minCareerGames={minCareerGames}
+              minCareerSeasons={minCareerSeasons}
               onViewDetails={handleViewDetails}
               onSetNickname={readOnly ? undefined : onSetNickname}
             />
           </YStack>
-        </XStack>
+
+          {/* ── Bench: stacked single column, split by Hitters / Pitchers ── */}
+          <BenchPanel
+            players={benchHitters}
+            selectedPlayer={readOnly ? null : selectedPlayer}
+            onPlayerSelect={handlePlayerSelect}
+            onBench={readOnly ? undefined : handleBenchPlayer}
+            title="Bench Hitters"
+            titleId="bench-hitters-title"
+            emptyLabel="No bench hitters"
+            emptyHint={
+              readOnly
+                ? 'No hitters on the bench.'
+                : 'Add free agents or move hitters from the lineup.'
+            }
+            accentColor="$green9"
+            recentlyMovedIds={recentlyMovedIds}
+            playerMatchupData={playerMatchupData}
+            onViewDetails={handleViewDetails}
+            onSetNickname={readOnly ? undefined : onSetNickname}
+          />
+
+          <BenchPanel
+            players={benchPitchers}
+            selectedPlayer={readOnly ? null : selectedPlayer}
+            onPlayerSelect={handlePlayerSelect}
+            onBench={readOnly ? undefined : handleBenchPlayer}
+            title="Bench Pitchers"
+            titleId="bench-pitchers-title"
+            emptyLabel="No bench pitchers"
+            emptyHint={
+              readOnly
+                ? 'No pitchers on the bench.'
+                : 'Add free agents or move pitchers from the rotation.'
+            }
+            accentColor={BRAND_NAVY_LIGHT}
+            recentlyMovedIds={recentlyMovedIds}
+            playerMatchupData={playerMatchupData}
+            onViewDetails={handleViewDetails}
+            onSetNickname={readOnly ? undefined : onSetNickname}
+          />
+        </YStack>
       </YStack>
 
       {/* Player Detail Modal */}
