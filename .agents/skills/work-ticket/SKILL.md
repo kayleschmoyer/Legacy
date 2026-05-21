@@ -348,27 +348,24 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
 2. **Gather all To Do descendants, two levels deep**:
 
-   a. List direct children (paginate until `nextPageToken` is absent):
+   a. List direct children (paginate until `nextPageToken` is absent). Do **not** pass `status: "To Do"` on this call — a container-shaped child (Epic/Story) in any status may still hold To Do grandchildren, and filtering here would drop those containers and hide their work:
 
    ```
    jira_list_children(key: "LS-<epic>", limit: 100)
    ```
 
    b. Split the result into two groups:
-   - **Leaf-shaped children**: `type` in `{Task, Bug, Sub-task}` — these are terminal.
-   - **Container-shaped children**: `type` in `{Epic, Story}` — these may themselves have children.
+   - **Leaf-shaped children**: `type` in `{Task, Bug, Sub-task}` — these are terminal. Keep only those with `status == "To Do"`.
+   - **Container-shaped children**: `type` in `{Epic, Story}` — these may themselves have children. Keep all of them regardless of status so we can recurse one level.
 
-   c. For container-shaped children, fetch one more level. **Batch into a single JQL** to stay under per-call result limits and avoid N+1 calls:
+   c. For each container-shaped child, fetch its **To Do** grandchildren via `jira_list_children` with the `status` filter and pagination — never raw JQL:
 
    ```
-   jira_search(
-     jql: 'parent in (LS-<c1>, LS-<c2>, ...) AND status = "To Do"',
-     maxResults: 50,
-     compact: true
-   )
+   jira_list_children(key: "LS-<container>", status: "To Do", limit: 100)
+   // paginate via pageToken until nextPageToken is absent
    ```
 
-   Paginate via `pageToken` until `nextPageToken` is absent. Combine grandchildren with the leaf-shaped children, then **filter the combined set to `status = "To Do"`**.
+   Issue these calls in parallel (one per container child) by batching them into a single tool-call message. Combine the resulting grandchildren with the To Do leaf-shaped children from step (b) to form the final To Do descendant set.
 
    d. **Stop at two levels.** Do not recurse further; the design assumption is that bucket-epic → child-epic → story/task is the deepest realistic shape and deeper trees should be flattened in Jira, not papered over by the skill.
 
@@ -505,7 +502,7 @@ Used **only** when `--batch` is passed (or implied by user phrasing like "work a
    jira_transition(key: "LS-####", status: "In Progress")
    ```
 
-2. **Enumerate ALL To Do descendants two levels deep** using the same gathering procedure as Parent Dispatch Mode step 2 (direct children via `jira_list_children`, then `jira_search` with `parent in (...)` for container-shaped children, then the parallel `jira_check_blockers` pass in step 2e). Paginate.
+2. **Enumerate ALL To Do descendants two levels deep** using the same gathering procedure as Parent Dispatch Mode step 2 (direct children via `jira_list_children`, then per-container `jira_list_children(status: "To Do")` for grandchildren — no raw JQL — then the parallel `jira_check_blockers` pass in step 2e). Paginate.
 
 3. **Dispatch every unblocked To Do descendant** (do **not** claim upfront — chips claim themselves):
 
