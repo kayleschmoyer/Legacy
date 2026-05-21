@@ -23,6 +23,14 @@ import {
   SportKindEnum,
   Team,
 } from './types';
+import {
+  isEraFreeForSport,
+  isEraValidForSport,
+  isPoolValidForSport,
+  isRosterSizeValidForSport,
+  normalizeSport,
+  ROSTER_RANGE_BY_SPORT,
+} from './sport-validation';
 import { builder } from '../builder';
 import {
   adjustMatchupsForNewTotal,
@@ -267,19 +275,44 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
-      const premiumEraFilters = [
-        'dead_ball',
-        'golden_age',
-        'expansion',
-        'free_agency',
-        'steroid_era',
-        'custom',
-      ];
-      if (inputEraFilter && premiumEraFilters.includes(inputEraFilter)) {
+      // ── Sport-aware input validation (LS-4684 / LS-4685) ───────────────
+      // The client UI varies eraFilter / playerPool / maxRosterSize by sport;
+      // the server is authoritative and must reject inconsistent inputs from
+      // raw GraphQL calls. Free-era enforcement is also sport-aware now —
+      // football's "Spread Offense" (2011 – Now) is the free counterpart to
+      // baseball's "Modern (2006+)".
+      const resolvedSport = normalizeSport(inputSport);
+
+      if (
+        inputEraFilter &&
+        !isEraValidForSport(resolvedSport, inputEraFilter)
+      ) {
+        throw UserInputError(
+          `Era "${inputEraFilter}" is not valid for ${resolvedSport} leagues.`,
+        );
+      }
+
+      if (playerPool && !isPoolValidForSport(resolvedSport, playerPool)) {
+        throw UserInputError(
+          `Player pool "${playerPool}" is not valid for ${resolvedSport} leagues.`,
+        );
+      }
+
+      if (
+        maxRosterSize != null &&
+        !isRosterSizeValidForSport(resolvedSport, maxRosterSize)
+      ) {
+        const range = ROSTER_RANGE_BY_SPORT[resolvedSport];
+        throw UserInputError(
+          `Max roster size must be between ${range.min} and ${range.max} for ${resolvedSport} leagues.`,
+        );
+      }
+
+      if (inputEraFilter && !isEraFreeForSport(resolvedSport, inputEraFilter)) {
         await requireEntitlement(
           context,
           ENTITLEMENTS.historical_era_filters,
-          'Era-based filtering (non-Modern eras) requires a premium subscription. Upgrade to access historical era leagues.',
+          'Era-based filtering (non-free eras) requires a premium subscription. Upgrade to access historical era leagues.',
         );
       }
 

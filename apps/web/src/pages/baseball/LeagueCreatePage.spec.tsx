@@ -1,12 +1,13 @@
 /**
- * LS-4587 — Sport switcher tests for the Create League page.
+ * LS-4631 — Sport-aware Create League page.
  *
  * Covers:
  *   1. Both sport tabs render with their accessible role/labels.
- *   2. Baseball starts selected (aria-selected="true").
- *   3. Clicking Football does NOT change selection — Baseball stays selected.
- *   4. Clicking Football reveals the "coming soon" status notice.
- *   5. Dismissing the notice hides it again.
+ *   2. Default selection follows the URL — `/baseball/league/create`
+ *      selects Baseball, `/football/league/create` selects Football.
+ *   3. The H1 reflects the active sport.
+ *   4. Football mode swaps in football-specific era + pool options.
+ *   5. Baseball mode keeps baseball-specific era + pool options.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 /* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
@@ -19,12 +20,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
-
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate,
-}));
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
@@ -108,6 +103,7 @@ jest.mock('tamagui', () => {
 const mockCreateLeague = jest.fn();
 jest.mock('../../api/db/graphql.generated', () => ({
   GetUserLeagues: 'GetUserLeagues',
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useCreateLeagueAndTeamsMutation: jest.fn(() => [
     mockCreateLeague,
     { loading: false },
@@ -118,36 +114,42 @@ jest.mock('../../api/db/graphql.generated', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function renderPage() {
+function renderPage(initialPath = '/baseball/league/create') {
   const Page = require('./LeagueCreatePage')
     .LeagueCreatePage as React.ComponentType;
   return render(
-    <MemoryRouter initialEntries={['/baseball/league/create']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/baseball/league/create" element={<Page />} />
+        <Route path="/football/league/create" element={<Page />} />
       </Routes>
     </MemoryRouter>,
   );
+}
+
+/** Expand all collapsible sections so era / pool controls are mounted. */
+function expandAllSections() {
+  fireEvent.click(screen.getByRole('button', { name: /Expand all/i }));
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('LeagueCreatePage — sport switcher', () => {
+describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateLeague.mockResolvedValue({ data: undefined });
   });
 
-  it('renders both sport tabs', () => {
-    renderPage();
+  it('renders both sport tabs at the baseball URL', () => {
+    renderPage('/baseball/league/create');
     expect(screen.getByTestId('sport-tab-baseball')).toBeInTheDocument();
     expect(screen.getByTestId('sport-tab-football')).toBeInTheDocument();
   });
 
-  it('selects Baseball by default', () => {
-    renderPage();
+  it('selects Baseball at /baseball/league/create with a baseball heading', () => {
+    renderPage('/baseball/league/create');
     expect(screen.getByTestId('sport-tab-baseball')).toHaveAttribute(
       'aria-selected',
       'true',
@@ -156,37 +158,65 @@ describe('LeagueCreatePage — sport switcher', () => {
       'aria-selected',
       'false',
     );
-  });
-
-  it('does not surface the coming-soon notice on first render', () => {
-    renderPage();
     expect(
-      screen.queryByText(/Football leagues are coming soon/i),
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows the coming-soon notice when Football is clicked', () => {
-    renderPage();
-    fireEvent.click(screen.getByTestId('sport-tab-football'));
-    expect(
-      screen.getByText(/Football leagues are coming soon/i),
+      screen.getByRole('heading', { name: /Create Baseball League/i }),
     ).toBeInTheDocument();
-    // Baseball stays selected — Football is presentation-only for this PR.
-    expect(screen.getByTestId('sport-tab-baseball')).toHaveAttribute(
+  });
+
+  it('selects Football at /football/league/create with a football heading', () => {
+    renderPage('/football/league/create');
+    expect(screen.getByTestId('sport-tab-football')).toHaveAttribute(
       'aria-selected',
       'true',
     );
+    expect(screen.getByTestId('sport-tab-baseball')).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+    expect(
+      screen.getByRole('heading', { name: /Create Football League/i }),
+    ).toBeInTheDocument();
   });
 
-  it('dismisses the coming-soon notice via the Dismiss button', () => {
-    renderPage();
-    fireEvent.click(screen.getByTestId('sport-tab-football'));
+  it('shows football-specific eras at the football URL', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+    // Football eras include "Pioneer" and "Super Bowl Era".
+    expect(screen.getByText(/^Pioneer$/)).toBeInTheDocument();
+    expect(screen.getByText(/Super Bowl Era/)).toBeInTheDocument();
+    // Baseball-only eras must not appear in football mode.
+    expect(screen.queryByText(/Dead Ball/)).not.toBeInTheDocument();
+  });
+
+  it('shows baseball-specific eras at the baseball URL', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(screen.getByText(/Dead Ball/)).toBeInTheDocument();
+    expect(screen.getByText(/Steroid Era/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Pioneer$/)).not.toBeInTheDocument();
+  });
+
+  it('shows football conference pool labels at the football URL', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+    expect(screen.getByRole('button', { name: 'All NFL' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'NFC' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AFC' })).toBeInTheDocument();
+    // Baseball-specific pool labels do not appear.
     expect(
-      screen.getByText(/Football leagues are coming soon/i),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByText(/Dismiss/i));
+      screen.queryByRole('button', { name: 'All MLB' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('surfaces the football Beta banner only on the football URL', () => {
+    renderPage('/football/league/create');
+    expect(screen.getByTestId('football-beta-banner')).toBeInTheDocument();
+  });
+
+  it('does not surface the football Beta banner on the baseball URL', () => {
+    renderPage('/baseball/league/create');
     expect(
-      screen.queryByText(/Football leagues are coming soon/i),
+      screen.queryByTestId('football-beta-banner'),
     ).not.toBeInTheDocument();
   });
 });

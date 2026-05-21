@@ -1,24 +1,27 @@
 /**
- * League Creation — Football Flow E2E Tests (LS-4635)
+ * League Creation — Sport-aware E2E Tests (LS-4631)
  *
- * Covers the Create League page's football sport tab:
- *  - Happy path: clicking the Football tab surfaces the "coming soon" Beta
- *    banner with a working Dismiss control, and the Baseball tab remains
- *    selectable.
- *  - Premium-blocked path: with the Football tab interacted with, the existing
- *    premium gates (FAAB, salary cap, historical era) still fire for a free
- *    user. Premium gating is sport-agnostic on the Create League page today,
- *    so parity for the football flow is preserved by construction.
+ * Verifies the Create League page reacts to the active sport — URL-driven
+ * (`/baseball/league/create` vs `/football/league/create`), SportSwitcher
+ * navigates between the two, and submission persists `sport` in the
+ * CreateLeagueAndTeams GraphQL mutation.
+ *
+ * Hermetic — all GraphQL is mocked via page.route. Supersedes the LS-4635
+ * "coming soon" tests now that the SportSwitcher is fully wired.
  *
  * Complements:
- *  - league-creation.spec.ts (basic baseball happy path)
+ *  - league-creation.spec.ts (baseball happy path)
  *  - league-creation-advanced.spec.ts (advanced settings + baseline FAAB gate)
  */
 
-import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/auth';
+import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 
+/** Expand a collapsible section by clicking its toggle header. */
 async function expandSection(
   page: import('@playwright/test').Page,
   sectionId: string,
@@ -32,86 +35,202 @@ async function expandSection(
   }
 }
 
-test.describe('League Creation — Football Flow @regression', () => {
-  // ─── Happy path ──────────────────────────────────────────────────────────
-
-  test('shows Football and Baseball sport tabs with Beta marker on Football', async ({
-    page,
-  }) => {
-    await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
-
-    const baseballTab = page.getByTestId('sport-tab-baseball');
-    const footballTab = page.getByTestId('sport-tab-football');
-
-    await expect(baseballTab).toBeVisible();
-    await expect(footballTab).toBeVisible();
-    // Baseball is the default selection.
-    await expect(baseballTab).toHaveAttribute('aria-selected', 'true');
-    // Football is announced as Beta via its aria-label.
-    await expect(footballTab).toHaveAttribute('aria-label', /Beta/i);
+/**
+ * Mocks the createLeagueAndTeams mutation and resolves with the captured
+ * variables so tests can assert on the input payload.
+ */
+async function mockCreateLeague(
+  page: import('@playwright/test').Page,
+  capturedInput: { current: Record<string, unknown> | null },
+) {
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const body = route.request().postData() ?? '';
+    if (body.toLowerCase().includes('createleagueandteams')) {
+      try {
+        const parsed = JSON.parse(body) as {
+          variables?: { input?: Record<string, unknown> };
+        };
+        capturedInput.current = parsed.variables?.input ?? null;
+      } catch {
+        capturedInput.current = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            createLeagueAndTeams: {
+              __typename: 'CreateLeagueAndTeamsPayload',
+              league: {
+                __typename: 'League',
+                id: 777,
+                name: 'Test League',
+                owner: 1,
+                maxRosterSize: 16,
+                currentMatchup: null,
+                draftStatus: 'not-started',
+                numberOfTeams: 10,
+                playerPool: 'all',
+                draftMode: 'live',
+                selectionMethod: 'standard',
+                draftOrder: 'snake',
+                isPublic: false,
+              },
+            },
+          },
+        }),
+      });
+      return;
+    }
+    await unmockedGraphQLFallback(route);
   });
+}
 
-  test('clicking the Football tab surfaces a dismissable coming-soon banner', async ({
+test.describe('League Creation — Sport-aware @regression', () => {
+  // ─── URL-driven sport selection ─────────────────────────────────────────
+
+  test('renders the baseball form at /baseball/league/create', async ({
     page,
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
-    await page.getByTestId('sport-tab-football').click();
-
-    // The banner is an aria-live status region so screen readers announce it.
-    const banner = page.getByRole('status').filter({
-      hasText: /Football leagues are coming soon/i,
-    });
-    await expect(banner).toBeVisible();
-    await expect(banner).toContainText(/create a Baseball league/i);
-
-    // The Dismiss control inside the banner hides it again.
-    await banner.getByRole('button', { name: /dismiss/i }).click();
-    await expect(banner).not.toBeVisible();
-  });
-
-  test('returns to the Baseball form after dismissing the Football banner', async ({
-    page,
-  }) => {
-    await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
-
-    await page.getByTestId('sport-tab-football').click();
-    await page
-      .getByRole('status')
-      .filter({ hasText: /Football leagues are coming soon/i })
-      .getByRole('button', { name: /dismiss/i })
-      .click();
-
-    // Baseball is still the active sport (Football is a coming-soon placeholder
-    // and does not change selection) and the baseball form is still rendered.
     await expect(page.getByTestId('sport-tab-baseball')).toHaveAttribute(
       'aria-selected',
       'true',
     );
+    await expect(page.getByTestId('sport-tab-football')).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
     await expect(
       page.getByRole('heading', { name: /Create Baseball League/i }),
     ).toBeVisible();
+    // Baseball-specific era card.
+    await expect(page.getByText(/Dead Ball/i)).toBeVisible();
+    // Football beta banner is hidden in baseball mode.
+    await expect(page.getByTestId('football-beta-banner')).toHaveCount(0);
   });
 
-  // ─── Premium-blocked path (free user) ────────────────────────────────────
+  test('renders the football form at /football/league/create', async ({
+    page,
+  }) => {
+    await page.goto('/football/league/create');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByTestId('sport-tab-football')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByTestId('sport-tab-baseball')).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+    await expect(
+      page.getByRole('heading', { name: /Create Football League/i }),
+    ).toBeVisible();
+    // Football-specific era card.
+    await expect(page.getByText(/Super Bowl Era/i)).toBeVisible();
+    // Football conference pool button.
+    await expect(
+      page.getByRole('button', { name: 'NFC', exact: true }),
+    ).toBeVisible();
+    // The Beta banner is rendered as a polite status region.
+    await expect(page.getByTestId('football-beta-banner')).toBeVisible();
+  });
+
+  // ─── Switching sport via the SportSwitcher ──────────────────────────────
+
+  test('clicking the Football tab navigates to /football/league/create and swaps the form', async ({
+    page,
+  }) => {
+    await page.goto('/baseball/league/create');
+    await page.waitForLoadState('networkidle');
+
+    await page.getByTestId('sport-tab-football').click();
+    await expect(page).toHaveURL(/\/football\/league\/create/);
+    await expect(
+      page.getByRole('heading', { name: /Create Football League/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/Super Bowl Era/i)).toBeVisible();
+  });
+
+  test('clicking the Baseball tab navigates back to /baseball/league/create', async ({
+    page,
+  }) => {
+    await page.goto('/football/league/create');
+    await page.waitForLoadState('networkidle');
+
+    await page.getByTestId('sport-tab-baseball').click();
+    await expect(page).toHaveURL(/\/baseball\/league\/create/);
+    await expect(
+      page.getByRole('heading', { name: /Create Baseball League/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/Dead Ball/i)).toBeVisible();
+  });
+
+  // ─── Submission persists `sport` ────────────────────────────────────────
+
+  test('baseball submit sends sport=baseball in the mutation input', async ({
+    page,
+  }) => {
+    const captured: { current: Record<string, unknown> | null } = {
+      current: null,
+    };
+    await mockCreateLeague(page, captured);
+
+    await page.goto('/baseball/league/create');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
+
+    await page
+      .getByPlaceholder('Enter your league name')
+      .fill('Hermetic Baseball League');
+    await page.getByRole('button', { name: /create league/i }).click();
+
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+    expect(captured.current?.sport).toBe('baseball');
+  });
+
+  test('football submit sends sport=football in the mutation input and routes under /football', async ({
+    page,
+  }) => {
+    const captured: { current: Record<string, unknown> | null } = {
+      current: null,
+    };
+    await mockCreateLeague(page, captured);
+
+    await page.goto('/football/league/create');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
+
+    await page
+      .getByPlaceholder('Enter your league name')
+      .fill('Hermetic Football League');
+    await page.getByRole('button', { name: /create league/i }).click();
+
+    await expect(page).toHaveURL(/\/football\/league\/\d+/);
+    expect(captured.current?.sport).toBe('football');
+  });
+
+  // ─── Premium gates still fire in football mode ──────────────────────────
+  // The Create League premium gating is sport-agnostic, but the gates render
+  // inside sport-aware sections (eras swap per FREE_ERA_IDS_BY_SPORT; FAAB +
+  // salary cap controls live in the shared waiver/budget section). These
+  // tests prove that a free user hitting `/football/league/create` still
+  // sees the existing gates fire — protecting against regressions where the
+  // sport-aware refactor accidentally bypasses a gate.
 
   freeUserTest(
-    'free user: Football tab + FAAB still triggers the premium gate',
+    'free user: football mode + FAAB still triggers the premium gate',
     async ({ page }) => {
-      await page.goto('/baseball/league/create');
+      await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
 
-      // Touch the Football tab first — premium gating must remain in effect
-      // regardless of which sport the user has interacted with.
-      await page.getByTestId('sport-tab-football').click();
-      await expect(
-        page
-          .getByRole('status')
-          .filter({ hasText: /Football leagues are coming soon/i }),
-      ).toBeVisible();
+      await expect(page.getByTestId('sport-tab-football')).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
 
       await expandSection(page, 'waiver-budget');
 
@@ -126,12 +245,10 @@ test.describe('League Creation — Football Flow @regression', () => {
   );
 
   freeUserTest(
-    'free user: Football tab + Salary Cap still triggers the premium gate',
+    'free user: football mode + Salary Cap still surfaces the premium gate',
     async ({ page }) => {
-      await page.goto('/baseball/league/create');
+      await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
-
-      await page.getByTestId('sport-tab-football').click();
 
       await expandSection(page, 'waiver-budget');
 
@@ -146,20 +263,17 @@ test.describe('League Creation — Football Flow @regression', () => {
   );
 
   freeUserTest(
-    'free user: Football tab + non-free era opens the era upgrade modal',
+    'free user: football mode + premium era opens the era upgrade modal',
     async ({ page }) => {
-      await page.goto('/baseball/league/create');
+      await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
-
-      await page.getByTestId('sport-tab-football').click();
 
       await expandSection(page, 'era-history');
 
-      // Dead Ball is a premium era — clicking it should open the era upgrade
-      // modal rather than selecting the era.
-      await page.getByText(/Dead Ball/i).click();
+      // "Super Bowl Era" is a football-specific premium era — clicking it
+      // should open the era upgrade modal rather than selecting the era.
+      await page.getByText(/Super Bowl Era/i).click();
 
-      // Upgrade modal headline names the gated feature.
       await expect(
         page.getByText(/Historical Era Selection/i).first(),
       ).toBeVisible({ timeout: 10000 });

@@ -1,5 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Card,
   H1,
@@ -22,7 +28,6 @@ import {
 } from '../../utils/draftDateUtils';
 import {
   DEFAULT_NUM_DIVISIONS,
-  DEFAULT_NUM_TEAMS,
   MAX_LEAGUE_NAME_LENGTH,
 } from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
@@ -32,23 +37,59 @@ import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
+  Sport,
   useCreateLeagueAndTeamsMutation,
 } from '../../api/db/graphql.generated';
 import {
+  AMBER,
   BG_DARK,
   BRAND_GOLD,
   BRAND_NAVY_LIGHT,
+  EMERALD,
   WHITE,
   withAlpha,
 } from '../../constants/colors';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 
+// ── Sport switcher ───────────────────────────────────────────────────────────
+// Sport is URL-driven (`/baseball/league/create` vs `/football/league/create`)
+// and persisted on submit so the league row carries it forward (LS-4631).
+
+const SPORTS = [
+  {
+    id: 'baseball',
+    name: 'Baseball',
+    icon: '⚾',
+    league: 'MLB',
+    beta: false,
+    defaultTeams: 12,
+    defaultRoster: 26,
+  },
+  {
+    id: 'football',
+    name: 'Football',
+    icon: '🏈',
+    league: 'NFL',
+    beta: true,
+    defaultTeams: 10,
+    defaultRoster: 16,
+  },
+] as const;
+
+type SportId = (typeof SPORTS)[number]['id'];
+
+/** Read the sport from a pathname (`/football/...` → football, otherwise baseball). */
+function sportFromPathname(pathname: string): SportId {
+  return pathname.startsWith('/football') ? 'football' : 'baseball';
+}
+
 interface CreateLeagueFormData {
+  sport: SportId;
   leagueName: string;
   numberOfTeams: number;
   numberOfDivisions: number;
   schedulingStrategy: 'divisional' | 'round-robin' | 'random';
-  playerPool: 'all' | 'nl' | 'al';
+  playerPool: string;
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
   draftOrder: 'snake' | 'linear';
@@ -68,15 +109,51 @@ interface CreateLeagueFormData {
 }
 
 const TEAM_COUNT_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16];
-const ROSTER_SIZE_OPTIONS = [20, 22, 25, 30, 35, 40];
 const ALL_DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
 const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
-const PLAYER_POOL_OPTIONS = [
-  { label: 'All MLB', value: 'all' },
-  { label: 'National League', value: 'nl' },
-  { label: 'American League', value: 'al' },
-] as const;
+// ── Sport-specific datasets (per docs/design/HI6N3yPYUzeh981B5SkXmw CreateForm.jsx) ──
+
+const PLAYER_POOL_OPTIONS_BY_SPORT: Record<
+  SportId,
+  ReadonlyArray<{ label: string; value: string }>
+> = {
+  baseball: [
+    { label: 'All MLB', value: 'all' },
+    { label: 'National League', value: 'nl' },
+    { label: 'American League', value: 'al' },
+  ],
+  football: [
+    { label: 'All NFL', value: 'all' },
+    { label: 'NFC', value: 'nfc' },
+    { label: 'AFC', value: 'afc' },
+  ],
+};
+
+const ROSTER_SIZE_OPTIONS_BY_SPORT: Record<SportId, readonly number[]> = {
+  baseball: [20, 22, 24, 26, 28, 30, 35, 40],
+  football: [13, 14, 15, 16, 17, 18, 20, 22],
+};
+
+interface RosterRange {
+  min: number;
+  max: number;
+  defaultLabel: string;
+}
+
+const ROSTER_RANGE_BY_SPORT: Record<SportId, RosterRange> = {
+  baseball: {
+    min: 15,
+    max: 50,
+    defaultLabel: '26 is the Legacy Sports standard.',
+  },
+  football: {
+    min: 10,
+    max: 25,
+    defaultLabel:
+      '16 is the Legacy Sports standard (1 QB, 2 RB, 3 WR, 1 TE, K, DEF + bench).',
+  },
+};
 
 const DRAFT_MODE_OPTIONS = [
   { label: 'Live Draft', value: 'live' },
@@ -100,36 +177,135 @@ const SCHEDULING_STRATEGY_OPTIONS = [
   { label: 'Random', value: 'random' },
 ] as const;
 
-const ERA_OPTIONS = [
-  { id: 'all', name: 'All Eras', years: '1871 – Now', premium: false },
-  {
-    id: 'dead_ball',
-    name: 'Dead Ball (pre-1920)',
-    years: '1901 – 1919',
-    premium: true,
-  },
-  { id: 'golden_age', name: 'Golden Age', years: '1920 – 1945', premium: true },
-  { id: 'expansion', name: 'Expansion', years: '1946 – 1968', premium: true },
-  {
-    id: 'free_agency',
-    name: 'Free Agency',
-    years: '1969 – 1993',
-    premium: true,
-  },
-  {
-    id: 'steroid_era',
-    name: 'Steroid Era',
-    years: '1994 – 2005',
-    premium: true,
-  },
-  { id: 'modern', name: 'Modern (2006+)', years: '2006 – Now', premium: false },
-  { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
-] as const;
+interface EraOption {
+  id: string;
+  name: string;
+  years: string;
+  premium: boolean;
+}
+
+const ERAS_BY_SPORT: Record<SportId, ReadonlyArray<EraOption>> = {
+  baseball: [
+    { id: 'all', name: 'All Eras', years: '1871 – Now', premium: false },
+    {
+      id: 'dead_ball',
+      name: 'Dead Ball (pre-1920)',
+      years: '1901 – 1919',
+      premium: true,
+    },
+    {
+      id: 'golden_age',
+      name: 'Golden Age',
+      years: '1920 – 1945',
+      premium: true,
+    },
+    { id: 'expansion', name: 'Expansion', years: '1946 – 1968', premium: true },
+    {
+      id: 'free_agency',
+      name: 'Free Agency',
+      years: '1969 – 1993',
+      premium: true,
+    },
+    {
+      id: 'steroid_era',
+      name: 'Steroid Era',
+      years: '1994 – 2005',
+      premium: true,
+    },
+    {
+      id: 'modern',
+      name: 'Modern (2006+)',
+      years: '2006 – Now',
+      premium: false,
+    },
+    { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
+  ],
+  football: [
+    { id: 'all', name: 'All Eras', years: '1920 – Now', premium: false },
+    { id: 'pioneer', name: 'Pioneer', years: '1920 – 1945', premium: true },
+    {
+      id: 'single_platoon',
+      name: 'Single-Platoon',
+      years: '1946 – 1959',
+      premium: true,
+    },
+    {
+      id: 'super_bowl',
+      name: 'Super Bowl Era',
+      years: '1960 – 1977',
+      premium: true,
+    },
+    {
+      id: 'west_coast',
+      name: 'West Coast',
+      years: '1978 – 1993',
+      premium: true,
+    },
+    {
+      id: 'salary_cap',
+      name: 'Salary Cap',
+      years: '1994 – 2010',
+      premium: true,
+    },
+    {
+      id: 'spread_offense',
+      name: 'Spread Offense',
+      years: '2011 – Now',
+      premium: false,
+    },
+    { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
+  ],
+};
+
+const FREE_ERA_IDS_BY_SPORT: Record<SportId, ReadonlySet<string>> = {
+  baseball: new Set(['all', 'modern']),
+  football: new Set(['all', 'spread_offense']),
+};
 
 const WAIVER_TYPE_OPTIONS = [
   { label: 'Standard', value: 'standard' },
   { label: 'FAAB  ·  Premium', value: 'faab' },
 ] as const;
+
+// ── Sport theme tones (LS-4631) ─────────────────────────────────────────────
+// Primary swaps navy → forest green; accent swaps seam-red → amber.
+
+const THEME_PRIMARY_BY_SPORT: Record<SportId, string> = {
+  baseball: BRAND_NAVY_LIGHT,
+  football: EMERALD,
+};
+
+const ACCENT_BY_SPORT: Record<SportId, string> = {
+  baseball: '#C41E3A', // seam-red
+  football: AMBER,
+};
+
+// ── Sport switch — reset sport-keyed fields to that sport's defaults ────────
+
+function defaultsForSport(sport: SportId): {
+  numberOfTeams: number;
+  maxRosterSize: number;
+} {
+  const s = SPORTS.find((x) => x.id === sport) ?? SPORTS[0];
+  return { numberOfTeams: s.defaultTeams, maxRosterSize: s.defaultRoster };
+}
+
+function applySportSwitch(
+  f: CreateLeagueFormData,
+  nextSport: SportId,
+): CreateLeagueFormData {
+  const fresh = defaultsForSport(nextSport);
+  return {
+    ...f,
+    sport: nextSport,
+    numberOfTeams: fresh.numberOfTeams,
+    maxRosterSize: fresh.maxRosterSize,
+    eraFilter: 'all',
+    playerPool: 'all',
+    customEraStartYear: undefined,
+    customEraEndYear: undefined,
+  };
+}
 
 // ── Display helpers for the summary sidebar ─────────────────────────────────
 
@@ -137,7 +313,7 @@ function eraDisplayLabel(f: CreateLeagueFormData): string {
   if (f.eraFilter === 'custom') {
     return `${f.customEraStartYear ?? '—'} – ${f.customEraEndYear ?? '—'}`;
   }
-  return ERA_OPTIONS.find((e) => e.id === f.eraFilter)?.name ?? '—';
+  return ERAS_BY_SPORT[f.sport].find((e) => e.id === f.eraFilter)?.name ?? '—';
 }
 
 function scheduleDisplayLabel(v: string): string {
@@ -150,9 +326,9 @@ function scheduleDisplayLabel(v: string): string {
   );
 }
 
-function poolDisplayLabel(v: string): string {
+function poolDisplayLabel(sport: SportId, v: string): string {
   return (
-    { all: 'All MLB', nl: 'National League', al: 'American League' }[v] ?? '—'
+    PLAYER_POOL_OPTIONS_BY_SPORT[sport].find((p) => p.value === v)?.label ?? '—'
   );
 }
 
@@ -171,8 +347,9 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
     errs.numberOfDivisions = 'More divisions than teams.';
   if (f.numberOfTeams % 2 === 1 && f.numberOfDivisions % 2 === 0)
     errs.numberOfDivisions = 'Division parity must match team parity.';
-  if (f.maxRosterSize < 15 || f.maxRosterSize > 50)
-    errs.maxRosterSize = 'Roster must be 15–50.';
+  const range = ROSTER_RANGE_BY_SPORT[f.sport];
+  if (f.maxRosterSize < range.min || f.maxRosterSize > range.max)
+    errs.maxRosterSize = `Roster must be ${range.min}–${range.max}.`;
   if (f.eraFilter === 'custom') {
     if (f.customEraStartYear == null || f.customEraEndYear == null)
       errs.customEra = 'Both start and end year required.';
@@ -186,13 +363,6 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
 
 // ── Sport switcher ───────────────────────────────────────────────────────────
 
-const SPORTS = [
-  { id: 'baseball', name: 'Baseball', icon: '⚾', league: 'MLB', beta: false },
-  { id: 'football', name: 'Football', icon: '🏈', league: 'NFL', beta: true },
-] as const;
-
-type SportId = (typeof SPORTS)[number]['id'];
-
 interface SportSwitcherProps {
   value: SportId;
   onSelect: (sport: SportId) => void;
@@ -204,6 +374,7 @@ function SportSwitcher({
   onSelect,
   disabled,
 }: SportSwitcherProps): React.JSX.Element {
+  const themePrimary = THEME_PRIMARY_BY_SPORT[value];
   return (
     <XStack
       gap="$2.5"
@@ -227,9 +398,9 @@ function SportSwitcher({
             aria-selected={selected}
             aria-label={`${s.name} — ${s.league}${s.beta ? ' (Beta)' : ''}`}
             backgroundColor={
-              selected ? withAlpha(BRAND_NAVY_LIGHT, 0.32) : 'transparent'
+              selected ? withAlpha(themePrimary, 0.32) : 'transparent'
             }
-            borderColor={selected ? '$brandNavyLight' : 'transparent'}
+            borderColor={selected ? themePrimary : 'transparent'}
             borderWidth={1}
             borderRadius="$4"
             paddingHorizontal="$4"
@@ -441,6 +612,7 @@ function CollapsibleSection({
 // ── EraCardGrid ──────────────────────────────────────────────────────────────
 
 interface EraCardGridProps {
+  sport: SportId;
   value: string;
   onChange: (v: string) => void;
   isPremium: boolean;
@@ -449,12 +621,15 @@ interface EraCardGridProps {
 }
 
 function EraCardGrid({
+  sport,
   value,
   onChange,
   isPremium,
   disabled,
   onUpgrade,
 }: EraCardGridProps): React.JSX.Element {
+  const eraOptions = ERAS_BY_SPORT[sport];
+  const themePrimary = THEME_PRIMARY_BY_SPORT[sport];
   return (
     <div
       style={{
@@ -463,7 +638,7 @@ function EraCardGrid({
         gap: 8,
       }}
     >
-      {ERA_OPTIONS.map((era) => {
+      {eraOptions.map((era) => {
         const locked = era.premium && !isPremium;
         const selected = value === era.id;
         return (
@@ -482,13 +657,13 @@ function EraCardGrid({
               background: selected
                 ? era.premium
                   ? 'rgba(197,165,90,0.08)'
-                  : withAlpha(BRAND_NAVY_LIGHT, 0.22)
+                  : withAlpha(themePrimary, 0.22)
                 : '#0A0F1A',
               border: `1px ${locked ? 'dashed' : 'solid'} ${
                 selected
                   ? era.premium
                     ? '#C5A55A'
-                    : withAlpha(BRAND_NAVY_LIGHT, 0.8)
+                    : withAlpha(themePrimary, 0.8)
                   : '#2F3B53'
               }`,
               borderRadius: 8,
@@ -503,7 +678,7 @@ function EraCardGrid({
               transition:
                 'border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, opacity 150ms ease',
               boxShadow: selected
-                ? `0 0 0 1px ${era.premium ? '#C5A55A' : withAlpha(BRAND_NAVY_LIGHT, 0.8)} inset`
+                ? `0 0 0 1px ${era.premium ? '#C5A55A' : withAlpha(themePrimary, 0.8)} inset`
                 : 'none',
               opacity: disabled ? 0.5 : 1,
             }}
@@ -849,7 +1024,10 @@ function SummarySidePanel({
             value={scheduleDisplayLabel(f.schedulingStrategy)}
           />
           <SummaryRow label="Roster" value={`${f.maxRosterSize} players`} />
-          <SummaryRow label="Pool" value={poolDisplayLabel(f.playerPool)} />
+          <SummaryRow
+            label="Pool"
+            value={poolDisplayLabel(f.sport, f.playerPool)}
+          />
           <SummaryRow
             label="Era"
             value={eraDisplayLabel(f)}
@@ -888,7 +1066,9 @@ function SummarySidePanel({
             "Your league is created and you're set as Commissioner.",
             `Send invite links to up to ${teams - 1} managers.`,
             `Draft opens ${formatDraftDate(f.draftDate)}.`,
-            'Tune lineups, settings, and waivers right up to first pitch.',
+            f.sport === 'football'
+              ? 'Tune lineups, settings, and waivers right up to kickoff.'
+              : 'Tune lineups, settings, and waivers right up to first pitch.',
           ].map((item) => (
             <XStack key={item} gap="$2.5" alignItems="flex-start">
               <YStack
@@ -920,36 +1100,43 @@ function SummarySidePanel({
 
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] = useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
-  const [selectedSport, setSelectedSport] = useState<SportId>('baseball');
-  const [showFootballComingSoon, setShowFootballComingSoon] = useState(false);
 
-  const handleSportSelect = useCallback((sport: SportId) => {
-    if (sport === 'football') {
-      setShowFootballComingSoon(true);
-      return;
-    }
-    setShowFootballComingSoon(false);
-    setSelectedSport(sport);
-  }, []);
+  // Sport is URL-driven (LS-4631): `/baseball/league/create` vs
+  // `/football/league/create`. SportSwitcher navigates between the two; the
+  // location-derived value is the source of truth.
+  const selectedSport: SportId = sportFromPathname(location.pathname);
+  const sportMeta = SPORTS.find((s) => s.id === selectedSport) ?? SPORTS[0];
+  const sportAccent = ACCENT_BY_SPORT[selectedSport];
+
+  const handleSportSelect = useCallback(
+    (sport: SportId) => {
+      if (sport === selectedSport) return;
+      navigate(`/${sport}/league/create`, { replace: true });
+    },
+    [navigate, selectedSport],
+  );
 
   const [formData, setFormData] = useState<CreateLeagueFormData>(() => {
     const initialLeagueName = (searchParams.get('name') ?? '')
       .trim()
       .slice(0, MAX_LEAGUE_NAME_LENGTH);
+    const initialDefaults = defaultsForSport(selectedSport);
     return {
+      sport: selectedSport,
       leagueName: initialLeagueName,
-      numberOfTeams: DEFAULT_NUM_TEAMS,
+      numberOfTeams: initialDefaults.numberOfTeams,
       numberOfDivisions: DEFAULT_NUM_DIVISIONS,
       schedulingStrategy: 'divisional',
       playerPool: 'all',
       draftMode: 'live',
       selectionMethod: 'standard',
       draftOrder: 'snake',
-      maxRosterSize: 25,
+      maxRosterSize: initialDefaults.maxRosterSize,
       draftDate: undefined,
       waiverType: 'standard',
       faabBudgetDefault: 100,
@@ -962,6 +1149,16 @@ export function LeagueCreatePage(): React.JSX.Element {
       auctionMinBid: 1,
     };
   });
+
+  // When the URL-derived sport changes, reset sport-keyed fields so eras /
+  // pools / roster sizes track the active sport.
+  const prevSportRef = useRef<SportId>(selectedSport);
+  useEffect(() => {
+    if (prevSportRef.current !== selectedSport) {
+      setFormData((prev) => applySportSwitch(prev, selectedSport));
+      prevSportRef.current = selectedSport;
+    }
+  }, [selectedSport]);
 
   // Collapsible section state
   const [openSections, setOpenSections] = useState<Set<string>>(
@@ -1056,8 +1253,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     }
     if (
       (!isPremium || premiumLoading) &&
-      formData.eraFilter !== 'all' &&
-      formData.eraFilter !== 'modern'
+      !FREE_ERA_IDS_BY_SPORT[formData.sport].has(formData.eraFilter)
     ) {
       trackPremiumFeatureClick('Historical Era Selection');
       setShowEraUpgradeModal(true);
@@ -1075,6 +1271,8 @@ export function LeagueCreatePage(): React.JSX.Element {
         context: { suppressGlobalError: true },
         variables: {
           input: {
+            sport:
+              formData.sport === 'football' ? Sport.Football : Sport.Baseball,
             leagueName: trimmedLeagueName,
             numberOfTeams: formData.numberOfTeams,
             numberOfDivisions: formData.numberOfDivisions,
@@ -1120,7 +1318,7 @@ export function LeagueCreatePage(): React.JSX.Element {
 
       if (result.data?.createLeagueAndTeams?.league?.id) {
         navigate(
-          `/baseball/league/${result.data.createLeagueAndTeams.league.id}`,
+          `/${formData.sport}/league/${result.data.createLeagueAndTeams.league.id}`,
         );
       }
     } catch (error) {
@@ -1140,8 +1338,12 @@ export function LeagueCreatePage(): React.JSX.Element {
   return (
     <ScrollView flex={1} backgroundColor="$background">
       <PageMeta
-        title="Create a League"
-        description="Start your own fantasy baseball league on Legacy Sports. Customize draft settings, roster rules, and invite friends to compete."
+        title={`Create a ${sportMeta.name} League`}
+        description={
+          selectedSport === 'football'
+            ? 'Start your own fantasy football league on Legacy Sports. Customize draft settings, roster rules, and invite friends to compete.'
+            : 'Start your own fantasy baseball league on Legacy Sports. Customize draft settings, roster rules, and invite friends to compete.'
+        }
       />
 
       <YStack
@@ -1168,7 +1370,7 @@ export function LeagueCreatePage(): React.JSX.Element {
               textTransform="uppercase"
               color="$brandGoldLight"
             >
-              Baseball · New League
+              {sportMeta.name} · New League
             </Text>
             <H1
               fontFamily="$display"
@@ -1177,9 +1379,20 @@ export function LeagueCreatePage(): React.JSX.Element {
               color="$color"
               letterSpacing={-0.5}
               $sm={{ fontSize: '$8' }}
+              data-testid="create-league-heading"
             >
-              Create Baseball League
+              Create {sportMeta.name} League
             </H1>
+            {/* Sport-accent rule under the H1 — seam-red for baseball,
+                amber for football per the LS-4631 theming. */}
+            <YStack
+              data-testid="sport-accent-rule"
+              width={56}
+              height={3}
+              borderRadius={2}
+              backgroundColor={sportAccent}
+              marginTop="$2"
+            />
             <Text
               fontFamily="$body"
               fontSize={17}
@@ -1230,7 +1443,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             onSelect={handleSportSelect}
             disabled={isFormDisabled}
           />
-          {showFootballComingSoon && (
+          {selectedSport === 'football' && (
             <XStack
               role="status"
               aria-live="polite"
@@ -1242,6 +1455,7 @@ export function LeagueCreatePage(): React.JSX.Element {
               borderRadius="$4"
               padding="$3"
               marginTop="$1"
+              data-testid="football-beta-banner"
             >
               <Text fontSize={16} aria-hidden="true">
                 🏈
@@ -1255,7 +1469,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   textTransform="uppercase"
                   color="$brandGoldLight"
                 >
-                  Football leagues are coming soon
+                  Football is in Beta
                 </Text>
                 <Text
                   fontFamily="$body"
@@ -1263,17 +1477,10 @@ export function LeagueCreatePage(): React.JSX.Element {
                   color="$color11"
                   marginTop={2}
                 >
-                  We&apos;re rolling out football as part of a Beta. For now,
-                  create a Baseball league — you can convert later.
+                  Football leagues are rolling out gradually. Expect the
+                  occasional rough edge while we polish the experience.
                 </Text>
               </YStack>
-              <Button
-                size="$2"
-                variant="outlined"
-                onPress={() => setShowFootballComingSoon(false)}
-              >
-                Dismiss
-              </Button>
             </XStack>
           )}
         </YStack>
@@ -1468,7 +1675,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <span>
                     {scheduleDisplayLabel(formData.schedulingStrategy)} ·{' '}
                     {formData.maxRosterSize} roster ·{' '}
-                    {poolDisplayLabel(formData.playerPool)}
+                    {poolDisplayLabel(formData.sport, formData.playerPool)}
                   </span>
                 }
                 open={openSections.has('roster-schedule')}
@@ -1505,11 +1712,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                   {/* Max Roster Size */}
                   <FieldRow
                     label="Max Roster Size"
-                    hint="Number of players each team can have"
+                    hint={`Active + bench. ${ROSTER_RANGE_BY_SPORT[formData.sport].defaultLabel}`}
                   >
                     <ButtonGroup
                       value={formData.maxRosterSize}
-                      options={ROSTER_SIZE_OPTIONS}
+                      options={ROSTER_SIZE_OPTIONS_BY_SPORT[formData.sport]}
                       onChange={(v) => handleInputChange('maxRosterSize', v)}
                       disabled={isFormDisabled}
                     />
@@ -1518,14 +1725,17 @@ export function LeagueCreatePage(): React.JSX.Element {
                   {/* Player Pool */}
                   <FieldRow
                     label="Player Pool"
-                    hint="Which players can be drafted"
+                    hint={
+                      formData.sport === 'football'
+                        ? 'Limit to one conference, or keep it open league-wide.'
+                        : "Narrow the league to a single league's talent, or open it up."
+                    }
                   >
                     <ButtonGroup
                       value={formData.playerPool}
-                      options={PLAYER_POOL_OPTIONS.map((o) => ({
-                        value: o.value,
-                        label: o.label,
-                      }))}
+                      options={PLAYER_POOL_OPTIONS_BY_SPORT[formData.sport].map(
+                        (o) => ({ value: o.value, label: o.label }),
+                      )}
                       onChange={(v) => handleInputChange('playerPool', v)}
                       disabled={isFormDisabled}
                     />
@@ -1616,6 +1826,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   hint="Only players active during this window are draftable."
                 >
                   <EraCardGrid
+                    sport={formData.sport}
                     value={formData.eraFilter}
                     onChange={(v) => handleInputChange('eraFilter', v)}
                     isPremium={!!isPremium && !premiumLoading}
@@ -2093,7 +2304,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <Button
                     size="$4"
                     variant="outlined"
-                    onPress={() => navigate('/baseball')}
+                    onPress={() => navigate(`/${formData.sport}`)}
                     disabled={isFormDisabled}
                   >
                     Cancel
