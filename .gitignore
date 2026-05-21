@@ -346,5 +346,8 @@ scratch/*
 # Claude Code built-in worktrees (ephemeral, not ticket-tracked)
 .claude/worktrees/
 
+# Scheduled-tasks MCP server runtime lock (sessionId/pid/acquiredAt)
+.claude/scheduled_tasks.lock
+
 # Copilot CLI session marker (runtime file written by session-start hook)
 .copilot-session
