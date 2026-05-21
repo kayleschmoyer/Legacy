@@ -8,7 +8,6 @@ describe('App E2E Tests', () => {
   });
 
   it('should launch app successfully', async () => {
-    // Wait for the app to load
     await driver.waitUntil(
       async () => await driver.isDisplayed('//android.widget.TextView'),
       {
@@ -16,66 +15,30 @@ describe('App E2E Tests', () => {
         timeoutMsg: 'App did not launch within 30 seconds',
       },
     );
-
-    console.log('✅ App launched successfully');
-    expect(true).toBe(true);
   });
 
   it('should display main screen elements', async () => {
-    // Check for basic app elements
     const mainContainer = await driver.$('//android.view.ViewGroup');
     await expect(mainContainer).toBeDisplayed();
-
-    console.log('✅ Main screen elements are displayed');
   });
 
   it('should validate navigation functionality', async () => {
-    // Basic navigation test
-    try {
-      // Look for any touchable elements
-      const touchableElements = await driver.$$(
-        '//android.widget.Button | //android.view.ViewGroup[@clickable="true"]',
-      );
-
-      if (touchableElements.length > 0) {
-        console.log(
-          `✅ Found ${touchableElements.length} interactive elements`,
-        );
-      } else {
-        console.log(
-          'ℹ️ No interactive elements found - this is normal for a basic app',
-        );
-      }
-
-      expect(true).toBe(true);
-    } catch (error) {
-      console.log(
-        'ℹ️ Navigation test skipped - no navigation elements found:',
-        error.message,
-      );
-      expect(true).toBe(true);
-    }
+    const touchableElements = await driver.$$(
+      '//android.widget.Button | //android.view.ViewGroup[@clickable="true"]',
+    );
+    expect(touchableElements.length).toBeGreaterThan(0);
   });
 
   it('should handle basic user interactions', async () => {
-    try {
-      // Test basic touch interactions
-      const screenCenter = await driver.getWindowSize();
-      await driver.touchAction({
-        action: 'tap',
-        x: screenCenter.width / 2,
-        y: screenCenter.height / 2,
-      });
+    const screenSize = await driver.getWindowSize();
+    await driver.touchAction({
+      action: 'tap',
+      x: screenSize.width / 2,
+      y: screenSize.height / 2,
+    });
 
-      console.log('✅ Touch interactions working');
-      expect(true).toBe(true);
-    } catch (error) {
-      console.log(
-        'ℹ️ Touch interaction test completed with basic validation:',
-        error.message,
-      );
-      expect(true).toBe(true);
-    }
+    const mainContainer = await driver.$('//android.view.ViewGroup');
+    await expect(mainContainer).toBeDisplayed();
   });
 
   afterEach(async () => {
