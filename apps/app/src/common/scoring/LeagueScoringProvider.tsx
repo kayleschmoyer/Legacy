@@ -93,7 +93,12 @@ export function applyMultiplierGroups(
         typeof entry.multiplier === 'number' &&
         Number.isFinite(entry.multiplier)
       ) {
-        target[entry.sourceColumn] = entry.multiplier;
+        // Normalize snake_case DB column names (e.g. "e_def") to
+        // camelCase keys (e.g. "eDef") so API overrides replace defaults.
+        const key = entry.sourceColumn.replace(/_([a-z])/g, (_, c: string) =>
+          c.toUpperCase(),
+        );
+        target[key] = entry.multiplier;
       }
     }
   }
