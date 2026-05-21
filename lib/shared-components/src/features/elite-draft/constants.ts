@@ -21,6 +21,20 @@ export const POSITION_COLORS: Record<string, string> = {
   DH: '#8B2635', // burgundy
 };
 
+// Football position colors — sourced from the draft-board mockup's gridiron
+// theme. Pre-stages the shared token vocabulary planned in ADR 0011 §3; once
+// the sport-scoped getPositionColor(sport, pos) lands these will migrate to
+// `lib/shared-components/src/utils/colors.ts`.
+export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
+  QB: BRAND_SEAM_RED, // seam red
+  RB: '#8B6F47', // dirt brown
+  WR: '#2D6A4F', // turf green
+  TE: '#7C8794', // steel
+  K: BRAND_GOLD, // heritage gold
+  DEF: '#4A6FA5', // navy blue
+  FLEX: '#C49A6C', // muted gold
+};
+
 export const TIMER_RADIUS = 50;
 export const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;
 export const DEFAULT_PICK_TIME = 120; // matches server default

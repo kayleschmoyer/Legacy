@@ -2,10 +2,17 @@ import React from 'react';
 import type { DraftPickRecord, DraftPlayer } from './types';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
-import { getPositionColor } from './utils';
+import {
+  type DraftSport,
+  getPositionColor,
+  getPositionColorForSport,
+} from './utils';
 
-// Position slot configuration for the depth-chart-style roster summary
-const POSITION_SLOTS: Array<{ pos: string; label: string; slots: number }> = [
+// Position slot configuration for the depth-chart-style roster summary,
+// sport-scoped per ADR 0011 §6 / LS-4663.
+type PositionSlotConfig = { pos: string; label: string; slots: number };
+
+const BASEBALL_POSITION_SLOTS: PositionSlotConfig[] = [
   { pos: 'C', label: 'C', slots: 1 },
   { pos: '1B', label: '1B', slots: 1 },
   { pos: '2B', label: '2B', slots: 1 },
@@ -15,6 +22,24 @@ const POSITION_SLOTS: Array<{ pos: string; label: string; slots: number }> = [
   { pos: 'P', label: 'P', slots: 9 },
   { pos: 'U', label: 'UTIL', slots: 2 },
 ];
+
+const FOOTBALL_POSITION_SLOTS: PositionSlotConfig[] = [
+  { pos: 'QB', label: 'QB', slots: 1 },
+  { pos: 'RB', label: 'RB', slots: 2 },
+  { pos: 'WR', label: 'WR', slots: 3 },
+  { pos: 'TE', label: 'TE', slots: 1 },
+  { pos: 'K', label: 'K', slots: 1 },
+  { pos: 'DEF', label: 'DEF', slots: 1 },
+  { pos: 'FLEX', label: 'FLEX', slots: 1 },
+];
+
+export function getPositionSlotsForSport(
+  sport: DraftSport,
+): PositionSlotConfig[] {
+  return sport === 'football'
+    ? FOOTBALL_POSITION_SLOTS
+    : BASEBALL_POSITION_SLOTS;
+}
 
 interface DraftRailProps {
   // Intelligence
@@ -30,6 +55,8 @@ interface DraftRailProps {
   // Roster
   myTeam: DraftPlayer[];
   positionCounts: Record<string, number>;
+  /** League sport — drives depth-chart slot layout and roster-bar fill colors. */
+  sport?: DraftSport;
   // History
   pickHistory: DraftPickRecord[];
   statsLookup: Map<number, DraftPlayer>;
@@ -70,6 +97,7 @@ export function DraftRail({
   autoPickDisabled,
   myTeam,
   positionCounts,
+  sport = 'baseball',
   pickHistory,
   statsLookup,
   teamNameById,
@@ -77,8 +105,9 @@ export function DraftRail({
   onDraftPlayer,
   onCommissionerPick,
 }: DraftRailProps): React.JSX.Element {
+  const positionSlots = getPositionSlotsForSport(sport);
   const totalDrafted = myTeam.length;
-  const totalSlots = POSITION_SLOTS.reduce((sum, s) => sum + s.slots, 0);
+  const totalSlots = positionSlots.reduce((sum, s) => sum + s.slots, 0);
 
   return (
     <aside className="d-rail" aria-label="Draft panel">
@@ -135,10 +164,10 @@ export function DraftRail({
           </span>
         </div>
         <div className="d-pos-progress-list" role="list">
-          {POSITION_SLOTS.map(({ pos, label, slots }) => {
+          {positionSlots.map(({ pos, label, slots }) => {
             const count = positionCounts[pos] ?? 0;
             const fill = slots > 0 ? Math.min(1, count / slots) : 0;
-            const barColor = getPositionColor(pos);
+            const barColor = getPositionColorForSport(sport, pos);
             const isFilled = count > 0;
             const isComplete = count >= slots;
             return (
