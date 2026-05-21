@@ -106,6 +106,9 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           <div
             style="flex: 1;"
           />
+          <button>
+            Help
+          </button>
           <div>
             Notification Dropdown
           </div>
@@ -243,6 +246,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           <div
             style="flex: 1;"
           />
+          <button>
+            Help
+          </button>
           <div>
             Notification Dropdown
           </div>
@@ -359,6 +365,9 @@ exports[`App Navigation should match navigation snapshot 1`] = `
       <div
         style="flex: 1;"
       />
+      <button>
+        Help
+      </button>
       <div>
         Notification Dropdown
       </div>
@@ -456,6 +465,9 @@ exports[`App Navigation should render navigation with correct links 1`] = `
       <div
         style="flex: 1;"
       />
+      <button>
+        Help
+      </button>
       <div>
         Notification Dropdown
       </div>

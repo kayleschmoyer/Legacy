@@ -347,6 +347,9 @@ function Navigation() {
 
             <div style={{ flex: 1 }} />
 
+            {/* Help & bug-report (mobile parity with desktop) */}
+            <HelpMenuButton onBugReport={() => setBugDialogOpen(true)} />
+
             {/* Notifications */}
             <NotificationDropdown />
           </XStack>

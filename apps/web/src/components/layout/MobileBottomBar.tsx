@@ -24,7 +24,7 @@ interface MobileTab {
 const TABS: MobileTab[] = [
   { id: 'players', label: 'Players', to: '/players', Icon: Users },
   { id: 'stats', label: 'Stats', to: '/players/stats', Icon: BarChart2 },
-  { id: 'minigames', label: 'Games', to: '/games', Icon: Zap },
+  { id: 'minigames', label: 'Minigames', to: '/games', Icon: Zap },
   { id: 'alerts', label: 'Alerts', to: '/notifications', Icon: Bell },
   { id: 'you', label: 'You', to: '/profile/settings', isAvatar: true },
 ];
