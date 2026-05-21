@@ -30,7 +30,7 @@ const TEAM_A = {
   record: '9-4-0 · 1st place · East',
   score: '142.7',
   win: true,
-  gradient: 'linear-gradient(135deg, #1B3A5C 0%, #C5A55A 100%)',
+  gradient: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_GOLD} 100%)`,
 };
 const TEAM_B = {
   initials: 'DC',
@@ -259,7 +259,7 @@ export const MatchupScene: React.FC = () => {
           background: SURFACE_CARD,
           border: `1px solid ${GLASS_BORDER}`,
           borderRadius: 24,
-          padding: '44px 56px',
+          padding: '36px 56px',
           display: 'grid',
           gridTemplateColumns: '1fr auto 1fr',
           alignItems: 'center',
@@ -433,7 +433,7 @@ export const MatchupScene: React.FC = () => {
             background: SURFACE_PANEL,
             border: `1px solid ${PANEL_BORDER}`,
             borderRadius: 20,
-            padding: '22px 24px',
+            padding: '18px 22px',
           }}
         >
           <div
@@ -466,7 +466,7 @@ export const MatchupScene: React.FC = () => {
             background: SURFACE_PANEL,
             border: `1px solid ${PANEL_BORDER}`,
             borderRadius: 20,
-            padding: '22px 24px',
+            padding: '18px 22px',
           }}
         >
           <div
