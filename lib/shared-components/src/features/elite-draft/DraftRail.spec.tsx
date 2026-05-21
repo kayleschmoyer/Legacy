@@ -8,7 +8,7 @@
  */
 import React from 'react';
 import { DraftRail } from './DraftRail';
-import { FOOTBALL_POSITION_COLORS, POSITION_COLORS } from './constants';
+import { POSITION_COLORS } from './constants';
 import { render } from '../../test-utils';
 
 jest.mock('./DraftIntelligence', () => ({
@@ -81,20 +81,22 @@ describe('DraftRail roster depth chart', () => {
     expect(
       colors.some(
         (c) =>
-          c.includes(FOOTBALL_POSITION_COLORS.QB.toLowerCase()) ||
+          c.includes(POSITION_COLORS.football.QB.toLowerCase()) ||
           c === 'rgb(196, 30, 58)',
       ),
     ).toBe(true);
     expect(
       colors.some(
         (c) =>
-          c.includes(FOOTBALL_POSITION_COLORS.RB.toLowerCase()) ||
+          c.includes(POSITION_COLORS.football.RB.toLowerCase()) ||
           c === 'rgb(139, 111, 71)',
       ),
     ).toBe(true);
     // Baseball palette must not bleed into a football rail.
     expect(
-      colors.every((c) => !c.includes(POSITION_COLORS['1B'].toLowerCase())),
+      colors.every(
+        (c) => !c.includes(POSITION_COLORS.baseball['1B'].toLowerCase()),
+      ),
     ).toBe(true);
   });
 });

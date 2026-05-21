@@ -1106,7 +1106,7 @@ export function PlayerStatsDataGrid({
                 const rowBg = index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW;
                 const posKey = player.primaryPosition;
                 const posColor = posKey
-                  ? getPositionColor(posKey)
+                  ? getPositionColor('baseball', posKey)
                   : POS_UTILITY;
                 return (
                   <XStack

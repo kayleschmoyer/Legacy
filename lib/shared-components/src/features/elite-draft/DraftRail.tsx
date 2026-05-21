@@ -2,11 +2,8 @@ import React from 'react';
 import type { DraftPickRecord, DraftPlayer } from './types';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
-import {
-  type DraftSport,
-  getPositionColor,
-  getPositionColorForSport,
-} from './utils';
+import { getPositionColor } from './utils';
+import type { Sport } from '../../utils/colors';
 
 // Position slot configuration for the depth-chart-style roster summary,
 // sport-scoped per ADR 0011 §6 / LS-4663.
@@ -33,9 +30,7 @@ const FOOTBALL_POSITION_SLOTS: PositionSlotConfig[] = [
   { pos: 'FLEX', label: 'FLEX', slots: 1 },
 ];
 
-export function getPositionSlotsForSport(
-  sport: DraftSport,
-): PositionSlotConfig[] {
+export function getPositionSlotsForSport(sport: Sport): PositionSlotConfig[] {
   return sport === 'football'
     ? FOOTBALL_POSITION_SLOTS
     : BASEBALL_POSITION_SLOTS;
@@ -56,7 +51,7 @@ interface DraftRailProps {
   myTeam: DraftPlayer[];
   positionCounts: Record<string, number>;
   /** League sport — drives depth-chart slot layout and roster-bar fill colors. */
-  sport?: DraftSport;
+  sport?: Sport;
   // History
   pickHistory: DraftPickRecord[];
   statsLookup: Map<number, DraftPlayer>;
@@ -82,7 +77,7 @@ function pickRoundLabel(pick: DraftPickRecord): string {
 }
 
 function getPositionPill(pos: string): { bg: string; color: string } {
-  const color = getPositionColor(pos);
+  const color = getPositionColor('baseball', pos);
   return { bg: `${color}26`, color }; // 15% opacity bg
 }
 
@@ -167,7 +162,7 @@ export function DraftRail({
           {positionSlots.map(({ pos, label, slots }) => {
             const count = positionCounts[pos] ?? 0;
             const fill = slots > 0 ? Math.min(1, count / slots) : 0;
-            const barColor = getPositionColorForSport(sport, pos);
+            const barColor = getPositionColor(sport ?? 'baseball', pos);
             const isFilled = count > 0;
             const isComplete = count >= slots;
             return (

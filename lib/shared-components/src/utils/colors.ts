@@ -43,26 +43,52 @@ export const BRAND_GOLD_PRESS = '#A8894A';
 export const BRAND_GOLD_LIGHT = '#D4BB78';
 export const BRAND_GOLD_DARK = '#A68B3E';
 
-// -- Position Colors (baseball-themed) --------------------------------
+// -- Position Colors -------------------------------------------------
 
+/** Sport scope for position color lookups. Mirrors the `sport_kind` enum
+ *  introduced by the sport-toggle initiative (ADR 0011). */
+export type Sport = 'baseball' | 'football';
+
+// Baseball position tokens.
 export const POS_PITCHER = '#C41E3A';
 export const POS_CATCHER = '#7C8794';
 export const POS_INFIELD = '#8B6F47';
 export const POS_OUTFIELD = '#2D6A4F';
 export const POS_UTILITY = '#C5A55A';
 
-export const POSITION_COLORS: Record<string, string> = {
-  C: POS_CATCHER,
-  '1B': POS_INFIELD,
-  '2B': POS_INFIELD,
-  '3B': POS_INFIELD,
-  SS: POS_INFIELD,
-  OF: POS_OUTFIELD,
-  P: POS_PITCHER,
+// Football position tokens — mirrors the football theme block in the
+// Draft Board mockup (`draft.html` ~lines 2700–2846, ADR 0011 §3).
+export const POS_QB = BRAND_SEAM_RED; // seam red
+export const POS_RB = '#8B6F47'; // dirt brown
+export const POS_WR = '#2D6A4F'; // turf green
+export const POS_TE = '#7C8794'; // steel
+export const POS_K = BRAND_GOLD; // heritage gold
+export const POS_DEF = '#4A6FA5'; // navy blue
+export const POS_FLEX = '#C49A6C'; // muted gold
+
+export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
+  baseball: {
+    C: POS_CATCHER,
+    '1B': POS_INFIELD,
+    '2B': POS_INFIELD,
+    '3B': POS_INFIELD,
+    SS: POS_INFIELD,
+    OF: POS_OUTFIELD,
+    P: POS_PITCHER,
+  },
+  football: {
+    QB: POS_QB,
+    RB: POS_RB,
+    WR: POS_WR,
+    TE: POS_TE,
+    K: POS_K,
+    DEF: POS_DEF,
+    FLEX: POS_FLEX,
+  },
 };
 
-export function getPositionColor(position: string): string {
-  return POSITION_COLORS[position] ?? POS_UTILITY;
+export function getPositionColor(sport: Sport, position: string): string {
+  return POSITION_COLORS[sport][position] ?? POS_UTILITY;
 }
 
 // -- Text ------------------------------------------------------------

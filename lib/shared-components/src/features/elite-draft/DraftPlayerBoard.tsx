@@ -359,7 +359,10 @@ export function DraftPlayerBoard({
               </thead>
               <tbody>
                 {filteredPlayers.map((player, idx) => {
-                  const posColor = getPositionColor(player.position ?? '');
+                  const posColor = getPositionColor(
+                    'baseball',
+                    player.position ?? '',
+                  );
                   return (
                     <tr
                       key={player.id}
@@ -462,7 +465,7 @@ export function DraftPlayerBoard({
                     : p.position === pos,
                 )
                 .slice(0, slots);
-              const posColor = getPositionColor(pos);
+              const posColor = getPositionColor('baseball', pos);
               return (
                 <div key={pos} className="d-depth-slot">
                   <div

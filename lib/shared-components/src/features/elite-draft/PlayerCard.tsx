@@ -41,7 +41,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   onPlayerClick?: (playerId: number) => void;
 }) {
   const isDrafting = isMyPick && pickLoading;
-  const posColor = getPositionColor(player.position);
+  const posColor = getPositionColor('baseball', player.position);
   const secondaryPositions = player.eligiblePositions?.filter(
     (p) => p !== player.position,
   );

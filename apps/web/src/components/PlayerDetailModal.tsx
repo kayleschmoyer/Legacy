@@ -149,7 +149,7 @@ function PositionBadge({ position }: { position: string }) {
     <Text
       data-testid="player-position"
       color={WHITE}
-      backgroundColor={getPositionColor(position)}
+      backgroundColor={getPositionColor('baseball', position)}
       paddingHorizontal={8}
       paddingVertical={4}
       borderRadius={4}
@@ -804,7 +804,9 @@ export function PlayerDetailModal({
     : 'Player';
 
   // ------ Era-tinted background — radial wash keyed off the player's position ------
-  const headerAccentColor = position ? getPositionColor(position) : undefined;
+  const headerAccentColor = position
+    ? getPositionColor('baseball', position)
+    : undefined;
   const mastheadBackground = headerAccentColor
     ? `radial-gradient(ellipse at 100% 0%, ${withAlpha(headerAccentColor, 0.18)} 0%, transparent 55%), radial-gradient(ellipse at 0% 100%, ${withAlpha(headerAccentColor, 0.1)} 0%, transparent 50%), ${BG_DARK}`
     : BG_DARK;

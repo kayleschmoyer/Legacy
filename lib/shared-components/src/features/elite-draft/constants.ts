@@ -6,33 +6,38 @@ import {
   BRAND_GOLD,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  POS_DEF,
+  POS_FLEX,
+  POS_K,
+  POS_QB,
+  POS_RB,
+  POS_TE,
+  POS_WR,
+  type Sport,
 } from '../../utils/colors';
 
-export const POSITION_COLORS: Record<string, string> = {
-  C: BRAND_SEAM_RED, // seam red
-  '1B': '#B5651D', // warm amber
-  '2B': BRAND_GOLD, // heritage gold
-  '3B': '#2D6A4F', // forest green
-  SS: BRAND_NAVY_LIGHT, // navy blue
-  OF: '#64748B', // slate — replaces banned purple
-  P: '#4A708B', // steel blue — replaces banned cyan
-  SP: '#4A708B', // steel blue — replaces banned cyan
-  RP: '#2E7D6E', // forest teal
-  DH: '#8B2635', // burgundy
-};
-
-// Football position colors — sourced from the draft-board mockup's gridiron
-// theme. Pre-stages the shared token vocabulary planned in ADR 0011 §3; once
-// the sport-scoped getPositionColor(sport, pos) lands these will migrate to
-// `lib/shared-components/src/utils/colors.ts`.
-export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
-  QB: BRAND_SEAM_RED, // seam red
-  RB: '#8B6F47', // dirt brown
-  WR: '#2D6A4F', // turf green
-  TE: '#7C8794', // steel
-  K: BRAND_GOLD, // heritage gold
-  DEF: '#4A6FA5', // navy blue
-  FLEX: '#C49A6C', // muted gold
+export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
+  baseball: {
+    C: BRAND_SEAM_RED, // seam red
+    '1B': '#B5651D', // warm amber
+    '2B': BRAND_GOLD, // heritage gold
+    '3B': '#2D6A4F', // forest green
+    SS: BRAND_NAVY_LIGHT, // navy blue
+    OF: '#64748B', // slate — replaces banned purple
+    P: '#4A708B', // steel blue — replaces banned cyan
+    SP: '#4A708B', // steel blue — replaces banned cyan
+    RP: '#2E7D6E', // forest teal
+    DH: '#8B2635', // burgundy
+  },
+  football: {
+    QB: POS_QB,
+    RB: POS_RB,
+    WR: POS_WR,
+    TE: POS_TE,
+    K: POS_K,
+    DEF: POS_DEF,
+    FLEX: POS_FLEX,
+  },
 };
 
 export const TIMER_RADIUS = 50;

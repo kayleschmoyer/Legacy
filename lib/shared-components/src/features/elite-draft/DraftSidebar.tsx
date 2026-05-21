@@ -294,7 +294,7 @@ export function DraftSidebar({
                 <span
                   style={{
                     display: 'inline-block',
-                    background: getPositionColor(pos),
+                    background: getPositionColor('baseball', pos),
                     borderRadius: 4,
                     padding: '1px 5px',
                     fontSize: 10,

@@ -31,7 +31,7 @@ export function BaseballCard({
   pickNumber,
   overallPick,
 }: BaseballCardProps): React.JSX.Element {
-  const posColor = getPositionColor(player.position);
+  const posColor = getPositionColor('baseball', player.position);
   const secondaryPositions = player.eligiblePositions?.filter(
     (p) => p !== player.position,
   );

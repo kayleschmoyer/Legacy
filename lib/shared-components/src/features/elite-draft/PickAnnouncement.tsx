@@ -31,7 +31,7 @@ export function PickAnnouncement({
   onDismiss: () => void;
   commentary?: string;
 }) {
-  const posColor = getPositionColor(player.position);
+  const posColor = getPositionColor('baseball', player.position);
   const labelClass = isAuto ? 'auto-pick' : isMyPick ? 'my-pick' : 'opp-pick';
   const labelText = isAuto
     ? '⏱ AUTO-DRAFTED'

@@ -79,7 +79,12 @@ export function DraftIntelligence({
                 <span className="d-intel-name">{rec.playerName}</span>
                 <span
                   className="d-intel-pos"
-                  style={{ background: getPositionColor(rec.position ?? '') }}
+                  style={{
+                    background: getPositionColor(
+                      'baseball',
+                      rec.position ?? '',
+                    ),
+                  }}
                 >
                   {rec.position}
                 </span>

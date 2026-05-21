@@ -367,7 +367,7 @@ function PlayerRow({
   onDraft: (id: number) => void;
   onCommissionerPick: (id: number) => void;
 }) {
-  const posColor = getPositionColor(player.position);
+  const posColor = getPositionColor('baseball', player.position);
   const canDraft = isMyPick || (commPickMode && isOwner);
 
   return (
@@ -914,7 +914,7 @@ export function EliteDraftBoardScreen({
                       borderRadius="$2"
                       backgroundColor={
                         ui.selectedPosition === pos
-                          ? getPositionColor(pos)
+                          ? getPositionColor('baseball', pos)
                           : '$gray3'
                       }
                     >
@@ -985,7 +985,7 @@ export function EliteDraftBoardScreen({
               <Text color="$gray10">No picks yet</Text>
             ) : (
               playerData.myTeam.map((player) => {
-                const posColor = getPositionColor(player.position);
+                const posColor = getPositionColor('baseball', player.position);
                 return (
                   <Card key={player.id} padding="$3" bordered>
                     <XStack alignItems="center" space="$2">
