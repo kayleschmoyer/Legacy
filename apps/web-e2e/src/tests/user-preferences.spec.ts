@@ -36,12 +36,8 @@ test.describe('User Preferences – static elements @smoke', () => {
     ).toBeVisible();
   });
 
-  test('shows Customize your Legacy Sports experience copy', async ({
-    page,
-  }) => {
-    await expect(
-      page.getByText(/customize your legacy sports experience/i),
-    ).toBeVisible();
+  test('shows the auto-save subtitle', async ({ page }) => {
+    await expect(page.getByText(/save automatically/i)).toBeVisible();
   });
 });
 
@@ -74,8 +70,8 @@ test.describe('User Preferences – Appearance section @regression', () => {
     });
   });
 
-  test('shows Enable animations toggle', async ({ page }) => {
-    await expect(page.getByText('Enable animations')).toBeVisible();
+  test('shows Animations toggle', async ({ page }) => {
+    await expect(page.getByText('Animations', { exact: true })).toBeVisible();
   });
 
   test('clicking the Dark theme chip selects it and persists to localStorage', async ({
@@ -91,7 +87,7 @@ test.describe('User Preferences – Appearance section @regression', () => {
     ).toBeVisible({ timeout: 10000 });
 
     // Verify auto-save banner appears
-    await expect(page.getByText('Preferences saved')).toBeVisible({
+    await expect(page.getByTestId('prefs-save-banner')).toBeVisible({
       timeout: 5000,
     });
 
@@ -114,13 +110,11 @@ test.describe('User Preferences – Appearance section @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('User Preferences – toggle interaction @regression', () => {
-  test('Enable animations toggle is interactive', async ({ page }) => {
+  test('Animations toggle is interactive', async ({ page }) => {
     await page.goto('/preferences');
     await page.waitForLoadState('load');
 
-    const toggle = page.locator(
-      '[role="switch"][aria-label="Enable animations"]',
-    );
+    const toggle = page.locator('[role="switch"][aria-label="Animations"]');
     await expect(toggle).toBeVisible();
 
     const initialState = await toggle.getAttribute('aria-checked');
