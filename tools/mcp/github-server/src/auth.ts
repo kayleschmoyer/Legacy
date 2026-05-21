@@ -6,6 +6,8 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readGitRemoteUrl } from './git-config.js';
+
 const CONFIG_DIR = join(homedir(), '.config', 'legacy-sports-github');
 const TOKEN_PATH = join(CONFIG_DIR, 'token.json');
 
@@ -784,20 +786,26 @@ export async function getRepoOwnerName(): Promise<{
     }
   }
 
-  const remoteUrl = await new Promise<string>((res, reject) => {
-    execFile(
-      'git',
-      ['remote', 'get-url', 'origin'],
-      { cwd: getRepoRoot(), timeout: 5_000 },
-      (err, stdout) => {
-        if (err) {
-          reject(new Error(`Failed to get git remote URL: ${err.message}`));
-        } else {
-          res(stdout.trim());
-        }
-      },
-    );
-  });
+  // Prefer reading `.git/config` directly — avoids `spawn git ENOENT` when
+  // the MCP server process is launched without Git on PATH (LS-4599).
+  const repoRoot = getRepoRoot();
+  let remoteUrl = readGitRemoteUrl(repoRoot);
+  if (!remoteUrl) {
+    remoteUrl = await new Promise<string>((res, reject) => {
+      execFile(
+        'git',
+        ['remote', 'get-url', 'origin'],
+        { cwd: repoRoot, timeout: 5_000 },
+        (err, stdout) => {
+          if (err) {
+            reject(new Error(`Failed to get git remote URL: ${err.message}`));
+          } else {
+            res(stdout.trim());
+          }
+        },
+      );
+    });
+  }
 
   // Standard github.com SSH and HTTPS patterns. Explicitly strip a trailing
   // ".git" so that repo names containing dots (e.g. "my.repo") are preserved.

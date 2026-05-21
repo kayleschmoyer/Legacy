@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readGitRemoteUrl } from './git-config.js';
+
 const GITHUB_API = 'https://api.github.com';
 const DEFAULT_APP_ID = '3158619';
 const DEFAULT_INSTALLATION_ID = '118260223';
@@ -195,33 +197,37 @@ export async function getToken(): Promise<string> {
 
 /** Parse owner/repo from the git remote origin URL. */
 async function getRepoSlug(): Promise<string> {
-  return new Promise((resolvePromise, reject) => {
-    const cmd = process.platform === 'win32' ? 'git.exe' : 'git';
-    execFile(
-      cmd,
-      ['remote', 'get-url', 'origin'],
-      { cwd: getRepoRoot(), timeout: 5_000 },
-      (err, stdout) => {
-        if (err) {
-          reject(new Error('Failed to get git remote URL'));
-          return;
-        }
-        const url = stdout.trim();
-        // Match github.com HTTPS/SSH formats and local proxy format (/git/owner/repo)
-        const match =
-          url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/) ??
-          url.match(/\/git\/([^/]+\/[^/]+?)(?:\.git)?$/) ??
-          [];
-        if (!match[1]) {
-          reject(
-            new Error(`Could not parse owner/repo from remote URL: ${url}`),
-          );
-          return;
-        }
-        resolvePromise(match[1]);
-      },
-    );
-  });
+  // Prefer reading `.git/config` directly — avoids `spawn git ENOENT` when
+  // the MCP server process is launched without Git on PATH (LS-4599).
+  const repoRoot = getRepoRoot();
+  let url = readGitRemoteUrl(repoRoot);
+  if (!url) {
+    url = await new Promise<string>((resolvePromise, reject) => {
+      const cmd = process.platform === 'win32' ? 'git.exe' : 'git';
+      execFile(
+        cmd,
+        ['remote', 'get-url', 'origin'],
+        { cwd: repoRoot, timeout: 5_000 },
+        (err, stdout) => {
+          if (err) {
+            reject(new Error(`Failed to get git remote URL: ${err.message}`));
+            return;
+          }
+          resolvePromise(stdout.trim());
+        },
+      );
+    });
+  }
+
+  // Match github.com HTTPS/SSH formats and local proxy format (/git/owner/repo)
+  const match =
+    url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/) ??
+    url.match(/\/git\/([^/]+\/[^/]+?)(?:\.git)?$/) ??
+    [];
+  if (!match[1]) {
+    throw new Error(`Could not parse owner/repo from remote URL: ${url}`);
+  }
+  return match[1];
 }
 
 // Cache token and slug for the lifetime of the server process (with expiry for App tokens)
