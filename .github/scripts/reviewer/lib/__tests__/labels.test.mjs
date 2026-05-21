@@ -130,3 +130,39 @@ describe('cleanupOperationalLabels', () => {
     assert.deepStrictEqual(calls, []);
   });
 });
+
+// Regression guard for LS-4678. The terminal-verdict cleanup in index.mjs
+// must pass `preserveReadyLabel: true` unconditionally — including on
+// APPROVED — so post-approval pushes re-trigger Reviewer (W1) instead of
+// stalling at the bot-review ruleset gate on the new HEAD SHA. A future edit
+// that reintroduces `verdict !== 'APPROVED'` (or any conditional) would
+// silently re-open the stall; this static-source check catches that in
+// review-script tests rather than as a runtime regression on a real PR.
+describe('reviewer terminal cleanup (LS-4678)', () => {
+  it('passes preserveReadyLabel: true at the verdict-cleanup call site', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    const indexPath = join(here, '..', '..', 'index.mjs');
+    const src = await readFile(indexPath, 'utf8');
+
+    // The cleanup call inside the terminal-verdict block (after postRealReview)
+    // must use `preserveReadyLabel: true`. We anchor the regex to the comment
+    // referencing LS-4678 to avoid coupling to surrounding line numbers.
+    const pattern =
+      /LS-4678[\s\S]{0,500}?cleanupOperationalLabels\([^)]*?preserveReadyLabel:\s*true/m;
+    assert.match(
+      src,
+      pattern,
+      'Terminal-verdict cleanup in index.mjs must pass preserveReadyLabel: true (LS-4678).',
+    );
+
+    // And the old conditional form must not be reintroduced.
+    assert.doesNotMatch(
+      src,
+      /preserveReadyLabel:\s*verdict\s*!==\s*'APPROVED'/,
+      'Old conditional `preserveReadyLabel: verdict !== "APPROVED"` reintroduced — see LS-4678.',
+    );
+  });
+});

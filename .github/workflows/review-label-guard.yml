@@ -1,0 +1,71 @@
+name: Review Label Guard (W7)
+
+# Belt-and-suspenders for LS-4678: re-applies `bot:ready-for-review` on a
+# `synchronize` event when the label is absent but a prior APPROVED bot review
+# exists. Without this, a manually-stripped label after approval leaves the new
+# HEAD SHA without a `bot-review` status — the ruleset blocks merge and no
+# Reviewer (W1) cycle fires to unblock it (W1 only fires on synchronize when
+# the label is present).
+#
+# The reviewer itself preserves the label through merge (see reviewer/index.mjs
+# `preserveReadyLabel: true`), so this guard only kicks in when something
+# external removed it.
+#
+# Skipped when:
+#   - PR is a draft (no merge gate yet).
+#   - PR is from a fork (no write permission to apply labels).
+#   - `review-bot-override` present (override path; do not reintroduce W1).
+#   - `needs-human-arbitration` present (terminal state; human owns it).
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-label-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  reapply-label:
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') &&
+      !contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
+      !contains(github.event.pull_request.labels.*.name, 'needs-human-arbitration')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Generate reviewer app token
+        id: reviewer-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+      - name: Re-apply bot:ready-for-review if prior bot approval exists
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Count APPROVED reviews authored by any Bot account. Any prior bot
+          # APPROVED means a cycle was previously in play and the label should
+          # be restored so the new HEAD SHA gets a fresh cycle. Filtering on
+          # `user.type == "Bot"` rather than the specific reviewer app keeps
+          # this workflow installation-token-friendly (no /app endpoint call)
+          # and false positives from other bots just trigger a correct extra
+          # cycle on a PR that benefits from one.
+          approvals=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+            --jq '[.[] | select(.user.type == "Bot" and .state == "APPROVED")] | length' \
+            | awk '{s+=$1} END {print s+0}')
+          if [ "${approvals}" -gt 0 ]; then
+            echo "Found ${approvals} prior bot APPROVED review(s); re-applying bot:ready-for-review"
+            gh api -X POST "repos/${REPO}/issues/${PR_NUMBER}/labels" \
+              -f "labels[]=bot:ready-for-review" > /dev/null
+          else
+            echo "No prior bot approval — leaving label off (PR was never in an active cycle)"
+          fi

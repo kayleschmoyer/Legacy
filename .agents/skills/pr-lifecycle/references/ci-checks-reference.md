@@ -278,6 +278,8 @@ Resolve any conflicts, then push. The check re-runs automatically on the next `s
 
 **Important:** `bot-review` is a **commit status**, not a check run. `github_retrigger_check` will NOT find it — use `github_list_commit_statuses({ number: PR# })` to see it.
 
+**HEAD-SHA gating (LS-4678):** the ruleset evaluates `bot-review` against the PR's HEAD SHA. A `success` on an older SHA does NOT carry forward to a new HEAD; every push needs a fresh cycle on the new tip. The reviewer keeps `bot:ready-for-review` on the PR through merge (including on APPROVED) so post-approval pushes auto-fire a new cycle. If the label is externally stripped between cycles, Review Label Guard (W7, `.github/workflows/review-label-guard.yml`) re-applies it on the next push when a prior bot APPROVED exists.
+
 **Fix (normal path):** Follow the [Review Thread Workflow](../SKILL.md#review-thread-workflow-bot-review-failures):
 
 1. `github_get_review_threads({ number: PR#, unresolvedOnly: true })`

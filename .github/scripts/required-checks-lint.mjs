@@ -5,7 +5,7 @@
  * Validates naming discipline between .github/ruleset.json required checks
  * and the GitHub Actions workflow jobs that provide them.
  *
- * Three assertions:
+ * Four assertions:
  *  1. Every required check context in ruleset.json has a matching job name
  *     (or a .github/checks/*.sh script) so checks can never be "Expected" but
  *     never-run due to a name typo.
@@ -13,6 +13,10 @@
  *     filters at the pull_request trigger level — such filters cause the check
  *     to be skipped on PRs that don't touch those paths, creating stuck checks.
  *  3. Every required-check job has timeout-minutes <= 30.
+ *  4. Every context in MANDATORY_CONTEXTS is present in the active
+ *     required_status_checks set. Regression guard so a future ruleset edit
+ *     cannot silently drop a check the merge gate depends on (e.g. `bot-review`
+ *     — without it, post-approval pushes can merge unreviewed; see LS-4678).
  *
  * Supported context forms:
  *  - Direct: context matches a job's display name (or job ID) in a workflow file.
@@ -34,6 +38,22 @@ const WORKFLOWS_DIR = join(ROOT, '.github', 'workflows');
 const CHECKS_DIR = join(ROOT, '.github', 'checks');
 const RULESET_FILE = join(ROOT, '.github', 'ruleset.json');
 const MAX_REQUIRED_JOB_TIMEOUT = 30;
+
+/**
+ * Contexts the merge gate cannot safely lose. Each entry pairs the context
+ * name with a short rationale shown in the failure message so a future editor
+ * understands why removing it is blocked.
+ *
+ * Add to this list when introducing a new check whose absence would create a
+ * silent merge-correctness regression (e.g. a security gate, a review gate).
+ */
+const MANDATORY_CONTEXTS = Object.freeze([
+  {
+    context: 'bot-review',
+    reason:
+      'Without bot-review on HEAD SHA, post-approval pushes can merge unreviewed (LS-4678).',
+  },
+]);
 
 let passed = 0;
 let failed = 0;
@@ -336,6 +356,23 @@ for (const [ctx, { file, timeoutMinutes }] of contextProviders) {
     );
   } else {
     ok(`"${ctx}" has timeout-minutes: ${timeoutMinutes}`);
+  }
+}
+
+// ── Assertion 4: mandatory contexts are present ──────────────────────────────
+
+console.log(
+  '\n─── Assertion 4: mandatory contexts present in ruleset ──────────────',
+);
+const requiredContextSet = new Set(requiredContexts);
+for (const { context, reason } of MANDATORY_CONTEXTS) {
+  if (requiredContextSet.has(context)) {
+    ok(`"${context}" is in required_status_checks`);
+  } else {
+    fail(
+      `"${context}" is required by MANDATORY_CONTEXTS but missing from ` +
+        `.github/ruleset.json required_status_checks. ${reason}`,
+    );
   }
 }
 

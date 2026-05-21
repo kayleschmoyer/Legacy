@@ -45,7 +45,7 @@ The canonical per-check fix commands and CI triage workflows live in the agent s
 1. Run `github_get_review_threads({ number: PR# })` to get open threads
 2. Fix issues and commit
 3. Reply to each thread: `FIX: <sha>` or `JUSTIFY: <rationale>`
-4. Apply `bot:ready-for-review` label to trigger next review cycle
+4. The push fires the next cycle automatically — `bot:ready-for-review` persists through merge (LS-4678), so re-applying is unnecessary unless it was externally removed
 5. See `AGENTS.md §8` for the full Author Agent Contract
 
 ### PR not merging?

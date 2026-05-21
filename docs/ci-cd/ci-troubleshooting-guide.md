@@ -143,7 +143,7 @@ The `bot-review` commit status is set by the Code Reviewer Bot via the reviewer 
 2. Fix the flagged code or prepare structured replies
 3. Commit and push fixes
 4. Reply to each thread: `FIX: <sha>` (fix committed) or `JUSTIFY: <rationale>` (finding incorrect/out of scope)
-5. Apply `bot:ready-for-review` label to trigger Cycle 2
+5. The push in step 3 fires Cycle 2 automatically — `bot:ready-for-review` persists through merge (LS-4678). Only re-apply if the label was externally stripped; Review Label Guard (W7) will auto-reapply on the next push when a prior bot APPROVED exists
 
 Full protocol in `AGENTS.md §8`. Use `/respond-to-review` to scaffold structured replies.
 

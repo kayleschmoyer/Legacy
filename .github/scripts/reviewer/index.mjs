@@ -921,8 +921,15 @@ async function main() {
         );
       }
     }
+    // Keep `bot:ready-for-review` through merge — not only while the cycle is
+    // mid-flight. Stripping it on APPROVED leaves subsequent pushes (post-
+    // approval polish, typo fixes) with no Reviewer (W1) trigger: the new
+    // HEAD SHA has no `bot-review` commit status, and the ruleset requires
+    // that status on HEAD, so merge silently stalls. Preserving the label
+    // means every push fires a fresh cycle until the PR merges (at which
+    // point label state is irrelevant). See LS-4678.
     cleanupOperationalLabels(prNumber, {
-      preserveReadyLabel: verdict !== 'APPROVED',
+      preserveReadyLabel: true,
     });
   }
 }

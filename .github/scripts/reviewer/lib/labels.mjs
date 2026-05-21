@@ -30,11 +30,16 @@ export const OPERATIONAL_LABELS = Object.freeze([
  * (currently only `review-bot-degraded` from the infra-failure paths) so the
  * just-applied label is not removed.
  *
- * Pass `{ preserveReadyLabel: true }` when the cycle is still in progress
- * (CHANGES_REQUESTED verdict, transient infra failures) so the
- * `bot:ready-for-review` label stays on the PR. The reviewer workflow fires
- * on `synchronize` events when this label is present, meaning agents no
- * longer need to re-apply the label after each push to trigger the next cycle.
+ * Pass `{ preserveReadyLabel: true }` to keep `bot:ready-for-review` on the
+ * PR. The reviewer workflow fires on `synchronize` events when this label is
+ * present, meaning agents no longer need to re-apply the label after each
+ * push to trigger the next cycle. Per LS-4678, callers should preserve the
+ * label through merge — including on APPROVED — so post-approval pushes still
+ * fire a fresh cycle and don't silently stall behind the `bot-review` ruleset
+ * gate on the new HEAD SHA. The only path that intentionally strips the label
+ * is the non-rate-limit infra-failure path in index.mjs's terminal failure
+ * handler (see `applyFailureLabel`), where leaving the label off prevents a
+ * re-fire loop.
  *
  * Not called from:
  *   - Shadow-mode paths — shadow runs are observation-only and do not mutate

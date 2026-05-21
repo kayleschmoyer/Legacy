@@ -27,6 +27,7 @@ on:
       - .github/workflows/**
       - .github/ruleset.json
       - .github/checks/**
+      - .github/scripts/required-checks-lint.mjs
 
 concurrency:
   group: required-checks-lint-${{ github.event.pull_request.number }}

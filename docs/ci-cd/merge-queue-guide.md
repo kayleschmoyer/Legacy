@@ -59,7 +59,7 @@ Every PR requires a passing code review from the Code Reviewer Bot, enforced via
 2. **Reviewer posts findings:**
    - **Critical/high findings** → GitHub `REQUEST_CHANGES` review, `bot-review` set to `failure`
    - **Clean diff** → GitHub `APPROVE` review, `bot-review` set to `success`, `merge-when-ready` label added automatically
-3. **Author responds to threads** — using the RAISE/ADJUDICATE/VERIFY cycle protocol (`FIX: <sha>` or `JUSTIFY: <rationale>` per thread), then applies the `bot:ready-for-review` label to trigger the next review cycle
+3. **Author responds to threads** — using the RAISE/ADJUDICATE/VERIFY cycle protocol (`FIX: <sha>` or `JUSTIFY: <rationale>` per thread); pushing the fix commits fires the next cycle automatically because `bot:ready-for-review` persists through merge (LS-4678). Re-applying the label is only needed if it was externally removed
 4. **Cycle 2 (ADJUDICATE)** — bot re-evaluates; unresolved mandates must be `FIX: <sha>`; if resolved, `bot-review` → `success`
 
 See `AGENTS.md §8` (Author Agent Contract) and [ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md) for the full cycle protocol.
