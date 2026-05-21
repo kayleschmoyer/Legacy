@@ -804,8 +804,19 @@ export const CSS = `
 }
 .d-card-meta {
   font-size: 12px; color: var(--d-text-muted); margin-top: 3px; font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
-.d-card-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.d-card-career {
+  font-size: 11px; color: var(--d-text-muted); margin-top: 2px;
+  font-weight: 500; letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.d-card-career-years { color: var(--d-text-secondary, var(--d-text-muted)); }
+.d-card-badges { display: flex; align-items: baseline; gap: 6px; flex-shrink: 0; }
+.d-pos-alt {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--d-text-muted); text-transform: uppercase;
+}
 .d-rank-badge {
   background: linear-gradient(135deg, var(--d-accent) 0%, var(--d-accent-dark, #A68B3E) 100%);
   color: white; padding: 2px 8px; border-radius: var(--d-radius-sm);
@@ -1745,19 +1756,26 @@ export const CSS = `
 }
 
 .bc-elig {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: rgba(248, 250, 252, 0.55);
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  font-variant-numeric: tabular-nums;
 }
 
-.bc-elig-badge {
-  font-size: 7.5px;
-  font-weight: 700;
-  color: #fff;
-  padding: 1px 3px;
-  border-radius: 2px;
-  opacity: 0.7;
+.bc-career {
+  font-size: 8px;
+  color: rgba(248, 250, 252, 0.45);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bc-career-years {
+  color: rgba(248, 250, 252, 0.7);
 }
 
 .bc-divider {

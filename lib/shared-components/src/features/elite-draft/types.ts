@@ -29,6 +29,10 @@ export interface DraftPlayer {
   gamesStarted?: number;
   /** Career average points per game (hitter PPG for batters, pitching PPG for pitchers) */
   ppg?: number | null;
+  /** First MLB season (4-digit year). When paired with careerEndYear, drives the career-span sub-line. */
+  careerStartYear?: number | null;
+  /** Final MLB season (4-digit year). */
+  careerEndYear?: number | null;
 }
 
 export interface AvailableDraftPlayer {

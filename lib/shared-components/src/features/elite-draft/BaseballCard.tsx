@@ -2,6 +2,15 @@ import React from 'react';
 import { type DraftPlayer } from './types';
 import { getPositionColor } from './utils';
 
+function formatCareerSpan(
+  startYear: number | null | undefined,
+  endYear: number | null | undefined,
+): string | null {
+  if (startYear == null) return null;
+  const end = endYear ?? startYear;
+  return end === startYear ? `${startYear}` : `${startYear}–${end}`;
+}
+
 // ---------------------------------------------------------------------------
 // BaseballCard – baseball card look-alike display for a drafted player (LS-628)
 // ---------------------------------------------------------------------------
@@ -23,6 +32,13 @@ export function BaseballCard({
   overallPick,
 }: BaseballCardProps): React.JSX.Element {
   const posColor = getPositionColor(player.position);
+  const secondaryPositions = player.eligiblePositions?.filter(
+    (p) => p !== player.position,
+  );
+  const careerYears = formatCareerSpan(
+    player.careerStartYear,
+    player.careerEndYear,
+  );
 
   return (
     <div
@@ -55,20 +71,19 @@ export function BaseballCard({
         <div className="bc-overall">PICK #{overallPick}</div>
         <h4 className="bc-name">{player.name}</h4>
 
-        {/* Secondary eligible positions */}
-        {player.eligiblePositions && player.eligiblePositions.length > 1 && (
-          <div className="bc-elig">
-            {player.eligiblePositions
-              .filter((p) => p !== player.position)
-              .map((p) => (
-                <span
-                  key={p}
-                  className="bc-elig-badge"
-                  style={{ background: getPositionColor(p) }}
-                >
-                  {p}
-                </span>
-              ))}
+        {/* Secondary eligible positions — inline muted text, not pills */}
+        {secondaryPositions && secondaryPositions.length > 0 && (
+          <div
+            className="bc-elig"
+            aria-label={`Also eligible: ${secondaryPositions.join(', ')}`}
+          >
+            Also: {secondaryPositions.join(' · ')}
+          </div>
+        )}
+
+        {careerYears && (
+          <div className="bc-career">
+            <span className="bc-career-years">{careerYears}</span>
           </div>
         )}
 

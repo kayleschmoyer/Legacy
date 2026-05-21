@@ -6,6 +6,17 @@ import { getPositionColor } from './utils';
 // Player Card Sub-component
 // ---------------------------------------------------------------------------
 
+function formatCareerSpan(
+  startYear: number | null | undefined,
+  endYear: number | null | undefined,
+): { years: string; seasons: number | null } | null {
+  if (startYear == null) return null;
+  const end = endYear ?? startYear;
+  const years = end === startYear ? `${startYear}` : `${startYear}–${end}`;
+  const seasons = end >= startYear ? end - startYear + 1 : null;
+  return { years, seasons };
+}
+
 export const PlayerCard = React.memo(function PlayerCard({
   player,
   index,
@@ -31,6 +42,13 @@ export const PlayerCard = React.memo(function PlayerCard({
 }) {
   const isDrafting = isMyPick && pickLoading;
   const posColor = getPositionColor(player.position);
+  const secondaryPositions = player.eligiblePositions?.filter(
+    (p) => p !== player.position,
+  );
+  const careerSpan = formatCareerSpan(
+    player.careerStartYear,
+    player.careerEndYear,
+  );
 
   return (
     <div
@@ -67,26 +85,32 @@ export const PlayerCard = React.memo(function PlayerCard({
                 ? `${player.games} G · ${player.hits} H`
                 : 'Career stats pending'}
             </div>
+            {careerSpan && (
+              <div className="d-card-career">
+                Career{' '}
+                <span className="d-card-career-years">{careerSpan.years}</span>
+                {careerSpan.seasons != null &&
+                  ` · ${careerSpan.seasons} seasons`}
+              </div>
+            )}
           </div>
           <div className="d-card-badges">
-            <span className="d-pos-badge" style={{ background: posColor }}>
+            <span
+              className="d-pos-badge"
+              style={{ background: posColor }}
+              title="Primary position"
+            >
               {player.position}
             </span>
-            {player.eligiblePositions
-              ?.filter((p) => p !== player.position)
-              .map((p) => (
-                <span
-                  key={p}
-                  className="d-pos-badge"
-                  style={{
-                    background: getPositionColor(p),
-                    opacity: 0.75,
-                    fontSize: 9,
-                  }}
-                >
-                  {p}
-                </span>
-              ))}
+            {secondaryPositions && secondaryPositions.length > 0 && (
+              <span
+                className="d-pos-alt"
+                title="Also eligible"
+                aria-label={`Also eligible: ${secondaryPositions.join(', ')}`}
+              >
+                {secondaryPositions.join(' · ')}
+              </span>
+            )}
           </div>
         </div>
 
