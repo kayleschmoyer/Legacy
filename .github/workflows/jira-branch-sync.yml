@@ -28,9 +28,13 @@ name: "Jira Branch Sync"
 # Independently of whether the child ticket transition succeeded or was
 # skipped, the workflow also syncs the parent epic status (if any) based
 # on the aggregate state of all its children:
-#   Any child In Progress / In Review / Done  → Epic "In Progress"
-#   All children In Review or Done            → Epic "In Review"
 #   All children Done                         → Epic "Done"
+#   All children In Review or Done            → Epic "In Review"
+#   Any child In Progress or In Review        → Epic "In Progress"
+#   Otherwise (no active children)            → no change
+#
+# A Done child alone does NOT pull an epic out of To Do / Backlog —
+# only In Progress / In Review children count as "active work". See LS-4683.
 #
 # Epics with the Jira label "pinned-status" are excluded from automatic
 # status transitions — they remain at whatever status was set manually.
@@ -353,11 +357,11 @@ jobs:
             }
 
             TRANSITION_ID=$(echo "$RESPONSE" | jq -r --arg t "$TARGET" \
-              '.transitions[] | select(.name == $t) | .id' | head -1)
+              '.transitions[] | select(.name == $t or .to.name == $t) | .id' | head -1)
 
             if [[ -z "$TRANSITION_ID" ]]; then
               echo "⚠️  Transition '$TARGET' is not available for $TICKET."
-              echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
+              echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[] | "\(.name)→\(.to.name)"] | join(", ")')"
               continue
             fi
 
@@ -478,7 +482,8 @@ jobs:
               [[ -z "$STATUS" ]] && continue
               case "$STATUS" in
                 "Done")
-                  ANY_ACTIVE=true
+                  # Done alone is not "active work" — only In Progress / In Review
+                  # should pull an epic out of To Do / Backlog. See LS-4683.
                   ;;
                 "In Review")
                   ANY_ACTIVE=true
@@ -529,11 +534,11 @@ jobs:
             }
 
             TRANSITION_ID=$(echo "$TRANS_RESPONSE" | jq -r --arg t "$EPIC_TARGET" \
-              '.transitions[] | select(.name == $t) | .id' | head -1)
+              '.transitions[] | select(.name == $t or .to.name == $t) | .id' | head -1)
 
             if [[ -z "$TRANSITION_ID" ]]; then
               echo "⚠️  Transition '$EPIC_TARGET' not available for epic $EPIC_KEY."
-              echo "Available: $(echo "$TRANS_RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
+              echo "Available: $(echo "$TRANS_RESPONSE" | jq -r '[.transitions[] | "\(.name)→\(.to.name)"] | join(", ")')"
               continue
             fi
 

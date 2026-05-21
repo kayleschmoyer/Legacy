@@ -5,7 +5,8 @@ name: "Jira Status Audit"
 #
 # PR audit: checks open PRs against Jira ticket status, labels mismatches.
 # Epic audit: applies rollup logic (same as jira-branch-sync.yml) to all
-# non-Done epics — recalculates expected status from children and transitions.
+# epics — recalculates expected status from children and transitions.
+# Done epics are included so they can be demoted when a child is reopened.
 #
 # Jira sync is one-directional (GitHub → Jira). If someone manually changes
 # a ticket status in Jira, GitHub PRs remain unaware. Similarly, epics can
@@ -302,9 +303,9 @@ jobs:
       #
       # Applies the same rollup logic as jira-branch-sync.yml:
       #   All children Done                         → Epic "Done"
-      #   All children In Review or Done             → Epic "In Review"
-      #   Any child In Progress / In Review / Done   → Epic "In Progress"
-      #   No children active (all To Do / Backlog)   → no change
+      #   All children In Review or Done            → Epic "In Review"
+      #   Any child In Progress or In Review        → Epic "In Progress"
+      #   No children active (all To Do / Backlog / Done-only) → no change
       #
       # Epics with the "pinned-status" Jira label are excluded.
       # -------------------------------------------------------------------
@@ -316,8 +317,10 @@ jobs:
           echo ""
           echo "🔍 Auditing epic rollup statuses..."
 
-          # Fetch all non-Done epics in the LS project (paginated)
-          ENCODED_JQL=$(echo -n 'project = LS AND issuetype = Epic AND status != Done' | jq -sRr @uri)
+          # Fetch all epics in the LS project (paginated).
+          # We include Done epics so the audit can demote a Done epic back to
+          # In Progress / In Review when a child is reopened (LS-4683).
+          ENCODED_JQL=$(echo -n 'project = LS AND issuetype = Epic' | jq -sRr @uri)
           ALL_EPICS="[]"
           START_AT=0
           PAGE_SIZE=100
@@ -343,7 +346,7 @@ jobs:
           done
 
           EPIC_COUNT=$(echo "$ALL_EPICS" | jq 'length')
-          echo "Found $EPIC_COUNT non-Done epics"
+          echo "Found $EPIC_COUNT epics"
 
           TRANSITIONED=0
           SKIPPED_PINNED=0
@@ -415,7 +418,8 @@ jobs:
             while IFS= read -r STATUS; do
               case "$STATUS" in
                 "Done")
-                  ANY_ACTIVE=true
+                  # Done alone is not "active work" — only In Progress / In Review
+                  # should pull an epic out of To Do / Backlog. See LS-4683.
                   ;;
                 "In Review")
                   ANY_ACTIVE=true
@@ -462,10 +466,10 @@ jobs:
             }
 
             TRANSITION_ID=$(echo "$TRANS_RESPONSE" | jq -r --arg t "$EXPECTED_STATUS" \
-              '.transitions[] | select(.name == $t) | .id' | head -1)
+              '.transitions[] | select(.name == $t or .to.name == $t) | .id' | head -1)
 
             if [[ -z "$TRANSITION_ID" ]]; then
-              AVAILABLE=$(echo "$TRANS_RESPONSE" | jq -r '[.transitions[].name] | join(", ")')
+              AVAILABLE=$(echo "$TRANS_RESPONSE" | jq -r '[.transitions[] | "\(.name)→\(.to.name)"] | join(", ")')
               echo "  ⚠️  $EPIC_KEY: transition '$EXPECTED_STATUS' not available (available: $AVAILABLE)"
               ERRORS=$((ERRORS + 1))
               continue

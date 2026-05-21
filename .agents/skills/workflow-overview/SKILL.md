@@ -359,11 +359,14 @@ Automatically keeps Jira ticket statuses in sync with branch/PR activity.
 
 After transitioning the child ticket, the workflow also syncs the parent epic status based on the aggregate state of all its children:
 
-| Children State                       | Epic Transition |
-| ------------------------------------ | --------------- |
-| Any child In Progress/In Review/Done | In Progress     |
-| All children In Review or Done       | In Review       |
-| All children Done                    | Done            |
+| Children State                                | Epic Transition |
+| --------------------------------------------- | --------------- |
+| All children Done                             | Done            |
+| All children In Review or Done                | In Review       |
+| Any child In Progress or In Review            | In Progress     |
+| Otherwise (all To Do / Backlog, or Done-only) | no change       |
+
+A Done child alone does NOT pull an epic out of To Do / Backlog — only In Progress / In Review children count as "active work" (LS-4683).
 
 Epics with the Jira label `pinned-status` are excluded from automatic transitions.
 
