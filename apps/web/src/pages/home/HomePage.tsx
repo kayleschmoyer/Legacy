@@ -124,7 +124,7 @@ const SPORTS: SportConfig[] = [
     icon: 'baseball',
     title: 'Baseball',
     description:
-      '162 games, every era since 1876. Draft Ruth alongside Trout — then watch the archived stats play out.',
+      '162 games, every era since 1876. Draft Ruth alongside Trout — then watch the archived tape play out.',
     route: '/baseball',
     accentBase: BRAND_NAVY,
     accentAlpha: 0.55,
@@ -1300,7 +1300,33 @@ function StatsCta({
 
 /* ─── Error card ─── */
 
-function ErrorCard({ onRetry }: { onRetry: () => void }) {
+function formatUtcTime(d: Date): string {
+  const hh = d.getUTCHours().toString().padStart(2, '0');
+  const mm = d.getUTCMinutes().toString().padStart(2, '0');
+  const ss = d.getUTCSeconds().toString().padStart(2, '0');
+  return `${hh}:${mm}:${ss} UTC`;
+}
+
+// Stable 8-char id derived from the error message so retries preserve the
+// reference until a different error is seen.
+function shortErrorId(message: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < message.length; i++) {
+    h = (h ^ message.charCodeAt(i)) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return `req_${h.toString(16).padStart(8, '0').slice(0, 8)}`;
+}
+
+function ErrorCard({
+  onRetry,
+  reference,
+  occurredAt,
+}: {
+  onRetry: () => void;
+  reference?: string;
+  occurredAt?: Date;
+}) {
   return (
     <section
       role="alert"
@@ -1380,6 +1406,51 @@ function ErrorCard({ onRetry }: { onRetry: () => void }) {
           are safe — this is a display issue only. Try again, or come back in a
           moment.
         </p>
+        {(reference || occurredAt) && (
+          <div
+            style={{
+              fontFamily: 'Literata, Georgia, serif',
+              fontSize: 13,
+              color: TEXT_SECONDARY,
+              marginTop: 4,
+            }}
+          >
+            {reference && (
+              <>
+                Reference{' '}
+                <code
+                  style={{
+                    fontFamily:
+                      'JetBrains Mono, ui-monospace, Menlo, monospace',
+                    fontSize: 12,
+                    color: TEXT_INTERFACE,
+                    background: withAlpha(BRAND_SEAM_RED, 0.12),
+                    border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.3)}`,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  {reference}
+                </code>
+              </>
+            )}
+            {reference && occurredAt && (
+              <span style={{ color: TEXT_SEPARATOR, margin: '0 8px' }}>·</span>
+            )}
+            {occurredAt && (
+              <span
+                style={{
+                  fontFamily: 'JetBrains Mono, ui-monospace, Menlo, monospace',
+                  fontSize: 12,
+                  fontVariantNumeric: 'tabular-nums',
+                  color: TEXT_INTERFACE,
+                }}
+              >
+                {formatUtcTime(occurredAt)}
+              </span>
+            )}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
           <button
             onClick={onRetry}
@@ -1435,6 +1506,10 @@ export function HomePage(): React.JSX.Element {
   const userId = auth?.user?.id;
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [errorMeta, setErrorMeta] = useState<{
+    message: string;
+    occurredAt: Date;
+  } | null>(null);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
 
@@ -1500,6 +1575,19 @@ export function HomePage(): React.JSX.Element {
     skip: !auth?.user,
     fetchPolicy: 'cache-and-network',
   });
+
+  // Capture the moment an error first appears so retries preserve the
+  // displayed timestamp while a fresh error resets it.
+  useEffect(() => {
+    if (!summariesError) {
+      if (errorMeta !== null) setErrorMeta(null);
+      return;
+    }
+    const message = summariesError.message || 'unknown';
+    if (errorMeta?.message !== message) {
+      setErrorMeta({ message, occurredAt: new Date() });
+    }
+  }, [summariesError, errorMeta]);
 
   const [fetchArchived, { data: archivedData, loading: archivedLoading }] =
     useGetArchivedUserLeagueSummariesLazyQuery({
@@ -1591,6 +1679,10 @@ export function HomePage(): React.JSX.Element {
     !summariesLoading &&
     !summaryData?.getUserLeagueSummaries
   ) {
+    const errorMessage = summariesError.message || 'unknown';
+    const errorReference = shortErrorId(errorMessage);
+    const errorOccurredAt =
+      errorMeta?.message === errorMessage ? errorMeta.occurredAt : new Date();
     return (
       <ScrollView>
         <PageMeta
@@ -1635,7 +1727,11 @@ export function HomePage(): React.JSX.Element {
                 Welcome, {userName}
               </h1>
             </div>
-            <ErrorCard onRetry={() => void refetchSummaries()} />
+            <ErrorCard
+              onRetry={() => void refetchSummaries()}
+              reference={errorReference}
+              occurredAt={errorOccurredAt}
+            />
             {/* On This Day still available */}
             <div style={{ marginTop: 56 }}>
               <SectionHead
