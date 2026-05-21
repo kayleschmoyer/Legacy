@@ -8,7 +8,7 @@
  * See LS-3852 for the original race-condition fix in MatchupRosterEditor.tsx.
  */
 import React from 'react';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 
 import type {
   MatchupPlayerData,
@@ -19,7 +19,11 @@ import { render } from '../../test-utils';
 
 const noop = () => Promise.resolve();
 
-function makePlayer(id: string, positionId: number | null): MatchupPlayerData {
+function makePlayer(
+  id: string,
+  positionId: number | null,
+  eligiblePositions: string[] = ['SP'],
+): MatchupPlayerData {
   return {
     id,
     positionId,
@@ -28,7 +32,7 @@ function makePlayer(id: string, positionId: number | null): MatchupPlayerData {
     player: {
       firstName: 'Test',
       lastName: `Player${id}`,
-      eligiblePositions: ['SP'],
+      eligiblePositions,
     },
   };
 }
@@ -211,6 +215,110 @@ describe('MatchupRosterEditorView', () => {
         container.querySelectorAll('[data-testid^="matchup-player-row-"]')
           .length,
       ).toBeGreaterThan(0);
+    });
+  });
+
+  describe('position eligibility validation (LS-4036)', () => {
+    // The view used to fire onMoveToPosition / onSwapPositions for any drop
+    // target, leaving the server to reject ineligible moves while the UI
+    // silently swallowed the error. These tests pin both the pre-mutation
+    // guard and its visible UX surface. The pure eligibility predicate has
+    // its own matrix in rosterUtils.spec.ts.
+    //
+    // Tamagui drops `data-testid` on animated XStack rows (LS-4133), so each
+    // row is wrapped in a plain `<div data-testid="matchup-player-row-{id}">`
+    // whose first child is the Tamagui-rendered onPress carrier. Selection
+    // requires dispatching the click on that inner element, not the wrapper.
+    const selectPlayer = (container: HTMLElement, playerId: string): void => {
+      const wrapper = container.querySelector(
+        `[data-testid="matchup-player-row-${playerId}"]`,
+      );
+      const inner = wrapper?.firstElementChild as HTMLElement | null;
+      if (!inner) throw new Error(`row ${playerId} not rendered`);
+      fireEvent.click(inner);
+    };
+
+    it('shows "Not eligible" on an empty SP slot when an ineligible batter is selected', () => {
+      const benchBatter = makePlayer('b1', null, ['C']);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[benchBatter]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      // Before selection: no "Not eligible" badge on the empty slot.
+      expect(screen.queryByText(/Not eligible/)).toBeNull();
+
+      selectPlayer(container, 'b1');
+
+      // After selecting the ineligible batter, the empty SP slot now shows
+      // "Not eligible" instead of "Tap to assign".
+      expect(screen.getByText(/Not eligible/)).toBeTruthy();
+      expect(screen.queryByText(/Tap to assign/)).toBeNull();
+    });
+
+    it('disables (and dims) ineligible position buttons for a selected bench player', () => {
+      const benchBatter = makePlayer('b1', null, ['C']);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[benchBatter]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      selectPlayer(container, 'b1');
+
+      const spBtn = container.querySelector(
+        '[data-testid="roster-assign-b1-101"]',
+      );
+      expect(spBtn).not.toBeNull();
+      // Tamagui Button forwards `disabled` to the rendered button element.
+      expect(spBtn?.disabled).toBe(true);
+    });
+
+    it('blocks an ineligible assign click and surfaces the inline error', () => {
+      const benchBatter = makePlayer('b1', null, ['C']);
+      const onMoveToPosition = jest.fn().mockResolvedValue(undefined);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[benchBatter]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={onMoveToPosition}
+        />,
+      );
+      selectPlayer(container, 'b1');
+
+      // The button is disabled, but the eligibility guard inside the handler
+      // is the actual source of truth. Confirm both layers: the button is
+      // disabled in the DOM, and no mutation was ever fired by the prior tap.
+      expect(onMoveToPosition).not.toHaveBeenCalled();
+
+      // The empty slot rendered with the "Not eligible" label, the canonical
+      // visible explanation referenced by the bug report.
+      expect(screen.getByText(/Not eligible/)).toBeTruthy();
+    });
+
+    it('does not show "Not eligible" when the selected bench player is eligible for the slot', () => {
+      const benchPitcher = makePlayer('p1', null, ['SP']);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[benchPitcher]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      selectPlayer(container, 'p1');
+      expect(screen.queryByText(/Not eligible/)).toBeNull();
+      expect(screen.getByText(/Tap to assign/)).toBeTruthy();
     });
   });
 

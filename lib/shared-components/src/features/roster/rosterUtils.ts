@@ -38,6 +38,22 @@ export function isPitcherPositionType(posType: string): boolean {
   return PITCHER_POSITION_TYPES.has(posType.toUpperCase());
 }
 
+/**
+ * Returns true when a player whose `eligiblePositions` list is `eligible` may
+ * be assigned to a slot of type `slotType`. Slot type matching is
+ * case-insensitive. A missing/empty eligibility list is treated as ineligible
+ * for any starter slot (server-side mutations would reject the assignment).
+ */
+export function isEligibleForSlot(
+  eligible: readonly string[] | null | undefined,
+  slotType: string | null | undefined,
+): boolean {
+  if (!slotType) return true; // moving to bench (null slot) is always allowed
+  if (!eligible || eligible.length === 0) return false;
+  const target = slotType.toUpperCase();
+  return eligible.some((p) => p.toUpperCase() === target);
+}
+
 /** Returns true when the matchup's stats loading status indicates an active load. */
 export function isStatsLoading(status: string | null | undefined): boolean {
   return status === 'loading' || status === 'queued' || status === 'retry';

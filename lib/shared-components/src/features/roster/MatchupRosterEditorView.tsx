@@ -9,7 +9,11 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { getPositionColors, POSITION_SLOT_ORDER } from './rosterUtils';
+import {
+  getPositionColors,
+  isEligibleForSlot,
+  POSITION_SLOT_ORDER,
+} from './rosterUtils';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -90,10 +94,18 @@ export function MatchupRosterEditorView({
   onMoveToPosition,
 }: MatchupRosterEditorViewProps): React.JSX.Element | null {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
 
   const selectedPlayer = useMemo(
     () => players.find((p) => p.id === selectedPlayerId) ?? null,
     [players, selectedPlayerId],
+  );
+
+  const playerName = useCallback(
+    (p: MatchupPlayerData): string =>
+      `${p.player?.firstName ?? ''} ${p.player?.lastName ?? ''}`.trim() ||
+      `player ${p.id}`,
+    [],
   );
 
   /** Position slots sorted in canonical display order (batters first, then pitchers). */
@@ -129,11 +141,13 @@ export function MatchupRosterEditorView({
 
       if (!selectedPlayerId) {
         setSelectedPlayerId(player.id);
+        setEligibilityError(null);
         return;
       }
 
       if (selectedPlayerId === player.id) {
         setSelectedPlayerId(null);
+        setEligibilityError(null);
         return;
       }
 
@@ -144,6 +158,36 @@ export function MatchupRosterEditorView({
         return;
       }
 
+      // Eligibility check: each player must be eligible at the slot they'd
+      // move into. Bench (null positionId) is always allowed.
+      const firstNewSlotType = player.positionId
+        ? (positionMap.get(player.positionId) ?? null)
+        : null;
+      const secondNewSlotType = first.positionId
+        ? (positionMap.get(first.positionId) ?? null)
+        : null;
+
+      const firstEligible = isEligibleForSlot(
+        first.player?.eligiblePositions ?? null,
+        firstNewSlotType,
+      );
+      const secondEligible = isEligibleForSlot(
+        player.player?.eligiblePositions ?? null,
+        secondNewSlotType,
+      );
+
+      if (!firstEligible || !secondEligible) {
+        const offender = !firstEligible ? first : player;
+        const targetSlot = !firstEligible
+          ? firstNewSlotType
+          : secondNewSlotType;
+        setEligibilityError(
+          `${playerName(offender)} is not eligible for ${targetSlot}.`,
+        );
+        return;
+      }
+
+      setEligibilityError(null);
       void (async () => {
         await onSwapPositions(
           first.id,
@@ -154,7 +198,14 @@ export function MatchupRosterEditorView({
         setSelectedPlayerId(null);
       })();
     },
-    [selectedPlayerId, selectedPlayer, mutating, onSwapPositions],
+    [
+      selectedPlayerId,
+      selectedPlayer,
+      mutating,
+      onSwapPositions,
+      positionMap,
+      playerName,
+    ],
   );
 
   /**
@@ -162,19 +213,32 @@ export function MatchupRosterEditorView({
    * Called when the user taps an empty slot row in the starters section.
    */
   const handleAssignToSlot = useCallback(
-    (slotId: number) => {
+    (slotId: number, slotType: string) => {
       if (mutating || !selectedPlayer) return;
+      if (
+        !isEligibleForSlot(
+          selectedPlayer.player?.eligiblePositions ?? null,
+          slotType,
+        )
+      ) {
+        setEligibilityError(
+          `${playerName(selectedPlayer)} is not eligible for ${slotType}.`,
+        );
+        return;
+      }
+      setEligibilityError(null);
       void (async () => {
         await onMoveToPosition(selectedPlayer.id, slotId);
         setSelectedPlayerId(null);
       })();
     },
-    [mutating, selectedPlayer, onMoveToPosition],
+    [mutating, selectedPlayer, onMoveToPosition, playerName],
   );
 
   const handleMoveToBench = useCallback(
     (player: MatchupPlayerData) => {
       if (mutating) return;
+      setEligibilityError(null);
       void (async () => {
         await onMoveToPosition(player.id, null);
         setSelectedPlayerId(null);
@@ -184,14 +248,26 @@ export function MatchupRosterEditorView({
   );
 
   const handleAssignPosition = useCallback(
-    (player: MatchupPlayerData, positionId: number) => {
+    (player: MatchupPlayerData, positionId: number, positionType: string) => {
       if (mutating) return;
+      if (
+        !isEligibleForSlot(
+          player.player?.eligiblePositions ?? null,
+          positionType,
+        )
+      ) {
+        setEligibilityError(
+          `${playerName(player)} is not eligible for ${positionType}.`,
+        );
+        return;
+      }
+      setEligibilityError(null);
       void (async () => {
         await onMoveToPosition(player.id, positionId);
         setSelectedPlayerId(null);
       })();
     },
-    [mutating, onMoveToPosition],
+    [mutating, onMoveToPosition, playerName],
   );
 
   // ── Render helpers ─────────────────────────────────────────────────────────
@@ -199,7 +275,13 @@ export function MatchupRosterEditorView({
   /** Renders an empty slot row. Tappable when a player is currently selected. */
   const renderEmptySlot = (slot: MatchupPositionOption) => {
     const badge = getPositionColors(slot.type);
-    const canAssign = !locked && selectedPlayer !== null;
+    const isIneligible =
+      selectedPlayer !== null &&
+      !isEligibleForSlot(
+        selectedPlayer.player?.eligiblePositions ?? null,
+        slot.type,
+      );
+    const canAssign = !locked && selectedPlayer !== null && !isIneligible;
     return (
       <XStack
         key={`empty-slot-${slot.id}`}
@@ -215,7 +297,9 @@ export function MatchupRosterEditorView({
         }
         pressStyle={canAssign ? { scale: 0.99 } : undefined}
         animation="quick"
-        onPress={canAssign ? () => handleAssignToSlot(slot.id) : undefined}
+        onPress={
+          canAssign ? () => handleAssignToSlot(slot.id, slot.type) : undefined
+        }
         alignItems="center"
         gap="$2"
       >
@@ -249,6 +333,11 @@ export function MatchupRosterEditorView({
         {canAssign && (
           <Text fontSize="$1" color="$green10" fontWeight="600">
             Tap to assign
+          </Text>
+        )}
+        {!locked && isIneligible && (
+          <Text fontSize="$1" color="$red10" fontWeight="600">
+            Not eligible
           </Text>
         )}
       </XStack>
@@ -356,24 +445,35 @@ export function MatchupRosterEditorView({
             section === 'bench' &&
             positionOptions.length > 0 && (
               <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
-                {positionOptions.map((opt) => (
-                  <Button
-                    key={opt.id}
-                    size="$2"
-                    backgroundColor="$blue8"
-                    color="white"
-                    data-testid={`roster-assign-${player.id}-${opt.id}`}
-                    pressStyle={{ backgroundColor: '$blue10' }}
-                    hoverStyle={{ backgroundColor: '$blue9' }}
-                    onPress={(e: { stopPropagation: () => void }) => {
-                      e.stopPropagation();
-                      handleAssignPosition(player, opt.id);
-                    }}
-                    disabled={mutating}
-                  >
-                    {opt.type}
-                  </Button>
-                ))}
+                {positionOptions.map((opt) => {
+                  const eligible = isEligibleForSlot(
+                    player.player?.eligiblePositions ?? null,
+                    opt.type,
+                  );
+                  return (
+                    <Button
+                      key={opt.id}
+                      size="$2"
+                      backgroundColor={eligible ? '$blue8' : '$gray5'}
+                      color="white"
+                      data-testid={`roster-assign-${player.id}-${opt.id}`}
+                      opacity={eligible ? 1 : 0.5}
+                      pressStyle={
+                        eligible ? { backgroundColor: '$blue10' } : undefined
+                      }
+                      hoverStyle={
+                        eligible ? { backgroundColor: '$blue9' } : undefined
+                      }
+                      onPress={(e: { stopPropagation: () => void }) => {
+                        e.stopPropagation();
+                        handleAssignPosition(player, opt.id, opt.type);
+                      }}
+                      disabled={mutating || !eligible}
+                    >
+                      {opt.type}
+                    </Button>
+                  );
+                })}
               </XStack>
             )}
 
@@ -452,6 +552,37 @@ export function MatchupRosterEditorView({
               : 'Tap a player to select them, then tap another to swap positions.'}
         </Text>
       </YStack>
+
+      {/* Eligibility error banner */}
+      {!locked && eligibilityError && (
+        <XStack
+          paddingHorizontal="$4"
+          paddingVertical="$2"
+          backgroundColor="$red3"
+          borderBottomWidth={1}
+          borderBottomColor="$red6"
+          alignItems="center"
+          gap="$2"
+        >
+          <Text
+            fontSize="$2"
+            fontWeight="600"
+            color="$red11"
+            data-testid="roster-eligibility-error"
+            flex={1}
+          >
+            {eligibilityError}
+          </Text>
+          <Button
+            size="$2"
+            theme="alt2"
+            data-testid="roster-eligibility-error-dismiss"
+            onPress={() => setEligibilityError(null)}
+          >
+            Dismiss
+          </Button>
+        </XStack>
+      )}
 
       {/* Mutation loading indicator */}
       {!locked && mutating && (
