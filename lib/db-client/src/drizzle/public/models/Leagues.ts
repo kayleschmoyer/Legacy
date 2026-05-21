@@ -32,6 +32,7 @@ import {
   waiverType,
   weekAdvanceStatus,
   tradeOfferStatus,
+  sportKind,
 } from './Enums';
 
 // Define leagues first since other tables reference it
@@ -41,6 +42,9 @@ export const leagues = pgTable(
     id: serial('id').primaryKey().notNull(),
     name: varchar('name').notNull(),
     owner: integer('owner').notNull(),
+    /** Sport discriminator for multi-sport leagues (LS-4628). Defaults to
+     *  baseball; football lands as part of LS-4568. */
+    sport: sportKind('sport').notNull().default('baseball'),
     maxRosterSize: integer('max_roster_size').notNull().default(25),
     currentMatchup: integer('current_matchup'),
     /** Canonical current active week number. Replaces the currentMatchup FK as the

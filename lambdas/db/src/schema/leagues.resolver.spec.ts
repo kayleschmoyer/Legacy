@@ -548,6 +548,79 @@ describe('League Mutations', () => {
 
       expect((result as any)?.maxRosterSize).toBe(30);
     });
+
+    it('should default sport to baseball when not provided (LS-4628)', async () => {
+      mockDb.limit.mockResolvedValue([{ tier: 'premium' }]);
+      mockCreateLeague.mockResolvedValueOnce({
+        league: {
+          id: 1,
+          name: 'Test League',
+          sport: 'baseball',
+          maxRosterSize: 25,
+          owner: 1,
+          currentMatchup: null,
+          draftStatus: 'not-started',
+          inviteCode: 'ABCD1234',
+          playerPool: 'all',
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const createLeagueField = mutationType?.getFields().createLeague;
+      if (!createLeagueField?.resolve) {
+        throw new Error('createLeague resolver not found');
+      }
+
+      await createLeagueField.resolve(
+        {},
+        { name: 'Test League' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ sport: 'baseball' }),
+      );
+    });
+
+    it('should persist football sport when provided (LS-4628)', async () => {
+      mockDb.limit.mockResolvedValue([{ tier: 'premium' }]);
+      mockCreateLeague.mockResolvedValueOnce({
+        league: {
+          id: 2,
+          name: 'Gridiron Dynasty',
+          sport: 'football',
+          maxRosterSize: 25,
+          owner: 1,
+          currentMatchup: null,
+          draftStatus: 'not-started',
+          inviteCode: 'FOOT1234',
+          playerPool: 'all',
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const createLeagueField = mutationType?.getFields().createLeague;
+      if (!createLeagueField?.resolve) {
+        throw new Error('createLeague resolver not found');
+      }
+
+      const result = await createLeagueField.resolve(
+        {},
+        { name: 'Gridiron Dynasty', sport: 'football' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ sport: 'football' }),
+      );
+      expect((result as any)?.sport).toBe('football');
+    });
   });
 
   describe('joinLeague mutation', () => {

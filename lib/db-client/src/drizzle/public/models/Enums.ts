@@ -11,6 +11,14 @@ export const selectionMethod = pgEnum('selection_method', [
 export const playerPool = pgEnum('player_pool', ['all', 'nl', 'al']);
 
 /**
+ * Sport kind — discriminator for multi-sport leagues. Baseball is the
+ * historical default; football lands as part of LS-4568 (draft-board sport
+ * toggle). Used to gate sport-specific behaviour (positions, era options,
+ * stat ingestion, etc.).
+ */
+export const sportKind = pgEnum('sport_kind', ['baseball', 'football']);
+
+/**
  * Era filter — restricts the available player pool to players whose careers
  * overlapped with the selected historical baseball era.
  *

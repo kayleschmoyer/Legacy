@@ -95,6 +95,45 @@ describe('Leagues - DB Integration Tests', () => {
         }),
       ).rejects.toThrow();
     });
+
+    it('should default sport to baseball for existing leagues (LS-4628)', async () => {
+      const user = getUser(2);
+      const league = getLeague(0);
+
+      const [inserted] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: league.name,
+          owner: user.id,
+          inviteCode: 'SPORTDEF',
+        })
+        .returning();
+
+      expect(inserted.sport).toBe('baseball');
+    });
+
+    it('should persist explicit football sport (LS-4628)', async () => {
+      const user = getUser(2);
+
+      const [inserted] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: 'Gridiron Dynasty',
+          owner: user.id,
+          inviteCode: 'FOOTBALL',
+          sport: 'football',
+        })
+        .returning();
+
+      expect(inserted.sport).toBe('football');
+
+      const [reread] = await db
+        .select({ sport: integrationTestSchema.leagues.sport })
+        .from(integrationTestSchema.leagues)
+        .where(eq(integrationTestSchema.leagues.id, inserted.id))
+        .limit(1);
+      expect(reread.sport).toBe('football');
+    });
   });
 
   describe('getLeaguesByOwner', () => {

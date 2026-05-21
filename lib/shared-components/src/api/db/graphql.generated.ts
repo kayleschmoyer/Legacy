@@ -437,6 +437,7 @@ export type CreateLeagueAndTeamsInput = {
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -889,6 +890,8 @@ export type League = {
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
+  /** Sport for this league (baseball or football). (LS-4628) */
+  sport?: Maybe<Sport>;
   /** ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues. */
   tierFrozenAt?: Maybe<Scalars['String']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
@@ -1583,6 +1586,7 @@ export type MutationCreateCheckoutSessionArgs = {
 export type MutationCreateLeagueArgs = {
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   name: Scalars['String']['input'];
+  sport?: InputMaybe<Sport>;
 };
 
 export type MutationCreateLeagueAndTeamsArgs = {
@@ -3519,6 +3523,12 @@ export type SetTeamLockInput = {
   reason?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };
+
+/** Sport for a league (baseball or football). */
+export enum Sport {
+  Baseball = 'baseball',
+  Football = 'football',
+}
 
 /** Result of starting a new disclosure game session */
 export type StartDisclosureGameResult = {

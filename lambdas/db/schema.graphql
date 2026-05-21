@@ -477,6 +477,7 @@ input CreateLeagueAndTeamsInput {
   salaryFloor: Int
   schedulingStrategy: String
   selectionMethod: String
+  sport: Sport
   startDate: String
   tradingEnabled: Boolean
   waiverEnabled: Boolean
@@ -1008,6 +1009,11 @@ type League {
   seasonNumber: Int
   secondaryColor: String
   spStartsPerMatchup: Int
+
+  """
+  Sport for this league (baseball or football). (LS-4628)
+  """
+  sport: Sport
 
   """
   ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues.
@@ -1574,7 +1580,7 @@ type Mutation {
     priceId: String!
     successUrl: String!
   ): CheckoutSessionResult
-  createLeague(maxRosterSize: Int, name: String!): League
+  createLeague(maxRosterSize: Int, name: String!, sport: Sport): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!
   ): CreateLeagueAndTeamsPayload
@@ -3431,6 +3437,14 @@ input SetTeamLockInput {
   locked: Boolean!
   reason: String
   teamId: Int!
+}
+
+"""
+Sport for a league (baseball or football).
+"""
+enum Sport {
+  baseball
+  football
 }
 
 """

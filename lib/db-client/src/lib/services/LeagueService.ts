@@ -48,6 +48,8 @@ const DEFAULT_TEAM_NAMES = [
   'Team Omicron',
 ];
 
+export type SportKind = 'baseball' | 'football';
+
 export type EraFilterValue =
   | 'all'
   | 'dead_ball'
@@ -62,6 +64,8 @@ export interface CreateLeagueOptions {
   name: string;
   ownerId: number;
   ownerUsername: string;
+  /** Sport for this league (LS-4628). Defaults to baseball. */
+  sport?: SportKind;
   maxRosterSize?: number;
   numberOfTeams?: number;
   numberOfDivisions?: number;
@@ -101,6 +105,7 @@ export interface CreateLeagueResult {
     id: number;
     name: string;
     owner: number;
+    sport: SportKind;
     maxRosterSize: number;
     currentMatchup: number | null;
     currentWeek: number | null;
@@ -157,6 +162,7 @@ export class LeagueService {
       name,
       ownerId,
       ownerUsername,
+      sport = 'baseball',
       maxRosterSize = 25,
       numberOfTeams = 12,
       numberOfDivisions = 2,
@@ -210,6 +216,7 @@ export class LeagueService {
           .values({
             name,
             owner: ownerId,
+            sport,
             maxRosterSize,
             currentMatchup: null,
             inviteCode,
@@ -239,6 +246,7 @@ export class LeagueService {
             id: PublicSchema.leagues.id,
             name: PublicSchema.leagues.name,
             owner: PublicSchema.leagues.owner,
+            sport: PublicSchema.leagues.sport,
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
             currentMatchup: PublicSchema.leagues.currentMatchup,
             currentWeek: PublicSchema.leagues.currentWeek,

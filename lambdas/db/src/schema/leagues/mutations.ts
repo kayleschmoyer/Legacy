@@ -20,6 +20,7 @@ import {
   League,
   LeagueMember,
   LeaguePosition,
+  SportKindEnum,
   Team,
 } from './types';
 import { builder } from '../builder';
@@ -52,6 +53,8 @@ const CreateLeagueAndTeamsInput = builder.inputType(
   {
     fields: (t) => ({
       leagueName: t.string({ required: true }),
+      // Sport for the league. Defaults to 'baseball' when omitted (LS-4628).
+      sport: t.field({ type: SportKindEnum, required: false }),
       numberOfTeams: t.int({ required: true }),
       numberOfDivisions: t.int({ required: false }), // default 2 (two divisions)
       schedulingStrategy: t.string({ required: false }), // 'round-robin' | 'divisional' | 'random' (optional, defaults to 'divisional')
@@ -179,6 +182,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
       const {
         leagueName,
+        sport: inputSport,
         numberOfTeams,
         numberOfDivisions,
         schedulingStrategy: inputSchedulingStrategy,
@@ -314,6 +318,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           name: leagueName,
           ownerId: userId,
           ownerUsername: username,
+          sport: inputSport ?? 'baseball',
           maxRosterSize: maxRosterSize || 25,
           numberOfTeams,
           numberOfDivisions: resolvedNumberOfDivisions,
@@ -782,6 +787,8 @@ builder.mutationField('createLeague', (t) =>
     type: League,
     args: {
       name: t.arg.string({ required: true }),
+      // Sport for the league. Defaults to 'baseball' when omitted (LS-4628).
+      sport: t.arg({ type: SportKindEnum, required: false }),
       maxRosterSize: t.arg.int({ required: false }),
     },
     resolve: async (_parent, args, context) => {
@@ -816,6 +823,7 @@ builder.mutationField('createLeague', (t) =>
           name: args.name,
           ownerId: userId,
           ownerUsername: context.user.username || 'User',
+          sport: args.sport ?? 'baseball',
           maxRosterSize,
         });
 

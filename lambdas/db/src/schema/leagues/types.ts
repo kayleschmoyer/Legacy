@@ -11,6 +11,14 @@ import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
 import { AuthenticationError } from '../graphql-errors';
 
+// Sport kind enum (LS-4628) — discriminator for multi-sport leagues. Mirrors
+// the `sport_kind` Postgres enum. Lowercase values match the DB enum directly
+// so resolvers can pass the value through without translation.
+export const SportKindEnum = builder.enumType('Sport', {
+  values: ['baseball', 'football'] as const,
+  description: 'Sport for a league (baseball or football).',
+});
+
 // Default roster positions for new leagues
 // These represent a standard fantasy baseball roster configuration
 export const DEFAULT_ROSTER_POSITIONS = [
@@ -43,6 +51,10 @@ export const League = builder.objectRef<{
   id: number;
   name: string;
   owner: number;
+  /** Sport for this league. Defaults to 'baseball' when the resolver's
+   *  parent select did not include it — every league has a non-null value
+   *  in the DB (LS-4628). */
+  sport?: 'baseball' | 'football';
   maxRosterSize: number;
   currentMatchup: number | null;
   /** Authoritative current week number — replaces the currentMatchup FK pointer. */
@@ -117,6 +129,11 @@ League.implement({
     id: t.exposeInt('id'),
     name: t.exposeString('name'),
     owner: t.exposeInt('owner'),
+    sport: t.field({
+      type: SportKindEnum,
+      description: 'Sport for this league (baseball or football). (LS-4628)',
+      resolve: (parent) => parent.sport ?? 'baseball',
+    }),
     maxRosterSize: t.exposeInt('maxRosterSize'),
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),
     currentWeek: t.exposeInt('currentWeek', { nullable: true }),
