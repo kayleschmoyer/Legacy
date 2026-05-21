@@ -205,6 +205,16 @@ import {
   id = "eipalloc-0a477d5acbdbc9bf0"
 }
 
+# One-time import (LS-4702): the running NAT instance drifted out of Terraform
+# state, so every apply planned to create a new instance and failed with
+# InvalidNetworkInterface.InUse on the managed ENI (eni-06dde37d8591629f7).
+# Importing brings the live instance back under management. Remove this block
+# after the next successful apply.
+import {
+  to = aws_instance.nat_instance[0]
+  id = "i-0ac135e00f80fd09c"
+}
+
 # Elastic IP for NAT instance (optional, for static IP).
 # Attaches to the managed ENI so the EIP follows the network interface across
 # NAT instance replacements rather than getting disassociated when the instance
