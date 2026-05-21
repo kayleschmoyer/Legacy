@@ -139,6 +139,9 @@
 .ll-cta-pane {
   position: relative;
   padding: 40px 32px 40px 8px;
+  /* Clip the radial-gradient ::before backdrop so its negative inset
+     can't push horizontal page overflow at tablet widths. */
+  overflow: hidden;
 }
 .ll-cta-pane::before {
   content: '';
@@ -617,7 +620,7 @@
     margin-right: auto;
   }
   .ll-marquee-row {
-    justify-content: flex-start;
+    justify-content: center;
   }
   .ll-card-pane {
     max-width: 460px;
