@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { PendingTradeOfferBanner } from './PendingTradeOfferBanner';
 import {
   type LeagueFragment,
   type LeaguePositionFragment,
@@ -174,6 +175,10 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
           title="Future Week — Provisional Lineup"
           sub="Changes you make will apply to this week and all future matchups until updated again."
         />
+      )}
+
+      {isCurrent && league.id != null && (
+        <PendingTradeOfferBanner leagueId={league.id} myTeamId={myTeamId} />
       )}
 
       {isCurrent && <PendingWaiverClaims teamId={myTeamId} />}
