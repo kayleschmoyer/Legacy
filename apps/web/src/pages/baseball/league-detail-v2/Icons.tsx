@@ -268,4 +268,28 @@ export const I = {
       <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
     </Svg>
   ),
+  Home: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M3 12 12 3l9 9M5 10v10h14V10" />
+    </Svg>
+  ),
+  Logout: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+    </Svg>
+  ),
+  Upload: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+    </Svg>
+  ),
+  Palette: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M12 22a10 10 0 1 1 10-10c0 2-2 2-2 4 0 3-3 3-4 1-1-2-3-2-4 0-.5 1-2 2-4 2s-4-2-4-4" />
+      <circle cx="6.5" cy="11.5" r="1.5" />
+      <circle cx="10" cy="7" r="1.5" />
+      <circle cx="15" cy="7" r="1.5" />
+      <circle cx="18" cy="12" r="1.5" />
+    </Svg>
+  ),
 };

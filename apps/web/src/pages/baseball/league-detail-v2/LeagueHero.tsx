@@ -59,7 +59,12 @@ export const LeagueHero: React.FC<{
       <span className="meta" style={{ color: 'var(--fg4)' }}>
         ·
       </span>
-      <span className="eyebrow">Baseball · {league.scoringLabel}</span>
+      <span
+        className="eyebrow"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+      >
+        <I.Baseball size={12} /> Baseball · {league.scoringLabel}
+      </span>
       {isCommissioner ? (
         <span
           className="ls-chip ls-chip-commish"
@@ -71,7 +76,7 @@ export const LeagueHero: React.FC<{
     </div>
     <div className="ls-hero-main">
       <div className="ls-hero-crest">
-        <I.Shield size={44} style={{ color: 'var(--brand-gold-light)' }} />
+        <I.Baseball size={48} style={{ color: 'var(--brand-gold-light)' }} />
       </div>
       <div className="ls-hero-body">
         <h1 data-testid="league-title">{league.name}</h1>

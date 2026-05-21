@@ -117,6 +117,25 @@ export interface PlayerRowVM {
   bench?: boolean;
 }
 
+// Pace-target tint for the actual score: green if outperforming projected pace
+// by ≥10%, red if underperforming by ≥10%, neutral otherwise. Lock-only rows
+// (no gamesPlayed/gamesRemaining) compare against full projection.
+const paceColorStyle = (p: PlayerRowVM): React.CSSProperties | undefined => {
+  if (p.proj == null || p.actual == null) return undefined;
+  const total =
+    p.gamesPlayed != null && p.gamesRemaining != null
+      ? p.gamesPlayed + p.gamesRemaining
+      : 0;
+  const frac = total > 0 ? p.gamesPlayed! / total : 1;
+  if (frac === 0) return undefined;
+  const target = p.proj * frac;
+  if (target <= 0) return undefined;
+  const ratio = (p.actual - target) / target;
+  if (ratio >= 0.1) return { color: 'var(--success-fg)' };
+  if (ratio <= -0.1) return { color: 'var(--danger-fg)' };
+  return undefined;
+};
+
 export const PlayerRow: React.FC<{
   p: PlayerRowVM;
   editable?: boolean;
@@ -170,7 +189,9 @@ export const PlayerRow: React.FC<{
         </div>
       </div>
       <div className={`ls-player-score ${best ? 'best' : ''}`}>
-        <div className="actual">{(p.actual ?? 0).toFixed(1)}</div>
+        <div className="actual" style={paceColorStyle(p)}>
+          {(p.actual ?? 0).toFixed(1)}
+        </div>
         {p.proj != null ? (
           <div className="proj">{p.proj.toFixed(1)} proj</div>
         ) : null}
