@@ -221,6 +221,21 @@ export const AMBER_WARM = '#E3B870';
 /** Stats Page border — design-spec shade between PANEL_BORDER and OUTLINE_SUBTLE. */
 export const STATS_BORDER = '#1E2D45';
 
+// ─── Design-System Foreground Tokens ────────────────────────
+// Mirror the `--fg2` / `--success-fg` / `--info-fg` / `--danger-fg` semantic
+// tokens defined in the synced design bundles (e.g. r09ipdRY07dJXR9hh4J1Ug
+// — Admin). Use these instead of inlining hex values so consumers stay
+// consistent when the bundle is re-synced.
+
+/** Secondary body text on dark backgrounds (--fg2). */
+export const TEXT_FG2 = '#DEE6FF';
+/** Muted "valid / success" status text (--success-fg). */
+export const SUCCESS_FG = '#6FD39A';
+/** Muted "info" status text (--info-fg) — used for numeric JSON tinting. */
+export const INFO_FG = '#8FB4E8';
+/** Deep-amber ink for high-contrast text on a trophy-gold surface. */
+export const TEXT_ON_GOLD = '#1B1208';
+
 export const STATS_PAGE_TOKENS = {
   BG_PAGE: BG_DARK,
   BG_SUBTLE: SURFACE_SUBTLE,
