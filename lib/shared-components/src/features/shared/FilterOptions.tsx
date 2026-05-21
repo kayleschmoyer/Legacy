@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
 import { Select, Text, YStack } from 'tamagui';
 
-// Position options for baseball
-export const BASEBALL_POSITIONS = [
+// Sport-kind discriminator. Aligns with ADR 0011 §2; will be replaced by the
+// shared `SportKind` type from the position-model split (LS-4659) once that
+// lands.
+export type SportKind = 'baseball' | 'football';
+
+export interface FilterPosition {
+  label: string;
+  value: string;
+}
+
+const BASEBALL_FILTER_POSITIONS: FilterPosition[] = [
   { label: 'All Positions', value: '' },
   { label: 'Pitcher', value: 'P' },
   { label: 'Catcher', value: 'C' },
@@ -17,7 +26,32 @@ export const BASEBALL_POSITIONS = [
   { label: 'Designated Hitter', value: 'DH' },
 ];
 
+const FOOTBALL_FILTER_POSITIONS: FilterPosition[] = [
+  { label: 'All Positions', value: '' },
+  { label: 'QB', value: 'QB' },
+  { label: 'RB', value: 'RB' },
+  { label: 'WR', value: 'WR' },
+  { label: 'TE', value: 'TE' },
+  { label: 'K', value: 'K' },
+  { label: 'DEF', value: 'DEF' },
+  { label: 'FLEX', value: 'FLEX' },
+];
+
+export const POSITIONS_BY_SPORT: Record<SportKind, FilterPosition[]> = {
+  baseball: BASEBALL_FILTER_POSITIONS,
+  football: FOOTBALL_FILTER_POSITIONS,
+};
+
+export function getPositionsForSport(sport: SportKind): FilterPosition[] {
+  return POSITIONS_BY_SPORT[sport];
+}
+
 export interface FilterOptionsProps {
+  /**
+   * Active sport. Drives the default position list when `positions` is not
+   * supplied. Sourced from `league.sport` once that field lands (LS-4657/4658).
+   */
+  sport?: SportKind;
   position?: string;
   onPositionChange?: (position: string) => void;
   team?: string;
@@ -25,10 +59,12 @@ export interface FilterOptionsProps {
   league?: string;
   onLeagueChange?: (league: string) => void;
   disabled?: boolean;
-  positions?: { label: string; value: string }[];
+  /** Explicit override; takes precedence over `sport`. */
+  positions?: FilterPosition[];
 }
 
 function FilterOptions({
+  sport = 'baseball',
   position = '',
   onPositionChange,
   team = '',
@@ -36,11 +72,13 @@ function FilterOptions({
   league = '',
   onLeagueChange,
   disabled = false,
-  positions = BASEBALL_POSITIONS,
+  positions,
 }: FilterOptionsProps) {
   const [localPosition, setLocalPosition] = useState(position);
   const [localTeam, setLocalTeam] = useState(team);
   const [localLeague, setLocalLeague] = useState(league);
+
+  const resolvedPositions = positions ?? POSITIONS_BY_SPORT[sport];
 
   const handlePositionChange = (value: string) => {
     setLocalPosition(value);
@@ -88,7 +126,7 @@ function FilterOptions({
             <Select.Content>
               <Select.ScrollUpButton />
               <Select.Viewport>
-                {positions.map((pos, idx) => (
+                {resolvedPositions.map((pos, idx) => (
                   <Select.Item key={pos.value} index={idx} value={pos.value}>
                     <Select.ItemText>{pos.label}</Select.ItemText>
                     <Select.ItemIndicator marginLeft="auto">

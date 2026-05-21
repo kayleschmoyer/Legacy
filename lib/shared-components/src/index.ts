@@ -130,8 +130,10 @@ export * from './Dropdown';
 // Team components
 export * from './features/teams/TeamPicker';
 
+// Sport-agnostic filter UI
+export * from './features/shared/FilterOptions';
+
 // Baseball components
-export * from './features/baseball/FilterOptions';
 export * from './features/baseball/PlayersOverview';
 export * from './features/baseball/MLBHome';
 
