@@ -130,20 +130,36 @@ function looksLikeFilePattern(token) {
 /**
  * Extract concrete file paths from the required-doc cell.
  * Only markdown link hrefs are extractable; plain-text doc names are skipped.
+ * Links whose surrounding clause contains a conditional `if ...` qualifier
+ * (e.g. "SKILL.md if migration commands change") are treated as conditional
+ * and skipped — the linter can't evaluate the predicate mechanically, and
+ * unconditionally requiring the doc produces spurious advisory comments.
  */
 function extractDocPaths(docText, touchMapDir) {
   const paths = [];
+  // Split into clauses on comma/semicolon so each link is evaluated alongside
+  // only its own qualifier, not qualifiers from sibling clauses.
+  const clauses = docText.split(/[,;]/);
   const linkRe = /\[[^\]]*\]\(([^)]+)\)/g;
-  let m;
-  while ((m = linkRe.exec(docText)) !== null) {
-    const href = m[1].trim();
-    if (href.startsWith('http')) continue;
-    const abs = resolve(touchMapDir, href);
-    const rel = abs
-      .replace(root, '')
-      .replace(/^[\\/]/, '')
-      .replace(/\\/g, '/');
-    paths.push(rel);
+  for (const clause of clauses) {
+    let m;
+    while ((m = linkRe.exec(clause)) !== null) {
+      const href = m[1].trim();
+      if (href.startsWith('http')) continue;
+      // Strip the matched link text/href, then check the remaining clause
+      // for a conditional `if` qualifier.
+      const rest = (
+        clause.slice(0, m.index) + clause.slice(m.index + m[0].length)
+      ).toLowerCase();
+      if (/\bif\b/.test(rest)) continue;
+      const abs = resolve(touchMapDir, href);
+      const rel = abs
+        .replace(root, '')
+        .replace(/^[\\/]/, '')
+        .replace(/\\/g, '/');
+      paths.push(rel);
+    }
+    linkRe.lastIndex = 0;
   }
   return paths;
 }
