@@ -35,14 +35,17 @@ export interface AuditSessionBashParams {
   auditMode?: boolean;
 }
 
-/** Resolve the Python interpreter: prefer python3, fall back to python / py (Windows). */
-function resolvePythonInterpreter(): string {
-  if (process.platform === 'win32') {
-    // On Windows, 'py -3' is the canonical launcher, but execFile needs a single command.
-    // Use PYTHON env override if set; otherwise fall back to 'python3' then 'python'.
-    return process.env.PYTHON ?? 'python3';
-  }
-  return process.env.PYTHON ?? 'python3';
+/**
+ * Ordered list of Python interpreter candidates to try.
+ * If the `PYTHON` env var is set, it is used as the sole candidate.
+ * Otherwise: `python3` → `python`, plus `py` on Windows (the standard launcher
+ * on stock Windows installs where `python`/`python3` are not on PATH).
+ */
+export function pythonInterpreterCandidates(): string[] {
+  if (process.env.PYTHON) return [process.env.PYTHON];
+  const candidates = ['python3', 'python'];
+  if (process.platform === 'win32') candidates.push('py');
+  return candidates;
 }
 
 /**
@@ -55,7 +58,7 @@ export async function auditSessionBash(
 ): Promise<ToolResult> {
   const repoRoot = getRepoRoot();
   const scriptPath = resolvePath(repoRoot, 'scripts', 'audit-session-bash.py');
-  const python = resolvePythonInterpreter();
+  const interpreters = pythonInterpreterCandidates();
 
   const args = [scriptPath];
   if (params.auditMode) {
@@ -87,7 +90,12 @@ export async function auditSessionBash(
   if (params.pid !== undefined) args.push('--pid', String(params.pid));
   if (params.scanScratch) args.push('--scan-scratch');
 
-  const tryExec = (interpreter: string): Promise<ToolResult> =>
+  interface ExecOutcome {
+    result: ToolResult;
+    notFound: boolean;
+  }
+
+  const tryExec = (interpreter: string): Promise<ExecOutcome> =>
     new Promise((done) => {
       execFile(
         interpreter,
@@ -95,53 +103,75 @@ export async function auditSessionBash(
         { cwd: repoRoot, timeout: 30_000, maxBuffer: 10 * 1024 * 1024 },
         (err, stdout, stderr) => {
           if (err) {
+            const errCode = (err as NodeJS.ErrnoException).code;
+            const notFound =
+              errCode === 'ENOENT' ||
+              (stderr ?? '').includes('ENOENT') ||
+              err.message.includes('ENOENT');
             done({
-              isError: true,
-              content: [
-                {
-                  type: 'text',
-                  text: `audit-session-bash failed (interpreter: ${interpreter}): ${stderr.trim() || err.message}`,
-                },
-              ],
+              notFound,
+              result: {
+                isError: true,
+                content: [
+                  {
+                    type: 'text',
+                    text: `audit-session-bash failed (interpreter: ${interpreter}): ${stderr.trim() || err.message}`,
+                  },
+                ],
+              },
             });
             return;
           }
           if (params.gapsOnly && !params.auditMode) {
             // --gaps-only returns plain text, not JSON
-            done({ content: [{ type: 'text', text: stdout.trim() }] });
+            done({
+              notFound: false,
+              result: { content: [{ type: 'text', text: stdout.trim() }] },
+            });
             return;
           }
           try {
             const data: unknown = JSON.parse(stdout.trim());
             done({
-              content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+              notFound: false,
+              result: {
+                content: [
+                  { type: 'text', text: JSON.stringify(data, null, 2) },
+                ],
+              },
             });
           } catch {
             const preview = stdout.slice(0, 500);
             const truncated = stdout.length > 500 ? '... (truncated)' : '';
             done({
-              isError: true,
-              content: [
-                {
-                  type: 'text',
-                  text: `Failed to parse JSON output from audit-session-bash.py:\n${preview}${truncated}`,
-                },
-              ],
+              notFound: false,
+              result: {
+                isError: true,
+                content: [
+                  {
+                    type: 'text',
+                    text: `Failed to parse JSON output from audit-session-bash.py:\n${preview}${truncated}`,
+                  },
+                ],
+              },
             });
           }
         },
       );
     });
 
-  const result = await tryExec(python);
-  // If python3 failed (e.g. not found on PATH), retry with 'python' as fallback
-  if (
-    result.isError === true &&
-    python === 'python3' &&
-    typeof result.content[0]?.text === 'string' &&
-    result.content[0].text.includes('ENOENT')
-  ) {
-    return tryExec('python');
+  for (const interpreter of interpreters) {
+    const outcome = await tryExec(interpreter);
+    if (!outcome.notFound) return outcome.result;
   }
-  return result;
+  // All candidates failed with ENOENT — no Python found on PATH.
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text',
+        text: `audit-session-bash failed: no Python interpreter found on PATH. Tried: ${interpreters.join(', ')}. Set the PYTHON env var to a valid interpreter path.`,
+      },
+    ],
+  };
 }
