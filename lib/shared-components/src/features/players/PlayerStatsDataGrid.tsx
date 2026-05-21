@@ -831,7 +831,6 @@ export function PlayerStatsDataGrid({
           borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
         }}
         paddingVertical="$2"
-        paddingHorizontal="$3"
       >
         {visibleColumns.map((column) => {
           const sortField =
@@ -944,7 +943,6 @@ export function PlayerStatsDataGrid({
                   borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
                 }}
                 paddingVertical="$2"
-                paddingHorizontal="$3"
               >
                 {visibleColumns.map((column) => {
                   const isNameCol = column.key === 'displayName';
@@ -1018,7 +1016,7 @@ export function PlayerStatsDataGrid({
               padding="$3"
               gap="$2"
             >
-              <Spinner size="small" color={BRAND_NAVY_LIGHT as never} />
+              <Spinner size="small" color={BRAND_NAVY_LIGHT} />
               <Text style={{ color: TEXT_MUTED, fontSize: 12 }}>
                 Loading player statistics...
               </Text>
@@ -1090,7 +1088,6 @@ export function PlayerStatsDataGrid({
               }}
               pressStyle={{ scale: 0.998 }}
               paddingVertical="$2"
-              paddingHorizontal="$3"
               onPress={() => handleRowClick(player)}
               cursor="pointer"
             >
