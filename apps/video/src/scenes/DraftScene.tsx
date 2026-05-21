@@ -9,12 +9,15 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
+  BRAND_NAVY,
+  BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
   BRAND_SEAM_RED_LIGHT,
   FONT_BODY,
   FONT_DISPLAY,
   FONT_MONO,
   GLASS_BORDER,
+  OUTLINE_DEFAULT,
   OUTLINE_SUBTLE,
   PANEL_BORDER,
   POS_CATCHER,
@@ -26,6 +29,8 @@ import {
   SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  TEXT_QUIETEST,
+  TEXT_SECONDARY,
 } from '../theme';
 
 // Storyboard: Round 4 · Pick 41 — available player pool (top 8)
@@ -329,7 +334,7 @@ export const DraftScene: React.FC = () => {
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 800,
                 fontSize: 26,
-                color: TEXT_MUTED,
+                color: TEXT_SECONDARY,
                 textTransform: 'uppercase',
                 letterSpacing: '0.12em',
               }}
@@ -349,9 +354,9 @@ export const DraftScene: React.FC = () => {
                     fontSize: 24,
                     padding: '10px 20px',
                     borderRadius: 9999,
-                    border: `1px solid ${i === 0 ? '#2C4A7C' : PANEL_BORDER}`,
+                    border: `1px solid ${i === 0 ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT}`,
                     color: i === 0 ? TEXT_PRIMARY : TEXT_MUTED,
-                    background: i === 0 ? '#1B3A5C' : 'transparent',
+                    background: i === 0 ? BRAND_NAVY : 'transparent',
                   }}
                 >
                   {f}
@@ -453,7 +458,7 @@ export const DraftScene: React.FC = () => {
                       fontFamily: FONT_DISPLAY,
                       fontSize: 24,
                       letterSpacing: '0.18em',
-                      color: '#6C80BA',
+                      color: TEXT_QUIETEST,
                       textTransform: 'uppercase',
                       display: 'block',
                     }}
@@ -482,7 +487,7 @@ export const DraftScene: React.FC = () => {
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
               fontSize: 26,
-              color: TEXT_MUTED,
+              color: TEXT_SECONDARY,
               textTransform: 'uppercase',
               letterSpacing: '0.12em',
               marginBottom: 16,
@@ -579,7 +584,7 @@ export const DraftScene: React.FC = () => {
                   style={{
                     fontFamily: FONT_MONO,
                     fontSize: 24,
-                    color: '#6C80BA',
+                    color: TEXT_QUIETEST,
                   }}
                 >
                   {pick.pick}
@@ -652,15 +657,15 @@ export const DraftScene: React.FC = () => {
             boxShadow: `0 0 12px ${BRAND_GOLD}`,
           }}
         />
-        Scene 05<span style={{ color: '#6C80BA' }}>/</span>Live Draft
+        Scene 05<span style={{ color: TEXT_QUIETEST }}>/</span>Live Draft
       </div>
       <div
         style={{
           position: 'absolute',
           right: 56,
           bottom: 40,
-          fontFamily: "'Roboto Mono', monospace",
-          color: '#6C80BA',
+          fontFamily: FONT_MONO,
+          color: TEXT_QUIETEST,
           fontSize: 24,
           letterSpacing: '0.08em',
           opacity: footerOpacity,
