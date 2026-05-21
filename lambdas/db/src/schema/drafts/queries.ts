@@ -21,9 +21,16 @@ import {
   DraftTeamAutoPickStatus,
   DraftTeamOrderEntry,
 } from './types';
-import { verifyLeagueMembership } from '../authorization';
+import {
+  isCommissionerOrOwner,
+  verifyLeagueMembership,
+} from '../authorization';
 import { builder } from '../builder';
-import { AuthenticationError, UserInputError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../graphql-errors';
 
 /**
  * Query: Get draft by ID
@@ -671,7 +678,21 @@ builder.queryField('getDraftRecommendations', (t) =>
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
       if (!draft) throw UserInputError('Draft not found');
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+      const membership = await verifyLeagueMembership(
+        context.db,
+        draft.leagueId,
+        context.user.id,
+      );
+
+      // Recommendations expose a team's projected draft strategy and positional
+      // needs. Only the team's own member — or a league commissioner/owner —
+      // may view them; otherwise any league member could poll for every
+      // opposing team during the draft (LS-2495).
+      if (membership.teamId !== teamId && !isCommissionerOrOwner(membership)) {
+        throw ForbiddenError(
+          'Cannot view draft recommendations for another team',
+        );
+      }
 
       // All picks for this draft G�� tells us who's been picked and what the
       // requesting team already has on their roster.
