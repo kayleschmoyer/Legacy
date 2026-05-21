@@ -9,6 +9,8 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
   FONT_DISPLAY,
   FONT_BODY,
   FONT_MONO,
@@ -21,6 +23,7 @@ import {
   SURFACE_CARD,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  TEXT_QUIETEST,
 } from '../theme';
 
 interface PlayerCardData {
@@ -227,7 +230,7 @@ const EraPlayerCard: React.FC<{
                 fontSize: 24,
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
-                color: '#6C80BA',
+                color: TEXT_QUIETEST,
               }}
             >
               {stat.key}
@@ -344,7 +347,8 @@ export const CrossEraScene: React.FC = () => {
       {/* Player cards grid */}
       <div
         style={{
-          display: 'flex',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 28,
           flex: 1,
           alignItems: 'stretch',
@@ -378,7 +382,7 @@ export const CrossEraScene: React.FC = () => {
             right: 0,
             top: 28,
             height: 2,
-            background: `linear-gradient(90deg, #C41E3A 0%, #2C4A7C 50%, #C5A55A 100%)`,
+            background: `linear-gradient(90deg, ${BRAND_SEAM_RED} 0%, ${BRAND_NAVY_LIGHT} 50%, ${BRAND_GOLD} 100%)`,
             borderRadius: 2,
             clipPath: `inset(0 ${100 - timelineWidth}% 0 0)`,
           }}
@@ -454,15 +458,15 @@ export const CrossEraScene: React.FC = () => {
             boxShadow: `0 0 12px ${BRAND_GOLD}`,
           }}
         />
-        Scene 03<span style={{ color: '#6C80BA' }}>/</span>Cross-Era
+        Scene 03<span style={{ color: TEXT_QUIETEST }}>/</span>Cross-Era
       </div>
       <div
         style={{
           position: 'absolute',
           right: 56,
           bottom: 40,
-          fontFamily: "'Roboto Mono', monospace",
-          color: '#6C80BA',
+          fontFamily: FONT_MONO,
+          color: TEXT_QUIETEST,
           fontSize: 24,
           letterSpacing: '0.08em',
           opacity: footerOpacity,
