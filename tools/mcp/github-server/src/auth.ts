@@ -30,6 +30,18 @@ let cachedToken: string | null = null;
 let cachedTokenSource: TokenSource | null = null;
 let cachedRepo: { owner: string; name: string } | null = null;
 
+/**
+ * True when the server is running inside AWS Lambda (URL-based MCP deployment).
+ * Interactive sources (.netrc, gh CLI, OAuth device flow) are never valid in
+ * Lambda — there is no user terminal and no shell tools — so we short-circuit
+ * those branches to produce an honest error instead of timing out on
+ * `https://github.com/login/device/code` (which can 404 from inside Lambda
+ * regardless of the underlying app-token failure).
+ */
+function isLambda(): boolean {
+  return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
+}
+
 /** Resolve the repository root from this script's location (tools/mcp/github-server/src/). */
 export function getRepoRoot(): string {
   const thisDir = resolve(fileURLToPath(import.meta.url), '..');
@@ -594,35 +606,39 @@ export async function tryResolveToken(): Promise<{
     );
   }
 
-  // 4. .netrc file
-  const netrcToken = await readNetrcToken();
-  if (netrcToken) {
-    if (await validateToken(netrcToken)) {
-      cachedToken = netrcToken;
-      cachedTokenSource = 'netrc';
-      // Cache to file so subsequent calls (and restarts) don't re-parse .netrc
-      await writeCachedToken(netrcToken).catch((err) => {
-        process.stderr.write(
-          `Warning: Failed to cache netrc token to file: ${err instanceof Error ? err.message : err}\n`,
-        );
-      });
-      return { token: netrcToken, source: 'netrc' };
+  // Steps 4-5 (.netrc, gh CLI) are skipped in Lambda — neither is configured
+  // there, and probing them only delays the inevitable failure.
+  if (!isLambda()) {
+    // 4. .netrc file
+    const netrcToken = await readNetrcToken();
+    if (netrcToken) {
+      if (await validateToken(netrcToken)) {
+        cachedToken = netrcToken;
+        cachedTokenSource = 'netrc';
+        // Cache to file so subsequent calls (and restarts) don't re-parse .netrc
+        await writeCachedToken(netrcToken).catch((err) => {
+          process.stderr.write(
+            `Warning: Failed to cache netrc token to file: ${err instanceof Error ? err.message : err}\n`,
+          );
+        });
+        return { token: netrcToken, source: 'netrc' };
+      }
     }
-  }
 
-  // 5. gh auth token
-  const ghToken = await tryGhAuthToken();
-  if (ghToken) {
-    if (await validateToken(ghToken)) {
-      cachedToken = ghToken;
-      cachedTokenSource = 'gh-cli';
-      // Cache to file so subsequent calls don't shell out to `gh` again
-      await writeCachedToken(ghToken).catch((err) => {
-        process.stderr.write(
-          `Warning: Failed to cache gh-cli token to file: ${err instanceof Error ? err.message : err}\n`,
-        );
-      });
-      return { token: ghToken, source: 'gh-cli' };
+    // 5. gh auth token
+    const ghToken = await tryGhAuthToken();
+    if (ghToken) {
+      if (await validateToken(ghToken)) {
+        cachedToken = ghToken;
+        cachedTokenSource = 'gh-cli';
+        // Cache to file so subsequent calls don't shell out to `gh` again
+        await writeCachedToken(ghToken).catch((err) => {
+          process.stderr.write(
+            `Warning: Failed to cache gh-cli token to file: ${err instanceof Error ? err.message : err}\n`,
+          );
+        });
+        return { token: ghToken, source: 'gh-cli' };
+      }
     }
   }
 
@@ -686,6 +702,21 @@ export async function getToken(): Promise<string> {
   } catch (err) {
     process.stderr.write(
       `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}. Trying other methods.\n`,
+    );
+  }
+
+  // Steps 4-6 (.netrc, gh CLI, OAuth device flow) require either a developer
+  // machine (for the cached credentials) or an interactive terminal (for the
+  // device-flow handshake). None of those are available in Lambda — falling
+  // through there guarantees a misleading "Device code request failed (404)"
+  // when the underlying problem is really that the GitHub App token chain
+  // failed. Short-circuit with an honest error instead.
+  if (isLambda()) {
+    throw new Error(
+      'GitHub MCP server (Lambda): no valid token from env, cached file, or ' +
+        'AGENT_AUTHOR_APP_PRIVATE_KEY. Interactive sources (.netrc, gh CLI, ' +
+        'device flow) are not available in Lambda. Check the GITHUB_TOKEN_SECRET_NAME ' +
+        'secret and the GitHub App installation.',
     );
   }
 
