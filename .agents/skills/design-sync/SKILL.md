@@ -53,8 +53,8 @@ Bundle: `docs/design/<id>/`
 
 ## Acceptance Criteria
 
-- **AC1** — Implementation reflects the design in `docs/design/<id>/pages/*.html` for each page listed in `bundle.json`.
-- **AC2** — Design tokens from `docs/design/<id>/ds/` are integrated (not duplicated) into the shared component library where applicable.
+- **AC1** — Implementation reflects every HTML prototype under `docs/design/<id>/<slug>/project/` and honors the final iteration captured in `<slug>/chats/`.
+- **AC2** — Design tokens from `docs/design/<id>/<slug>/project/colors_and_type.css` (and `project/ds/` if present) are integrated (not duplicated) into the shared component library where applicable.
 - **AC3** — Brand rules from AGENTS.md ("Design Context") are honored.
 - **AC4** — `make pc` passes; self-review complete; PR merged.
 
@@ -75,8 +75,8 @@ Locally: `/implement-design LS-####`
 
 1. **Parse ticket key** from `$ARGUMENTS` (e.g. `LS-4561`).
 2. **Re-fetch ticket** via `jira_view` for ground truth; do not trust the slash-command argument blindly.
-3. **Resolve designId** — read `bundle.json` reference from the ticket description, or scan `docs/design/manifest.json` for an entry whose `jiraKey == LS-####`.
-4. **Load bundle** — `docs/design/<designId>/bundle.json` plus everything under that directory.
+3. **Resolve designId** — read the design id from the ticket description (look for a line like `Design id: <id>` or a path `docs/design/<id>/`), or scan `docs/design/manifest.json` for an entry whose `jiraKey == LS-####`.
+4. **Load bundle** — resolve the slug from `manifest.designs[].slug` (fallback: the single non-`SYNC-REPORT.md` directory under `docs/design/<designId>/`), then read `docs/design/<designId>/<slug>/README.md`, every transcript under `<slug>/chats/`, and enumerate `<slug>/project/`. There is no `bundle.json` — the manifest entry plus the README plus the chat transcripts are the bundle metadata.
 5. **Completeness gate** — apply [completeness-gate.md](references/completeness-gate.md). On any **block-level** miss: post a Jira comment with a checklist of what's missing, transition the ticket to **Blocked**, stop. Warnings: log them and continue.
 6. **Slicing heuristic** — apply [slicing-heuristic.md](references/slicing-heuristic.md). Two outcomes:
    - **Implement-in-one** → proceed with the new-feature entrypoint (worktree → code → `make pc` → self-review → PR → bot review → merge). The original ticket is what gets closed.

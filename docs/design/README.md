@@ -13,12 +13,13 @@ Design bundles synced from [Claude Design](https://claude.ai/design).
 
 - `manifest.json` — registry of every known design (`id`, `url`, `lastSyncedHash`, `jiraKey`, `status`). The only file in this directory humans should touch, and only to **seed** a URL before the first sync run. See [manifest-schema.md](../../.agents/skills/design-sync/references/manifest-schema.md).
 - `<design-id>/` — one folder per design. Populated by `/sync-designs`. Contains:
-  - `bundle.json` — canonical metadata extracted from Claude Design
-  - `pages/` — rendered HTML per page
-  - `ds/` — design system files (tokens, fonts, color/type CSS)
-  - `components/` — JSX component prototypes
-  - `screenshots/` — visual references
   - `SYNC-REPORT.md` — what changed in the most recent sync (added/modified/removed files)
+  - `<slug>/` — a single content subdirectory whose name matches `manifest.designs[].slug` (e.g. `legacy-sports-public-leagues`). Inside it:
+    - `README.md` — "CODING AGENTS: READ THIS FIRST" handoff doc written by Claude Design
+    - `chats/chat*.md` — design conversation transcripts (where the user's intent lives — read these first)
+    - `project/` — HTML prototypes plus supporting assets. Typical contents: `<Title>.html`, `colors_and_type.css`, `assets/`, `fonts/`, `icons/`, `uploads/`. Some bundles also include `components/`, `ds/`, `src/`, `design-canvas.jsx`, `preview-bundle.tsx`, or `styles*.css` — contents vary by design.
+
+> **No `bundle.json`.** Older docs referenced a `bundle.json` metadata file; the real format is the layout above. The manifest entry plus `<slug>/README.md` plus the chat transcripts are the bundle's metadata.
 
 ## How to use
 

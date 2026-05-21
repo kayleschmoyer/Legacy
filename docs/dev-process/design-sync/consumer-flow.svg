@@ -35,7 +35,7 @@
   <rect x="260" y="152" width="400" height="76" rx="8" class="step"/>
   <text x="460" y="174" text-anchor="middle" class="stepText">Read ticket · resolve designId · load bundle</text>
   <text x="460" y="192" text-anchor="middle" class="stepSub">jira_view · regex designId from description</text>
-  <text x="460" y="208" text-anchor="middle" class="stepSub">read docs/design/&lt;designId&gt;/bundle.json + pages/</text>
+  <text x="460" y="208" text-anchor="middle" class="stepSub">read docs/design/&lt;id&gt;/&lt;slug&gt;/{README, chats, project}</text>
 
   <path d="M 460 228 L 460 258" class="arrow" marker-end="url(#arrow3)"/>
 

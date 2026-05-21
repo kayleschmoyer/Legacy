@@ -49,7 +49,7 @@ Both agents are **manually dispatched**. There is no schedule and no automatic t
 
 **Decision tree**:
 
-1. **Completeness gate** — reject if the bundle is missing structural pieces (no `bundle.json`, no rendered HTML, empty `pages: []`, no design tokens). On reject: post a Jira comment with a checklist of what's missing, transition the ticket to **Blocked**, stop. See [completeness-gate.md](../../.agents/skills/design-sync/references/completeness-gate.md).
+1. **Completeness gate** — reject if the bundle is missing structural pieces (no `<slug>/README.md`, no rendered HTML under `<slug>/project/`, no `chats/` transcripts, no token source like `colors_and_type.css`). On reject: post a Jira comment with a checklist of what's missing, transition the ticket to **Blocked**, stop. See [completeness-gate.md](../../.agents/skills/design-sync/references/completeness-gate.md).
 
 2. **Slicing heuristic** — if the design fits in one PR (≤2 pages, ≤8 distinct components, no net-new tokens) → implement directly in the worktree, drive the original ticket to merge. Otherwise → create one child Jira ticket per page or major component under the parent design ticket, spawn one chip per child via `mcp__ccd_session__spawn_task`, transition the parent to "In Review" as a tracker. See [slicing-heuristic.md](../../.agents/skills/design-sync/references/slicing-heuristic.md).
 
@@ -63,11 +63,16 @@ docs/
     manifest.json              # source-of-truth registry, updated by sync agent
     README.md                  # human readme pointing here
     <design-id>/               # one folder per design
-      bundle.json              # canonical metadata extracted from Claude Design
-      pages/                   # rendered HTML per page
-      ds/                      # design system files (tokens, fonts)
-      components/              # JSX prototypes
       SYNC-REPORT.md           # what changed in the most recent sync
+      <slug>/                  # single content dir; name matches manifest.designs[].slug
+        README.md              # "CODING AGENTS: READ THIS FIRST" handoff doc
+        chats/                 # design conversation transcripts (intent lives here)
+          chat*.md
+        project/               # HTML prototypes + assets
+          <Title>.html         # one or more rendered prototypes
+          colors_and_type.css  # typography + color tokens
+          assets/ fonts/ icons/ uploads/
+          # optional, varies per design: components/, ds/, src/, *.jsx, styles*.css
 docs/
   dev-process/
     design-sync.md             # this file

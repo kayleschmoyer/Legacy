@@ -12,7 +12,8 @@ Canonical source: [`docs/design/manifest.json`](../../../../docs/design/manifest
     {
       "id": "670f7892-5193-4b8a-a54c-20b112ad11bb", // Claude Design page UUID
       "url": "https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb",
-      "title": "League Detail", // pulled from bundle.json, falls back to "Untitled <id-short>"
+      "title": "League Detail", // human label; sync agent updates this from the bundle's project name
+      "slug": "legacy-sports-league-detail", // matches the single content directory under docs/design/<id>/
       "lastSyncedHash": "sha256-9a3f...", // see Hashing below
       "lastSyncedAt": "2026-05-20T12:00:00Z",
       "jiraKey": "LS-4561", // the most recent sync ticket for this design
@@ -24,17 +25,18 @@ Canonical source: [`docs/design/manifest.json`](../../../../docs/design/manifest
 
 ### Field semantics
 
-| Field                      | Required             | Notes                                                                                                                                     |
-| -------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`                  | yes                  | Currently `1`. Sync agent refuses to operate on a higher version it doesn't recognize.                                                    |
-| `lastSyncedAt` (top-level) | yes after first run  | When the manifest itself was last rewritten.                                                                                              |
-| `designs[].id`             | yes                  | The Claude Design page UUID. Used as the directory name under `docs/design/`.                                                             |
-| `designs[].url`            | yes                  | The full Claude Design URL. Used by Phase 1 step 5 fallback discovery and by humans.                                                      |
-| `designs[].title`          | yes                  | Human-readable label. Sync agent updates this if the bundle's metadata changes.                                                           |
-| `designs[].lastSyncedHash` | yes after first sync | See Hashing.                                                                                                                              |
-| `designs[].lastSyncedAt`   | yes after first sync | Per-design timestamp; differs from top-level when only some designs changed.                                                              |
-| `designs[].jiraKey`        | yes after first sync | The **most recent** sync ticket. Older tickets remain queryable in Jira but aren't tracked here.                                          |
-| `designs[].status`         | yes                  | `active` = present in latest discovery set. `archived` = was present once but not in latest discovery; the bundle directory is preserved. |
+| Field                      | Required             | Notes                                                                                                                                                                                                                                                                                              |
+| -------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                  | yes                  | Currently `1`. Sync agent refuses to operate on a higher version it doesn't recognize.                                                                                                                                                                                                             |
+| `lastSyncedAt` (top-level) | yes after first run  | When the manifest itself was last rewritten.                                                                                                                                                                                                                                                       |
+| `designs[].id`             | yes                  | The Claude Design page UUID. Used as the directory name under `docs/design/`.                                                                                                                                                                                                                      |
+| `designs[].url`            | yes                  | The full Claude Design URL. Used by Phase 1 step 5 fallback discovery and by humans.                                                                                                                                                                                                               |
+| `designs[].title`          | yes                  | Human-readable label. Sync agent updates this if the bundle's metadata changes.                                                                                                                                                                                                                    |
+| `designs[].slug`           | yes after first sync | The single content directory under `docs/design/<id>/` (e.g. `legacy-sports-public-leagues`). Consumers (`/implement-design`) join paths as `docs/design/<id>/<slug>/...`. If absent on an older manifest entry, fall back to enumerating the single non-`SYNC-REPORT.md` directory under `<id>/`. |
+| `designs[].lastSyncedHash` | yes after first sync | See Hashing.                                                                                                                                                                                                                                                                                       |
+| `designs[].lastSyncedAt`   | yes after first sync | Per-design timestamp; differs from top-level when only some designs changed.                                                                                                                                                                                                                       |
+| `designs[].jiraKey`        | yes after first sync | The **most recent** sync ticket. Older tickets remain queryable in Jira but aren't tracked here.                                                                                                                                                                                                   |
+| `designs[].status`         | yes                  | `active` = present in latest discovery set. `archived` = was present once but not in latest discovery; the bundle directory is preserved.                                                                                                                                                          |
 
 ## Seeding (manual, first time only)
 

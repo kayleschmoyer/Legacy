@@ -20,8 +20,12 @@ Load the authoritative playbook via `Skill(skill: "design-sync")` and the fronte
    - If zero or multiple matches, stop and post a Jira comment: `"Cannot resolve designId from ticket. Please add a line 'Design id: <uuid>' to the description and re-dispatch."` Do not guess.
 
 3. **Load the bundle**
-   - Confirm `docs/design/<id>/bundle.json` exists. Read it.
-   - Enumerate `pages/`, `ds/`, `components/`, `screenshots/` (any missing is a gate signal — capture for step 4).
+   - Resolve the slug: read `docs/design/manifest.json` and find the entry whose `id == <design-id>`; use `designs[i].slug`. If `slug` is absent, enumerate `docs/design/<id>/` and pick the single non-`SYNC-REPORT.md` directory.
+   - **Sanitize before joining paths (mandatory at runtime).** This prompt is the agent's implementation — you (the LLM running `/implement-design`) **MUST** perform this validation in your reasoning step before issuing any `Read`/`Write`/`Glob`/`Grep` call whose path contains `<id>` or `<slug>`. Both come from semi-trusted sources (manifest, ticket description, on-disk directory names). Validate **both** against `^[A-Za-z0-9_-]+$` and reject anything containing `/`, `\`, `:`, `..`, leading `.`, whitespace, or an absolute-path prefix. After constructing each path, mentally normalize it (resolve any `..` segments) and confirm it still begins with the literal prefix `docs/design/<id>/`. On any failure: stop, post a Jira comment naming the contaminated value, and transition the ticket to **Blocked**. Do not retry, do not "fix up" the value, do not proceed with a sanitized version. See [completeness-gate.md §Path-traversal sanitization](../../.agents/skills/design-sync/references/completeness-gate.md#path-traversal-sanitization-mandatory) for the full rule and entry-point list.
+   - Confirm `docs/design/<id>/<slug>/README.md` exists and read it — it tells you what kind of bundle this is and which file the user was last iterating on.
+   - Read every transcript under `docs/design/<id>/<slug>/chats/` — that's where the user's intent and final iteration live.
+   - Enumerate `docs/design/<id>/<slug>/project/` — capture HTML prototypes, `colors_and_type.css`, and any `ds/`, `components/`, `src/`, or JSX preview files for step 4.
+   - There is **no `bundle.json`** in this layout. Do not look for one. The bundle's metadata is the manifest entry + the `<slug>/README.md` + the chat transcripts.
 
 4. **Completeness gate**
    - Apply every B-check from [completeness-gate.md](../../.agents/skills/design-sync/references/completeness-gate.md).
@@ -42,9 +46,9 @@ When all three thresholds hold (≤2 pages, ≤8 components, 0 new tokens):
 
 - Proceed with the standard work-ticket flow (`Skill(skill: "work-ticket")`).
 - Implementation references:
-  - Visual targets: `docs/design/<id>/pages/*.html` and `screenshots/`
-  - Tokens: `docs/design/<id>/ds/`
-  - Component intents: `bundle.json.components`
+  - Visual targets: `docs/design/<id>/<slug>/project/*.html` (plus any JSX previews like `design-canvas.jsx` or `components/*.jsx`)
+  - Tokens: `docs/design/<id>/<slug>/project/colors_and_type.css` (and `project/ds/` if present)
+  - Intent & component breakdown: `docs/design/<id>/<slug>/chats/*.md` and `<slug>/README.md`
   - Brand rules: AGENTS.md "Design Context"
 - Include any W-check warnings in the first commit message and PR body.
 - Drive to merge: `make pc` → self-review every changed file → push → PR → `github_mark_pr_ready` → bot review cycles → merge → Jira "Done".
