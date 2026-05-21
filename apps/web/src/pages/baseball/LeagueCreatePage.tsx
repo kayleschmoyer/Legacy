@@ -34,7 +34,13 @@ import {
   GetUserLeaguesQuery,
   useCreateLeagueAndTeamsMutation,
 } from '../../api/db/graphql.generated';
-import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
+import {
+  BG_DARK,
+  BRAND_GOLD,
+  BRAND_NAVY_LIGHT,
+  WHITE,
+  withAlpha,
+} from '../../constants/colors';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 
 interface CreateLeagueFormData {
@@ -176,6 +182,122 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
   if (f.draftDate && f.draftDate < new Date())
     errs.draftDate = 'Draft date must be in the future.';
   return errs;
+}
+
+// ── Sport switcher ───────────────────────────────────────────────────────────
+
+const SPORTS = [
+  { id: 'baseball', name: 'Baseball', icon: '⚾', league: 'MLB', beta: false },
+  { id: 'football', name: 'Football', icon: '🏈', league: 'NFL', beta: true },
+] as const;
+
+type SportId = (typeof SPORTS)[number]['id'];
+
+interface SportSwitcherProps {
+  value: SportId;
+  onSelect: (sport: SportId) => void;
+  disabled?: boolean;
+}
+
+function SportSwitcher({
+  value,
+  onSelect,
+  disabled,
+}: SportSwitcherProps): React.JSX.Element {
+  return (
+    <XStack
+      gap="$2.5"
+      padding="$1.5"
+      backgroundColor={withAlpha(BG_DARK, 0.6)}
+      borderWidth={1}
+      borderColor="$borderColor"
+      borderRadius="$5"
+      $sm={{ flexDirection: 'column' }}
+    >
+      {SPORTS.map((s) => {
+        const selected = value === s.id;
+        return (
+          <Button
+            key={s.id}
+            flex={1}
+            size="$5"
+            unstyled
+            data-testid={`sport-tab-${s.id}`}
+            role="tab"
+            aria-selected={selected}
+            aria-label={`${s.name} — ${s.league}${s.beta ? ' (Beta)' : ''}`}
+            backgroundColor={
+              selected ? withAlpha(BRAND_NAVY_LIGHT, 0.32) : 'transparent'
+            }
+            borderColor={selected ? '$brandNavyLight' : 'transparent'}
+            borderWidth={1}
+            borderRadius="$4"
+            paddingHorizontal="$4"
+            paddingVertical="$3.5"
+            justifyContent="flex-start"
+            onPress={() => !disabled && onSelect(s.id)}
+            disabled={disabled}
+            hoverStyle={
+              selected ? undefined : { backgroundColor: withAlpha(WHITE, 0.03) }
+            }
+            pressStyle={{ scale: 0.99 }}
+            cursor="pointer"
+            position="relative"
+          >
+            <XStack gap="$3" alignItems="center" flex={1}>
+              <Text fontSize={24} aria-hidden="true">
+                {s.icon}
+              </Text>
+              <YStack flex={1} minWidth={0}>
+                <Text
+                  fontFamily="$display"
+                  fontWeight="800"
+                  fontSize={18}
+                  color={selected ? '$color' : '$color11'}
+                  letterSpacing={-0.1}
+                >
+                  {s.name}
+                </Text>
+                <Text
+                  fontFamily="$display"
+                  fontWeight="700"
+                  fontSize={10}
+                  letterSpacing={1.6}
+                  textTransform="uppercase"
+                  color={selected ? '$brandGoldLight' : '$gray9'}
+                  marginTop={2}
+                >
+                  {s.league}
+                  {s.beta ? ' · Beta' : ''}
+                </Text>
+              </YStack>
+            </XStack>
+            {s.beta && (
+              <Text
+                position="absolute"
+                top={8}
+                right={10}
+                fontFamily="$display"
+                fontWeight="700"
+                fontSize={9}
+                letterSpacing={1.4}
+                textTransform="uppercase"
+                color="$brandGoldLight"
+                backgroundColor={withAlpha(BRAND_GOLD, 0.14)}
+                borderWidth={1}
+                borderColor={withAlpha(BRAND_GOLD, 0.45)}
+                paddingHorizontal={6}
+                paddingVertical={2}
+                borderRadius={4}
+              >
+                Beta
+              </Text>
+            )}
+          </Button>
+        );
+      })}
+    </XStack>
+  );
 }
 
 // ── Styled primitives ────────────────────────────────────────────────────────
@@ -802,6 +924,17 @@ export function LeagueCreatePage(): React.JSX.Element {
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] = useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
+  const [selectedSport, setSelectedSport] = useState<SportId>('baseball');
+  const [showFootballComingSoon, setShowFootballComingSoon] = useState(false);
+
+  const handleSportSelect = useCallback((sport: SportId) => {
+    if (sport === 'football') {
+      setShowFootballComingSoon(true);
+      return;
+    }
+    setShowFootballComingSoon(false);
+    setSelectedSport(sport);
+  }, []);
 
   const [formData, setFormData] = useState<CreateLeagueFormData>(() => {
     const initialLeagueName = (searchParams.get('name') ?? '')
@@ -1079,6 +1212,71 @@ export function LeagueCreatePage(): React.JSX.Element {
             </Button>
           </XStack>
         </XStack>
+
+        {/* ── Sport switcher ── */}
+        <YStack gap="$2">
+          <Text
+            fontFamily="$display"
+            fontWeight="700"
+            fontSize={11}
+            letterSpacing={1.4}
+            textTransform="uppercase"
+            color="$gray9"
+          >
+            Sport
+          </Text>
+          <SportSwitcher
+            value={selectedSport}
+            onSelect={handleSportSelect}
+            disabled={isFormDisabled}
+          />
+          {showFootballComingSoon && (
+            <XStack
+              role="status"
+              aria-live="polite"
+              gap="$3"
+              alignItems="center"
+              backgroundColor={withAlpha(BRAND_GOLD, 0.08)}
+              borderWidth={1}
+              borderColor={withAlpha(BRAND_GOLD, 0.35)}
+              borderRadius="$4"
+              padding="$3"
+              marginTop="$1"
+            >
+              <Text fontSize={16} aria-hidden="true">
+                🏈
+              </Text>
+              <YStack flex={1}>
+                <Text
+                  fontFamily="$display"
+                  fontWeight="700"
+                  fontSize={12}
+                  letterSpacing={1.2}
+                  textTransform="uppercase"
+                  color="$brandGoldLight"
+                >
+                  Football leagues are coming soon
+                </Text>
+                <Text
+                  fontFamily="$body"
+                  fontSize={13}
+                  color="$color11"
+                  marginTop={2}
+                >
+                  We&apos;re rolling out football as part of a Beta. For now,
+                  create a Baseball league — you can convert later.
+                </Text>
+              </YStack>
+              <Button
+                size="$2"
+                variant="outlined"
+                onPress={() => setShowFootballComingSoon(false)}
+              >
+                Dismiss
+              </Button>
+            </XStack>
+          )}
+        </YStack>
 
         {/* ── Submit error banner ── */}
         {submitError && (
