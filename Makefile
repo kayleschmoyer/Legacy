@@ -4,7 +4,7 @@
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
 	lint lint-fix lint-workflows lint-skills format fmt typecheck validate \
-	test test-all test-watch test-e2e check-skipped-tests check-skipped-tests-verbose \
+	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios build-android build-ios \
@@ -323,6 +323,10 @@ test-watch: ## Run tests in watch mode
 test-e2e: ## Run end-to-end tests
 	@$(call echo_blue,Running e2e tests...)
 	pnpm exec nx run-many -t e2e
+
+e2e-auth: ## Mint or refresh the web-e2e OAuth JWT (machine-wide cache at ~/.legacy-sports/e2e-token.json)
+	@$(call echo_blue,Resolving web-e2e auth token...)
+	node scripts/e2e-auth.mjs
 
 check-skipped-tests: ## Check for skipped tests and report them
 	@$(call echo_blue,Checking for skipped tests...)

@@ -74,6 +74,23 @@ The hermetic suite under `src/tests/` does NOT need this — the green `e2e` Git
 
 You can also dispatch the workflow manually from the Actions tab (`Run workflow` → enter the PR number) for cases where the label cannot be applied (e.g. from a fork PR running with reduced permissions).
 
+## Local authentication
+
+Both suites need a JWT to drive the authenticated UI. Two modes:
+
+- **CI** (or `E2E_AUTH_MODE=ci`): `global-setup.ts` signs a hermetic JWT locally with `E2E_SIGNING_SECRET`. No backend validates it — the hermetic mocks never check signatures. Nothing to set up.
+- **Local**: the OAuth device flow signs you in with a real Google account. The resulting JWT is cached **machine-wide** at `~/.legacy-sports/e2e-token.json` (Windows: `%USERPROFILE%\.legacy-sports\e2e-token.json`), so every worktree on the same machine reuses one cached token until it expires. The cache file lives outside any worktree, so `twig worktree clean` never destroys it.
+
+To mint or refresh the token without launching Playwright:
+
+```bash
+make e2e-auth
+# prints `already authenticated as <email>` if a valid token is cached,
+# otherwise opens the browser for the device handshake and writes the cache.
+```
+
+The CLI lives at [`scripts/e2e-auth.mjs`](../../scripts/e2e-auth.mjs) and shares its device-flow + cache implementation with [`src/global-setup.ts`](src/global-setup.ts) (LS-4679).
+
 ## Why two suites?
 
 The split mirrors the distinction between unit tests and integration tests in the backend:

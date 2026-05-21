@@ -1,9 +1,12 @@
 import type { FullConfig } from '@playwright/test';
-import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 import { E2EJwtUtil } from './utils/jwt';
+// Type-only import resolves to the sibling scripts/e2e-auth.d.ts — the
+// runtime is .mjs (loaded dynamically below) but the type surface is fully
+// declared, so the cast in resolveAuthToken() is type-safe, not `any`.
+type E2EAuthModule = typeof import('../../../scripts/e2e-auth');
 
 /**
  * Playwright global setup for E2E authentication.
@@ -16,9 +19,11 @@ import { E2EJwtUtil } from './utils/jwt';
  *           storage state (cookie + localStorage user profile). The
  *           production JWT signing key is intentionally NOT used here.
  *   Local – Uses the OAuth device flow so the developer authenticates with
- *           their real Google account. The resulting token is cached in
- *           `.auth/token-cache.json` so you only need to re-authenticate
- *           when the token expires.
+ *           their real Google account. The resulting token is cached at a
+ *           machine-wide, user-scoped path (~/.legacy-sports/e2e-token.json)
+ *           so every worktree on the same machine reuses one cached JWT
+ *           until it expires (LS-4679). Mint or refresh the token without
+ *           launching Playwright via `make e2e-auth`.
  *
  * The generated JWT is saved as a Playwright `storageState` file (.auth/state.json)
  * which is automatically loaded into every browser context via the Playwright config.
@@ -26,33 +31,6 @@ import { E2EJwtUtil } from './utils/jwt';
 
 const AUTH_DIR = path.join(__dirname, '..', '.auth');
 const STORAGE_STATE_PATH = path.join(AUTH_DIR, 'state.json');
-const TOKEN_CACHE_PATH = path.join(AUTH_DIR, 'token-cache.json');
-
-interface TokenCache {
-  jwt: string;
-  email: string;
-  expiresAt: number; // epoch ms
-}
-
-interface DeviceAuthResponse {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  verification_uri_complete: string;
-  expires_in: number;
-  interval: number;
-}
-
-interface DeviceTokenResponse {
-  jwt: string;
-  user: {
-    id: number;
-    email: string;
-    username: string;
-    accessLevel: string;
-  };
-  refreshToken?: string;
-}
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -82,9 +60,23 @@ async function resolveAuthToken(): Promise<string> {
     return signJwtLocally();
   }
 
-  // Local mode — device flow with caching
+  // Local mode — device flow with machine-wide caching. Device-flow + cache
+  // primitives live in scripts/e2e-auth.mjs so the standalone `make e2e-auth`
+  // CLI and Playwright share one implementation. Types come from the sibling
+  // scripts/e2e-auth.d.ts so this import is fully type-checked (LS-4679).
   console.log('[E2E Auth] Local mode — using device flow (cached if valid)');
-  return resolveLocalToken();
+  const sharedModulePath = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'scripts',
+    'e2e-auth.mjs',
+  );
+  const mod = (await import(
+    /* webpackIgnore: true */ sharedModulePath
+  )) as E2EAuthModule;
+  return mod.resolveLocalToken();
 }
 
 // ---------------------------------------------------------------------------
@@ -101,166 +93,8 @@ function signJwtLocally(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Local: device-flow with caching
-// ---------------------------------------------------------------------------
-
-async function resolveLocalToken(): Promise<string> {
-  const cached = loadCachedToken();
-  if (cached) {
-    console.log(`[E2E Auth] Using cached token for ${cached.email}`);
-    return cached.jwt;
-  }
-
-  console.log('[E2E Auth] No valid cached token — starting device flow…');
-  return runDeviceFlow();
-}
-
-function loadCachedToken(): TokenCache | null {
-  try {
-    if (!fs.existsSync(TOKEN_CACHE_PATH)) return null;
-
-    const raw = fs.readFileSync(TOKEN_CACHE_PATH, 'utf-8');
-    const cache = JSON.parse(raw) as TokenCache;
-
-    // Check expiration with a 5-minute buffer
-    if (cache.expiresAt - 5 * 60 * 1000 < Date.now()) {
-      console.log('[E2E Auth] Cached token expired — will re-authenticate');
-      return null;
-    }
-
-    // Basic JWT format sanity check
-    if (!cache.jwt || cache.jwt.split('.').length !== 3) return null;
-
-    return cache;
-  } catch {
-    return null;
-  }
-}
-
-function cacheToken(jwt: string, email: string, expiresInSeconds: number) {
-  fs.mkdirSync(AUTH_DIR, { recursive: true });
-
-  const cache: TokenCache = {
-    jwt,
-    email,
-    expiresAt: Date.now() + expiresInSeconds * 1000,
-  };
-
-  fs.writeFileSync(TOKEN_CACHE_PATH, JSON.stringify(cache, null, 2), {
-    mode: 0o600, // owner-only
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Device flow
-// ---------------------------------------------------------------------------
-
-async function runDeviceFlow(): Promise<string> {
-  const oauthUrl = resolveOAuthUrl();
-
-  // Step 1 — request device authorization
-  const authResponse = await fetch(`${oauthUrl}/device/authorize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_type: 'cli',
-      device_name: `E2E-${process.env.COMPUTERNAME || 'test'}`,
-    }),
-  });
-
-  if (!authResponse.ok) {
-    throw new Error(
-      `Device auth request failed (${authResponse.status}): ${await authResponse.text()}`,
-    );
-  }
-
-  const deviceAuth = (await authResponse.json()) as DeviceAuthResponse;
-
-  // Step 2 — prompt user to authorize
-  console.log('');
-  console.log('╔══════════════════════════════════════════════════════╗');
-  console.log('║  🔐  E2E Authentication Required                    ║');
-  console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  Code: ${deviceAuth.user_code.padEnd(46)}║`);
-  console.log(
-    `║  URL:  ${deviceAuth.verification_uri_complete.substring(0, 46).padEnd(46)}║`,
-  );
-  console.log('╚══════════════════════════════════════════════════════╝');
-  console.log('');
-
-  // Try to open the browser automatically (Windows / macOS / Linux)
-  openBrowser(deviceAuth.verification_uri_complete);
-
-  // Step 3 — poll for token
-  const pollIntervalMs = (deviceAuth.interval || 5) * 1000;
-  const deadline = Date.now() + deviceAuth.expires_in * 1000;
-
-  while (Date.now() < deadline) {
-    await sleep(pollIntervalMs);
-
-    const tokenResponse = await fetch(`${oauthUrl}/device/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_code: deviceAuth.device_code }),
-    });
-
-    if (tokenResponse.status === 200) {
-      const data = (await tokenResponse.json()) as DeviceTokenResponse;
-
-      // Cache for future runs — assume 24h if not specified
-      cacheToken(data.jwt, data.user.email, 24 * 60 * 60);
-
-      console.log(
-        `[E2E Auth] ✅ Authenticated as ${data.user.email} (${data.user.accessLevel})`,
-      );
-      return data.jwt;
-    }
-
-    // 428 = authorization_pending — keep polling
-    if (tokenResponse.status === 428) continue;
-
-    // Anything else is an error
-    const errorBody = await tokenResponse.text().catch(() => 'unknown');
-    throw new Error(
-      `Device flow token request failed (${tokenResponse.status}): ${errorBody}`,
-    );
-  }
-
-  throw new Error(
-    'Device flow timed out — user did not complete authorization in time.',
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function resolveOAuthUrl(): string {
-  return (
-    process.env.VITE_OAUTH_PROXY_URL ||
-    process.env.OAUTH_PROXY_URL ||
-    'https://api.legacysports.dev/oauth'
-  );
-}
-
-function openBrowser(url: string) {
-  try {
-    const platform = process.platform;
-    if (platform === 'win32') {
-      execSync(`start "" "${url}"`, { stdio: 'ignore' });
-    } else if (platform === 'darwin') {
-      execSync(`open "${url}"`, { stdio: 'ignore' });
-    } else {
-      execSync(`xdg-open "${url}"`, { stdio: 'ignore' });
-    }
-  } catch {
-    // Silently ignore — the URL is printed for manual copy-paste
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /** Single source of truth for the hermetic CSRF token in global-setup storageState. */
 const E2E_CSRF_TOKEN = 'e2e-csrf-token';
