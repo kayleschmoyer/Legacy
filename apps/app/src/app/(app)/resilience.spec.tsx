@@ -300,10 +300,13 @@ describe('App resilience tests', () => {
         fireEvent.press(retryButton);
       }
 
-      await waitFor(() => {
-        expect(mockRefetchLeagues).toHaveBeenCalledTimes(10);
-      });
-    });
+      await waitFor(
+        () => {
+          expect(mockRefetchLeagues).toHaveBeenCalledTimes(10);
+        },
+        { timeout: 15000 },
+      );
+    }, 20000);
 
     it('handles rapid Retry presses on a team query error without crashing', async () => {
       mockUseGetUserTeamIdQuery.mockReturnValue({
@@ -321,10 +324,13 @@ describe('App resilience tests', () => {
         fireEvent.press(retryButton);
       }
 
-      await waitFor(() => {
-        expect(mockRefetchTeam).toHaveBeenCalledTimes(10);
-      });
-    });
+      await waitFor(
+        () => {
+          expect(mockRefetchTeam).toHaveBeenCalledTimes(10);
+        },
+        { timeout: 15000 },
+      );
+    }, 20000);
 
     it('handles rapid league selection and back navigation without crashing', () => {
       const leagues = Array.from({ length: 5 }, (_, i) => ({

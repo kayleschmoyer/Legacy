@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { forwardRef } from 'react';
 import { Button as TamaguiButton } from 'tamagui';
+import { VARIANT_STYLES } from './button-variants';
 import type { ButtonProps, ButtonRef } from '../types/ui';
-
-// Import Tamagui Button component
 
 // Button component with stable types and consistent API
 export const Button = forwardRef<ButtonRef, ButtonProps>(
@@ -11,7 +10,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     {
       children,
       title,
-      variant: _variant = 'primary',
+      variant = 'primary',
       size = 'medium',
       disabled = false,
       loading = false,
@@ -20,11 +19,10 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     },
     ref,
   ) => {
-    // Map our variant to Tamagui variant
-    const tamaguiVariant = React.useMemo(() => {
-      // For now, Tamagui Button only supports 'outlined', so we use that consistently
-      return 'outlined' as const;
-    }, []);
+    const variantStyle = React.useMemo(
+      () => VARIANT_STYLES[variant],
+      [variant],
+    );
 
     // Map our size to Tamagui size
     const tamaguiSize = React.useMemo(() => {
@@ -45,7 +43,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     return (
       <TamaguiButton
         ref={ref}
-        variant={tamaguiVariant}
+        variant={variantStyle.tamaguiVariant}
         size={tamaguiSize}
         disabled={disabled || loading}
         onPress={onPress}
@@ -66,10 +64,11 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
         paddingLeft={props.paddingLeft}
         paddingHorizontal={props.paddingHorizontal}
         paddingVertical={props.paddingVertical}
-        backgroundColor={props.backgroundColor}
-        borderColor={props.borderColor}
-        borderWidth={props.borderWidth}
+        backgroundColor={props.backgroundColor ?? variantStyle.backgroundColor}
+        borderColor={props.borderColor ?? variantStyle.borderColor}
+        borderWidth={props.borderWidth ?? variantStyle.borderWidth}
         borderRadius={props.borderRadius}
+        color={variantStyle.color}
         testID={props.testID}
         id={props.id}
         accessibilityLabel={props.accessibilityLabel}
