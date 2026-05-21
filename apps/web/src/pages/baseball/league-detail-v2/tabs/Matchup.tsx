@@ -55,18 +55,59 @@ const STATUS_CHIP: Record<
   unknown: { cls: 'ls-chip-final', label: 'Status unknown', pulse: false },
 };
 
+// Pace-target tint for the team scoreboard score: green when the team is
+// outperforming its projected per-game pace by >10%, red when underperforming
+// by >10%, neutral otherwise. Mirrors paceColorStyle in Shared.tsx.
+const teamScorePaceStyle = (
+  actual: number,
+  proj: number | null | undefined,
+  gamesPlayed: number,
+  totalGames: number,
+): React.CSSProperties | undefined => {
+  if (proj == null || totalGames <= 0 || gamesPlayed <= 0) return undefined;
+  const target = proj * (gamesPlayed / totalGames);
+  if (target <= 0) return undefined;
+  const ratio = actual / target;
+  if (ratio > 1.1) return { color: 'var(--success-fg)' };
+  if (ratio < 0.9) return { color: 'var(--danger-fg)' };
+  return undefined;
+};
+
 const ScoreboardHero: React.FC<{
   weekNumber?: number | null;
   totalMatchups?: number | null;
   status?: MatchupStatus | null;
   team1: MatchupTeamSide;
   team2: MatchupTeamSide;
+  gamesPlayed: number;
+  totalGames: number;
   onTeam: (teamId: number) => void;
-}> = ({ weekNumber, totalMatchups, status, team1, team2, onTeam }) => {
+}> = ({
+  weekNumber,
+  totalMatchups,
+  status,
+  team1,
+  team2,
+  gamesPlayed,
+  totalGames,
+  onTeam,
+}) => {
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
   const chip = STATUS_CHIP[status ?? 'unknown'] ?? STATUS_CHIP.unknown;
+  const score1Pace = teamScorePaceStyle(
+    score1,
+    team1.projectedScore,
+    gamesPlayed,
+    totalGames,
+  );
+  const score2Pace = teamScorePaceStyle(
+    score2,
+    team2.projectedScore,
+    gamesPlayed,
+    totalGames,
+  );
   return (
     <div
       className="ls-scoreboard-hero"
@@ -79,11 +120,10 @@ const ScoreboardHero: React.FC<{
             {chip.pulse ? <span className="ls-dot ls-pulse" /> : null}
             {chip.label} · Week {weekNumber ?? '—'}
           </span>
-          {totalMatchups ? (
-            <span className="meta">
-              Matchup {weekNumber ?? '?'}/{totalMatchups}
-            </span>
-          ) : null}
+          <span className="meta">
+            Head-to-Head · Matchup {weekNumber ?? '?'}
+            {totalMatchups ? `/${totalMatchups}` : ''}
+          </span>
         </div>
       </div>
       <div className="body">
@@ -99,9 +139,17 @@ const ScoreboardHero: React.FC<{
           >
             {initialsFromName(team1.name)}
           </div>
-          <div className="name">{team1.name ?? 'Team 1'}</div>
+          <div
+            className="name"
+            onClick={() => team1.id != null && onTeam(team1.id)}
+            style={team1.id != null ? { cursor: 'pointer' } : undefined}
+          >
+            {team1.name ?? 'Team 1'}
+          </div>
           <div className="record mono">{team1.record ?? '—'}</div>
-          <div className="score-huge">{score1.toFixed(2)}</div>
+          <div className="score-huge" style={score1Pace}>
+            {score1.toFixed(2)}
+          </div>
           {team1.projectedScore != null ? (
             <div className="proj">{team1.projectedScore.toFixed(2)} proj</div>
           ) : null}
@@ -119,9 +167,17 @@ const ScoreboardHero: React.FC<{
           >
             {initialsFromName(team2.name)}
           </div>
-          <div className="name">{team2.name ?? 'Team 2'}</div>
+          <div
+            className="name"
+            onClick={() => team2.id != null && onTeam(team2.id)}
+            style={team2.id != null ? { cursor: 'pointer' } : undefined}
+          >
+            {team2.name ?? 'Team 2'}
+          </div>
           <div className="record mono">{team2.record ?? '—'}</div>
-          <div className="score-huge">{score2.toFixed(2)}</div>
+          <div className="score-huge" style={score2Pace}>
+            {score2.toFixed(2)}
+          </div>
           {team2.projectedScore != null ? (
             <div className="proj">{team2.projectedScore.toFixed(2)} proj</div>
           ) : null}
@@ -240,6 +296,8 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   const totalGames = matchup?.gamesPerMatchup ?? league.gamesPerMatchup ?? 0;
   const gamesPlayed = matchup?.selectedGamesCount ?? 0;
   const gamesRemaining = Math.max(0, totalGames - gamesPlayed);
+  const percentComplete =
+    totalGames > 0 ? Math.round((gamesPlayed / totalGames) * 100) : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -280,35 +338,72 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         status={matchup?.status ?? null}
         team1={team1Side}
         team2={team2Side}
+        gamesPlayed={gamesPlayed}
+        totalGames={totalGames}
         onTeam={onTeam}
       />
 
       {totalGames > 0 ? (
         <div className="ls-games-remaining">
           <div className="ls-games-row">
-            <span className="eyebrow">Games Remaining</span>
-            <span className="mono" style={{ color: 'var(--fg2)' }}>
-              {gamesRemaining} / {totalGames}
-            </span>
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: '.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--fg1)',
+                }}
+              >
+                Games Remaining
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  color: 'var(--fg3)',
+                  marginTop: 2,
+                }}
+              >
+                <span className="mono" style={{ color: 'var(--fg1-strong)' }}>
+                  {gamesPlayed}
+                </span>{' '}
+                of <span className="mono">{totalGames}</span> complete ·{' '}
+                <span className="mono">{gamesRemaining}</span> remaining
+              </div>
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
+                fontSize: 28,
+                color: 'var(--brand-gold-light)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+              aria-label={`${percentComplete} percent complete`}
+            >
+              {percentComplete}%
+            </div>
+          </div>
+          <div className="ls-progress">
+            <div
+              className="ls-progress-fill"
+              style={{ width: `${percentComplete}%` }}
+            />
           </div>
           <div className="ls-games-dots">
             {Array.from({ length: totalGames }).map((_, idx) => {
               const cls =
                 idx < gamesPlayed
                   ? 'done'
-                  : idx === gamesPlayed
+                  : idx === gamesPlayed &&
+                      matchup?.status === MatchupStatus.InProgress
                     ? 'live'
                     : 'pending';
               return <div key={idx} className={`ls-game-dot ${cls}`} />;
             })}
-          </div>
-          <div className="ls-progress">
-            <div
-              className="ls-progress-fill"
-              style={{
-                width: `${totalGames === 0 ? 0 : (gamesPlayed / totalGames) * 100}%`,
-              }}
-            />
           </div>
         </div>
       ) : null}
