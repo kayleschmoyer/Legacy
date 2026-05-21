@@ -10,7 +10,6 @@ export { PlayersTable } from './PlayersTable';
 // Advanced player statistics components
 export { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 export { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
-export { PlayerStatsFilterDialog } from './PlayerStatsFilterDialog';
 export { PlayerStatsPage } from './PlayerStatsPage';
 
 // Career statistics services and types

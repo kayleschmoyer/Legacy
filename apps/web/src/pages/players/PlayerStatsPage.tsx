@@ -32,6 +32,39 @@ import { useGetPlayerIdByBrefIdQuery } from '../../api/db/graphql.generated';
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
 
+/**
+ * Build URL search params from a committed filter snapshot. Exported for unit
+ * testing — the host component wraps this with `setSearchParams(...)`.
+ *
+ * Numeric formatting matches the URL param contract documented in
+ * `docs/agents/pages/players/stats.md` (3 decimals for AVG, 2 for ERA).
+ */
+export function buildStatsSearchParams(state: {
+  viewMode: PlayerStatsViewMode;
+  pageSize: number;
+  filters: PlayerStatsFilters;
+}): URLSearchParams {
+  const next = new URLSearchParams();
+  next.set('view', state.viewMode);
+  next.set('pageSize', String(state.pageSize));
+  if (state.filters.searchTerm)
+    next.set('searchTerm', state.filters.searchTerm);
+  if (state.filters.position) next.set('position', state.filters.position);
+  if (state.filters.team) next.set('team', state.filters.team);
+  if (state.filters.playerType)
+    next.set('playerType', state.filters.playerType);
+  if (state.filters.minHomeRuns !== undefined) {
+    next.set('minHomeRuns', String(state.filters.minHomeRuns));
+  }
+  if (state.filters.minBattingAvg !== undefined) {
+    next.set('minBattingAvg', state.filters.minBattingAvg.toFixed(3));
+  }
+  if (state.filters.maxERA !== undefined) {
+    next.set('maxERA', state.filters.maxERA.toFixed(2));
+  }
+  return next;
+}
+
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
 
 function readStatsFormat(): 'standard' | 'expanded' {
@@ -63,7 +96,7 @@ function readStatsFormat(): 'standard' | 'expanded' {
 const TOAST_DURATION_MS = 2400;
 
 export function PlayerStatsPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
 
   // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
@@ -206,6 +239,18 @@ export function PlayerStatsPage() {
     [],
   );
 
+  // Mirror committed filter state into URL params so reload restores the view.
+  const handleFiltersChange = useCallback(
+    (state: {
+      viewMode: PlayerStatsViewMode;
+      pageSize: number;
+      filters: PlayerStatsFilters;
+    }) => {
+      setSearchParams(buildStatsSearchParams(state), { replace: true });
+    },
+    [setSearchParams],
+  );
+
   // Handle share functionality — shared component passes a relative URL; prepend origin here
   const handleShare = useCallback((relativeUrl: string) => {
     const url = `${window.location.origin}${relativeUrl}`;
@@ -316,6 +361,7 @@ export function PlayerStatsPage() {
         onPlayerDetails={handlePlayerDetails}
         onExport={handleExport}
         onShare={handleShare}
+        onFiltersChange={handleFiltersChange}
       />
 
       {/* Player detail modal */}

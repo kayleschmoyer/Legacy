@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
@@ -120,7 +120,17 @@ export interface PlayerStatsPageProps {
     viewMode: PlayerStatsViewMode,
   ) => void;
   onShare?: (url: string) => void;
+  /** Fired when the committed filter snapshot changes so the host can mirror to URL params. */
+  onFiltersChange?: (state: {
+    viewMode: 'combined' | 'hitters' | 'pitchers';
+    pageSize: number;
+    filters: PlayerStatsFilters;
+  }) => void;
 }
+
+// ERA "off" sentinel — sits at the high end of the slider so "Max ERA = 5.00" means
+// no upper bound is applied. Matches the design reference (project/stats.jsx).
+const ERA_MAX_OFF = 5;
 
 interface AppliedFilters {
   search: string;
@@ -129,7 +139,7 @@ interface AppliedFilters {
   pageSize: number;
   minHR: number;
   minAVG: number;
-  minWins: number;
+  maxERA: number;
 }
 
 function normalizeViewMode(
@@ -161,6 +171,7 @@ export function PlayerStatsPage({
   onPlayerDetails,
   onExport,
   onShare,
+  onFiltersChange,
 }: PlayerStatsPageProps) {
   // ── View mode ─────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<'combined' | 'hitters' | 'pitchers'>(
@@ -179,7 +190,7 @@ export function PlayerStatsPage({
   // ── Advanced filter draft state ────────────────────────────────
   const [minHR, setMinHR] = useState(initialFilters.minHomeRuns ?? 0);
   const [minAVG, setMinAVG] = useState(initialFilters.minBattingAvg ?? 0);
-  const [minWins, setMinWins] = useState(initialFilters.minWins ?? 0);
+  const [maxERA, setMaxERA] = useState(initialFilters.maxERA ?? ERA_MAX_OFF);
 
   // ── Applied filters — committed snapshot that drives grid queries ─
   // Separate draft vs. applied state avoids mid-input query flicker and
@@ -191,7 +202,7 @@ export function PlayerStatsPage({
     pageSize: initialPageSize,
     minHR: initialFilters.minHomeRuns ?? 0,
     minAVG: initialFilters.minBattingAvg ?? 0,
-    minWins: initialFilters.minWins ?? 0,
+    maxERA: initialFilters.maxERA ?? ERA_MAX_OFF,
   }));
 
   const applyFilters = useCallback(() => {
@@ -202,9 +213,9 @@ export function PlayerStatsPage({
       pageSize,
       minHR,
       minAVG,
-      minWins,
+      maxERA,
     });
-  }, [search, position, team, pageSize, minHR, minAVG, minWins]);
+  }, [search, position, team, pageSize, minHR, minAVG, maxERA]);
 
   // Stringify-based key forces grid unmount/remount on each filter commit,
   // which triggers a fresh GraphQL query with the new initialParams.
@@ -247,10 +258,34 @@ export function PlayerStatsPage({
           : undefined,
       team:
         appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
-      minWins: appliedFilters.minWins > 0 ? appliedFilters.minWins : undefined,
     }),
     [appliedFilters],
   );
+
+  // ── Notify host of applied filter changes (URL round-trip) ───
+  useEffect(() => {
+    if (!onFiltersChange) return;
+    const filters: PlayerStatsFilters = {};
+    if (appliedFilters.search) filters.searchTerm = appliedFilters.search;
+    if (appliedFilters.position !== 'All Positions') {
+      filters.position = appliedFilters.position;
+    }
+    if (appliedFilters.team !== 'All Teams') {
+      filters.team = appliedFilters.team;
+    }
+    if (appliedFilters.minHR > 0) filters.minHomeRuns = appliedFilters.minHR;
+    if (appliedFilters.minAVG > 0) {
+      filters.minBattingAvg = appliedFilters.minAVG;
+    }
+    if (appliedFilters.maxERA < ERA_MAX_OFF) {
+      filters.maxERA = appliedFilters.maxERA;
+    }
+    onFiltersChange({
+      viewMode,
+      pageSize: appliedFilters.pageSize,
+      filters,
+    });
+  }, [appliedFilters, viewMode, onFiltersChange]);
 
   // ── Player click handlers ──────────────────────────────────────
   const handleBattingPlayerClick = useCallback(
@@ -289,10 +324,10 @@ export function PlayerStatsPage({
       team: team !== 'All Teams' ? team : undefined,
       minHomeRuns: minHR > 0 ? minHR : undefined,
       minBattingAvg: minAVG > 0 ? minAVG : undefined,
-      minWins: minWins > 0 ? minWins : undefined,
+      maxERA: maxERA < ERA_MAX_OFF ? maxERA : undefined,
     };
     onExport(filters, viewMode);
-  }, [onExport, search, position, team, minHR, minAVG, minWins, viewMode]);
+  }, [onExport, search, position, team, minHR, minAVG, maxERA, viewMode]);
 
   const handleShare = useCallback(() => {
     if (!onShare) return;
@@ -305,7 +340,7 @@ export function PlayerStatsPage({
     if (team !== 'All Teams') params.set('team', team);
     if (minHR > 0) params.set('minHomeRuns', String(minHR));
     if (minAVG > 0) params.set('minBattingAvg', minAVG.toFixed(3));
-    if (minWins > 0) params.set('minWins', String(minWins));
+    if (maxERA < ERA_MAX_OFF) params.set('maxERA', maxERA.toFixed(2));
     // Build relative URL — the caller is responsible for prepending the origin.
     // This keeps the shared component free of window.location (safe for native).
     onShare(`/players/stats?${params.toString()}`);
@@ -318,14 +353,14 @@ export function PlayerStatsPage({
     team,
     minHR,
     minAVG,
-    minWins,
+    maxERA,
   ]);
 
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';
   const showPitching = viewMode === 'combined' || viewMode === 'pitchers';
 
-  // ── URL preview (mocked for display, matches actual URL contract) ─
+  // ── URL preview — matches the URL params that apps/web persists ─
   const urlPreview = useMemo(() => {
     const params: string[] = [`view=${viewMode}`, `pageSize=${pageSize}`];
     if (search) params.push(`search=${encodeURIComponent(search)}`);
@@ -334,9 +369,9 @@ export function PlayerStatsPage({
     if (team !== 'All Teams') params.push(`team=${encodeURIComponent(team)}`);
     if (minHR > 0) params.push(`minHomeRuns=${minHR}`);
     if (minAVG > 0) params.push(`minBattingAvg=${minAVG.toFixed(3)}`);
-    if (minWins > 0) params.push(`minWins=${minWins}`);
+    if (maxERA < ERA_MAX_OFF) params.push(`maxERA=${maxERA.toFixed(2)}`);
     return `/players/stats?${params.join('&')}`;
-  }, [viewMode, pageSize, search, position, team, minHR, minAVG, minWins]);
+  }, [viewMode, pageSize, search, position, team, minHR, minAVG, maxERA]);
 
   return (
     <YStack flex={1} style={{ backgroundColor: BG_DARK }}>
@@ -344,8 +379,16 @@ export function PlayerStatsPage({
       {Platform.OS === 'web' && (
         <style>{`
           @keyframes ps-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes ps-advSlide {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
           @media (prefers-reduced-motion: no-preference) {
             .ps-tabContent { animation: ps-fadeIn 140ms ease forwards; }
+            .ps-adv-panel { animation: ps-advSlide 180ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .ps-adv-panel { animation: none; }
           }
           .ps-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
             background: linear-gradient(to right, ${BRAND_GOLD} 0%, ${BRAND_GOLD} var(--pct,0%), rgba(255,255,255,0.08) var(--pct,0%), rgba(255,255,255,0.08) 100%);
@@ -927,9 +970,10 @@ export function PlayerStatsPage({
         </XStack>
 
         {/* ── Advanced filters panel ─────────────────────────────────── */}
-        {/* MOTION: slide down 180ms ease-out when opened */}
+        {/* MOTION: slide down 180ms ease-out when opened (web only) */}
         {advancedOpen && (
           <YStack
+            className={Platform.OS === 'web' ? 'ps-adv-panel' : undefined}
             style={{
               padding: '18px 20px',
               background: SURFACE_CARD,
@@ -955,7 +999,7 @@ export function PlayerStatsPage({
                 onPress={() => {
                   setMinHR(0);
                   setMinAVG(0);
-                  setMinWins(0);
+                  setMaxERA(ERA_MAX_OFF);
                   applyFilters();
                 }}
                 accessibilityRole="button"
@@ -1007,13 +1051,13 @@ export function PlayerStatsPage({
                 onCommit={applyFilters}
               />
               <StatSlider
-                label="Min Wins (Pitchers)"
-                value={minWins}
-                min={0}
-                max={40}
-                step={1}
-                format={(v) => String(v)}
-                onChange={setMinWins}
+                label="Max ERA"
+                value={maxERA}
+                min={0.5}
+                max={ERA_MAX_OFF}
+                step={0.05}
+                format={(v) => v.toFixed(2)}
+                onChange={setMaxERA}
                 onCommit={applyFilters}
               />
             </XStack>
