@@ -280,11 +280,13 @@ function PlayerSearchInput({
   excludeIds,
   disabled,
   usedCount,
+  filledSlots,
 }: {
   onSelect: (player: PlayerSummary) => void;
   excludeIds: number[];
   disabled: boolean;
   usedCount: number;
+  filledSlots?: React.ReactNode;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -521,7 +523,7 @@ function PlayerSearchInput({
         </p>
       </div>
 
-      {/* Slot chips */}
+      {/* Slot chips — filled and empty rendered together inside the selector card */}
       {usedCount > 0 && (
         <div
           style={{
@@ -532,7 +534,7 @@ function PlayerSearchInput({
           }}
           aria-label="Selected players"
         >
-          {/* Filled slots rendered externally — empty slots shown here */}
+          {filledSlots}
           {Array.from({ length: MAX_PLAYERS - usedCount }).map((_, i) => (
             <span
               key={`empty-${i}`}
@@ -1674,36 +1676,22 @@ export function PlayerComparisonPage() {
           {/* Editorial masthead */}
           <Masthead />
 
-          {/* Chip row of selected players */}
-          {activePlayers.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                flexWrap: 'wrap',
-                marginBottom: 14,
-              }}
-              aria-label="Selected players"
-            >
-              {selected.map((p, idx) =>
-                p ? (
-                  <PlayerChip
-                    key={p.id}
-                    player={p}
-                    index={idx}
-                    onRemove={() => handleRemove(idx)}
-                  />
-                ) : null,
-              )}
-            </div>
-          )}
-
-          {/* Search & selection panel */}
+          {/* Search & selection panel — filled chips render inline with empty slots */}
           <PlayerSearchInput
             onSelect={handleAdd}
             excludeIds={activeIds}
             disabled={activePlayers.length >= MAX_PLAYERS}
             usedCount={activePlayers.length}
+            filledSlots={selected.map((p, idx) =>
+              p ? (
+                <PlayerChip
+                  key={p.id}
+                  player={p}
+                  index={idx}
+                  onRemove={() => handleRemove(idx)}
+                />
+              ) : null,
+            )}
           />
 
           {/* Empty state */}
