@@ -24,20 +24,18 @@ test.describe('Help Page — header and layout @smoke', () => {
   });
 
   test('shows descriptive subtitle text', async ({ page }) => {
-    await expect(
-      page.getByText(/find answers to common questions/i),
-    ).toBeVisible();
+    await expect(page.getByText(/drafting your first dynasty/i)).toBeVisible();
   });
 
   test('renders the Tutorial section heading', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /new to legacy sports/i }),
+      page.getByRole('heading', { name: /take the clubhouse tour/i }),
     ).toBeVisible();
   });
 
   test('renders the Quick Links section heading', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /quick links/i }),
+      page.getByRole('heading', { name: /jump back in/i }),
     ).toBeVisible();
   });
 
@@ -55,7 +53,7 @@ test.describe('Help Page — header and layout @smoke', () => {
 
   test('renders the Contact & Support section heading', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /contact & support/i }),
+      page.getByRole('heading', { name: /talk to a real person/i }),
     ).toBeVisible();
   });
 });
@@ -94,7 +92,7 @@ test.describe('Help Page — tutorial launcher @smoke', () => {
   });
 
   test('shows tutorial walkthrough description text', async ({ page }) => {
-    await expect(page.getByText(/6-step walkthrough/i)).toBeVisible();
+    await expect(page.getByText(/six-step walkthrough/i)).toBeVisible();
   });
 });
 

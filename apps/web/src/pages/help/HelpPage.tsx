@@ -1,14 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Button,
-  H1,
-  H2,
-  Paragraph,
-  Separator,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components/ui';
+import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { ScrollView, styled } from 'tamagui';
 import {
   DISCORD_URL,
@@ -20,18 +12,12 @@ import {
 import {
   AlertTriangle,
   BarChart3,
-  BookOpen,
   Bug,
   ChevronDown,
   Gamepad2,
-  HelpCircle,
-  History,
   Lightbulb,
-  Link as LinkIcon,
-  Mail,
   MessageCircle,
   Plus,
-  Rocket,
   Settings,
   Trophy,
   Users,
@@ -40,187 +26,240 @@ import { BugReportButton } from '../../components/layout/BugReportButton';
 import { env } from '../../config/environment';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
-import {
-  BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  GRADIENT_NAVY,
-  TEXT_PRIMARY,
-  withAlpha,
-} from '../../constants/colors';
+import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
-/* ─── Icon lookup for contact items (shared data uses emoji strings) ─── */
+/* ─── Contact icon lookup ───
+ * Keyed by HELP_CONTACT_ITEMS.title (stable semantic identifier) rather than
+ * the `icon` emoji field, which could drift if the shared content is edited.
+ * Items without a mapped title fall back to rendering the emoji as a string.
+ */
 
 const CONTACT_ICON_MAP: Record<
   string,
   React.ComponentType<{ size?: number; color?: string }>
 > = {
-  // Keyed by the `icon` emoji field in HELP_CONTACT_ITEMS (stable data key)
-  '\uD83D\uDC1B': Bug,
-  '\uD83D\uDCA1': Lightbulb,
-  '\uD83D\uDCAC': MessageCircle,
-  '\uD83C\uDFAE': Gamepad2,
+  'Report a Bug': Bug,
+  'Suggest a Feature': Lightbulb,
+  'Community Discussions': MessageCircle,
+  'Join our Discord': Gamepad2,
 };
 
-/* ─── Styled Components ─── */
+/* ─── Quick link data ─── */
+
+const QUICK_LINKS = [
+  { to: '/baseball', icon: Trophy, label: 'My Leagues' },
+  { to: '/players', icon: Users, label: 'Players' },
+  { to: '/players/stats', icon: BarChart3, label: 'Player Stats' },
+  { to: '/baseball/league/create', icon: Plus, label: 'Create League' },
+  { to: '/profile/settings', icon: Settings, label: 'Profile Settings' },
+];
+
+/* ─── Tutorial preview step data (illustrative, mirrors OnboardingTutorial) ─── */
+
+const TUTORIAL_PREVIEW_STEPS = [
+  {
+    n: '01',
+    title: 'Pick your era',
+    desc: 'Modern, Dead-Ball, or All-Time',
+    time: '~ 12s',
+  },
+  {
+    n: '02',
+    title: 'Build your roster',
+    desc: 'Draft 23 across all positions',
+    time: '~ 25s',
+  },
+  {
+    n: '03',
+    title: 'Set your lineup',
+    desc: 'Bench, DH, and rotation',
+    time: '~ 18s',
+  },
+  {
+    n: '04',
+    title: 'Read the scoreboard',
+    desc: 'Live archived stats explained',
+    time: '~ 20s',
+  },
+  {
+    n: '05',
+    title: 'Trade & waivers',
+    desc: 'Commissioner approvals',
+    time: '~ 22s',
+  },
+  {
+    n: '06',
+    title: 'Win the pennant',
+    desc: 'Playoffs & the championship',
+    time: '~ 15s',
+  },
+];
+
+/* ─── One-time keyframe injection (pulse dot + skeleton shimmer) ─── */
+
+const KEYFRAME_STYLE_ID = 'help-page-keyframes';
+
+function ensureKeyframes() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(KEYFRAME_STYLE_ID)) return;
+  const el = document.createElement('style');
+  el.id = KEYFRAME_STYLE_ID;
+  el.textContent = `
+    @keyframes helpUrgentPulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .help-pulse-dot { animation: none !important; }
+    }
+  `;
+  document.head.appendChild(el);
+}
+
+/* ─── Styled primitives ─── */
 
 const PageContainer = styled(YStack, {
   flex: 1,
   minHeight: '100vh',
   backgroundColor: '$background',
-  paddingBottom: '$10',
 });
 
 const ContentContainer = styled(YStack, {
-  maxWidth: 860,
+  maxWidth: 1180,
   width: '100%',
   alignSelf: 'center',
-  paddingHorizontal: '$5',
-  gap: '$6',
+  paddingHorizontal: '$6',
+  paddingTop: '$8',
+  paddingBottom: '$12',
+  gap: 0,
   $sm: {
-    paddingHorizontal: '$3',
-    gap: '$4',
+    paddingHorizontal: '$4',
+    paddingTop: '$6',
+    paddingBottom: '$10',
   },
 });
 
-const PageHeader = styled(YStack, {
-  paddingVertical: '$8',
-  gap: '$2',
-  $sm: {
-    paddingVertical: '$6',
-  },
-});
+/* ─── FAQ row (numbered, editorial accordion) ─── */
 
-const SectionCard = styled(YStack, {
-  borderRadius: '$6',
-  borderWidth: 1,
-  borderColor: '$glassBorder',
-  overflow: 'hidden',
-});
+interface NumberedFaqItemProps extends HelpFaqItem {
+  index: number;
+}
 
-const SectionHeader = styled(XStack, {
-  paddingHorizontal: '$5',
-  paddingVertical: '$4',
-  alignItems: 'center',
-  gap: '$3',
-  borderBottomWidth: 1,
-  borderBottomColor: '$glassBorder',
-});
-
-const SectionIconBox = styled(YStack, {
-  width: 36,
-  height: 36,
-  borderRadius: '$4',
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '$color2',
-});
-
-const SectionBody = styled(YStack, {
-  padding: '$5',
-  gap: '$4',
-  $sm: {
-    padding: '$4',
-  },
-});
-
-/* ─── FAQ accordion item ─── */
-
-type FaqItemProps = HelpFaqItem;
-
-const FaqRow = styled(YStack, {
-  borderRadius: '$4',
-  borderWidth: 1,
-  borderColor: '$glassBorder',
-  overflow: 'hidden',
-  cursor: 'pointer' as never,
-});
-
-const FaqQuestion = styled(XStack, {
-  paddingHorizontal: '$4',
-  paddingVertical: '$4',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '$3',
-  hoverStyle: {
-    backgroundColor: '$color2',
-  },
-  animation: 'quick',
-});
-
-const FaqAnswer = styled(YStack, {
-  paddingHorizontal: '$4',
-  paddingVertical: '$4',
-  borderTopWidth: 1,
-  borderTopColor: '$glassBorder',
-});
-
-function FaqItem({ question, answer }: FaqItemProps) {
+function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
   const [open, setOpen] = useState(false);
-  // Generate a stable ID from the question text for aria-controls
-  const faqId = `faq-${question
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .slice(0, 40)}`;
-
   const slug = question
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 40);
+  const faqId = `faq-${slug}`;
+  const num = String(index + 1).padStart(2, '0');
 
   return (
-    <FaqRow data-testid={`faq-item-${slug}`}>
-      <FaqQuestion
+    <YStack
+      data-testid={`faq-item-${slug}`}
+      borderBottomWidth={1}
+      borderBottomColor="rgba(30, 45, 69, 1)"
+    >
+      <XStack
+        tag="button"
+        type="button"
         onPress={() => setOpen((v) => !v)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setOpen((v) => !v);
-          }
-        }}
         aria-expanded={open}
         aria-controls={faqId}
+        alignItems="center"
+        width="100%"
+        paddingHorizontal={24}
+        paddingVertical={22}
+        borderWidth={0}
+        backgroundColor="transparent"
+        cursor="pointer"
+        animation="quick"
+        hoverStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr auto',
+          gap: 18,
+          textAlign: 'left',
+          color: '#E8EDF5',
+          minHeight: 44,
+        }}
       >
-        <Paragraph fontWeight="600" color="$color" flex={1}>
-          {question}
-        </Paragraph>
         <span
-          aria-hidden="true"
           style={{
-            display: 'inline-flex',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s',
+            fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
+            fontWeight: 500,
+            fontSize: 12,
+            color: '#6C80BA',
+            letterSpacing: '0.06em',
+            fontVariantNumeric: 'tabular-nums',
+            width: 32,
           }}
         >
-          <ChevronDown size={18} color={BRAND_GOLD_LIGHT} />
+          {num}
         </span>
-      </FaqQuestion>
+        <span
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 700,
+            fontSize: 18,
+            letterSpacing: '0.01em',
+            color: open ? '#D4BB78' : '#E8EDF5',
+            transition: 'color 150ms ease',
+          }}
+        >
+          {question}
+        </span>
+        <ChevronDown
+          size={16}
+          color={open ? '#D4BB78' : '#8A9BB5'}
+          style={{
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 150ms ease',
+          }}
+        />
+      </XStack>
       {open && (
-        <FaqAnswer id={faqId} role="region" aria-label={question}>
-          <Paragraph color="$colorPress" lineHeight={24}>
+        <YStack
+          id={faqId}
+          role="region"
+          aria-label={question}
+          paddingLeft={74}
+          paddingRight={24}
+          paddingBottom={26}
+          $sm={{ paddingLeft: 64, paddingRight: 18, paddingBottom: 22 }}
+        >
+          <p
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 15,
+              lineHeight: 1.65,
+              color: '#C9D2E2',
+              margin: 0,
+              maxWidth: '65ch',
+            }}
+          >
             {answer}
-          </Paragraph>
-        </FaqAnswer>
+          </p>
+        </YStack>
       )}
-    </FaqRow>
+    </YStack>
   );
 }
 
 /* ─── Contact card ─── */
 
-const ContactCard = styled(YStack, {
-  borderRadius: '$5',
+const ContactCardBase = styled(YStack, {
+  borderRadius: 16,
   borderWidth: 1,
-  padding: '$4',
-  gap: '$2',
+  borderColor: '#1E2D45',
+  backgroundColor: '#111B2F',
+  padding: 22,
+  cursor: 'pointer' as never,
   animation: 'quick',
   hoverStyle: {
-    borderColor: BRAND_NAVY_LIGHT,
-    backgroundColor: '$color2',
+    borderColor: 'rgba(197, 165, 90, 0.35)',
+    backgroundColor: '#16223A',
   },
 });
 
@@ -246,85 +285,146 @@ function ContactOption({
     : href
       ? () => window.open(href, '_blank', 'noopener,noreferrer')
       : undefined;
-  const IconComponent = CONTACT_ICON_MAP[icon];
+  const IconComponent = CONTACT_ICON_MAP[title];
+
   return (
-    <ContactCard
-      borderColor="$glassBorder"
+    <ContactCardBase
       onPress={handlePress}
       cursor={handlePress ? ('pointer' as never) : undefined}
+      role={handlePress ? 'button' : undefined}
+      tabIndex={handlePress ? 0 : undefined}
+      aria-label={handlePress ? title : undefined}
+      onKeyDown={
+        handlePress
+          ? (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handlePress();
+              }
+            }
+          : undefined
+      }
     >
-      <XStack alignItems="center" gap="$3">
+      <XStack alignItems="center" gap={18}>
         <YStack
-          width={40}
-          height={40}
-          borderRadius="$4"
+          width={48}
+          height={48}
+          borderRadius={12}
           alignItems="center"
           justifyContent="center"
-          style={
-            {
-              background: GRADIENT_NAVY,
-            } as never
-          }
+          borderWidth={1}
+          borderColor="#1E2D45"
+          style={{ background: 'rgba(27, 58, 92, 0.4)' }}
         >
           {IconComponent ? (
-            <IconComponent size={20} color={BRAND_GOLD_LIGHT} />
+            <IconComponent size={24} color="#D4BB78" />
           ) : (
-            <Paragraph fontSize={20} lineHeight={22}>
-              <span role="img" aria-label={iconLabel}>
-                {icon}
-              </span>
-            </Paragraph>
+            <span role="img" aria-label={iconLabel} style={{ fontSize: 22 }}>
+              {icon}
+            </span>
           )}
         </YStack>
-        <YStack flex={1} gap="$1">
-          <Paragraph fontWeight="700" color={BRAND_GOLD} fontSize="$4">
+        <YStack flex={1} gap={4}>
+          <span
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 16,
+              letterSpacing: '0.04em',
+              color: '#E8EDF5',
+            }}
+          >
             {title}
-          </Paragraph>
-          <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
+          </span>
+          <span
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: '#8A9BB5',
+            }}
+          >
             {description}
-          </Paragraph>
+          </span>
         </YStack>
+        <span
+          aria-hidden="true"
+          style={{
+            fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
+            fontSize: 12,
+            color: '#6C80BA',
+          }}
+        >
+          ↗
+        </span>
       </XStack>
-    </ContactCard>
+    </ContactCardBase>
   );
 }
 
-/* ─── Quick-link chip ─── */
+/* ─── Section eyebrow + title ─── */
 
-const QuickLinkChip = styled(XStack, {
-  alignItems: 'center',
-  gap: '$2',
-  paddingHorizontal: '$4',
-  paddingVertical: '$3',
-  borderRadius: '$10',
-  borderWidth: 1,
-  borderColor: '$glassBorder',
-  cursor: 'pointer' as never,
-  animation: 'quick',
-  hoverStyle: {
-    borderColor: BRAND_NAVY_LIGHT,
-    backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
-  },
-  pressStyle: {
-    scale: 0.97,
-  },
-});
+interface SectionHeadProps {
+  eyebrow?: string;
+  title: string;
+  sub?: string;
+}
 
-/* ─── Quick link data ─── */
-
-const QUICK_LINKS = [
-  { to: '/baseball', icon: Trophy, label: 'My Leagues' },
-  { to: '/players', icon: Users, label: 'Players' },
-  { to: '/players/stats', icon: BarChart3, label: 'Player Stats' },
-  { to: '/baseball/league/create', icon: Plus, label: 'Create League' },
-  { to: '/profile/settings', icon: Settings, label: 'Profile Settings' },
-];
+function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
+  return (
+    <YStack gap={6} maxWidth="70ch" marginBottom={20}>
+      {eyebrow && (
+        <span
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: '#D4BB78',
+          }}
+        >
+          {eyebrow}
+        </span>
+      )}
+      <h2
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 30,
+          lineHeight: 1.1,
+          letterSpacing: '-0.01em',
+          color: '#E8EDF5',
+          margin: 0,
+        }}
+      >
+        {title}
+      </h2>
+      {sub && (
+        <p
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 15,
+            color: '#8A9BB5',
+            margin: 0,
+          }}
+        >
+          {sub}
+        </p>
+      )}
+    </YStack>
+  );
+}
 
 /* ─── Main component ─── */
 
 export default function HelpPage() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [bugReportOpen, setBugReportOpen] = useState(false);
+
+  useEffect(() => {
+    ensureKeyframes();
+  }, []);
 
   return (
     <>
@@ -343,220 +443,541 @@ export default function HelpPage() {
         <ScrollView>
           <ContentContainer>
             {/* ── Page header ── */}
-            <PageHeader>
-              <H1 color={BRAND_GOLD}>Help &amp; Support</H1>
-              <Paragraph color="$colorPress" fontSize="$5" lineHeight={28}>
-                Find answers to common questions and learn how to get the most
-                out of Legacy Sports.
-              </Paragraph>
-            </PageHeader>
+            <YStack
+              gap={8}
+              marginBottom={40}
+              maxWidth="70ch"
+              $sm={{ marginBottom: 28 }}
+            >
+              <span
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: '#D4BB78',
+                }}
+              >
+                The Clubhouse
+              </span>
+              <h1
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 800,
+                  fontSize: 'clamp(40px, 5vw, 56px)',
+                  lineHeight: 1,
+                  letterSpacing: '-0.02em',
+                  color: '#FFFFFF',
+                  margin: 0,
+                }}
+              >
+                Help &amp; Support
+              </h1>
+              <p
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 18,
+                  lineHeight: 1.6,
+                  color: '#C9D2E2',
+                  margin: '8px 0 0',
+                  maxWidth: '62ch',
+                }}
+              >
+                Whether you&rsquo;re drafting your first dynasty or wrangling a
+                12-team commissioner gig, the answers are here. If you
+                don&rsquo;t find what you need, we&rsquo;re a Discord message
+                away.
+              </p>
+            </YStack>
 
-            {/* ── Tutorial launcher ── */}
-            <SectionCard>
-              <SectionHeader>
-                <SectionIconBox>
-                  <BookOpen size={18} color={BRAND_GOLD_LIGHT} />
-                </SectionIconBox>
-                <YStack flex={1} gap="$1">
-                  <H2 color="$color">New to Legacy Sports?</H2>
-                  <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
-                    Take the interactive tutorial to learn how historical-stats
-                    scoring, season assignment, and game selection work.
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
-              <SectionBody>
-                <XStack
-                  alignItems="center"
-                  justifyContent="space-between"
-                  flexWrap="wrap"
-                  gap="$3"
-                >
-                  <Paragraph
-                    color="$colorPress"
-                    fontSize="$3"
-                    lineHeight={22}
+            {/* ── Tutorial hero ── */}
+            <YStack
+              borderTopWidth={0}
+              paddingVertical={0}
+              marginBottom={40}
+              $sm={{ marginBottom: 28 }}
+            >
+              <YStack
+                borderWidth={1}
+                borderColor="rgba(197, 165, 90, 0.45)"
+                borderRadius={24}
+                overflow="hidden"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #0F1A30 0%, #16223A 60%, #1B3A5C 100%)',
+                  boxShadow:
+                    '0 0 0 1px rgba(197, 165, 90, 0.35), 0 6px 24px rgba(197, 165, 90, 0.25)',
+                }}
+              >
+                <XStack $sm={{ flexDirection: 'column' }} alignItems="stretch">
+                  {/* Left: copy + CTA */}
+                  <YStack
+                    flex={1.2}
+                    padding={36}
+                    gap={18}
+                    $sm={{ padding: 24, gap: 14, flex: 1 }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: 700,
+                        fontSize: 12,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: '#D4BB78',
+                      }}
+                    >
+                      New to Legacy Sports?
+                    </span>
+                    <h2
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: 800,
+                        fontSize: 36,
+                        lineHeight: 1,
+                        letterSpacing: '-0.01em',
+                        color: '#FFFFFF',
+                        margin: 0,
+                      }}
+                    >
+                      Take the clubhouse tour
+                    </h2>
+                    <p
+                      style={{
+                        fontFamily: FONT_BODY,
+                        fontSize: 16,
+                        lineHeight: 1.6,
+                        color: '#C9D2E2',
+                        margin: 0,
+                        maxWidth: '50ch',
+                      }}
+                    >
+                      A six-step walkthrough of every surface you&rsquo;ll touch
+                      &mdash; from drafting historical lineups to setting your
+                      weekly rotation. You&rsquo;ll know your way around before
+                      first pitch.
+                    </p>
+                    <XStack
+                      alignItems="center"
+                      gap={14}
+                      style={{
+                        fontFamily: FONT_BODY,
+                        fontSize: 13,
+                        color: '#8A9BB5',
+                      }}
+                    >
+                      <span>Runs in under 2 minutes</span>
+                      <span style={{ color: '#6C80BA' }}>·</span>
+                      <span>Skip or resume any time</span>
+                    </XStack>
+                    <XStack gap={10} flexWrap="wrap" marginTop={6}>
+                      <Button
+                        size="$4"
+                        borderRadius={12}
+                        onPress={() => setTutorialOpen(true)}
+                        style={{
+                          background: '#C5A55A',
+                          color: '#111',
+                          border: '1px solid #D4BB78',
+                          fontFamily: FONT_DISPLAY,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          padding: '13px 22px',
+                          minHeight: 44,
+                        }}
+                        hoverStyle={{ opacity: 0.9 }}
+                      >
+                        Launch Tutorial
+                      </Button>
+                    </XStack>
+                  </YStack>
+
+                  {/* Right: 6-step preview rail (hidden on phone) */}
+                  <YStack
                     flex={1}
-                    minWidth={200}
+                    padding={32}
+                    gap={10}
+                    borderLeftWidth={1}
+                    borderLeftColor="rgba(255, 255, 255, 0.06)"
+                    style={{ background: 'rgba(10, 15, 26, 0.45)' }}
+                    $sm={{
+                      display: 'none' as never,
+                    }}
+                    aria-hidden="true"
                   >
-                    Our 6-step walkthrough covers the unique historical game
-                    mechanic — from archived box scores to sample matchups. Runs
-                    in under 2 minutes.
-                  </Paragraph>
-                  <Button
-                    size="$4"
-                    borderRadius="$6"
-                    fontWeight="700"
-                    backgroundColor="transparent"
-                    onPress={() => setTutorialOpen(true)}
-                    style={
-                      {
-                        background: GRADIENT_NAVY,
-                        color: TEXT_PRIMARY,
-                        border: 'none',
-                      } as never
-                    }
-                    hoverStyle={{ opacity: 0.9 }}
-                    icon={<Rocket size={16} color={TEXT_PRIMARY} />}
-                  >
-                    Launch Tutorial
-                  </Button>
-                </XStack>
-              </SectionBody>
-            </SectionCard>
-
-            {/* ── Quick links ── */}
-            <SectionCard>
-              <SectionHeader>
-                <SectionIconBox>
-                  <LinkIcon size={18} color={BRAND_GOLD_LIGHT} />
-                </SectionIconBox>
-                <H2 color="$color">Quick Links</H2>
-              </SectionHeader>
-              <SectionBody>
-                <XStack flexWrap="wrap" gap="$3">
-                  {QUICK_LINKS.map(({ to, icon: Icon, label }) => (
-                    <Link key={to} to={to} style={{ textDecoration: 'none' }}>
-                      <QuickLinkChip>
-                        <Icon size={16} color={BRAND_GOLD_LIGHT} />
-                        <Paragraph
-                          color="$color"
-                          fontWeight="500"
-                          fontSize="$3"
+                    {TUTORIAL_PREVIEW_STEPS.map((step) => (
+                      <XStack
+                        key={step.n}
+                        alignItems="center"
+                        gap={14}
+                        paddingHorizontal={12}
+                        paddingVertical={10}
+                        borderRadius={10}
+                        borderWidth={1}
+                        borderColor="rgba(255, 255, 255, 0.04)"
+                        style={{ background: 'rgba(255, 255, 255, 0.02)' }}
+                      >
+                        <YStack
+                          width={30}
+                          height={30}
+                          borderRadius={9999}
+                          alignItems="center"
+                          justifyContent="center"
+                          borderWidth={1}
+                          borderColor="rgba(197, 165, 90, 0.35)"
+                          style={{
+                            background: 'rgba(197, 165, 90, 0.12)',
+                          }}
                         >
-                          {label}
-                        </Paragraph>
-                      </QuickLinkChip>
-                    </Link>
-                  ))}
+                          <span
+                            style={{
+                              fontFamily: FONT_DISPLAY,
+                              fontWeight: 800,
+                              fontSize: 13,
+                              color: '#D4BB78',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {step.n}
+                          </span>
+                        </YStack>
+                        <YStack flex={1} gap={2}>
+                          <span
+                            style={{
+                              fontFamily: FONT_BODY,
+                              fontWeight: 600,
+                              fontSize: 14,
+                              color: '#E8EDF5',
+                            }}
+                          >
+                            {step.title}
+                          </span>
+                          <span
+                            style={{
+                              fontFamily: FONT_BODY,
+                              fontSize: 12,
+                              color: '#8A9BB5',
+                            }}
+                          >
+                            {step.desc}
+                          </span>
+                        </YStack>
+                        <span
+                          style={{
+                            fontFamily:
+                              "'JetBrains Mono', ui-monospace, Menlo, monospace",
+                            fontSize: 10,
+                            color: '#6C80BA',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {step.time}
+                        </span>
+                      </XStack>
+                    ))}
+                  </YStack>
                 </XStack>
-              </SectionBody>
-            </SectionCard>
+              </YStack>
+            </YStack>
+
+            {/* ── Quick Links ── */}
+            <YStack
+              borderTopWidth={1}
+              borderTopColor="#1E2D45"
+              paddingTop={40}
+              marginBottom={40}
+              $sm={{ paddingTop: 28, marginBottom: 28 }}
+            >
+              <SectionHead
+                title="Jump back in"
+                sub="Five spots most managers head to first."
+              />
+              <XStack
+                flexWrap="wrap"
+                gap={10}
+                tag="nav"
+                aria-label="Quick links"
+              >
+                {QUICK_LINKS.map(({ to, icon: Icon, label }) => (
+                  <Link key={to} to={to} style={{ textDecoration: 'none' }}>
+                    <XStack
+                      alignItems="center"
+                      gap={10}
+                      paddingHorizontal={18}
+                      paddingVertical={12}
+                      borderRadius={9999}
+                      borderWidth={1}
+                      borderColor="#1E2D45"
+                      backgroundColor="#111B2F"
+                      cursor="pointer"
+                      animation="quick"
+                      hoverStyle={{
+                        borderColor: 'rgba(197, 165, 90, 0.45)',
+                        backgroundColor: '#16223A',
+                      }}
+                      style={{ minHeight: 44 }}
+                    >
+                      <Icon size={16} color="#D4BB78" />
+                      <span
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          color: '#E8EDF5',
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          fontFamily:
+                            "'JetBrains Mono', ui-monospace, Menlo, monospace",
+                          fontSize: 14,
+                          color: '#8A9BB5',
+                        }}
+                      >
+                        →
+                      </span>
+                    </XStack>
+                  </Link>
+                ))}
+              </XStack>
+            </YStack>
 
             {/* ── FAQ ── */}
-            <SectionCard>
-              <SectionHeader>
-                <SectionIconBox>
-                  <HelpCircle size={18} color={BRAND_GOLD_LIGHT} />
-                </SectionIconBox>
-                <H2 color="$color">Frequently Asked Questions</H2>
-              </SectionHeader>
-              <SectionBody>
-                {HELP_FAQ_ITEMS.map((item) => (
-                  <FaqItem
+            <YStack
+              borderTopWidth={1}
+              borderTopColor="#1E2D45"
+              paddingTop={40}
+              marginBottom={40}
+              $sm={{ paddingTop: 28, marginBottom: 28 }}
+            >
+              <SectionHead
+                eyebrow="01 / Common Questions"
+                title="Frequently asked questions"
+                sub="The most-pulled threads from our Discord, answered."
+              />
+              <YStack
+                borderRadius={16}
+                borderWidth={1}
+                borderColor="#1E2D45"
+                backgroundColor="#111B2F"
+                overflow="hidden"
+              >
+                {HELP_FAQ_ITEMS.map((item, i) => (
+                  <NumberedFaqItem
                     key={item.question}
+                    index={i}
                     question={item.question}
                     answer={item.answer}
                   />
                 ))}
-              </SectionBody>
-            </SectionCard>
+              </YStack>
+            </YStack>
 
             {/* ── Historical Stats FAQ ── */}
-            <SectionCard>
-              <SectionHeader>
-                <SectionIconBox>
-                  <History size={18} color={BRAND_GOLD_LIGHT} />
-                </SectionIconBox>
-                <YStack flex={1} gap="$1">
-                  <H2 color="$color">Historical Stats — How It Works</H2>
-                  <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
-                    Unique to Legacy Sports — answers to common questions about
-                    our historical-stats game mechanic.
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
-              <SectionBody>
-                {HELP_HISTORICAL_FAQ_ITEMS.map((item) => (
-                  <FaqItem
+            <YStack
+              borderTopWidth={1}
+              borderTopColor="#1E2D45"
+              paddingTop={40}
+              marginBottom={40}
+              $sm={{ paddingTop: 28, marginBottom: 28 }}
+            >
+              <SectionHead
+                eyebrow="02 / The Archive"
+                title="Historical stats — how it works"
+                sub="A few of the deeper questions about era play, season assignment, and the records we count."
+              />
+              <YStack
+                borderRadius={16}
+                borderWidth={1}
+                borderColor="#1E2D45"
+                backgroundColor="#111B2F"
+                overflow="hidden"
+              >
+                {HELP_HISTORICAL_FAQ_ITEMS.map((item, i) => (
+                  <NumberedFaqItem
                     key={item.question}
+                    index={i}
                     question={item.question}
                     answer={item.answer}
                   />
                 ))}
-              </SectionBody>
-            </SectionCard>
+              </YStack>
+            </YStack>
 
-            {/* ── Contact & support ── */}
-            <SectionCard>
-              <SectionHeader>
-                <SectionIconBox>
-                  <Mail size={18} color={BRAND_GOLD_LIGHT} />
-                </SectionIconBox>
-                <H2 color="$color">Contact &amp; Support</H2>
-              </SectionHeader>
-              <SectionBody>
-                <YStack gap="$3">
-                  {HELP_CONTACT_ITEMS.map((item) => {
-                    const useAction =
-                      item.action === 'bug-report' && env.jiraProxyUrl;
-                    return (
-                      <ContactOption
-                        key={item.title}
-                        icon={item.icon}
-                        iconLabel={item.title.toLowerCase()}
-                        title={item.title}
-                        description={item.description}
-                        href={useAction ? undefined : item.url}
-                        onPress={
-                          useAction ? () => setBugReportOpen(true) : undefined
-                        }
-                      />
-                    );
-                  })}
-                </YStack>
+            {/* ── Contact & Support ── */}
+            <YStack
+              borderTopWidth={1}
+              borderTopColor="#1E2D45"
+              paddingTop={40}
+              $sm={{ paddingTop: 28 }}
+            >
+              <SectionHead
+                title="Talk to a real person"
+                sub="Pick the channel that fits. We read everything."
+              />
 
-                <Separator marginVertical="$2" />
+              <YStack
+                gap={14}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                }}
+                $sm={{
+                  style: {
+                    display: 'grid',
+                    gridTemplateColumns: '1fr',
+                  } as never,
+                }}
+              >
+                {HELP_CONTACT_ITEMS.map((item) => {
+                  const useAction =
+                    item.action === 'bug-report' && env.jiraProxyUrl;
+                  return (
+                    <ContactOption
+                      key={item.title}
+                      icon={item.icon}
+                      iconLabel={item.title.toLowerCase()}
+                      title={item.title}
+                      description={item.description}
+                      href={useAction ? undefined : item.url}
+                      onPress={
+                        useAction ? () => setBugReportOpen(true) : undefined
+                      }
+                    />
+                  );
+                })}
+              </YStack>
 
-                <YStack
-                  padding="$4"
-                  borderRadius="$4"
-                  style={
-                    {
-                      backgroundColor: withAlpha(BRAND_SEAM_RED, 0.06),
-                    } as never
-                  }
-                  borderWidth={1}
-                  borderColor={withAlpha(BRAND_SEAM_RED, 0.2)}
-                  gap="$2"
-                >
-                  <XStack alignItems="center" gap="$2">
-                    <AlertTriangle size={16} color={BRAND_SEAM_RED} />
-                    <Paragraph
-                      fontWeight="700"
-                      color={BRAND_SEAM_RED}
-                      fontSize="$3"
+              {/* Urgent / Discord callout */}
+              <YStack
+                marginTop={18}
+                padding={22}
+                borderRadius={16}
+                borderWidth={1}
+                borderColor="rgba(196, 30, 58, 0.4)"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(196, 30, 58, 0.08), rgba(196, 30, 58, 0.02)), #111B2F',
+                }}
+                gap={12}
+              >
+                <XStack alignItems="center" gap={10} flexWrap="wrap">
+                  <XStack
+                    alignItems="center"
+                    gap={8}
+                    paddingHorizontal={12}
+                    paddingVertical={6}
+                    borderRadius={9999}
+                    borderWidth={1}
+                    borderColor="rgba(196, 30, 58, 0.5)"
+                    style={{ background: 'rgba(196, 30, 58, 0.15)' }}
+                  >
+                    <span
+                      className="help-pulse-dot"
+                      aria-hidden="true"
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 9999,
+                        background: '#E63950',
+                        display: 'inline-block',
+                        animation:
+                          'helpUrgentPulse 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite',
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: 700,
+                        fontSize: 11,
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
+                        color: '#E63950',
+                      }}
                     >
-                      Urgent account issues?
-                    </Paragraph>
+                      Urgent account issues
+                    </span>
                   </XStack>
-                  <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
-                    For account access problems or missed draft notifications,
-                    join our{' '}
-                    <a
-                      href={DISCORD_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: BRAND_GOLD_LIGHT, fontWeight: 600 }}
-                    >
-                      Discord server
-                    </a>{' '}
-                    and post in #urgent-support — we respond much faster there.
-                  </Paragraph>
-                </YStack>
-              </SectionBody>
-            </SectionCard>
+                  <AlertTriangle size={16} color="#C41E3A" />
+                </XStack>
+                <p
+                  style={{
+                    fontFamily: FONT_BODY,
+                    fontSize: 15,
+                    lineHeight: 1.55,
+                    color: '#C9D2E2',
+                    margin: 0,
+                    maxWidth: '62ch',
+                  }}
+                >
+                  For account access problems or missed draft notifications,
+                  join our{' '}
+                  <a
+                    href={DISCORD_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#D4BB78', fontWeight: 600 }}
+                  >
+                    Discord server
+                  </a>{' '}
+                  and post in{' '}
+                  <code
+                    style={{
+                      fontFamily:
+                        "'JetBrains Mono', ui-monospace, Menlo, monospace",
+                      fontSize: 13,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      padding: '1px 6px',
+                      borderRadius: 4,
+                      color: '#E8EDF5',
+                    }}
+                  >
+                    #urgent-support
+                  </code>{' '}
+                  &mdash; we respond much faster there than over email.
+                </p>
+              </YStack>
+            </YStack>
 
-            {/* ── Footer note ── */}
-            <YStack alignItems="center" paddingVertical="$4" gap="$1">
-              <Paragraph color="$gray10" fontSize="$3" textAlign="center">
+            {/* ── Footer ── */}
+            <YStack
+              marginTop={64}
+              paddingTop={32}
+              borderTopWidth={1}
+              borderTopColor="#1E2D45"
+              gap={6}
+              $sm={{ marginTop: 48, paddingTop: 20 }}
+            >
+              <span
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 13,
+                  color: '#C9D2E2',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
                 © {new Date().getFullYear()} Legacy Sports · Fantasy Baseball
                 Management
-              </Paragraph>
-              <Paragraph color="$gray10" fontSize="$2" textAlign="center">
-                Powered by official MLB statistics • Data refreshed throughout
+              </span>
+              <span
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 12,
+                  color: '#6C80BA',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                Powered by official MLB statistics · Data refreshed throughout
                 each game day
-              </Paragraph>
+              </span>
             </YStack>
           </ContentContainer>
         </ScrollView>
