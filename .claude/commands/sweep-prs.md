@@ -105,7 +105,7 @@ mcp__ccd_session__spawn_task({
 
 Failing checks (initial snapshot): <list job names + runId from github_pr_batch_status>
 
-Load Skill(skill: "fix-pr") and Skill(skill: "debugging"). Pull the run logs (ci_view_run with the runId), identify the root cause, fix in the worktree, run make pc, self-review, push. If the failure is a flake (passes on re-run with no code change), use ci_rerun(runId, failedOnly: true) and stop.
+Load Skill(skill: "fix-pr") and Read(.agents/skills/debugging/SKILL.md). Pull the run logs (ci_view_run with the runId), identify the root cause, fix in the worktree, run make pc, self-review, push. If the failure is a flake (passes on re-run with no code change), use ci_rerun(runId, failedOnly: true) and stop.
 
 A task is complete when CI on the latest SHA is green (or the failure is a confirmed flake that has been re-run). Before stopping, remove the orchestrator's claim with github_manage_labels(prs: [<num>], remove: ["agent-in-progress"]) so the next sweep can pick the PR up if it still needs work.`
 })
