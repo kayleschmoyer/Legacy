@@ -5,6 +5,7 @@ import {
   type LeagueFragment,
   type TeamFragment,
   type TeamMemberFragment,
+  useGetLeagueDuesStatusQuery,
   useGetLeagueStandingsQuery,
 } from '../../../../api/db/graphql.generated';
 import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
@@ -118,6 +119,91 @@ const QuickStandings: React.FC<{
     ) : null}
   </Section>
 );
+
+export const DuesCompact: React.FC<{ leagueId: number }> = ({ leagueId }) => {
+  const { data } = useGetLeagueDuesStatusQuery({
+    variables: { leagueId },
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all',
+  });
+  const settings = data?.leagueDuesSettings;
+  const members = data?.leagueDuesStatus ?? [];
+  if (!settings?.enabled || members.length === 0) return null;
+  const amountCents = settings.amountCents ?? 0;
+  const amountDollars = (amountCents / 100).toFixed(2);
+  const paid = members.filter((m) => m.paid).length;
+  const total = members.length;
+  const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+  const collectedDollars = ((paid * amountCents) / 100).toFixed(2);
+  const pending = members.filter((m) => !m.paid);
+  return (
+    <Section
+      title="League Dues"
+      sub={`$${amountDollars} per team`}
+      right={
+        <span className="ls-chip ls-chip-pre">
+          <I.Dollar size={10} /> Enabled
+        </span>
+      }
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 28,
+            fontWeight: 800,
+            color: 'var(--fg1)',
+            letterSpacing: '-.02em',
+            lineHeight: 1,
+          }}
+        >
+          {paid}
+          <span style={{ color: 'var(--fg4)', fontWeight: 600 }}>/{total}</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--fg3)' }}>
+          teams paid · ${collectedDollars} collected
+        </div>
+      </div>
+      <div className="ls-progress" style={{ marginBottom: 12 }}>
+        <div className="ls-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      {pending.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: 10,
+              letterSpacing: '.14em',
+              textTransform: 'uppercase',
+              color: 'var(--fg4)',
+              marginBottom: 4,
+            }}
+          >
+            Outstanding
+          </div>
+          {pending.map((m) => (
+            <div className="ls-dues-row" key={m.userId ?? m.username}>
+              <span style={{ color: 'var(--fg1)' }}>
+                {m.username ?? `User ${m.userId ?? ''}`}
+              </span>
+              <span className="status pending">
+                <I.Clock size={11} /> Pending
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Section>
+  );
+};
 
 const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
@@ -464,6 +550,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             onViewAll={() => onTab('standings')}
             weekNumber={league.currentWeekNumber}
           />
+          {league.id != null ? <DuesCompact leagueId={league.id} /> : null}
           {isCommissioner ? <InviteCard league={league} /> : null}
         </div>
       </div>
