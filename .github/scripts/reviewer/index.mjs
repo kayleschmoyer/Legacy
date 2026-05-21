@@ -52,6 +52,10 @@ import {
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
 import { createFallbackProvider } from './lib/fallback.mjs';
 import { verifyReferencedPaths } from './lib/ref-verifier.mjs';
+import {
+  extractIntegrationResults,
+  formatIntegrationResultsSection,
+} from './lib/integration-results.mjs';
 
 const STRIP_LOG_MAX_FINDINGS = 3;
 const STRIP_LOG_MAX_TITLE_LEN = 60;
@@ -482,6 +486,17 @@ async function main() {
     );
   }
 
+  // Parse <integration-results> PR comments so the LLM can confirm a touched
+  // integration spec has structured evidence before flagging it (LS-4617).
+  const integrationResults = extractIntegrationResults(prIssueComments);
+  if (integrationResults.length > 0) {
+    process.stdout.write(
+      `[reviewer] Integration results: parsed ${integrationResults.length} spec result(s) from PR comments\n`,
+    );
+  }
+  const integrationResultsSection =
+    formatIntegrationResultsSection(integrationResults);
+
   // Build prompts — fail open on infra errors (e.g. missing reviewer-rules.md)
   let systemPrompt, userPrompt;
   try {
@@ -495,6 +510,7 @@ async function main() {
       ctx,
       authorResponsesSection,
       existingCrossReferences,
+      integrationResultsSection,
     );
   } catch (err) {
     process.stderr.write(

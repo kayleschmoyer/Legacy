@@ -93,12 +93,17 @@ export function buildSystemPrompt(cycleRoleSection = '') {
  * @param {string[]} [existingCrossReferences]  File paths referenced in the PR diff that
  *   were verified to exist in the base branch. Injected so the LLM doesn't flag correctly
  *   documented cross-references as "missing implementation" (LS-4330).
+ * @param {string} [integrationResultsSection]  Pre-formatted "## Integration Test Results"
+ *   section from `formatIntegrationResultsSection()`. Injected so the LLM can confirm a
+ *   touched integration spec has structured evidence and skip the "missing Playwright
+ *   evidence" finding (LS-4617).
  * @returns {string}
  */
 export function buildUserPrompt(
   ctx,
   authorResponsesSection = '',
   existingCrossReferences = [],
+  integrationResultsSection = '',
 ) {
   const { title, body, headRefName, baseRefName, diff } = ctx;
 
@@ -119,6 +124,14 @@ export function buildUserPrompt(
         `<!-- END VERIFIED CROSS-REFERENCES -->`
       : '';
 
+  // Inject parsed `<integration-results>` PR comments so the LLM can confirm a
+  // touched integration spec has structured evidence before flagging it
+  // (LS-4617). The section is already wrapped in HTML-comment safety markers
+  // and includes its own header.
+  const integrationBlock = integrationResultsSection
+    ? `\n\n${integrationResultsSection}`
+    : '';
+
   return `## Pull Request: ${title}
 
 **Branch**: \`${headRefName}\` → \`${baseRefName}\`
@@ -130,7 +143,7 @@ ${body?.trim() || '_No description provided._'}
 
 \`\`\`diff
 ${diff?.trim() || '_No diff available._'}
-\`\`\`${authorBlock}${refBlock}
+\`\`\`${authorBlock}${refBlock}${integrationBlock}
 
 Review this pull request according to your instructions. Apply the self-critique pass, then respond with ONLY valid JSON in this exact format — no prose, no markdown fences:
 

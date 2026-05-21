@@ -1,0 +1,273 @@
+# =============================================================================
+# Run Integration Tests (LS-4617)
+# =============================================================================
+# Runs the live-backend integration Playwright suite on demand and posts
+# structured `<integration-results>` evidence as a PR comment. The reviewer bot
+# parses those blocks to confirm a touched integration spec has been verified
+# and skips its "missing Playwright evidence" finding.
+#
+# Triggers:
+#   * pull_request `labeled` with `run:integration` — author/operator opts in
+#   * workflow_dispatch — manual run with a specific PR number
+#
+# The label is removed automatically when the run completes (success or
+# failure) so re-applying it re-runs the suite.
+# =============================================================================
+
+name: "Run Integration Tests"
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: "Pull request number to run integration tests on"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  # Include the label name (or a fixed workflow_dispatch sentinel) in the group
+  # so an unrelated `pull_request.labeled` event on the same PR — which will be
+  # skipped by every job's `if` guard anyway — does not land in the same
+  # concurrency group and cancel an active integration run via cancel-in-progress.
+  group: run-integration-tests-pr-${{ github.event.pull_request.number || inputs.pr-number }}-${{ github.event.label.name || 'workflow-dispatch' }}
+  cancel-in-progress: true
+
+jobs:
+  resolve:
+    name: "Resolve PR & Touched Specs"
+    # Skip label events that aren't ours; always run for workflow_dispatch.
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run:integration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pr-number: ${{ steps.resolve.outputs.pr-number }}
+      pr-head-sha: ${{ steps.resolve.outputs.pr-head-sha }}
+      pr-head-ref: ${{ steps.resolve.outputs.pr-head-ref }}
+      pr-base-ref: ${{ steps.resolve.outputs.pr-base-ref }}
+      touched-specs: ${{ steps.diff.outputs.touched-specs }}
+      has-touched-specs: ${{ steps.diff.outputs.has-touched-specs }}
+    steps:
+      - name: "Resolve PR metadata"
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ inputs.pr-number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid PR number: $PR_NUMBER"
+            exit 1
+          fi
+          META=$(gh pr view "$PR_NUMBER" --json headRefName,baseRefName,headRefOid)
+          HEAD_REF=$(echo "$META" | jq -r '.headRefName')
+          BASE_REF=$(echo "$META" | jq -r '.baseRefName')
+          HEAD_SHA=$(echo "$META" | jq -r '.headRefOid')
+          echo "pr-number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr-head-sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr-head-ref=$HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "pr-base-ref=$BASE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: "Checkout PR head"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ steps.resolve.outputs.pr-head-sha }}
+          fetch-depth: 0
+
+      - name: "List touched integration specs"
+        id: diff
+        env:
+          BASE_REF: ${{ steps.resolve.outputs.pr-base-ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
+          MERGE_BASE=$(git merge-base "origin/$BASE_REF" HEAD || echo "")
+          if [ -z "$MERGE_BASE" ]; then
+            echo "::warning::Could not compute merge-base — falling back to running every integration spec."
+            mapfile -t SPECS < <(find apps/web-e2e/src/integration/tests -type f -name '*.integration.spec.ts' | sort)
+          else
+            mapfile -t CHANGED < <(git diff --name-only --diff-filter=AMR "$MERGE_BASE"..HEAD)
+            SPECS=()
+            CONFIG_TOUCHED=false
+            for f in "${CHANGED[@]}"; do
+              if [[ "$f" == apps/web-e2e/src/integration/tests/*.integration.spec.ts ]]; then
+                SPECS+=("$f")
+              fi
+              if [[ "$f" == apps/web-e2e/playwright.integration.config.ts ]]; then
+                CONFIG_TOUCHED=true
+              fi
+            done
+            # If only the config file changed, run every integration spec so the
+            # config change is exercised end-to-end.
+            if [ "${#SPECS[@]}" -eq 0 ] && [ "$CONFIG_TOUCHED" = "true" ]; then
+              mapfile -t SPECS < <(find apps/web-e2e/src/integration/tests -type f -name '*.integration.spec.ts' | sort)
+            fi
+          fi
+          if [ "${#SPECS[@]}" -eq 0 ]; then
+            echo "has-touched-specs=false" >> "$GITHUB_OUTPUT"
+            echo "touched-specs=" >> "$GITHUB_OUTPUT"
+          else
+            JOINED=$(IFS=, ; echo "${SPECS[*]}")
+            echo "has-touched-specs=true" >> "$GITHUB_OUTPUT"
+            echo "touched-specs=$JOINED" >> "$GITHUB_OUTPUT"
+            printf '%s\n' "${SPECS[@]}"
+          fi
+
+  run:
+    name: "Run Integration Suite"
+    needs: [resolve]
+    if: needs.resolve.outputs.has-touched-specs == 'true'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    env:
+      PR_NUMBER: ${{ needs.resolve.outputs.pr-number }}
+      PR_HEAD_SHA: ${{ needs.resolve.outputs.pr-head-sha }}
+      TOUCHED_SPECS: ${{ needs.resolve.outputs.touched-specs }}
+    outputs:
+      result: ${{ steps.tests.outcome }}
+    steps:
+      - name: "Checkout PR head"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.resolve.outputs.pr-head-sha }}
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Resolve AMI-baked Playwright browsers"
+        shell: bash
+        run: |
+          # Match the env handling in run-playwright-tests.yml so we never fall
+          # back to ~/.cache/ms-playwright (empty on self-hosted runners).
+          echo "PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers" >> "$GITHUB_ENV"
+
+      - name: "Run Integration Tests"
+        id: tests
+        shell: bash
+        env:
+          CI: "true"
+          # Force the json reporter to write to a file (default is stdout, which
+          # would interleave with the line reporter output and break parsing).
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results.json
+          INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
+          E2E_COMMISSIONER_EMAIL: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
+          E2E_COMMISSIONER_PASSWORD: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
+          E2E_MANAGER_1_EMAIL: ${{ secrets.E2E_MANAGER_1_EMAIL }}
+          E2E_MANAGER_1_PASSWORD: ${{ secrets.E2E_MANAGER_1_PASSWORD }}
+          E2E_MANAGER_2_EMAIL: ${{ secrets.E2E_MANAGER_2_EMAIL }}
+          E2E_MANAGER_2_PASSWORD: ${{ secrets.E2E_MANAGER_2_PASSWORD }}
+          E2E_MANAGER_3_EMAIL: ${{ secrets.E2E_MANAGER_3_EMAIL }}
+          E2E_MANAGER_3_PASSWORD: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
+          GOOGLE_TEST_EMAIL: ${{ secrets.GOOGLE_TEST_EMAIL }}
+          GOOGLE_TEST_PASSWORD: ${{ secrets.GOOGLE_TEST_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Convert the comma-separated touched-specs list into discrete args so
+          # filenames with spaces (rare but legal) survive the shell expansion.
+          IFS=',' read -ra SPEC_ARGS <<< "$TOUCHED_SPECS"
+          echo "Running ${#SPEC_ARGS[@]} touched integration spec(s):"
+          printf '  - %s\n' "${SPEC_ARGS[@]}"
+          # Reporters: line for live console, json for the comment formatter.
+          pnpm exec playwright test \
+            --config=apps/web-e2e/playwright.integration.config.ts \
+            --workers=1 \
+            --reporter=line,json \
+            -- "${SPEC_ARGS[@]}" \
+            | tee playwright-output.log
+        continue-on-error: true
+
+      - name: "Persist test-results.json from Playwright"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The integration config's `json` reporter writes test-results.json to
+          # the workspace root by default when no outputFile is configured. Fall
+          # back to the html-report's data file if the workspace copy is missing.
+          if [ -f test-results.json ]; then
+            echo "test-results.json present at workspace root"
+          elif [ -f playwright-report/data/test-results.json ]; then
+            cp playwright-report/data/test-results.json test-results.json
+          else
+            echo "::warning::No test-results.json produced — comment will be skipped"
+          fi
+
+      - name: "Upload Playwright HTML report"
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v5
+        with:
+          name: integration-report-pr-${{ env.PR_NUMBER }}-run-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: "Post integration-results comment on PR"
+        if: always() && hashFiles('test-results.json') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_URL: ${{ format('{0}/{1}/actions/runs/{2}#artifacts', github.server_url, github.repository, github.run_id) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/integration-results/format-comment.mjs \
+            --report test-results.json \
+            --report-url "$REPORT_URL" \
+            --specs "$TOUCHED_SPECS" > integration-results-comment.md
+          cat integration-results-comment.md
+          gh pr comment "$PR_NUMBER" --body-file integration-results-comment.md
+
+      # Surface the underlying playwright exit code so the workflow run reflects
+      # the test outcome even though `continue-on-error: true` lets the comment
+      # post on failure.
+      - name: "Fail job if Playwright failed"
+        if: steps.tests.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::error::Integration tests failed (see steps above)."
+          exit 1
+
+  cleanup-label:
+    name: "Remove run:integration label"
+    needs: [resolve, run]
+    # Always attempt cleanup when the run was kicked off by the label event,
+    # regardless of whether `run` passed, failed, or was skipped (e.g. no
+    # touched specs). Skipped only when `resolve` itself didn't complete (so
+    # we have no PR number to operate on) or when the workflow was dispatched
+    # manually (no label to remove).
+    if: always() && needs.resolve.result != 'skipped' && needs.resolve.result != 'cancelled' && github.event_name == 'pull_request' && github.event.label.name == 'run:integration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: "Remove label"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ needs.resolve.outputs.pr-number }}"
+          # The label may already be gone if a sibling run removed it; ignore 404.
+          # URL-encode the colon in the label name for the path segment.
+          gh api -X DELETE \
+            "repos/${{ github.repository }}/issues/${PR_NUMBER}/labels/run%3Aintegration" \
+            >/dev/null 2>&1 || true
+          echo "Removed run:integration label from PR #${PR_NUMBER}"

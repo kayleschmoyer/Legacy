@@ -40,7 +40,7 @@ Runs against the live backend. Uses test-user credentials auto-linked from the m
 Rules:
 
 - Direct `page.request` API calls are **expected** — this is not a hermeticity violation.
-- Not run in CI for PRs (too slow) — local execution is the only gate.
+- Not run in CI for PRs by default (too slow) — local execution or the on-demand `run:integration` label is the gate.
 - Test files use the `*.integration.spec.ts` naming pattern.
 - Test names include `(Live Backend) @integration @critical`.
 
@@ -51,6 +51,28 @@ pnpm exec nx integration web-e2e -- --grep='Flow Name'
 ```
 
 See [`.agents/skills/testing/references/integration-commands.md`](../../.agents/skills/testing/references/integration-commands.md) for credentials and setup details.
+
+#### Reviewer evidence: the `run:integration` label (LS-4617)
+
+The reviewer bot expects structured evidence for any touched integration spec because the suite does not run on PRs by default. Apply the **`run:integration`** label to a PR to dispatch [`.github/workflows/run-integration-tests.yml`](../../.github/workflows/run-integration-tests.yml):
+
+1. The workflow checks out the PR head, diffs against the merge base to find every touched `apps/web-e2e/src/integration/tests/**/*.integration.spec.ts` file, and runs only those (`workers=1` against `api.legacy-fantasy.com`).
+2. It uploads the HTML report as a workflow artifact and posts a PR comment containing one `<integration-results>` block per touched spec, e.g.
+
+   ```text
+   <integration-results>
+   spec: apps/web-e2e/src/integration/tests/foo.integration.spec.ts
+   status: passed
+   duration_ms: 12345
+   report: https://github.com/<owner>/<repo>/actions/runs/<id>#artifacts
+   </integration-results>
+   ```
+
+3. The reviewer bot parses every `<integration-results>` block from PR comments and treats `status: passed` as sufficient evidence for that spec. A touched integration spec with no matching block (or a non-passed status) is flagged `high` with the remediation **"apply the `run:integration` label"** — clear and actionable, never the older "make the report URL fetchable" mandate.
+
+The hermetic suite under `src/tests/` does NOT need this — the green `e2e` GitHub check is sufficient evidence on its own. The label is removed automatically after the run completes; re-apply it to re-run.
+
+You can also dispatch the workflow manually from the Actions tab (`Run workflow` → enter the PR number) for cases where the label cannot be applied (e.g. from a fork PR running with reduced permissions).
 
 ## Why two suites?
 

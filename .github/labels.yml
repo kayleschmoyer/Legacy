@@ -161,6 +161,14 @@
   color: "0052cc"
   description: "Trigger a runner-AMI rebuild on this PR (Packer build via OIDC)"
 
+# Triggers .github/workflows/run-integration-tests.yml — applied by the author
+# (or the review bot's remediation message) to run the live-backend integration
+# Playwright suite on this PR and post structured <integration-results> evidence
+# as a PR comment for the reviewer to verify. Auto-removed after the run.
+- name: "run:integration"
+  color: "0e8a16"
+  description: "Run the integration Playwright suite on this PR (auto-removed after the run)"
+
 # ---------------------------------------------------------------------------
 # Agent Automation Labels
 # Applied by sweep agents (tools/mcp/github-server) and scripts/ship-pr.js
