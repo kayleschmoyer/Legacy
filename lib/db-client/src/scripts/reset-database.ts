@@ -12,11 +12,28 @@ import { Pool } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDatabaseConfig } from '../config/database';
 
+/**
+ * Throws unless the caller has explicitly opted in via `ALLOW_DB_RESET=true`
+ * and the process is not running in production. Exported for unit testing.
+ */
+export function assertResetAllowed(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.NODE_ENV === 'production') {
+    throw new Error('resetDatabase is not permitted when NODE_ENV=production.');
+  }
+  if (env.ALLOW_DB_RESET !== 'true') {
+    throw new Error(
+      'Refusing to reset database. Set ALLOW_DB_RESET=true to confirm you intend to drop all schemas.',
+    );
+  }
+}
+
 async function resetDatabase() {
   try {
     LOGGER.info('🔄 Legacy Sports Database Reset');
     LOGGER.info('==============================');
     LOGGER.warn('⚠️ WARNING: This will DROP ALL tables and data!');
+
+    assertResetAllowed();
 
     LOGGER.info('🔍 Resolving database credentials...');
 
@@ -24,7 +41,7 @@ async function resetDatabase() {
     const dbConfig = await getDatabaseConfig();
 
     LOGGER.info(
-      `📡 Connected to database: ${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}`,
+      `📡 Connected to database: ${dbConfig.host}:${dbConfig.port ?? 5432}/${dbConfig.database}`,
     );
 
     // Create postgres pool
@@ -32,7 +49,7 @@ async function resetDatabase() {
       database: dbConfig.database,
       host: dbConfig.host,
       password: dbConfig.password,
-      port: 5432,
+      port: dbConfig.port ?? 5432,
       user: dbConfig.user,
       ssl: dbConfig.ssl,
       max: 1, // Use single connection
