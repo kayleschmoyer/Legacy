@@ -120,6 +120,7 @@ Use the MCP tools below instead of `gh` CLI. These tools handle temp file body e
 | `gh pr ready`                                 | `github_mark_pr_ready`                                                                                                                                      |
 | `gh pr edit --add-label`                      | `github_manage_labels` (supports both `add` and `remove` arrays)                                                                                            |
 | `gh pr edit --remove-label`                   | `github_manage_labels` (supports both `add` and `remove` arrays)                                                                                            |
+| `gh pr edit N --title "..."` / `--body "..."` | `github_edit_pr({ number: N, title?, body? })` — patches PR title and/or body; at least one of `title` or `body` is required                                |
 | `gh pr merge`                                 | `github_merge_pr({ number: N, ... })` — default: merge queue; use `strategy: "direct"` for admin merge; accepts `prNumber` as alias for `number`            |
 | Remove all `ci-failure-*` labels              | `github_clear_ci_failure_labels`                                                                                                                            |
 | `gh api graphql` (resolve thread)             | `github_resolve_thread` / `github_resolve_threads`                                                                                                          |
