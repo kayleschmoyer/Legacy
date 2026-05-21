@@ -10,11 +10,9 @@ import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 
-import {
-  ALLOWED_POSITIONS_FOR_AUTO_PICK,
-  getFirstQueuedPlayerForTeam,
-} from './helpers';
+import { getFirstQueuedPlayerForTeam } from './helpers';
 import type { BestBenchPick, PlayerDraftInfo } from './candidate-pool';
+import { selectStrategy, type SportKind } from './strategies';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +33,12 @@ export interface AutoPickParams {
   currentPickInfo: { teamId: number };
   /** Unfilled roster position slot types for the current team. */
   unfilledPositionTypes: string[];
+  /**
+   * Sport-scoped scoring strategy. Defaults to 'baseball' for backward
+   * compatibility with callers that haven't yet read `league.sport`
+   * (sport_kind enum lands in epic LS-4568 slice [2/10]).
+   */
+  sport?: SportKind;
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -62,7 +66,10 @@ export async function selectAutoPickPlayer(
     bestBenchPick,
     currentPickInfo,
     unfilledPositionTypes,
+    sport = 'baseball',
   } = params;
+
+  const strategy = selectStrategy(sport);
 
   let autoPlayerId: number | undefined;
   let autoPickReason = '';
@@ -84,9 +91,9 @@ export async function selectAutoPickPlayer(
     });
   }
 
-  // ── Smart auto-pick: projected fantasy points + positional scarcity ──
+  // ── Smart auto-pick: sport-scoped strategy ───────────────────────────
   if (autoPlayerId === undefined && unfilledPositionTypes.length > 0) {
-    const scored = scoreByPositionalScarcity(
+    const scored = strategy.scoreForUnfilledPositions(
       playerDraftInfo,
       unfilledPositionTypes,
     );
@@ -95,25 +102,28 @@ export async function selectAutoPickPlayer(
 
     LOGGER.info('[autoProcessDraftPicks] Smart auto-pick selected', {
       draftId,
+      sport,
       playerId: autoPlayerId,
       reason: autoPickReason,
       unfilledPositionTypes,
     });
-  } else if (autoPlayerId === undefined) {
-    // No unfilled starting positions — use bench pick
-    if (bestBenchPick) {
-      autoPlayerId = bestBenchPick.playerId;
-      autoPickReason = `Best available (bench) — ${bestBenchPick.fpg.toFixed(1)} projected matchup pts, starts in ${bestBenchPick.slotsCoverable}/${bestBenchPick.totalSlots} slots`;
-      LOGGER.info(
-        '[autoProcessDraftPicks] Auto-pick for bench (versatility + matchup pts)',
-        {
-          draftId,
-          playerId: autoPlayerId,
-          reason: autoPickReason,
-          totalSlots: bestBenchPick.totalSlots,
-        },
-      );
-    }
+  }
+
+  // Bench pick — used when no starting slots remain, or when the strategy
+  // found no eligible candidate for any unfilled slot (football leagues
+  // without a position match).
+  if (autoPlayerId === undefined && bestBenchPick) {
+    autoPlayerId = bestBenchPick.playerId;
+    autoPickReason = `Best available (bench) — ${bestBenchPick.fpg.toFixed(1)} projected matchup pts, starts in ${bestBenchPick.slotsCoverable}/${bestBenchPick.totalSlots} slots`;
+    LOGGER.info(
+      '[autoProcessDraftPicks] Auto-pick for bench (versatility + matchup pts)',
+      {
+        draftId,
+        playerId: autoPlayerId,
+        reason: autoPickReason,
+        totalSlots: bestBenchPick.totalSlots,
+      },
+    );
   }
 
   // Final fallback (should rarely happen — only if no stats exist)
@@ -142,73 +152,6 @@ export async function selectAutoPickPlayer(
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
-
-/**
- * Score candidates by projected FPG × positional scarcity multiplier.
- * Players matching scarcer unfilled positions get a boost; players not
- * matching any unfilled position get a penalty (0.25×).
- */
-function scoreByPositionalScarcity(
-  playerDraftInfo: Map<number, PlayerDraftInfo>,
-  unfilledPositionTypes: string[],
-): AutoPickResult {
-  const totalEligible = Math.max(playerDraftInfo.size, 1);
-
-  // Compute positional scarcity: scarcer positions → higher boost
-  const positionCandidateCounts = new Map<string, number>();
-  for (const posType of unfilledPositionTypes) {
-    const allowedStatPositions = ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [
-      posType,
-    ];
-    let posCount = 0;
-    for (const [, info] of playerDraftInfo) {
-      if (allowedStatPositions.some((sp) => info.positions.includes(sp))) {
-        posCount++;
-      }
-    }
-    positionCandidateCounts.set(posType, Math.max(posCount, 1));
-  }
-
-  let bestScore = -Infinity;
-  let bestPlayerId: number | undefined;
-  let bestReason = '';
-
-  for (const [id, info] of playerDraftInfo) {
-    let scarcityMultiplier = 0.25; // Penalty for not filling any need
-    let matchesUnfilled = false;
-    let bestPosition = '';
-
-    for (const posType of unfilledPositionTypes) {
-      const allowedStatPositions = ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [
-        posType,
-      ];
-      if (allowedStatPositions.some((sp) => info.positions.includes(sp))) {
-        matchesUnfilled = true;
-        const posCount = positionCandidateCounts.get(posType) ?? totalEligible;
-        // sqrt-based scarcity: moderate boost, capped at 5×
-        const posScarcity = Math.min(Math.sqrt(totalEligible / posCount), 5.0);
-        if (posScarcity > scarcityMultiplier) {
-          scarcityMultiplier = posScarcity;
-          bestPosition = posType;
-        }
-      }
-    }
-
-    const draftScore = info.fpg * scarcityMultiplier;
-    if (draftScore > bestScore) {
-      bestScore = draftScore;
-      bestPlayerId = id;
-      bestReason = matchesUnfilled
-        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-        : `Best available (bench) — ${info.fpg.toFixed(1)} projected matchup pts`;
-    }
-  }
-
-  return {
-    playerId: bestPlayerId as number,
-    reason: bestReason,
-  };
-}
 
 /**
  * Guard against a concurrent pick taking our preferred player between
