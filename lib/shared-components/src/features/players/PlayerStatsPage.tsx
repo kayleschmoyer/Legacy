@@ -19,6 +19,7 @@ import {
   SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  withAlpha,
 } from '../../utils/colors';
 import type { CareerPitchingFragment } from '../../api/db/graphql.generated';
 
@@ -30,6 +31,31 @@ const OUTLINE_SUBTLE = '#1C2740';
 const OUTLINE_DEFAULT = '#2F3B53';
 const FG3 = '#9CAAC5';
 const FG4 = '#6C80BA';
+
+// Export / Share gold-accent button — matches the BRAND_GOLD heritage treatment
+// from the Stats Page design (project/stats.css `.sp-btn-ghost` + toast border).
+const GOLD_ACCENT_BUTTON_STYLE = {
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: withAlpha(BRAND_GOLD, 0.4),
+  backgroundColor: withAlpha(BRAND_GOLD, 0.08),
+  borderStyle: 'solid' as const,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 8,
+  minHeight: 40,
+};
+
+const GOLD_ACCENT_BUTTON_LABEL_STYLE = {
+  color: BRAND_GOLD_LIGHT,
+  fontSize: 12,
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '700' as const,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+};
 
 const POSITIONS = [
   'All Positions',
@@ -456,19 +482,8 @@ export function PlayerStatsPage({
                 <Pressable
                   onPress={handleShare}
                   accessibilityRole="button"
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: OUTLINE_DEFAULT,
-                    backgroundColor: 'transparent',
-                    borderStyle: 'solid',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    minHeight: 40,
-                  }}
+                  accessibilityLabel="Share player statistics link"
+                  style={GOLD_ACCENT_BUTTON_STYLE}
                 >
                   {Platform.OS === 'web' && (
                     <svg
@@ -476,7 +491,7 @@ export function PlayerStatsPage({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="currentColor"
+                      stroke={BRAND_GOLD_LIGHT}
                       strokeWidth="2"
                     >
                       <circle cx="18" cy="5" r="3" />
@@ -486,33 +501,13 @@ export function PlayerStatsPage({
                       <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                     </svg>
                   )}
-                  <Text
-                    style={{
-                      color: TEXT_PRIMARY,
-                      fontSize: 12,
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: '700',
-                    }}
-                  >
-                    Share
-                  </Text>
+                  <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>Share</Text>
                 </Pressable>
                 <Pressable
                   onPress={handleExport}
                   accessibilityRole="button"
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: OUTLINE_DEFAULT,
-                    backgroundColor: 'transparent',
-                    borderStyle: 'solid',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    minHeight: 40,
-                  }}
+                  accessibilityLabel="Export player statistics as JSON"
+                  style={GOLD_ACCENT_BUTTON_STYLE}
                 >
                   {Platform.OS === 'web' && (
                     <svg
@@ -520,7 +515,7 @@ export function PlayerStatsPage({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="currentColor"
+                      stroke={BRAND_GOLD_LIGHT}
                       strokeWidth="2"
                     >
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -528,14 +523,7 @@ export function PlayerStatsPage({
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                   )}
-                  <Text
-                    style={{
-                      color: TEXT_PRIMARY,
-                      fontSize: 12,
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: '700',
-                    }}
-                  >
+                  <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>
                     Export JSON
                   </Text>
                 </Pressable>

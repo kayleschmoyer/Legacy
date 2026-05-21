@@ -27,6 +27,12 @@ export interface BaseModalProps {
   subtitle?: string;
   /** Optional badge / extra content rendered inline next to the title */
   titleBadge?: React.ReactNode;
+  /**
+   * Optional accent color for the header. When provided, the header is rendered
+   * as a position/category-tinted radial wash over the navy gradient instead of
+   * the plain navy gradient.
+   */
+  headerAccentColor?: string;
   /** Optional max width override (default: 960) */
   maxWidth?: number;
   /** Optional max height override (default: 88vh) */
@@ -62,10 +68,14 @@ export function BaseModal({
   titleId = 'base-modal-title',
   subtitle,
   titleBadge,
+  headerAccentColor,
   maxWidth = 960,
   maxHeight = '88vh',
   children,
 }: BaseModalProps) {
+  const headerBackground = headerAccentColor
+    ? `radial-gradient(ellipse at 100% 0%, ${withAlpha(headerAccentColor, 0.32)} 0%, transparent 60%), radial-gradient(ellipse at 0% 100%, ${withAlpha(headerAccentColor, 0.18)} 0%, transparent 55%), linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`
+    : `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`;
   return (
     <Dialog modal open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -106,7 +116,7 @@ export function BaseModal({
             justifyContent="space-between"
             alignItems="center"
             style={{
-              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`,
+              background: headerBackground,
             }}
           >
             <YStack gap="$1" flex={1} marginRight="$3">

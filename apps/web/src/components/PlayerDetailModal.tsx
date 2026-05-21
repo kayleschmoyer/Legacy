@@ -537,6 +537,9 @@ export function PlayerDetailModal({
     <PositionBadge position={position} />
   ) : undefined;
 
+  // ------ Era-tinted header — radial wash keyed off the player's position ------
+  const headerAccentColor = position ? getPositionColor(position) : undefined;
+
   return (
     <BaseModal
       open={open}
@@ -545,6 +548,7 @@ export function PlayerDetailModal({
       titleId="player-detail-title"
       subtitle={subtitle}
       titleBadge={titleBadge}
+      headerAccentColor={headerAccentColor}
     >
       <ScrollView maxHeight="calc(88vh - 100px)">
         <YStack padding="$4" gap="$4">

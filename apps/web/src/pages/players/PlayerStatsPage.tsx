@@ -17,8 +17,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  SURFACE_CARD,
   TEXT_HIGH_CONTRAST,
   WHITE,
   withAlpha,
@@ -57,9 +60,20 @@ function readStatsFormat(): 'standard' | 'expanded' {
  * - Export and sharing functionality
  * - Deep linking support
  */
+const TOAST_DURATION_MS = 2400;
+
 export function PlayerStatsPage() {
   const [searchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
+
+  // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
+  // sr-only live region populated (screen readers re-announce changes; the
+  // visible affordance is the confirmation for sighted users).
+  useEffect(() => {
+    if (!liveMsg) return undefined;
+    const timer = window.setTimeout(() => setLiveMsg(''), TOAST_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [liveMsg]);
 
   // Stats format preference from user settings
   const [statsFormat, setStatsFormat] = useState<'standard' | 'expanded'>(
@@ -237,6 +251,60 @@ export function PlayerStatsPage() {
       <div className="sr-only" aria-live="polite">
         {liveMsg}
       </div>
+      {/* Visible toast confirmation — paired with the sr-only live region above.
+          Crossfade-only animation honors prefers-reduced-motion. */}
+      <style>{`
+        @keyframes ls-stats-toast-in {
+          from { opacity: 0; transform: translate(-50%, 8px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ls-stats-toast { animation: ls-stats-toast-fade 180ms ease forwards; }
+        }
+        @keyframes ls-stats-toast-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
+      {liveMsg && (
+        <div
+          className="ls-stats-toast"
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: 28,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            background: SURFACE_CARD,
+            border: `1px solid ${withAlpha(BRAND_GOLD, 0.4)}`,
+            borderRadius: 9999,
+            padding: '12px 20px 12px 16px',
+            color: BRAND_GOLD_LIGHT,
+            fontFamily: "'Literata', serif",
+            fontSize: 14,
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
+            animation: 'ls-stats-toast-in 180ms ease forwards',
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={BRAND_GOLD}
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          {liveMsg}
+        </div>
+      )}
       <SharedPlayerStatsPage
         title="MLB Player Statistics"
         initialViewMode={initialState.viewMode}
