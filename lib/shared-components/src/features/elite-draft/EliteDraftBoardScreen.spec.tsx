@@ -408,13 +408,13 @@ describe('EliteDraftBoardScreen — draft completion paths (LS-4268 regression g
       }),
     );
 
-    const { queryByTestId, getByText } = render(
+    const { queryByTestId } = render(
       <EliteDraftBoardScreen {...defaultProps} />,
     );
 
     expect(queryByTestId('draft-complete-view')).toBeNull();
     expect(queryByTestId('pre-draft-lobby')).toBeNull();
-    expect(getByText('Loading draft board...')).toBeTruthy();
+    expect(queryByTestId('draft-board-loading')).toBeTruthy();
   });
 });
 
