@@ -1,8 +1,9 @@
 /**
  * Position eligibility mapping — single source of truth for all layers.
  *
- * Maps each league roster slot type to the player stat-position keys that qualify.
- * Includes the generic 'P' key to match career_fielding data for RP/SP slots.
+ * Maps each league roster slot type to the player stat-position keys that qualify,
+ * scoped by sport (`baseball` | `football`). Most live data is baseball today; the
+ * football entry is sourced from the Draft Board sport-toggle design (ADR 0011).
  *
  * Consumed by:
  *  - lib/db-client  (lineup auto-assignment)
@@ -10,10 +11,13 @@
  *  - lib/shared-components  (re-exported from PositionModels.ts)
  *
  * NOTE: lambdas/db/src/schema/drafts/candidate-pool.ts has a SQL CTE
- * `position_mapping` that mirrors these mappings. When updating entries here,
- * keep that CTE in sync.
+ * `position_mapping` that mirrors the baseball mapping. When updating the
+ * baseball entry, keep that CTE in sync.
  */
-export const ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
+
+export type SportKind = 'baseball' | 'football';
+
+const BASEBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
   Object.freeze({
     '1B': ['1B'],
     '2B': ['2B'],
@@ -31,12 +35,52 @@ export const ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
     XDH: ['DH'],
   });
 
-/** Stat positions that count as pitching for auto-pick filtering (includes generic 'P'). */
+const FOOTBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
+  Object.freeze({
+    QB: ['QB'],
+    RB: ['RB'],
+    WR: ['WR'],
+    TE: ['TE'],
+    K: ['K'],
+    DEF: ['DEF'],
+    FLEX: ['RB', 'WR', 'TE'],
+    BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'],
+  });
+
+/**
+ * Slot → eligible-position mapping, keyed by sport. New code should read this
+ * with the active `league.sport` rather than touching `ALLOWED_POSITIONS`.
+ */
+export const ALLOWED_POSITIONS_BY_SPORT: Readonly<
+  Record<SportKind, Readonly<Record<string, readonly string[]>>>
+> = Object.freeze({
+  baseball: BASEBALL_ALLOWED_POSITIONS,
+  football: FOOTBALL_ALLOWED_POSITIONS,
+});
+
+/**
+ * Baseball-only slot mapping, retained as a back-compat alias. New code should
+ * use `ALLOWED_POSITIONS_BY_SPORT[league.sport]` instead.
+ */
+export const ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
+  BASEBALL_ALLOWED_POSITIONS;
+
+/** Baseball stat positions that count as pitching (includes generic 'P'). */
 export const PITCHING_POSITIONS: ReadonlySet<string> = Object.freeze(
   new Set(['SP', 'RP', 'P']),
 );
 
-/** Stat positions that count as batting for auto-pick filtering. */
+/** Baseball stat positions that count as batting. */
 export const BATTING_POSITIONS: ReadonlySet<string> = Object.freeze(
   new Set(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'OF', 'DH']),
+);
+
+/** Football positions that count as offense. */
+export const OFFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
+  new Set(['QB', 'RB', 'WR', 'TE', 'K', 'FLEX']),
+);
+
+/** Football positions that count as defense. */
+export const DEFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
+  new Set(['DEF']),
 );
