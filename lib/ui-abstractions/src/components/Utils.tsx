@@ -5,6 +5,8 @@ import { forwardRef } from 'react';
 import {
   Separator as TamaguiSeparator,
   Spinner as TamaguiSpinner,
+  Text as TamaguiText,
+  YStack,
 } from 'tamagui';
 import type { TamaguiElement } from 'tamagui';
 import type { BaseUIProps, ViewProps } from '../types/ui';
@@ -47,25 +49,21 @@ export function LoadingPanel({
   ...props
 }: LoadingPanelProps) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        ...(props.flex && { flex: props.flex }),
-        ...(props.width && { width: props.width }),
-        ...(props.height && { height: props.height }),
-      }}
+    <YStack
+      alignItems="center"
+      justifyContent="center"
+      padding="$4"
+      flex={props.flex}
+      width={props.width}
+      height={props.height}
     >
       <Spinner size={spinnerSize} />
       {message && (
-        <span style={{ marginTop: 8, fontSize: 14, color: '#666' }}>
+        <TamaguiText marginTop="$2" fontSize="$3" color="$gray11">
           {message}
-        </span>
+        </TamaguiText>
       )}
-    </div>
+    </YStack>
   );
 }
 
