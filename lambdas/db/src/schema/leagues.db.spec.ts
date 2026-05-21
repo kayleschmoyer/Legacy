@@ -1,8 +1,8 @@
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
 import {
   cleanupTestData,
+  createTestPool,
   getTestDatabase,
   integrationTestInternalSchema,
   integrationTestSchema,
@@ -432,13 +432,7 @@ describe('Leagues - DB Integration Tests', () => {
 
       // Open a second independent pool to simulate a cold-start Lambda with a
       // fresh connection that has never touched this transaction.
-      const url =
-        process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'] ?? '';
-      const secondPool = new Pool({
-        connectionString: url,
-        max: 1,
-        ssl: { rejectUnauthorized: false },
-      });
+      const secondPool = createTestPool();
       const secondDb = drizzle(secondPool, { schema: integrationTestSchema });
 
       try {
@@ -460,13 +454,7 @@ describe('Leagues - DB Integration Tests', () => {
     });
 
     it('returns undefined from a fresh connection when no matching invite code exists', async () => {
-      const url =
-        process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'] ?? '';
-      const secondPool = new Pool({
-        connectionString: url,
-        max: 1,
-        ssl: { rejectUnauthorized: false },
-      });
+      const secondPool = createTestPool();
       const secondDb = drizzle(secondPool, { schema: integrationTestSchema });
 
       try {

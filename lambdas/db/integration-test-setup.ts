@@ -23,6 +23,24 @@ function connectionString(): string {
   return url;
 }
 
+// Local Postgres (Docker / CI service container) has no TLS — only enable SSL
+// when talking to a remote managed instance. Centralised so individual specs
+// that need a fresh, independent Pool (e.g. simulating Lambda cold-start) get
+// the same gating as the shared test pool.
+function shouldUseSsl(url: string): boolean {
+  if (process.env.USE_LOCAL_CREDENTIALS === 'true') return false;
+  return !/@(localhost|127\.0\.0\.1)[:/]/.test(url);
+}
+
+export function createTestPool(options: { max?: number } = {}): Pool {
+  const url = connectionString();
+  return new Pool({
+    connectionString: url,
+    max: options.max ?? 1,
+    ssl: shouldUseSsl(url) ? { rejectUnauthorized: false } : false,
+  });
+}
+
 // Shared test fixtures — seeded once per test run, never deleted.
 // Tests that need a league owner reference these; only users.db.spec.ts
 // creates and removes its own isolated test users.
@@ -92,6 +110,17 @@ async function ensureTestFixtures(): Promise<void> {
       access_level = EXCLUDED.access_level
   `);
 
+  // Seed users above use explicit IDs (1–3), which do NOT advance the serial
+  // sequence. Without this, the next default-id insert returns nextval=1 and
+  // collides with the seed row (LS-4682). Fast-forward the sequence past any
+  // pre-seeded explicit IDs.
+  await db!.execute(sql`
+    SELECT setval(
+      pg_get_serial_sequence('app_internal.users', 'id'),
+      GREATEST((SELECT COALESCE(MAX(id), 0) FROM app_internal.users), 1)
+    )
+  `);
+
   const { players } = PublicSchema;
   const [{ count: playerCount }] = await db!
     .select({ count: sql<number>`count(*)::int` })
@@ -135,19 +164,7 @@ async function ensureTestFixtures(): Promise<void> {
 
 export async function setupIntegrationTestDatabase(): Promise<void> {
   if (pool) return;
-  const url = connectionString();
-  // Local Postgres (Docker/CI service container) has no TLS — only enable SSL
-  // when talking to a remote managed instance. resolveLocalCredentials() applies
-  // the same gate to the migration pool; without it here, the first test query
-  // fails with a TLS handshake error against the CI postgres service.
-  const isLocal =
-    process.env.USE_LOCAL_CREDENTIALS === 'true' ||
-    /@(localhost|127\.0\.0\.1)[:/]/.test(url);
-  pool = new Pool({
-    connectionString: url,
-    max: 3,
-    ssl: isLocal ? false : { rejectUnauthorized: false },
-  });
+  pool = createTestPool({ max: 3 });
   db = drizzle(pool, { schema: PublicSchema });
   await ensureTestFixtures();
 }
