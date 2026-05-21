@@ -66,6 +66,7 @@ export type PitcherStatKey = (typeof PITCHER_STAT_KEYS)[number];
 export type StatKey = HitterStatKey | PitcherStatKey;
 export type PlayerType = 'hitter' | 'pitcher';
 export type GameMode = 'season' | 'career_team' | 'most_teams';
+export type Sport = 'baseball' | 'football';
 
 export interface CreateSeasonDraftGameParams {
   name: string;
@@ -76,6 +77,7 @@ export interface CreateSeasonDraftGameParams {
   statKey?: string; // defaults to 'hr'
   gameMode?: GameMode; // defaults to 'season'
   playerType?: PlayerType; // defaults to 'hitter'
+  sport?: Sport; // defaults to 'baseball'
 }
 
 export interface MakePickParams {
@@ -97,6 +99,7 @@ export interface GameState {
   statKey: string;
   gameMode: string;
   playerType: string;
+  sport: Sport;
   inviteCode: string | null;
   pickDeadlineSeconds: number;
   currentPickDeadline: string | null;
@@ -156,6 +159,7 @@ export class SeasonDraftGameService {
 
     const playerType: PlayerType = params.playerType ?? 'hitter';
     const gameMode: GameMode = params.gameMode ?? 'season';
+    const sport: Sport = params.sport ?? 'baseball';
 
     // For most_teams mode, statKey is a derived stat — auto-set to 'teams_played'
     const statKey =
@@ -195,12 +199,13 @@ export class SeasonDraftGameService {
         statKey,
         gameMode,
         playerType,
+        sport,
         inviteCode,
       })
       .returning();
 
     LOGGER.info(
-      `Created Season Draft Game ${game.id}: ${params.name} (${playerType}/${statKey}/${gameMode})`,
+      `Created Season Draft Game ${game.id}: ${params.name} (${sport}/${playerType}/${statKey}/${gameMode})`,
     );
 
     // Define roster positions based on player type
@@ -413,6 +418,7 @@ export class SeasonDraftGameService {
     statKey: string;
     gameMode: string;
     playerType: string;
+    sport: Sport;
     playerCount: number;
     maxPlayers: number;
     creatorName: string;
@@ -446,6 +452,7 @@ export class SeasonDraftGameService {
       statKey: game.statKey,
       gameMode: game.gameMode,
       playerType: game.playerType,
+      sport: game.sport,
       playerCount: joinedPlayers.length,
       maxPlayers: SEASON_DRAFT_MAX_PLAYERS,
       creatorName: creator?.playerName ?? joinedPlayers[0]?.playerName ?? '',
@@ -589,6 +596,7 @@ export class SeasonDraftGameService {
       statKey: game.statKey,
       gameMode: game.gameMode,
       playerType: game.playerType,
+      sport: game.sport,
       inviteCode: game.inviteCode ?? null,
       pickDeadlineSeconds: game.pickDeadlineSeconds,
       currentPickDeadline:
@@ -1119,6 +1127,7 @@ export class SeasonDraftGameService {
       statKey: string;
       gameMode: string;
       playerType: string;
+      sport: Sport;
       isMyTurn: boolean;
       inviteCode: string | null;
       playerCount: number;
@@ -1137,6 +1146,7 @@ export class SeasonDraftGameService {
         statKey: PublicSchema.seasonDraftGames.statKey,
         gameMode: PublicSchema.seasonDraftGames.gameMode,
         playerType: PublicSchema.seasonDraftGames.playerType,
+        sport: PublicSchema.seasonDraftGames.sport,
         currentTurn: PublicSchema.seasonDraftGames.currentTurn,
         draftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
         inviteCode: PublicSchema.seasonDraftGames.inviteCode,
@@ -1231,6 +1241,7 @@ export class SeasonDraftGameService {
         statKey: g.statKey,
         gameMode: g.gameMode,
         playerType: g.playerType,
+        sport: g.sport,
         isMyTurn: g.currentTurn === g.draftOrder,
         inviteCode: g.inviteCode ?? null,
         playerCount: players.length,

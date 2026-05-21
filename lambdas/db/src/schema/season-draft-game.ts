@@ -17,6 +17,7 @@ import {
   GameUnavailableError,
   UserInputError,
 } from './graphql-errors';
+import { SportKindEnum } from './leagues/types';
 
 // Create database service instance - used in GraphQL resolvers
 const _dbService = createDatabaseService(getDbOptions());
@@ -177,6 +178,7 @@ const SeasonDraftGameLobbyInfo = builder.objectRef<{
   statKey: string;
   gameMode: string;
   playerType: string;
+  sport: 'baseball' | 'football';
   playerCount: number;
   maxPlayers: number;
   creatorName: string;
@@ -203,6 +205,10 @@ SeasonDraftGameLobbyInfo.implement({
       type: SeasonDraftPlayerType,
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
     }),
+    sport: t.field({
+      type: SportKindEnum,
+      resolve: (parent) => parent.sport ?? 'baseball',
+    }),
     playerCount: t.exposeInt('playerCount'),
     maxPlayers: t.exposeInt('maxPlayers'),
     creatorName: t.exposeString('creatorName', { nullable: true }),
@@ -223,6 +229,7 @@ const SeasonDraftGame = builder.objectRef<{
   statKey: string;
   gameMode: string;
   playerType: string;
+  sport: 'baseball' | 'football';
   inviteCode: string | null;
   pickDeadlineSeconds: number;
   currentPickDeadline: string | null;
@@ -280,6 +287,10 @@ SeasonDraftGame.implement({
       type: SeasonDraftPlayerType,
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
     }),
+    sport: t.field({
+      type: SportKindEnum,
+      resolve: (parent) => parent.sport ?? 'baseball',
+    }),
     inviteCode: t.exposeString('inviteCode', { nullable: true }),
     pickDeadlineSeconds: t.exposeInt('pickDeadlineSeconds'),
     currentPickDeadline: t.exposeString('currentPickDeadline', {
@@ -303,6 +314,7 @@ const SeasonDraftGameSummary = builder.objectRef<{
   statKey: string;
   gameMode: string;
   playerType: string;
+  sport: 'baseball' | 'football';
   isMyTurn: boolean;
   inviteCode: string | null;
   playerCount: number;
@@ -332,6 +344,10 @@ SeasonDraftGameSummary.implement({
     playerType: t.field({
       type: SeasonDraftPlayerType,
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
+    }),
+    sport: t.field({
+      type: SportKindEnum,
+      resolve: (parent) => parent.sport ?? 'baseball',
     }),
     isMyTurn: t.exposeBoolean('isMyTurn'),
     inviteCode: t.exposeString('inviteCode', { nullable: true }),
@@ -532,6 +548,7 @@ builder.mutationFields((t) => ({
       statKey: t.arg.string({ required: false }),
       gameMode: t.arg.string({ required: false }),
       playerType: t.arg.string({ required: false }),
+      sport: t.arg({ type: SportKindEnum, required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -557,6 +574,7 @@ builder.mutationFields((t) => ({
           | 'hitter'
           | 'pitcher'
           | undefined,
+        sport: args.sport ?? undefined,
       });
 
       return gameId;

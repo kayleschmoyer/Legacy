@@ -4,11 +4,13 @@ mutation CreateSeasonDraftGame(
   $statKey: String
   $gameMode: String
   $playerType: String
+  $sport: Sport
 ) {
   createSeasonDraftGame(
     name: $name
     statKey: $statKey
     gameMode: $gameMode
     playerType: $playerType
+    sport: $sport
   )
 }

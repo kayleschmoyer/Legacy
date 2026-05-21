@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, H1, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Circle, Stack } from './primitives';
+import { SPORT_LOBBY_CHROME, toSportKind } from './sportChrome';
 import {
   SeasonDraftGameMode,
   SeasonDraftGameStatus,
@@ -60,6 +61,8 @@ export const SeasonDraftJoin: React.FC<SeasonDraftJoinProps> = ({
 
   const [joinGame, { loading: joining }] = useJoinSeasonDraftGameMutation();
   const game = data?.seasonDraftGameByInviteCode;
+  const sport = toSportKind(game?.sport);
+  const sportChrome = SPORT_LOBBY_CHROME[sport];
 
   const handleJoin = async () => {
     if (!inviteCode) return;
@@ -162,8 +165,27 @@ export const SeasonDraftJoin: React.FC<SeasonDraftJoinProps> = ({
           )}
 
           {!loading && game && (
-            <YStack gap="$4">
+            <YStack gap="$4" data-sport={sport}>
               <YStack gap="$1">
+                <XStack alignItems="center" gap="$2">
+                  <Text
+                    fontSize={16}
+                    role="img"
+                    accessibilityLabel={sportChrome.iconLabel}
+                  >
+                    {sportChrome.icon}
+                  </Text>
+                  <Text
+                    data-testid="sport-strapline"
+                    fontSize={11}
+                    color="$brandGoldLight"
+                    letterSpacing={1.6}
+                    textTransform="uppercase"
+                    fontWeight="700"
+                  >
+                    {sportChrome.strapline}
+                  </Text>
+                </XStack>
                 <H1 color="$color" fontSize={26} fontWeight="800">
                   {game.name}
                 </H1>
@@ -176,15 +198,18 @@ export const SeasonDraftJoin: React.FC<SeasonDraftJoinProps> = ({
               </YStack>
 
               <XStack flexWrap="wrap" gap="$3">
+                <DetailItem label="Sport">{sportChrome.shortLabel}</DetailItem>
                 <DetailItem label="Stat">
                   {game.statKey
                     ? (STAT_LABELS[game.statKey] ?? game.statKey)
                     : '—'}
                 </DetailItem>
                 <DetailItem label="Pool">
-                  {game.playerType === SeasonDraftPlayerType.Pitcher
-                    ? 'Pitchers'
-                    : 'Hitters'}
+                  {sport === 'football'
+                    ? 'Gridiron'
+                    : game.playerType === SeasonDraftPlayerType.Pitcher
+                      ? 'Pitchers'
+                      : 'Hitters'}
                 </DetailItem>
                 <DetailItem label="Mode">
                   {game.gameMode === SeasonDraftGameMode.CareerTeam

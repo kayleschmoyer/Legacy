@@ -1603,6 +1603,7 @@ export type MutationCreateSeasonDraftGameArgs = {
   gameMode?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   playerType?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
   statKey?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -3294,6 +3295,7 @@ export type SeasonDraftGame = {
   picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players?: Maybe<Array<SeasonDraftPlayer>>;
+  sport?: Maybe<Sport>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3309,6 +3311,7 @@ export type SeasonDraftGameLobbyInfo = {
   playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players: Array<SeasonDraftLobbyPlayer>;
+  sport?: Maybe<Sport>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3354,6 +3357,7 @@ export type SeasonDraftGameSummary = {
   playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players: Array<SeasonDraftLobbyPlayer>;
+  sport?: Maybe<Sport>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
   totalPicks?: Maybe<Scalars['Int']['output']>;

@@ -21,6 +21,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Circle, Stack } from './primitives';
+import { SPORT_LOBBY_CHROME, type SportKind, toSportKind } from './sportChrome';
 import {
   SeasonDraftGameMode,
   SeasonDraftPlayerType,
@@ -118,6 +119,7 @@ interface GameState {
   statKey: string;
   gameMode: SeasonDraftGameMode;
   playerType: SeasonDraftPlayerType;
+  sport?: SportKind | null;
   inviteCode?: string | null;
   pickDeadlineSeconds?: number | null;
   currentPickDeadline?: string | null;
@@ -235,6 +237,8 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     gameState?.gameMode === SeasonDraftGameMode.CareerTeam;
   const isPitcherDraft =
     gameState?.playerType === SeasonDraftPlayerType.Pitcher;
+  const sport: SportKind = toSportKind(gameState?.sport);
+  const sportChrome = SPORT_LOBBY_CHROME[sport];
 
   // `gameState.statKey` is nullable in the generated types — coalesce
   // before any string operations so older rows / partial cache entries
@@ -696,7 +700,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           justifyContent="space-between"
           flexWrap="wrap"
         >
-          <YStack flex={1} flexBasis={320} gap="$2">
+          <YStack flex={1} flexBasis={320} gap="$2" data-sport={sport}>
             <XStack alignItems="center" gap="$2">
               <Circle
                 size={8}
@@ -717,6 +721,23 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               >
                 {phaseLabel}
               </Eyebrow>
+              <Text
+                fontSize={14}
+                role="img"
+                accessibilityLabel={sportChrome.iconLabel}
+              >
+                {sportChrome.icon}
+              </Text>
+              <Text
+                data-testid="sport-strapline"
+                fontSize={11}
+                color="$brandGoldLight"
+                letterSpacing={1.6}
+                textTransform="uppercase"
+                fontWeight="700"
+              >
+                {sportChrome.strapline}
+              </Text>
             </XStack>
             <H1
               color="$color"
@@ -730,7 +751,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
             <XStack alignItems="center" gap="$2" flexWrap="wrap">
               <StatChip>{statKeyShort}</StatChip>
               <Text color="$textMuted" fontSize={13}>
-                {isPitcherDraft ? 'Pitchers' : 'Hitters'}
+                {sport === 'football'
+                  ? 'Gridiron'
+                  : isPitcherDraft
+                    ? 'Pitchers'
+                    : 'Hitters'}
               </Text>
               <Text color="$textMuted" fontSize={13}>
                 ·

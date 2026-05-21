@@ -13,7 +13,11 @@ import {
   YStack,
 } from 'tamagui';
 import { Stack } from './primitives';
-import { useCreateSeasonDraftGameMutation } from '../../api/db/graphql.generated';
+import { SPORT_LOBBY_CHROME, type SportKind } from './sportChrome';
+import {
+  Sport,
+  useCreateSeasonDraftGameMutation,
+} from '../../api/db/graphql.generated';
 import { BRAND_GOLD, withAlpha } from '../../utils/colors';
 
 interface StatDef {
@@ -61,10 +65,12 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
   onCancel,
 }) => {
   const [name, setName] = useState('');
+  const [sport, setSport] = useState<SportKind>('baseball');
   const [playerType, setPlayerType] = useState<PlayerType>('hitter');
   const [gameMode, setGameMode] = useState<GameMode>('season');
   const [statKey, setStatKey] = useState('hr');
   const [submitting, setSubmitting] = useState(false);
+  const sportChrome = SPORT_LOBBY_CHROME[sport];
 
   const [createGame] = useCreateSeasonDraftGameMutation();
 
@@ -88,6 +94,7 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
           statKey,
           gameMode,
           playerType,
+          sport: sport === 'football' ? Sport.Football : Sport.Baseball,
         },
       });
       const id = result.data?.createSeasonDraftGame;
@@ -134,6 +141,7 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
           <YStack flex={1} flexBasis={320} minWidth={280} gap="$3">
             <Eyebrow color="$brandGoldLight">Live Preview</Eyebrow>
             <YStack
+              data-sport={sport}
               backgroundColor="$surfaceCard"
               borderRadius="$4"
               borderWidth={1}
@@ -141,6 +149,24 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
               padding="$4"
               gap="$3"
             >
+              <XStack alignItems="center" gap="$2">
+                <Text
+                  fontSize={18}
+                  role="img"
+                  accessibilityLabel={sportChrome.iconLabel}
+                >
+                  {sportChrome.icon}
+                </Text>
+                <Text
+                  fontSize={11}
+                  letterSpacing={1.6}
+                  textTransform="uppercase"
+                  color="$brandGoldLight"
+                  fontWeight="700"
+                >
+                  {sportChrome.strapline}
+                </Text>
+              </XStack>
               <Text fontSize={22} fontWeight="800" color="$color">
                 {name.trim() || 'Untitled Game'}
               </Text>
@@ -232,6 +258,21 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
                 borderColor="$surfacePanelBorder"
               />
             </Field>
+
+            <YStack gap="$2">
+              <Field label="Sport">
+                <ToggleGroup
+                  testID="sport-toggle"
+                  options={[
+                    { value: 'baseball', label: '⚾  Baseball' },
+                    { value: 'football', label: '🏈  Football' },
+                  ]}
+                  value={sport}
+                  onChange={(v) => setSport(v as SportKind)}
+                />
+              </Field>
+              <Helper>{sportChrome.helperText}</Helper>
+            </YStack>
 
             <XStack gap="$3" flexWrap="wrap">
               <YStack flex={1} flexBasis={180} minWidth={160} gap="$2">
@@ -433,13 +474,16 @@ function ToggleGroup({
   options,
   value,
   onChange,
+  testID,
 }: {
   options: Array<{ value: string; label: string }>;
   value: string;
   onChange: (next: string) => void;
+  testID?: string;
 }): React.JSX.Element {
   return (
     <XStack
+      data-testid={testID}
       borderWidth={1}
       borderColor="$surfacePanelBorder"
       borderRadius="$3"
@@ -454,6 +498,8 @@ function ToggleGroup({
             chromeless
             flex={1}
             size="$3"
+            data-testid={testID ? `${testID}-option-${o.value}` : undefined}
+            data-active={active ? 'true' : 'false'}
             backgroundColor={active ? '$brandGold' : 'transparent'}
             color={active ? '$brandNavy' : '$color'}
             fontWeight={active ? '800' : '600'}

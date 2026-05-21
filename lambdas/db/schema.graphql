@@ -1600,6 +1600,7 @@ type Mutation {
     gameMode: String
     name: String!
     playerType: String
+    sport: Sport
     statKey: String
   ): Int
   createTiebreakerRules(
@@ -3196,6 +3197,7 @@ type SeasonDraftGame {
   picks: [SeasonDraftGamePickHistory!]
   playerType: SeasonDraftPlayerType
   players: [SeasonDraftPlayer!]
+  sport: Sport
   statKey: String
   status: SeasonDraftGameStatus
 }
@@ -3212,6 +3214,7 @@ type SeasonDraftGameLobbyInfo {
   playerCount: Int
   playerType: SeasonDraftPlayerType
   players: [SeasonDraftLobbyPlayer!]!
+  sport: Sport
   statKey: String
   status: SeasonDraftGameStatus
 }
@@ -3261,6 +3264,7 @@ type SeasonDraftGameSummary {
   playerCount: Int
   playerType: SeasonDraftPlayerType
   players: [SeasonDraftLobbyPlayer!]!
+  sport: Sport
   statKey: String
   status: SeasonDraftGameStatus
   totalPicks: Int

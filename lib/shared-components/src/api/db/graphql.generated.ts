@@ -1609,6 +1609,7 @@ export type MutationCreateSeasonDraftGameArgs = {
   gameMode?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   playerType?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
   statKey?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -3300,6 +3301,7 @@ export type SeasonDraftGame = {
   picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players?: Maybe<Array<SeasonDraftPlayer>>;
+  sport?: Maybe<Sport>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3315,6 +3317,7 @@ export type SeasonDraftGameLobbyInfo = {
   playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players: Array<SeasonDraftLobbyPlayer>;
+  sport?: Maybe<Sport>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3360,6 +3363,7 @@ export type SeasonDraftGameSummary = {
   playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players: Array<SeasonDraftLobbyPlayer>;
+  sport?: Maybe<Sport>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
   totalPicks?: Maybe<Scalars['Int']['output']>;
@@ -4607,6 +4611,7 @@ export type CreateSeasonDraftGameMutationVariables = Exact<{
   statKey?: InputMaybe<Scalars['String']['input']>;
   gameMode?: InputMaybe<Scalars['String']['input']>;
   playerType?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
 }>;
 
 export type CreateSeasonDraftGameMutation = {
@@ -5345,6 +5350,7 @@ export type GetSeasonDraftGameQuery = {
     statKey?: string | null;
     gameMode?: SeasonDraftGameMode | null;
     playerType?: SeasonDraftPlayerType | null;
+    sport?: Sport | null;
     inviteCode?: string | null;
     pickDeadlineSeconds?: number | null;
     currentPickDeadline?: string | null;
@@ -5399,6 +5405,7 @@ export type GetSeasonDraftGameByInviteCodeQuery = {
     statKey?: string | null;
     gameMode?: SeasonDraftGameMode | null;
     playerType?: SeasonDraftPlayerType | null;
+    sport?: Sport | null;
     playerCount?: number | null;
     maxPlayers?: number | null;
     creatorName?: string | null;
@@ -5448,6 +5455,7 @@ export type GetSeasonDraftGamesQuery = {
     statKey?: string | null;
     gameMode?: SeasonDraftGameMode | null;
     playerType?: SeasonDraftPlayerType | null;
+    sport?: Sport | null;
     isMyTurn?: boolean | null;
     inviteCode?: string | null;
     playerCount?: number | null;
@@ -9959,12 +9967,14 @@ export const CreateSeasonDraftGame = gql`
     $statKey: String
     $gameMode: String
     $playerType: String
+    $sport: Sport
   ) {
     createSeasonDraftGame(
       name: $name
       statKey: $statKey
       gameMode: $gameMode
       playerType: $playerType
+      sport: $sport
     )
   }
 `;
@@ -9990,6 +10000,7 @@ export type CreateSeasonDraftGameMutationFn = MutationFunction<
  *      statKey: // value for 'statKey'
  *      gameMode: // value for 'gameMode'
  *      playerType: // value for 'playerType'
+ *      sport: // value for 'sport'
  *   },
  * });
  */
@@ -11798,6 +11809,7 @@ export const GetSeasonDraftGame = gql`
       statKey
       gameMode
       playerType
+      sport
       inviteCode
       pickDeadlineSeconds
       currentPickDeadline
@@ -11904,6 +11916,7 @@ export const GetSeasonDraftGameByInviteCode = gql`
       statKey
       gameMode
       playerType
+      sport
       playerCount
       maxPlayers
       creatorName
@@ -12220,6 +12233,7 @@ export const GetSeasonDraftGames = gql`
       statKey
       gameMode
       playerType
+      sport
       isMyTurn
       inviteCode
       playerCount

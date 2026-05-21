@@ -406,6 +406,38 @@ describe('Season Draft Game Resolver', () => {
         }),
       );
     });
+
+    it('forwards sport=football when provided (LS-4664)', async () => {
+      mockSeasonDraftGameService.createGame.mockResolvedValueOnce(100);
+
+      const resolver = getMutation('createSeasonDraftGame');
+      await resolver(
+        {},
+        { name: 'Gridiron Greats', sport: 'football' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockSeasonDraftGameService.createGame).toHaveBeenCalledWith(
+        mockDb,
+        expect.objectContaining({ sport: 'football' }),
+      );
+    });
+
+    it('forwards undefined sport when omitted — service defaults to baseball', async () => {
+      mockSeasonDraftGameService.createGame.mockResolvedValueOnce(101);
+
+      const resolver = getMutation('createSeasonDraftGame');
+      await resolver(
+        {},
+        { name: 'Bombers Only' },
+        mockContext,
+        undefined as never,
+      );
+
+      const callArgs = mockSeasonDraftGameService.createGame.mock.calls[0][1];
+      expect(callArgs.sport).toBeUndefined();
+    });
   });
 
   // ── joinSeasonDraftGame mutation ──────────────────────────────────────────

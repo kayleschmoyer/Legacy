@@ -11,6 +11,7 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core';
 import { players } from './Players';
+import { sportKind } from './Enums';
 
 /**
  * Season Draft Game Database Schema
@@ -66,6 +67,9 @@ export const seasonDraftGames = pgTable(
     playerType: seasonDraftPlayerType('player_type')
       .notNull()
       .default('hitter'), // hitter or pitcher
+    /** Sport discriminator (LS-4664). Defaults to baseball; football lobbies
+     *  swap copy/icons via the `sport` field on the SeasonDraftGame GraphQL type. */
+    sport: sportKind('sport').notNull().default('baseball'),
     inviteCode: varchar('invite_code', { length: 12 }).unique(), // Shareable invite code
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
       .defaultNow()

@@ -12,6 +12,7 @@ query GetSeasonDraftGame($gameId: Int!) {
     statKey
     gameMode
     playerType
+    sport
     inviteCode
     pickDeadlineSeconds
     currentPickDeadline
