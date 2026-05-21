@@ -17,6 +17,8 @@ Both phases are **manually dispatched by the user** via slash commands; nothing 
 | User runs `/implement-design LS-####` | Consume | Local                   |
 | Designing changes to this pipeline    | Both    | Anywhere                |
 
+> **Bucket fan-out command**: `/implement-design LS-####`. When `/work-ticket` is invoked on the design-sync bucket epic, Parent Dispatch Mode dispatches one chip per To Do child using this command (not `/work-ticket`). See [`.agents/skills/work-ticket/references/bucket-epic-routing.md`](../work-ticket/references/bucket-epic-routing.md).
+
 ## Phase 1: Sync (cloud agent)
 
 > Full prompt: [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md)

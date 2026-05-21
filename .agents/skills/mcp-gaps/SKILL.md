@@ -26,6 +26,8 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 | Processing the current bucket epic backlog      | Triage |
 | After an audit identifies new gaps to implement | Triage |
 
+> **Bucket fan-out command**: `/work-ticket LS-####`. When `/work-ticket` is invoked on the mcp-gaps bucket epic, Parent Dispatch Mode dispatches one chip per To Do child using `/work-ticket` (each child is a standalone leaf ticket — no special per-child command). See [`.agents/skills/work-ticket/references/bucket-epic-routing.md`](../work-ticket/references/bucket-epic-routing.md).
+
 ---
 
 ## Phase 1: Audit (Quick Reference)
