@@ -14,8 +14,11 @@ import {
   BRAND_GOLD_LIGHT,
   FONT_BODY,
   FONT_DISPLAY,
+  FONT_MONO,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  TEXT_QUIETEST,
+  TEXT_SECONDARY,
 } from '../theme';
 
 export const TitleScene: React.FC = () => {
@@ -208,7 +211,7 @@ export const TitleScene: React.FC = () => {
           fontFamily: FONT_BODY,
           fontStyle: 'italic',
           fontSize: 38,
-          color: TEXT_MUTED,
+          color: TEXT_SECONDARY,
           textAlign: 'center',
           maxWidth: 1100,
         }}
@@ -278,7 +281,7 @@ export const TitleScene: React.FC = () => {
           }}
         />
         Scene 01
-        <span style={{ color: '#6C80BA' }}>/</span>
+        <span style={{ color: TEXT_QUIETEST }}>/</span>
         Title
       </div>
 
@@ -287,8 +290,8 @@ export const TitleScene: React.FC = () => {
           position: 'absolute',
           right: 56,
           bottom: 40,
-          fontFamily: "'Roboto Mono', monospace",
-          color: '#6C80BA',
+          fontFamily: FONT_MONO,
+          color: TEXT_QUIETEST,
           fontSize: 24,
           letterSpacing: '0.08em',
           opacity: badgesOpacity,

@@ -20,7 +20,9 @@ export const BRAND_SEAM_RED_LIGHT = '#E63950';
 export const GREEN = '#22C55E';
 
 export const TEXT_PRIMARY = '#F8FAFC';
+export const TEXT_SECONDARY = '#DEE6FF';
 export const TEXT_MUTED = '#9CAAC5';
+export const TEXT_QUIETEST = '#6C80BA';
 
 // Position colors
 export const POS_PITCHER = '#C41E3A';
