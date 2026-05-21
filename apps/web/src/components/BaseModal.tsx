@@ -37,6 +37,13 @@ export interface BaseModalProps {
   maxWidth?: number;
   /** Optional max height override (default: 88vh) */
   maxHeight?: string;
+  /**
+   * When true, suppress the default gradient header. The consumer is then
+   * responsible for rendering its own masthead inside `children` (including a
+   * close affordance that calls `onOpenChange(false)`). `title` is still used
+   * as the accessible label via `aria-label` on the dialog content.
+   */
+  hideHeader?: boolean;
   /** Modal body content */
   children: React.ReactNode;
 }
@@ -71,6 +78,7 @@ export function BaseModal({
   headerAccentColor,
   maxWidth = 960,
   maxHeight = '88vh',
+  hideHeader = false,
   children,
 }: BaseModalProps) {
   const headerBackground = headerAccentColor
@@ -95,7 +103,9 @@ export function BaseModal({
           key="base-modal-content"
           role="dialog"
           aria-modal="true"
-          aria-labelledby={titleId}
+          {...(hideHeader
+            ? { 'aria-label': title }
+            : { 'aria-labelledby': titleId })}
           animateOnly={['transform', 'opacity']}
           animation={['quick', { opacity: { overshootClamping: true } }]}
           enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
@@ -109,49 +119,51 @@ export function BaseModal({
           overflow="hidden"
           padding={0}
         >
-          {/* ── Glass gradient header ── */}
-          <XStack
-            paddingHorizontal="$5"
-            paddingVertical="$4"
-            justifyContent="space-between"
-            alignItems="center"
-            style={{
-              background: headerBackground,
-            }}
-          >
-            <YStack gap="$1" flex={1} marginRight="$3">
-              <XStack gap="$2" alignItems="center" flexWrap="wrap">
-                <H3
-                  id={titleId}
-                  color={WHITE}
-                  fontSize="$7"
-                  fontWeight="bold"
-                  margin={0}
-                >
-                  {title}
-                </H3>
-                {titleBadge}
-              </XStack>
-              {subtitle && (
-                <Text fontSize="$2" color={withAlpha(WHITE, 0.75)}>
-                  {subtitle}
-                </Text>
-              )}
-            </YStack>
+          {/* ── Glass gradient header (suppressed when `hideHeader`) ── */}
+          {!hideHeader && (
+            <XStack
+              paddingHorizontal="$5"
+              paddingVertical="$4"
+              justifyContent="space-between"
+              alignItems="center"
+              style={{
+                background: headerBackground,
+              }}
+            >
+              <YStack gap="$1" flex={1} marginRight="$3">
+                <XStack gap="$2" alignItems="center" flexWrap="wrap">
+                  <H3
+                    id={titleId}
+                    color={WHITE}
+                    fontSize="$7"
+                    fontWeight="bold"
+                    margin={0}
+                  >
+                    {title}
+                  </H3>
+                  {titleBadge}
+                </XStack>
+                {subtitle && (
+                  <Text fontSize="$2" color={withAlpha(WHITE, 0.75)}>
+                    {subtitle}
+                  </Text>
+                )}
+              </YStack>
 
-            <Dialog.Close asChild>
-              <Button
-                size="$3"
-                circular
-                icon={X}
-                aria-label="Close"
-                backgroundColor={withAlpha(WHITE, 0.15)}
-                color={WHITE}
-                hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.25) }}
-                pressStyle={{ backgroundColor: withAlpha(WHITE, 0.3) }}
-              />
-            </Dialog.Close>
-          </XStack>
+              <Dialog.Close asChild>
+                <Button
+                  size="$3"
+                  circular
+                  icon={X}
+                  aria-label="Close"
+                  backgroundColor={withAlpha(WHITE, 0.15)}
+                  color={WHITE}
+                  hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.25) }}
+                  pressStyle={{ backgroundColor: withAlpha(WHITE, 0.3) }}
+                />
+              </Dialog.Close>
+            </XStack>
+          )}
 
           {/* ── Scrollable body ── */}
           {children}

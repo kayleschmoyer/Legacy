@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
+import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import { BaseModal } from './BaseModal';
 import type { CareerArcMode } from './CareerArcChart';
-import { StatCard, type StatRowData } from './StatCard';
-import { StatTable } from './StatTable';
 import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayerCareerArcQuery,
@@ -15,11 +14,20 @@ import {
   outsToBaseballIP,
 } from '../lib/scoring/ipUtils';
 import {
+  BG_DARK,
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
   getPositionColor,
-  TEXT_MUTED,
+  STATS_BORDER,
+  SURFACE_CARD,
+  SURFACE_PANEL,
+  SURFACE_SUBTLE,
+  TEXT_INTERFACE,
+  TEXT_SECONDARY,
+  TEXT_TERTIARY,
   WHITE,
   withAlpha,
 } from '../constants/colors';
@@ -27,6 +35,14 @@ import {
 const CareerArcChart = React.lazy(() =>
   import('./CareerArcChart').then((m) => ({ default: m.CareerArcChart })),
 );
+
+// ---------------------------------------------------------------------------
+// Editorial type tokens — match the Player Details design bundle
+// (docs/design/kXxk3B29-DRvoJthw6UifA, slice 2 / LS-4622).
+// ---------------------------------------------------------------------------
+
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
+const FONT_BODY = "'Literata', serif";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,11 +96,239 @@ interface SeasonRow {
 
 type StatsTab = 'career-arc' | 'batting' | 'pitching' | 'fielding';
 
+interface CareerTile {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+}
+
 // ---------------------------------------------------------------------------
-// Tab Button
+// Editorial sub-components
 // ---------------------------------------------------------------------------
 
-function TabButton({
+function PortraitAvatar({
+  initials,
+  accent,
+}: {
+  initials: string;
+  accent?: string;
+}) {
+  // Linear gradient: navy → position-tinted accent (defaults to brand gold).
+  const tint = accent ?? BRAND_GOLD;
+  return (
+    <XStack
+      width={92}
+      height={92}
+      borderRadius={46}
+      alignItems="center"
+      justifyContent="center"
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_GOLD, 0.45)}
+      style={{
+        background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${tint} 100%)`,
+      }}
+      $sm={{ width: 68, height: 68, borderRadius: 34 }}
+    >
+      <Text
+        color={WHITE}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 28,
+          letterSpacing: '0.04em',
+        }}
+      >
+        {initials}
+      </Text>
+    </XStack>
+  );
+}
+
+function PositionBadge({ position }: { position: string }) {
+  return (
+    <Text
+      data-testid="player-position"
+      color={WHITE}
+      backgroundColor={getPositionColor(position)}
+      paddingHorizontal={8}
+      paddingVertical={4}
+      borderRadius={4}
+      minWidth={32}
+      textAlign="center"
+      style={{
+        fontFamily: FONT_DISPLAY,
+        fontWeight: 700,
+        fontSize: 11,
+        letterSpacing: '0.1em',
+      }}
+    >
+      {position}
+    </Text>
+  );
+}
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      color={BRAND_GOLD}
+      style={{
+        fontFamily: FONT_DISPLAY,
+        fontWeight: 700,
+        fontSize: 11,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function EditorialHeading({
+  children,
+  size = 'h1',
+}: {
+  children: React.ReactNode;
+  size?: 'h1' | 'h2';
+}) {
+  const isH1 = size === 'h1';
+  return (
+    <Text
+      color={WHITE}
+      style={{
+        fontFamily: FONT_DISPLAY,
+        fontWeight: 800,
+        fontSize: isH1 ? 54 : 22,
+        lineHeight: isH1 ? 0.95 : 1.1,
+        letterSpacing: isH1 ? '-0.02em' : '0.04em',
+        textTransform: isH1 ? 'none' : 'uppercase',
+        margin: 0,
+      }}
+      $sm={isH1 ? { style: { fontSize: 34 } } : undefined}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+}) {
+  return (
+    <YStack
+      flex={1}
+      minWidth={120}
+      padding={20}
+      gap={6}
+      backgroundColor={SURFACE_CARD}
+      borderWidth={1}
+      borderColor={STATS_BORDER}
+      borderRadius={16}
+    >
+      <Text
+        color={TEXT_TERTIARY}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        color={accent ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 54,
+          lineHeight: 1,
+          letterSpacing: '-0.01em',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+        $sm={{ style: { fontSize: 34 } }}
+      >
+        {value}
+      </Text>
+    </YStack>
+  );
+}
+
+function CareerStatTile({ label, value, accent }: CareerTile) {
+  return (
+    <YStack
+      flex={1}
+      minWidth={120}
+      padding={14}
+      gap={4}
+      backgroundColor={SURFACE_SUBTLE}
+      borderWidth={1}
+      borderColor={STATS_BORDER}
+      borderRadius={16}
+    >
+      <Text
+        color={TEXT_TERTIARY}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          fontSize: 10,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        color={accent ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 26,
+          lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </Text>
+    </YStack>
+  );
+}
+
+function SectionHead({ title, meta }: { title: string; meta?: string }) {
+  return (
+    <XStack
+      alignItems="baseline"
+      justifyContent="space-between"
+      gap={12}
+      marginTop={28}
+      marginBottom={14}
+      flexWrap="wrap"
+    >
+      <EditorialHeading size="h2">{title}</EditorialHeading>
+      {meta && (
+        <Text
+          color={TEXT_TERTIARY}
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 13,
+            fontStyle: 'italic',
+          }}
+        >
+          {meta}
+        </Text>
+      )}
+    </XStack>
+  );
+}
+
+function EditorialTab({
   label,
   tabKey,
   active,
@@ -98,22 +342,26 @@ function TabButton({
   return (
     <YStack
       cursor="pointer"
-      paddingHorizontal="$3"
-      paddingVertical="$2"
+      paddingHorizontal={18}
+      paddingVertical={14}
       borderBottomWidth={2}
-      borderBottomColor={active ? BRAND_NAVY_LIGHT : 'transparent'}
-      hoverStyle={{
-        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
-      }}
-      pressStyle={{ scale: 0.97 }}
+      borderBottomColor={active ? BRAND_GOLD : 'transparent'}
       animation="quick"
+      pressStyle={{ scale: 0.97 }}
+      hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
       onPress={onPress}
       data-testid={`tab-${tabKey}`}
     >
       <Text
-        fontSize="$3"
-        fontWeight={active ? '700' : '500'}
-        color={active ? BRAND_GOLD_LIGHT : TEXT_MUTED}
+        color={active ? TEXT_INTERFACE : TEXT_SECONDARY}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          fontSize: 13,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+        }}
       >
         {label}
       </Text>
@@ -121,79 +369,113 @@ function TabButton({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Position Badge
-// ---------------------------------------------------------------------------
-
-function PositionBadge({ position }: { position: string }) {
-  return (
-    <Text
-      data-testid="player-position"
-      fontSize="$2"
-      fontWeight="700"
-      color={WHITE}
-      backgroundColor={getPositionColor(position)}
-      paddingHorizontal="$2"
-      paddingVertical="$1"
-      borderRadius="$2"
-    >
-      {position}
-    </Text>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Position Avatar (circle with position initials)
-// ---------------------------------------------------------------------------
-
-function PositionAvatar({ position }: { position: string }) {
-  return (
-    <XStack
-      width={48}
-      height={48}
-      borderRadius={24}
-      backgroundColor={getPositionColor(position)}
-      alignItems="center"
-      justifyContent="center"
-      borderWidth={2}
-      borderColor={withAlpha(WHITE, 0.25)}
-    >
-      <Text fontSize="$4" fontWeight="bold" color={WHITE}>
-        {position}
-      </Text>
-    </XStack>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Hero Stat Chip
-// ---------------------------------------------------------------------------
-
-function HeroStat({ label, value }: { label: string; value: string | number }) {
+function EditorialTable({
+  caption,
+  headers,
+  rows,
+}: {
+  caption: string;
+  headers: string[];
+  rows: (string | number)[][];
+}) {
   return (
     <YStack
-      alignItems="center"
-      paddingHorizontal="$3"
-      paddingVertical="$2"
-      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.15)}
-      borderRadius="$3"
+      marginTop={14}
       borderWidth={1}
-      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
-      minWidth={72}
-      animation="quick"
-      hoverStyle={{
-        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25),
-        borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
-      }}
+      borderColor={STATS_BORDER}
+      borderRadius={16}
+      backgroundColor={SURFACE_CARD}
+      overflow="hidden"
     >
-      <Text fontSize="$5" fontWeight="bold" color={BRAND_GOLD_LIGHT}>
-        {value}
-      </Text>
-      <Text fontSize="$1" fontWeight="600" color={TEXT_MUTED} marginTop="$1">
-        {label}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <YStack minWidth={700}>
+          <XStack
+            backgroundColor={SURFACE_PANEL}
+            borderBottomWidth={1}
+            borderBottomColor={STATS_BORDER}
+            paddingVertical={12}
+            paddingHorizontal={12}
+          >
+            {headers.map((h, i) => (
+              <Text
+                key={h}
+                flex={i === 0 ? 1.2 : 1}
+                minWidth={0}
+                numberOfLines={1}
+                color={TEXT_SECONDARY}
+                textAlign={i === 0 ? 'left' : 'right'}
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {h}
+              </Text>
+            ))}
+          </XStack>
+          {rows.map((cells, ri) => (
+            <XStack
+              key={String(cells[0])}
+              paddingVertical={12}
+              paddingHorizontal={12}
+              borderBottomWidth={ri < rows.length - 1 ? 1 : 0}
+              borderBottomColor={STATS_BORDER}
+              hoverStyle={{
+                backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.1),
+              }}
+            >
+              {cells.map((cell, ci) => (
+                <Text
+                  key={`${cells[0]}-${headers[ci]}`}
+                  flex={ci === 0 ? 1.2 : 1}
+                  minWidth={0}
+                  numberOfLines={1}
+                  color={ci === 0 ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
+                  textAlign={ci === 0 ? 'left' : 'right'}
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: ci === 0 ? 800 : 600,
+                    fontSize: 15,
+                    letterSpacing: ci === 0 ? '0.04em' : 0,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {cell}
+                </Text>
+              ))}
+            </XStack>
+          ))}
+        </YStack>
+      </ScrollView>
+      <Text
+        // Accessible caption — visually hidden, announced by screen readers.
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        {caption}
       </Text>
     </YStack>
   );
+}
+
+// Build initials from "Firstname Lastname" — first letter of first + last word.
+function deriveInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '··';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -203,11 +485,9 @@ function HeroStat({ label, value }: { label: string; value: string | number }) {
 /**
  * PlayerDetailModal — Full-featured player detail dialog.
  *
- * Shows career hero stats, summary cards, and tabbed season-by-season
- * batting / pitching / fielding statistics.
- *
- * Built on shared `BaseModal`, `StatCard`, and `StatTable` components
- * following Legacy Sports UI Standards.
+ * Editorial layout matches design slice 2 of the Player Details bundle
+ * (LS-4586 / LS-4622): masthead with portrait + scoreboard-sized name,
+ * hero career stats, a flat career grid, and editorial-typography tabs.
  */
 export function PlayerDetailModal({
   playerId,
@@ -219,7 +499,6 @@ export function PlayerDetailModal({
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
   const [activeTab, setActiveTab] = useState<StatsTab>('career-arc');
-
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
 
   // ------ Data fetching ------
@@ -229,9 +508,6 @@ export function PlayerDetailModal({
       skip: !playerId || !open,
     });
 
-  // Prefer fresh data; fall back to previousData so the modal never shows a
-  // spinner when the query is refetching a player whose data is already cached
-  // or was previously displayed (fixes the LS-2308 loading flicker).
   const displayData = data ?? previousData;
 
   const { data: arcData } = useGetPlayerCareerArcQuery({
@@ -241,22 +517,17 @@ export function PlayerDetailModal({
 
   const eligiblePositions = displayData?.player?.eligiblePositions ?? [];
 
-  // Use the current query's fresh data for the modal title so the header
-  // always reflects the requested player. Falling back to `playerName` prop
-  // (not to `previousData`) prevents the header from briefly showing the
-  // prior player's name while a new player's data is in-flight.
   const firstName = data?.player?.firstName;
   const lastName = data?.player?.lastName;
   const resolvedPlayerName =
     firstName && lastName ? `${firstName} ${lastName}` : playerName;
+  const initials = deriveInitials(resolvedPlayerName);
 
   // ------ Transform to season rows ------
   const seasonRows = useMemo((): SeasonRow[] => {
     if (!displayData) return [];
-
     const seasons = new Map<number, SeasonRow>();
 
-    // Batting
     displayData.playerSeasonBatting?.forEach(
       (b: {
         season?: number | null;
@@ -279,7 +550,6 @@ export function PlayerDetailModal({
         const obp = pa > 0 ? ((h + bb) / pa).toFixed(3) : '.000';
         const slg =
           ab > 0 ? (((b.homeRuns ?? 0) * 4 + h) / ab).toFixed(3) : '.000';
-
         row.batting = {
           games: b.games ?? 0,
           pa,
@@ -296,7 +566,6 @@ export function PlayerDetailModal({
       },
     );
 
-    // Pitching
     displayData.playerSeasonPitching?.forEach(
       (p: {
         season?: number | null;
@@ -315,7 +584,6 @@ export function PlayerDetailModal({
         const decimalInnings = ipToDecimalInnings(ip);
         const era =
           decimalInnings > 0 ? ((er * 9) / decimalInnings).toFixed(2) : '0.00';
-
         row.pitching = {
           games: p.games ?? 0,
           wins: p.wins ?? 0,
@@ -329,7 +597,6 @@ export function PlayerDetailModal({
       },
     );
 
-    // Fielding (aggregate positions per season)
     displayData.playerSeasonFielding?.forEach(
       (f: {
         season?: number | null;
@@ -342,7 +609,6 @@ export function PlayerDetailModal({
       }) => {
         if (!f?.season) return;
         const row: SeasonRow = seasons.get(f.season) || { season: f.season };
-
         if (row.fielding) {
           row.fielding.games += f.games ?? 0;
           row.fielding.inn += f.inningsDefended ?? 0;
@@ -393,12 +659,17 @@ export function PlayerDetailModal({
     const pIP = outsToBaseballIP(pTotalOuts);
     const pSO = pitching.reduce((s, r) => s + (r.pitching?.so ?? 0), 0);
 
+    const years = seasonRows.map((r) => r.season);
+    const minYear = Math.min(...years);
+    const maxYear = Math.max(...years);
+
     return {
       hasBatting: batting.length > 0,
       hasPitching: pitching.length > 0,
       hasFielding: seasonRows.some((r) => r.fielding),
       seasons: seasonRows.length,
-      // batting
+      minYear,
+      maxYear,
       games: totGames,
       ab: totAB,
       h: totH,
@@ -406,7 +677,6 @@ export function PlayerDetailModal({
       rbi: totRBI,
       sb: totSB,
       avg: totAB > 0 ? (totH / totAB).toFixed(3) : '.000',
-      // pitching
       pGames,
       pWins,
       pLosses,
@@ -489,8 +759,6 @@ export function PlayerDetailModal({
     fieldingTableRows,
   ]);
 
-  // Sync activeTab with available tabs — if the current tab isn't available,
-  // fall back to the first available tab.
   useEffect(() => {
     if (
       availableTabs.length > 0 &&
@@ -500,67 +768,103 @@ export function PlayerDetailModal({
     }
   }, [availableTabs, activeTab]);
 
-  // ------ Career stat card data ------
-  const battingCardRows = useMemo((): StatRowData[] => {
+  // ------ Career stat tile rows ------
+  const battingTiles: CareerTile[] = useMemo(() => {
     if (!careerTotals?.hasBatting) return [];
     return [
-      { label: 'Games', value: careerTotals.games },
-      { label: 'Batting Average', value: careerTotals.avg, accent: true },
-      { label: 'Home Runs', value: careerTotals.hr },
-      { label: 'RBI', value: careerTotals.rbi },
-      { label: 'Hits', value: careerTotals.h },
-      { label: 'Stolen Bases', value: careerTotals.sb },
+      { label: 'Games', value: careerTotals.games.toLocaleString('en-US') },
+      { label: 'AVG', value: careerTotals.avg, accent: true },
+      { label: 'Home Runs', value: careerTotals.hr.toLocaleString('en-US') },
+      { label: 'RBI', value: careerTotals.rbi.toLocaleString('en-US') },
+      { label: 'Hits', value: careerTotals.h.toLocaleString('en-US') },
+      {
+        label: 'Stolen Bases',
+        value: careerTotals.sb.toLocaleString('en-US'),
+      },
     ];
   }, [careerTotals]);
 
-  const pitchingCardRows = useMemo((): StatRowData[] => {
+  const pitchingTiles: CareerTile[] = useMemo(() => {
     if (!careerTotals?.hasPitching) return [];
     return [
-      { label: 'Games', value: careerTotals.pGames },
+      { label: 'Games', value: careerTotals.pGames.toLocaleString('en-US') },
       {
         label: 'Record',
-        value: `${careerTotals.pWins}\u2013${careerTotals.pLosses}`,
+        value: `${careerTotals.pWins}–${careerTotals.pLosses}`,
         accent: true,
       },
-      { label: 'Innings Pitched', value: careerTotals.pIP },
-      { label: 'Strikeouts', value: careerTotals.pSO },
+      { label: 'Innings', value: careerTotals.pIP },
+      { label: 'Strikeouts', value: careerTotals.pSO.toLocaleString('en-US') },
     ];
   }, [careerTotals]);
 
-  // ------ Subtitle ------
-  const subtitle = careerTotals
-    ? `${careerTotals.seasons} season${careerTotals.seasons !== 1 ? 's' : ''}`
-    : undefined;
+  // ------ Eyebrow text ------
+  const eyebrowText = careerTotals
+    ? `Player · ${careerTotals.seasons} Season${careerTotals.seasons !== 1 ? 's' : ''} · ${careerTotals.minYear}–${careerTotals.maxYear}`
+    : 'Player';
 
-  // ------ Title badge ------
-  const titleBadge = position ? (
-    <PositionBadge position={position} />
-  ) : undefined;
-
-  // ------ Era-tinted header — radial wash keyed off the player's position ------
+  // ------ Era-tinted background — radial wash keyed off the player's position ------
   const headerAccentColor = position ? getPositionColor(position) : undefined;
+  const mastheadBackground = headerAccentColor
+    ? `radial-gradient(ellipse at 100% 0%, ${withAlpha(headerAccentColor, 0.18)} 0%, transparent 55%), radial-gradient(ellipse at 0% 100%, ${withAlpha(headerAccentColor, 0.1)} 0%, transparent 50%), ${BG_DARK}`
+    : BG_DARK;
 
   return (
     <BaseModal
       open={open}
       onOpenChange={onOpenChange}
       title={resolvedPlayerName}
-      titleId="player-detail-title"
-      subtitle={subtitle}
-      titleBadge={titleBadge}
-      headerAccentColor={headerAccentColor}
+      maxWidth={1200}
+      hideHeader
     >
-      <ScrollView maxHeight="calc(88vh - 100px)">
-        <YStack padding="$4" gap="$4">
+      <ScrollView maxHeight="calc(88vh)" backgroundColor={BG_DARK}>
+        <YStack
+          padding={24}
+          $sm={{ padding: 16 }}
+          style={{ background: mastheadBackground }}
+        >
+          {/* ── Editorial masthead ── */}
+          <XStack
+            gap={16}
+            alignItems="center"
+            paddingBottom={20}
+            borderBottomWidth={1}
+            borderBottomColor={STATS_BORDER}
+            flexWrap="wrap"
+          >
+            <PortraitAvatar initials={initials} accent={headerAccentColor} />
+            <YStack flex={1} gap={4} minWidth={200}>
+              <Eyebrow>{eyebrowText}</Eyebrow>
+              <EditorialHeading>{resolvedPlayerName}</EditorialHeading>
+            </YStack>
+            <Button
+              size="$3"
+              circular
+              icon={X}
+              aria-label="Close"
+              onPress={() => onOpenChange(false)}
+              backgroundColor={withAlpha(WHITE, 0.08)}
+              borderColor={STATS_BORDER}
+              borderWidth={1}
+              color={TEXT_INTERFACE}
+              hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.14) }}
+              pressStyle={{ backgroundColor: withAlpha(WHITE, 0.18) }}
+            />
+          </XStack>
+
           {/* ── Loading ── */}
           {loading && !displayData && (
             <YStack
               alignItems="center"
-              paddingVertical="$8"
+              paddingVertical={48}
               data-testid="player-detail-loading"
             >
-              <Spinner size="large" color={BRAND_NAVY_LIGHT} />
-              <Text marginTop="$3" color={TEXT_MUTED}>
+              <Spinner size="large" color={BRAND_GOLD} />
+              <Text
+                marginTop={12}
+                color={TEXT_TERTIARY}
+                style={{ fontFamily: FONT_BODY, fontStyle: 'italic' }}
+              >
                 Loading player statistics…
               </Text>
             </YStack>
@@ -570,19 +874,27 @@ export function PlayerDetailModal({
           {error && (
             <YStack
               data-testid="player-detail-error"
-              backgroundColor={withAlpha(BRAND_SEAM_RED, 0.12)}
-              padding="$4"
-              borderRadius="$3"
+              marginTop={20}
+              backgroundColor={SURFACE_CARD}
+              padding={28}
+              borderRadius={16}
               borderWidth={1}
               borderColor={withAlpha(BRAND_SEAM_RED, 0.35)}
             >
-              <Text color={BRAND_SEAM_RED} fontWeight="600">
-                Error loading stats
+              <Text
+                color={WHITE}
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 800,
+                  fontSize: 22,
+                }}
+              >
+                We couldn't load this player
               </Text>
               <Text
-                color={withAlpha(BRAND_SEAM_RED, 0.8)}
-                fontSize="$2"
-                marginTop="$1"
+                color={TEXT_SECONDARY}
+                marginTop={6}
+                style={{ fontFamily: FONT_BODY }}
               >
                 {error.message}
               </Text>
@@ -593,102 +905,161 @@ export function PlayerDetailModal({
           {!!displayData && !error && seasonRows.length === 0 && (
             <YStack
               alignItems="center"
-              paddingVertical="$8"
-              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.08)}
-              borderRadius="$3"
+              paddingVertical={48}
+              marginTop={20}
+              backgroundColor={SURFACE_CARD}
+              borderWidth={1}
+              borderColor={STATS_BORDER}
+              borderStyle="dashed"
+              borderRadius={16}
               data-testid="player-detail-empty"
             >
-              <Text color={TEXT_MUTED} fontSize="$4">
-                No season statistics found
+              <Text
+                color={WHITE}
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 800,
+                  fontSize: 28,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                No season statistics found.
+              </Text>
+              <Text
+                color={TEXT_SECONDARY}
+                marginTop={8}
+                style={{ fontFamily: FONT_BODY, fontStyle: 'italic' }}
+              >
+                This player has no major-league seasons in the archive.
               </Text>
             </YStack>
           )}
 
-          {/* ── Eligible positions ── */}
+          {/* ── Positions band ── */}
           {!!displayData && !error && eligiblePositions.length > 0 && (
             <XStack
-              gap="$2"
+              gap={10}
               alignItems="center"
               flexWrap="wrap"
+              paddingVertical={14}
+              borderBottomWidth={1}
+              borderBottomColor={STATS_BORDER}
               data-testid="eligible-positions"
             >
-              <Text fontSize="$2" fontWeight="600" color={TEXT_MUTED}>
-                Eligible Positions
+              <Text
+                color={TEXT_TERTIARY}
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Eligible
               </Text>
-              <XStack gap="$1.5" flexWrap="wrap">
-                {eligiblePositions.map((pos) => (
-                  <PositionBadge key={pos} position={pos} />
+              {eligiblePositions.map((pos) => (
+                <PositionBadge key={pos} position={pos} />
+              ))}
+            </XStack>
+          )}
+
+          {/* ── Hero stats ── */}
+          {!!displayData && !error && careerTotals && (
+            <XStack gap={14} flexWrap="wrap" marginTop={20}>
+              {careerTotals.hasBatting && (
+                <>
+                  <HeroStat
+                    label="Career AVG"
+                    value={careerTotals.avg}
+                    accent
+                  />
+                  <HeroStat
+                    label="Home Runs"
+                    value={careerTotals.hr.toLocaleString('en-US')}
+                  />
+                  <HeroStat
+                    label="Runs Batted In"
+                    value={careerTotals.rbi.toLocaleString('en-US')}
+                  />
+                </>
+              )}
+              {careerTotals.hasPitching && !careerTotals.hasBatting && (
+                <>
+                  <HeroStat
+                    label="Record"
+                    value={`${careerTotals.pWins}–${careerTotals.pLosses}`}
+                    accent
+                  />
+                  <HeroStat
+                    label="Strikeouts"
+                    value={careerTotals.pSO.toLocaleString('en-US')}
+                  />
+                  <HeroStat label="Innings Pitched" value={careerTotals.pIP} />
+                </>
+              )}
+            </XStack>
+          )}
+
+          {/* ── Career batting grid ── */}
+          {!!displayData && !error && battingTiles.length > 0 && (
+            <YStack data-testid="career-batting-card">
+              <SectionHead
+                title="Career Batting"
+                meta={
+                  careerTotals
+                    ? `Aggregated across ${careerTotals.seasons} season${careerTotals.seasons !== 1 ? 's' : ''}`
+                    : undefined
+                }
+              />
+              <XStack gap={8} flexWrap="wrap">
+                {battingTiles.map((t) => (
+                  <CareerStatTile
+                    key={t.label}
+                    label={t.label}
+                    value={t.value}
+                    accent={t.accent}
+                  />
                 ))}
               </XStack>
-            </XStack>
+            </YStack>
           )}
 
-          {/* ── Hero stats + position avatar ── */}
-          {!!displayData && !error && careerTotals && (
-            <>
-              <XStack gap="$3" alignItems="center" flexWrap="wrap">
-                {position && <PositionAvatar position={position} />}
-                <XStack gap="$2" flexWrap="wrap" flex={1}>
-                  {careerTotals.hasBatting && (
-                    <>
-                      <HeroStat label="AVG" value={careerTotals.avg} />
-                      <HeroStat label="HR" value={careerTotals.hr} />
-                      <HeroStat label="RBI" value={careerTotals.rbi} />
-                    </>
-                  )}
-                  {careerTotals.hasPitching && (
-                    <>
-                      <HeroStat
-                        label="W-L"
-                        value={`${careerTotals.pWins}\u2013${careerTotals.pLosses}`}
-                      />
-                      <HeroStat label="SO" value={careerTotals.pSO} />
-                    </>
-                  )}
-                </XStack>
+          {/* ── Career pitching grid ── */}
+          {!!displayData && !error && pitchingTiles.length > 0 && (
+            <YStack data-testid="career-pitching-card">
+              <SectionHead
+                title="Career Pitching"
+                meta={
+                  careerTotals
+                    ? `Aggregated across ${careerTotals.seasons} season${careerTotals.seasons !== 1 ? 's' : ''}`
+                    : undefined
+                }
+              />
+              <XStack gap={8} flexWrap="wrap">
+                {pitchingTiles.map((t) => (
+                  <CareerStatTile
+                    key={t.label}
+                    label={t.label}
+                    value={t.value}
+                    accent={t.accent}
+                  />
+                ))}
               </XStack>
-
-              <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)} />
-            </>
+            </YStack>
           )}
 
-          {/* ── Career summary cards ── */}
-          {!!displayData && !error && careerTotals && (
-            <XStack gap="$3" flexWrap="wrap" alignItems="flex-start">
-              {battingCardRows.length > 0 && (
-                <YStack
-                  flex={1}
-                  minWidth={280}
-                  data-testid="career-batting-card"
-                >
-                  <StatCard title="Career Batting" rows={battingCardRows} />
-                </YStack>
-              )}
-              {pitchingCardRows.length > 0 && (
-                <YStack
-                  flex={1}
-                  minWidth={280}
-                  data-testid="career-pitching-card"
-                >
-                  <StatCard title="Career Pitching" rows={pitchingCardRows} />
-                </YStack>
-              )}
-            </XStack>
-          )}
-
-          {/* ── Season-by-season tabs ── */}
+          {/* ── Tabs ── */}
           {!!displayData && !error && availableTabs.length > 0 && (
             <>
-              <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)} />
-
-              {/* Tab bar */}
               <XStack
-                gap="$1"
+                marginTop={28}
                 borderBottomWidth={1}
-                borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                borderBottomColor={STATS_BORDER}
+                overflow="scroll"
               >
                 {availableTabs.map((tab) => (
-                  <TabButton
+                  <EditorialTab
                     key={tab.key}
                     label={tab.label}
                     tabKey={tab.key}
@@ -698,19 +1069,18 @@ export function PlayerDetailModal({
                 ))}
               </XStack>
 
-              {/* Tab content */}
+              {/* Career Arc */}
               {activeTab === 'career-arc' && (
-                <YStack gap="$3">
-                  {/* Arc mode toggle (batting/pitching) */}
+                <YStack gap={12} marginTop={22}>
                   {hasBattingArc && hasPitchingArc && (
-                    <XStack gap="$1">
-                      <TabButton
+                    <XStack gap={4}>
+                      <EditorialTab
                         label="Batting"
                         tabKey="arc-batting"
                         active={arcMode === 'batting'}
                         onPress={() => setArcMode('batting')}
                       />
-                      <TabButton
+                      <EditorialTab
                         label="Pitching"
                         tabKey="arc-pitching"
                         active={arcMode === 'pitching'}
@@ -718,48 +1088,74 @@ export function PlayerDetailModal({
                       />
                     </XStack>
                   )}
-                  <React.Suspense fallback={<Spinner />}>
-                    <CareerArcChart
-                      battingSeasons={arcData?.playerSeasonBatting}
-                      pitchingSeasons={arcData?.playerSeasonPitching}
-                      mode={hasBattingArc ? arcMode : 'pitching'}
-                    />
-                  </React.Suspense>
+                  <YStack
+                    padding={22}
+                    backgroundColor={SURFACE_SUBTLE}
+                    borderWidth={1}
+                    borderColor={STATS_BORDER}
+                    borderRadius={16}
+                  >
+                    <React.Suspense fallback={<Spinner color={BRAND_GOLD} />}>
+                      <CareerArcChart
+                        battingSeasons={arcData?.playerSeasonBatting}
+                        pitchingSeasons={arcData?.playerSeasonPitching}
+                        mode={hasBattingArc ? arcMode : 'pitching'}
+                      />
+                    </React.Suspense>
+                  </YStack>
                 </YStack>
               )}
 
               {activeTab === 'batting' && battingTableRows.length > 0 && (
-                <StatTable
-                  title="Batting by Season"
-                  headers={[
-                    'YEAR',
-                    'G',
-                    'PA',
-                    'AB',
-                    'H',
-                    'HR',
-                    'RBI',
-                    'SB',
-                    'AVG',
-                  ]}
-                  rows={battingTableRows}
-                />
+                <>
+                  <SectionHead
+                    title="Season by Season · Batting"
+                    meta="Newest first"
+                  />
+                  <EditorialTable
+                    caption="Season batting statistics"
+                    headers={[
+                      'Year',
+                      'G',
+                      'PA',
+                      'AB',
+                      'H',
+                      'HR',
+                      'RBI',
+                      'SB',
+                      'AVG',
+                    ]}
+                    rows={battingTableRows}
+                  />
+                </>
               )}
 
               {activeTab === 'pitching' && pitchingTableRows.length > 0 && (
-                <StatTable
-                  title="Pitching by Season"
-                  headers={['YEAR', 'G', 'W-L', 'ERA', 'IP', 'SO', 'BB']}
-                  rows={pitchingTableRows}
-                />
+                <>
+                  <SectionHead
+                    title="Season by Season · Pitching"
+                    meta="Newest first"
+                  />
+                  <EditorialTable
+                    caption="Season pitching statistics"
+                    headers={['Year', 'G', 'W-L', 'ERA', 'IP', 'SO', 'BB']}
+                    rows={pitchingTableRows}
+                  />
+                </>
               )}
 
               {activeTab === 'fielding' && fieldingTableRows.length > 0 && (
-                <StatTable
-                  title="Fielding by Season"
-                  headers={['YEAR', 'POS', 'G', 'INN', 'PO', 'A', 'E']}
-                  rows={fieldingTableRows}
-                />
+                <>
+                  <SectionHead
+                    title="Season by Season · Fielding"
+                    meta="Newest first"
+                  />
+                  <EditorialTable
+                    caption="Season fielding statistics"
+                    headers={['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']}
+                    rows={fieldingTableRows}
+                  />
+                </>
               )}
             </>
           )}
