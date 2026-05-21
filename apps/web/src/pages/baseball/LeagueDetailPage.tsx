@@ -64,6 +64,10 @@ import {
   PendingWaiverClaims,
 } from '@legacy-sports/shared-components/roster';
 import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
+import {
+  handleRosterMutationError,
+  MATCHUP_LOCK_POLL_INTERVAL_MS,
+} from './matchup-lock-refresh';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueHistory } from '../../features/baseball/LeagueHistory';
@@ -1236,11 +1240,15 @@ export function LeagueDetailPage(): React.JSX.Element {
     ? parseInt(displayedMatchup.id, 10)
     : null;
 
-  const { data: matchupPlayersData } = useGetMatchupPlayersQuery({
-    variables: { matchupId: displayedMatchupIdNum ?? 0 },
-    skip: !displayedMatchupIdNum,
-    fetchPolicy: 'cache-and-network',
-  });
+  const { data: matchupPlayersData, refetch: refetchMatchupPlayers } =
+    useGetMatchupPlayersQuery({
+      variables: { matchupId: displayedMatchupIdNum ?? 0 },
+      skip: !displayedMatchupIdNum,
+      fetchPolicy: 'cache-and-network',
+      // LS-4034: keep matchup-lock state fresh so the UI doesn't let users
+      // move players after the server has locked their matchup mid-session.
+      pollInterval: MATCHUP_LOCK_POLL_INTERVAL_MS,
+    });
 
   const gamesPerMatchup = displayedMatchup?.gamesPerMatchup ?? 10;
 
@@ -1446,10 +1454,22 @@ export function LeagueDetailPage(): React.JSX.Element {
           dispatch(updateTeamMember(updated as TeamMemberFragment));
         }
       } catch (error) {
-        LOGGER.error('Error assigning player:', String(error));
+        handleRosterMutationError({
+          error,
+          logger: LOGGER,
+          logPrefix: 'Error assigning player:',
+          refetchMatchupPlayers: displayedMatchupIdNum
+            ? refetchMatchupPlayers
+            : null,
+        });
       }
     },
-    [updateTeamMemberPosition, dispatch, displayedMatchupIdNum],
+    [
+      updateTeamMemberPosition,
+      dispatch,
+      displayedMatchupIdNum,
+      refetchMatchupPlayers,
+    ],
   );
 
   const handlePlayerRemove = useCallback(
@@ -1476,10 +1496,23 @@ export function LeagueDetailPage(): React.JSX.Element {
           }
         }
       } catch (error) {
-        LOGGER.error('Error removing player:', String(error));
+        handleRosterMutationError({
+          error,
+          logger: LOGGER,
+          logPrefix: 'Error removing player:',
+          refetchMatchupPlayers: displayedMatchupIdNum
+            ? refetchMatchupPlayers
+            : null,
+        });
       }
     },
-    [updateTeamMemberPosition, teamMembers, dispatch, displayedMatchupIdNum],
+    [
+      updateTeamMemberPosition,
+      teamMembers,
+      dispatch,
+      displayedMatchupIdNum,
+      refetchMatchupPlayers,
+    ],
   );
 
   const handlePlayerSwap = useCallback(
@@ -1538,10 +1571,23 @@ export function LeagueDetailPage(): React.JSX.Element {
           }
         }
       } catch (error) {
-        LOGGER.error('Error swapping players:', String(error));
+        handleRosterMutationError({
+          error,
+          logger: LOGGER,
+          logPrefix: 'Error swapping players:',
+          refetchMatchupPlayers: displayedMatchupIdNum
+            ? refetchMatchupPlayers
+            : null,
+        });
       }
     },
-    [swapTeamMemberPositions, positions, dispatch, displayedMatchupIdNum],
+    [
+      swapTeamMemberPositions,
+      positions,
+      dispatch,
+      displayedMatchupIdNum,
+      refetchMatchupPlayers,
+    ],
   );
 
   const handleSetNickname = useCallback(
