@@ -106,7 +106,7 @@ If child B depends on child A, note this in child B's description under Technica
 
 > "Depends on LS-XXXX (child A). Branch from that ticket's branch, not from main."
 
-And create a Jira issue link if the tool is available:
+And create a Jira issue link if the tool is available (`inwardKey` is the blocked ticket, `outwardKey` is the blocker — reads "inwardKey is blocked by outwardKey"):
 
 ```
 jira_link_issues({ inwardKey: "LS-B", outwardKey: "LS-A", linkType: "Blocks" })
