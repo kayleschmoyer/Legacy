@@ -9,8 +9,11 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
+  TEXT_QUIETEST,
+  TEXT_SECONDARY,
   FONT_DISPLAY,
   FONT_BODY,
+  FONT_MONO,
   OUTLINE_SUBTLE,
   SURFACE_PANEL,
   SURFACE_CARD,
@@ -117,7 +120,7 @@ export const DifferentiatorScene: React.FC = () => {
               top: 14,
               width: 18,
               height: isLegacy ? 3 : 2,
-              background: isLegacy ? BRAND_GOLD : '#6C80BA',
+              background: isLegacy ? BRAND_GOLD : TEXT_QUIETEST,
             }}
           />
           <div
@@ -125,7 +128,7 @@ export const DifferentiatorScene: React.FC = () => {
               fontFamily: FONT_BODY,
               fontSize: 28,
               lineHeight: 1.4,
-              color: isLegacy ? '#DEE6FF' : TEXT_MUTED,
+              color: TEXT_SECONDARY,
             }}
           >
             {p.bold && parts.length === 2 ? (
@@ -133,7 +136,7 @@ export const DifferentiatorScene: React.FC = () => {
                 {parts[0]}
                 <b
                   style={{
-                    color: isLegacy ? TEXT_PRIMARY : TEXT_MUTED,
+                    color: TEXT_PRIMARY,
                     fontWeight: 600,
                   }}
                 >
@@ -257,7 +260,7 @@ export const DifferentiatorScene: React.FC = () => {
               letterSpacing: '0.20em',
               fontSize: 26,
               marginBottom: 14,
-              color: '#6C80BA',
+              color: TEXT_QUIETEST,
             }}
           >
             Normal Fantasy
@@ -267,7 +270,7 @@ export const DifferentiatorScene: React.FC = () => {
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
               fontSize: 56,
-              color: '#DEE6FF',
+              color: TEXT_SECONDARY,
               lineHeight: 1.0,
               margin: '0 0 32px 0',
               letterSpacing: '-0.01em',
@@ -286,7 +289,7 @@ export const DifferentiatorScene: React.FC = () => {
             alignSelf: 'center',
             fontFamily: FONT_DISPLAY,
             fontWeight: 800,
-            color: '#6C80BA',
+            color: TEXT_QUIETEST,
             fontSize: 56,
             textAlign: 'center',
             letterSpacing: '0.04em',
@@ -369,15 +372,15 @@ export const DifferentiatorScene: React.FC = () => {
             boxShadow: `0 0 12px ${BRAND_GOLD}`,
           }}
         />
-        Scene 02<span style={{ color: '#6C80BA' }}>/</span>Differentiator
+        Scene 02<span style={{ color: TEXT_QUIETEST }}>/</span>Differentiator
       </div>
       <div
         style={{
           position: 'absolute',
           right: 56,
           bottom: 40,
-          fontFamily: "'Roboto Mono', monospace",
-          color: '#6C80BA',
+          fontFamily: FONT_MONO,
+          color: TEXT_QUIETEST,
           fontSize: 24,
           letterSpacing: '0.08em',
           opacity: vsOpacity,
