@@ -32,10 +32,17 @@ export interface MlbDataProvider {
     group: 'hitting' | 'pitching' | 'fielding',
   ): Promise<PlayerSeasonStats>;
 
-  /** Returns a player's stats for a single game. */
+  /**
+   * Returns a player's stats for a single game.
+   *
+   * When `season` is omitted, providers backed by the MLB Stats API only
+   * search the current season's game log — pass an explicit `season` when
+   * looking up games from a prior year (backfill, re-score, season rollover).
+   */
   getPlayerGameStats(
     mlbPlayerId: number,
     gamePk: number,
+    season?: number,
   ): Promise<PlayerGameStats>;
 
   // ── Reference ─────────────────────────────────────────────────────────────

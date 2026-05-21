@@ -242,10 +242,15 @@ export class MlbStatsApiProvider implements MlbDataProvider {
   async getPlayerGameStats(
     mlbPlayerId: number,
     gamePk: number,
+    season?: number,
   ): Promise<PlayerGameStats> {
     const data = await this.get<MlbApiPlayerStatsResponse>(
       `/v1/people/${mlbPlayerId}/stats`,
-      { stats: 'gameLog', sportId: 1 },
+      {
+        stats: 'gameLog',
+        sportId: 1,
+        ...(season !== undefined ? { season } : {}),
+      },
     );
     const split = (data.stats?.[0]?.splits ?? []).find(
       (s) => s.game?.gamePk === gamePk,
