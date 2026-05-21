@@ -24,10 +24,10 @@ Autonomously work a Jira ticket from To Do through to merge (or Done). Handles t
 work-ticket <ticket-key> [--batch]
 ```
 
-| Argument       | Required | Description                                                                                                                                                                                                                                                                                                                               |
-| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<ticket-key>` | Yes      | Jira ticket key to work (e.g. `LS-1234`)                                                                                                                                                                                                                                                                                                  |
-| `--batch`      | No       | For parent tickets: **dispatch one chip per unblocked To Do child** via `mcp__ccd_session__spawn_task` so each child is worked in its own independent agent session, instead of working only the first child in this session. The orchestrator does not wait on chips — each child drives itself to merge. Has no effect on leaf tickets. |
+| Argument       | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ticket-key>` | Yes      | Jira ticket key to work (e.g. `LS-1234`)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `--batch`      | No       | For parent tickets: **dispatch one chip per unblocked To Do child** via `mcp__ccd_session__spawn_task` so each child is worked in its own independent agent session, instead of working only the first child in this session. The orchestrator does not claim children (chips claim atomically inside their own session, so a failed chip leaves the ticket in "To Do" for the next run) and does not wait on chips — each child drives itself to merge. Has no effect on leaf tickets. |
 
 The `--batch` flag is also implied when the user's natural-language request contains phrases like "work all tickets under", "process the full backlog", or "implement all children of".
 
@@ -116,11 +116,11 @@ jira_list_children(key: "LS-####", limit: 100)
 
 > **Pagination required**: if the response contains `nextPageToken`, you must paginate (pass `pageToken` to subsequent calls) until `nextPageToken` is absent. Never assume the first page is complete — default limits (10-25) will silently truncate large epics.
 
-| Condition                                                      | Mode                                                                                                |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| No children (or `jira_list_children` returns empty)            | **Leaf mode** — implement this ticket directly                                                      |
-| Has children, `--batch` flag absent                            | **Parent mode (single)** — work the first available child and stop                                  |
-| Has children, `--batch` flag present (or implied by user text) | **Parent mode (chip dispatch)** — claim every unblocked To Do child, spawn one chip per child, stop |
+| Condition                                                      | Mode                                                                                                             |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| No children (or `jira_list_children` returns empty)            | **Leaf mode** — implement this ticket directly                                                                   |
+| Has children, `--batch` flag absent                            | **Parent mode (single)** — work the first available child and stop                                               |
+| Has children, `--batch` flag present (or implied by user text) | **Parent mode (chip dispatch)** — spawn one chip per unblocked To Do child (chips claim their own tickets), stop |
 
 ### Step 1b: Planning phase
 
@@ -336,7 +336,7 @@ Pick the **first** unblocked To Do child and work it to completion. Do **not** l
 
 > **Why (default / single mode)**: working multiple tickets in a single session risks leaving tickets "In Progress" with no active agent. One ticket per session keeps the state clean and lets the user decide what to pick up next.
 >
-> **Why batch mode is safe**: with `--batch`, every claimed child is immediately handed off to its own chip session via `mcp__ccd_session__spawn_task` — there is never an "In Progress" ticket without an active agent because each chip owns its ticket end-to-end. The orchestrator does no implementation work; it only claims and dispatches.
+> **Why batch mode is safe**: with `--batch`, every unblocked child is handed off to its own chip session via `mcp__ccd_session__spawn_task`, and the **chip** claims the ticket atomically via `jira_claim_ticket` as its first action — not the orchestrator. If a chip fails to start (spawn error, crash, OOM), the ticket stays in "To Do" and is eligible for the next dispatcher pass, instead of being stranded "In Progress" with no active worker. The orchestrator performs **zero Jira state mutations** on children; it only re-verifies status and dispatches. Concurrent-dispatcher race is handled by `jira_claim_ticket` returning `ALREADY_CLAIMED` to the loser.
 
 1. **Transition parent to In Progress** (if not already):
 
@@ -370,6 +370,11 @@ Pick the **first** unblocked To Do child and work it to completion. Do **not** l
    - Verify: `jira_view` again to confirm transition succeeded. If it failed, pick
      the next candidate.
 
+   > **Default mode only**: this upfront claim is safe here because the **same session**
+   > continues directly into step 3 and works the ticket — there is no chip-handoff window
+   > during which a failure could strand the ticket. Batch mode is different: see step 4
+   > below, which replaces this upfront claim with chip-side claiming via `jira_claim_ticket`.
+
 3. **Work the claimed child ticket** using the full Leaf Mode flow (Steps 4–8 above).
    The child is implemented, validated (`make pc`), self-reviewed, committed, pushed,
    PR created, watched through CI and review, and shepherded to merge before anything else.
@@ -390,7 +395,7 @@ Pick the **first** unblocked To Do child and work it to completion. Do **not** l
    | Some children still To Do (all blocked)                 | Keep parent **In Progress** — report blocked tickets |
    | Some children still To Do (unblocked — remaining work)  | Keep parent **In Progress** — report remaining count |
 
-   > **Batch mode** (`--batch` flag or implied): replace steps 2c–3 with chip dispatch — for each unblocked To Do child, re-verify status via `jira_view`, claim via `jira_transition(status: "In Progress")`, then call `mcp__ccd_session__spawn_task` using the chip template in the Gotchas section below. Spawn all chips in one pass, then update the parent status in step 4 based on the new in-progress children. **Do not loop, do not wait on chips, do not drive their PRs to merge in this session** — each chip owns its own ticket end-to-end. If chip dispatch fails for a claimed child (tool error, etc.), transition that child back to "To Do" before reporting.
+   > **Batch mode** (`--batch` flag or implied): replace steps 2c–3 with chip dispatch — for each unblocked To Do child, re-verify status via `jira_view` (skip if no longer "To Do"), then call `mcp__ccd_session__spawn_task` using the chip template in the Gotchas section below. **Do NOT transition the child to "In Progress" yourself** — the chip claims it atomically via `jira_claim_ticket` as its first action. Claiming upfront here would strand the ticket "In Progress" with no active worker if the chip fails to start, and the ticket would silently fall off the "To Do" queue for the next batch run. Spawn all chips in one pass, then update the parent status in step 4 based on the children still in "To Do" / chips dispatched. **Do not loop, do not wait on chips, do not drive their PRs to merge in this session** — each chip owns its own ticket end-to-end.
 
 ### Step 3: MCP gap audit
 
@@ -437,7 +442,7 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
 ## Gotchas
 
 - **One child ticket per session (default)** — when a parent ticket is given, claim and work only the first available child. Do not loop back to claim more tickets after the first PR merges unless `--batch` was passed. Leaving multiple tickets "In Progress" without an active agent causes stale-claim drift and confuses sweep agents.
-- **Batch mode (`--batch`)** — pass `--batch` (or use natural-language phrases like "work all tickets under LS-####" / "process the full backlog") to dispatch chips for every unblocked To Do child. The orchestrator scans, claims (`jira_transition` to "In Progress"), and spawns one chip per child via `mcp__ccd_session__spawn_task`. Each chip is an independent Claude Code session that drives its single ticket to merge using the full work-ticket flow. The orchestrator does **not** wait on chips, track their state, or shepherd their PRs. Chip prompt template:
+- **Batch mode (`--batch`)** — pass `--batch` (or use natural-language phrases like "work all tickets under LS-####" / "process the full backlog") to dispatch chips for every unblocked To Do child. The orchestrator scans, re-verifies each candidate is still "To Do", and spawns one chip per child via `mcp__ccd_session__spawn_task`. **The orchestrator does NOT transition children to "In Progress"** — each chip claims its own ticket atomically via `jira_claim_ticket` as its first action. This keeps the queue self-healing: if a chip fails to start (spawn error, crash, OOM), the ticket stays in "To Do" instead of being stranded "In Progress" with no active worker. Concurrent dispatchers are handled by `jira_claim_ticket` returning `ALREADY_CLAIMED` to the loser. Each chip is an independent Claude Code session that drives its single ticket to merge using the full work-ticket flow. The orchestrator does **not** wait on chips, track their state, or shepherd their PRs. Chip prompt template:
 
   ```
   mcp__ccd_session__spawn_task({
@@ -448,7 +453,7 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
   Ticket: LS-<child_key> — <one-line summary from jira_view>
   Parent: LS-<parent_key>
 
-  The ticket is already transitioned to "In Progress" — do not claim it again. Proceed directly with the work-ticket Leaf Mode flow.
+  The ticket is still in "To Do" — the orchestrator did NOT claim it. Your first action must be jira_claim_ticket(key: "LS-<child_key>") as described in work-ticket Leaf Mode Step 1. If it returns ALREADY_CLAIMED or STOP, another agent grabbed it first — follow that step's instructions (check for an open PR; stop if found or if the ticket was updated within the last 60 minutes). Then proceed with the work-ticket Leaf Mode flow.
 
   Load Skill(skill: "work-ticket") FIRST, before any other tool call, and follow every step in it. The skill is authoritative — it owns the read-the-full-ticket gate (quote back ACs as AC1, AC2, ... before any state-changing tool call), the scope discipline rules (Out of Scope is a hard boundary; one ticket = one worktree = one PR), and the AC verification gate that runs before self-review.
 
