@@ -5,7 +5,7 @@ import {
   type DraftPlayer,
   type LeagueTeam,
 } from './types';
-import { getPositionColor, normalizeTeamId } from './utils';
+import { normalizeDraftPosition, normalizeTeamId } from './utils';
 
 // ---------------------------------------------------------------------------
 // Draft Grid Sub-component (team columns view)
@@ -121,16 +121,7 @@ export function DraftGrid({
         {/* Round rows */}
         {rounds.map((round) => (
           <React.Fragment key={round}>
-            <div
-              className="d-draft-grid-cell"
-              style={{
-                fontWeight: 700,
-                color: 'var(--d-text-secondary)',
-                fontSize: 11,
-              }}
-            >
-              R{round}
-            </div>
+            <div className="d-draft-grid-cell round-label">R{round}</div>
             {teams.map((team) => {
               const key = `${round}-${team.id}`;
               const pick = pickGrid[key];
@@ -148,47 +139,31 @@ export function DraftGrid({
                     ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
                     : `Player #${pick.playerId}`;
                 const position = player?.position;
-                const posColor = position ? getPositionColor(position) : null;
-
-                const cellStyle: React.CSSProperties = {
-                  ...(pick.teamId === myTeamId
-                    ? { borderColor: 'rgba(16,185,129,0.2)' }
-                    : {}),
-                  ...(posColor
-                    ? {
-                        borderLeftColor: posColor,
-                        borderLeftWidth: 3,
-                        background: `${posColor}18`,
-                      }
-                    : {}),
-                };
+                const posBucket = normalizeDraftPosition(position);
+                const isMyTeam = pick.teamId === myTeamId;
+                const className = [
+                  'd-draft-grid-cell',
+                  'filled',
+                  isMyTeam ? 'me-team' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
                 return (
                   <div
                     key={team.id}
-                    className="d-draft-grid-cell filled"
+                    className={className}
+                    data-pos={posBucket ?? undefined}
                     title={`Pick #${pick.overallPick}: ${playerName}${position ? ` (${position})` : ''}`}
-                    style={cellStyle}
                   >
-                    {posColor && position && (
+                    <span className="d-draft-grid-cell-name">{playerName}</span>
+                    {position && (
                       <span
-                        style={{
-                          display: 'inline-block',
-                          background: posColor,
-                          color: '#fff',
-                          fontSize: 8,
-                          fontWeight: 700,
-                          padding: '1px 4px',
-                          borderRadius: 3,
-                          marginBottom: 2,
-                          letterSpacing: '0.03em',
-                        }}
+                        className="d-draft-grid-cell-pos"
+                        aria-hidden="true"
                       >
                         {position}
                       </span>
                     )}
-                    <span style={{ fontSize: 10, display: 'block' }}>
-                      {playerName}
-                    </span>
                   </div>
                 );
               }

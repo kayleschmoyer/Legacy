@@ -1315,6 +1315,8 @@ export const CSS = `
   box-shadow: 0 2px 8px rgba(197, 165, 90, 0.1);
 }
 .d-draft-grid-cell {
+  position: relative;
+  overflow: hidden;
   font-size: 10px; text-align: center;
   padding: 5px 4px;
   background: rgba(255,255,255,0.015);
@@ -1323,6 +1325,11 @@ export const CSS = `
   display: flex; align-items: center; justify-content: center;
   color: var(--d-text-muted);
   transition: all 0.25s ease;
+}
+.d-draft-grid-cell.round-label {
+  font-weight: 700;
+  color: var(--d-text-secondary);
+  font-size: 11px;
 }
 .d-draft-grid-cell.filled {
   background: rgba(255,255,255,0.04);
@@ -1337,6 +1344,96 @@ export const CSS = `
   border-color: rgba(197, 165, 90, 0.3);
   animation: pickPulse 2s ease-in-out infinite;
   box-shadow: inset 0 0 12px rgba(197, 165, 90, 0.08);
+}
+
+/* Position color accent on filled cells — 3px left stripe + faint
+   position-tinted background, keyed on the normalized data-pos bucket
+   (P / C / IF / OF / U) using the --pos-* tokens from LS-4627. Raw
+   positions (SP/RP, CF/LF/RF, UTIL, etc.) are normalized in JSX via
+   normalizeDraftPosition() before reaching the DOM. */
+.d-draft-grid-cell.filled[data-pos='P'] {
+  border-left: 3px solid var(--pos-p);
+  background: color-mix(in srgb, var(--pos-p) 9%, rgba(255,255,255,0.04));
+}
+.d-draft-grid-cell.filled[data-pos='C'] {
+  border-left: 3px solid var(--pos-c);
+  background: color-mix(in srgb, var(--pos-c) 9%, rgba(255,255,255,0.04));
+}
+.d-draft-grid-cell.filled[data-pos='IF'] {
+  border-left: 3px solid var(--pos-if);
+  background: color-mix(in srgb, var(--pos-if) 9%, rgba(255,255,255,0.04));
+}
+.d-draft-grid-cell.filled[data-pos='OF'] {
+  border-left: 3px solid var(--pos-of);
+  background: color-mix(in srgb, var(--pos-of) 9%, rgba(255,255,255,0.04));
+}
+.d-draft-grid-cell.filled[data-pos='U'] {
+  border-left: 3px solid var(--pos-u);
+  background: color-mix(in srgb, var(--pos-u) 9%, rgba(255,255,255,0.04));
+}
+/* Hover variants brighten the tint while preserving the position accent
+   (the position rules above would otherwise win over .filled:hover). */
+.d-draft-grid-cell.filled[data-pos='P']:hover {
+  background: color-mix(in srgb, var(--pos-p) 16%, rgba(255,255,255,0.07));
+}
+.d-draft-grid-cell.filled[data-pos='C']:hover {
+  background: color-mix(in srgb, var(--pos-c) 16%, rgba(255,255,255,0.07));
+}
+.d-draft-grid-cell.filled[data-pos='IF']:hover {
+  background: color-mix(in srgb, var(--pos-if) 16%, rgba(255,255,255,0.07));
+}
+.d-draft-grid-cell.filled[data-pos='OF']:hover {
+  background: color-mix(in srgb, var(--pos-of) 16%, rgba(255,255,255,0.07));
+}
+.d-draft-grid-cell.filled[data-pos='U']:hover {
+  background: color-mix(in srgb, var(--pos-u) 16%, rgba(255,255,255,0.07));
+}
+
+/* Lower-right position glyph — display-font, large, low-opacity reinforcement. */
+.d-draft-grid-cell-pos {
+  position: absolute;
+  bottom: 1px;
+  right: 4px;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  opacity: 0.22;
+  pointer-events: none;
+  color: var(--d-text);
+}
+.d-draft-grid-cell[data-pos='P'] .d-draft-grid-cell-pos {
+  color: var(--pos-p);
+  opacity: 0.55;
+}
+.d-draft-grid-cell[data-pos='C'] .d-draft-grid-cell-pos {
+  color: var(--pos-c);
+  opacity: 0.55;
+}
+.d-draft-grid-cell[data-pos='IF'] .d-draft-grid-cell-pos {
+  color: var(--pos-if);
+  opacity: 0.55;
+}
+.d-draft-grid-cell[data-pos='OF'] .d-draft-grid-cell-pos {
+  color: var(--pos-of);
+  opacity: 0.55;
+}
+.d-draft-grid-cell[data-pos='U'] .d-draft-grid-cell-pos {
+  color: var(--pos-u);
+  opacity: 0.55;
+}
+
+/* My-team override — gold border replaces position stripe (loudest signal). */
+.d-draft-grid-cell.me-team {
+  border-color: rgba(197, 165, 90, 0.4);
+  border-left-color: var(--d-accent);
+}
+.d-draft-grid-cell-name {
+  display: block;
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
 }
 
 /* ===== Toast Notifications ===== */
