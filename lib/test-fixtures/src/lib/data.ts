@@ -6,6 +6,7 @@
  * when a fresh mutable copy with optional overrides is needed.
  */
 
+import { fixtureFootballPlayers } from './football-pool';
 import type {
   FixtureCareerStats,
   FixtureLeague,
@@ -14,6 +15,11 @@ import type {
   FixtureTeam,
   FixtureUser,
 } from './types';
+
+export {
+  countFootballPoolByPosition,
+  fixtureFootballPlayers,
+} from './football-pool';
 
 export const fixturePlayers: readonly FixturePlayer[] = Object.freeze([
   { id: 1, firstName: 'Mike', lastName: 'Trout', brefId: 'troutmi01' },
@@ -168,4 +174,5 @@ export const fixtures = {
   teams: fixtureTeams,
   matchups: fixtureMatchups,
   careerStats: fixtureCareerStats,
+  footballPlayers: fixtureFootballPlayers,
 } as const;

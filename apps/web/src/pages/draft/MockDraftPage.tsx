@@ -8,10 +8,12 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { FootballMockPoolPreview } from '@legacy-sports/shared-components/draft';
 import { useInitializeMockDraftMutation } from '../../api/db/graphql.generated';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { PageMeta } from '../../components/PageMeta';
+import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 import {
   BLACK,
   BRAND_GOLD,
@@ -24,6 +26,14 @@ import {
   withAlpha,
 } from '../../constants/colors';
 
+/**
+ * GrowthBook flag key that gates the football sport option on this page
+ * (ADR 0011 §4, LS-4666). When off, the page behaves exactly as before.
+ */
+export const FOOTBALL_MOCK_PLAYERS_FLAG = 'football-mock-players';
+
+type SportKind = 'baseball' | 'football';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface MockDraftSettings {
@@ -32,6 +42,7 @@ interface MockDraftSettings {
   userPickPosition: number;
   draftOrder: 'snake' | 'linear';
   playerPool: 'all' | 'nl' | 'al';
+  sport: SportKind;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -141,12 +152,15 @@ interface SetupScreenProps {
   onStart: (settings: MockDraftSettings) => void;
   loading?: boolean;
   error?: string | null;
+  /** When true, the Sport selector exposes a Football option (LS-4666). */
+  footballMockEnabled?: boolean;
 }
 
 function SetupScreen({
   onStart,
   loading = false,
   error = null,
+  footballMockEnabled = false,
 }: SetupScreenProps): React.JSX.Element {
   const navigate = useNavigate();
   const [numTeams, setNumTeams] = React.useState(8);
@@ -156,10 +170,22 @@ function SetupScreen({
     React.useState<MockDraftSettings['draftOrder']>('snake');
   const [playerPool, setPlayerPool] =
     React.useState<MockDraftSettings['playerPool']>('all');
+  const [sport, setSport] = React.useState<SportKind>('baseball');
 
   const handleStart = () => {
-    onStart({ numTeams, rosterSize, userPickPosition, draftOrder, playerPool });
+    onStart({
+      numTeams,
+      rosterSize,
+      userPickPosition,
+      draftOrder,
+      playerPool,
+      sport,
+    });
   };
+
+  // Football mock-draft engine wiring lands with LS-4657 → LS-4665. Until those
+  // ship, the football toggle is a preview affordance only — Start is disabled.
+  const footballPreviewActive = footballMockEnabled && sport === 'football';
 
   return (
     <YStack
@@ -229,6 +255,46 @@ function SetupScreen({
           borderColor={OVERLAY_WHITE_10}
           style={{ boxShadow: `0 16px 64px ${withAlpha(BLACK, 0.4)}` }}
         >
+          {/* Sport — only visible when the football-mock-players flag is on */}
+          {footballMockEnabled && (
+            <FieldSection label="Sport" labelId="sport-label">
+              <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+                <OptionButton
+                  label="⚾ Baseball"
+                  selected={sport === 'baseball'}
+                  accent={BRAND_SEAM_RED}
+                  onPress={() => setSport('baseball')}
+                  width={140}
+                />
+                <OptionButton
+                  label="🏈 Football"
+                  selected={sport === 'football'}
+                  accent={BRAND_GOLD}
+                  onPress={() => setSport('football')}
+                  width={140}
+                />
+              </XStack>
+            </FieldSection>
+          )}
+
+          {/* Football mock pool preview — engine wiring follows in LS-4657→LS-4665 */}
+          {footballPreviewActive && (
+            <YStack marginBottom="$5" gap="$2">
+              <FootballMockPoolPreview />
+              <Paragraph
+                fontFamily="$body"
+                fontSize={12}
+                color="$gray10"
+                margin={0}
+                textAlign="center"
+              >
+                Football draft engine wiring lands with the rest of the sport
+                toggle slice (LS-4657 → LS-4665). Start is disabled until the
+                backend can consume this pool.
+              </Paragraph>
+            </YStack>
+          )}
+
           {/* Number of Teams */}
           <FieldSection label="Number of Teams" labelId="teams-label">
             <XStack gap="$2" flexWrap="wrap" justifyContent="center">
@@ -352,13 +418,18 @@ function SetupScreen({
               size="$5"
               variant="primary"
               onPress={handleStart}
-              disabled={loading}
+              disabled={loading || footballPreviewActive}
               flex={1}
               backgroundColor={BRAND_SEAM_RED}
               borderColor={BRAND_SEAM_RED}
               hoverStyle={{ backgroundColor: '#A8182F' }}
               pressStyle={{ scale: 0.98 }}
-              opacity={loading ? 0.7 : 1}
+              opacity={loading || footballPreviewActive ? 0.5 : 1}
+              aria-label={
+                footballPreviewActive
+                  ? 'Football mock draft coming soon — engine wiring pending'
+                  : undefined
+              }
             >
               <Text
                 fontFamily="$display"
@@ -367,7 +438,11 @@ function SetupScreen({
                 color="$color"
                 letterSpacing={0.5}
               >
-                {loading ? '⏳ Starting…' : '🚀 Start Mock Draft'}
+                {loading
+                  ? '⏳ Starting…'
+                  : footballPreviewActive
+                    ? '🏈 Football — Coming Soon'
+                    : '🚀 Start Mock Draft'}
               </Text>
             </Button>
             <Button
@@ -407,6 +482,7 @@ function SetupScreen({
 export function MockDraftPage(): React.JSX.Element {
   const navigate = useNavigate();
   const isPremium = useIsPremium();
+  const footballMockEnabled = useFeatureIsOn(FOOTBALL_MOCK_PLAYERS_FLAG);
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
   const [missingLeagueIdError, setMissingLeagueIdError] = React.useState<
@@ -414,6 +490,8 @@ export function MockDraftPage(): React.JSX.Element {
   >(null);
 
   const handleStart = async (s: MockDraftSettings) => {
+    // Football mock draft is preview-only until the sport-aware engine ships.
+    if (s.sport === 'football') return;
     setMissingLeagueIdError(null);
     const result = await initializeMockDraft({
       variables: {
@@ -449,6 +527,7 @@ export function MockDraftPage(): React.JSX.Element {
         }}
         loading={loading}
         error={error?.message ?? missingLeagueIdError}
+        footballMockEnabled={footballMockEnabled}
       />
     </PremiumGate>
   );

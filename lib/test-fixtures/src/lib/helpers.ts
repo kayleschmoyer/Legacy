@@ -7,6 +7,7 @@
 
 import { fixtures } from './data';
 import type {
+  FixtureFootballPlayer,
   FixtureLeague,
   FixtureMatchup,
   FixturePlayer,
@@ -24,6 +25,7 @@ export interface FixtureItemMap {
   leagues: FixtureLeague;
   teams: FixtureTeam;
   matchups: FixtureMatchup;
+  footballPlayers: FixtureFootballPlayer;
 }
 
 /**
@@ -79,3 +81,7 @@ export const getTeam = (index = 0): FixtureTeam => getFixture('teams', index);
 /** Return a fresh mutable copy of fixture matchup at the given index. */
 export const getMatchup = (index = 0): FixtureMatchup =>
   getFixture('matchups', index);
+
+/** Return a fresh mutable copy of fixture football player at the given index. */
+export const getFootballPlayer = (index = 0): FixtureFootballPlayer =>
+  getFixture('footballPlayers', index);

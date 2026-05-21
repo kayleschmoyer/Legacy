@@ -20,6 +20,28 @@ export interface FixturePlayer {
   brefId: string;
 }
 
+/**
+ * Football positions modeled in the mock pool. `FLEX` is a roster slot,
+ * not a player position, so it is intentionally excluded — FLEX eligibility
+ * is derived from `position` at draft time.
+ */
+export type FootballPosition = 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+
+export interface FixtureFootballPlayer {
+  id: number;
+  firstName: string;
+  lastName: string;
+  position: FootballPosition;
+  /** NFL team abbreviation (e.g. "KC", "DAL"). */
+  team: string;
+  /** Fantasy points per game (mock projection, not real stats). */
+  fpg: number;
+  /** Ownership percentage across leagues, 0–100. */
+  ownershipPct: number;
+  /** Bye week number (5–14 in regular NFL seasons). */
+  byeWeek: number;
+}
+
 export interface FixtureLeague {
   id: number;
   name: string;
@@ -108,4 +130,5 @@ export interface FixtureCollections {
   teams: FixtureTeam[];
   matchups: FixtureMatchup[];
   careerStats: FixtureCareerStats;
+  footballPlayers: FixtureFootballPlayer[];
 }

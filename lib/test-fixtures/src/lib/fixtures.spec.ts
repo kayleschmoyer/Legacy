@@ -1,6 +1,8 @@
 import {
+  countFootballPoolByPosition,
   createCareerBattingStat,
   createCareerPitchingStat,
+  createFootballPlayer,
   createLeague,
   createMatchup,
   createPlayer,
@@ -8,6 +10,7 @@ import {
   createUser,
   findFixture,
   fixtureCareerStats,
+  fixtureFootballPlayers,
   fixtureLeagues,
   fixtureMatchups,
   fixturePlayers,
@@ -15,6 +18,7 @@ import {
   fixtureTeams,
   fixtureUsers,
   getFixture,
+  getFootballPlayer,
   getLeague,
   getMatchup,
   getPlayer,
@@ -231,6 +235,74 @@ describe('@legacy-sports/test-fixtures', () => {
       const stat = createCareerBattingStat({ hr: 62, playerId: 2 });
       expect(stat.hr).toBe(62);
       expect(stat.playerId).toBe(2);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Football mock pool
+  // -------------------------------------------------------------------------
+  describe('fixtureFootballPlayers', () => {
+    it('seeds ~250 players across the six modeled positions', () => {
+      expect(fixtureFootballPlayers.length).toBe(250);
+      const counts = countFootballPoolByPosition();
+      expect(counts.QB).toBeGreaterThan(0);
+      expect(counts.RB).toBeGreaterThan(0);
+      expect(counts.WR).toBeGreaterThan(0);
+      expect(counts.TE).toBeGreaterThan(0);
+      expect(counts.K).toBeGreaterThan(0);
+      expect(counts.DEF).toBeGreaterThan(0);
+      const total = Object.values(counts).reduce<number>((a, b) => a + b, 0);
+      expect(total).toBe(fixtureFootballPlayers.length);
+    });
+
+    it('produces unique ids and frozen entries', () => {
+      const ids = new Set(fixtureFootballPlayers.map((p) => p.id));
+      expect(ids.size).toBe(fixtureFootballPlayers.length);
+      expect(Object.isFrozen(fixtureFootballPlayers)).toBe(true);
+    });
+
+    it('keeps fpg and ownership within plausible per-position ranges', () => {
+      for (const p of fixtureFootballPlayers) {
+        expect(p.fpg).toBeGreaterThanOrEqual(0);
+        expect(p.fpg).toBeLessThanOrEqual(40);
+        expect(p.ownershipPct).toBeGreaterThanOrEqual(0);
+        expect(p.ownershipPct).toBeLessThanOrEqual(100);
+        expect(p.byeWeek).toBeGreaterThanOrEqual(5);
+        expect(p.byeWeek).toBeLessThanOrEqual(14);
+      }
+    });
+
+    it('is exposed via the fixtures namespace', () => {
+      expect(fixtures.footballPlayers).toBe(fixtureFootballPlayers);
+    });
+
+    it('is deterministic — repeated imports yield the same first entry', () => {
+      const head = fixtureFootballPlayers[0];
+      expect(head.position).toBe('QB');
+      expect(head.id).toBe(1);
+    });
+  });
+
+  describe('getFootballPlayer', () => {
+    it('returns a deep clone — mutations do not affect the source', () => {
+      const p = getFootballPlayer(0);
+      const originalName = fixtureFootballPlayers[0].firstName;
+      p.firstName = 'Changed';
+      expect(fixtureFootballPlayers[0].firstName).toBe(originalName);
+    });
+  });
+
+  describe('createFootballPlayer', () => {
+    it('returns defaults when called with no arguments', () => {
+      const player = createFootballPlayer();
+      expect(player.position).toBe('QB');
+      expect(player.team).toBe('KC');
+    });
+
+    it('merges overrides', () => {
+      const player = createFootballPlayer({ position: 'WR', team: 'CIN' });
+      expect(player.position).toBe('WR');
+      expect(player.team).toBe('CIN');
     });
   });
 

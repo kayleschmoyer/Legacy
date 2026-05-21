@@ -19,6 +19,7 @@
 import type {
   FixtureCareerBattingStat,
   FixtureCareerPitchingStat,
+  FixtureFootballPlayer,
   FixtureLeague,
   FixtureMatchup,
   FixturePlayer,
@@ -34,6 +35,22 @@ export function createPlayer(
     firstName: 'Mike',
     lastName: 'Trout',
     brefId: 'troutmi01',
+    ...overrides,
+  };
+}
+
+export function createFootballPlayer(
+  overrides: Partial<FixtureFootballPlayer> = {},
+): FixtureFootballPlayer {
+  return {
+    id: 1,
+    firstName: 'Patrick',
+    lastName: 'Mahomes',
+    position: 'QB',
+    team: 'KC',
+    fpg: 24.5,
+    ownershipPct: 99.2,
+    byeWeek: 10,
     ...overrides,
   };
 }

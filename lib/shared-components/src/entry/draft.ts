@@ -4,3 +4,4 @@
 export * from '../screens/DraftBoardScreen';
 export * from '../features/draft/DraftBoard';
 export * from '../features/draft/ChatPanel';
+export * from '../features/draft/FootballMockPoolPreview';
