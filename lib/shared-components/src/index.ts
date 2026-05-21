@@ -260,5 +260,8 @@ export * from './components/BannerPicker';
 // Heritage Line icon system
 export * from './components/icons';
 
+// Brand assets — logo lockup and hero composition
+export * from './components/branding';
+
 // Elite Draft Board (promoted from web)
 export * from './features/elite-draft';
