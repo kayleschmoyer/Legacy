@@ -37,6 +37,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
 import { PublicSchema } from './client/PublicDbClient';
+import { inArrayAny } from './query-builders/inArrayAny';
 
 // ── Season Selector ──────────────────────────────────────────────────────────
 
@@ -338,7 +339,7 @@ export class MatchupService {
         g: PublicSchema.seasonBatting.g,
       })
       .from(PublicSchema.seasonBatting)
-      .where(inArray(PublicSchema.seasonBatting.playerId, allPlayerIds));
+      .where(inArrayAny(PublicSchema.seasonBatting.playerId, allPlayerIds));
 
     const fieldingStats = await db
       .select({
@@ -347,7 +348,7 @@ export class MatchupService {
         g: PublicSchema.seasonFielding.g,
       })
       .from(PublicSchema.seasonFielding)
-      .where(inArray(PublicSchema.seasonFielding.playerId, allPlayerIds));
+      .where(inArrayAny(PublicSchema.seasonFielding.playerId, allPlayerIds));
 
     const gameCountMap = new Map<string, number>();
 

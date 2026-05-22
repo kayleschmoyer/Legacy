@@ -4,7 +4,11 @@
 
 import DataLoader from 'dataloader';
 import { inArray } from 'drizzle-orm';
-import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import {
+  type GenericDatabase,
+  inArrayAny,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 
 // ---------------------------------------------------------------------------
 // Module-level eligible-positions cache (LS-434)
@@ -76,7 +80,7 @@ export const createPlayersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
       const allPlayers = await db
         .select()
         .from(PublicSchema.players)
-        .where(inArray(PublicSchema.players.id, ids));
+        .where(inArrayAny(PublicSchema.players.id, ids));
 
       const playersMap = new Map<
         number,

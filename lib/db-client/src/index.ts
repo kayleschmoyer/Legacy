@@ -20,6 +20,7 @@ export * from './lib/client/matchup-queries-optimized';
 
 // Type-safe query utilities
 export * from './lib/query-builders/TypeSafeQueryBuilder';
+export * from './lib/query-builders/inArrayAny';
 export * from './lib/prepared-statements/PreparedStatements';
 export * from './lib/validation/ValidationUtils';
 

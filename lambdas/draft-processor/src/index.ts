@@ -30,6 +30,7 @@ import {
   createAllMatchupsForLeague,
   filterPlayerIdsByLeagueEligibility,
   finalizeDraftCompletion,
+  inArrayAny,
   PublicDb,
   PublicSchema,
   runWithPublicClient,
@@ -447,7 +448,7 @@ async function buildPlayerPool(
       .from(PublicSchema.seasonBatting)
       .where(
         and(
-          inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
+          inArrayAny(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
           gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
           gte(PublicSchema.seasonBatting.g, minGames),
           notNegroLeague(PublicSchema.seasonBatting.lgId),
@@ -461,7 +462,7 @@ async function buildPlayerPool(
       .from(PublicSchema.seasonPitching)
       .where(
         and(
-          inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
+          inArrayAny(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
           gte(PublicSchema.seasonPitching.season, MIN_SEASON_WITH_GAME_DATA),
           gte(PublicSchema.seasonPitching.g, minGames),
           notNegroLeague(PublicSchema.seasonPitching.lgId),
@@ -476,7 +477,7 @@ async function buildPlayerPool(
       .from(PublicSchema.seasonFielding)
       .where(
         and(
-          inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
+          inArrayAny(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
           gte(PublicSchema.seasonFielding.season, MIN_SEASON_WITH_GAME_DATA),
           notNegroLeague(PublicSchema.seasonFielding.lgId),
         ),
