@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { Card, Input, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   ArrowLeftRight,
@@ -45,6 +46,42 @@ export function LeagueTradeBlock({
 
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [priceInput, setPriceInput] = useState('');
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const handleSavePrice = async (memberId: number) => {
+    setMutationError(null);
+    try {
+      await setTradeBlock({
+        variables: {
+          teamMemberId: memberId,
+          onTradeBlock: true,
+          askingPrice: priceInput || null,
+        },
+      });
+      setEditingPriceId(null);
+      setPriceInput('');
+    } catch (error) {
+      LOGGER.error('Failed to update asking price', error as Error);
+      setMutationError('Failed to update asking price. Please try again.');
+    }
+  };
+
+  const handleRemove = async (memberId: number) => {
+    setMutationError(null);
+    try {
+      await setTradeBlock({
+        variables: {
+          teamMemberId: memberId,
+          onTradeBlock: false,
+        },
+      });
+    } catch (error) {
+      LOGGER.error('Failed to remove player from trade block', error as Error);
+      setMutationError(
+        'Failed to remove player from trade block. Please try again.',
+      );
+    }
+  };
 
   const players = data?.leagueTradeBlock ?? [];
   const displayList = expanded ? players : players.slice(0, 5);
@@ -166,6 +203,18 @@ export function LeagueTradeBlock({
     >
       {header}
 
+      {mutationError && (
+        <Text
+          color="$red10"
+          fontSize="$2"
+          marginBottom="$2"
+          testID="trade-block-mutation-error"
+          role="alert"
+        >
+          {mutationError}
+        </Text>
+      )}
+
       <YStack gap="$1">
         {displayList.map((member, idx) => {
           const memberId = member.id;
@@ -245,16 +294,9 @@ export function LeagueTradeBlock({
                           paddingHorizontal="$2"
                           disabled={mutating}
                           onPress={() => {
-                            void setTradeBlock({
-                              variables: {
-                                teamMemberId: memberId,
-                                onTradeBlock: true,
-                                askingPrice: priceInput || null,
-                              },
-                            });
-                            setEditingPriceId(null);
-                            setPriceInput('');
+                            void handleSavePrice(memberId);
                           }}
+                          testID="save-price-button"
                         >
                           <Text
                             fontSize="$1"
@@ -297,14 +339,9 @@ export function LeagueTradeBlock({
                       borderRadius="$2"
                       paddingHorizontal="$2"
                       disabled={mutating}
-                      onPress={() =>
-                        void setTradeBlock({
-                          variables: {
-                            teamMemberId: memberId,
-                            onTradeBlock: false,
-                          },
-                        })
-                      }
+                      onPress={() => {
+                        void handleRemove(memberId);
+                      }}
                     >
                       <Text fontSize="$1" fontWeight="600" color="$red11">
                         Remove
