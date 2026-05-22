@@ -50,6 +50,18 @@ export const Positions: Story = {
   ),
 };
 
+export const StatusChips: Story = {
+  render: () => (
+    <XStack gap="$2" flexWrap="wrap" alignItems="center">
+      <Chip label="Draft Live" tone="live" />
+      <Chip label="Pre-Draft" tone="pre" />
+      <Chip label="Active" tone="active" />
+      <Chip label="Coming Soon" tone="soon" />
+      <Chip label="Final" tone="fin" />
+    </XStack>
+  ),
+};
+
 export const Filters: Story = {
   render: () => (
     <XStack gap="$2">

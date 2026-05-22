@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { Animated } from 'react-native';
 import { Text, XStack } from 'tamagui';
 import type { GetProps } from 'tamagui';
 
@@ -11,6 +12,11 @@ export type ChipTone =
   | 'success'
   | 'warning'
   | 'info'
+  | 'live'
+  | 'pre'
+  | 'active'
+  | 'soon'
+  | 'fin'
   | Position;
 
 export interface ChipProps extends Omit<
@@ -30,7 +36,7 @@ export interface ChipProps extends Omit<
 
 const TONE_STYLES: Record<
   ChipTone,
-  { bg: string; fg: string; border: string }
+  { bg: string; fg: string; border: string; alwaysBorder?: boolean }
 > = {
   neutral: { bg: '$surfaceCard', fg: '$color', border: '$outlineStrong' },
   navy: { bg: '$brandNavy', fg: '$color12', border: '$brandNavyLight' },
@@ -39,6 +45,40 @@ const TONE_STYLES: Record<
   success: { bg: '$successMuted', fg: '$green10', border: '$green7' },
   warning: { bg: '$warningMuted', fg: '$amber10', border: '$amber7' },
   info: { bg: '$accentMuted', fg: '$blue10', border: '$blue8' },
+  // Status chips — league lifecycle states, always show border.
+  // Backgrounds use rgba values (same pattern as position chips below) since
+  // no dedicated alpha-tinted tokens exist in the current foundations slice.
+  // fg/border use Tamagui tokens where exact equivalents exist.
+  live: {
+    bg: 'rgba(196,30,58,0.15)',
+    fg: '$brandSeamRedLight',
+    border: 'rgba(196,30,58,0.4)',
+    alwaysBorder: true,
+  },
+  pre: {
+    bg: 'rgba(197,165,90,0.12)',
+    fg: '$brandGoldLight',
+    border: 'rgba(197,165,90,0.4)',
+    alwaysBorder: true,
+  },
+  active: {
+    bg: 'rgba(34,197,94,0.12)',
+    fg: '#22C55E',
+    border: 'rgba(34,197,94,0.4)',
+    alwaysBorder: true,
+  },
+  soon: {
+    bg: 'rgba(245,158,11,0.12)',
+    fg: '#F59E0B',
+    border: 'rgba(245,158,11,0.4)',
+    alwaysBorder: true,
+  },
+  fin: {
+    bg: 'rgba(127,144,174,0.15)',
+    fg: '$textMuted',
+    border: '$outlineStrong',
+    alwaysBorder: true,
+  },
   // Position chips — semantic field colors
   P: { bg: 'rgba(196,30,58,0.16)', fg: '#E07A8C', border: '$positionPitcher' },
   C: {
@@ -63,9 +103,54 @@ const TONE_STYLES: Record<
   },
 };
 
+/** Status tones that use the design-system eyebrow typography and always-visible borders. */
+const STATUS_TONES = new Set<ChipTone>([
+  'live',
+  'pre',
+  'active',
+  'soon',
+  'fin',
+]);
+
+function PulseDot({ color }: { color: string }): React.JSX.Element {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={{
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: color,
+        opacity,
+      }}
+    />
+  );
+}
+
 /**
  * Pill chip — used for player positions, status, filters. Borderless
- * by default; selected state strengthens the border.
+ * by default; selected state or status tones (live/pre/active/soon/fin)
+ * always show their border.
  */
 export function Chip({
   label,
@@ -77,9 +162,12 @@ export function Chip({
   ...rest
 }: ChipProps): React.JSX.Element {
   const styles = TONE_STYLES[tone];
-  const padY = size === 'sm' ? 2 : 4;
-  const padX = size === 'sm' ? 8 : 10;
-  const fontSize = size === 'sm' ? 11 : 12;
+  const isStatus = STATUS_TONES.has(tone);
+  const padY = size === 'sm' ? 2 : isStatus ? 6 : 4;
+  const padX = size === 'sm' ? 8 : isStatus ? 12 : 10;
+  const fontSize = size === 'sm' ? 11 : isStatus ? 11 : 12;
+  const leadingNode =
+    leading ?? (tone === 'live' ? <PulseDot color={styles.fg} /> : undefined);
   return (
     <XStack
       alignItems="center"
@@ -89,20 +177,35 @@ export function Chip({
       borderRadius={9999}
       backgroundColor={styles.bg}
       borderWidth={1}
-      borderColor={selected ? styles.border : 'transparent'}
+      borderColor={
+        selected || styles.alwaysBorder ? styles.border : 'transparent'
+      }
       hoverStyle={{ borderColor: styles.border }}
       pressStyle={{ scale: 0.97 }}
       animation="quick"
       alignSelf="flex-start"
+      role={rest.onPress != null ? 'button' : undefined}
+      tabIndex={rest.onPress != null ? 0 : undefined}
+      onKeyDown={
+        rest.onPress != null
+          ? (e: React.KeyboardEvent<HTMLElement>) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.currentTarget.click();
+              }
+            }
+          : undefined
+      }
       {...rest}
     >
-      {leading}
+      {leadingNode}
       <Text
-        fontFamily="$body"
+        fontFamily={isStatus ? '$heading' : '$body'}
         fontSize={fontSize}
         fontWeight="700"
         color={styles.fg}
-        letterSpacing={0.4}
+        letterSpacing={isStatus ? 1.32 : 0.4}
+        textTransform={isStatus ? 'uppercase' : undefined}
       >
         {label}
       </Text>

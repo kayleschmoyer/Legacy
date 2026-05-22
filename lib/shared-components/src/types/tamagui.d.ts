@@ -134,4 +134,15 @@ declare module '@tamagui/separator' {
   }
 }
 
+// Extend WebOnlyPressEvents to include keyboard events missing from @tamagui/core's
+// RN type definitions. WebOnlyPressEvents → TamaguiComponentPropsBase →
+// StackNonStyleProps → RNTamaguiViewNonStyleProps, so this addition flows through
+// to all Stack-based components (XStack, YStack, etc.) in tsconfig.lib.json.
+declare module '@tamagui/web' {
+  interface WebOnlyPressEvents {
+    onKeyDown?: import('react').DOMAttributes<HTMLElement>['onKeyDown'];
+    onKeyUp?: import('react').DOMAttributes<HTMLElement>['onKeyUp'];
+  }
+}
+
 export {};
