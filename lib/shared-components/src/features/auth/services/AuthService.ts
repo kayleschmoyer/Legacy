@@ -196,16 +196,18 @@ export class AuthService {
 
   /**
    * Authenticate user with Discord authorization code.
-   * POSTs the code to the `/discord` endpoint; the lambda exchanges it
-   * for a Discord access token and returns a JWT on success.
+   * POSTs the code and `state` (echoed back from Discord) to the
+   * `/discord` endpoint; the lambda verifies `state` against the CSRF
+   * cookie bound at `/oauth/discord/authorize` time, exchanges the code
+   * for a Discord access token, and returns a JWT on success.
    */
-  async authenticateWithDiscord(code: string): Promise<User> {
+  async authenticateWithDiscord(code: string, state: string): Promise<User> {
     try {
       const response = await fetch(`${this.oauthProxyUrl}/discord`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, state }),
       });
 
       if (!response.ok) {
@@ -259,10 +261,13 @@ export class AuthService {
 
   /**
    * Link a Discord account to the currently authenticated user.
-   * POSTs the OAuth authorization code to `/oauth/discord/link` with the
-   * CSRF double-submit token required for cookie-authenticated requests.
+   * POSTs the OAuth authorization code and `state` (echoed back from
+   * Discord) to `/oauth/discord/link`, with the CSRF double-submit token
+   * required for cookie-authenticated requests. The lambda also verifies
+   * `state` against the CSRF cookie bound at `/oauth/discord/authorize`
+   * time to prevent link-CSRF.
    */
-  async linkDiscordAccount(code: string): Promise<void> {
+  async linkDiscordAccount(code: string, state: string): Promise<void> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -273,7 +278,7 @@ export class AuthService {
       method: 'POST',
       headers,
       credentials: 'include',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, state }),
     });
 
     if (!response.ok) {

@@ -27,6 +27,7 @@ import {
 } from './handlers/DeviceFlow';
 import {
   handleDiscordAuth,
+  handleDiscordAuthorize,
   handleDiscordLink,
   handleDiscordUnlink,
 } from './handlers/Discord';
@@ -250,6 +251,7 @@ const baseOAuthHandler = async (
               '/oauth/device/complete-local (CLI device flow with local auth)',
               '/oauth/impersonate (start admin impersonation session)',
               '/oauth/stop-impersonate (end admin impersonation session)',
+              '/oauth/discord/authorize (Discord OAuth initiation)',
               '/oauth/discord (Discord OAuth login)',
               '/oauth/discord/link (link Discord to existing account)',
               '/oauth/discord/unlink (unlink Discord from account)',
@@ -400,6 +402,14 @@ const baseOAuthHandler = async (
       case '/dev/oauth/stop-impersonate':
         if (event.httpMethod === 'POST') {
           return cors(handleStopImpersonate(event));
+        }
+        break;
+
+      case '/oauth/discord/authorize':
+      case '/dev/oauth/discord/authorize':
+        if (event.httpMethod === 'GET') {
+          const result = handleDiscordAuthorize(event);
+          return cors(result);
         }
         break;
 

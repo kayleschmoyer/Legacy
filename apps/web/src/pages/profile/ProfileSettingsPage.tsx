@@ -202,8 +202,6 @@ function getAccessBadgeColor(level: string): string {
 
 /* ─── Main Component ─── */
 
-const DISCORD_OAUTH_STATE_STORAGE_KEY = 'discord_oauth_link_state';
-
 const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
@@ -310,39 +308,18 @@ const ProfileSettingsPage: React.FC = () => {
   }, [editedUsername, dbUsername, updateUsername, refetchUser, auth]);
 
   const handleConnectDiscord = useCallback(() => {
-    const clientId = auth.config.discordClientId;
-    if (!clientId) return;
-
-    // Generate a cryptographically random state nonce to prevent link-CSRF attacks
-    const stateBytes = new Uint8Array(16);
-    window.crypto.getRandomValues(stateBytes);
-    const state = Array.from(stateBytes, (b) =>
-      b.toString(16).padStart(2, '0'),
-    ).join('');
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(DISCORD_OAUTH_STATE_STORAGE_KEY, state);
-      }
-    } catch {
-      // sessionStorage unavailable — abort to avoid unvalidatable redirect
+    // Delegate state generation and cookie binding to the backend
+    // `/oauth/discord/authorize` endpoint. The backend issues an HttpOnly
+    // single-use state cookie, then 302s the browser to Discord. The
+    // CSRF binding lives entirely server-side; no sessionStorage is
+    // needed (and HttpOnly is stronger against XSS than sessionStorage).
+    const oauthProxyUrl = auth.config.oauthProxyUrl;
+    if (!oauthProxyUrl) {
       setDiscordError('Unable to start Discord connection. Please try again.');
       return;
     }
-
-    const appBaseUrl = new URL(
-      import.meta.env.BASE_URL,
-      window.location.origin,
-    );
-    const redirectUri = new URL('auth/discord/callback', appBaseUrl).toString();
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'identify email',
-      state,
-    });
-    window.location.href = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
-  }, [auth.config.discordClientId]);
+    window.location.href = `${oauthProxyUrl}/discord/authorize?link=1`;
+  }, [auth.config.oauthProxyUrl]);
 
   const handleDisconnectDiscord = useCallback(async () => {
     if (

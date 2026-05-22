@@ -6,7 +6,12 @@ import {
   linkDiscordAccount,
   setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
-import { handleDiscordAuth } from './Discord';
+import { handleDiscordAuth, handleDiscordAuthorize } from './Discord';
+import { verifyOauthState } from '../util/oauth-state';
+
+const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
+  typeof verifyOauthState
+>;
 import { notifyNewUserSignup } from '../util/discord';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -51,6 +56,15 @@ jest.mock('../util/jwt-cookie', () => ({
   parseJwtFromCookies: jest.fn().mockReturnValue(null),
   validateCsrf: jest.fn().mockReturnValue(true),
   CSRF_HEADER: 'x-csrf-token',
+}));
+
+jest.mock('../util/oauth-state', () => ({
+  buildOauthStateCookie: jest.fn().mockReturnValue('ls_oauth_state=stub'),
+  buildClearOauthStateCookie: jest
+    .fn()
+    .mockReturnValue('ls_oauth_state=; Max-Age=0'),
+  generateOauthState: jest.fn().mockReturnValue('mock-state-token'),
+  verifyOauthState: jest.fn(),
 }));
 
 jest.mock('../util/discord', () => ({
@@ -155,6 +169,8 @@ describe('handleDiscordAuth', () => {
     process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
     mockSetInitialAvatarUrl.mockResolvedValue(undefined);
+    // Default: state matches — existing flows under test exercise the happy path
+    mockVerifyOauthState.mockReturnValue(true);
 
     // Default: token exchange then user fetch
     fetchSpy = jest
@@ -212,5 +228,82 @@ describe('handleDiscordAuth', () => {
 
     expect(result.statusCode).toBe(200);
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the OAuth state does not match the cookie', async () => {
+    mockVerifyOauthState.mockReturnValue(false);
+
+    const result = await handleDiscordAuth(
+      makeEvent({ code: 'auth-code', state: 'bad-state' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body) as { error: string }).toMatchObject({
+      error: 'Invalid OAuth state — please retry sign-in',
+    });
+    expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
+  });
+
+  it('clears the OAuth state cookie on success (single-use)', async () => {
+    mockGetUserByDiscordId.mockResolvedValue(mockUser);
+    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+
+    const result = await handleDiscordAuth(
+      makeEvent({ code: 'auth-code', state: 'good-state' }),
+    );
+
+    expect(result.statusCode).toBe(200);
+    const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    expect(setCookies).toEqual(
+      expect.arrayContaining([expect.stringContaining('ls_oauth_state=')]),
+    );
+    // Specifically the clearing cookie (Max-Age=0)
+    expect((setCookies as string[]).some((c) => c.includes('Max-Age=0'))).toBe(
+      true,
+    );
+  });
+
+  it('passes state to verifyOauthState along with the request Cookie header', async () => {
+    mockGetUserByDiscordId.mockResolvedValue(mockUser);
+    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+
+    const event = makeEvent({ code: 'auth-code', state: 'tok-from-discord' });
+    event.headers = { Cookie: 'ls_oauth_state=tok-from-discord' };
+
+    await handleDiscordAuth(event);
+
+    expect(mockVerifyOauthState).toHaveBeenCalledWith(
+      'tok-from-discord',
+      'ls_oauth_state=tok-from-discord',
+    );
+  });
+});
+
+describe('handleDiscordAuthorize', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
+    process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
+  });
+
+  it('302s to Discord with the generated state and sets the state cookie', () => {
+    const event = makeEvent({});
+
+    const result = handleDiscordAuthorize(event);
+
+    expect(result.statusCode).toBe(302);
+    const location = (result.headers?.['Location'] as string | undefined) ?? '';
+    expect(location).toMatch(
+      /^https:\/\/discord\.com\/api\/oauth2\/authorize\?/,
+    );
+    expect(location).toContain('state=mock-state-token');
+    expect(location).toContain('client_id=test-client-id');
+    expect(location).toContain(
+      'redirect_uri=https%3A%2F%2Fexample.com%2Fcallback',
+    );
+    expect(location).toContain('scope=identify+email');
+
+    const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    expect(setCookies).toEqual(expect.arrayContaining(['ls_oauth_state=stub']));
   });
 });

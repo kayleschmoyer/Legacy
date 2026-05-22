@@ -65,24 +65,6 @@ function SecureIcon() {
   );
 }
 
-/* ── Constants ── */
-const DISCORD_LOGIN_STATE_KEY = 'discord_oauth_login_state';
-
-function buildDiscordAuthUrl(
-  clientId: string,
-  redirectUri: string,
-  state: string,
-): string {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'identify email',
-    state,
-  });
-  return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
-}
-
 /* ── Helpers ── */
 
 function formatBattingMarquee(
@@ -176,17 +158,7 @@ export function LoginPage(): React.JSX.Element {
       return;
     }
 
-    let storedState: string | null = null;
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        storedState = sessionStorage.getItem(DISCORD_LOGIN_STATE_KEY);
-        sessionStorage.removeItem(DISCORD_LOGIN_STATE_KEY);
-      }
-    } catch {
-      /* sessionStorage unavailable */
-    }
-
-    if (!code || !state || state !== storedState) {
+    if (!code || !state) {
       setErrorMessage(
         'Discord sign-in failed: invalid state. Please try again.',
       );
@@ -204,7 +176,7 @@ export function LoginPage(): React.JSX.Element {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, state }),
         });
 
         if (!response.ok) {
@@ -358,28 +330,13 @@ export function LoginPage(): React.JSX.Element {
   }, [isConfigured, isConfiguring, isLoading, loginWithOAuth]);
 
   const handleDiscordSignIn = useCallback(() => {
-    const clientId = config.discordClientId;
-    if (!clientId) return;
-
-    const stateBytes = new Uint8Array(16);
-    window.crypto.getRandomValues(stateBytes);
-    const state = Array.from(stateBytes, (b) =>
-      b.toString(16).padStart(2, '0'),
-    ).join('');
-    try {
-      if (typeof sessionStorage !== 'undefined')
-        sessionStorage.setItem(DISCORD_LOGIN_STATE_KEY, state);
-    } catch {
-      return;
-    }
-
-    const appBaseUrl = new URL(
-      import.meta.env.BASE_URL,
-      window.location.origin,
-    );
-    const redirectUri = new URL('auth/discord/callback', appBaseUrl).toString();
-    window.location.href = buildDiscordAuthUrl(clientId, redirectUri, state);
-  }, [config.discordClientId]);
+    // Delegate state generation and cookie binding to the backend.
+    // `/oauth/discord/authorize` sets a single-use HttpOnly state cookie
+    // and 302s to Discord.
+    const oauthProxyUrl = config.oauthProxyUrl;
+    if (!oauthProxyUrl) return;
+    window.location.href = `${oauthProxyUrl}/discord/authorize`;
+  }, [config.oauthProxyUrl]);
 
   const googleDisabled = isLoading || isDiscordLoading || isConfiguring;
   const discordDisabled = isLoading || isDiscordLoading;

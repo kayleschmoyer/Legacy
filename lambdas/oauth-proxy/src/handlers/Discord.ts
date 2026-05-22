@@ -20,6 +20,12 @@ import {
   parseJwtFromCookies,
   validateCsrf,
 } from '../util/jwt-cookie';
+import {
+  buildClearOauthStateCookie,
+  buildOauthStateCookie,
+  generateOauthState,
+  verifyOauthState,
+} from '../util/oauth-state';
 import { withDbClient } from '../util/db';
 import { notifyNewUserSignup } from '../util/discord';
 import { DiscordEnv, Secret, SECRET_CONFIG } from '../util';
@@ -44,6 +50,25 @@ function errorResponse(
   message: string,
 ): APIGatewayProxyResult {
   return { statusCode, body: JSON.stringify({ error: message }) };
+}
+
+/**
+ * Attach a clearing Set-Cookie to a response, preserving any cookies the
+ * downstream handler already set. Used to enforce single-use of the OAuth
+ * state cookie on every response from /oauth/discord and /oauth/discord/link.
+ */
+function withClearStateCookie(
+  response: APIGatewayProxyResult,
+  clearCookie: string,
+): APIGatewayProxyResult {
+  const existing = response.multiValueHeaders?.['Set-Cookie'] ?? [];
+  return {
+    ...response,
+    multiValueHeaders: {
+      ...response.multiValueHeaders,
+      'Set-Cookie': [...(existing as string[]), clearCookie],
+    },
+  };
 }
 
 function getDiscordClientId(): string {
@@ -164,17 +189,80 @@ function requireCsrf(event: APIGatewayEvent): APIGatewayProxyResult | null {
 // ── Public handlers ──────────────────────────────────────────────────────────
 
 /**
+ * GET /oauth/discord/authorize
+ * Initiates the Discord OAuth flow. Generates a server-side state token,
+ * binds it to the browser via a short-lived HttpOnly cookie, and 302s to
+ * Discord. The frontend must POST this `state` back alongside `code` so the
+ * `/oauth/discord` (and `/oauth/discord/link`) handlers can verify the
+ * binding before trusting the authorization code.
+ *
+ * Query string:
+ * - `link=1` (optional): the caller is the account-link flow rather than
+ *   sign-in. Currently informational; the same Discord client is used.
+ */
+export const handleDiscordAuthorize = (
+  _event: APIGatewayEvent,
+): APIGatewayProxyResult => {
+  const clientId = getDiscordClientId();
+  const redirectUri = getDiscordRedirectUri();
+  const state = generateOauthState();
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'identify email',
+    state,
+    prompt: 'consent',
+  });
+
+  const authorizeUrl = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+
+  LOGGER.debug('Redirecting to Discord OAuth (state bound to browser)');
+
+  return {
+    statusCode: 302,
+    headers: { Location: authorizeUrl },
+    multiValueHeaders: {
+      'Set-Cookie': [buildOauthStateCookie(state)],
+    },
+    body: '',
+  };
+};
+
+/**
  * POST /oauth/discord
- * Accepts { code } from the frontend after Discord OAuth redirect.
- * Exchanges the code for user info, finds or creates the user, returns JWT.
+ * Accepts { code, state } from the frontend after Discord OAuth redirect.
+ * Verifies `state` against the cookie bound at `/oauth/discord/authorize`
+ * time, then exchanges the code for user info, finds or creates the user,
+ * and returns the internal JWT.
  */
 export const handleDiscordAuth = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const body = JSON.parse(event.body ?? '{}') as { code?: string };
+  const body = JSON.parse(event.body ?? '{}') as {
+    code?: string;
+    state?: string;
+  };
+  const requestCookieHeader =
+    event.headers?.['Cookie'] ?? event.headers?.['cookie'];
+
+  // Single-use: clear the state cookie on every response.
+  const clearState = buildClearOauthStateCookie();
 
   if (!body.code) {
-    return errorResponse(400, 'Missing authorization code');
+    return withClearStateCookie(
+      errorResponse(400, 'Missing authorization code'),
+      clearState,
+    );
+  }
+
+  if (!verifyOauthState(body.state, requestCookieHeader)) {
+    LOGGER.warn('Discord OAuth rejected: state mismatch');
+    return withClearStateCookie(
+      errorResponse(400, 'Invalid OAuth state — please retry sign-in'),
+      clearState,
+    );
   }
 
   let discordUser: DiscordUser;
@@ -185,18 +273,27 @@ export const handleDiscordAuth = async (
       'Discord OAuth exchange failed',
       error instanceof Error ? error.message : String(error),
     );
-    return errorResponse(401, 'Discord authentication failed');
+    return withClearStateCookie(
+      errorResponse(401, 'Discord authentication failed'),
+      clearState,
+    );
   }
 
   if (!discordUser.email) {
-    return errorResponse(
-      400,
-      'Discord account does not have a verified email address',
+    return withClearStateCookie(
+      errorResponse(
+        400,
+        'Discord account does not have a verified email address',
+      ),
+      clearState,
     );
   }
 
   if (!discordUser.verified) {
-    return errorResponse(400, 'Discord email is not verified');
+    return withClearStateCookie(
+      errorResponse(400, 'Discord email is not verified'),
+      clearState,
+    );
   }
 
   LOGGER.info('Discord OAuth user authenticated', {
@@ -266,13 +363,15 @@ export const handleDiscordAuth = async (
     await notifyNewUserSignup(email, newUserId, 'discord');
   }
 
-  return result;
+  return withClearStateCookie(result, clearState);
 };
 
 /**
  * POST /oauth/discord/link
  * Links a Discord account to the authenticated user.
- * Accepts { code } — a Discord OAuth authorization code.
+ * Accepts { code, state } — `state` must match the cookie bound at
+ * `/oauth/discord/authorize` time, preventing link-CSRF where an attacker
+ * tricks a victim into linking the attacker's Discord account.
  */
 export const handleDiscordLink = async (
   event: APIGatewayEvent,
@@ -285,9 +384,27 @@ export const handleDiscordLink = async (
     return errorResponse(401, 'Authentication required');
   }
 
-  const body = JSON.parse(event.body ?? '{}') as { code?: string };
+  const body = JSON.parse(event.body ?? '{}') as {
+    code?: string;
+    state?: string;
+  };
+  const requestCookieHeader =
+    event.headers?.['Cookie'] ?? event.headers?.['cookie'];
+  const clearState = buildClearOauthStateCookie();
+
   if (!body.code) {
-    return errorResponse(400, 'Missing authorization code');
+    return withClearStateCookie(
+      errorResponse(400, 'Missing authorization code'),
+      clearState,
+    );
+  }
+
+  if (!verifyOauthState(body.state, requestCookieHeader)) {
+    LOGGER.warn('Discord link rejected: state mismatch');
+    return withClearStateCookie(
+      errorResponse(400, 'Invalid OAuth state — please retry linking'),
+      clearState,
+    );
   }
 
   let discordUser: DiscordUser;
@@ -298,10 +415,13 @@ export const handleDiscordLink = async (
       'Discord link exchange failed',
       error instanceof Error ? error.message : String(error),
     );
-    return errorResponse(401, 'Discord authentication failed');
+    return withClearStateCookie(
+      errorResponse(401, 'Discord authentication failed'),
+      clearState,
+    );
   }
 
-  return await withDbClient(async (db) => {
+  const linkResult = await withDbClient(async (db) => {
     // Check if this Discord account is already linked to another user
     const existingUser = await getUserByDiscordId(db, discordUser.id);
     if (existingUser && existingUser.id !== userId) {
@@ -344,6 +464,8 @@ export const handleDiscordLink = async (
       }),
     };
   });
+
+  return withClearStateCookie(linkResult, clearState);
 };
 
 /**

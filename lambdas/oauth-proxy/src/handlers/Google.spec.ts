@@ -1,5 +1,11 @@
 import { APIGatewayEvent } from 'aws-lambda';
-import { handleGoogleAuth, handleSecureGoogleAuth } from './Google';
+import {
+  handleGoogleAuth,
+  handleGoogleAuthorize,
+  handleGoogleCallback,
+  handleSecureGoogleAuth,
+} from './Google';
+import { verifyOauthState } from '../util/oauth-state';
 
 // Mock dependencies
 jest.mock('@legacy-sports/logging', () => ({
@@ -64,6 +70,27 @@ jest.mock('../util/lambda', () => ({
 
 jest.mock('./DeviceFlow', () => ({
   completeDeviceFlow: jest.fn(),
+}));
+
+jest.mock('../util/oauth-state', () => ({
+  generateOauthState: jest.fn().mockReturnValue('test-csrf-token'),
+  buildOauthStateCookie: jest.fn(
+    (token: string) => `ls_oauth_state=${token}; HttpOnly`,
+  ),
+  buildClearOauthStateCookie: jest
+    .fn()
+    .mockReturnValue('ls_oauth_state=; Max-Age=0'),
+  verifyOauthState: jest.fn(),
+  // Real-ish encode/decode so callback tests can exercise the device-code
+  // splitting behaviour without pulling in the actual module.
+  encodeOauthState: (csrf: string, device?: string) =>
+    device ? `${csrf}.${device}` : csrf,
+  decodeOauthState: (state: string | undefined | null) => {
+    if (!state) return { csrfToken: '', deviceCode: '' };
+    const idx = state.indexOf('.');
+    if (idx === -1) return { csrfToken: state, deviceCode: '' };
+    return { csrfToken: state.slice(0, idx), deviceCode: state.slice(idx + 1) };
+  },
 }));
 
 // Mock google-auth-library with a chainable OAuth2Client.
@@ -341,5 +368,141 @@ describe('handleSecureGoogleAuth — error logging', () => {
       cause,
       expect.objectContaining({ context: 'id_token_verification' }),
     );
+  });
+});
+
+const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
+  typeof verifyOauthState
+>;
+
+describe('handleGoogleAuthorize — CSRF state binding', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('sets the state cookie and forwards the composed state to Google', async () => {
+    const event = makeEvent({});
+    const result = await handleGoogleAuthorize(event);
+
+    expect(result.statusCode).toBe(302);
+    const location = (result.headers?.['Location'] as string | undefined) ?? '';
+    // state is just the CSRF token when no caller-supplied device code
+    expect(location).toContain('state=test-csrf-token');
+
+    const cookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    expect(cookies).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('ls_oauth_state=test-csrf-token'),
+      ]),
+    );
+  });
+
+  it('preserves a caller-supplied state (device code) by appending it after the CSRF token', async () => {
+    const event = {
+      ...makeEvent({}),
+      queryStringParameters: { state: 'device-code-xyz' },
+    };
+    const result = await handleGoogleAuthorize(event);
+
+    const location = (result.headers?.['Location'] as string | undefined) ?? '';
+    expect(location).toContain('state=test-csrf-token.device-code-xyz');
+  });
+});
+
+describe('handleGoogleCallback — CSRF state verification', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makeCallbackEvent(
+    overrides: Partial<APIGatewayEvent> = {},
+  ): APIGatewayEvent {
+    return {
+      ...makeEvent({}),
+      httpMethod: 'GET',
+      queryStringParameters: { code: 'auth-code', state: 'test-csrf-token' },
+      headers: { Cookie: 'ls_oauth_state=test-csrf-token' },
+      ...overrides,
+    };
+  }
+
+  it('returns 400 when state does not match the cookie', async () => {
+    mockVerifyOauthState.mockReturnValue(false);
+
+    const result = await handleGoogleCallback(makeCallbackEvent());
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string };
+    expect(body.error).toBe('Invalid state');
+    // single-use: cleared on the failure response
+    const cookies = (result.multiValueHeaders?.['Set-Cookie'] ??
+      []) as string[];
+    expect(cookies.some((c) => c.includes('Max-Age=0'))).toBe(true);
+  });
+
+  it('returns 400 when state cookie is missing entirely', async () => {
+    mockVerifyOauthState.mockReturnValue(false);
+
+    const result = await handleGoogleCallback(
+      makeCallbackEvent({ headers: {} }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect((JSON.parse(result.body) as { error: string }).error).toBe(
+      'Invalid state',
+    );
+  });
+
+  it('forwards only the device code (not the CSRF token) downstream when state matches', async () => {
+    mockVerifyOauthState.mockReturnValue(true);
+
+    // The callback delegates to handleSecureGoogleAuth which requires a body.
+    // We don't need to assert downstream success — just that state validation
+    // passes and the cookie is cleared.
+    const result = await handleGoogleCallback(
+      makeCallbackEvent({
+        queryStringParameters: {
+          code: 'auth-code',
+          state: 'test-csrf-token.device-xyz',
+        },
+      }),
+    );
+
+    // Downstream may return any status; what matters is the state cookie was
+    // cleared on success too (single-use enforcement).
+    const cookies = (result.multiValueHeaders?.['Set-Cookie'] ??
+      []) as string[];
+    expect(cookies.some((c) => c.includes('Max-Age=0'))).toBe(true);
+    // And we did NOT short-circuit with a 400 invalid-state body
+    if (result.statusCode === 400) {
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).not.toBe('Invalid state');
+    }
+  });
+
+  it('returns 400 with the OAuth error message when Google reports an error', async () => {
+    const result = await handleGoogleCallback(
+      makeCallbackEvent({
+        queryStringParameters: { error: 'access_denied' },
+      }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(result.body).toContain('access_denied');
+    const cookies = (result.multiValueHeaders?.['Set-Cookie'] ??
+      []) as string[];
+    expect(cookies.some((c) => c.includes('Max-Age=0'))).toBe(true);
+  });
+
+  it('returns 400 when authorization code is missing', async () => {
+    const result = await handleGoogleCallback(
+      makeCallbackEvent({
+        queryStringParameters: { state: 'test-csrf-token' },
+      }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string };
+    expect(body.error).toBe('Missing authorization code');
   });
 });

@@ -5,16 +5,17 @@ import { Spinner } from 'tamagui';
 import { AuthService, useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
 
-const DISCORD_OAUTH_STATE_STORAGE_KEY = 'discord_oauth_link_state';
-
 /**
  * Handles the Discord OAuth callback for authenticated users linking their
  * Discord account from profile settings.
  *
  * Flow:
- * 1. User clicks "Connect Discord" in profile settings (random state nonce stored in sessionStorage)
+ * 1. User clicks "Connect Discord" in profile settings -> browser navigates to
+ *    `/oauth/discord/authorize` on the backend, which sets an HttpOnly state
+ *    cookie and 302s to Discord.
  * 2. Discord redirects here with ?code=...&state=<nonce>
- * 3. This page validates the state nonce, then delegates to AuthService.linkDiscordAccount
+ * 3. This page forwards code+state to the backend; the backend verifies
+ *    state against the cookie (single-use), then links the account.
  * 4. On success: redirects to /profile/settings
  * 5. On error: shows error with a link back to profile settings
  */
@@ -38,18 +39,7 @@ export function DiscordCallbackPage(): React.JSX.Element {
       return;
     }
 
-    // Validate state nonce to prevent link-CSRF attacks
-    let storedState: string | null = null;
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        storedState = sessionStorage.getItem(DISCORD_OAUTH_STATE_STORAGE_KEY);
-        sessionStorage.removeItem(DISCORD_OAUTH_STATE_STORAGE_KEY);
-      }
-    } catch {
-      // sessionStorage unavailable
-    }
-
-    if (!code || !state || state !== storedState) {
+    if (!code || !state) {
       setErrorMessage(
         'Discord authorization failed: the security check did not pass. Please try again from your profile settings.',
       );
@@ -58,7 +48,7 @@ export function DiscordCallbackPage(): React.JSX.Element {
 
     const linkAccount = async () => {
       try {
-        await authService.linkDiscordAccount(code);
+        await authService.linkDiscordAccount(code, state);
         LOGGER.info('Discord account linked successfully');
         navigate('/profile/settings?discord_linked=1', { replace: true });
       } catch (err) {

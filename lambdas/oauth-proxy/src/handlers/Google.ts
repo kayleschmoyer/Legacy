@@ -14,6 +14,14 @@ import { getUserFromGoogleEmail } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
+import {
+  buildClearOauthStateCookie,
+  buildOauthStateCookie,
+  decodeOauthState,
+  encodeOauthState,
+  generateOauthState,
+  verifyOauthState,
+} from '../util/oauth-state';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 import { getAuthSuccessHtml, htmlEscape } from '../util/html';
@@ -84,7 +92,15 @@ export const handleGoogleAuthorize = async (
 
   try {
     const { clientId } = await getGoogleAuthSettings();
-    const state = event.queryStringParameters?.state || '';
+
+    // Generate a server-side CSRF token bound to this browser via a
+    // short-lived HttpOnly cookie. The token is sent to Google as part of
+    // `state`; the callback verifies it before trusting the response.
+    // A caller-supplied `state` (the device code, for CLI device flow) is
+    // appended after the CSRF token so the callback can recover it.
+    const csrfToken = generateOauthState();
+    const deviceCode = event.queryStringParameters?.state || '';
+    const composedState = encodeOauthState(csrfToken, deviceCode);
 
     // Build Google OAuth URL
     const params = new URLSearchParams({
@@ -94,17 +110,20 @@ export const handleGoogleAuthorize = async (
       scope: 'openid profile email',
       access_type: 'offline',
       prompt: 'consent',
-      state: state,
+      state: composedState,
     });
 
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/auth?${params.toString()}`;
 
-    LOGGER.debug(`Redirecting to Google OAuth: ${googleAuthUrl}`);
+    LOGGER.debug('Redirecting to Google OAuth (state bound to browser)');
 
     return {
       statusCode: 302,
       headers: {
         Location: googleAuthUrl,
+      },
+      multiValueHeaders: {
+        'Set-Cookie': [buildOauthStateCookie(csrfToken)],
       },
       body: '',
     };
@@ -133,10 +152,15 @@ export const handleGoogleCallback = async (
 ): Promise<APIGatewayProxyResult> => {
   LOGGER.info('Google OAuth callback received');
 
+  // The state cookie is single-use: clear it on every response from this
+  // handler (success or failure) so it cannot be replayed.
+  const clearStateCookie = buildClearOauthStateCookie();
+
   try {
     const code = event.queryStringParameters?.code;
-    const state = event.queryStringParameters?.state;
+    const rawState = event.queryStringParameters?.state;
     const error = event.queryStringParameters?.error;
+    const cookieHeader = event.headers?.['Cookie'] ?? event.headers?.['cookie'];
 
     if (error) {
       LOGGER.error(`OAuth error from Google: ${error}`);
@@ -144,6 +168,9 @@ export const handleGoogleCallback = async (
         statusCode: 400,
         headers: {
           'Content-Type': 'text/html',
+        },
+        multiValueHeaders: {
+          'Set-Cookie': [clearStateCookie],
         },
         body: `
 <!DOCTYPE html>
@@ -162,6 +189,9 @@ export const handleGoogleCallback = async (
     if (!code) {
       return {
         statusCode: 400,
+        multiValueHeaders: {
+          'Set-Cookie': [clearStateCookie],
+        },
         body: JSON.stringify({
           error: 'Missing authorization code',
           message: 'No authorization code received from Google',
@@ -169,17 +199,52 @@ export const handleGoogleCallback = async (
       };
     }
 
-    // Create a synthetic event for the existing Google auth handler
-    // Include the redirect_uri that Google used for this callback so the token exchange matches
+    // Verify the CSRF state against the cookie bound at /authorize time.
+    // The state Google echoes back has the form `<csrf>` or `<csrf>.<deviceCode>`.
+    const { csrfToken, deviceCode } = decodeOauthState(rawState);
+    if (!verifyOauthState(csrfToken, cookieHeader)) {
+      LOGGER.warn('Google OAuth callback rejected: state mismatch');
+      return {
+        statusCode: 400,
+        multiValueHeaders: {
+          'Set-Cookie': [clearStateCookie],
+        },
+        body: JSON.stringify({
+          error: 'Invalid state',
+          message:
+            'OAuth state did not match. The login attempt may have expired or been tampered with — please try again.',
+        }),
+      };
+    }
+
+    // Create a synthetic event for the existing Google auth handler.
+    // Forward only the device code (not the CSRF token) as the downstream
+    // `state`, so completeDeviceFlow continues to receive the device code
+    // it expects. Include the redirect_uri that Google used for this
+    // callback so the token exchange matches.
     const syntheticEvent: APIGatewayEvent = {
       ...event,
       httpMethod: 'POST',
       body: JSON.stringify({ code, redirect_uri: getRedirectUri(event) }),
-      queryStringParameters: { ...event.queryStringParameters, state },
+      queryStringParameters: {
+        ...event.queryStringParameters,
+        state: deviceCode || undefined,
+      },
     };
 
-    // Use existing secure Google auth handler
-    return await handleSecureGoogleAuth(syntheticEvent);
+    const downstream = await handleSecureGoogleAuth(syntheticEvent);
+
+    // Append the clearing Set-Cookie alongside whatever downstream cookies
+    // the secure handler set, so the state cookie is single-use even on
+    // success.
+    const existing = downstream.multiValueHeaders?.['Set-Cookie'] ?? [];
+    return {
+      ...downstream,
+      multiValueHeaders: {
+        ...downstream.multiValueHeaders,
+        'Set-Cookie': [...(existing as string[]), clearStateCookie],
+      },
+    };
   } catch (error) {
     LOGGER.error(
       'Google callback error:',
@@ -190,6 +255,9 @@ export const handleGoogleCallback = async (
       statusCode: 500,
       headers: {
         'Content-Type': 'text/html',
+      },
+      multiValueHeaders: {
+        'Set-Cookie': [clearStateCookie],
       },
       body: `
 <!DOCTYPE html>
