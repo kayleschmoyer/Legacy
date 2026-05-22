@@ -198,6 +198,101 @@ describe('OAuth proxy CORS headers', () => {
     );
   });
 
+  type LoggerMock = {
+    LOGGER: {
+      debug: jest.Mock;
+      info: jest.Mock;
+      warn: jest.Mock;
+      error: jest.Mock;
+    };
+  };
+  type LocalMock = { handleLogin: jest.Mock; handleRegister: jest.Mock };
+  type RollbarMock = { captureError: jest.Mock };
+
+  function makeLoginEvent(
+    body: Record<string, unknown>,
+    headers: Record<string, string>,
+  ): APIGatewayEvent {
+    return {
+      httpMethod: 'POST',
+      path: '/oauth/login',
+      headers,
+      multiValueHeaders: {},
+      body: JSON.stringify(body),
+      queryStringParameters: null,
+      multiValueQueryStringParameters: null,
+      pathParameters: null,
+      stageVariables: null,
+      requestContext: {} as APIGatewayEvent['requestContext'],
+      resource: '/oauth/login',
+      isBase64Encoded: false,
+    };
+  }
+
+  it('POST /oauth/login never leaks the password into LOGGER calls (even at debug)', async () => {
+    const password = 'hunter2-LITERAL-NEVER-LOG';
+    const cookie = 'ls_jwt=eyJSECRET; ls_csrf=CSRF_SECRET';
+
+    const logging = jest.requireMock<LoggerMock>('@legacy-sports/logging');
+    const local = jest.requireMock<LocalMock>('./handlers/Local');
+    local.handleLogin.mockResolvedValueOnce({
+      statusCode: 200,
+      body: JSON.stringify({ ok: true }),
+    });
+
+    await handler(
+      makeLoginEvent(
+        { email: 'a@b.com', password },
+        {
+          Cookie: cookie,
+          Authorization: 'Bearer should-not-be-logged',
+          'User-Agent': 'jest',
+          Origin: 'https://legacy-fantasy.com',
+        },
+      ),
+      {} as Context,
+    );
+
+    const allCalls = [
+      logging.LOGGER.debug,
+      logging.LOGGER.info,
+      logging.LOGGER.warn,
+      logging.LOGGER.error,
+    ].flatMap((m) => m.mock.calls as unknown[]);
+    const allLoggerCalls = JSON.stringify(allCalls);
+    expect(allLoggerCalls).not.toContain(password);
+    expect(allLoggerCalls).not.toContain('ls_jwt');
+    expect(allLoggerCalls).not.toContain('CSRF_SECRET');
+    expect(allLoggerCalls).not.toContain('should-not-be-logged');
+  });
+
+  it('captureError on a failed /oauth/login does not include Cookie/Authorization headers', async () => {
+    const rollbar = jest.requireMock<RollbarMock>('@legacy-sports/rollbar');
+    const local = jest.requireMock<LocalMock>('./handlers/Local');
+    rollbar.captureError.mockClear();
+    local.handleLogin.mockRejectedValueOnce(new Error('boom'));
+
+    await handler(
+      makeLoginEvent(
+        { email: 'a@b.com', password: 'pw-LEAK-check' },
+        {
+          Cookie: 'ls_jwt=ROLLBAR_LEAK_CHECK',
+          Authorization: 'Bearer ROLLBAR_AUTH_LEAK',
+          'User-Agent': 'jest',
+        },
+      ),
+      {} as Context,
+    );
+
+    expect(rollbar.captureError).toHaveBeenCalledTimes(1);
+    const callArgs = rollbar.captureError.mock.calls[0] as unknown[];
+    const context = callArgs[1] as { headers: Record<string, string> };
+    expect(context.headers).toEqual({ 'user-agent': 'jest' });
+    const serialized = JSON.stringify(rollbar.captureError.mock.calls);
+    expect(serialized).not.toContain('ROLLBAR_LEAK_CHECK');
+    expect(serialized).not.toContain('ROLLBAR_AUTH_LEAK');
+  });
+
   it('GET /oauth/health with allowed origin reflects that origin in CORS headers', async () => {
     process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
     const result = await handler(

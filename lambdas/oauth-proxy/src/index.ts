@@ -35,6 +35,7 @@ import {
   handleStopImpersonate,
 } from './handlers/Impersonate';
 import { withRateLimit } from './util/rate-limit';
+import { sanitizeHeaders } from './util/lambda';
 
 // Defense-in-depth rate-limit budgets for auth endpoints. Per-IP, per
 // Lambda execution context (see util/rate-limit.ts). Edge throttling
@@ -175,7 +176,7 @@ const baseOAuthHandler = async (
     AWS_REGION: process.env.AWS_REGION,
   });
   LOGGER.debug('Request Details:', {
-    headers: event.headers,
+    headers: sanitizeHeaders(event.headers),
     body: event.body ? '[BODY_PRESENT]' : '[NO_BODY]',
     queryStringParameters: event.queryStringParameters,
   });
@@ -450,7 +451,7 @@ const baseOAuthHandler = async (
       httpMethod: event.httpMethod,
       path: event.path,
       query: event.queryStringParameters,
-      headers: event.headers,
+      headers: sanitizeHeaders(event.headers),
       operation: 'oauth_request',
     });
 
