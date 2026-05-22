@@ -13,7 +13,7 @@ import {
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   DEFAULT_ROSTER_POSITIONS,
@@ -31,7 +31,7 @@ import {
   normalizeSport,
   ROSTER_RANGE_BY_SPORT,
 } from './sport-validation';
-import { builder } from '../builder';
+import { builder, type Context } from '../builder';
 import {
   adjustMatchupsForNewTotal,
   createAllMatchupsForLeague,
@@ -654,6 +654,86 @@ builder.mutationField('startDraft', (t) =>
   }),
 );
 
+// ── Team-claim helper ─────────────────────────────────────────────────────
+//
+// LS-2497: atomically claim an unassigned team slot for a user joining a
+// league. Concurrent joiners previously could observe the same row as
+// unassigned and both INSERT into league_members, producing duplicate
+// ownership and (for paid leagues) double-charging risk.
+//
+// Locks the candidate team row with `FOR UPDATE OF t SKIP LOCKED` inside a
+// transaction so any concurrent claim attempt is forced to a *different*
+// team row (or to "no rows" when every team is locked). A defensive
+// re-verification against league_members covers the case where a concurrent
+// transaction had already committed an INSERT before our row lock — the
+// LEFT JOIN snapshot could be stale, so we re-check inside the locked
+// transaction before claiming.
+type LeaguePermissionLevel =
+  | 'general_manager'
+  | 'assistant_manager'
+  | 'commissioner';
+
+type ClaimResult = { teamId: number } | { fullLeague: true };
+
+export async function claimUnassignedTeamForUser(
+  db: Context['db'],
+  params: {
+    leagueId: number;
+    userId: number;
+    teamName: string;
+    permissionLevel: LeaguePermissionLevel;
+  },
+): Promise<ClaimResult> {
+  const { leagueId, userId, teamName, permissionLevel } = params;
+
+  return db.transaction(async (tx) => {
+    const candidates = await tx.execute(sql`
+      SELECT t.id
+      FROM teams t
+      LEFT JOIN league_members lm
+        ON lm.team_id = t.id AND lm.league_id = ${leagueId}
+      WHERE t.league_id = ${leagueId} AND lm.user_id IS NULL
+      ORDER BY t.id
+      LIMIT 1
+      FOR UPDATE OF t SKIP LOCKED
+    `);
+
+    const teamId = (candidates.rows[0] as { id: number } | undefined)?.id;
+    if (teamId === undefined) {
+      return { fullLeague: true } as const;
+    }
+
+    const existing = await tx
+      .select({ userId: PublicSchema.leagueMembers.userId })
+      .from(PublicSchema.leagueMembers)
+      .where(
+        and(
+          eq(PublicSchema.leagueMembers.leagueId, leagueId),
+          eq(PublicSchema.leagueMembers.teamId, teamId),
+        ),
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      return { fullLeague: true } as const;
+    }
+
+    await tx
+      .update(PublicSchema.teams)
+      .set({ name: teamName, updatedAt: new Date() })
+      .where(eq(PublicSchema.teams.id, teamId));
+
+    await tx.insert(PublicSchema.leagueMembers).values({
+      leagueId,
+      userId,
+      teamId,
+      permissionLevel,
+    });
+
+    return { teamId };
+  });
+}
+
 // Mutation field to join a league using an invite code
 builder.mutationField('joinLeagueByCode', (t) =>
   t.field({
@@ -710,50 +790,25 @@ builder.mutationField('joinLeagueByCode', (t) =>
           throw UserInputError('You are already a member of this league');
         }
 
-        // Find an unassigned team in the league (one with no league_members entry)
-        const unassignedTeams = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            waiverOrder: PublicSchema.teams.waiverOrder,
-            faabBudget: PublicSchema.teams.faabBudget,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-            logoUrl: PublicSchema.teams.logoUrl,
-            primaryColor: PublicSchema.teams.primaryColor,
-            secondaryColor: PublicSchema.teams.secondaryColor,
-            isLocked: PublicSchema.teams.isLocked,
-          })
-          .from(PublicSchema.teams)
-          .leftJoin(
-            PublicSchema.leagueMembers,
-            and(
-              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
-              eq(PublicSchema.leagueMembers.leagueId, league.id),
-            ),
-          )
-          .where(
-            and(
-              eq(PublicSchema.teams.leagueId, league.id),
-              isNull(PublicSchema.leagueMembers.userId),
-            ),
-          )
-          .orderBy(PublicSchema.teams.id)
-          .limit(1);
+        // LS-2497: atomic claim — wraps team selection + rename + membership
+        // insert in a transaction with a row-level lock so two concurrent
+        // joiners can't both observe the same team as unassigned.
+        const claim = await claimUnassignedTeamForUser(context.db, {
+          leagueId: league.id,
+          userId,
+          teamName,
+          permissionLevel: 'general_manager',
+        });
 
-        if (unassignedTeams.length === 0) {
+        if ('fullLeague' in claim) {
           throw UserInputError(
             'This league is full. All teams have been claimed.',
           );
         }
 
-        // Claim the unassigned team by renaming it to the user's chosen name
+        // Fetch the team we just claimed for the GraphQL response payload.
         const updatedTeams = await context.db
-          .update(PublicSchema.teams)
-          .set({ name: teamName, updatedAt: new Date() })
-          .where(eq(PublicSchema.teams.id, unassignedTeams[0].id))
-          .returning({
+          .select({
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
@@ -768,45 +823,20 @@ builder.mutationField('joinLeagueByCode', (t) =>
             isLocked: PublicSchema.teams.isLocked,
             avatarUrl: PublicSchema.teams.avatarUrl,
             bannerUrl: PublicSchema.teams.bannerUrl,
-          });
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, claim.teamId))
+          .limit(1);
 
         const team = updatedTeams[0];
 
-        // LS-4541: defense in depth — if the UPDATE...RETURNING produced an
-        // unexpected shape (no rows, or a row missing the leagueId we just
-        // wrote), fail loudly here rather than letting Pothos serialize a
-        // bogus Team object. The schema marks Team.leagueId as non-nullable,
-        // so a missing value would otherwise collapse the entire mutation
-        // result to `null` with a buried non-null violation in errors[];
-        // surfacing it as an explicit server error keeps CloudWatch the
-        // single source of truth for join-flow failures.
         if (!team || typeof team.leagueId !== 'number') {
           throw new Error(
-            `joinLeagueByCode: UPDATE teams returned malformed row ` +
-              `(teamId=${unassignedTeams[0].id} leagueId=${league.id}); ` +
+            `joinLeagueByCode: post-claim SELECT teams returned malformed row ` +
+              `(teamId=${claim.teamId} leagueId=${league.id}); ` +
               `expected { id, leagueId } but got ${JSON.stringify(team)}`,
           );
         }
-
-        // Add user to league members with explicit typing
-        const leagueMemberData: {
-          leagueId: number;
-          userId: number;
-          teamId: number;
-          permissionLevel:
-            | 'general_manager'
-            | 'assistant_manager'
-            | 'commissioner';
-        } = {
-          leagueId: league.id,
-          userId: userId,
-          teamId: team.id,
-          permissionLevel: 'general_manager',
-        };
-
-        await context.db
-          .insert(PublicSchema.leagueMembers)
-          .values(leagueMemberData);
 
         LOGGER.info('User joined league', {
           userId,
@@ -973,35 +1003,17 @@ builder.mutationField('joinLeague', (t) =>
           };
         }
 
-        // Find an unassigned team in the league (one with no league_members entry)
-        const unassignedTeamsForJoin = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            waiverOrder: PublicSchema.teams.waiverOrder,
-            faabBudget: PublicSchema.teams.faabBudget,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .leftJoin(
-            PublicSchema.leagueMembers,
-            and(
-              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
-              eq(PublicSchema.leagueMembers.leagueId, league.id),
-            ),
-          )
-          .where(
-            and(
-              eq(PublicSchema.teams.leagueId, league.id),
-              isNull(PublicSchema.leagueMembers.userId),
-            ),
-          )
-          .orderBy(PublicSchema.teams.id)
-          .limit(1);
+        // LS-2497: atomic claim (transaction + row-level lock) — see
+        // claimUnassignedTeamForUser above for why this replaces the previous
+        // unlocked SELECT-then-UPDATE-then-INSERT sequence.
+        const claim = await claimUnassignedTeamForUser(context.db, {
+          leagueId: league.id,
+          userId,
+          teamName,
+          permissionLevel: 'general_manager',
+        });
 
-        if (unassignedTeamsForJoin.length === 0) {
+        if ('fullLeague' in claim) {
           return {
             success: false,
             message: 'This league is full. All teams have been claimed.',
@@ -1009,30 +1021,36 @@ builder.mutationField('joinLeague', (t) =>
           };
         }
 
-        // Claim the unassigned team by renaming it to the user's chosen name
-        const updatedTeamsForJoin = await context.db
-          .update(PublicSchema.teams)
-          .set({ name: teamName, updatedAt: new Date() })
-          .where(eq(PublicSchema.teams.id, unassignedTeamsForJoin[0].id))
-          .returning({
+        const updatedTeams = await context.db
+          .select({
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            divisionId: PublicSchema.teams.divisionId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,
             faabBudget: PublicSchema.teams.faabBudget,
-          });
+            logoUrl: PublicSchema.teams.logoUrl,
+            primaryColor: PublicSchema.teams.primaryColor,
+            secondaryColor: PublicSchema.teams.secondaryColor,
+            isLocked: PublicSchema.teams.isLocked,
+            avatarUrl: PublicSchema.teams.avatarUrl,
+            bannerUrl: PublicSchema.teams.bannerUrl,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, claim.teamId))
+          .limit(1);
 
-        const team = updatedTeamsForJoin[0];
+        const team = updatedTeams[0];
 
-        // Add user as league member
-        await context.db.insert(PublicSchema.leagueMembers).values({
-          leagueId: league.id,
-          userId: userId,
-          teamId: team.id,
-          permissionLevel: 'general_manager',
-        });
+        if (!team || typeof team.leagueId !== 'number') {
+          throw new Error(
+            `joinLeague: post-claim SELECT teams returned malformed row ` +
+              `(teamId=${claim.teamId} leagueId=${league.id}); ` +
+              `expected { id, leagueId } but got ${JSON.stringify(team)}`,
+          );
+        }
 
         // Send a league chat notification
         const joinerUsername = context.user.username ?? `user_${userId}`;
@@ -1790,51 +1808,48 @@ builder.mutationField('joinPublicLeague', (t) =>
           throw UserInputError('You are already a member of this league');
         }
 
-        // Find an unassigned team slot
-        const unassignedTeams = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-          })
-          .from(PublicSchema.teams)
-          .leftJoin(
-            PublicSchema.leagueMembers,
-            and(
-              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
-              eq(PublicSchema.leagueMembers.leagueId, leagueId),
-            ),
-          )
-          .where(
-            and(
-              eq(PublicSchema.teams.leagueId, leagueId),
-              isNull(PublicSchema.leagueMembers.userId),
-            ),
-          )
-          .orderBy(PublicSchema.teams.id)
-          .limit(1);
+        // LS-2497: atomic claim (transaction + row-level lock) — see
+        // claimUnassignedTeamForUser above for why this replaces the previous
+        // unlocked SELECT-then-UPDATE-then-INSERT sequence.
+        const claim = await claimUnassignedTeamForUser(context.db, {
+          leagueId,
+          userId,
+          teamName: teamName.trim(),
+          permissionLevel: 'general_manager',
+        });
 
-        if (unassignedTeams.length === 0) {
+        if ('fullLeague' in claim) {
           throw UserInputError(
             'This league is full. All teams have been claimed.',
           );
         }
 
-        const teamId = unassignedTeams[0].id;
+        // Fetch the team we just claimed for the GraphQL response payload and
+        // to guard against malformed rows (mirrors joinLeagueByCode).
+        const updatedTeams = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, claim.teamId))
+          .limit(1);
 
-        // Rename the claimed team
-        await context.db
-          .update(PublicSchema.teams)
-          .set({ name: teamName.trim(), updatedAt: new Date() })
-          .where(eq(PublicSchema.teams.id, teamId));
+        const team = updatedTeams[0];
 
-        // Create league membership
-        await context.db.insert(PublicSchema.leagueMembers).values({
-          leagueId,
+        if (!team || typeof team.leagueId !== 'number') {
+          throw new Error(
+            `joinPublicLeague: post-claim SELECT teams returned malformed row ` +
+              `(teamId=${claim.teamId} leagueId=${leagueId}); ` +
+              `expected { id, leagueId } but got ${JSON.stringify(team)}`,
+          );
+        }
+
+        LOGGER.info('User joined public league', {
           userId,
-          teamId,
-          permissionLevel: 'general_manager',
+          leagueId,
+          teamId: team.id,
         });
-
-        LOGGER.info('User joined public league', { userId, leagueId, teamId });
 
         // Send a league chat notification
         const joinerUsername = context.user.username ?? `user_${userId}`;
@@ -1865,8 +1880,8 @@ builder.mutationField('joinPublicLeague', (t) =>
         return {
           success: true,
           message: `You have joined "${league.name}" successfully!`,
-          leagueId,
-          teamId,
+          leagueId: team.leagueId,
+          teamId: team.id,
         };
       } catch (error) {
         if (error instanceof GraphQLError) {
