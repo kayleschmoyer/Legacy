@@ -74,19 +74,19 @@ These are published automatically by CI workflows — no manual steps required.
 
 ### Android APK
 
-[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/tag/android-latest)
+[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/latest/download/legacy-sports-latest.apk)
 
 **Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases?q=android)
 
 **Scan to download on your phone:**
 
-<a href="https://github.com/bkrupa/legacy-sports/releases/tag/android-latest"><img src="docs/assets/apk-qr.svg" alt="QR code linking to the latest Android APK release" width="180" height="180" /></a>
+<a href="https://github.com/bkrupa/legacy-sports/releases/latest/download/legacy-sports-latest.apk"><img src="docs/assets/apk-qr.svg" alt="QR code that downloads the latest Android APK directly" width="180" height="180" /></a>
 
 **Installation Instructions:**
 
-1. Download the APK file from the link above (or scan the QR code on your phone)
-2. Enable "Install from Unknown Sources" in your Android settings
-3. Install the APK on your Android device
+1. Tap the button or scan the QR code — the APK downloads directly
+2. Enable "Install from Unknown Sources" in your Android settings (if prompted)
+3. Open the downloaded APK to install it
 
 > **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
