@@ -314,6 +314,10 @@ jest.mock('./subscription-settings', () => ({
   __esModule: true,
   default: () => 'SubscriptionSettingsScreen',
 }));
+jest.mock('./update-check', () => ({
+  __esModule: true,
+  default: () => 'UpdateCheckScreen',
+}));
 jest.mock('.', () => ({ __esModule: true, default: () => 'Home' }));
 jest.mock('./baseball/league/create', () => ({
   __esModule: true,
@@ -610,6 +614,7 @@ describe('App Drawer Layout', () => {
         'preferences',
         'notifications',
         'subscription-settings',
+        'update-check',
         'league-discovery',
       ];
 

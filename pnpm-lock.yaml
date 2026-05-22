@@ -748,9 +748,15 @@ importers:
       expo-device:
         specifier: ~6.0.0
         version: 6.0.2(expo@54.0.34)
+      expo-file-system:
+        specifier: ~19.0.0
+        version: 19.0.22(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.5)(utf-8-validate@6.0.6))
       expo-image:
         specifier: ~3.0.11
         version: 3.0.11(expo@54.0.34)(react-native-web@0.21.2(encoding@0.1.13)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.5)(utf-8-validate@6.0.6))(react@19.2.5)
+      expo-intent-launcher:
+        specifier: ~13.0.0
+        version: 13.0.8(expo@54.0.34)
       expo-notifications:
         specifier: ~0.30.0
         version: 0.30.7(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.5)(utf-8-validate@6.0.6))(react@19.2.5)
@@ -1479,6 +1485,8 @@ importers:
       postgres:
         specifier: ^3.4.7
         version: 3.4.9
+
+  lib/design-tokens: {}
 
   lib/env-utilities:
     dependencies:
@@ -12143,6 +12151,11 @@ packages:
     peerDependenciesMeta:
       react-native-web:
         optional: true
+
+  expo-intent-launcher@13.0.8:
+    resolution: {integrity: sha512-sgGFotttKKN6dIatjOEJT8M6Arfakus7vIxgshg5VkxarVhZBGJzOJam7rbUlB1O/gQ8em9G8vhEU9AfjEIe7A==}
+    peerDependencies:
+      expo: '*'
 
   expo-keep-awake@15.0.8:
     resolution: {integrity: sha512-YK9M1VrnoH1vLJiQzChZgzDvVimVoriibiDIFLbQMpjYBnvyfUeHJcin/Gx1a+XgupNXy92EQJLgI/9ZuXajYQ==}
@@ -35625,6 +35638,10 @@ snapshots:
       react-native: 0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.5)(utf-8-validate@6.0.6)
     optionalDependencies:
       react-native-web: 0.21.2(encoding@0.1.13)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+
+  expo-intent-launcher@13.0.8(expo@54.0.34):
+    dependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@6.1.2)(bufferutil@4.1.0)(expo-router@6.0.23)(graphql@16.13.2)(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.5)(utf-8-validate@6.0.6))(react@19.2.5)(typescript@5.9.3)(utf-8-validate@6.0.6)
 
   expo-keep-awake@15.0.8(expo@54.0.34)(react@19.2.5):
     dependencies:

@@ -3,6 +3,7 @@ import {
   createDrawerNavigator,
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, XStack, YStack } from 'tamagui';
 import { getExpoPushTokenAsync } from 'expo-notifications';
@@ -35,6 +36,7 @@ import ProfileSettingsScreen from './profile-settings';
 import PreferencesScreen from './preferences';
 import NotificationsScreen from './notifications';
 import SubscriptionSettingsScreen from './subscription-settings';
+import UpdateCheckScreen from './update-check';
 import {
   useDisableDeviceTokenMutation,
   useGetUnreadNotificationCountQuery,
@@ -76,6 +78,7 @@ export type AppDrawerParamList = {
   preferences: undefined;
   notifications: undefined;
   'subscription-settings': undefined;
+  'update-check': undefined;
 };
 
 const { Navigator, Screen } = createDrawerNavigator<AppDrawerParamList>();
@@ -166,6 +169,14 @@ const ROUTES = Object.freeze<Route[]>([
     route: 'about',
     title: 'About',
   },
+  ...(Platform.OS === 'android'
+    ? [
+        {
+          route: 'update-check' as const,
+          title: 'Check for Updates',
+        },
+      ]
+    : []),
 ]);
 
 function CustomDrawerContent(
@@ -431,6 +442,11 @@ export default function Layout() {
               title: 'Subscription & Billing',
             }}
             component={SubscriptionSettingsScreen}
+          />
+          <Screen
+            name="update-check"
+            options={{ title: 'Check for Updates' }}
+            component={UpdateCheckScreen}
           />
         </Navigator>
       </GestureHandlerRootView>
