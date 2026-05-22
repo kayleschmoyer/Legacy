@@ -168,6 +168,12 @@ export * from './utils/styles';
 export * from './components/StatusBadge';
 export * from './components/EmptyState';
 export * from './components/ErrorState';
+// Card from `./components/Card` is the design-system version. The legacy
+// `Card` exported from `./Layout` (a thin Tamagui wrapper with title/subtitle
+// props) has no current consumers; import it directly from './Layout' if
+// needed.
+export { Card } from './components/Card';
+export type { CardProps } from './components/Card';
 export * from './components/PanelCard';
 export * from './components/UnifiedLoadingPanel';
 
