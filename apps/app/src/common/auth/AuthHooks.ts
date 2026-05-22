@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from 'react';
-import memoizeOne from 'memoize-one';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'expo-router';
@@ -218,15 +217,6 @@ export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   return usePlatformAuthHandlers(callbacks);
 }
 
-const refreshJwt = memoizeOne(async (_keychainLastUpdate: number) => {
-  const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
-  const tokenResponse = await axios.post<OAuthProxyTokens>(
-    `${oauthProxy}/google/refresh`,
-    {},
-  );
-  await storeToken(tokenResponse.data);
-});
-
 const LOCAL_USER: LegacySportsJwt = {
   about: null,
   email: null,
@@ -236,30 +226,17 @@ const LOCAL_USER: LegacySportsJwt = {
 };
 
 export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
+  // Re-run the hook when stored secrets change (login/logout) so the cached
+  // JWT picks up the new value. The bump value is captured inside the
+  // callback purely so the dependency is real and not a lint-disable.
   const lastUpdateTime = useLastUpdateTime();
 
   const runHook = useCallback(async () => {
+    void lastUpdateTime;
     if (getEnvVarOptional(EnvironmentVariable.BYPASS_AUTH) === 'true') {
       return LOCAL_USER;
     }
-
-    let jwt = await getJwt();
-
-    // JWT Expired, but we can try to refresh
-    if (jwt === null) {
-      try {
-        await refreshJwt(lastUpdateTime);
-      } catch (err) {
-        // This is okay, we probably don't have one
-        LOGGER.info(
-          `Could not refresh jwt: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-
-      jwt = await getJwt();
-    }
-
-    return jwt;
+    return await getJwt();
   }, [lastUpdateTime]);
 
   return useAsyncHook(runHook);

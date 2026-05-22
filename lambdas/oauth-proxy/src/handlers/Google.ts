@@ -1,9 +1,5 @@
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
-import {
-  Credentials,
-  OAuth2Client,
-  UserRefreshClient,
-} from 'google-auth-library';
+import { Credentials, OAuth2Client } from 'google-auth-library';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 
@@ -16,7 +12,7 @@ import { completeDeviceFlow } from './DeviceFlow';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
 import { getUserFromGoogleEmail } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
-import { decryptCookies, encryptCookies } from '../util/cookie';
+import { encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
@@ -30,7 +26,6 @@ interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
   _googlePicture?: string; // Pre-extracted picture from verified token
 }
 
-const REFRESH_TOKEN_COOKIE = 'GOOGLE_REFRESH_TOKEN';
 const GOOGLE_JWT_COOKIE = 'GOOGLE_JWT';
 
 interface GoogleAuthSettings {
@@ -664,7 +659,6 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   const cookies = {
     [GOOGLE_JWT_COOKIE]: idToken,
     [JWT_COOKIE_NAME]: internalJwt,
-    [REFRESH_TOKEN_COOKIE]: '', // Only available from authorization code flow
   };
 
   LOGGER.debug('Encrypting cookies.');
@@ -725,66 +719,4 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   LOGGER.debug('Complete.');
 
   return result;
-};
-
-export const handleGoogleRefresh = async (event: APIGatewayEvent) => {
-  LOGGER.debug('Initialize database.');
-  const { clientId, clientSecret } = await getGoogleAuthSettings();
-
-  const cookieHeader = event.headers['Cookie'] || '';
-
-  const cookies = await decryptCookies(cookieHeader);
-
-  const refreshToken = cookies[REFRESH_TOKEN_COOKIE];
-
-  if (!refreshToken) {
-    throw new Error('Could not determine refresh token!');
-  }
-
-  const user = new UserRefreshClient(clientId, clientSecret, refreshToken);
-
-  const { credentials } = await user.refreshAccessToken(); // obtain new tokens
-
-  if (credentials.id_token === null || credentials.id_token === undefined) {
-    throw new Error('Invalid token returned from google!');
-  }
-
-  const idToken = credentials.id_token;
-
-  // Verify the refreshed id_token with Google's public keys to ensure it's authentic
-  const oauthClient = getOAuthClient(clientId, clientSecret);
-  const ticket = await oauthClient.verifyIdToken({
-    idToken,
-    audience: clientId,
-  });
-  const googlePayload = ticket.getPayload();
-
-  const email = googlePayload?.email;
-  if (!email) {
-    LOGGER.error(
-      'Verified refresh token payload is missing required email claim',
-    );
-    throw new Error('Invalid ID token from Google: missing email');
-  }
-
-  return await withDbClient(async (db) => {
-    const userInfo = await getUserFromGoogleEmail(
-      db,
-      email,
-      googlePayload?.picture,
-    );
-
-    const internalJwt = await createJwt(userInfo, {
-      picture: googlePayload?.picture,
-    });
-
-    const result: APIGatewayProxyResult = {
-      body: JSON.stringify({
-        jwt: internalJwt,
-      }),
-      statusCode: 200,
-    };
-
-    return result;
-  });
 };

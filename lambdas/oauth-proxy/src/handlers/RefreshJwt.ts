@@ -36,9 +36,10 @@ const IMPERSONATION_TTL_SECONDS = 2 * 60 * 60;
 
 /**
  * Maximum time (in seconds) after a JWT has expired that a refresh is still allowed.
- * 30 days — users who haven't visited in over 30 days must re-authenticate.
+ * 7 days — limits the blast radius of a stolen JWT (LS-2547). Users who haven't
+ * visited in over 7 days must re-authenticate via the full OAuth flow.
  */
-const REFRESH_GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60;
+const REFRESH_GRACE_PERIOD_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * POST /oauth/refresh-jwt

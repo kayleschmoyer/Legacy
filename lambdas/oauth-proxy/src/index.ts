@@ -13,7 +13,6 @@ import {
   handleGoogleAuth,
   handleGoogleAuthorize,
   handleGoogleCallback,
-  handleGoogleRefresh,
   handleSecureGoogleAuth,
 } from './handlers/Google';
 import { handleLogin, handleRegister } from './handlers/Local';
@@ -241,7 +240,6 @@ const baseOAuthHandler = async (
               '/oauth/google/legacy (original flow for backward compatibility)',
               '/oauth/google/authorize (OAuth initiation)',
               '/oauth/google/callback (OAuth callback)',
-              '/oauth/google/refresh',
               '/oauth/refresh-jwt (silent JWT refresh for live sessions)',
               '/oauth/login',
               '/oauth/register',
@@ -299,14 +297,6 @@ const baseOAuthHandler = async (
       case '/dev/oauth/google/callback':
         if (event.httpMethod === 'GET') {
           const result = await handleGoogleCallback(event);
-          return cors(result);
-        }
-        break;
-
-      case '/oauth/google/refresh':
-      case '/dev/oauth/google/refresh':
-        if (event.httpMethod === 'POST') {
-          const result = await handleGoogleRefresh(event);
           return cors(result);
         }
         break;

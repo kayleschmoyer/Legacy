@@ -362,41 +362,10 @@ describe('AuthHooks', () => {
       });
     });
 
-    it('attempts refresh when no JWT exists in storage', async () => {
-      // Set up axios mock to handle the refresh call and store the new JWT.
-      // The mock also writes to mockSecureStorage so the subsequent getJwt()
-      // finds the refreshed token.
-      const refreshedJwt = createFakeJwt(TEST_USER);
-      mockAxiosPost.mockImplementation((url: string) => {
-        if (typeof url === 'string' && url.includes('/google/refresh')) {
-          return Promise.resolve({ data: { jwt: refreshedJwt } });
-        }
-        return Promise.resolve({ data: {} });
-      });
-
-      const { result } = renderHook(() => useCurrentUserInfo());
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      // Verify that a refresh call was actually attempted
-      const refreshWasCalled = mockAxiosPost.mock.calls.some(
-        ([url]) => typeof url === 'string' && url.includes('/google/refresh'),
-      );
-      expect(refreshWasCalled).toBe(true);
-
-      // Verify that the refreshed JWT was persisted via setItem
-      expect(mockSetItem).toHaveBeenCalledWith('INTERNAL_JWT', refreshedJwt);
-
-      // And that the refreshed JWT was read and used to populate data
-      expect(result.current.data).not.toBeNull();
-    });
-
-    it('returns null when no JWT exists and refresh fails', async () => {
-      // No JWT in storage, refresh fails
-      mockAxiosPost.mockRejectedValue(new Error('No refresh token'));
-
+    it('returns null when no JWT exists in storage', async () => {
+      // No JWT in storage. The legacy /oauth/google/refresh endpoint was
+      // removed in LS-2547 — it was dead code (always 500'd) — so missing
+      // JWT now simply resolves to null without an HTTP call.
       const { result } = renderHook(() => useCurrentUserInfo());
 
       await waitFor(() => {
@@ -404,6 +373,10 @@ describe('AuthHooks', () => {
       });
 
       expect(result.current.data).toBeNull();
+      const refreshWasCalled = mockAxiosPost.mock.calls.some(
+        ([url]) => typeof url === 'string' && url.includes('/refresh'),
+      );
+      expect(refreshWasCalled).toBe(false);
     });
 
     it('returns LOCAL_USER when BYPASS_AUTH is true', async () => {

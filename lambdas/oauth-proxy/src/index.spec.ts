@@ -44,7 +44,6 @@ jest.mock('./handlers/Google', () => ({
   handleGoogleAuth: jest.fn(),
   handleGoogleAuthorize: jest.fn(),
   handleGoogleCallback: jest.fn(),
-  handleGoogleRefresh: jest.fn(),
   handleSecureGoogleAuth: jest.fn(),
 }));
 jest.mock('./handlers/Local', () => ({

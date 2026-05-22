@@ -9,7 +9,7 @@ The OAuth Proxy provides secure authentication through Google OAuth and generate
 ## Endpoints
 
 - `POST /oauth/google` - Google OAuth authentication
-- `POST /oauth/google/refresh` - Refresh Google OAuth tokens
+- `POST /oauth/refresh-jwt` - Silently refresh an expired internal JWT (7-day grace window)
 - `OPTIONS *` - CORS preflight handling
 
 ## Environment Variables
