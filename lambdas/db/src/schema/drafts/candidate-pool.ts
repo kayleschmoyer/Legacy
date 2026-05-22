@@ -251,7 +251,8 @@ async function computePlayerDraftInfo(
     LEFT JOIN public.player_scoring_cache cs
       ON cs.player_id = p.id AND cs.league_id IS NULL
     WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
-    ORDER BY projected_fpg DESC`,
+    ORDER BY projected_fpg DESC
+    LIMIT 1000`,
   );
 
   // Position eligibility from the mat view
