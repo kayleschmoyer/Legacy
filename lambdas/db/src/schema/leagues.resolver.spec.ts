@@ -719,4 +719,73 @@ describe('League Mutations', () => {
       ).rejects.toThrow('DB connection failed');
     });
   });
+
+  describe('updateLeagueSettings mutation', () => {
+    it('should fail when user is not authenticated', async () => {
+      const unauthenticatedContext = { user: null };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1 } },
+          unauthenticatedContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('should fail when caller is not a member of the league', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('You are not a member of this league');
+    });
+
+    it('should fail when caller is an assistant_manager (LS-2502)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'assistant_manager' },
+      ]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, salaryCap: 1_000_000 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Only a general manager or commissioner can update league settings',
+      );
+    });
+  });
 });

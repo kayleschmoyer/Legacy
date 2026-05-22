@@ -1279,6 +1279,14 @@ builder.mutationField('updateLeagueSettings', (t) =>
       }
 
       // Both 'general_manager' and 'commissioner' can update settings
+      if (
+        membership[0].permissionLevel !== 'general_manager' &&
+        membership[0].permissionLevel !== 'commissioner'
+      ) {
+        throw ForbiddenError(
+          'Only a general manager or commissioner can update league settings',
+        );
+      }
 
       // Build change descriptions for the chat notification
       const changeDescriptions: string[] = [];
