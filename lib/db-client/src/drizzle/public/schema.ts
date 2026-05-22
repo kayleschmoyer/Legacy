@@ -12,6 +12,7 @@ export * from './models/Statistics';
 export * from './models/Users';
 export * from './models/Scoring';
 export * from './models/Sports';
+export * from './models/FootballTeams';
 export * from './models/SeasonDraftGame';
 export * from './models/SalaryCap';
 export * from './models/DisclosureGame';

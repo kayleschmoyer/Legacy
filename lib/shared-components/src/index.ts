@@ -238,6 +238,9 @@ export * from './utils/mapGraphQLToScoringFormat';
 // Preset image data (avatars, team logos, banners)
 export * from './constants/presets';
 
+// NFL team reference data
+export * from './constants/nflTeams';
+
 // Chat components
 export * from './features/chat/GifPicker';
 
