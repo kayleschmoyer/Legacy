@@ -4,17 +4,42 @@ import { CommandArgs } from '../utils/loadEnvFile';
 import { JWTPayload, User } from '../types/cli-types';
 
 export interface GenerateJwtArgs extends CommandArgs {
-  format?: 'token' | 'header' | 'env' | 'localstorage';
+  reveal?: boolean;
+  logFile?: string;
+}
+
+export interface GenerateJwtDeps {
+  authService?: Pick<
+    CLIAuthService,
+    'isAuthenticated' | 'authenticate' | 'getAuthToken'
+  >;
+  stdout?: NodeJS.WritableStream;
+  exit?: (code: number) => never;
 }
 
 export const handleGenerateJwt = async (
   args: GenerateJwtArgs,
+  deps: GenerateJwtDeps = {},
 ): Promise<void> => {
-  try {
-    const { format } = args;
-    const authService = new CLIAuthService();
+  const stdout = deps.stdout ?? process.stdout;
+  const exit = deps.exit ?? ((code: number) => process.exit(code));
 
-    // Authenticate via device flow if not already logged in
+  try {
+    // --reveal cannot be combined with --log-file. Refuse before authenticating so
+    // the user isn't prompted through a device-flow for a command that will refuse.
+    if (args.reveal && args.logFile) {
+      LOGGER.error(
+        '❌ --reveal cannot be combined with --log-file: that would persist the JWT to disk.',
+      );
+      LOGGER.error(
+        '   Re-run without --log-file, or omit --reveal to see metadata only.',
+      );
+      exit(1);
+      return;
+    }
+
+    const authService = deps.authService ?? new CLIAuthService();
+
     if (!(await authService.isAuthenticated())) {
       LOGGER.info(
         '🔐 Not authenticated. Starting device flow authentication...',
@@ -29,7 +54,7 @@ export const handleGenerateJwt = async (
       throw new Error('Authentication succeeded but no token was retrieved');
     }
 
-    // Decode JWT payload for display info (no verification — we trust our stored tokens)
+    // Decode JWT payload for metadata display (no verification — we trust our stored tokens)
     const payload = JSON.parse(
       Buffer.from(jwt.split('.')[1], 'base64').toString(),
     ) as JWTPayload;
@@ -45,60 +70,29 @@ export const handleGenerateJwt = async (
       accessLevel: payload.accessLevel,
     };
 
-    // Output based on format
-    switch (format) {
-      case 'header':
-        outputHeaderFormat(jwt);
-        break;
-      case 'env':
-        outputEnvFormat(jwt);
-        break;
-      case 'localstorage':
-        outputLocalStorageFormat(jwt);
-        break;
-      case 'token':
-      default:
-        outputTokenFormat(jwt, user, payload, expirationDate);
-        break;
+    printMetadata(user, payload, expirationDate);
+
+    if (!args.reveal) {
+      LOGGER.info('');
+      LOGGER.info(
+        '🔒 Token withheld. Re-run with --reveal to print it once on stdout (incompatible with --log-file).',
+      );
+      return;
     }
+
+    // Write the raw token directly to stdout — bypass LOGGER so no FileOutputDestination
+    // can capture it. Exactly one write, no surrounding prose.
+    stdout.write(`${jwt}\n`);
   } catch (error) {
     LOGGER.error(
       '❌ Error generating JWT:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
     );
-    process.exit(1);
+    exit(1);
   }
 };
 
-/**
- * Output JWT as Authorization header JSON
- */
-function outputHeaderFormat(jwtToken: string): void {
-  const headerJson = {
-    Authorization: `Bearer ${jwtToken}`,
-  };
-  console.log(JSON.stringify(headerJson, null, 2));
-}
-
-/**
- * Output JWT as environment variable
- */
-function outputEnvFormat(jwtToken: string): void {
-  console.log(`export AUTH_JWT="${jwtToken}"`);
-}
-
-/**
- * Output JWT as localStorage command
- */
-function outputLocalStorageFormat(jwtToken: string): void {
-  console.log(`localStorage.setItem('auth_jwt', '${jwtToken}');`);
-}
-
-/**
- * Output JWT with full details (default format)
- */
-function outputTokenFormat(
-  jwtToken: string,
+function printMetadata(
   user: User,
   payload: JWTPayload,
   expirationDate: Date,
@@ -106,18 +100,10 @@ function outputTokenFormat(
   LOGGER.info('\n🎉 JWT Retrieved Successfully!');
   LOGGER.info('================================');
   LOGGER.info(`User: ${user.email} (ID: ${user.id})`);
+  LOGGER.info(`Username: ${user.username}`);
   LOGGER.info(`Access Level: ${payload.accessLevel}`);
   LOGGER.info(`Expires: ${expirationDate.toISOString()}`);
-  LOGGER.info(`\n🔑 JWT Token:`);
-  console.log(jwtToken);
-
-  LOGGER.info('\n💡 Usage Examples:');
-  LOGGER.info('  • Set as environment variable:');
-  LOGGER.info(`    export AUTH_JWT="${jwtToken}"`);
-  LOGGER.info('  • Use in HTTP Authorization header:');
-  LOGGER.info(`    Authorization: Bearer ${jwtToken}`);
-  LOGGER.info('  • Store in localStorage for web testing:');
-  LOGGER.info(`    localStorage.setItem('auth_jwt', '${jwtToken}')`);
-  LOGGER.info('  • Copy to E2E test auth fixture:');
-  LOGGER.info(`    window.localStorage.setItem('auth_jwt', '${jwtToken}')`);
+  if (payload.iat) {
+    LOGGER.info(`Issued At: ${new Date(payload.iat * 1000).toISOString()}`);
+  }
 }

@@ -354,14 +354,22 @@ export function buildProgram(): Command {
   program
     .command('generate-jwt')
     .description(
-      'Obtain a JWT via device flow authentication and output it in the requested format',
+      'Obtain a JWT via device flow authentication and print its metadata. ' +
+        'By default the raw token is NOT printed — pass --reveal to print it once on stdout. ' +
+        '--reveal is incompatible with the global --log-file option.',
     )
     .option(
-      '-f, --format <format>',
-      'Output format: token (default), header, env, localstorage',
-      'token',
+      '--reveal',
+      'Print the raw JWT exactly once on stdout (refuses to run with --log-file)',
+      false,
     )
-    .action(handleGenerateJwt);
+    .action((options: { reveal?: boolean }, command: Command) => {
+      const globals: { logFile?: string } = command.optsWithGlobals();
+      return handleGenerateJwt({
+        reveal: options.reveal ?? false,
+        logFile: globals.logFile,
+      });
+    });
 
   program
     .command('inspect-sqs-queue')
