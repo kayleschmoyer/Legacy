@@ -4,6 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { getUserById } from '@legacy-sports/db-client';
 import { Secret, SECRET_CONFIG } from '../util';
+import { generateJti, JWT_AUDIENCE, JWT_ISSUER } from '../util/jwt';
 import {
   buildClearImpersonationCookie,
   buildImpersonationCookie,
@@ -81,6 +82,8 @@ export const handleImpersonate = async (
   try {
     adminPayload = verify(adminJwt, jwtKey, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }) as JwtPayload;
   } catch (err) {
     LOGGER.warn(
@@ -178,6 +181,9 @@ export const handleImpersonate = async (
     const impersonationJwt = sign(impersonationPayload, jwtKey, {
       algorithm: 'HS256',
       expiresIn: IMPERSONATION_TTL_SECONDS,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+      jwtid: generateJti(),
     });
 
     // Audit log

@@ -35,6 +35,12 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, eq } from 'drizzle-orm';
 
+/** Issuer claim minted by lambdas/oauth-proxy and required on verify. */
+const JWT_ISSUER = 'legacy-sports-oauth-proxy';
+
+/** Audience claim required by all internal Legacy Sports lambdas. */
+const JWT_AUDIENCE = 'legacy-sports';
+
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
@@ -194,6 +200,8 @@ async function validateToken(
     try {
       const decoded = verify(token, jwtSecret, {
         algorithms: ['HS256'],
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
       }) as JwtPayload;
 
       LOGGER.info('JWT verified successfully', { userId: decoded.id });

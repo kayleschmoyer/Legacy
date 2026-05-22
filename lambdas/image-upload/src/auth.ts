@@ -9,6 +9,12 @@ const JWT_SECRET_LOCAL = process.env['JWT_SECRET'] ?? '';
 const CSRF_HEADER = 'x-csrf-token';
 const CSRF_COOKIE = 'ls_csrf';
 
+/** Issuer claim minted by lambdas/oauth-proxy and required on verify. */
+const JWT_ISSUER = 'legacy-sports-oauth-proxy';
+
+/** Audience claim required by all internal Legacy Sports lambdas. */
+const JWT_AUDIENCE = 'legacy-sports';
+
 let jwtSecretPromise: Promise<string> | null = null;
 
 async function getJwtSecret(): Promise<string> {
@@ -74,6 +80,8 @@ export async function getAuthenticatedUserId(
     const token = authHeader.slice(7);
     const payload = verify(token, jwtSecret, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }) as { id: number | string };
     const id =
       typeof payload.id === 'string' ? parseInt(payload.id, 10) : payload.id;
@@ -106,6 +114,8 @@ export async function getAuthenticatedUserId(
 
       const payload = verify(token, jwtSecret, {
         algorithms: ['HS256'],
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
       }) as { id: number | string };
       const id =
         typeof payload.id === 'string' ? parseInt(payload.id, 10) : payload.id;

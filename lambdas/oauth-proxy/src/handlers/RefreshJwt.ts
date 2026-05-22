@@ -4,7 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { getUserById } from '@legacy-sports/db-client';
 import { Secret, SECRET_CONFIG } from '../util';
-import { createJwt } from '../util/jwt';
+import { createJwt, generateJti, JWT_AUDIENCE, JWT_ISSUER } from '../util/jwt';
 import {
   buildAuthCookies,
   buildImpersonationCookie,
@@ -107,6 +107,8 @@ export const handleRefreshJwt = async (
     // Verify signature but ignore expiration — we handle the grace window ourselves
     payload = verify(token, jwtKey, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
       ignoreExpiration: true,
     }) as RefreshJwtPayload;
   } catch (err) {
@@ -153,6 +155,8 @@ export const handleRefreshJwt = async (
     try {
       impPayload = verify(impersonationJwt, jwtKey, {
         algorithms: ['HS256'],
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
         ignoreExpiration: true,
       }) as RefreshJwtPayload;
     } catch {
@@ -207,6 +211,9 @@ export const handleRefreshJwt = async (
           const refreshedImpJwt = sign(refreshedImpPayload, jwtKey, {
             algorithm: 'HS256',
             expiresIn: IMPERSONATION_TTL_SECONDS,
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE,
+            jwtid: generateJti(),
           });
           allCookies.push(
             ...buildImpersonationCookie(

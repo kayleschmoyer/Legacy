@@ -2,6 +2,7 @@ import { sign } from 'jsonwebtoken';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
+import { randomBytes } from 'node:crypto';
 import { builder } from './builder';
 import { requireAuth } from './authorization';
 import {
@@ -408,6 +409,9 @@ builder.mutationField('impersonateUser', (t) =>
       const token = sign(payload, jwtSecret, {
         algorithm: 'HS256',
         expiresIn: IMPERSONATION_TTL,
+        issuer: 'legacy-sports-oauth-proxy',
+        audience: 'legacy-sports',
+        jwtid: randomBytes(16).toString('hex'),
       });
 
       // Audit log: record every impersonation event for security forensics.

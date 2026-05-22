@@ -11,7 +11,12 @@ import {
   unlinkDiscordAccount,
 } from '@legacy-sports/db-client';
 import { verify } from 'jsonwebtoken';
-import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
+import {
+  createJwt,
+  JWT_AUDIENCE,
+  JWT_COOKIE_NAME,
+  JWT_ISSUER,
+} from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
 import {
   buildAuthCookies,
@@ -163,6 +168,8 @@ async function getAuthenticatedUserId(
     const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
     const decoded = verify(jwtToken, jwtKey, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }) as { id: number };
     return decoded.id;
   } catch {

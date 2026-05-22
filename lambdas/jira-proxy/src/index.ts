@@ -42,6 +42,12 @@ async function getJwtSecret(): Promise<string> {
 /** Cookie name for the HttpOnly JWT cookie set by the OAuth proxy. */
 const JWT_COOKIE = 'ls_jwt';
 
+/** Issuer claim minted by lambdas/oauth-proxy and required on verify. */
+const JWT_ISSUER = 'legacy-sports-oauth-proxy';
+
+/** Audience claim required by all internal Legacy Sports lambdas. */
+const JWT_AUDIENCE = 'legacy-sports';
+
 /**
  * Parse the JWT from the Cookie header string.
  * Returns null if the ls_jwt cookie is not present.
@@ -83,6 +89,8 @@ async function verifyAuthToken(
     const secret = await getJwtSecret();
     const decoded = verify(token, secret, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }) as JwtUserPayload;
     return decoded;
   } catch {

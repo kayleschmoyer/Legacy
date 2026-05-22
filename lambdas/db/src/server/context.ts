@@ -132,6 +132,12 @@ const IMP_JWT_COOKIE = 'ls_imp_jwt';
 const CSRF_COOKIE = 'ls_csrf';
 const CSRF_HEADER = 'x-csrf-token';
 
+/** Issuer claim minted by lambdas/oauth-proxy and required on verify. */
+const JWT_ISSUER = 'legacy-sports-oauth-proxy';
+
+/** Audience claim required by all internal Legacy Sports lambdas. */
+const JWT_AUDIENCE = 'legacy-sports';
+
 /**
  * Extract and verify the user from the Authorization header.
  * Returns null if no valid token is present.
@@ -148,6 +154,8 @@ export async function extractUserFromEvent(
     const jwtSecret = await getJwtSecret();
     const decoded = verify(token, jwtSecret, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }) as JWTPayload;
     return parseUserFromJwtPayload(decoded);
   } catch (error) {
@@ -273,6 +281,8 @@ export async function extractUserFromApiEvent(
     const jwtSecret = await getJwtSecret();
     const decoded = verify(cookieJwt, jwtSecret, {
       algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }) as JWTPayload;
     return { user: parseUserFromJwtPayload(decoded), authSource: 'cookie' };
   } catch (error) {

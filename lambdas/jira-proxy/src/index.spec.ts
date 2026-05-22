@@ -48,7 +48,12 @@ function makeValidAuthHeader(overrides: Record<string, unknown> = {}): string {
   const token = sign(
     { id: 1, email: 'user@example.com', username: 'testuser', ...overrides },
     TEST_JWT_SECRET,
-    { algorithm: 'HS256', expiresIn: '1h' },
+    {
+      algorithm: 'HS256',
+      expiresIn: '1h',
+      issuer: 'legacy-sports-oauth-proxy',
+      audience: 'legacy-sports',
+    },
   );
   return `Bearer ${token}`;
 }
@@ -229,6 +234,8 @@ describe('Jira Proxy Handler', () => {
       const token = sign({ id: 1, username: 'testuser' }, TEST_JWT_SECRET, {
         algorithm: 'HS256',
         expiresIn: '-1s',
+        issuer: 'legacy-sports-oauth-proxy',
+        audience: 'legacy-sports',
       });
       const event = makeEvent({
         headers: { Authorization: `Bearer ${token}` },

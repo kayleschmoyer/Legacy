@@ -280,7 +280,13 @@ describe('impersonateUser mutation', () => {
         impersonatedBy: expect.objectContaining({ id: 1 }),
       }),
       'test-jwt-secret',
-      { algorithm: 'HS256', expiresIn: '2h' },
+      expect.objectContaining({
+        algorithm: 'HS256',
+        expiresIn: '2h',
+        issuer: 'legacy-sports-oauth-proxy',
+        audience: 'legacy-sports',
+        jwtid: expect.stringMatching(/^[0-9a-f]{32}$/),
+      }),
     );
 
     // Audit log at error level with only IDs (no PII)
