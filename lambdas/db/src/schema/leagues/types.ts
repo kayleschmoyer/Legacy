@@ -5,8 +5,6 @@
  * team, and waiver resolvers.
  */
 import type { Team as DbTeam } from '@legacy-sports/db-client';
-import { PublicSchema } from '@legacy-sports/db-client';
-import { and, eq, sql, sum } from 'drizzle-orm';
 import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
 import { AuthenticationError } from '../graphql-errors';
@@ -305,24 +303,14 @@ Team.implement({
         'Total salary cap payroll for this team (sum of team_members.salary). ' +
         'Null if the league does not have salary cap enabled.',
       resolve: async (parent, _args, context) => {
-        const [capRow] = await context.db
-          .select({ salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, parent.leagueId))
-          .limit(1);
-        if (!capRow?.salaryCapEnabled) return null;
-        const [row] = await context.db
-          .select({
-            total: sql<number>`COALESCE(${sum(PublicSchema.teamMembers.salary)}, 0)`,
-          })
-          .from(PublicSchema.teamMembers)
-          .where(
-            and(
-              eq(PublicSchema.teamMembers.teamId, parent.id),
-              eq(PublicSchema.teamMembers.leagueId, parent.leagueId),
-            ),
-          );
-        return Number(row?.total ?? 0);
+        const config = await context.loaders.leaguePayrollConfig.load(
+          parent.leagueId,
+        );
+        if (!config?.salaryCapEnabled) return null;
+        return context.loaders.teamPayroll.load({
+          teamId: parent.id,
+          leagueId: parent.leagueId,
+        });
       },
     }),
     capSpace: t.int({
@@ -331,28 +319,15 @@ Team.implement({
         'Remaining salary cap space for this team ' +
         '(league.salaryCap - totalPayroll). Null if cap is not enabled or no cap limit is set.',
       resolve: async (parent, _args, context) => {
-        const [capRow] = await context.db
-          .select({
-            salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
-            salaryCap: PublicSchema.leagues.salaryCap,
-          })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, parent.leagueId))
-          .limit(1);
-        if (!capRow?.salaryCapEnabled || capRow.salaryCap == null) return null;
-        const [row] = await context.db
-          .select({
-            total: sql<number>`COALESCE(${sum(PublicSchema.teamMembers.salary)}, 0)`,
-          })
-          .from(PublicSchema.teamMembers)
-          .where(
-            and(
-              eq(PublicSchema.teamMembers.teamId, parent.id),
-              eq(PublicSchema.teamMembers.leagueId, parent.leagueId),
-            ),
-          );
-        const payroll = Number(row?.total ?? 0);
-        return capRow.salaryCap - payroll;
+        const config = await context.loaders.leaguePayrollConfig.load(
+          parent.leagueId,
+        );
+        if (!config?.salaryCapEnabled || config.salaryCap == null) return null;
+        const payroll = await context.loaders.teamPayroll.load({
+          teamId: parent.id,
+          leagueId: parent.leagueId,
+        });
+        return config.salaryCap - payroll;
       },
     }),
   }),

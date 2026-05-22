@@ -3,7 +3,7 @@
  */
 
 import DataLoader from 'dataloader';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql, sum } from 'drizzle-orm';
 import {
   type GenericDatabase,
   inArrayAny,
@@ -137,6 +137,109 @@ export const createUsersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
     }
     return keys.map((key) => usersMap.get(key) ?? null);
   });
+
+/**
+ * DataLoader for per-league salary cap / luxury tax config (LS-2506)
+ * Key: leagueId (number)
+ * Returns: { salaryCapEnabled, salaryCap, luxuryTaxThreshold } or null if the
+ *   league row does not exist.
+ *
+ * Batches the `leagues` row lookups used by Team.totalPayroll and Team.capSpace
+ * so a `leagueTeams` query returning N teams issues one query instead of 2N.
+ */
+export interface LeaguePayrollConfig {
+  salaryCapEnabled: boolean;
+  salaryCap: number | null;
+  luxuryTaxThreshold: number | null;
+}
+
+export const createLeaguePayrollConfigLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, LeaguePayrollConfig | null>(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select({
+        id: PublicSchema.leagues.id,
+        salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+        salaryCap: PublicSchema.leagues.salaryCap,
+        luxuryTaxThreshold: PublicSchema.leagues.luxuryTaxThreshold,
+      })
+      .from(PublicSchema.leagues)
+      .where(inArray(PublicSchema.leagues.id, ids));
+
+    const configMap = new Map<number, LeaguePayrollConfig>();
+    for (const row of rows) {
+      configMap.set(row.id, {
+        salaryCapEnabled: row.salaryCapEnabled,
+        salaryCap: row.salaryCap,
+        luxuryTaxThreshold: row.luxuryTaxThreshold,
+      });
+    }
+    return keys.map((key) => configMap.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for per-team payroll sums (LS-2506)
+ * Key: { teamId, leagueId } (composite, serialized via cacheKeyFn)
+ * Returns: number — sum of team_members.salary for that (teamId, leagueId)
+ *
+ * Batches all requested team IDs into one `GROUP BY teamId` aggregate so
+ * Team.totalPayroll and Team.capSpace share a single query across N teams.
+ */
+export interface TeamPayrollKey {
+  teamId: number;
+  leagueId: number;
+}
+
+export const createTeamPayrollLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<TeamPayrollKey, number, string>(
+    async (keys) => {
+      // Group requested teamIds by leagueId so each aggregate query is scoped
+      // to one league. In practice all keys in a single batch share a league
+      // (resolver always passes parent.leagueId), but supporting mixed leagues
+      // keeps the loader correct without forcing callers to partition.
+      const byLeague = new Map<number, Set<number>>();
+      for (const key of keys) {
+        let teamIds = byLeague.get(key.leagueId);
+        if (!teamIds) {
+          teamIds = new Set();
+          byLeague.set(key.leagueId, teamIds);
+        }
+        teamIds.add(key.teamId);
+      }
+
+      const totals = new Map<string, number>();
+      await Promise.all(
+        [...byLeague.entries()].map(async ([leagueId, teamIdSet]) => {
+          const teamIds = [...teamIdSet];
+          const rows = await db
+            .select({
+              teamId: PublicSchema.teamMembers.teamId,
+              total: sql<number>`COALESCE(${sum(PublicSchema.teamMembers.salary)}, 0)`,
+            })
+            .from(PublicSchema.teamMembers)
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.leagueId, leagueId),
+                inArray(PublicSchema.teamMembers.teamId, teamIds),
+              ),
+            )
+            .groupBy(PublicSchema.teamMembers.teamId);
+          for (const row of rows) {
+            totals.set(`${leagueId}:${row.teamId}`, Number(row.total ?? 0));
+          }
+        }),
+      );
+
+      return keys.map(
+        (key) => totals.get(`${key.leagueId}:${key.teamId}`) ?? 0,
+      );
+    },
+    { cacheKeyFn: (key) => `${key.leagueId}:${key.teamId}` },
+  );
 
 /**
  * DataLoader for league positions by ID

@@ -23,8 +23,10 @@ import {
 
 import {
   createEligiblePositionsLoader,
+  createLeaguePayrollConfigLoader,
   createLeaguePositionByIdLoader,
   createPlayersLoader,
+  createTeamPayrollLoader,
   createTeamsLoader,
   createUsersLoader,
 } from './entity-loaders';
@@ -79,6 +81,8 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   matchupMessages: createMatchupMessagesLoader(db),
   playoffMatchupsByBracket: createPlayoffMatchupsByBracketLoader(db),
   leaguePositionById: createLeaguePositionByIdLoader(db),
+  leaguePayrollConfig: createLeaguePayrollConfigLoader(db),
+  teamPayroll: createTeamPayrollLoader(db),
 });
 
 /**
