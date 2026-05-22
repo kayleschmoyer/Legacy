@@ -185,6 +185,59 @@ describe('PlayerService — scoring sort', () => {
     expect(mockDb.execute).toHaveBeenCalledTimes(1);
   });
 
+  it('joins league-specific scoring cache when leagueId is provided (LS-4688)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+      leagueId: 42,
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).toContain('cs_league');
+    expect(sqlText).toContain('cs_default');
+  });
+
+  it('skips the league-specific join when no leagueId is provided (LS-4688)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).not.toContain('cs_league');
+    expect(sqlText).toContain('cs_default');
+  });
+
+  it('reads pre-computed hitter_avg_ppg / pitching_avg_ppg from the cache (LS-4688)', async () => {
+    mockDb.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 1,
+          first_name: 'Mike',
+          last_name: 'Trout',
+          bref_id: 'troutmi01',
+          stats_last_fetched_at: null,
+          batting_score: '1500',
+          pitching_score: '0',
+          fielding_score: '-25',
+          hitter_score: '1475',
+          total_score: '1475',
+          career_games: '1200',
+          avg_ppg: '1.229',
+          hitter_avg_ppg: '1.229',
+          pitching_avg_ppg: '0',
+        },
+      ],
+    });
+
+    const result = await service.getPlayersWithScoring({
+      orderBy: 'hitterAvgPointsPerGame',
+    });
+
+    expect(result[0].scoring.hitterAvgPpg).toBe(1.229);
+    expect(result[0].scoring.pitchingAvgPpg).toBe(0);
+  });
+
   it('supports all scoring orderBy options', async () => {
     const scoringOptions = [
       'totalScore',

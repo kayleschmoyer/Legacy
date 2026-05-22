@@ -313,21 +313,16 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       `;
 
       // Scoring-joined SELECT: joins only the default (NULL league) scoring cache (LS-3115).
-      // Computes hitter/pitching PPG as (category score) / career_games, matching the field
-      // descriptions on DraftPlayer and including fielding in the hitter figure.
+      // Reads pre-computed per-game rates from player_scoring_cache (LS-4688) so the
+      // SELECT is a column read instead of per-row arithmetic.
       const basePlayerSelectWithScoring = sql`
         SELECT
           p.id, p.first_name, p.last_name, p.bref_id,
           p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
           p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
           p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
-          COALESCE(
-            (COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0))
-            / NULLIF(cs.career_games, 0), 0
-          ) AS hitter_avg_ppg,
-          COALESCE(
-            COALESCE(cs.pitching_score, 0) / NULLIF(cs.career_games, 0), 0
-          ) AS pitching_avg_ppg
+          COALESCE(cs.hitter_avg_ppg, 0) AS hitter_avg_ppg,
+          COALESCE(cs.pitching_avg_ppg, 0) AS pitching_avg_ppg
         FROM public.players p
         LEFT JOIN public.player_scoring_cache cs
           ON cs.player_id = p.id AND cs.league_id IS NULL
@@ -448,16 +443,12 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         totalScore: 'COALESCE(cs.total_score, 0)',
         careerGames: 'COALESCE(cs.career_games, 0)',
         avgPointsPerGame: 'COALESCE(cs.avg_ppg, 0)',
-        // PostgreSQL does not resolve SELECT output aliases when they appear
-        // inside another expression (e.g. the COALESCE wrapper in ORDER BY
-        // below). Duplicate the underlying scoring expression instead of
-        // referencing `hitter_avg_ppg` / `pitching_avg_ppg` so the ORDER BY
-        // resolves against the `cs` input-table columns.
-        hitterAvgPointsPerGame:
-          '(COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0))' +
-          ' / NULLIF(cs.career_games, 0)',
-        pitchingAvgPointsPerGame:
-          'COALESCE(cs.pitching_score, 0) / NULLIF(cs.career_games, 0)',
+        // Reference cs.* directly (the player_scoring_cache stored columns
+        // added in LS-4688), not the SELECT-list aliases — PostgreSQL does
+        // not resolve output aliases inside the COALESCE wrapper in the
+        // ORDER BY clause below.
+        hitterAvgPointsPerGame: 'cs.hitter_avg_ppg',
+        pitchingAvgPointsPerGame: 'cs.pitching_avg_ppg',
       };
 
       // Scoring sorts: join player_scoring_cache (LS-696 — replaces compute_career_scores)

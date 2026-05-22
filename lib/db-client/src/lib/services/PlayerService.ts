@@ -503,19 +503,46 @@ export class PlayerService {
             ? sql`WHERE ${sql.join(rawConditions, sql` AND `)}`
             : sql``;
 
-        // Use raw SQL to join players with the scoring function.
-        const limitClause = queryOptions.limit
-          ? sql`LIMIT ${sql.raw(String(queryOptions.limit))}`
-          : sql``;
-        const offsetClause = queryOptions.offset
-          ? sql`OFFSET ${sql.raw(String(queryOptions.offset))}`
-          : sql``;
+        // Clamp LIMIT/OFFSET to safe integer ranges and bind as parameters so
+        // the values can never carry SQL fragments even if a caller passes
+        // unvalidated input.
+        const limitClause =
+          queryOptions.limit != null
+            ? sql`LIMIT ${Math.min(Math.max(1, Math.trunc(queryOptions.limit)), 1000)}`
+            : sql``;
+        const offsetClause =
+          queryOptions.offset != null
+            ? sql`OFFSET ${Math.max(0, Math.trunc(queryOptions.offset))}`
+            : sql``;
 
-        // Join against player_scoring_cache (LS-696):
+        // Join against player_scoring_cache (LS-696, LS-4688):
         //   cs_league — league-specific pre-computed scores (matched by league_id)
         //   cs_default — default (NULL league_id) pre-computed scores as fallback
         // COALESCE prefers league-specific; falls back to default when no custom
-        // scoring profile exists for this league.
+        // scoring profile exists for this league. When no leagueId is supplied
+        // (the dominant browse case), the league-specific join is skipped to avoid
+        // a wasted index lookup that always returns NULL.
+        // hitter_avg_ppg / pitching_avg_ppg are stored columns on player_scoring_cache
+        // so the SELECT is a column read instead of per-row arithmetic.
+        const includeLeagueJoin =
+          leagueIdParam !== null && leagueIdParam !== undefined;
+        const leagueJoin = includeLeagueJoin
+          ? sql`LEFT JOIN public.player_scoring_cache cs_league
+              ON cs_league.player_id = p.id AND cs_league.league_id = ${leagueIdParam}`
+          : sql``;
+        const pickCol = (col: string): SQL =>
+          includeLeagueJoin
+            ? sql`COALESCE(cs_league.${sql.raw(col)}, cs_default.${sql.raw(col)}, 0)`
+            : sql`COALESCE(cs_default.${sql.raw(col)}, 0)`;
+        const battingScoreExpr = pickCol('batting_score');
+        const pitchingScoreExpr = pickCol('pitching_score');
+        const fieldingScoreExpr = pickCol('fielding_score');
+        const totalScoreExpr = pickCol('total_score');
+        const careerGamesExpr = pickCol('career_games');
+        const avgPpgExpr = pickCol('avg_ppg');
+        const hitterAvgPpgExpr = pickCol('hitter_avg_ppg');
+        const pitchingAvgPpgExpr = pickCol('pitching_avg_ppg');
+
         const scoringQuery = sql`
           SELECT
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
@@ -523,29 +550,17 @@ export class PlayerService {
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             p.bat_hand, p.throw_hand,
-            COALESCE(cs_league.batting_score, cs_default.batting_score, 0) AS batting_score,
-            COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0) AS pitching_score,
-            COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0) AS fielding_score,
-            COALESCE(cs_league.batting_score, cs_default.batting_score, 0) + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0) AS hitter_score,
-            COALESCE(cs_league.total_score, cs_default.total_score, 0) AS total_score,
-            COALESCE(cs_league.career_games, cs_default.career_games, 0) AS career_games,
-            COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, 0) AS avg_ppg,
-            CASE
-              WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0
-              THEN (COALESCE(cs_league.batting_score, cs_default.batting_score, 0)
-                  + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0))
-                   / COALESCE(cs_league.career_games, cs_default.career_games, 0)
-              ELSE 0
-            END AS hitter_avg_ppg,
-            CASE
-              WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0
-              THEN COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0)
-                   / COALESCE(cs_league.career_games, cs_default.career_games, 0)
-              ELSE 0
-            END AS pitching_avg_ppg
+            ${battingScoreExpr} AS batting_score,
+            ${pitchingScoreExpr} AS pitching_score,
+            ${fieldingScoreExpr} AS fielding_score,
+            ${battingScoreExpr} + ${fieldingScoreExpr} AS hitter_score,
+            ${totalScoreExpr} AS total_score,
+            ${careerGamesExpr} AS career_games,
+            ${avgPpgExpr} AS avg_ppg,
+            ${hitterAvgPpgExpr} AS hitter_avg_ppg,
+            ${pitchingAvgPpgExpr} AS pitching_avg_ppg
           FROM public.players p
-          LEFT JOIN public.player_scoring_cache cs_league
-            ON cs_league.player_id = p.id AND cs_league.league_id = ${leagueIdParam}
+          ${leagueJoin}
           LEFT JOIN public.player_scoring_cache cs_default
             ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
           ${careerStatJoin}
