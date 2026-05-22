@@ -73,6 +73,7 @@ export const leaguePermissionLevel = pgEnum('league_permission_level', [
 ]);
 
 export const playerPosition = pgEnum('player_position', [
+  // Baseball
   'SP',
   'RP',
   'C',
@@ -84,9 +85,22 @@ export const playerPosition = pgEnum('player_position', [
   'LF',
   'CF',
   'DH',
+  // Football skill (LS-245)
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  // Football IDP (LS-245): DL covers DE/DT; LB covers ILB/OLB/MLB; DB covers CB/S/FS/SS
+  'DL',
+  'LB',
+  'DB',
+  // Football DST synthetic player (LS-245)
+  'DST',
 ]);
 
 export const positionSlot = pgEnum('position_slot', [
+  // Baseball
   'SP',
   'RP',
   'C',
@@ -101,12 +115,35 @@ export const positionSlot = pgEnum('position_slot', [
   'XDH',
   'OF',
   'IF',
+  // Football offensive + DST (LS-245)
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DST',
+  'FLEX', // RB/WR/TE eligible
+  'SFLEX', // QB/RB/WR/TE eligible (Superflex)
+  // Football IDP (LS-245); DP is the defensive flex (any IDP position)
+  'DL',
+  'LB',
+  'DB',
+  'DP',
 ]);
 
 export const scoringStatGroup = pgEnum('scoring_stat_group', [
+  // Baseball
   'batting',
   'pitching',
   'fielding',
+  // Football offensive (LS-245)
+  'passing',
+  'rushing',
+  'receiving',
+  'kicking',
+  // Football defensive (LS-245): defense=DST team defense, idp=Individual Defensive Player
+  'defense',
+  'idp',
 ]);
 
 export const schedulingStrategy = pgEnum('scheduling_strategy', [

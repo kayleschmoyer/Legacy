@@ -9,6 +9,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import type {
   LeagueScoringProfileEntry,
+  ScoringMultiplierGroup,
   ScoringStatDefinition,
   ScoringStatGroup,
 } from '@legacy-sports/db-client';
@@ -17,7 +18,42 @@ import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 const dbService = createDatabaseService(getDbOptions());
 
-const SCORING_GROUPS: ScoringStatGroup[] = ['batting', 'pitching', 'fielding'];
+const SCORING_GROUPS: ScoringMultiplierGroup[] = [
+  'batting',
+  'pitching',
+  'fielding',
+];
+
+// The DB scoring_stat_group enum was extended with football values in LS-245,
+// but the scoring-profile schema (definitions seed, GraphQL enum, league
+// multipliers) is still baseball-only — football scoring lands in LS-251 /
+// LS-254 / LS-255. Until then, narrow the wider DB type back to the baseball
+// subset before indexing into baseball-shaped structures.
+export function isBaseballScoringGroup(
+  group: ScoringStatGroup,
+): group is ScoringMultiplierGroup {
+  return group === 'batting' || group === 'pitching' || group === 'fielding';
+}
+
+/**
+ * Narrow a definition's `statGroup` to the baseball-only subset that the
+ * current GraphQL `ScoringStatGroupEnum` exposes. Throws (and emits a
+ * `LOGGER.error` for Rollbar) on any other value so we notice if a football
+ * definition leaks in before the GraphQL surface widens (LS-255).
+ */
+export function resolveBaseballScoringGroup(
+  definition: Pick<ScoringStatDefinition, 'id' | 'statGroup'>,
+): ScoringMultiplierGroup {
+  if (isBaseballScoringGroup(definition.statGroup)) {
+    return definition.statGroup;
+  }
+  const message = `Unexpected non-baseball scoring stat group: ${definition.statGroup}`;
+  LOGGER.error(message, new Error(message), {
+    statGroup: definition.statGroup,
+    statDefinitionId: definition.id,
+  });
+  throw new Error(message);
+}
 
 const ScoringStatGroupEnum = builder.enumType('ScoringStatGroup', {
   description: 'Grouping for fantasy scoring statistics',
@@ -59,7 +95,7 @@ interface ScoringMultiplierEntry {
 }
 
 interface ScoringRuleGroup {
-  group: ScoringStatGroup;
+  group: ScoringMultiplierGroup;
   values: ScoringMultiplierEntry[];
 }
 
@@ -229,7 +265,9 @@ async function loadDefaultScoringConfig(): Promise<ScoringConfigGraph> {
 
   const stats = definitions.map((definition) => {
     const defaultMultiplier = parseNumeric(definition.defaultMultiplier) ?? 0;
-    const groupEntries = multipliers[definition.statGroup];
+    const groupEntries = isBaseballScoringGroup(definition.statGroup)
+      ? multipliers[definition.statGroup]
+      : null;
     const override = groupEntries
       ? parseNumeric(groupEntries[definition.sourceColumn])
       : null;
@@ -266,7 +304,7 @@ ScoringStatDefinitionRef.implement({
     statKey: t.exposeString('statKey'),
     statGroup: t.field({
       type: ScoringStatGroupEnum,
-      resolve: (definition) => definition.statGroup,
+      resolve: resolveBaseballScoringGroup,
     }),
     sourceTable: t.exposeString('sourceTable'),
     sourceColumn: t.exposeString('sourceColumn'),
