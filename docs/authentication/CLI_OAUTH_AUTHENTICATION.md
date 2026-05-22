@@ -151,7 +151,7 @@ The OAuth Lambda now includes device flow endpoints:
    ```json
    {
      "device_code": "abc123...",
-     "user_code": "ABC123",
+     "user_code": "ABCDEFGH",
      "verification_uri": "https://api.legacysports.dev/oauth/device/verify",
      "expires_in": 600,
      "interval": 5

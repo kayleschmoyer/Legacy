@@ -266,11 +266,20 @@ async function markFlowComplete(
 // Code generators
 // ---------------------------------------------------------------------------
 
+// The user_code is the only secret a human types into the verify page to
+// claim a pending device authorization, so it must be unpredictable.
+// Math.random() is not a CSPRNG (its output is recoverable from a small
+// sample of prior outputs); use crypto.randomInt instead. The 32-char
+// alphabet (32^8 ≈ 1.1e12 combos) excludes visually ambiguous I/O/0/1.
+const USER_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const USER_CODE_LENGTH = 8;
+
 function generateUserCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < USER_CODE_LENGTH; i++) {
+    result += USER_CODE_ALPHABET.charAt(
+      crypto.randomInt(0, USER_CODE_ALPHABET.length),
+    );
   }
   return result;
 }
@@ -843,15 +852,15 @@ function getVerificationHtml(error?: string): string {
         ${error ? `<div class="error">${error}</div>` : ''}
 
         <div class="instructions">
-            Enter the 6-character code displayed in your CLI:
+            Enter the 8-character code displayed in your CLI:
         </div>
 
         <form method="get">
             <input
                 type="text"
                 name="user_code"
-                placeholder="ABC123"
-                maxlength="6"
+                placeholder="ABCDEFGH"
+                maxlength="8"
                 autocomplete="off"
                 autofocus
                 required

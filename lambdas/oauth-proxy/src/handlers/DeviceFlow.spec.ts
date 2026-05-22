@@ -125,7 +125,10 @@ describe('DeviceFlow', () => {
       const body = parseBody<DeviceAuthorizeResponse>(result.body);
       expect(body.device_code).toBeDefined();
       expect(body.user_code).toBeDefined();
-      expect(body.user_code).toHaveLength(6);
+      expect(body.user_code).toHaveLength(8);
+      // user_code must only contain characters from the unambiguous alphabet
+      // (proves the CSPRNG path is generating from the expected character set).
+      expect(body.user_code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/);
       expect(body.verification_uri).toContain('/oauth/device/verify');
       expect(body.expires_in).toBe(600);
       expect(body.interval).toBe(5);
