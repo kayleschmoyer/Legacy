@@ -151,18 +151,24 @@ function InnerLayout(): React.JSX.Element {
  */
 export default function Layout() {
   return (
-    <ErrorBoundary>
-      <TamaguiProvider
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        config={tamaguiConfig}
-        defaultTheme="dark"
-      >
+    // TamaguiProvider must wrap ErrorBoundary: ErrorBoundary's fallback UI
+    // uses tamagui components (YStack/Text/Button), which call useTheme().
+    // With ErrorBoundary on the outside, any caught error would trigger a
+    // fallback render that itself throws "Missing theme" because the
+    // TamaguiProvider it was wrapping has been unmounted along with the
+    // errored subtree. That secondary throw escapes and crashes the app.
+    <TamaguiProvider
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      config={tamaguiConfig}
+      defaultTheme="dark"
+    >
+      <ErrorBoundary>
         {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
         <ThemeProvider>
           <InnerLayout />
         </ThemeProvider>
-      </TamaguiProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </TamaguiProvider>
   );
 }
 
