@@ -206,17 +206,29 @@ describe('Draft Order Mutations - TOCTOU concurrency (LS-2499)', () => {
 
     // Tx B: applies the same SET LOCAL statement_timeout the resolver uses
     // (clamped down for the test) and tries to grab the lock — should error
-    // out with a timeout rather than hang silently.
-    await expect(
-      db.transaction(async (tx) => {
+    // out with a timeout rather than hang silently. Drizzle wraps the pg
+    // error as `Failed query: ...` at error.message, with the underlying
+    // `canceling statement due to statement timeout` text on error.cause, so
+    // we assert against the cause chain rather than the wrapped message.
+    let caught: unknown;
+    try {
+      await db.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL statement_timeout = '250'`);
         await tx
           .select({ id: drafts.id })
           .from(drafts)
           .where(eq(drafts.id, draftId))
           .for('update');
-      }),
-    ).rejects.toThrow(/statement timeout|canceling statement/i);
+      });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const causeMessage =
+      (caught as { cause?: { message?: string } } | undefined)?.cause
+        ?.message ?? (caught as Error).message;
+    expect(causeMessage).toMatch(/statement timeout|canceling statement/i);
 
     await txAPromise;
   });
