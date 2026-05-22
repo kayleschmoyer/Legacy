@@ -222,7 +222,13 @@ async function run(): Promise<void> {
     .description(
       'Reset database by dropping all tables and schemas (DESTRUCTIVE)',
     )
-    .action(handleResetDatabase);
+    .option(
+      '--db-name <name>',
+      'Name of the connected database; must match the resolved database to proceed',
+    )
+    .action((options: { confirm?: boolean; dbName?: string }) =>
+      handleResetDatabase(options),
+    );
 
   program
     .command('create-matchup')
