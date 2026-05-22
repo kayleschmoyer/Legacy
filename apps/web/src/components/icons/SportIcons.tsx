@@ -51,13 +51,15 @@ export const FootballIcon: React.FC<SportIconProps> = ({
     strokeLinejoin="round"
     aria-hidden="true"
   >
-    {/* Ball body: pointed oval */}
-    <path d="M 10 2.5 C 15.5 2.5 18 5.5 18 10 C 18 14.5 15.5 17.5 10 17.5 C 4.5 17.5 2 14.5 2 10 C 2 5.5 4.5 2.5 10 2.5 Z" />
+    {/* Ball body: pointed oval — control points are colinear with the
+        long axis at the tips so the cubic curves meet at a sharp point
+        rather than rounding off into a generic oval. */}
+    <path d="M 10 2 C 13 4 17 6.5 17 10 C 17 13.5 13 16 10 18 C 7 16 3 13.5 3 10 C 3 6.5 7 4 10 2 Z" />
     {/* Lace — vertical spine */}
-    <line x1="10" y1="5" x2="10" y2="15" />
+    <line x1="10" y1="6" x2="10" y2="14" />
     {/* Lace — three cross stitches */}
-    <line x1="8" y1="7" x2="12" y2="7" />
-    <line x1="8" y1="10" x2="12" y2="10" />
-    <line x1="8" y1="13" x2="12" y2="13" />
+    <line x1="8.5" y1="8" x2="11.5" y2="8" />
+    <line x1="8.5" y1="10" x2="11.5" y2="10" />
+    <line x1="8.5" y1="12" x2="11.5" y2="12" />
   </svg>
 );
