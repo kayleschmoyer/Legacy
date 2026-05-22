@@ -88,6 +88,10 @@ function makeEvent(overrides: Partial<APIGatewayEvent> = {}): APIGatewayEvent {
   };
 }
 
+// Default same-origin headers for /oauth/device/complete-local. Matches the
+// fetch() call from the verify HTML page (Origin = API host).
+const SAME_ORIGIN_HEADERS = { Origin: 'https://localhost' };
+
 describe('DeviceFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -133,6 +137,7 @@ describe('DeviceFlow', () => {
       const event = makeEvent({
         body: JSON.stringify({ user_code: 'ABC123' }),
         path: '/oauth/device/complete-local',
+        headers: SAME_ORIGIN_HEADERS,
       });
       const result = await handleDeviceCompleteLocal(event);
       expect(result.statusCode).toBe(400);
@@ -149,6 +154,7 @@ describe('DeviceFlow', () => {
           password: 'pass123',
         }),
         path: '/oauth/device/complete-local',
+        headers: SAME_ORIGIN_HEADERS,
       });
       const result = await handleDeviceCompleteLocal(event);
       expect(result.statusCode).toBe(400);
@@ -196,6 +202,7 @@ describe('DeviceFlow', () => {
           password: 'password123',
         }),
         path: '/oauth/device/complete-local',
+        headers: SAME_ORIGIN_HEADERS,
       });
       const completeResult = await handleDeviceCompleteLocal(completeEvent);
       expect(completeResult.statusCode).toBe(200);
@@ -251,6 +258,7 @@ describe('DeviceFlow', () => {
           password: 'wrong-password',
         }),
         path: '/oauth/device/complete-local',
+        headers: SAME_ORIGIN_HEADERS,
       });
       const result = await handleDeviceCompleteLocal(completeEvent);
       expect(result.statusCode).toBe(401);
@@ -295,12 +303,110 @@ describe('DeviceFlow', () => {
           password: 'password123',
         }),
         path: '/oauth/device/complete-local',
+        headers: SAME_ORIGIN_HEADERS,
       });
       const result = await handleDeviceCompleteLocal(completeEvent);
       expect(result.statusCode).toBe(401);
       expect(parseBody<ErrorResponse>(result.body).error).toBe(
         'invalid_credentials',
       );
+    });
+
+    describe('origin enforcement (LS-2565)', () => {
+      const validBody = JSON.stringify({
+        user_code: 'ABC123',
+        email: 'test@example.com',
+        password: 'password123',
+      });
+
+      afterEach(() => {
+        delete process.env['CORS_ALLOWED_ORIGINS'];
+      });
+
+      it('rejects requests with no Origin header', async () => {
+        const event = makeEvent({
+          body: validBody,
+          path: '/oauth/device/complete-local',
+          headers: {},
+        });
+        const result = await handleDeviceCompleteLocal(event);
+        expect(result.statusCode).toBe(403);
+        expect(parseBody<ErrorResponse>(result.body).error).toBe('forbidden');
+        // Credentials must never be looked up when origin is rejected.
+        expect(mockGetUserByEmail).not.toHaveBeenCalled();
+      });
+
+      it('rejects requests with a cross-origin Origin not in the allowlist', async () => {
+        process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
+        const event = makeEvent({
+          body: validBody,
+          path: '/oauth/device/complete-local',
+          headers: { Origin: 'https://evil.example.com' },
+        });
+        const result = await handleDeviceCompleteLocal(event);
+        expect(result.statusCode).toBe(403);
+        expect(parseBody<ErrorResponse>(result.body).error).toBe('forbidden');
+        expect(mockGetUserByEmail).not.toHaveBeenCalled();
+      });
+
+      it('accepts requests whose Origin is in CORS_ALLOWED_ORIGINS', async () => {
+        process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
+        // Authorize first so the user_code resolves to an active flow.
+        const authorizeResult = await handleDeviceAuthorize(
+          makeEvent({
+            body: JSON.stringify({ client_type: 'cli', device_name: 'test' }),
+          }),
+        );
+        const { user_code } = parseBody<DeviceAuthorizeResponse>(
+          authorizeResult.body,
+        );
+
+        mockGetUserByEmail.mockResolvedValue({
+          id: 1,
+          email: 'test@example.com',
+          username: 'testuser',
+          accessLevel: 'none' as const,
+          passwordHash: 'hashed',
+          avatarUrl: null,
+          privacyPolicyAcceptedAt: null,
+          subscriptionTier: 'free' as const,
+          discordId: null,
+          discordUsername: null,
+          discordAvatar: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        mockTestPassword.mockResolvedValue(true);
+        mockCreateJwt.mockResolvedValue('jwt');
+
+        const event = makeEvent({
+          body: JSON.stringify({
+            user_code,
+            email: 'test@example.com',
+            password: 'password123',
+          }),
+          path: '/oauth/device/complete-local',
+          headers: { Origin: 'https://legacy-fantasy.com' },
+        });
+        const result = await handleDeviceCompleteLocal(event);
+        expect(result.statusCode).toBe(200);
+      });
+
+      it('accepts same-origin requests from the API gateway host', async () => {
+        // Mirrors the verify HTML page's fetch() — Origin = API host, not
+        // anything in CORS_ALLOWED_ORIGINS. Verifies the verify page UX
+        // continues to work after the origin gate is enforced.
+        process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
+        const event = makeEvent({
+          body: validBody,
+          path: '/oauth/device/complete-local',
+          headers: { Origin: 'https://localhost' },
+        });
+        // Will fall through to invalid_code since user_code 'ABC123' is fake,
+        // but the important check is that the origin gate did NOT reject (403).
+        const result = await handleDeviceCompleteLocal(event);
+        expect(result.statusCode).not.toBe(403);
+      });
     });
   });
 });

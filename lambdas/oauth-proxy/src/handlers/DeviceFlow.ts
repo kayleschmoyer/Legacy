@@ -511,6 +511,36 @@ export const completeDeviceFlow = async (
 };
 
 /**
+ * Server-side same-site enforcement for /oauth/device/complete-local.
+ *
+ * Browsers always send `Origin` on cross-origin fetches and on same-origin
+ * POSTs in modern engines; CLIs don't hit this endpoint (they poll /token).
+ * Rejecting requests whose `Origin` is neither in CORS_ALLOWED_ORIGINS nor
+ * the API gateway's own host kills the cross-origin credential-collection
+ * attack without relying on the browser to enforce CORS.
+ */
+function isOriginAllowed(event: APIGatewayEvent): boolean {
+  const origin = event.headers?.Origin ?? event.headers?.origin;
+  if (!origin) return false;
+
+  const raw =
+    process.env['CORS_ALLOWED_ORIGINS'] ?? 'https://legacy-fantasy.com';
+  const allowed = new Set(
+    raw
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  );
+
+  const sameOriginHost = event.requestContext?.domainName;
+  if (sameOriginHost) {
+    allowed.add(`https://${sameOriginHost}`);
+  }
+
+  return allowed.has(origin);
+}
+
+/**
  * Complete device flow using local email/password credentials.
  * Allows test users (or any user with a password hash) to authenticate
  * via the device flow without requiring Google OAuth.
@@ -519,6 +549,20 @@ export const handleDeviceCompleteLocal = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
   LOGGER.info('Device flow local auth completion requested');
+
+  if (!isOriginAllowed(event)) {
+    LOGGER.warn('Device flow local auth rejected: origin not allowed', {
+      origin: event.headers?.Origin ?? event.headers?.origin ?? null,
+    });
+    return {
+      statusCode: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: 'forbidden',
+        message: 'Request origin not allowed',
+      }),
+    };
+  }
 
   try {
     const body = parseEventBody<DeviceCompleteLocalRequest>(event);
