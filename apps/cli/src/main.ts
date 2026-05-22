@@ -1,5 +1,5 @@
 import './.startup';
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import { logError } from '@legacy-sports/utils';
 import { FileOutputDestination, LOGGER } from '@legacy-sports/logging/server';
 import {
@@ -63,7 +63,7 @@ if (rollbarConfig) {
   LOGGER.info('Rollbar initialized for CLI');
 }
 
-async function run(): Promise<void> {
+export function buildProgram(): Command {
   const program = new Command();
 
   program
@@ -222,6 +222,7 @@ async function run(): Promise<void> {
     .description(
       'Reset database by dropping all tables and schemas (DESTRUCTIVE)',
     )
+    .option('--confirm', 'Confirm destructive reset', false)
     .option(
       '--db-name <name>',
       'Name of the connected database; must match the resolved database to proceed',
@@ -258,7 +259,11 @@ async function run(): Promise<void> {
   program
     .command('decode-jwt')
     .description('Decode and analyze a JWT token')
-    .action(handleDecodeJwt);
+    .requiredOption('-t, --token <jwt>', 'JWT token to decode')
+    .option('--pretty', 'Pretty-print the decoded payload', false)
+    .action((options: { token: string; pretty?: boolean }) =>
+      handleDecodeJwt(options),
+    );
 
   program
     .command('set-user-type')
@@ -272,12 +277,30 @@ async function run(): Promise<void> {
     .description('List existing users with their IDs and email addresses')
     .action(handleListUsers);
 
+  const parseAccessLevel = (value: string): 'none' | 'admin' => {
+    if (value !== 'none' && value !== 'admin') {
+      throw new InvalidArgumentError(
+        `Access level must be 'none' or 'admin', got '${value}'`,
+      );
+    }
+    return value;
+  };
+
   program
     .command('add-user')
     .description(
       'Add a new user to the database (required for OAuth authentication)',
     )
-    .action(handleAddUser);
+    .requiredOption('--email <email>', 'User email address')
+    .option(
+      '--access-level <level>',
+      'Access level (none|admin)',
+      parseAccessLevel,
+      'none',
+    )
+    .action((options: { email: string; accessLevel?: 'none' | 'admin' }) =>
+      handleAddUser(options),
+    );
 
   // auth command with positional argument
   program
@@ -664,18 +687,25 @@ async function run(): Promise<void> {
       }) => handleCleanupTestLeagues(options),
     );
 
+  return program;
+}
+
+async function run(): Promise<void> {
+  const program = buildProgram();
   await program.parseAsync(process.argv);
 }
 
-LOGGER.info('Starting CLI application...');
+if (require.main === module) {
+  LOGGER.info('Starting CLI application...');
 
-run()
-  .then(() => {
-    LOGGER.info('CLI application ran successfully');
-  })
-  .catch((err: unknown) => {
-    const error = err instanceof Error ? err : new Error(String(err));
-    logError(error);
-    captureError(error, { context: 'cli-application' });
-    process.exit(1);
-  });
+  run()
+    .then(() => {
+      LOGGER.info('CLI application ran successfully');
+    })
+    .catch((err: unknown) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logError(error);
+      captureError(error, { context: 'cli-application' });
+      process.exit(1);
+    });
+}
