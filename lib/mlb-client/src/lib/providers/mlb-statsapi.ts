@@ -243,7 +243,7 @@ export class MlbStatsApiProvider implements MlbDataProvider {
     mlbPlayerId: number,
     gamePk: number,
     season?: number,
-  ): Promise<PlayerGameStats> {
+  ): Promise<PlayerGameStats | null> {
     const data = await this.get<MlbApiPlayerStatsResponse>(
       `/v1/people/${mlbPlayerId}/stats`,
       {
@@ -255,7 +255,9 @@ export class MlbStatsApiProvider implements MlbDataProvider {
     const split = (data.stats?.[0]?.splits ?? []).find(
       (s) => s.game?.gamePk === gamePk,
     );
-    const stats = split?.stat ?? {};
+    if (!split) {
+      return null;
+    }
     const groupName = data.stats?.[0]?.group?.displayName;
     const group: 'hitting' | 'pitching' | 'fielding' =
       groupName === 'pitching'
@@ -267,7 +269,7 @@ export class MlbStatsApiProvider implements MlbDataProvider {
       playerId: mlbPlayerId,
       gamePk,
       group,
-      ...this.mapStats(stats, group),
+      ...this.mapStats(split.stat ?? {}, group),
     };
   }
 

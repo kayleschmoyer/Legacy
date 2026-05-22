@@ -1,8 +1,12 @@
 /**
- * Unit tests for MlbStatsApiProvider (LS-3800).
+ * Unit tests for MlbStatsApiProvider (LS-3800, LS-2737, LS-2735).
  *
- * Covers: status normalisation so "In Progress" maps to "Live"
- * (the root cause of the game ticker not reporting live data).
+ * Covers:
+ * - status normalisation so "In Progress" maps to "Live"
+ *   (the root cause of the game ticker not reporting live data).
+ * - getPlayerGameStats season passthrough (LS-2737).
+ * - getPlayerGameStats returning null when the requested gamePk is absent
+ *   from the player's game log (LS-2735).
  */
 
 import axios from 'axios';
@@ -56,10 +60,12 @@ describe('mapMlbStatus', () => {
   });
 });
 
-describe('MlbStatsApiProvider.getPlayerGameStats (LS-2737)', () => {
+describe('MlbStatsApiProvider.getPlayerGameStats', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedAxios.isAxiosError = jest.fn().mockReturnValue(false) as never;
+    // Default to an empty splits response so each test can override only the
+    // shape it cares about.
     mockedAxios.get.mockResolvedValue({
       data: {
         stats: [
@@ -71,6 +77,8 @@ describe('MlbStatsApiProvider.getPlayerGameStats (LS-2737)', () => {
       },
     });
   });
+
+  // ── LS-2737: season parameter ───────────────────────────────────────────
 
   it('forwards the season param when provided so prior-season games are found', async () => {
     const provider = new MlbStatsApiProvider();
@@ -95,5 +103,70 @@ describe('MlbStatsApiProvider.getPlayerGameStats (LS-2737)', () => {
     const params = calls[0][1]?.params as Record<string, unknown>;
     expect(params).toEqual({ stats: 'gameLog', sportId: 1 });
     expect(params).not.toHaveProperty('season');
+  });
+
+  // ── LS-2735: null when gamePk not in splits ─────────────────────────────
+
+  it('returns null when the requested gamePk is absent from the splits', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        stats: [
+          {
+            group: { displayName: 'hitting' },
+            splits: [
+              { game: { gamePk: 111 }, stat: { hits: 2, atBats: 4 } },
+              { game: { gamePk: 222 }, stat: { hits: 0, atBats: 3 } },
+            ],
+          },
+        ],
+      },
+    });
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getPlayerGameStats(545361, 999);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when splits is empty (player has no game log)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: { stats: [{ group: { displayName: 'hitting' }, splits: [] }] },
+    });
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getPlayerGameStats(545361, 123);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns mapped stats when the gamePk is present', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        stats: [
+          {
+            group: { displayName: 'hitting' },
+            splits: [
+              {
+                game: { gamePk: 123 },
+                stat: { hits: 2, atBats: 4, homeRuns: 1, rbi: 3 },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getPlayerGameStats(545361, 123);
+
+    expect(result).toEqual({
+      playerId: 545361,
+      gamePk: 123,
+      group: 'hitting',
+      hits: 2,
+      atBats: 4,
+      homeRuns: 1,
+      rbi: 3,
+    });
   });
 });

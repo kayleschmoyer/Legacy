@@ -33,7 +33,13 @@ export interface MlbDataProvider {
   ): Promise<PlayerSeasonStats>;
 
   /**
-   * Returns a player's stats for a single game.
+   * Returns a player's stats for a single game, or `null` if the player has
+   * no record in that game (e.g. did not appear, was on the IL, or the game
+   * is from a season not included in the provider's game log).
+   *
+   * Callers must distinguish `null` ("no record") from a stat object full of
+   * zeros ("played and recorded 0 in every category"); conflating the two
+   * silently corrupts fantasy scoring.
    *
    * When `season` is omitted, providers backed by the MLB Stats API only
    * search the current season's game log — pass an explicit `season` when
@@ -43,7 +49,7 @@ export interface MlbDataProvider {
     mlbPlayerId: number,
     gamePk: number,
     season?: number,
-  ): Promise<PlayerGameStats>;
+  ): Promise<PlayerGameStats | null>;
 
   // ── Reference ─────────────────────────────────────────────────────────────
   /** Returns the schedule for a given date with optional filters. */

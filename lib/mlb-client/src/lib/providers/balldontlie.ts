@@ -239,7 +239,7 @@ export class BallDontLieProvider implements MlbDataProvider {
     _mlbPlayerId: number,
     _gamePk: number,
     _season?: number,
-  ): Promise<PlayerGameStats> {
+  ): Promise<PlayerGameStats | null> {
     throw new NotImplementedError('getPlayerGameStats');
   }
 
