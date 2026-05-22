@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { Button, Image, Input, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  Image,
+  Input,
+  Spinner,
+  Text,
+  View,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { PRESET_BANNERS, type PresetImage } from '../constants/presets';
+import { TYPE_BODY } from '../utils/typography';
 
 // -- Props ------------------------------------------------------------
 
@@ -22,8 +32,7 @@ interface BannerPickerProps {
 
 // -- Constants --------------------------------------------------------
 
-const PREVIEW_HEIGHT = 80;
-const THUMB_HEIGHT = 52;
+const PREVIEW_HEIGHT = 96;
 
 /**
  * BannerPicker -- lets users choose a league banner from curated presets or
@@ -72,13 +81,15 @@ export function BannerPicker({
     <YStack gap="$4" padding="$4">
       {/* Live preview */}
       <YStack gap="$2">
-        <Text fontWeight="600" fontSize="$3" color="$textMuted">
+        <Text {...TYPE_BODY.eyebrow} color="$textMuted">
           PREVIEW
         </Text>
         <YStack
           borderRadius="$4"
           overflow="hidden"
-          backgroundColor="$gray4"
+          backgroundColor="$surfaceCard"
+          borderColor="$outlineSubtle"
+          borderWidth={1}
           height={PREVIEW_HEIGHT}
           width="100%"
           alignItems="center"
@@ -96,7 +107,7 @@ export function BannerPicker({
               resizeMode="cover"
             />
           ) : (
-            <Text fontSize="$2" color="$gray9">
+            <Text {...TYPE_BODY.caption} color="$textMuted">
               No banner selected
             </Text>
           )}
@@ -104,8 +115,15 @@ export function BannerPicker({
       </YStack>
 
       {/* Preset grid */}
-      <YStack gap="$2">
-        <Text fontWeight="600" fontSize="$3" color="$textMuted">
+      <YStack
+        gap="$3"
+        padding="$4"
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$5"
+      >
+        <Text {...TYPE_BODY.eyebrow} color="$textMuted">
           PRESETS
         </Text>
         <XStack flexWrap="wrap" gap="$2">
@@ -113,43 +131,32 @@ export function BannerPicker({
             const isActive =
               pendingUrl === preset.url || pendingUrl === resolve(preset.url);
             return (
-              <YStack
+              <View
                 key={preset.id}
                 onPress={() => handlePresetClick(preset.url)}
                 cursor="pointer"
-                minWidth={120}
-                maxWidth={260}
-                flex={1}
+                width="23.5%"
+                aspectRatio={3}
                 borderRadius="$3"
                 borderWidth={2}
-                borderColor={isActive ? '$blue10' : '$gray5'}
+                borderColor={isActive ? '$brandGold' : '$outlineSubtle'}
                 overflow="hidden"
+                shadowColor={isActive ? '$brandGold' : 'transparent'}
+                shadowRadius={isActive ? 12 : 0}
+                shadowOpacity={isActive ? 0.35 : 0}
               >
                 <Image
                   source={{
                     uri: preset.url,
                     width: 260,
-                    height: THUMB_HEIGHT,
+                    height: 88,
                   }}
                   width="100%"
-                  height={THUMB_HEIGHT}
+                  height="100%"
                   resizeMode="cover"
+                  accessibilityLabel={preset.label}
                 />
-                <XStack
-                  backgroundColor={isActive ? '$blue3' : '$gray3'}
-                  paddingHorizontal="$2"
-                  paddingVertical="$1"
-                  justifyContent="center"
-                >
-                  <Text
-                    fontSize="$1"
-                    fontWeight={isActive ? '700' : '400'}
-                    color={isActive ? '$blue11' : '$gray10'}
-                  >
-                    {preset.label}
-                  </Text>
-                </XStack>
-              </YStack>
+              </View>
             );
           })}
         </XStack>
@@ -157,7 +164,7 @@ export function BannerPicker({
 
       {/* Custom URL input */}
       <YStack gap="$2">
-        <Text fontWeight="600" fontSize="$3" color="$textMuted">
+        <Text {...TYPE_BODY.eyebrow} color="$textMuted">
           CUSTOM URL
         </Text>
         <XStack gap="$2">
@@ -188,7 +195,10 @@ export function BannerPicker({
         </Button>
         <Button
           size="$3"
-          theme="blue"
+          backgroundColor="$brandNavy"
+          color="$color12"
+          hoverStyle={{ backgroundColor: '$brandNavyLight' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
           onPress={handleSave}
           disabled={loading}
           icon={loading ? <Spinner size="small" /> : undefined}

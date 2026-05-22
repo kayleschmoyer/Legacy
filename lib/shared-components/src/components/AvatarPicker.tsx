@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Button, Input, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, Input, Spinner, Text, View, XStack, YStack } from 'tamagui';
 import { AvatarImage } from './AvatarImage';
 import {
   PRESET_AVATARS,
   PRESET_TEAM_LOGOS,
   type PresetImage,
 } from '../constants/presets';
+import { TYPE_BODY } from '../utils/typography';
 
 // -- Props ------------------------------------------------------------
 
@@ -34,7 +35,7 @@ interface AvatarPickerProps {
 // -- Component --------------------------------------------------------
 
 const PREVIEW_SIZE = 64;
-const GRID_SIZE = 40;
+const TILE_SIZE = 64;
 
 /**
  * AvatarPicker -- lets users pick from a curated preset list or enter any URL.
@@ -94,18 +95,25 @@ export function AvatarPicker({
           size={PREVIEW_SIZE}
         />
         <YStack gap="$1">
-          <Text fontWeight="600" fontSize="$4">
+          <Text {...TYPE_BODY.body} fontWeight="600" color="$color12">
             {variant === 'user' ? 'Avatar Preview' : 'Logo Preview'}
           </Text>
-          <Text fontSize="$2" color="$textMuted">
+          <Text {...TYPE_BODY.caption} color="$textMuted">
             {pendingUrl ? 'Custom URL or preset selected' : 'No image selected'}
           </Text>
         </YStack>
       </XStack>
 
       {/* Preset grid */}
-      <YStack gap="$2">
-        <Text fontWeight="600" fontSize="$3" color="$textMuted">
+      <YStack
+        gap="$3"
+        padding="$4"
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$5"
+      >
+        <Text {...TYPE_BODY.eyebrow} color="$textMuted">
           PRESETS
         </Text>
         <XStack flexWrap="wrap" gap="$2">
@@ -113,22 +121,48 @@ export function AvatarPicker({
             const isActive =
               pendingUrl === preset.url || pendingUrl === resolve(preset.url);
             return (
-              <YStack
+              <View
                 key={preset.id}
                 onPress={() => handlePresetClick(preset.url)}
                 cursor="pointer"
-                borderRadius="$3"
+                width={TILE_SIZE}
+                height={TILE_SIZE}
+                borderRadius={TILE_SIZE / 2}
                 borderWidth={2}
-                borderColor={isActive ? '$blue10' : 'transparent'}
-                padding={2}
+                borderColor={isActive ? '$brandGold' : 'transparent'}
+                position="relative"
+                shadowColor={isActive ? '$brandGold' : 'transparent'}
+                shadowRadius={isActive ? 12 : 0}
+                shadowOpacity={isActive ? 0.35 : 0}
               >
                 <AvatarImage
                   url={preset.url}
                   username={preset.label}
-                  size={GRID_SIZE}
-                  borderRadius={4}
+                  size={TILE_SIZE - 4}
                 />
-              </YStack>
+                {isActive ? (
+                  <View
+                    position="absolute"
+                    bottom={-2}
+                    right={-2}
+                    width={20}
+                    height={20}
+                    borderRadius={10}
+                    backgroundColor="$brandGold"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Text
+                      {...TYPE_BODY.eyebrow}
+                      color="#111"
+                      letterSpacing={0}
+                      fontSize={11}
+                    >
+                      ✓
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             );
           })}
         </XStack>
@@ -136,7 +170,7 @@ export function AvatarPicker({
 
       {/* Custom URL input */}
       <YStack gap="$2">
-        <Text fontWeight="600" fontSize="$3" color="$textMuted">
+        <Text {...TYPE_BODY.eyebrow} color="$textMuted">
           CUSTOM URL
         </Text>
         <XStack gap="$2">
@@ -167,7 +201,10 @@ export function AvatarPicker({
         </Button>
         <Button
           size="$3"
-          theme="blue"
+          backgroundColor="$brandNavy"
+          color="$color12"
+          hoverStyle={{ backgroundColor: '$brandNavyLight' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
           onPress={handleSave}
           disabled={loading}
           icon={loading ? <Spinner size="small" /> : undefined}
