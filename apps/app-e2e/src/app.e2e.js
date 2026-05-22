@@ -9,7 +9,10 @@ describe('App E2E Tests', () => {
 
   it('should launch app successfully', async () => {
     await driver.waitUntil(
-      async () => await driver.isDisplayed('//android.widget.TextView'),
+      async () => {
+        const el = await driver.$('//android.widget.TextView');
+        return await el.isDisplayed();
+      },
       {
         timeout: 30000,
         timeoutMsg: 'App did not launch within 30 seconds',
@@ -31,19 +34,19 @@ describe('App E2E Tests', () => {
 
   it('should handle basic user interactions', async () => {
     const screenSize = await driver.getWindowSize();
-    await driver.touchAction({
-      action: 'tap',
-      x: screenSize.width / 2,
-      y: screenSize.height / 2,
-    });
+    await driver
+      .action('pointer')
+      .move({ x: screenSize.width / 2, y: screenSize.height / 2 })
+      .down()
+      .up()
+      .perform();
 
     const mainContainer = await driver.$('//android.view.ViewGroup');
     await expect(mainContainer).toBeDisplayed();
   });
 
   afterEach(async () => {
-    // Clean up after each test
-    console.log('🧹 Test cleanup completed');
+    // Reserved for per-test cleanup hooks.
   });
 });
 
@@ -51,7 +54,10 @@ describe('App E2E Tests', () => {
 const E2EHelpers = {
   async waitForElement(selector, timeout = 10000) {
     return await driver.waitUntil(
-      async () => await driver.isDisplayed(selector),
+      async () => {
+        const el = await driver.$(selector);
+        return await el.isDisplayed();
+      },
       {
         timeout,
         timeoutMsg: `Element ${selector} not found within ${timeout}ms`,
