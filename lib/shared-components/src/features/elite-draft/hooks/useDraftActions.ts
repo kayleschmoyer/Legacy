@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useMutation } from '@apollo/client/react';
 import type { LeagueTeam } from '../types';
@@ -94,6 +94,14 @@ export function useDraftActions({
   const [toggleAutoPickMutation, { loading: toggleAutoPickLoading }] =
     useMutation(TOGGLE_DRAFT_AUTO_PICK);
 
+  // Synchronous re-entry guards. Apollo's `loading` flag only flips on the
+  // next render, so a rapid second click (or a timer/websocket-driven
+  // auto-pick racing a manual click) can pass a `pickLoading`-based check
+  // and fire the mutation twice with different `playerId`s. Refs update
+  // same-tick and close the race.
+  const isPickingRef = useRef(false);
+  const isCommPickingRef = useRef(false);
+
   const handleInitializeDraft = useCallback(
     async (
       draftOrder: 'snake' | 'linear' = 'snake',
@@ -173,7 +181,8 @@ export function useDraftActions({
 
   const handleMakePick = useCallback(
     async (playerId: number, isAutoPick = false) => {
-      if (!draftId || !isMyPick || pickLoading || draftPaused) return;
+      if (!draftId || !isMyPick || isPickingRef.current || draftPaused) return;
+      isPickingRef.current = true;
       try {
         setUrgentMessage('');
         await makeDraftPick({
@@ -214,12 +223,13 @@ export function useDraftActions({
               : `Draft pick failed: ${msg}`,
           );
         }
+      } finally {
+        isPickingRef.current = false;
       }
     },
     [
       draftId,
       isMyPick,
-      pickLoading,
       draftPaused,
       makeDraftPick,
       refetchCurrentPick,
@@ -307,7 +317,8 @@ export function useDraftActions({
 
   const handleCommissionerPick = useCallback(
     async (playerId: number) => {
-      if (!draftId || commPickLoading) return;
+      if (!draftId || isCommPickingRef.current) return;
+      isCommPickingRef.current = true;
       try {
         await commissionerPickMutation({
           variables: { draftId, playerId },
@@ -325,11 +336,12 @@ export function useDraftActions({
         } else {
           showToast(msg, 'error');
         }
+      } finally {
+        isCommPickingRef.current = false;
       }
     },
     [
       draftId,
-      commPickLoading,
       commissionerPickMutation,
       refetchCurrentPick,
       refetchPickHistory,
