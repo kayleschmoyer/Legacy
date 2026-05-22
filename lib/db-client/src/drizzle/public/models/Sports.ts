@@ -2,6 +2,7 @@ import {
   pgTable,
   varchar,
   integer,
+  text,
   timestamp,
   index,
   primaryKey,
@@ -47,6 +48,29 @@ export const sportPlayerPools = pgTable(
  * stored in `leagues.era_filter` (the `era_filter` enum). A NULL `endYear`
  * means the era extends to the present.
  */
+/**
+ * Static slot-eligibility mapping used by the draft auto-pick candidate-pool
+ * query (LS-4694). Mirrors the baseball entries in
+ * `ALLOWED_POSITIONS_BY_SPORT.baseball` (lib/utils/src/lib/allowed-positions.ts).
+ * Promoted from an inline `VALUES` CTE to a real table so the planner has
+ * statistics for join ordering.
+ */
+export const positionSlotMapping = pgTable(
+  'position_slot_mapping',
+  {
+    slotType: text('slot_type').notNull(),
+    statPos: text('stat_pos').notNull(),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({
+        columns: [table.slotType, table.statPos],
+        name: 'position_slot_mapping_pk',
+      }),
+    };
+  },
+);
+
 export const sportEras = pgTable(
   'sport_eras',
   {

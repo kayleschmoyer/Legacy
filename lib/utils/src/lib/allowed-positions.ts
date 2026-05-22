@@ -10,9 +10,11 @@
  *  - lambdas/db    (draft auto-pick via ALLOWED_POSITIONS_FOR_AUTO_PICK alias)
  *  - lib/shared-components  (re-exported from PositionModels.ts)
  *
- * NOTE: lambdas/db/src/schema/drafts/candidate-pool.ts has a SQL CTE
- * `position_mapping` that mirrors the baseball mapping. When updating the
- * baseball entry, keep that CTE in sync.
+ * NOTE: the baseball mapping is also persisted in
+ * `public.position_slot_mapping` (seeded by migration, consumed by the draft
+ * auto-pick query in lambdas/db/src/schema/drafts/candidate-pool.ts — see
+ * LS-4694). When updating the baseball entry, add a follow-up migration to
+ * keep that table in sync.
  */
 
 export type SportKind = 'baseball' | 'football';

@@ -299,21 +299,11 @@ async function computeBestBenchPick(
   );
   const benchTotalSlots = Number(totalSlotsResult.rows[0]?.total_slots ?? 0);
 
-  // Step 2: slots_coverable per eligible player
+  // Step 2: slots_coverable per eligible player. The slot/stat-position mapping
+  // lives in `public.position_slot_mapping` (seeded by migration) so the
+  // planner has statistics for join ordering — see LS-4694.
   const benchVersatilityRows = await db.execute(
-    sql`WITH position_mapping(slot_type, stat_pos) AS (
-      VALUES
-        ('1B'::text, '1B'::text),
-        ('2B', '2B'), ('3B', '3B'), ('C', 'C'),
-        ('CF', 'CF'), ('LF', 'LF'), ('RF', 'RF'), ('SS', 'SS'),
-        ('SP', 'SP'), ('SP', 'P'), ('RP', 'RP'), ('RP', 'P'),
-        ('OF', 'LF'), ('OF', 'RF'), ('OF', 'CF'), ('OF', 'OF'),
-        ('IF', '1B'), ('IF', '2B'), ('IF', '3B'), ('IF', 'SS'),
-        ('DH', '1B'), ('DH', '2B'), ('DH', '3B'), ('DH', 'SS'),
-        ('DH', 'LF'), ('DH', 'RF'), ('DH', 'CF'), ('DH', 'OF'), ('DH', 'C'), ('DH', 'DH'),
-        ('XDH', 'DH')
-    ),
-    eligible_players AS (
+    sql`WITH eligible_players AS (
       SELECT player_id, position
       FROM player_eligible_positions
       WHERE player_id = ANY(${sql.param(eligibleIds)}::integer[])
@@ -322,7 +312,7 @@ async function computeBestBenchPick(
       ep.player_id,
       COUNT(DISTINCT lp.id)::int AS slots_coverable
     FROM league_positions lp
-    JOIN position_mapping pm ON pm.slot_type = lp.position_type::text
+    JOIN position_slot_mapping pm ON pm.slot_type = lp.position_type::text
     JOIN eligible_players ep ON ep.position = pm.stat_pos
     WHERE lp.league_id = ${draftLeagueId}
     GROUP BY ep.player_id`,
