@@ -8,7 +8,8 @@
  * See LS-3852 for the original race-condition fix in MatchupRosterEditor.tsx.
  */
 import React from 'react';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { LOGGER } from '@legacy-sports/logging';
 
 import type {
   MatchupPlayerData,
@@ -16,6 +17,17 @@ import type {
 } from './MatchupRosterEditorView';
 import { MatchupRosterEditorView } from './MatchupRosterEditorView';
 import { render } from '../../test-utils';
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+const mockLogger = LOGGER as jest.Mocked<typeof LOGGER>;
 
 const noop = () => Promise.resolve();
 
@@ -319,6 +331,150 @@ describe('MatchupRosterEditorView', () => {
       selectPlayer(container, 'p1');
       expect(screen.queryByText(/Not eligible/)).toBeNull();
       expect(screen.getByText(/Tap to assign/)).toBeTruthy();
+    });
+  });
+
+  describe('mutation failure handling (LS-2664)', () => {
+    // Before LS-2664, the four mutation handlers called `setSelectedPlayerId(null)`
+    // unconditionally after `await onMutation(...)`. If the promise rejected, the
+    // line was never reached AND the rejection was silently swallowed by the
+    // surrounding `void`. These tests pin the new contract:
+    //   - selection is cleared on success
+    //   - selection is preserved on failure (user can retry)
+    //   - LOGGER.error is called on failure
+    //   - onMutationError prop is invoked with the thrown error
+    const selectPlayer = (container: HTMLElement, playerId: string): void => {
+      const wrapper = container.querySelector(
+        `[data-testid="matchup-player-row-${playerId}"]`,
+      );
+      const inner = wrapper?.firstElementChild as HTMLElement | null;
+      if (!inner) throw new Error(`row ${playerId} not rendered`);
+      fireEvent.click(inner);
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('preserves selection and reports error when onMoveToPosition rejects (bench → slot)', async () => {
+      const err = new Error('backend rejected');
+      const onMoveToPosition = jest.fn().mockRejectedValue(err);
+      const onMutationError = jest.fn();
+      const benchPitcher = makePlayer('p1', null, ['SP']);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[benchPitcher]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={onMoveToPosition}
+          onMutationError={onMutationError}
+        />,
+      );
+      selectPlayer(container, 'p1');
+
+      // Trigger an assign to the empty SP slot via the inline button row.
+      const assignBtn = container.querySelector(
+        '[data-testid="roster-assign-p1-101"]',
+      );
+      if (!assignBtn) throw new Error('assign button not rendered');
+      fireEvent.click(assignBtn);
+
+      await waitFor(() => expect(onMutationError).toHaveBeenCalledWith(err));
+      expect(mockLogger.error.mock.calls).toEqual([
+        ['MatchupRosterEditorView mutation failed', err],
+      ]);
+      // Row is still rendered with selection styling (border + actions visible).
+      expect(
+        container.querySelector('[data-testid="roster-assign-p1-101"]'),
+      ).not.toBeNull();
+    });
+
+    it('clears selection on successful mutation', async () => {
+      const onMoveToPosition = jest.fn().mockResolvedValue(undefined);
+      const benchPitcher = makePlayer('p1', null, ['SP']);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[benchPitcher]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={onMoveToPosition}
+        />,
+      );
+      selectPlayer(container, 'p1');
+
+      const assignBtn = container.querySelector(
+        '[data-testid="roster-assign-p1-101"]',
+      );
+      if (!assignBtn) throw new Error('assign button not rendered');
+      fireEvent.click(assignBtn);
+
+      // After success the inline action buttons disappear because the row is
+      // no longer selected.
+      await waitFor(() =>
+        expect(
+          container.querySelector('[data-testid="roster-assign-p1-101"]'),
+        ).toBeNull(),
+      );
+      expect(mockLogger.error.mock.calls).toHaveLength(0);
+    });
+
+    it('logs even when no onMutationError is provided', async () => {
+      const err = new Error('boom');
+      const onMoveToPosition = jest.fn().mockRejectedValue(err);
+      const starter = makePlayer('p1', 101, ['SP']);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[starter]}
+          positionMap={new Map([[101, 'SP']])}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={onMoveToPosition}
+        />,
+      );
+      selectPlayer(container, 'p1');
+
+      const benchBtn = container.querySelector(
+        '[data-testid="roster-bench-p1"]',
+      );
+      if (!benchBtn) throw new Error('bench button not rendered');
+      fireEvent.click(benchBtn);
+
+      await waitFor(() =>
+        expect(mockLogger.error.mock.calls).toEqual([
+          ['MatchupRosterEditorView mutation failed', err],
+        ]),
+      );
+    });
+
+    it('reports error when onSwapPositions rejects (two-player swap)', async () => {
+      const err = new Error('swap failed');
+      const onSwapPositions = jest.fn().mockRejectedValue(err);
+      const onMutationError = jest.fn();
+      const players = [
+        makePlayer('p1', 101, ['SP', 'C']),
+        makePlayer('p2', 102, ['SP', 'C']),
+      ];
+      const positionMap = new Map<number, string>([
+        [101, 'SP'],
+        [102, 'C'],
+      ]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT, C_SLOT]}
+          onSwapPositions={onSwapPositions}
+          onMoveToPosition={noop}
+          onMutationError={onMutationError}
+        />,
+      );
+      selectPlayer(container, 'p1');
+      selectPlayer(container, 'p2');
+
+      await waitFor(() => expect(onMutationError).toHaveBeenCalledWith(err));
+      expect(mockLogger.error.mock.calls.length).toBeGreaterThan(0);
     });
   });
 

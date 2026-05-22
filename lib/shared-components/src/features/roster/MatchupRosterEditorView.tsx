@@ -9,6 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   getPositionColors,
   isEligibleForSlot,
@@ -73,6 +74,15 @@ export interface MatchupRosterEditorViewProps {
     playerId: string,
     positionId: number | null,
   ) => Promise<void>;
+  /**
+   * Optional callback invoked when a mutation throws. When provided, the parent
+   * is responsible for surfacing the failure to the user. The component still
+   * logs the error via `LOGGER.error` regardless.
+   *
+   * On mutation failure, selection state is preserved so the user can retry
+   * without re-selecting the player.
+   */
+  onMutationError?: (err: unknown) => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -92,9 +102,29 @@ export function MatchupRosterEditorView({
   mutating = false,
   onSwapPositions,
   onMoveToPosition,
+  onMutationError,
 }: MatchupRosterEditorViewProps): React.JSX.Element | null {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [eligibilityError, setEligibilityError] = useState<string | null>(null);
+
+  // Run a mutation, clearing selection only on success. On failure, log the
+  // error and forward it to the parent — selection is preserved so the user
+  // can retry. Without this wrapper, a rejected promise would leave selection
+  // stuck and the error silently swallowed by the surrounding `void`.
+  const runMutation = useCallback(
+    (mutation: () => Promise<void>): void => {
+      void (async () => {
+        try {
+          await mutation();
+          setSelectedPlayerId(null);
+        } catch (err) {
+          LOGGER.error('MatchupRosterEditorView mutation failed', err as Error);
+          onMutationError?.(err);
+        }
+      })();
+    },
+    [onMutationError],
+  );
 
   const selectedPlayer = useMemo(
     () => players.find((p) => p.id === selectedPlayerId) ?? null,
@@ -188,15 +218,14 @@ export function MatchupRosterEditorView({
       }
 
       setEligibilityError(null);
-      void (async () => {
-        await onSwapPositions(
+      runMutation(() =>
+        onSwapPositions(
           first.id,
           player.positionId, // player1 takes player2's current slot
           player.id,
           first.positionId, // player2 takes player1's current slot
-        );
-        setSelectedPlayerId(null);
-      })();
+        ),
+      );
     },
     [
       selectedPlayerId,
@@ -205,6 +234,7 @@ export function MatchupRosterEditorView({
       onSwapPositions,
       positionMap,
       playerName,
+      runMutation,
     ],
   );
 
@@ -227,24 +257,18 @@ export function MatchupRosterEditorView({
         return;
       }
       setEligibilityError(null);
-      void (async () => {
-        await onMoveToPosition(selectedPlayer.id, slotId);
-        setSelectedPlayerId(null);
-      })();
+      runMutation(() => onMoveToPosition(selectedPlayer.id, slotId));
     },
-    [mutating, selectedPlayer, onMoveToPosition, playerName],
+    [mutating, selectedPlayer, onMoveToPosition, playerName, runMutation],
   );
 
   const handleMoveToBench = useCallback(
     (player: MatchupPlayerData) => {
       if (mutating) return;
       setEligibilityError(null);
-      void (async () => {
-        await onMoveToPosition(player.id, null);
-        setSelectedPlayerId(null);
-      })();
+      runMutation(() => onMoveToPosition(player.id, null));
     },
-    [mutating, onMoveToPosition],
+    [mutating, onMoveToPosition, runMutation],
   );
 
   const handleAssignPosition = useCallback(
@@ -262,12 +286,9 @@ export function MatchupRosterEditorView({
         return;
       }
       setEligibilityError(null);
-      void (async () => {
-        await onMoveToPosition(player.id, positionId);
-        setSelectedPlayerId(null);
-      })();
+      runMutation(() => onMoveToPosition(player.id, positionId));
     },
-    [mutating, onMoveToPosition, playerName],
+    [mutating, onMoveToPosition, playerName, runMutation],
   );
 
   // ── Render helpers ─────────────────────────────────────────────────────────
