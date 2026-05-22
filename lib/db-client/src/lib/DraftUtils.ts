@@ -514,12 +514,24 @@ export async function filterPlayerIdsByLeagueEligibility(
 
   // 3. Minimum career seasons
   if (settings.minCareerSeasons > 0 && currentIds.length > 0) {
+    // LS-4693: replaces the previous correlated NOT EXISTS + COUNT(DISTINCT)
+    // pair (two passes over season_batting per player) with a single pre-
+    // aggregated CTE so the index on (player_id, lg_id, season) is scanned
+    // once per batch instead of 2× per row.
     const rows = await db.execute(
       sql`
+        WITH eligibility AS (
+          SELECT player_id, COUNT(DISTINCT season) AS season_count
+          FROM season_batting
+          WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
+            AND lg_id IN ('AL', 'NL')
+          GROUP BY player_id
+        )
         SELECT p.id AS player_id
         FROM players p
+        LEFT JOIN eligibility e ON e.player_id = p.id
         WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
-          AND ${careerSeasonsCondition(settings.minCareerSeasons)}
+          AND (e.player_id IS NULL OR e.season_count >= ${settings.minCareerSeasons})
       `,
     );
 
