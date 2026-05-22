@@ -556,6 +556,33 @@ builder.mutationField('startDraft', (t) =>
       const { leagueId } = args;
       const userId = context.user.id;
 
+      // Verify caller is commissioner or GM of this league before delegating
+      // to DraftService. Defense in depth — do not rely solely on
+      // validateUserAccess in the service layer (LS-2496). Kept outside the
+      // try/catch so ForbiddenError is not rewrapped as a generic Error.
+      const [membership] = await context.db
+        .select({
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !membership ||
+        (membership.permissionLevel !== 'commissioner' &&
+          membership.permissionLevel !== 'general_manager')
+      ) {
+        throw ForbiddenError(
+          'Only the league Commissioner or General Manager can start the draft',
+        );
+      }
+
       try {
         // Read saved draft settings from the database
         const [savedDraft] = await context.db

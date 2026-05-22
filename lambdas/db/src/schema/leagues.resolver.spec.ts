@@ -788,4 +788,115 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('startDraft mutation', () => {
+    it('should fail when user is not authenticated', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { leagueId: 1 },
+          { user: null, db: mockDb },
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required to start draft');
+    });
+
+    it('should throw ForbiddenError when user is not a league member (LS-2496)', async () => {
+      // leagueMembers lookup returns empty — user is not a member
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      await expect(
+        field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
+      ).rejects.toThrow(
+        'Only the league Commissioner or General Manager can start the draft',
+      );
+    });
+
+    it('should throw ForbiddenError when user is an assistant_manager (LS-2496)', async () => {
+      // leagueMembers lookup returns an assistant_manager — not authorized
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([
+        { permissionLevel: 'assistant_manager' },
+      ]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      await expect(
+        field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
+      ).rejects.toThrow(
+        'Only the league Commissioner or General Manager can start the draft',
+      );
+    });
+
+    it('should not throw ForbiddenError when user is a commissioner (LS-2496)', async () => {
+      // First select: leagueMembers returns commissioner.
+      // Second select: drafts table (savedDraft) returns empty.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      // The resolver wraps downstream errors as
+      // 'Failed to start draft: ...'. We only care that it did NOT throw
+      // ForbiddenError (i.e. authorization passed). Any other failure mode
+      // from the heavily mocked DraftService is acceptable here.
+      await expect(
+        field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
+      ).rejects.not.toThrow(
+        'Only the league Commissioner or General Manager can start the draft',
+      );
+    });
+
+    it('should not throw ForbiddenError when user is a general_manager (LS-2496)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'general_manager' }])
+        .mockResolvedValueOnce([]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      await expect(
+        field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
+      ).rejects.not.toThrow(
+        'Only the league Commissioner or General Manager can start the draft',
+      );
+    });
+  });
 });
