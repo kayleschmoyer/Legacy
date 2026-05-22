@@ -72,7 +72,9 @@ export async function getAuthenticatedUserId(
     event.headers['authorization'] ?? event.headers['Authorization'] ?? '';
   if (authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
-    const payload = verify(token, jwtSecret) as { id: number | string };
+    const payload = verify(token, jwtSecret, {
+      algorithms: ['HS256'],
+    }) as { id: number | string };
     const id =
       typeof payload.id === 'string' ? parseInt(payload.id, 10) : payload.id;
     if (!Number.isFinite(id) || id <= 0) throw new Error('Invalid JWT id');
@@ -102,7 +104,9 @@ export async function getAuthenticatedUserId(
         throw new Error('CSRF validation failed');
       }
 
-      const payload = verify(token, jwtSecret) as { id: number | string };
+      const payload = verify(token, jwtSecret, {
+        algorithms: ['HS256'],
+      }) as { id: number | string };
       const id =
         typeof payload.id === 'string' ? parseInt(payload.id, 10) : payload.id;
       if (!Number.isFinite(id) || id <= 0) throw new Error('Invalid JWT id');

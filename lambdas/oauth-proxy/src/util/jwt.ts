@@ -26,7 +26,10 @@ export async function createJwt(
     accessLevel: user.accessLevel,
   });
 
-  const signedToken = sign(jwt, jwtKey, { expiresIn: '24h' });
+  const signedToken = sign(jwt, jwtKey, {
+    algorithm: 'HS256',
+    expiresIn: '24h',
+  });
 
   LOGGER.debug('JWT signed, length:', signedToken.length);
 

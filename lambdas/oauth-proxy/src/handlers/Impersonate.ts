@@ -176,6 +176,7 @@ export const handleImpersonate = async (
     };
 
     const impersonationJwt = sign(impersonationPayload, jwtKey, {
+      algorithm: 'HS256',
       expiresIn: IMPERSONATION_TTL_SECONDS,
     });
 

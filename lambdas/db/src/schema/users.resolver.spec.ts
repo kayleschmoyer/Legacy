@@ -273,14 +273,14 @@ describe('impersonateUser mutation', () => {
     // Token returned
     expect(result).toEqual({ token: 'mock-jwt-token' });
 
-    // sign() called with correct TTL
+    // sign() called with correct TTL and pinned HS256 algorithm
     expect(mockSign).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 10,
         impersonatedBy: expect.objectContaining({ id: 1 }),
       }),
       'test-jwt-secret',
-      { expiresIn: '2h' },
+      { algorithm: 'HS256', expiresIn: '2h' },
     );
 
     // Audit log at error level with only IDs (no PII)

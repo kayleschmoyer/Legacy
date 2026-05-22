@@ -136,7 +136,9 @@ async function getAuthenticatedUserId(
 
   try {
     const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
-    const decoded = verify(jwtToken, jwtKey) as { id: number };
+    const decoded = verify(jwtToken, jwtKey, {
+      algorithms: ['HS256'],
+    }) as { id: number };
     return decoded.id;
   } catch {
     return null;

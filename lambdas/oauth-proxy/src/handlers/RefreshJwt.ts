@@ -106,6 +106,7 @@ export const handleRefreshJwt = async (
   try {
     // Verify signature but ignore expiration — we handle the grace window ourselves
     payload = verify(token, jwtKey, {
+      algorithms: ['HS256'],
       ignoreExpiration: true,
     }) as RefreshJwtPayload;
   } catch (err) {
@@ -204,6 +205,7 @@ export const handleRefreshJwt = async (
             impersonatedBy: impPayload.impersonatedBy,
           };
           const refreshedImpJwt = sign(refreshedImpPayload, jwtKey, {
+            algorithm: 'HS256',
             expiresIn: IMPERSONATION_TTL_SECONDS,
           });
           allCookies.push(

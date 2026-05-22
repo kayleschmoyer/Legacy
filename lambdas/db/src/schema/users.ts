@@ -405,7 +405,10 @@ builder.mutationField('impersonateUser', (t) =>
       };
 
       const IMPERSONATION_TTL = '2h';
-      const token = sign(payload, jwtSecret, { expiresIn: IMPERSONATION_TTL });
+      const token = sign(payload, jwtSecret, {
+        algorithm: 'HS256',
+        expiresIn: IMPERSONATION_TTL,
+      });
 
       // Audit log: record every impersonation event for security forensics.
       // Logged at error level so it is forwarded to centralized error monitoring
