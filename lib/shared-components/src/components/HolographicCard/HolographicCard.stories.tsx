@@ -274,6 +274,100 @@ export const Interactive: Story = {
   ),
 };
 
+export const PlayerCardDefault: Story = {
+  render: () => (
+    <HolographicCard
+      variant="default"
+      playerName="Babe Ruth"
+      jerseyNumber="714"
+      position="P"
+      playerMeta="1923 · NYY · Outfield"
+      stats={[
+        { value: '.393', label: 'AVG' },
+        { value: '41', label: 'HR' },
+        { value: '14.1', label: 'WAR' },
+      ]}
+    />
+  ),
+};
+
+export const PlayerCardLegend: Story = {
+  render: () => (
+    <HolographicCard
+      variant="legend"
+      playerName="Barry Bonds"
+      jerseyNumber="762"
+      position="OF"
+      playerMeta="2001 · SF · Outfield"
+      stats={[
+        { value: '.328', label: 'AVG' },
+        { value: '73', label: 'HR' },
+        { value: '11.8', label: 'WAR' },
+      ]}
+    />
+  ),
+};
+
+export const PlayerCardRookie: Story = {
+  render: () => (
+    <HolographicCard
+      variant="rookie"
+      playerName="Ronald Acuña Jr."
+      jerseyNumber="001"
+      position="RK"
+      playerMeta="2018 · ATL · Outfield"
+      stats={[
+        { value: '.293', label: 'AVG' },
+        { value: '26', label: 'HR' },
+        { value: '3.7', label: 'WAR' },
+      ]}
+    />
+  ),
+};
+
+export const PlayerCardShowcase: Story = {
+  render: () => (
+    <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
+      <HolographicCard
+        variant="default"
+        playerName="Babe Ruth"
+        jerseyNumber="714"
+        position="P"
+        playerMeta="1923 · NYY · Outfield"
+        stats={[
+          { value: '.393', label: 'AVG' },
+          { value: '41', label: 'HR' },
+          { value: '14.1', label: 'WAR' },
+        ]}
+      />
+      <HolographicCard
+        variant="legend"
+        playerName="Barry Bonds"
+        jerseyNumber="762"
+        position="OF"
+        playerMeta="2001 · SF · Outfield"
+        stats={[
+          { value: '.328', label: 'AVG' },
+          { value: '73', label: 'HR' },
+          { value: '11.8', label: 'WAR' },
+        ]}
+      />
+      <HolographicCard
+        variant="rookie"
+        playerName="Ronald Acuña Jr."
+        jerseyNumber="001"
+        position="RK"
+        playerMeta="2018 · ATL · Outfield"
+        stats={[
+          { value: '.293', label: 'AVG' },
+          { value: '26', label: 'HR' },
+          { value: '3.7', label: 'WAR' },
+        ]}
+      />
+    </XStack>
+  ),
+};
+
 export const Playground: Story = {
   args: {
     variant: 'rainbow',
