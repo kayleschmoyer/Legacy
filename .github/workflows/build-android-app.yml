@@ -142,11 +142,102 @@ jobs:
           path: apps/app/android/${{ steps.build.outputs.apk-path }}
           retention-days: 3
 
+  smoke-android:
+    name: Boot Smoke (Emulator)
+    # GH-hosted ubuntu-latest is used here (not the self-hosted m7a.xlarge runner)
+    # because reactivecircus/android-emulator-runner requires KVM, which is exposed
+    # on GH-hosted Linux runners but not on non-metal EC2 instances.
+    runs-on: ubuntu-latest
+    needs: build-android
+    # Release APKs ship arm64-v8a + x86_64 so an x86_64 emulator can boot them.
+    # Debug APKs ship arm64-v8a only and would require slow ARM emulation — out of scope.
+    if: needs.build-android.outputs.build_type == 'release'
+    timeout-minutes: 25
+
+    steps:
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Download APK Artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: android-apk-${{ needs.build-android.outputs.build_type }}
+          path: ./artifacts
+
+      - name: AVD Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api34-x86_64-google_apis
+
+      - name: Boot emulator and verify APK launches
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          force-avd-creation: false
+          emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on
+          disable-animations: true
+          script: |
+            set -e
+
+            APK=$(ls ./artifacts/*.apk | head -1)
+            if [ -z "$APK" ] || [ ! -f "$APK" ]; then
+              echo "❌ No APK found in ./artifacts/"
+              ls -la ./artifacts/ || true
+              exit 1
+            fi
+            echo "🔧 Installing $APK"
+            adb install -r "$APK"
+
+            # Package and main activity from apps/app/app.json (android.package).
+            # Expo prebuild generates .MainActivity as the launcher activity.
+            PKG="com.legacySports"
+            ACTIVITY=".MainActivity"
+
+            echo "🧹 Clearing logcat buffer before launch"
+            adb logcat -c
+
+            echo "🚀 Launching $PKG/$ACTIVITY"
+            adb shell am start -W -n "$PKG/$ACTIVITY"
+
+            echo "⏳ Waiting 15s for app to settle..."
+            sleep 15
+
+            PID=$(adb shell pidof "$PKG" | tr -d '\r\n' || true)
+            if [ -z "$PID" ]; then
+              echo "❌ App process not running — APK crashed on launch"
+              echo ""
+              echo "=== Crash logcat (AndroidRuntime + ReactNativeJS) ==="
+              adb logcat -d AndroidRuntime:E ReactNativeJS:E "$PKG":V "*:S" || true
+              echo ""
+              echo "=== Last 100 lines of full logcat ==="
+              adb logcat -d -t 100 || true
+              exit 1
+            fi
+
+            echo "✅ App running (pid=$PID) — boot smoke passed"
+
   create-release:
     name: Create GitHub Release
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    needs: build-android
-    if: github.event.inputs.create_releases != 'false'
+    needs: [build-android, smoke-android]
+    # smoke-android is skipped for debug builds (arm64-only); accept skipped as well as success.
+    if: |
+      always() &&
+      github.event.inputs.create_releases != 'false' &&
+      needs.build-android.result == 'success' &&
+      (needs.smoke-android.result == 'success' || needs.smoke-android.result == 'skipped')
 
     steps:
       - name: Download APK Artifact
@@ -200,7 +291,7 @@ jobs:
   notify:
     name: Notify Build Results
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    needs: [build-android, create-release]
+    needs: [build-android, smoke-android, create-release]
     if: always()
 
     steps:
@@ -262,6 +353,7 @@ jobs:
           echo "- **Commit:** ${{ needs.build-android.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Type:** ${{ needs.build-android.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Android Status:** ${{ needs.build-android.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Boot Smoke Status:** ${{ needs.smoke-android.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Status:** ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
