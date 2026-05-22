@@ -78,9 +78,43 @@ Each skill's `SKILL.md` frontmatter includes a `role` field (executor, analyst, 
 
 Jira's GitHub integration links PRs to tickets via **PR title**, **commit messages**, and **branch name** (all scanned independently). For Claude Code launcher-checkbox sessions, do **not** rename branches or use `remoteBranch` overrides — rely on PR title + commits containing `LS-####`. See `.agents/skills/branch-naming/SKILL.md` for patterns by driver and full rules.
 
+## Who's Who in the PR Flow
+
+Several distinct actors operate on every PR. Most docs in this repo predate the current bot lineup and refer generically to "the bot" or "agents" — those terms are ambiguous, so use this table as the canonical reference.
+
+**You are the Author Agent.** You are not the Reviewer Bot, not Copilot, not the Merge Queue, and not the maintainer. Your responsibilities end where the Reviewer Bot's begin.
+
+| Actor               | Identity                                                                                         | What it does                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Author Agent**    | Your Claude session. Commits authored by `claude[bot]` (or human collaborators).                 | Writes code, opens the PR, replies to review threads, pushes fixes, applies `bot:ready-for-review` after every fix-push.                      |
+| **Reviewer Bot**    | `legacy-sports-review-bot` running `.github/workflows/review.yml` → `.github/scripts/reviewer/`. | Posts reviews on `ready_for_review` / `synchronize` (when `bot:ready-for-review` is present). Applies `merge-when-ready` on APPROVED verdict. |
+| **Copilot**         | GitHub's `copilot-pull-request-reviewer`.                                                        | Posts line-level review comments. Lower-priority signal than the Reviewer Bot.                                                                |
+| **Merge Queue**     | `.github/workflows/merge-queue.yml` + `.github/scripts/merge-queue-processor.js`.                | Watches for `merge-when-ready` and auto-merges PRs whose required checks are green.                                                           |
+| **CI Orchestrator** | `.github/workflows/ci-orchestrator.yml`.                                                         | Runs the CI test suite. Adds `CI: *` failure labels.                                                                                          |
+| **Maintainer**      | Human user (`bkrupa`).                                                                           | Applies escape-hatch labels (`review-bot-override`, `security-review-override`, `merge-to-parent`). Author Agent never touches these.         |
+
+### Label Ownership
+
+Single source of truth for which actor applies which label. If guidance elsewhere in this repo contradicts this table, **this table wins** — open a ticket to reconcile the stale doc.
+
+| Label                         | Applied by       | When                                                            | Author Agent should…                                                                                                                                                                                                                               |
+| ----------------------------- | ---------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-in-progress`           | Author Agent     | While the PR is in draft / still iterating                      | Apply on draft. The Reviewer Bot does not need it; it's a coordination signal for sweep agents.                                                                                                                                                    |
+| `bot:ready-for-review`        | **Author Agent** | After `github_mark_pr_ready` AND after every fix-push           | **Apply / re-apply.** This is the trigger that fires the Reviewer Bot. Without it, no new review cycle runs. See Critical Rule #14 in `pr-lifecycle/SKILL.md`.                                                                                     |
+| `merge-when-ready`            | **Reviewer Bot** | On APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`)  | **Never apply manually.** Manual application bypasses the gate that holds back PRs the Reviewer Bot has rejected. If a clean PR is missing it, fix the upstream cause (Reviewer Bot didn't run, didn't approve) — don't paper over with the label. |
+| `merge-to-parent`             | Maintainer       | For stacked PRs targeting a non-`main` branch                   | Never touch.                                                                                                                                                                                                                                       |
+| `review-bot-override`         | Maintainer       | Formal escape hatch when Reviewer Bot is wrong                  | Never touch. See §5 of the Author Agent Contract.                                                                                                                                                                                                  |
+| `security-review-override`    | Maintainer       | After human security review on `needs-human-security-review` PR | Never touch. See §6 of the Author Agent Contract.                                                                                                                                                                                                  |
+| `needs-human-security-review` | Reviewer Bot     | Critical security finding                                       | Never touch.                                                                                                                                                                                                                                       |
+| `needs-human-arbitration`     | Reviewer Bot     | Cycle exceeds MAX_CYCLE or `CANNOT-COMPLY` filed                | Never touch.                                                                                                                                                                                                                                       |
+| `review-bot-degraded`         | Reviewer Bot     | Cycle was rate-limited                                          | Re-apply `bot:ready-for-review` to retry. See `fix-reviews.md` step 8.                                                                                                                                                                             |
+| `CI: *` failure labels        | CI Orchestrator  | Auto, when a check fails                                        | Never touch — they clear automatically when the failing check passes.                                                                                                                                                                              |
+
+> Historical note: some docs still credit `copilot-auto-approve` with adding `merge-when-ready`. That attribution is stale — the current code path is Reviewer (W1) in `.github/scripts/reviewer/index.mjs:914`.
+
 ## Author Agent Contract (Bot-PR Flow)
 
-When a PR is authored by an agent and reviewed by the Code Reviewer Bot, the agent must follow this protocol exactly. Deviations cause the bot to flag format errors or escalate to a human.
+When a PR is authored by the Author Agent and reviewed by the Reviewer Bot, the Author Agent must follow this protocol exactly. Deviations cause the Reviewer Bot to flag format errors or escalate to a human.
 
 ### 1. PR Creation
 

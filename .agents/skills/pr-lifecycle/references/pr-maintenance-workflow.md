@@ -79,7 +79,7 @@ Before any git operations, settle easy PRs via API-only actions (~2 min):
 
 1. **Request Copilot reviews** on bot-authored PRs missing reviews
 2. **Handle Dependabot PRs** via comment commands (`@dependabot rebase` or label `merge-when-ready`)
-3. **Label already-clean PRs** with `merge-when-ready` → add to settled (agents may apply this label; the `copilot-auto-approve` bot also applies it after Copilot approval, but agents do not need to wait for it)
+3. **Verify Reviewer Bot labeling on already-clean PRs** — the Reviewer Bot applies `merge-when-ready` itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). Do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership)). If a clean PR is missing the label, re-apply `bot:ready-for-review` to fire a fresh Reviewer Bot cycle. **Dependabot exception**: apply `merge-when-ready` manually to clean Dependabot PRs — they bypass the Reviewer Bot. Add settled PRs to the settled set.
 4. **Re-run transient CI failures** (flaky tests, infra timeouts) early so CI runs during later passes
 5. **Resolve process/meta review threads** that don't need code changes
 
@@ -169,7 +169,7 @@ After all fixes, verify that clean PRs have been labeled by the `copilot-auto-ap
 github_request_review(prs: [<PR#>], copilot: true)
 ```
 
-> **Only the bot should add `merge-when-ready`**. Do **not** manually add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
+> **Only the Reviewer Bot should add `merge-when-ready`** (on APPROVED verdict). The Author Agent / Sweep Agent never applies this label manually — see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership). Also do **not** manually add or remove `merge-to-parent` — that label is managed by maintainers for stacked PRs targeting non-main branches.
 
 ### Full Sweep: Outer Loop
 
@@ -230,11 +230,12 @@ github_pr_dashboard(state: "open", limit: 100)
 
 The response includes a `summary` object with counts and a `prs` array with per-PR details. For detailed inspection of specific PRs, use `github_pr_batch_status` with an array of PR numbers.
 
-### Cloud Step 2: Verify Clean PRs Are Labeled
+### Cloud Step 2: Verify Reviewer Bot Labeling
 
-The `copilot-auto-approve` workflow automatically requests Copilot reviews and adds `merge-when-ready` when clean. If any clean PRs are missing the label:
+The **Reviewer Bot** (`.github/workflows/review.yml` → `.github/scripts/reviewer/index.mjs:914`) applies `merge-when-ready` itself on APPROVED verdict. Do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership)). If a clean PR is missing the label, re-apply `bot:ready-for-review` to fire a fresh Reviewer Bot cycle and/or request a Copilot review:
 
 ```
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])
 github_request_review(prs: [<PR#>], copilot: true)
 ```
 

@@ -24,15 +24,17 @@ For detailed inspection of specific PRs, use `github_pr_batch_status` with an ar
 
 > For a **scan-only** request, stop here and report the results.
 
-## Cloud Step 2: Label Clean PRs
+## Cloud Step 2: Verify Reviewer Bot Labeling
 
-Proactively add `merge-when-ready` to any PR with no unresolved review threads:
+The **Reviewer Bot** applies `merge-when-ready` itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). Do **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership). Manual application bypasses the gate that holds back PRs the Reviewer Bot has rejected.
 
-```
-github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
-```
+For PRs where Reviewer Bot has not yet labeled despite a clean state, the upstream cause is one of:
 
-This is safe even if CI is pending — failing CI will automatically remove the label. Do not wait for the `copilot-auto-approve` bot.
+- `bot:ready-for-review` was not (re-)applied after the last push → re-apply it: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`.
+- Reviewer Bot is rate-limited (`review-bot-degraded` label present) → remove and re-add `bot:ready-for-review` to retry.
+- Reviewer Bot verdict is still CHANGES_REQUESTED → review threads and push fixes (subsequent passes).
+
+**Dependabot exception**: Dependabot PRs are not reviewed by the Reviewer Bot. For those PRs only, applying `merge-when-ready` manually is the documented comment-command flow — see the Dependabot pass.
 
 ## Cloud Step 3: Re-run Flaky / Failed CI
 

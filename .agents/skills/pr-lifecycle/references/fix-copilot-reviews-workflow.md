@@ -244,5 +244,6 @@ After processing every PR, print a summary table:
   it does not replace `make pc` or any CI checks.
 - If a review comment is unclear or requires a design decision, **skip it**
   and leave a reply on the thread explaining why: `gh api ... --method POST`.
-- **Do not manually add `merge-when-ready`** — the `copilot-auto-approve` bot adds it
-  automatically when Copilot's review is clean after your fixes are pushed.
+- **Do not manually add `merge-when-ready`** — the **Reviewer Bot** adds it
+  automatically on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). See
+  [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership).

@@ -154,15 +154,19 @@ After posting a rebase command, the PR enters a "commanded" state. Dependabot ha
 
 **Remove Dependabot PRs from all subsequent passes (1, 2, 3)** — never enter their worktrees, modify their branches, or attempt code fixes.
 
-### 0c. Label Already-Clean PRs
+### 0c. Verify Reviewer Bot Labeling on Already-Clean PRs
 
-Any PR that is already mergeable, CI passing, and has no unresolved threads can be labeled immediately — no git operation needed:
+For PRs that are already mergeable, CI passing, and have no unresolved threads, the **Reviewer Bot** should have applied `merge-when-ready` itself on its APPROVED verdict — do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership)).
 
-```
-github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
-```
+If a clean PR is missing the label, the upstream cause is one of:
 
-Add these PRs to `settled` immediately.
+- `bot:ready-for-review` was not (re-)applied after the last push → re-apply it via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])` to fire the Reviewer Bot. Treat the PR as settled for this pass; the next sweep will see the label.
+- Reviewer Bot is rate-limited (`review-bot-degraded` label present) → remove and re-add `bot:ready-for-review`.
+- Reviewer Bot verdict is still CHANGES_REQUESTED → handle in Pass 2.
+
+Once `bot:ready-for-review` is in place, add the PR to `settled` for this pass.
+
+**Dependabot exception**: Dependabot PRs are not reviewed by the Reviewer Bot, so applying `merge-when-ready` manually IS the documented flow for them — see 0b.
 
 ### 0d. Re-run Transient CI Failures
 
@@ -371,15 +375,17 @@ This decouples Copilot review from the critical path — the sweep continues wor
 
 ---
 
-## Label Clean PRs
+## Verify Reviewer Bot Labeling
 
-After each pass, proactively label PRs that have no unresolved review threads with `merge-when-ready`:
+After each pass, the **Reviewer Bot** is responsible for adding `merge-when-ready` to PRs it has APPROVED (`.github/scripts/reviewer/index.mjs:914`). The Author/Sweep Agent does **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership).
 
-```
-github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
-```
+For each PR that is clean (no unresolved review threads, CI clean) but missing `merge-when-ready`:
 
-This is safe to do even if CI is still running or pending — failing CI will automatically remove the label. Do not wait for the `copilot-auto-approve` bot; label immediately when reviews are clean.
+1. Inspect the Reviewer Bot state. If the last review verdict is APPROVED, the label should already be present — if not, the Reviewer Bot's label-add likely failed transiently; re-trigger by removing and re-adding `bot:ready-for-review`.
+2. If `bot:ready-for-review` is missing on the current HEAD, the Reviewer Bot never ran the last cycle — re-apply the label: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`.
+3. If `review-bot-degraded` is present, the prior cycle was rate-limited — remove and re-add `bot:ready-for-review`.
+
+**Dependabot exception**: Dependabot PRs bypass the Reviewer Bot; for those, apply `merge-when-ready` manually as documented in pass 0b.
 
 > **Do not manually add or remove `merge-to-parent`** — that label is managed manually for stacked PRs targeting non-main branches.
 
@@ -467,7 +473,7 @@ REPEAT (max 10 passes):
           - IF pr has unresolved review threads         → github_manage_labels(prs: [<pr.number>], add: ["requires-human-review"])
           - Release claim via github_manage_labels(prs: [<pr.number>], remove: ["sweep-claimed"]) after acting
       - After acting, add pr to settled (Dependabot handles rebase asynchronously)
-    - 0c: Label already-clean PRs with merge-when-ready → add to settled
+    - 0c: For already-clean regular PRs, verify Reviewer Bot has applied merge-when-ready; if not, re-apply bot:ready-for-review to fire a fresh Reviewer Bot cycle (do NOT apply merge-when-ready manually — see Label Ownership in AGENTS.md) → add to settled
     - 0d: Re-run transient CI failures early (flaky tests, infra timeouts) so CI runs during later passes
     - 0e: Resolve process/meta review threads (no code change needed) — may settle additional PRs
 

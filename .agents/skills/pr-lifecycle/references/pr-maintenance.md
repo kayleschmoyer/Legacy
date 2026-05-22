@@ -52,9 +52,9 @@ bash scripts/cleanup-pr-body.sh
 LS-#### type(scope): Brief description
 ```
 
-### Copilot Review (Automatic)
+### Reviewer Bot (Automatic)
 
-The `copilot-auto-approve` workflow automatically requests Copilot review on PR open/update. When the review has no comments, the workflow auto-approves and labels `merge-when-ready`. No manual action needed.
+The Reviewer Bot (`.github/workflows/review.yml` → `.github/scripts/reviewer/index.mjs`) fires on `ready_for_review`, `labeled` (with `bot:ready-for-review`), and `synchronize` events (when `bot:ready-for-review` is present). On APPROVED verdict it applies `merge-when-ready` itself. The Author Agent never applies that label manually — see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership).
 
 > PR body template, PowerShell pitfalls, common issues, UI screenshots: see [references/](.)
 

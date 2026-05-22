@@ -95,7 +95,7 @@ After all fixes are applied and pushed:
 1. Re-check PR status: `github_pr_batch_status({ numbers: [<PR#>] })`
 2. Confirm: `mergeable != CONFLICTING`, no unresolved threads, CI green
 3. If new issues appeared (Copilot re-review found new problems, CI regressed), loop back to the relevant step — but cap total iterations at 3.
-4. Add `merge-when-ready` label when all clear: `github_manage_labels({ prs: [<PR#>], add: ["merge-when-ready"] })`
+4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership)).
 
 ## Iteration Cap
 

@@ -98,4 +98,4 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 - **Never** suppress a lint/type error to satisfy a review comment — fix the root cause
 - **Never** resolve a thread without either fixing it or explaining why it's not applicable
 - **Never** enter more than 2 fix-review rounds on the same PR
-- After resolving all threads, add the `merge-when-ready` label
+- After resolving all threads and pushing fixes, (re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle. The Reviewer Bot adds `merge-when-ready` itself on APPROVED — **never apply it manually** (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership))
