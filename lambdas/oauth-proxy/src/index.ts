@@ -35,6 +35,13 @@ import {
   handleImpersonate,
   handleStopImpersonate,
 } from './handlers/Impersonate';
+import { withRateLimit } from './util/rate-limit';
+
+// Defense-in-depth rate-limit budgets for auth endpoints. Per-IP, per
+// Lambda execution context (see util/rate-limit.ts). Edge throttling
+// (API Gateway / WAF) should be layered on top — these are a floor.
+const AUTH_RATE_LIMIT = { limit: 5, windowMs: 60 * 1000 };
+const DEVICE_POLL_RATE_LIMIT = { limit: 30, windowMs: 60 * 1000 };
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -323,7 +330,11 @@ const baseOAuthHandler = async (
       case '/oauth/login':
       case '/dev/oauth/login':
         if (event.httpMethod === 'POST') {
-          const result = await handleLogin(event);
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.login', ...AUTH_RATE_LIMIT },
+            () => handleLogin(event),
+          );
           return cors(result);
         }
         break;
@@ -331,7 +342,11 @@ const baseOAuthHandler = async (
       case '/oauth/register':
       case '/dev/oauth/register':
         if (event.httpMethod === 'POST') {
-          const result = await handleRegister(event);
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.register', ...AUTH_RATE_LIMIT },
+            () => handleRegister(event),
+          );
           return cors(result);
         }
         break;
@@ -340,7 +355,11 @@ const baseOAuthHandler = async (
       case '/oauth/device/authorize':
       case '/dev/oauth/device/authorize':
         if (event.httpMethod === 'POST') {
-          const result = await handleDeviceAuthorize(event);
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.device.authorize', ...AUTH_RATE_LIMIT },
+            () => handleDeviceAuthorize(event),
+          );
           return cors(result);
         }
         break;
@@ -348,7 +367,12 @@ const baseOAuthHandler = async (
       case '/oauth/device/token':
       case '/dev/oauth/device/token':
         if (event.httpMethod === 'POST') {
-          const result = await handleDeviceToken(event);
+          // Polling endpoint — higher budget than auth-credential routes.
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.device.token', ...DEVICE_POLL_RATE_LIMIT },
+            () => handleDeviceToken(event),
+          );
           return cors(result);
         }
         break;
@@ -364,7 +388,11 @@ const baseOAuthHandler = async (
       case '/oauth/device/complete-local':
       case '/dev/oauth/device/complete-local':
         if (event.httpMethod === 'POST') {
-          const result = await handleDeviceCompleteLocal(event);
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.device.complete-local', ...AUTH_RATE_LIMIT },
+            () => handleDeviceCompleteLocal(event),
+          );
           return cors(result);
         }
         break;

@@ -43,8 +43,8 @@ describe('handleRegister', () => {
     const result = await handleRegister(
       makeEvent({
         email: 'not-an-email',
-        password: 'password123',
-        confirmPassword: 'password123',
+        password: 'longenoughpassword',
+        confirmPassword: 'longenoughpassword',
       }),
     );
     expect(result.statusCode).toBe(400);
@@ -60,7 +60,7 @@ describe('handleRegister', () => {
     );
     expect(result.statusCode).toBe(400);
     expect((JSON.parse(result.body) as { error: string }).error).toMatch(
-      /at least 8 characters/,
+      /at least 12 characters/,
     );
   });
 
@@ -68,8 +68,8 @@ describe('handleRegister', () => {
     const result = await handleRegister(
       makeEvent({
         email: 'test@example.com',
-        password: 'password123',
-        confirmPassword: 'different123',
+        password: 'longenoughpassword',
+        confirmPassword: 'differentlongpass',
       }),
     );
     expect(result.statusCode).toBe(400);

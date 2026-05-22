@@ -8,7 +8,7 @@ import {
   setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 /**
  * Looks up or creates a user by their Google-verified email address.

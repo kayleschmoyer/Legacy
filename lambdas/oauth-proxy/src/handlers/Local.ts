@@ -1,7 +1,7 @@
 ﻿import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { createUser, getUserByEmail } from '@legacy-sports/db-client';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { hashPassword, testPassword } from '../Users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
@@ -10,6 +10,11 @@ import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 import { notifyNewUserSignup } from '../util/discord';
 
+// Minimum password length on registration. Existing accounts with shorter
+// passwords can still log in (LoginRequestSchema deliberately stays at min(1))
+// because rejecting them at the schema layer would lock real users out.
+export const MIN_PASSWORD_LENGTH = 12;
+
 const LoginRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -17,7 +22,12 @@ const LoginRequestSchema = z.object({
 
 const RegisterRequestSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z
+    .string()
+    .min(
+      MIN_PASSWORD_LENGTH,
+      `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    ),
   confirmPassword: z.string().min(1),
 });
 
@@ -28,10 +38,23 @@ function errorResponse(
   return { statusCode, body: JSON.stringify({ error: message }) };
 }
 
+function zodErrorToResponse(error: ZodError): APIGatewayProxyResult {
+  const first = error.issues[0];
+  const message = first?.message ?? 'Invalid request';
+  return errorResponse(400, message);
+}
+
 export const handleLogin = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const { email, password } = parseEventBody(event, LoginRequestSchema);
+  let email: string;
+  let password: string;
+  try {
+    ({ email, password } = parseEventBody(event, LoginRequestSchema));
+  } catch (err) {
+    if (err instanceof ZodError) return zodErrorToResponse(err);
+    return errorResponse(400, 'Invalid request body');
+  }
 
   LOGGER.debug('Initialize database.');
   return await withDbClient(async (db) => {
@@ -73,10 +96,18 @@ export const handleLogin = async (
 export const handleRegister = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const { email, password, confirmPassword } = parseEventBody(
-    event,
-    RegisterRequestSchema,
-  );
+  let email: string;
+  let password: string;
+  let confirmPassword: string;
+  try {
+    ({ email, password, confirmPassword } = parseEventBody(
+      event,
+      RegisterRequestSchema,
+    ));
+  } catch (err) {
+    if (err instanceof ZodError) return zodErrorToResponse(err);
+    return errorResponse(400, 'Invalid request body');
+  }
 
   if (password !== confirmPassword) {
     return errorResponse(400, 'Password and confirm password must match');

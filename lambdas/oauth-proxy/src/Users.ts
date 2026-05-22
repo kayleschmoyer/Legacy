@@ -1,6 +1,6 @@
 import { compare, genSalt, hash } from 'bcryptjs';
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 export async function hashPassword(plaintext: string): Promise<string> {
   const salt = await genSalt(SALT_ROUNDS);
