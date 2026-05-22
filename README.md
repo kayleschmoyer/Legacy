@@ -92,7 +92,7 @@ These are published automatically by CI workflows — no manual steps required.
 
 ## 🔒 Security
 
-[![Security Scanning](https://github.com/bkrupa/legacy-sports/actions/workflows/security-scanning.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/security-scanning.yml)
+[![CI Orchestrator (includes security scanning)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-orchestrator.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-orchestrator.yml)
 
 Security scanning is invoked by `ci-orchestrator.yml`, which runs on pull requests, merge groups, pushes to `develop`, manual dispatch, and on a scheduled basis; based on changed paths, the orchestrator selects dependency scanning for dependency-related changes or secrets-only scanning otherwise. Run `pnpm audit` locally to check for vulnerabilities.
 
