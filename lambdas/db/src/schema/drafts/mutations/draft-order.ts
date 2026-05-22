@@ -5,12 +5,16 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { Draft } from '../types';
 import { builder } from '../../builder';
 import type { Context } from '../../builder';
-import { AuthenticationError, UserInputError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 // ── Helpers shared by setDraftOrder / randomizeDraftOrder ────────────────────
 
@@ -84,99 +88,109 @@ builder.mutationField('setDraftOrder', (t) =>
       const userId = context.user.id;
 
       try {
-        // Fetch draft + league
-        const [draft] = await context.db
-          .select({
-            id: PublicSchema.drafts.id,
-            leagueId: PublicSchema.drafts.leagueId,
-            currentPick: PublicSchema.drafts.currentPick,
-          })
-          .from(PublicSchema.drafts)
-          .where(eq(PublicSchema.drafts.id, draftId))
-          .limit(1);
+        // Fetch + check + write inside one transaction with SELECT ... FOR UPDATE
+        // on the drafts row so concurrent makeDraftPick (which also locks the
+        // row) serializes against us — preventing TOCTOU on currentPick where
+        // a pick lands between the state check and the order rewrite.
+        const leagueIdForLog = await context.db.transaction(async (tx) => {
+          // Surface lock waits as errors rather than silent hangs.
+          await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-        if (!draft) {
-          throw UserInputError('Draft not found');
-        }
-
-        const [league] = await context.db
-          .select({
-            id: PublicSchema.leagues.id,
-            draftStatus: PublicSchema.leagues.draftStatus,
-          })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, draft.leagueId))
-          .limit(1);
-
-        if (!league) {
-          throw new Error('League not found');
-        }
-
-        // Only allowed when draft is in-progress and no picks made yet
-        if (league.draftStatus !== 'in-progress') {
-          throw new Error(
-            'Draft order can only be changed while the draft is in-progress',
-          );
-        }
-        if (Number(draft.currentPick) !== 0) {
-          throw new Error(
-            'Draft order cannot be changed after picks have been made',
-          );
-        }
-
-        // Verify the caller is the league GM (commissioner)
-        const [membership] = await context.db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (!membership || membership.permissionLevel !== 'general_manager') {
-          throw new Error(
-            'Only the league General Manager can change the draft order',
-          );
-        }
-
-        // Fetch current draft_teams to validate the provided teamIds (preserve autoPick/leagueId)
-        const currentTeams = await context.db
-          .select({
-            teamId: PublicSchema.draftTeams.teamId,
-            leagueId: PublicSchema.draftTeams.leagueId,
-            autoPick: PublicSchema.draftTeams.autoPick,
-          })
-          .from(PublicSchema.draftTeams)
-          .where(eq(PublicSchema.draftTeams.draftId, draftId));
-
-        const currentTeamMap = new Map(
-          currentTeams.map((t) => [
-            t.teamId,
-            { leagueId: t.leagueId, autoPick: t.autoPick },
-          ]),
-        );
-
-        if (new Set(teamIds).size !== teamIds.length) {
-          throw new Error('teamIds must not contain duplicate values');
-        }
-
-        if (teamIds.length !== currentTeamMap.size) {
-          throw new Error(
-            `Expected ${String(currentTeamMap.size)} team IDs but received ${String(teamIds.length)}`,
-          );
-        }
-        for (const id of teamIds) {
-          if (!currentTeamMap.has(id)) {
-            throw new Error(`Team ${String(id)} is not part of this draft`);
+          if (new Set(teamIds).size !== teamIds.length) {
+            throw UserInputError('teamIds must not contain duplicate values');
           }
-        }
 
-        // Delete and re-insert to avoid unique constraint violation on (draftId, draftOrder)
-        // when the reorder conflicts with existing orders during per-row updates.
-        await context.db.transaction(async (tx) => {
+          const [draft] = await tx
+            .select({
+              id: PublicSchema.drafts.id,
+              leagueId: PublicSchema.drafts.leagueId,
+              currentPick: PublicSchema.drafts.currentPick,
+            })
+            .from(PublicSchema.drafts)
+            .where(eq(PublicSchema.drafts.id, draftId))
+            .limit(1)
+            .for('update');
+
+          if (!draft) {
+            throw UserInputError('Draft not found');
+          }
+
+          const [league] = await tx
+            .select({
+              id: PublicSchema.leagues.id,
+              draftStatus: PublicSchema.leagues.draftStatus,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, draft.leagueId))
+            .limit(1);
+
+          if (!league) {
+            throw UserInputError('League not found');
+          }
+
+          if (league.draftStatus !== 'in-progress') {
+            throw UserInputError(
+              'Draft order can only be changed while the draft is in-progress',
+            );
+          }
+          if (Number(draft.currentPick) !== 0) {
+            throw UserInputError(
+              'Draft order cannot be changed after picks have been made',
+            );
+          }
+
+          // Verify the caller is the league GM (commissioner).
+          const [membership] = await tx
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+                eq(PublicSchema.leagueMembers.userId, userId),
+              ),
+            )
+            .limit(1);
+
+          if (!membership || membership.permissionLevel !== 'general_manager') {
+            throw ForbiddenError(
+              'Only the league General Manager can change the draft order',
+            );
+          }
+
+          // Fetch current draft_teams to validate the provided teamIds
+          // (preserve autoPick/leagueId).
+          const currentTeams = await tx
+            .select({
+              teamId: PublicSchema.draftTeams.teamId,
+              leagueId: PublicSchema.draftTeams.leagueId,
+              autoPick: PublicSchema.draftTeams.autoPick,
+            })
+            .from(PublicSchema.draftTeams)
+            .where(eq(PublicSchema.draftTeams.draftId, draftId));
+
+          const currentTeamMap = new Map(
+            currentTeams.map((t) => [
+              t.teamId,
+              { leagueId: t.leagueId, autoPick: t.autoPick },
+            ]),
+          );
+
+          if (teamIds.length !== currentTeamMap.size) {
+            throw UserInputError(
+              `Expected ${String(currentTeamMap.size)} team IDs but received ${String(teamIds.length)}`,
+            );
+          }
+          for (const id of teamIds) {
+            if (!currentTeamMap.has(id)) {
+              throw UserInputError(
+                `Team ${String(id)} is not part of this draft`,
+              );
+            }
+          }
+
+          // Delete and re-insert to avoid unique constraint violation on
+          // (draftId, draftOrder) when the reorder conflicts with existing
+          // orders during per-row updates.
           await tx
             .delete(PublicSchema.draftTeams)
             .where(eq(PublicSchema.draftTeams.draftId, draftId));
@@ -184,7 +198,9 @@ builder.mutationField('setDraftOrder', (t) =>
             teamIds.map((teamId, index) => {
               const meta = currentTeamMap.get(teamId);
               if (!meta)
-                throw new Error(`Team ${String(teamId)} not found in draft`);
+                throw UserInputError(
+                  `Team ${String(teamId)} not found in draft`,
+                );
               return {
                 draftId,
                 teamId,
@@ -194,11 +210,13 @@ builder.mutationField('setDraftOrder', (t) =>
               };
             }),
           );
+
+          return draft.leagueId;
         });
 
         LOGGER.info('Commissioner set draft order', {
           draftId,
-          leagueId: draft.leagueId,
+          leagueId: leagueIdForLog,
           teamIds,
           userId,
         });
@@ -209,7 +227,7 @@ builder.mutationField('setDraftOrder', (t) =>
         await postDraftOrderChatNotification(
           context.db,
           context.notificationService,
-          draft.leagueId,
+          leagueIdForLog,
           username,
           notificationText,
         );
@@ -260,93 +278,100 @@ builder.mutationField('randomizeDraftOrder', (t) =>
       const userId = context.user.id;
 
       try {
-        // Fetch draft + league
-        const [draft] = await context.db
-          .select({
-            id: PublicSchema.drafts.id,
-            leagueId: PublicSchema.drafts.leagueId,
-            currentPick: PublicSchema.drafts.currentPick,
-          })
-          .from(PublicSchema.drafts)
-          .where(eq(PublicSchema.drafts.id, draftId))
-          .limit(1);
+        // Fetch + check + write inside one transaction with SELECT ... FOR UPDATE
+        // on the drafts row so concurrent makeDraftPick (which also locks the
+        // row) serializes against us — preventing TOCTOU on currentPick where
+        // a pick lands between the state check and the order rewrite.
+        const leagueIdForLog = await context.db.transaction(async (tx) => {
+          // Surface lock waits as errors rather than silent hangs.
+          await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-        if (!draft) {
-          throw UserInputError('Draft not found');
-        }
+          const [draft] = await tx
+            .select({
+              id: PublicSchema.drafts.id,
+              leagueId: PublicSchema.drafts.leagueId,
+              currentPick: PublicSchema.drafts.currentPick,
+            })
+            .from(PublicSchema.drafts)
+            .where(eq(PublicSchema.drafts.id, draftId))
+            .limit(1)
+            .for('update');
 
-        const [league] = await context.db
-          .select({
-            id: PublicSchema.leagues.id,
-            draftStatus: PublicSchema.leagues.draftStatus,
-          })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, draft.leagueId))
-          .limit(1);
+          if (!draft) {
+            throw UserInputError('Draft not found');
+          }
 
-        if (!league) {
-          throw new Error('League not found');
-        }
+          const [league] = await tx
+            .select({
+              id: PublicSchema.leagues.id,
+              draftStatus: PublicSchema.leagues.draftStatus,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, draft.leagueId))
+            .limit(1);
 
-        // Only allowed when draft is in-progress and no picks made yet
-        if (league.draftStatus !== 'in-progress') {
-          throw new Error(
-            'Draft order can only be randomized while the draft is in-progress',
-          );
-        }
-        if (Number(draft.currentPick) !== 0) {
-          throw new Error(
-            'Draft order cannot be randomized after picks have been made',
-          );
-        }
+          if (!league) {
+            throw UserInputError('League not found');
+          }
 
-        // Verify the caller is the league GM
-        const [membership] = await context.db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
+          if (league.draftStatus !== 'in-progress') {
+            throw UserInputError(
+              'Draft order can only be randomized while the draft is in-progress',
+            );
+          }
+          if (Number(draft.currentPick) !== 0) {
+            throw UserInputError(
+              'Draft order cannot be randomized after picks have been made',
+            );
+          }
 
-        if (
-          !membership ||
-          (membership.permissionLevel !== 'general_manager' &&
-            membership.permissionLevel !== 'commissioner')
-        ) {
-          throw new Error(
-            'Only the league General Manager or Commissioner can randomize the draft order',
-          );
-        }
+          // Verify the caller is the league GM or Commissioner.
+          const [membership] = await tx
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+                eq(PublicSchema.leagueMembers.userId, userId),
+              ),
+            )
+            .limit(1);
 
-        // Fetch current team IDs in this draft (preserve autoPick and leagueId)
-        const currentTeams = await context.db
-          .select({
-            teamId: PublicSchema.draftTeams.teamId,
-            leagueId: PublicSchema.draftTeams.leagueId,
-            autoPick: PublicSchema.draftTeams.autoPick,
-          })
-          .from(PublicSchema.draftTeams)
-          .where(eq(PublicSchema.draftTeams.draftId, draftId))
-          .orderBy(asc(PublicSchema.draftTeams.draftOrder));
+          if (
+            !membership ||
+            (membership.permissionLevel !== 'general_manager' &&
+              membership.permissionLevel !== 'commissioner')
+          ) {
+            throw ForbiddenError(
+              'Only the league General Manager or Commissioner can randomize the draft order',
+            );
+          }
 
-        if (currentTeams.length === 0) {
-          throw new Error('No teams found for this draft');
-        }
+          // Fetch current team IDs in this draft (preserve autoPick and leagueId).
+          const currentTeams = await tx
+            .select({
+              teamId: PublicSchema.draftTeams.teamId,
+              leagueId: PublicSchema.draftTeams.leagueId,
+              autoPick: PublicSchema.draftTeams.autoPick,
+            })
+            .from(PublicSchema.draftTeams)
+            .where(eq(PublicSchema.draftTeams.draftId, draftId))
+            .orderBy(asc(PublicSchema.draftTeams.draftOrder));
 
-        // Fisher-Yates shuffle
-        const shuffled = [...currentTeams];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
+          if (currentTeams.length === 0) {
+            throw UserInputError('No teams found for this draft');
+          }
 
-        // Delete and re-insert to avoid unique constraint violation on (draftId, draftOrder)
-        // when the shuffled order conflicts with existing orders during per-row updates.
-        await context.db.transaction(async (tx) => {
+          // Fisher-Yates shuffle
+          const shuffled = [...currentTeams];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+
+          // Delete and re-insert to avoid unique constraint violation on
+          // (draftId, draftOrder) when the shuffled order conflicts with
+          // existing orders during per-row updates.
           await tx
             .delete(PublicSchema.draftTeams)
             .where(eq(PublicSchema.draftTeams.draftId, draftId));
@@ -359,11 +384,13 @@ builder.mutationField('randomizeDraftOrder', (t) =>
               autoPick: team.autoPick,
             })),
           );
+
+          return draft.leagueId;
         });
 
         LOGGER.info('Commissioner randomized draft order', {
           draftId,
-          leagueId: draft.leagueId,
+          leagueId: leagueIdForLog,
           userId,
         });
 
@@ -373,7 +400,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
         await postDraftOrderChatNotification(
           context.db,
           context.notificationService,
-          draft.leagueId,
+          leagueIdForLog,
           username,
           notificationText,
         );
