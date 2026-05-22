@@ -86,6 +86,7 @@ export const matchups = pgTable(
       }).onDelete('cascade'),
       // Note: Removed unique constraint on (leagueId, weekNumber) as a league
       // needs to support multiple matchups per week (one for each team pairing)
+      leagueIdIdx: index('matchups_league_id_idx').on(table.leagueId),
       team1IdIdx: index('matchups_team1_id_idx').on(table.team1Id),
       team2IdIdx: index('matchups_team2_id_idx').on(table.team2Id),
       statsLoadingStatusIdx: index('matchups_stats_loading_status_idx').on(
@@ -299,6 +300,7 @@ export const matchupMessages = pgTable(
         foreignColumns: [users.id],
         name: 'matchup_messages_flagger_fk',
       }).onDelete('set null'),
+      leagueIdIdx: index('matchup_messages_league_id_idx').on(table.leagueId),
       matchupIdCreatedAtIdx: index(
         'matchup_messages_matchup_id_created_at_idx',
       ).on(table.matchupId, table.createdAt.desc()),
