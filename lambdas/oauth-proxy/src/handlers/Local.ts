@@ -76,7 +76,7 @@ export const handleLogin = async (
       [JWT_COOKIE_NAME]: internalJwt,
     };
 
-    const cookieHeader = await encryptCookies(cookies);
+    const encryptedCookies = await encryptCookies(cookies);
     const csrfToken = generateCsrfToken();
     const authCookies = buildAuthCookies(internalJwt, csrfToken);
 
@@ -86,7 +86,7 @@ export const handleLogin = async (
         csrfToken,
       }),
       multiValueHeaders: {
-        'Set-Cookie': [cookieHeader, ...authCookies],
+        'Set-Cookie': [...encryptedCookies, ...authCookies],
       },
       statusCode: 200,
     };
@@ -138,7 +138,7 @@ export const handleRegister = async (
       [JWT_COOKIE_NAME]: internalJwt,
     };
 
-    const cookieHeader = await encryptCookies(cookies);
+    const encryptedCookies = await encryptCookies(cookies);
     const csrfToken = generateCsrfToken();
     const authCookies = buildAuthCookies(internalJwt, csrfToken);
 
@@ -148,7 +148,7 @@ export const handleRegister = async (
         csrfToken,
       }),
       multiValueHeaders: {
-        'Set-Cookie': [cookieHeader, ...authCookies],
+        'Set-Cookie': [...encryptedCookies, ...authCookies],
       },
       statusCode: 200,
     };

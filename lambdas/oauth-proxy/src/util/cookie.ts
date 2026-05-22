@@ -45,19 +45,25 @@ async function getCookieKey(): Promise<Buffer> {
   return Buffer.from(cookieKey, 'base64');
 }
 
+// Per RFC 6265, a single `Set-Cookie` header sets exactly one cookie — any
+// subsequent `name=value` segment is interpreted as an attribute of the first
+// cookie and silently dropped by browsers. Return one fully-formed cookie
+// string per entry so callers can hand each one to API Gateway via
+// `multiValueHeaders['Set-Cookie']`.
 export async function encryptCookies(
   cookies: Record<string, string | null | undefined>,
-): Promise<string> {
+): Promise<string[]> {
   const cookieKey = await getCookieKey();
-  const parts: string[] = [];
+  const results: string[] = [];
 
   for (const [name, value] of Object.entries(cookies)) {
     const encryptedValue = !value ? '' : encryptSymmetric(cookieKey, value);
-    parts.push(`${name}=${JSON.stringify(encryptedValue)}`);
+    results.push(
+      `${name}=${JSON.stringify(encryptedValue)}; HttpOnly; Secure; SameSite=Strict; Path=/`,
+    );
   }
 
-  parts.push('HttpOnly', 'Secure', 'SameSite=Strict');
-  return parts.join(';');
+  return results;
 }
 
 export async function decryptCookies(

@@ -47,7 +47,7 @@ jest.mock('../util/jwt', () => ({
 }));
 
 jest.mock('../util/cookie', () => ({
-  encryptCookies: jest.fn().mockResolvedValue('encrypted-cookie'),
+  encryptCookies: jest.fn().mockResolvedValue(['encrypted-cookie']),
 }));
 
 jest.mock('../util/jwt-cookie', () => ({

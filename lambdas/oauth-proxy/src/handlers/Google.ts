@@ -730,7 +730,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   };
 
   LOGGER.debug('Encrypting cookies.');
-  const cookieHeader = await encryptCookies(cookies);
+  const encryptedCookies = await encryptCookies(cookies);
 
   // Check if this is part of a device flow (state parameter contains device code)
   const state = event.queryStringParameters?.state;
@@ -779,7 +779,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       csrfToken,
     }),
     multiValueHeaders: {
-      'Set-Cookie': [cookieHeader, ...authCookies],
+      'Set-Cookie': [...encryptedCookies, ...authCookies],
     },
     statusCode: 200,
   };

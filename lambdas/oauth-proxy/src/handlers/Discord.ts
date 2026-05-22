@@ -352,7 +352,7 @@ export const handleDiscordAuth = async (
     const internalJwt = await createJwt(user);
 
     const cookies = { [JWT_COOKIE_NAME]: internalJwt };
-    const cookieHeader = await encryptCookies(cookies);
+    const encryptedCookies = await encryptCookies(cookies);
     const csrfToken = generateCsrfToken();
     const authCookies = buildAuthCookies(internalJwt, csrfToken);
 
@@ -360,7 +360,7 @@ export const handleDiscordAuth = async (
       statusCode: 200,
       body: JSON.stringify({ jwt: internalJwt, csrfToken }),
       multiValueHeaders: {
-        'Set-Cookie': [cookieHeader, ...authCookies],
+        'Set-Cookie': [...encryptedCookies, ...authCookies],
       },
     };
   });
