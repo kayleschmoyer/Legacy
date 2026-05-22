@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { LOGGER } from '@legacy-sports/logging';
-import { ErrorBoundary } from './ErrorBoundary';
+import { ErrorBoundary, ErrorBoundaryBase } from './ErrorBoundary';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -119,5 +119,37 @@ describe('ErrorBoundary', () => {
     );
 
     expect(getByText('Custom error screen')).toBeTruthy();
+  });
+
+  it('does not leak the component stack to non-admin users', () => {
+    const testError = new Error('secret-sounding internal failure');
+
+    const { queryByText } = render(
+      <ErrorBoundaryBase isAdmin={false}>
+        <ThrowingComponent error={testError} />
+      </ErrorBoundaryBase>,
+    );
+
+    expect(queryByText('Admin debug info')).toBeNull();
+    // The error.message must not appear as standalone text — only the
+    // dev-mode `error.toString()` line (prefixed with "Error: ") may
+    // include it, never the bare message that the admin panel would show.
+    expect(queryByText(testError.message)).toBeNull();
+    expect(
+      queryByText((content) => content.includes('ThrowingComponent')),
+    ).toBeNull();
+  });
+
+  it('renders the admin debug panel with error message when isAdmin is true', () => {
+    const testError = new Error('admin-visible failure');
+
+    const { getByText } = render(
+      <ErrorBoundaryBase isAdmin>
+        <ThrowingComponent error={testError} />
+      </ErrorBoundaryBase>,
+    );
+
+    expect(getByText('Admin debug info')).toBeTruthy();
+    expect(getByText('admin-visible failure')).toBeTruthy();
   });
 });

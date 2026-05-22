@@ -94,6 +94,16 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
+/**
+ * Like {@link useAuth} but returns `null` instead of throwing when no
+ * `AuthProvider` is mounted above the caller. Use this from components that
+ * may render outside the provider tree (e.g. a top-level `ErrorBoundary` that
+ * wraps the `AuthProvider` itself).
+ */
+export const useOptionalAuth = (): AuthContextType | null => {
+  return useContext(AuthContext) ?? null;
+};
+
 interface AuthProviderProps {
   children: React.ReactNode;
   config: OAuthConfig;

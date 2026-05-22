@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import React, { useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
-import { ErrorBoundary } from './ErrorBoundary';
+import { ErrorBoundary, ErrorBoundaryBase } from './ErrorBoundary';
 
 const ThrowingComponent = ({
   shouldThrow,
@@ -109,6 +109,44 @@ const RetryDemo = (): React.ReactElement => {
       </ErrorBoundary>
     </YStack>
   );
+};
+
+export const AdminFallback: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'When the current user is an admin, the fallback shows an extra "Admin debug info" panel containing `error.message` and the React component stack. Uses `ErrorBoundaryBase` directly so the story does not require an `AuthProvider` in the tree.',
+      },
+    },
+  },
+  render: () => (
+    <ErrorBoundaryBase isAdmin>
+      <ThrowingComponent
+        shouldThrow
+        error={new Error('Boom: rendering admin debug panel')}
+      />
+    </ErrorBoundaryBase>
+  ),
+};
+
+export const NonAdminFallback: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Non-admin users see the standard fallback with no error details or component stack.',
+      },
+    },
+  },
+  render: () => (
+    <ErrorBoundaryBase isAdmin={false}>
+      <ThrowingComponent
+        shouldThrow
+        error={new Error('Boom: hidden from non-admins')}
+      />
+    </ErrorBoundaryBase>
+  ),
 };
 
 export const RetryInteraction: Story = {

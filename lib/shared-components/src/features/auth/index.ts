@@ -1,6 +1,6 @@
 // Modern authentication system (recommended for new code)
 export { LoginPage } from './LoginPage';
-export { AuthProvider, useAuth } from './hooks/useAuth';
+export { AuthProvider, useAuth, useOptionalAuth } from './hooks/useAuth';
 export type { UseAuthResult } from './hooks/useAuth';
 export { AuthService, AuthSessionExpiredError } from './services/AuthService';
 export * from './EnhancedAuthGuard';
