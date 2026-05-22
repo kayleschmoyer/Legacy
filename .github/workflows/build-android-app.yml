@@ -155,6 +155,14 @@ jobs:
     timeout-minutes: 25
 
     steps:
+      - name: Checkout Repository
+        # Needed for scripts/ci/android-boot-smoke.sh — the emulator-runner
+        # invokes its `script:` in the workspace dir, so the script file
+        # must be on disk before that step runs.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
       - name: Enable KVM group permissions
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -188,45 +196,10 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on
           disable-animations: true
-          script: |
-            set -e
-
-            APK=$(ls ./artifacts/*.apk | head -1)
-            if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-              echo "❌ No APK found in ./artifacts/"
-              ls -la ./artifacts/ || true
-              exit 1
-            fi
-            echo "🔧 Installing $APK"
-            adb install -r "$APK"
-
-            # Package and main activity from apps/app/app.json (android.package).
-            # Expo prebuild generates .MainActivity as the launcher activity.
-            PKG="com.legacySports"
-            ACTIVITY=".MainActivity"
-
-            echo "🧹 Clearing logcat buffer before launch"
-            adb logcat -c
-
-            echo "🚀 Launching $PKG/$ACTIVITY"
-            adb shell am start -W -n "$PKG/$ACTIVITY"
-
-            echo "⏳ Waiting 15s for app to settle..."
-            sleep 15
-
-            PID=$(adb shell pidof "$PKG" | tr -d '\r\n' || true)
-            if [ -z "$PID" ]; then
-              echo "❌ App process not running — APK crashed on launch"
-              echo ""
-              echo "=== Crash logcat (AndroidRuntime + ReactNativeJS) ==="
-              adb logcat -d AndroidRuntime:E ReactNativeJS:E "$PKG":V "*:S" || true
-              echo ""
-              echo "=== Last 100 lines of full logcat ==="
-              adb logcat -d -t 100 || true
-              exit 1
-            fi
-
-            echo "✅ App running (pid=$PID) — boot smoke passed"
+          # Invoke the script as a single command — reactivecircus/android-emulator-runner
+          # splits multi-line inline `script:` blocks across separate `sh -c` calls, which
+          # breaks multi-line shell constructs like if/then/fi. See LS-4755 for details.
+          script: bash scripts/ci/android-boot-smoke.sh
 
   create-release:
     name: Create GitHub Release
