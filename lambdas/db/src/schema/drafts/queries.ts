@@ -1015,8 +1015,10 @@ builder.queryField('getDraftRecommendations', (t) =>
 /**
  * Query: Get the current user's draft queue for a draft (LS-473)
  *
- * Returns entries ordered by priority ASC. Only visible to the authenticated
- * user who owns the team in this draft.
+ * Returns entries ordered by priority ASC. Only visible to the league's
+ * general manager — draft queues reveal strategic pick order and must stay
+ * private even from other co-managers / assistant roles in the same league
+ * (LS-2501).
  */
 builder.queryField('getMyDraftQueue', (t) =>
   t.field({
@@ -1037,7 +1039,10 @@ builder.queryField('getMyDraftQueue', (t) =>
       if (!draft) throw UserInputError('Draft not found');
 
       const [membership] = await context.db
-        .select({ teamId: PublicSchema.leagueMembers.teamId })
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
         .from(PublicSchema.leagueMembers)
         .where(
           and(
@@ -1046,7 +1051,13 @@ builder.queryField('getMyDraftQueue', (t) =>
           ),
         )
         .limit(1);
-      if (!membership?.teamId) throw new Error('You are not in this league');
+      if (!membership?.teamId)
+        throw ForbiddenError('You are not in this league');
+      if (membership.permissionLevel !== 'general_manager') {
+        throw ForbiddenError(
+          'Only the team general manager can view this draft queue',
+        );
+      }
 
       const rows = await context.db
         .select()
