@@ -9,6 +9,8 @@ export interface DialogProps extends Omit<
 > {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Optional eyebrow label rendered above the title in heritage gold (e.g. "Commissioner action"). */
+  eyebrow?: string;
   title: string;
   description?: string;
   children?: React.ReactNode;
@@ -22,13 +24,10 @@ export interface DialogProps extends Omit<
   destructive?: boolean;
 }
 
-/**
- * Modal dialog over a navy scrim. Header / body / action row layout.
- * Set `destructive` to render the primary action in seam-red.
- */
 export function Dialog({
   open,
   onOpenChange,
+  eyebrow,
   title,
   description,
   children,
@@ -44,35 +43,46 @@ export function Dialog({
         <TamaguiDialog.Overlay
           key="overlay"
           animation="quick"
-          opacity={0.6}
+          opacity={1}
           enterStyle={{ opacity: 0 }}
           exitStyle={{ opacity: 0 }}
-          backgroundColor="#000"
+          backgroundColor="rgba(8, 12, 20, 0.7)"
         />
         <TamaguiDialog.Content
           key="content"
-          backgroundColor="$surfaceCard"
+          backgroundColor="$surfacePanel"
           borderRadius={20}
           borderWidth={1}
-          borderColor="$glassBorder"
-          padding="$5"
-          gap="$4"
-          width={440}
-          maxWidth="90vw"
-          shadowColor="rgba(8, 12, 20, 0.65)"
-          shadowOffset={{ width: 0, height: 12 }}
-          shadowRadius={32}
+          borderColor="$surfacePanelBorder"
+          padding={28}
+          gap={16}
+          maxWidth={480}
+          shadowColor="rgba(8, 12, 20, 0.75)"
+          shadowOffset={{ width: 0, height: 20 }}
+          shadowRadius={48}
           animation="medium"
           enterStyle={{ opacity: 0, scale: 0.96, y: 8 }}
           exitStyle={{ opacity: 0, scale: 0.96, y: 8 }}
         >
           <XStack alignItems="flex-start" gap="$3">
             <YStack flex={1} gap="$1">
+              {eyebrow ? (
+                <Text
+                  fontFamily="$heading"
+                  fontWeight="700"
+                  fontSize={11}
+                  letterSpacing={1.4}
+                  textTransform="uppercase"
+                  color="$brandGoldLight"
+                >
+                  {eyebrow}
+                </Text>
+              ) : null}
               <TamaguiDialog.Title asChild>
                 <Text
                   fontFamily="$heading"
                   fontWeight="800"
-                  fontSize={22}
+                  fontSize={24}
                   letterSpacing={-0.2}
                   color="$color12"
                 >
@@ -81,7 +91,12 @@ export function Dialog({
               </TamaguiDialog.Title>
               {description ? (
                 <TamaguiDialog.Description asChild>
-                  <Text fontFamily="$body" fontSize={14} color="$textMuted">
+                  <Text
+                    fontFamily="$body"
+                    fontSize={15}
+                    lineHeight={23}
+                    color="$textMuted"
+                  >
                     {description}
                   </Text>
                 </TamaguiDialog.Description>
@@ -90,7 +105,9 @@ export function Dialog({
             <TamaguiDialog.Close asChild>
               <Button
                 size="$2"
-                circular
+                width={32}
+                height={32}
+                borderRadius={8}
                 chromeless
                 icon={<X size={16} color="$textMuted" />}
                 aria-label="Close"
@@ -100,9 +117,23 @@ export function Dialog({
 
           {children}
 
-          <XStack justifyContent="flex-end" gap="$2">
-            <Button chromeless size="$3" onPress={onCancel} borderRadius={12}>
-              <Text fontFamily="$body" fontWeight="600" color="$textMuted">
+          <XStack justifyContent="flex-end" gap={10} marginTop={8}>
+            <Button
+              size="$3"
+              borderRadius={12}
+              borderWidth={1}
+              borderColor="$outlineStrong"
+              backgroundColor="transparent"
+              onPress={onCancel}
+            >
+              <Text
+                fontFamily="$heading"
+                fontWeight="700"
+                fontSize={13}
+                letterSpacing={0.5}
+                textTransform="uppercase"
+                color="$color11"
+              >
                 {cancelLabel}
               </Text>
             </Button>
@@ -125,8 +156,10 @@ export function Dialog({
               <Text
                 fontFamily="$heading"
                 fontWeight="700"
+                fontSize={13}
+                letterSpacing={0.5}
+                textTransform="uppercase"
                 color="#fff"
-                letterSpacing={0.4}
               >
                 {confirmLabel}
               </Text>

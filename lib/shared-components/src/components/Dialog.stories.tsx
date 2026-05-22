@@ -44,9 +44,11 @@ function DestructiveDemo(): React.JSX.Element {
       <Dialog
         open={open}
         onOpenChange={setOpen}
-        title="Delete Cooperstown Society?"
-        description="This permanently removes the league, its draft history, and all matchup records. This action cannot be undone."
+        eyebrow="Commissioner action"
+        title="Delete this league?"
+        description="This will permanently remove Dead Ball Dynasty, all 12 rosters, and 14 weeks of recorded matchups. This cannot be undone."
         confirmLabel="Delete League"
+        cancelLabel="Cancel"
         destructive
         onConfirm={() => setOpen(false)}
         onCancel={() => setOpen(false)}

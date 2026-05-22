@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import * as IntentLauncher from 'expo-intent-launcher';
+import { startActivityAsync as launchIntent } from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 
 const FLAG_GRANT_READ_URI_PERMISSION = 1;
@@ -82,7 +82,7 @@ export async function launchApkInstaller(fileUri: string): Promise<void> {
   }
 
   try {
-    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+    await launchIntent('android.intent.action.VIEW', {
       data: contentUri,
       flags: FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK,
       type: APK_MIME_TYPE,
