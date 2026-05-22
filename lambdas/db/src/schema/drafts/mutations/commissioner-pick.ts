@@ -52,13 +52,170 @@ builder.mutationField('commissionerPick', (t) =>
       const userId = context.user.id;
 
       try {
+        // ── LS-4692: Phase 1 — Non-locking pre-validation ────────────────
+        // Same shrink pattern as makeDraftPick — all read-only validation
+        // (commissioner permission, player existence, league-static
+        // eligibility filters) runs before acquiring the row lock.
+        const draftPreRows = await context.db.execute(
+          sql`SELECT id, league_id, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId}`,
+        );
+        const draftPre = draftPreRows.rows[0] as
+          | {
+              id: number;
+              league_id: number;
+              pick_time_limit_seconds: number;
+              selection_method: string;
+            }
+          | undefined;
+
+        if (!draftPre) {
+          throw UserInputError('Draft not found');
+        }
+
+        // Verify user is league commissioner
+        const [membership] = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, draftPre.league_id),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        if (!membership || membership.permissionLevel !== 'commissioner') {
+          throw ForbiddenError(
+            'Only a league commissioner can make picks on behalf of others',
+          );
+        }
+
+        const [leaguePre] = await context.db
+          .select()
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, draftPre.league_id))
+          .limit(1);
+
+        if (!leaguePre) {
+          throw UserInputError('League not found');
+        }
+
+        if (
+          leaguePre.draftStatus !== 'in-progress' &&
+          leaguePre.draftStatus !== 'paused'
+        ) {
+          throw UserInputError(
+            `Draft is not in progress (current status: ${leaguePre.draftStatus ?? 'unknown'})`,
+          );
+        }
+
+        const [player] = await context.db
+          .select()
+          .from(PublicSchema.players)
+          .where(eq(PublicSchema.players.id, playerId))
+          .limit(1);
+
+        if (!player) {
+          throw UserInputError('Player not found');
+        }
+
+        // Validate player eligibility against league settings
+        if (
+          !(await isPlayerInPool(context.db, playerId, leaguePre.playerPool))
+        ) {
+          throw UserInputError(
+            `Player is not in the ${leaguePre.playerPool.toUpperCase()} player pool`,
+          );
+        }
+
+        // Validate Hall of Fame eligibility (LS-295)
+        if (leaguePre.hofOnly && !player.hallOfFame) {
+          throw UserInputError(
+            'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
+          );
+        }
+
+        // Validate era eligibility (LS-295)
+        if (leaguePre.eraFilter && leaguePre.eraFilter !== 'all') {
+          const ERA_RANGES: Record<string, [number, number]> = {
+            dead_ball: [1871, 1919],
+            golden_age: [1920, 1960],
+            expansion: [1961, 1976],
+            free_agency: [1977, 1993],
+            steroid_era: [1994, 2005],
+            modern: [2006, 9999],
+          };
+          let eraStart: number | null = null;
+          let eraEnd: number | null = null;
+          if (leaguePre.eraFilter === 'custom') {
+            eraStart = leaguePre.customEraStartYear ?? null;
+            eraEnd = leaguePre.customEraEndYear ?? null;
+          } else {
+            const range = ERA_RANGES[leaguePre.eraFilter];
+            if (range) {
+              [eraStart, eraEnd] = range;
+            }
+          }
+          if (eraStart != null && eraEnd != null) {
+            const eraCheckResult = await context.db.execute(
+              sql`SELECT 1 FROM (
+                SELECT player_id FROM season_batting
+                  WHERE player_id = ${playerId}
+                    AND lg_id IN ('AL', 'NL')
+                    AND season >= ${eraStart}
+                    AND season <= ${eraEnd}
+                UNION
+                SELECT player_id FROM season_pitching
+                  WHERE player_id = ${playerId}
+                    AND lg_id IN ('AL', 'NL')
+                    AND season >= ${eraStart}
+                    AND season <= ${eraEnd}
+              ) era_check LIMIT 1`,
+            );
+            if (!eraCheckResult.rows[0]) {
+              const eraLabel = leaguePre.eraFilter
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c: string) => c.toUpperCase());
+              throw UserInputError(
+                `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
+              );
+            }
+          }
+        }
+
+        if (
+          !(await playerMeetsMinCareerGames(
+            context.db,
+            playerId,
+            leaguePre.minCareerGames,
+          ))
+        ) {
+          throw UserInputError(
+            `Player does not meet the minimum career games requirement (${leaguePre.minCareerGames})`,
+          );
+        }
+
+        if (
+          !(await playerMeetsMinCareerSeasons(
+            context.db,
+            playerId,
+            leaguePre.minCareerSeasons,
+          ))
+        ) {
+          throw UserInputError(
+            `Player does not meet the minimum career seasons requirement (${leaguePre.minCareerSeasons})`,
+          );
+        }
+
+        // ── LS-4692: Phase 2 — Short locked write transaction ─────────────
         const result = await context.db.transaction(async (tx) => {
           // Surface lock waits as errors rather than silent hangs
           await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-          // Lock the draft row — narrow SELECT to avoid transferring unused columns
+          // FOR NO KEY UPDATE serializes concurrent writers without blocking
+          // FK-referencing draft_picks INSERTs from other transactions.
           const draftRows = await tx.execute(
-            sql`SELECT id, league_id, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+            sql`SELECT id, league_id, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
           );
           const draft = draftRows.rows[0] as
             | {
@@ -73,24 +230,8 @@ builder.mutationField('commissionerPick', (t) =>
             throw UserInputError('Draft not found');
           }
 
-          // Verify user is league owner or commissioner
-          const [membership] = await tx
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, draft.league_id),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
-
-          if (!membership || membership.permissionLevel !== 'commissioner') {
-            throw ForbiddenError(
-              'Only a league commissioner can make picks on behalf of others',
-            );
-          }
-
+          // TOCTOU re-verify league status — could have flipped between
+          // Phase 1 and Phase 2.
           const [league] = await tx
             .select()
             .from(PublicSchema.leagues)
@@ -98,14 +239,14 @@ builder.mutationField('commissionerPick', (t) =>
             .limit(1);
 
           if (!league) {
-            throw new Error('League not found');
+            throw UserInputError('League not found');
           }
 
           if (
             league.draftStatus !== 'in-progress' &&
             league.draftStatus !== 'paused'
           ) {
-            throw new Error(
+            throw UserInputError(
               `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
             );
           }
@@ -113,10 +254,10 @@ builder.mutationField('commissionerPick', (t) =>
           const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
 
           if (!currentPickInfo || currentPickInfo.isComplete) {
-            throw new Error('Draft is already complete');
+            throw UserInputError('Draft is already complete');
           }
 
-          // Check player availability
+          // Check player availability (race-sensitive)
           const existingPick = await tx
             .select()
             .from(PublicSchema.draftPicks)
@@ -129,103 +270,7 @@ builder.mutationField('commissionerPick', (t) =>
             .limit(1);
 
           if (existingPick.length > 0) {
-            throw new Error('Player has already been drafted');
-          }
-
-          const [player] = await tx
-            .select()
-            .from(PublicSchema.players)
-            .where(eq(PublicSchema.players.id, playerId))
-            .limit(1);
-
-          if (!player) {
-            throw new Error('Player not found');
-          }
-
-          // Validate player eligibility against league settings
-          if (!(await isPlayerInPool(tx, playerId, league.playerPool))) {
-            throw new Error(
-              `Player is not in the ${league.playerPool.toUpperCase()} player pool`,
-            );
-          }
-
-          // Validate Hall of Fame eligibility (LS-295)
-          if (league.hofOnly && !player.hallOfFame) {
-            throw new Error(
-              'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
-            );
-          }
-
-          // Validate era eligibility (LS-295)
-          if (league.eraFilter && league.eraFilter !== 'all') {
-            const ERA_RANGES: Record<string, [number, number]> = {
-              dead_ball: [1871, 1919],
-              golden_age: [1920, 1960],
-              expansion: [1961, 1976],
-              free_agency: [1977, 1993],
-              steroid_era: [1994, 2005],
-              modern: [2006, 9999],
-            };
-            let eraStart: number | null = null;
-            let eraEnd: number | null = null;
-            if (league.eraFilter === 'custom') {
-              eraStart = league.customEraStartYear ?? null;
-              eraEnd = league.customEraEndYear ?? null;
-            } else {
-              const range = ERA_RANGES[league.eraFilter];
-              if (range) {
-                [eraStart, eraEnd] = range;
-              }
-            }
-            if (eraStart != null && eraEnd != null) {
-              const eraCheckResult = await tx.execute(
-                sql`SELECT 1 FROM (
-                  SELECT player_id FROM season_batting
-                    WHERE player_id = ${playerId}
-                      AND lg_id IN ('AL', 'NL')
-                      AND season >= ${eraStart}
-                      AND season <= ${eraEnd}
-                  UNION
-                  SELECT player_id FROM season_pitching
-                    WHERE player_id = ${playerId}
-                      AND lg_id IN ('AL', 'NL')
-                      AND season >= ${eraStart}
-                      AND season <= ${eraEnd}
-                ) era_check LIMIT 1`,
-              );
-              if (!eraCheckResult.rows[0]) {
-                const eraLabel = league.eraFilter
-                  .replace(/_/g, ' ')
-                  .replace(/\b\w/g, (c: string) => c.toUpperCase());
-                throw new Error(
-                  `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
-                );
-              }
-            }
-          }
-
-          if (
-            !(await playerMeetsMinCareerGames(
-              tx,
-              playerId,
-              league.minCareerGames,
-            ))
-          ) {
-            throw new Error(
-              `Player does not meet the minimum career games requirement (${league.minCareerGames})`,
-            );
-          }
-
-          if (
-            !(await playerMeetsMinCareerSeasons(
-              tx,
-              playerId,
-              league.minCareerSeasons,
-            ))
-          ) {
-            throw new Error(
-              `Player does not meet the minimum career seasons requirement (${league.minCareerSeasons})`,
-            );
+            throw UserInputError('Player has already been drafted');
           }
 
           // Commit the pick: insert pick row, advance draft state, and add player to roster.

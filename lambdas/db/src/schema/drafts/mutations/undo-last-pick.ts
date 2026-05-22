@@ -52,9 +52,11 @@ builder.mutationField('undoLastDraftPick', (t) =>
           // Surface lock waits as errors rather than silent hangs
           await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-          // Lock the draft row to prevent races
+          // Lock the draft row to prevent races. FOR NO KEY UPDATE (LS-4692)
+          // serializes concurrent writers without blocking FK-referencing
+          // draft_picks operations in other transactions.
           const draftRows = await tx.execute(
-            sql`SELECT id, league_id, current_pick, pick_time_limit_seconds FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+            sql`SELECT id, league_id, current_pick, pick_time_limit_seconds FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
           );
           const draft = draftRows.rows[0] as
             | {

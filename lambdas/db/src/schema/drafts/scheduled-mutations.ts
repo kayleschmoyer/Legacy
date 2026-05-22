@@ -259,9 +259,11 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 // Surface lock waits as errors rather than silent hangs
                 await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-                // Acquire row-level lock
+                // Acquire row-level lock. FOR NO KEY UPDATE (LS-4692)
+                // serializes concurrent pick writers without blocking
+                // FK-referencing draft_picks INSERTs from other transactions.
                 const draftRows = await tx.execute(
-                  sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+                  sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
                 );
                 const draft = draftRows.rows[0] as
                   | {
@@ -276,7 +278,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   // Draft was deleted between the outer query and this transaction
                   // (benign race condition — nothing to auto-pick on).
                   LOGGER.warn(
-                    `[autoProcessDraftPicks] Draft ${draftId} not found in FOR UPDATE transaction — likely deleted mid-flight, skipping`,
+                    `[autoProcessDraftPicks] Draft ${draftId} not found inside locked transaction — likely deleted mid-flight, skipping`,
                     { draftId },
                   );
                   return null;

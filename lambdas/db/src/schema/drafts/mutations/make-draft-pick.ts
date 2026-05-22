@@ -38,8 +38,10 @@ const badgeService = createBadgeService(getDbOptions());
 /**
  * Mutation: Make a draft pick
  *
- * Runs inside a serializable transaction with SELECT ... FOR UPDATE on the
- * drafts row to prevent race conditions from concurrent requests.
+ * Two-phase execution (LS-4692): Phase 1 runs static validation outside any
+ * row lock (player eligibility, league-member auth, league-static filters);
+ * Phase 2 acquires SELECT ... FOR NO KEY UPDATE on the drafts row only for
+ * race-sensitive checks (existing pick, roster capacity) and the commit.
  *
  * Validates:
  * - Auth, draft status (in-progress, not paused), turn ownership
@@ -64,16 +66,196 @@ builder.mutationField('makeDraftPick', (t) =>
       const userId = context.user.id;
 
       try {
-        // Entire pick operation runs in a transaction with row-level locking
+        // ── LS-4692: Phase 1 — Non-locking pre-validation ────────────────
+        // All read-only checks that don't depend on draft state (player
+        // existence, league-static eligibility filters, league-member auth)
+        // run BEFORE the row lock is acquired. Only race-sensitive checks
+        // (existing-pick, roster capacity) and the commit run inside the lock
+        // in Phase 2. This shrinks the lock-hold window from ~10 sequential
+        // DB round-trips to ~4, dramatically reducing contention on the
+        // drafts row under concurrent pick traffic (queryid 4044566576106028777
+        // and the correlated draft_picks INSERT tail).
+        const draftPreRows = await context.db.execute(
+          sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId}`,
+        );
+        const draftPre = draftPreRows.rows[0] as
+          | {
+              id: number;
+              league_id: number;
+              current_pick: number;
+              pick_time_limit_seconds: number;
+              selection_method: string;
+            }
+          | undefined;
+
+        if (!draftPre) {
+          throw UserInputError('Draft not found');
+        }
+
+        const [leaguePre] = await context.db
+          .select()
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, draftPre.league_id))
+          .limit(1);
+
+        if (!leaguePre) {
+          throw UserInputError('League not found');
+        }
+
+        if (leaguePre.draftStatus === 'paused') {
+          throw UserInputError(
+            'Draft is currently paused. Wait for the commissioner to resume.',
+          );
+        }
+
+        if (leaguePre.draftStatus !== 'in-progress') {
+          throw UserInputError(
+            `Draft is not in progress (current status: ${leaguePre.draftStatus ?? 'unknown'})`,
+          );
+        }
+
+        const currentPickInfoPre = await getCurrentDraftPickInfo(
+          context.db,
+          draftId,
+        );
+
+        if (!currentPickInfoPre) {
+          throw UserInputError('Could not determine current pick');
+        }
+
+        if (currentPickInfoPre.isComplete) {
+          throw UserInputError('Draft is already complete');
+        }
+
+        // Verify user owns the team whose turn it is. The user→team mapping
+        // does not change mid-draft, so this is safe outside the lock; the
+        // teamId is re-verified against the authoritative locked state below.
+        const [membership] = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, draftPre.league_id),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        if (!membership || membership.teamId !== currentPickInfoPre.teamId) {
+          throw ForbiddenError(
+            'Not authorized: It is not your turn to pick or you do not own this team',
+          );
+        }
+
+        // Player existence + league-static eligibility filters. These depend
+        // only on (playerId, league config) and not on any draft pick state.
+        const [player] = await context.db
+          .select()
+          .from(PublicSchema.players)
+          .where(eq(PublicSchema.players.id, playerId))
+          .limit(1);
+
+        if (!player) {
+          throw UserInputError('Player not found');
+        }
+
+        if (
+          !(await isPlayerInPool(context.db, playerId, leaguePre.playerPool))
+        ) {
+          throw UserInputError(
+            `Player is not in the ${leaguePre.playerPool.toUpperCase()} player pool`,
+          );
+        }
+
+        // Validate Hall of Fame eligibility (LS-295)
+        if (leaguePre.hofOnly && !player.hallOfFame) {
+          throw UserInputError(
+            'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
+          );
+        }
+
+        // Validate era eligibility (LS-295)
+        if (leaguePre.eraFilter && leaguePre.eraFilter !== 'all') {
+          const ERA_RANGES: Record<string, [number, number]> = {
+            dead_ball: [1871, 1919],
+            golden_age: [1920, 1960],
+            expansion: [1961, 1976],
+            free_agency: [1977, 1993],
+            steroid_era: [1994, 2005],
+            modern: [2006, 9999],
+          };
+          let eraStart: number | null = null;
+          let eraEnd: number | null = null;
+          if (leaguePre.eraFilter === 'custom') {
+            eraStart = leaguePre.customEraStartYear ?? null;
+            eraEnd = leaguePre.customEraEndYear ?? null;
+          } else {
+            const range = ERA_RANGES[leaguePre.eraFilter];
+            if (range) {
+              [eraStart, eraEnd] = range;
+            }
+          }
+          if (eraStart != null && eraEnd != null) {
+            const eraCheckResult = await context.db.execute(
+              sql`SELECT 1 FROM (
+                SELECT player_id FROM season_batting
+                  WHERE player_id = ${playerId}
+                    AND lg_id IN ('AL', 'NL')
+                    AND season >= ${eraStart}
+                    AND season <= ${eraEnd}
+                UNION
+                SELECT player_id FROM season_pitching
+                  WHERE player_id = ${playerId}
+                    AND lg_id IN ('AL', 'NL')
+                    AND season >= ${eraStart}
+                    AND season <= ${eraEnd}
+              ) era_check LIMIT 1`,
+            );
+            if (!eraCheckResult.rows[0]) {
+              const eraLabel = leaguePre.eraFilter
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c: string) => c.toUpperCase());
+              throw UserInputError(
+                `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
+              );
+            }
+          }
+        }
+
+        if (
+          !(await playerMeetsMinCareerGames(
+            context.db,
+            playerId,
+            leaguePre.minCareerGames,
+          ))
+        ) {
+          throw UserInputError(
+            `Player does not meet the minimum career games requirement (${leaguePre.minCareerGames})`,
+          );
+        }
+
+        if (
+          !(await playerMeetsMinCareerSeasons(
+            context.db,
+            playerId,
+            leaguePre.minCareerSeasons,
+          ))
+        ) {
+          throw UserInputError(
+            `Player does not meet the minimum career seasons requirement (${leaguePre.minCareerSeasons})`,
+          );
+        }
+
+        // ── LS-4692: Phase 2 — Short locked write transaction ─────────────
+        // FOR NO KEY UPDATE serializes concurrent writers to this draft row
+        // without blocking concurrent FK-referencing inserts on draft_picks
+        // from other transactions (those only need FOR KEY SHARE on drafts).
         const result = await context.db.transaction(async (tx) => {
           // Surface lock waits as errors rather than silent hangs
           await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-          // Lock the draft row to serialize concurrent pick attempts.
-          // Only select the columns actually needed to keep the locked row small
-          // and avoid unnecessary data transfer.
           const draftRows = await tx.execute(
-            sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+            sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
           );
           const draft = draftRows.rows[0] as
             | {
@@ -89,7 +271,8 @@ builder.mutationField('makeDraftPick', (t) =>
             throw UserInputError('Draft not found');
           }
 
-          // Fetch league to validate draft status and get maxRosterSize
+          // TOCTOU re-verify league status — could have flipped to paused
+          // between Phase 1 and Phase 2.
           const [league] = await tx
             .select()
             .from(PublicSchema.leagues)
@@ -112,7 +295,7 @@ builder.mutationField('makeDraftPick', (t) =>
             );
           }
 
-          // Calculate current pick info using the locked draft row
+          // Authoritative pick info from the locked draft row
           const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
 
           if (!currentPickInfo) {
@@ -123,7 +306,22 @@ builder.mutationField('makeDraftPick', (t) =>
             throw UserInputError('Draft is already complete');
           }
 
-          // Idempotency: if this exact pick was already made, return it
+          // TOCTOU guard: if the pick advanced between Phase 1 and Phase 2,
+          // the user's request is stale (auth was checked against a different
+          // team/slot). Surface as a user error so the client refetches and
+          // retries against the new state.
+          if (
+            currentPickInfo.teamId !== currentPickInfoPre.teamId ||
+            currentPickInfo.overallPick !== currentPickInfoPre.overallPick
+          ) {
+            throw UserInputError(
+              'Draft state changed during pick submission — please refresh and retry',
+            );
+          }
+
+          // Idempotency: if this exact pick was already made, return it.
+          // Re-check inside the lock to cover duplicate submits that raced
+          // through Phase 1 in parallel.
           const [existingOwnPick] = await tx
             .select()
             .from(PublicSchema.draftPicks)
@@ -150,33 +348,14 @@ builder.mutationField('makeDraftPick', (t) =>
               draftPick: existingOwnPick,
               isDraftComplete: false,
               leagueId: draft.league_id,
+              isMockDraft: league.isMockDraft,
               selectionMethod: draft.selection_method,
               currentPickInfo,
               nextPickInfo: null,
             };
           }
 
-          // Verify user owns the team whose turn it is
-          const leagueMembers = await tx
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, draft.league_id),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
-
-          const membership = leagueMembers[0];
-
-          if (!membership || membership.teamId !== currentPickInfo.teamId) {
-            throw ForbiddenError(
-              'Not authorized: It is not your turn to pick or you do not own this team',
-            );
-          }
-
-          // Check if player has already been drafted (by another team)
+          // Check if player has already been drafted (race-sensitive)
           const existingPick = await tx
             .select()
             .from(PublicSchema.draftPicks)
@@ -192,106 +371,7 @@ builder.mutationField('makeDraftPick', (t) =>
             throw UserInputError('Player has already been drafted');
           }
 
-          // Verify player exists
-          const [player] = await tx
-            .select()
-            .from(PublicSchema.players)
-            .where(eq(PublicSchema.players.id, playerId))
-            .limit(1);
-
-          if (!player) {
-            throw UserInputError('Player not found');
-          }
-
-          // Validate player is in the league's player pool (AL/NL restriction)
-          if (!(await isPlayerInPool(tx, playerId, league.playerPool))) {
-            throw UserInputError(
-              `Player is not in the ${league.playerPool.toUpperCase()} player pool`,
-            );
-          }
-
-          // Validate Hall of Fame eligibility (LS-295)
-          if (league.hofOnly && !player.hallOfFame) {
-            throw UserInputError(
-              'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
-            );
-          }
-
-          // Validate era eligibility (LS-295)
-          if (league.eraFilter && league.eraFilter !== 'all') {
-            const ERA_RANGES: Record<string, [number, number]> = {
-              dead_ball: [1871, 1919],
-              golden_age: [1920, 1960],
-              expansion: [1961, 1976],
-              free_agency: [1977, 1993],
-              steroid_era: [1994, 2005],
-              modern: [2006, 9999],
-            };
-            let eraStart: number | null = null;
-            let eraEnd: number | null = null;
-            if (league.eraFilter === 'custom') {
-              eraStart = league.customEraStartYear ?? null;
-              eraEnd = league.customEraEndYear ?? null;
-            } else {
-              const range = ERA_RANGES[league.eraFilter];
-              if (range) {
-                [eraStart, eraEnd] = range;
-              }
-            }
-            if (eraStart != null && eraEnd != null) {
-              const eraCheckResult = await tx.execute(
-                sql`SELECT 1 FROM (
-                  SELECT player_id FROM season_batting
-                    WHERE player_id = ${playerId}
-                      AND lg_id IN ('AL', 'NL')
-                      AND season >= ${eraStart}
-                      AND season <= ${eraEnd}
-                  UNION
-                  SELECT player_id FROM season_pitching
-                    WHERE player_id = ${playerId}
-                      AND lg_id IN ('AL', 'NL')
-                      AND season >= ${eraStart}
-                      AND season <= ${eraEnd}
-                ) era_check LIMIT 1`,
-              );
-              if (!eraCheckResult.rows[0]) {
-                const eraLabel = league.eraFilter
-                  .replace(/_/g, ' ')
-                  .replace(/\b\w/g, (c: string) => c.toUpperCase());
-                throw UserInputError(
-                  `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
-                );
-              }
-            }
-          }
-
-          // Validate player meets minimum career games requirement
-          if (
-            !(await playerMeetsMinCareerGames(
-              tx,
-              playerId,
-              league.minCareerGames,
-            ))
-          ) {
-            throw UserInputError(
-              `Player does not meet the minimum career games requirement (${league.minCareerGames})`,
-            );
-          }
-
-          // Validate player meets minimum career seasons requirement
-          if (
-            !(await playerMeetsMinCareerSeasons(
-              tx,
-              playerId,
-              league.minCareerSeasons,
-            ))
-          ) {
-            throw UserInputError(
-              `Player does not meet the minimum career seasons requirement (${league.minCareerSeasons})`,
-            );
-          }
-
-          // Validate roster limit — count existing team members
+          // Validate roster limit (race-sensitive)
           const { isFull: rosterFull } = await checkRosterCapacity(
             tx,
             currentPickInfo.teamId,
@@ -464,9 +544,11 @@ builder.mutationField('makeDraftPick', (t) =>
                   leagueId: number;
                   selectionMethod: string;
                 } | null> => {
-                  // Lock draft row to prevent concurrent modifications
+                  // Lock draft row to serialize concurrent pick attempts.
+                  // FOR NO KEY UPDATE (LS-4692) lets concurrent FK-referencing
+                  // inserts on draft_picks from unrelated transactions proceed.
                   const apDraftRows = await apTx.execute(
-                    sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+                    sql`SELECT * FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
                   );
                   const apDraft = apDraftRows.rows[0] as
                     | {
