@@ -25,6 +25,21 @@ export interface InputProps extends Omit<
 const SIZE_HEIGHT: Record<InputSize, number> = { sm: 32, md: 40, lg: 48 };
 const SIZE_FONT: Record<InputSize, number> = { sm: 13, md: 15, lg: 16 };
 
+function FormLabelText({ children }: { children: string }): React.JSX.Element {
+  return (
+    <Text
+      fontFamily="$heading"
+      fontSize={11}
+      fontWeight="700"
+      letterSpacing={1.1}
+      textTransform="uppercase"
+      color="$textMuted"
+    >
+      {children}
+    </Text>
+  );
+}
+
 /**
  * Heritage-styled text input. 6px radius (per design spec), Literata body
  * type, brand-navy focus ring, seam-red error treatment.
@@ -44,16 +59,7 @@ export function Input({
 
   return (
     <YStack gap="$1" width="100%">
-      {label ? (
-        <Text
-          fontFamily="$body"
-          fontSize="$2"
-          color="$textMuted"
-          fontWeight="600"
-        >
-          {label}
-        </Text>
-      ) : null}
+      {label ? <FormLabelText>{label}</FormLabelText> : null}
 
       <XStack
         alignItems="center"
@@ -114,16 +120,7 @@ export function Textarea({
   const hasError = Boolean(error);
   return (
     <YStack gap="$1" width="100%">
-      {label ? (
-        <Text
-          fontFamily="$body"
-          fontSize="$2"
-          color="$textMuted"
-          fontWeight="600"
-        >
-          {label}
-        </Text>
-      ) : null}
+      {label ? <FormLabelText>{label}</FormLabelText> : null}
       <TextArea
         unstyled
         minHeight={96}

@@ -151,6 +151,8 @@ export interface SegmentedControlProps {
   onValueChange: (value: string) => void;
   size?: 'sm' | 'md';
   fullWidth?: boolean;
+  /** `pill` (default) — fully-rounded nav/filter style. `box` — rectangular form-field style. */
+  variant?: 'pill' | 'box';
 }
 
 /**
@@ -163,16 +165,21 @@ export function SegmentedControl({
   onValueChange,
   size = 'md',
   fullWidth = false,
+  variant = 'pill',
 }: SegmentedControlProps): React.JSX.Element {
-  const padY = size === 'sm' ? 4 : 6;
+  const isBox = variant === 'box';
+  const padY = size === 'sm' ? 4 : isBox ? 7 : 6;
   const padX = size === 'sm' ? 10 : 14;
-  const fontSize = size === 'sm' ? 12 : 13;
+  const fontSize = size === 'sm' ? 12 : isBox ? 12 : 13;
+  const containerRadius = isBox ? 6 : 9999;
+  const itemRadius = isBox ? 4 : 9999;
+  const letterSpacing = isBox ? 1 : 0.6;
   return (
     <XStack
-      backgroundColor="$surfaceSubtle"
-      borderRadius={9999}
+      backgroundColor={isBox ? '$surfacePanel' : '$surfaceSubtle'}
+      borderRadius={containerRadius}
       borderWidth={1}
-      borderColor="$outlineSubtle"
+      borderColor={isBox ? '$outlineStrong' : '$outlineSubtle'}
       padding={3}
       gap={2}
       alignSelf={fullWidth ? 'stretch' : 'flex-start'}
@@ -184,7 +191,7 @@ export function SegmentedControl({
             key={opt.value}
             paddingHorizontal={padX}
             paddingVertical={padY}
-            borderRadius={9999}
+            borderRadius={itemRadius}
             backgroundColor={active ? '$brandNavy' : 'transparent'}
             cursor="pointer"
             onPress={() => onValueChange(opt.value)}
@@ -199,7 +206,7 @@ export function SegmentedControl({
               fontFamily="$heading"
               fontSize={fontSize}
               fontWeight="700"
-              letterSpacing={0.6}
+              letterSpacing={letterSpacing}
               color={active ? '$color12' : '$textMuted'}
               textTransform="uppercase"
             >

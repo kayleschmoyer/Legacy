@@ -52,6 +52,34 @@ function RadiosDemo(): React.JSX.Element {
   );
 }
 
+function FormToggleDemo(): React.JSX.Element {
+  const [scoring, setScoring] = useState('h2h');
+  return (
+    <YStack gap="$2" width={320}>
+      <Text
+        fontFamily="$heading"
+        fontSize={11}
+        fontWeight="700"
+        letterSpacing={1.1}
+        color="$textMuted"
+        textTransform="uppercase"
+      >
+        Scoring
+      </Text>
+      <SegmentedControl
+        variant="box"
+        value={scoring}
+        onValueChange={setScoring}
+        options={[
+          { value: 'h2h', label: 'Head-to-Head' },
+          { value: 'roto', label: 'Rotisserie' },
+          { value: 'points', label: 'Points' },
+        ]}
+      />
+    </YStack>
+  );
+}
+
 function SegmentedDemo(): React.JSX.Element {
   const [era, setEra] = useState('live');
   return (
@@ -88,6 +116,7 @@ function SegmentedDemo(): React.JSX.Element {
 
 export const Radios: Story = { render: () => <RadiosDemo /> };
 export const Segmented: Story = { render: () => <SegmentedDemo /> };
+export const FormToggle: Story = { render: () => <FormToggleDemo /> };
 
 export const All: Story = {
   render: () => (
