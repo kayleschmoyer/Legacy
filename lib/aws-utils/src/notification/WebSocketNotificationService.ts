@@ -1,8 +1,11 @@
 import {
+  type AttributeValue,
   DeleteItemCommand,
   DynamoDBClient,
   QueryCommand,
+  type QueryCommandInput,
   ScanCommand,
+  type ScanCommandInput,
 } from '@aws-sdk/client-dynamodb';
 import {
   ApiGatewayManagementApiClient,
@@ -355,6 +358,50 @@ export class WebSocketNotificationService {
   }
 
   /**
+   * Run a paginated DynamoDB Query, following LastEvaluatedKey until exhausted.
+   * Without this, results larger than DynamoDB's 1 MB-per-page cap are silently
+   * truncated — e.g. a large league's WebSocket connections would only partially
+   * receive notifications.
+   */
+  private async queryAllPages(
+    input: Omit<QueryCommandInput, 'ExclusiveStartKey'>,
+  ): Promise<DynamoDBItem[]> {
+    const items: DynamoDBItem[] = [];
+    let lastKey: Record<string, AttributeValue> | undefined;
+    do {
+      const result = await this.dynamoClient.send(
+        new QueryCommand({ ...input, ExclusiveStartKey: lastKey }),
+      );
+      if (result.Items) {
+        items.push(...(result.Items as DynamoDBItem[]));
+      }
+      lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
+    return items;
+  }
+
+  /**
+   * Run a paginated DynamoDB Scan, following LastEvaluatedKey until exhausted.
+   * See `queryAllPages` for the silent-truncation rationale.
+   */
+  private async scanAllPages(
+    input: Omit<ScanCommandInput, 'ExclusiveStartKey'>,
+  ): Promise<DynamoDBItem[]> {
+    const items: DynamoDBItem[] = [];
+    let lastKey: Record<string, AttributeValue> | undefined;
+    do {
+      const result = await this.dynamoClient.send(
+        new ScanCommand({ ...input, ExclusiveStartKey: lastKey }),
+      );
+      if (result.Items) {
+        items.push(...(result.Items as DynamoDBItem[]));
+      }
+      lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
+    return items;
+  }
+
+  /**
    * Get connections for a specific matchup
    */
   private async getMatchupConnections(
@@ -362,21 +409,18 @@ export class WebSocketNotificationService {
     viewContext = 'matchup',
   ): Promise<string[]> {
     try {
-      const result = await this.dynamoClient.send(
-        new QueryCommand({
-          TableName: this.connectionsTableName,
-          IndexName: 'MatchupIdIndex',
-          KeyConditionExpression: 'matchupId = :matchupId',
-          FilterExpression: 'viewContext = :context',
-          ExpressionAttributeValues: {
-            ':matchupId': { N: matchupId.toString() },
-            ':context': { S: viewContext },
-          },
-          ProjectionExpression: 'connectionId',
-        }),
-      );
+      const items = await this.queryAllPages({
+        TableName: this.connectionsTableName,
+        IndexName: 'MatchupIdIndex',
+        KeyConditionExpression: 'matchupId = :matchupId',
+        FilterExpression: 'viewContext = :context',
+        ExpressionAttributeValues: {
+          ':matchupId': { N: matchupId.toString() },
+          ':context': { S: viewContext },
+        },
+        ProjectionExpression: 'connectionId',
+      });
 
-      const items = result.Items || [];
       const connectionIds = items
         .map((item: DynamoDBItem) => item['connectionId']?.S)
         .filter((id: string | undefined): id is string => !!id);
@@ -403,19 +447,15 @@ export class WebSocketNotificationService {
 
       if (filterLeagueId !== undefined) {
         // Use GSI Query for efficient filtering by leagueId
-        const result = await this.dynamoClient.send(
-          new QueryCommand({
-            TableName: this.connectionsTableName,
-            IndexName: 'LeagueIdIndex',
-            KeyConditionExpression: 'leagueId = :leagueId',
-            ExpressionAttributeValues: {
-              ':leagueId': { N: filterLeagueId.toString() },
-            },
-            ProjectionExpression: 'connectionId',
-          }),
-        );
-
-        items = result.Items || [];
+        items = await this.queryAllPages({
+          TableName: this.connectionsTableName,
+          IndexName: 'LeagueIdIndex',
+          KeyConditionExpression: 'leagueId = :leagueId',
+          ExpressionAttributeValues: {
+            ':leagueId': { N: filterLeagueId.toString() },
+          },
+          ProjectionExpression: 'connectionId',
+        });
 
         LOGGER.info('Retrieved league connections via Query', {
           leagueId: filterLeagueId,
@@ -423,14 +463,10 @@ export class WebSocketNotificationService {
         });
       } else {
         // Scan for all connections (use sparingly, only for global broadcasts)
-        const result = await this.dynamoClient.send(
-          new ScanCommand({
-            TableName: this.connectionsTableName,
-            ProjectionExpression: 'connectionId',
-          }),
-        );
-
-        items = result.Items || [];
+        items = await this.scanAllPages({
+          TableName: this.connectionsTableName,
+          ProjectionExpression: 'connectionId',
+        });
 
         LOGGER.info('Retrieved all connections via Scan', {
           count: items.length,
@@ -804,19 +840,16 @@ export class WebSocketNotificationService {
    */
   private async getUserConnections(userId: number): Promise<string[]> {
     try {
-      const result = await this.dynamoClient.send(
-        new QueryCommand({
-          TableName: this.connectionsTableName,
-          IndexName: 'UserIdIndex',
-          KeyConditionExpression: 'userId = :userId',
-          ExpressionAttributeValues: {
-            ':userId': { N: userId.toString() },
-          },
-          ProjectionExpression: 'connectionId',
-        }),
-      );
+      const items = await this.queryAllPages({
+        TableName: this.connectionsTableName,
+        IndexName: 'UserIdIndex',
+        KeyConditionExpression: 'userId = :userId',
+        ExpressionAttributeValues: {
+          ':userId': { N: userId.toString() },
+        },
+        ProjectionExpression: 'connectionId',
+      });
 
-      const items = result.Items || [];
       const connectionIds = items
         .map((item: DynamoDBItem) => item['connectionId']?.S)
         .filter((id: string | undefined): id is string => !!id);
