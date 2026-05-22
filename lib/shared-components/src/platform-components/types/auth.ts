@@ -106,31 +106,18 @@ export interface OAuthProvider {
 }
 
 /**
- * Secure storage interface for cross-platform token storage
+ * Secure storage interface for cross-platform token storage.
+ *
+ * Canonical contract — both `utils/SecureStorage.ts` (web) and
+ * `utils/SecureStorage.native.ts` (mobile, via Metro's `.native.ts`
+ * resolution) implement this exactly. Do not add platform-specific
+ * options here; if a method does not make sense on every platform,
+ * it does not belong in the contract.
  */
 export interface ISecureStorage {
-  /**
-   * Store a value securely
-   */
   setItem(key: string, value: string): Promise<void>;
-
-  /**
-   * Retrieve a value securely
-   */
   getItem(key: string): Promise<string | null>;
-
-  /**
-   * Remove a specific item
-   */
   removeItem(key: string): Promise<void>;
-
-  /**
-   * Clear all stored items
-   */
   clear(): Promise<void>;
-
-  /**
-   * Check if secure storage is available
-   */
-  isAvailable(): Promise<boolean>;
+  hasItem(key: string): Promise<boolean>;
 }
