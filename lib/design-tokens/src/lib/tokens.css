@@ -1,0 +1,155 @@
+/* ============================================================
+   Legacy Sports — Design Foundations (colors, spacing, radii,
+   shadows, breakpoints). Mirror of lib/design-tokens TS exports
+   and lib/tamagui-config theme values. Typography lives in a
+   separate slice (LS-4704).
+   ============================================================ */
+
+:root {
+  /* ── Heritage brand anchors ──────────────────────────────── */
+  --brand-navy: #1b3a5c;
+  --brand-navy-light: #2c4a7c;
+  --brand-navy-dark: #143050;
+  --brand-seam-red: #c41e3a;
+  --brand-seam-red-light: #e63950;
+  --brand-seam-red-dark: #8b1a2b;
+  --brand-gold: #c5a55a;
+  --brand-gold-light: #d4bb78;
+  --brand-gold-dark: #a68b3e;
+
+  /* ── Dark theme (default — "night stadium") ──────────────── */
+  --bg: #0a0f1a;
+  --bg-hover: #0e1624;
+  --bg-press: #0b1220;
+  --surface-subtle: #0d1526;
+  --surface-panel: #111b2f;
+  --surface-card: #16223a;
+  --surface-raised: #1c2a47;
+
+  --outline-subtle: #1c2740;
+  --outline-default: #2f3b53;
+  --outline-strong: #4d5d80;
+  --panel-border: #1f2d48;
+
+  --fg1: #f8fafc;
+  --fg1-strong: #ffffff;
+  --fg2: #dee6ff;
+  --fg3: #9caac5;
+  --fg4: #6c80ba;
+  --fg-on-accent: #f8fafc;
+
+  /* ── Semantic / status ───────────────────────────────────── */
+  --success: #4aae7c;
+  --success-fg: #6fd39a;
+  --success-soft: rgba(34, 110, 74, 0.22);
+  --success-border: rgba(34, 110, 74, 0.55);
+
+  --warning: #c89452;
+  --warning-fg: #e3b870;
+  --warning-soft: rgba(176, 118, 38, 0.22);
+  --warning-border: rgba(176, 118, 38, 0.55);
+
+  --danger: #c23e54;
+  --danger-fg: #e07a8c;
+  --danger-soft: rgba(176, 46, 68, 0.22);
+  --danger-border: rgba(176, 46, 68, 0.55);
+
+  --info: #5b84c4;
+  --info-fg: #8fb4e8;
+  --info-soft: rgba(70, 110, 176, 0.22);
+  --info-border: rgba(70, 110, 176, 0.55);
+
+  --focus-ring: #4e8ed6;
+
+  /* ── Position colors ─────────────────────────────────────── */
+  --pos-pitcher: #c41e3a;
+  --pos-catcher: #7c8794;
+  --pos-infield: #8b6f47;
+  --pos-outfield: #2d6a4f;
+  --pos-utility: #c5a55a;
+
+  /* ── Glass / overlay ─────────────────────────────────────── */
+  --glass-surface: rgba(10, 15, 26, 0.75);
+  --glass-surface-light: rgba(10, 15, 26, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
+
+  /* ── Spacing scale (matches Tamagui $1–$10) ──────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+  --space-10: 72px;
+
+  /* ── Radii ───────────────────────────────────────────────── */
+  --radius-1: 4px;
+  --radius-2: 6px;
+  --radius-3: 8px;
+  --radius-4: 12px;
+  --radius-5: 16px;
+  --radius-6: 20px;
+  --radius-7: 24px;
+  --radius-pill: 9999px;
+
+  /* ── Elevation / shadow (dark-theme tuned) ───────────────── */
+  --shadow-sm: 0 1px 2px rgba(8, 12, 20, 0.4);
+  --shadow-md: 0 4px 14px rgba(8, 12, 20, 0.55);
+  --shadow-lg: 0 12px 32px rgba(8, 12, 20, 0.65);
+  --shadow-xl: 0 20px 48px rgba(8, 12, 20, 0.75);
+  --shadow-gold:
+    0 0 0 1px rgba(197, 165, 90, 0.35), 0 6px 24px rgba(197, 165, 90, 0.25);
+  --shadow-seam:
+    0 0 0 1px rgba(196, 30, 58, 0.45), 0 6px 20px rgba(196, 30, 58, 0.3);
+
+  /* ── Breakpoints (min-width thresholds) ──────────────────── */
+  --bp-xxs: 0px;
+  --bp-xs: 660px;
+  --bp-sm: 800px;
+  --bp-md: 860px;
+  --bp-lg: 980px;
+  --bp-xl: 1120px;
+  --bp-xxl: 1280px;
+}
+
+/* ── Light theme override ────────────────────────────────── */
+.theme-light,
+[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-hover: #f8fafc;
+  --bg-press: #f2f4f8;
+  --surface-subtle: #edf1f7;
+  --surface-panel: #eff4fb;
+  --surface-card: #f5f7fa;
+  --surface-raised: #ffffff;
+
+  --outline-subtle: #e1e7f0;
+  --outline-default: #cbd5e1;
+  --outline-strong: #7f90ae;
+  --panel-border: #d0dae8;
+
+  --fg1: #0b1220;
+  --fg1-strong: #000000;
+  --fg2: #1f2937;
+  --fg3: #4a6080;
+  --fg4: #7d8ead;
+
+  /* Light-theme gold is desaturated for AA contrast on white. */
+  --brand-gold: #b8942b;
+  --brand-gold-light: #d4b24a;
+  --brand-gold-dark: #967828;
+
+  --glass-surface: rgba(255, 255, 255, 0.75);
+  --glass-surface-light: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border-hover: rgba(0, 0, 0, 0.12);
+
+  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.08);
+  --shadow-md: 0 4px 14px rgba(2, 6, 23, 0.12);
+  --shadow-lg: 0 12px 32px rgba(2, 6, 23, 0.16);
+  --shadow-xl: 0 20px 48px rgba(2, 6, 23, 0.2);
+}
