@@ -166,36 +166,22 @@ async function fetchUndraftedCandidates(
 ): Promise<number[]> {
   const { gamesPerMatchup, spStartsPerMatchup } = settings;
 
+  // Rank undrafted candidates by projected FPG from player_scoring_cache
+  // (default/NULL league row). The cache stores per-game scoring components
+  // (batting_ppg/pitching_ppg/fielding_ppg) precomputed from the default
+  // scoring profile and refreshed by stats-lambda after each career stat
+  // update, so this avoids the 11-term CASE-WHEN over career_batting /
+  // career_pitching / career_fielding at query time (LS-4689).
   const undraftedRows = await db.execute(
     sql`SELECT p.id,
         (
-          CASE WHEN COALESCE(cb.g, 0) > 0 THEN
-            (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
-             COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
-             COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
-             COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
-             COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-            ) / cb.g * ${gamesPerMatchup}
-          ELSE 0 END
-          +
-          CASE WHEN COALESCE(cp.g, 0) > 0 THEN
-            (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
-             COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
-             COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
-             COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-            ) / cp.g * ${spStartsPerMatchup}
-          ELSE 0 END
-          +
-          CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-            (COALESCE(cf.po,0)*0.02 + COALESCE(cf.a,0)*0.1 +
-             COALESCE(cf.dp_def,0)*0.5 + COALESCE(cf.e_def,0)*-0.5
-            ) / cf.g * ${gamesPerMatchup}
-          ELSE 0 END
+          COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
+          COALESCE(cs.pitching_ppg, 0) * ${spStartsPerMatchup} +
+          COALESCE(cs.fielding_ppg, 0) * ${gamesPerMatchup}
         ) AS fpg
       FROM players p
-      LEFT JOIN career_batting cb ON cb.player_id = p.id
-      LEFT JOIN career_pitching cp ON cp.player_id = p.id
-      LEFT JOIN career_fielding cf ON cf.player_id = p.id
+      LEFT JOIN public.player_scoring_cache cs
+        ON cs.player_id = p.id AND cs.league_id IS NULL
       WHERE NOT EXISTS (
         SELECT 1 FROM draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
