@@ -1564,6 +1564,9 @@ importers:
       '@legacy-sports/api':
         specifier: workspace:*
         version: link:../api
+      '@legacy-sports/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../logging
