@@ -19,11 +19,11 @@ export const Default: Story = {
       <NavBar
         brand="Legacy Sports"
         links={[
-          { label: 'Home', active: true },
-          { label: 'Leagues' },
-          { label: 'Players' },
-          { label: 'Draft' },
-          { label: 'Standings' },
+          { label: 'Home', icon: 'scoreboard', active: true },
+          { label: 'Leagues', icon: 'league' },
+          { label: 'Draft', icon: 'draft' },
+          { label: 'Matchup', icon: 'matchup' },
+          { label: 'Stats', icon: 'stats' },
         ]}
         trailing={
           <>
@@ -42,6 +42,23 @@ export const Default: Story = {
             </Button>
           </>
         }
+      />
+    </YStack>
+  ),
+};
+
+export const NoIcons: Story = {
+  render: () => (
+    <YStack width="100%" minHeight={120} backgroundColor="$bg">
+      <NavBar
+        brand="Legacy Sports"
+        links={[
+          { label: 'Home', active: true },
+          { label: 'Leagues' },
+          { label: 'Draft' },
+          { label: 'Matchup' },
+          { label: 'Stats' },
+        ]}
       />
     </YStack>
   ),
