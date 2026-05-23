@@ -429,13 +429,21 @@ export const handleDiscordLink = async (
   }
 
   const linkResult = await withDbClient(async (db) => {
-    // Check if this Discord account is already linked to another user
+    // Check if this Discord account is already linked to another user.
+    // Use a generic error message that does not confirm the link exists,
+    // so a logged-in caller cannot enumerate which Discord IDs belong to
+    // other Legacy Sports users (LS-2549).
     const existingUser = await getUserByDiscordId(db, discordUser.id);
     if (existingUser && existingUser.id !== userId) {
-      return errorResponse(
-        409,
-        'This Discord account is already linked to another user',
+      LOGGER.warn(
+        'Discord link blocked: account already linked to another user',
+        {
+          userId,
+          discordId: discordUser.id,
+          existingUserId: existingUser.id,
+        },
       );
+      return errorResponse(409, 'Could not link Discord account');
     }
 
     // Check if the authenticated user already has a different Discord account linked

@@ -2,103 +2,85 @@
 
 ## Session Info
 
-- **Branch**: `claude/llm-cache-efficiency-PW43v`
-- **Ticket**: none — research task on agent-research branch (no Jira ticket)
-- **Cloud agent session**: 2026-04-07
-- **Topic**: Data-driven evaluation of how this project uses Claude (prompts, skills, hooks, MCP servers, prompt-cache efficiency)
+- **Branch**: `claude/exciting-sagan-bkakZ`
+- **PR**: [#4133](https://github.com/bkrupa/legacy-sports/pull/4133) — `LS-2549 fix(oauth-proxy): close account-enumeration leak on /oauth/register`
+- **Ticket**: [LS-2549](https://bkrupa.atlassian.net/browse/LS-2549) — In Review
+- **Date**: 2026-05-22
 
-> **No secrets in this file.**
+> No secrets in this file.
 
-## Background
+## Completed Steps
 
-User asked: _"How well are we using Claude in this project?"_ and explicitly requested a **data-driven** evaluation with **no extrapolation**. The cloud agent did all the measurements that could be done from a sandboxed Linux environment with no network egress and no API key, then hit three hard environment boundaries that block the most valuable measurements.
+- [x] Jira LS-2549 transitioned: To Do → In Progress → In Review
+- [x] Code implementation complete on `claude/exciting-sagan-bkakZ`
+- [x] Unit tests written and passing (58/58 oauth-proxy)
+- [x] `make pc` passes (lint, typecheck, test, build)
+- [x] Branch rebased onto latest `origin/main` (7ed0d00)
+- [x] Pushed to remote
+- [x] PR #4133 created and marked ready
+- [x] Labels applied: `agent-in-progress`, `bot:ready-for-review`
+- [x] Copilot review requested
+- [x] Implementation notes appended to Jira description
+- [x] Follow-up tickets filed: **LS-4739** (verification email flow), **LS-4740** (per-IP rate limiting)
 
-## Completed Steps (cloud)
+## Blocked Step
 
-- [x] Inventoried always-on files: `AGENTS.md` (29,169 b / 218 lines), `CLAUDE.md` (246 b shim), `.claude/settings.json` (2,254 b)
-- [x] Section-level breakdown of `AGENTS.md` — `## Workflow` (9,048 b) and `## Critical Rules` (7,862 b) are 58% of the file
-- [x] Inventoried 26 skills under `.agents/skills/` — total skill body 274,676 b, total description text 6,902 chars
-- [x] Ranked skill descriptions by char length — top offenders: `open-prs` (662), `work-ticket` (428), `cloud-teleport` (354), `mcp-gaps` (343), `terraform-local-apply` (334)
-- [x] Counted 99 reference files under `.agents/skills/**/references/` (lazy-loaded, 673,372 b)
-- [x] Counted 14 slash commands under `.claude/commands/` (15,971 b total)
-- [x] Executed both hooks and captured stdout — `check-github-auth.sh` emits 223 b on this session because the `CLAUDE_CODE_REMOTE` guard didn't match; `guard-main-repo.sh` correctly silent (0 b)
-- [x] Found `permissions.allow` ↔ `enabledMcpjsonServers` drift in `.claude/settings.json` — 3 servers (`legacy-sports-aws`, `worktree`, Atlassian plugin UUID) are whitelisted in `permissions.allow` but missing from `enabledMcpjsonServers`
-- [x] Measured verbatim line-level duplication between `AGENTS.md` and skill files — only **7 of 132** long lines are verbatim duplicates (all in `cloud-agent-mode/SKILL.md`); topical duplication is larger but not mechanically quantifiable
-- [x] **Retracted** previous-turn claim that `currentDate` is injected by the project harness — exhaustive search of repo + `~/.claude/` + `~/.config/` for the literal string `"Today's date is"` returned **0 hits**. The string appears only in 2 of my own assistant messages in the session JSONL. It's injected by Claude Code itself, not the project. Strike that bullet from the previous report.
-- [x] Wrote a self-contained, re-runnable measurement script: **`.claude/measure-agent-harness.py`**
+**Operation**: Drive PR #4133 to merge — handle Copilot review feedback, CI failures, and final merge.
+**Reason**: User requested teleport to local session for review-cycle handling.
+**Category**: User-initiated handoff (not a capability boundary).
 
-## Blocked Steps
+## Remaining Steps
 
-| #   | Operation                                                                                                                                                                                                                                                                                                                                     | Why blocked in cloud                                                                                                                                                       |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Exact Claude token counts** for every always-on file (AGENTS.md sections, skill descriptions, slash commands, hook outputs)                                                                                                                                                                                                                 | `pip install tiktoken` blocked by sandbox proxy (`openaipublic.blob.core.windows.net` 403); no `ANTHROPIC_API_KEY` for `messages.count_tokens`                             |
-| 2   | **MCP tool schema sizes** — for each of the 9 servers in `.mcp.json`, spawn it via `pnpm exec tsx`, call `tools/list`, and measure each tool's serialized schema size. This is the biggest unknown — these schemas are loaded on every session that doesn't use `ENABLE_TOOL_SEARCH` deferral, and we have **zero** data on their actual size | Cloud sandbox doesn't have project deps installed; spawning 9 long-running tsx processes is unreliable here                                                                |
-| 3   | **Real per-session cache hit rate** from `~/.claude/projects/-home-user-legacy-sports/*.jsonl` `usage` blocks — the JSONL files exist on disk and likely contain `cache_creation_input_tokens` / `cache_read_input_tokens` per turn. Aggregating these gives ground-truth cache efficiency over real recent sessions                          | Reading is technically possible from cloud, but the data being measured _is the local user's session history_, which is far more complete and current on the local machine |
+1. Watch PR #4133 for events:
+   - **Copilot review** (in progress at handoff): triage threads using the Author Agent Contract (`FIX: <sha>` / `JUSTIFY: <rationale>` per AGENTS.md). Cap at 2 review rounds.
+   - **CI**: respond to failures per `.agents/skills/pr-lifecycle/SKILL.md`.
+2. After CI green + bot APPROVED, merge.
+3. Verify Jira LS-2549 auto-transitions to Done (Jira Branch Sync); fall back to manual transition if it lags.
+4. Run MCP gap audit (`Skill: mcp-gap-audit`) if session exceeded threshold.
+5. (Optional) Decide whether to chip-dispatch LS-4739 and LS-4740 follow-ups now or defer to backlog.
 
-## Remaining Steps (local)
+## Context for the Local Agent
 
-The local agent should run **one command** and then interpret the results:
+### What was built
 
-```bash
-# Optional but strongly recommended for ground-truth tokens:
-export ANTHROPIC_API_KEY=...   # any working key — count_tokens is free
+**LS-2549** is a security bug — `/oauth/register` returned `409 'An account with this email already exists'` when the email was already registered, enabling account enumeration. Same problem on `/oauth/discord/link`.
 
-# Then:
-python3 .claude/measure-agent-harness.py
+User explicitly chose **option 1 (uniform-response + email follow-up)** over options 2 (generic-error only) or 3 (full per-IP rate limiting) when asked via `AskUserQuestion`. The fix:
+
+- **`lambdas/oauth-proxy/src/handlers/Local.ts`**: `/oauth/register` now returns identical `200 {status:'pending'}` body for new and existing emails. No JWT or auth cookies issued. Always hashes the password for timing parity.
+- **`lambdas/oauth-proxy/src/handlers/Discord.ts`**: `/oauth/discord/link` returns generic `409 'Could not link Discord account'` instead of confirming "already linked to another user". Detail kept in server warn log.
+- **`apps/web-e2e/src/utils/test-user-auth.ts`**: e2e bootstrap performs a second `POST /oauth/login` after a successful register (since register no longer returns a JWT).
+- **`lambdas/oauth-proxy/src/handlers/Local.spec.ts`**: rewrote with proper module mocks (previous file failed locally because it imported `@legacy-sports/db-client` without mocking, which throws on missing `DB_PASSWORD` at module-init). 8 new tests cover uniform response, no-JWT body, user-creation behavior, and timing-parity hash.
+- **`lambdas/oauth-proxy/src/handlers/Discord.spec.ts`**: added `handleDiscordLink` test block covering the generic-error path and the successful-link path.
+
+### Accepted tradeoffs (anticipate these in review)
+
+- **Squatting risk**: the uniform response still creates a user record on a new unverified email. An attacker can register `victim@example.com` with a password they choose, locking out the real owner. This is **out of scope for LS-2549** (which targets enumeration, not squatting) and is closed by **LS-4739** (verification email flow). Documented in the PR body and the ticket's Implementation Notes — reviewers may flag this; the response is "covered by LS-4739, not in this ticket's scope".
+- **Timing parity is best-effort**: bcrypt dominates the new-user path but the existing-user path also hashes; the DB read is non-uniform between the two. Sufficient to make timing a poor oracle in practice but not constant-time.
+- **`handleDiscordLink` second 409** (`'A different Discord account is already linked — unlink it first'`) is intentionally left as-is: it describes the _calling user's own_ state, not other users', so it's not an enumeration vector.
+
+### Pre-existing failing tests (out of scope)
+
+The previous `Local.spec.ts` had 8 of 9 tests failing locally because they exercised handlers without mocking DB modules (module-init throws on missing `DB_PASSWORD`). The new spec file replaces it with mocked tests that pass. The old tests for "password too short" hinted at a `min(8)` schema that never existed — that mismatch was pre-existing and not in scope here.
+
+## Files Changed
+
+```
+apps/web-e2e/src/utils/test-user-auth.ts         |  42 +++-
+lambdas/oauth-proxy/src/handlers/Discord.spec.ts |  65 ++++-
+lambdas/oauth-proxy/src/handlers/Discord.ts      |  15 +-
+lambdas/oauth-proxy/src/handlers/Local.spec.ts   | 229 ++++++++++++------
+lambdas/oauth-proxy/src/handlers/Local.ts        |  58 ++--
 ```
 
-This produces:
+## To Resume Locally
 
-- `scratch/measure-agent-harness-data.json (gitignored output)` — structured raw data, diff-friendly across runs
-- Stdout summary line with cache hit rate, MCP tool schema total, and always-on token total
+```bash
+git fetch origin claude/exciting-sagan-bkakZ
+git checkout claude/exciting-sagan-bkakZ
 
-The script auto-detects which tokenizer to use, in this order:
-
-1. `ANTHROPIC_API_KEY` set → calls `client.messages.count_tokens` (ground truth, free, slow)
-2. `tiktoken` installed → uses `cl100k_base` (close approximation, fast)
-3. Neither → falls back to `chars/4` (clearly labeled `approx`)
-
-The local agent should then:
-
-1. **Read `scratch/measure-agent-harness-data.json (gitignored output)`**.
-2. **Confirm `tokenizer_mode`** at the top — ideally `"anthropic-api"`. If `"approx"`, install tiktoken first (`pip install tiktoken`) and re-run; if still failing, set `ANTHROPIC_API_KEY` and re-run.
-3. **Build a results table** ranking the heaviest items in the always-on context budget. The bullets in the previous-turn assistant message (sections 1, 2, 3, 5, 6, 7, 8) are the targets — replace every char/byte number with a real token number.
-4. **Pay special attention to the new data:**
-   - `mcp_tool_schemas.grand_total_tokens` → the previously-unknown number. If this is large (say > 10k tokens), it justifies `ENABLE_TOOL_SEARCH` and informs which MCP servers to refactor first (the `tools` array per server is sorted descending by schema size).
-   - `session_usage.aggregate.cache_hit_rate` → the single most important metric in the entire report. This is the only ground-truth measurement of how cache-efficient the current setup _actually is_. A healthy harness should see >80%; if it's lower, we have a real problem to fix.
-   - `session_usage.sessions[*]` → top 20 sessions by cache reads. If hit rate varies wildly across sessions, identify the low-hit-rate sessions and inspect their JSONLs to find what invalidated the cache.
-5. **Report findings to the user** as a data-only update to the previous turn's analysis. No new opinions, no new extrapolations — just the numbers, ranked, with the previous turn's "I had only chars" caveats removed.
-
-## Context for Local Agent
-
-- **No code changes were made** in the cloud session. The branch is at `c2353a5` (clean working tree before the teleport commit). The only files added are `.claude/measure-agent-harness.py` and this handoff doc.
-- **The user explicitly authorized reading session JSONLs** (turn before this one: _"I'm happy to provide the authorization you need"_). The script reads `~/.claude/projects/-home-user-legacy-sports/*.jsonl` — proceed.
-- **Do NOT modify `AGENTS.md` or any skill files yet.** This research branch is for measurement only; any restructuring should happen on a separate branch with its own ticket so the slim can be A/B'd against the measured baseline.
-- **Re-runnability matters.** The script writes JSON so that after any future change to AGENTS.md / skills / hooks / settings, you can re-run and diff the JSON to prove the change actually moved the numbers. Treat the JSON as the canonical baseline.
-
-## Files Changed in Cloud Session
-
-- `.claude/measure-agent-harness.py` — self-contained measurement script (8 sections, ~350 lines)
-- `.claude/teleport-handoff.md` — this file
-
-## Previous-Turn Numbers (cloud, byte/char only — NOT tokens)
-
-For convenience when interpreting the script's output, here are the cloud-measured byte/line numbers so the local agent can sanity-check that nothing changed between sessions:
-
-| Metric                                      | Value        |
-| ------------------------------------------- | ------------ |
-| `AGENTS.md` bytes / lines                   | 29,169 / 218 |
-| `## Workflow` section bytes                 | 9,048        |
-| `## Critical Rules` section bytes           | 7,862        |
-| Skill count                                 | 26           |
-| Total skill body bytes                      | 274,676      |
-| Total skill description chars               | 6,902        |
-| Largest skill description (open-prs)        | 662 chars    |
-| Slash commands count / total bytes          | 14 / 15,971  |
-| Hook stdout (check-github-auth, this env)   | 223 b        |
-| MCP servers in `.mcp.json`                  | 9            |
-| MCP servers enabled in `settings.json`      | 7            |
-| `permissions.allow` entries                 | 34           |
-| Verbatim AGENTS.md ↔ skills duplicate lines | 7 / 132      |
-
-If any of these change after the local fetch + script run, that's interesting and worth a one-line note in the report.
+# PR:        https://github.com/bkrupa/legacy-sports/pull/4133
+# Ticket:    https://bkrupa.atlassian.net/browse/LS-2549
+# Follow-up: https://bkrupa.atlassian.net/browse/LS-4739 (verification email)
+# Follow-up: https://bkrupa.atlassian.net/browse/LS-4740 (per-IP rate limiting)
+```

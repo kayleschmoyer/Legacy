@@ -93,6 +93,24 @@ export const handleLogin = async (
   });
 };
 
+/**
+ * Uniform response returned by /oauth/register regardless of whether the
+ * email is already registered. The body and status code MUST be identical
+ * for the new-user and existing-user branches — any observable difference
+ * (status, body, headers) would re-introduce the account-enumeration leak
+ * this endpoint is hardened against (LS-2549).
+ *
+ * Note: no JWT or auth cookies are issued here. Once email verification
+ * is in place the verification email will deliver the appropriate path
+ * (welcome vs. "you already have an account, here is a password reset").
+ * Until then callers must log in separately via /oauth/login after
+ * registering — see apps/web-e2e/src/utils/test-user-auth.ts.
+ */
+const REGISTER_UNIFORM_RESPONSE: APIGatewayProxyResult = {
+  statusCode: 200,
+  body: JSON.stringify({ status: 'pending' }),
+};
+
 export const handleRegister = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
@@ -113,51 +131,51 @@ export const handleRegister = async (
     return errorResponse(400, 'Password and confirm password must match');
   }
 
+  // Always hash the password — even if the user already exists — so the
+  // existing-email and new-email branches do roughly the same amount of
+  // work. Without this, an attacker could distinguish the two branches
+  // by timing (hashing dominates the new-user path).
+  const hashedPassword = await hashPassword(password);
+
   LOGGER.debug('Initialize database.');
   let newUserId: number | null = null;
-  const result = await withDbClient(async (db) => {
+  let userCreateFailed = false;
+  await withDbClient(async (db) => {
     LOGGER.debug('Get User');
     const existingUser = await getUserByEmail(db, email);
     if (existingUser !== null) {
-      return errorResponse(409, 'An account with this email already exists');
+      // Existing email: log internally but return the uniform response so
+      // the API does not confirm account existence to the caller. Email is
+      // intentionally omitted from the log to avoid PII exposure.
+      LOGGER.info(
+        'Register called for existing email; returning uniform response',
+      );
+      return;
     }
 
-    const internalJwt = await db.transaction(async () => {
-      const hashedPassword = await hashPassword(password);
+    await db.transaction(async () => {
       const user = await createUser(db, email, hashedPassword);
 
       if (user === null) {
-        throw new Error('Failed to create user.');
+        userCreateFailed = true;
+        return;
       }
 
       newUserId = user.id;
-      return await createJwt(user);
     });
-
-    const cookies = {
-      [JWT_COOKIE_NAME]: internalJwt,
-    };
-
-    const encryptedCookies = await encryptCookies(cookies);
-    const csrfToken = generateCsrfToken();
-    const authCookies = buildAuthCookies(internalJwt, csrfToken);
-
-    return {
-      body: JSON.stringify({
-        jwt: internalJwt,
-        csrfToken,
-      }),
-      multiValueHeaders: {
-        'Set-Cookie': [...encryptedCookies, ...authCookies],
-      },
-      statusCode: 200,
-    };
   });
+
+  if (userCreateFailed) {
+    LOGGER.error(
+      'createUser returned null for a new email; cannot create user',
+    );
+    return errorResponse(500, 'Internal server error');
+  }
 
   // Best-effort Discord notification — sent after DB connection is released
   if (newUserId !== null) {
     await notifyNewUserSignup(email, newUserId, 'local');
   }
 
-  return result;
+  return REGISTER_UNIFORM_RESPONSE;
 };

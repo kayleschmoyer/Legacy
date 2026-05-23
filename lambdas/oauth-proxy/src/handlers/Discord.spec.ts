@@ -3,11 +3,17 @@ import {
   createUser,
   getUserByDiscordId,
   getUserByEmail,
+  getUserById,
   linkDiscordAccount,
   setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
-import { handleDiscordAuth, handleDiscordAuthorize } from './Discord';
+import {
+  handleDiscordAuth,
+  handleDiscordAuthorize,
+  handleDiscordLink,
+} from './Discord';
 import { verifyOauthState } from '../util/oauth-state';
+import { parseJwtFromCookies } from '../util/jwt-cookie';
 
 const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
   typeof verifyOauthState
@@ -102,6 +108,14 @@ const mockSetInitialAvatarUrl = setInitialAvatarUrl as jest.MockedFunction<
 const mockNotifyNewUserSignup = notifyNewUserSignup as jest.MockedFunction<
   typeof notifyNewUserSignup
 >;
+const mockParseJwtFromCookies = parseJwtFromCookies as jest.MockedFunction<
+  typeof parseJwtFromCookies
+>;
+const mockGetUserById = getUserById as jest.MockedFunction<typeof getUserById>;
+
+jest.mock('jsonwebtoken', () => ({
+  verify: jest.fn().mockReturnValue({ id: 42 }),
+}));
 
 const mockUser = {
   id: 99,
@@ -305,5 +319,58 @@ describe('handleDiscordAuthorize', () => {
 
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
     expect(setCookies).toEqual(expect.arrayContaining(['ls_oauth_state=stub']));
+  });
+});
+
+describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
+    process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
+    // Authenticated request: parse a cookie token; jsonwebtoken.verify is
+    // mocked to return { id: 42 } (the calling user).
+    mockParseJwtFromCookies.mockReturnValue('mock-jwt');
+
+    fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(makeDiscordUserResponse());
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('returns a generic error that does not confirm the Discord account is linked to another user', async () => {
+    // Discord ID is already linked to a DIFFERENT user (id 99, not the
+    // caller id 42). The previous behavior leaked this via a specific
+    // 409 "already linked to another user" message; the fix returns a
+    // generic message instead.
+    mockGetUserByDiscordId.mockResolvedValue({ ...mockUser, id: 99 });
+
+    const result = await handleDiscordLink(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(409);
+    const parsed = JSON.parse(result.body) as { error: string };
+    expect(parsed.error).not.toMatch(/another user/i);
+    expect(parsed.error).not.toMatch(/already linked/i);
+    expect(parsed.error).toBe('Could not link Discord account');
+  });
+
+  it('still allows the calling user to link their own Discord account', async () => {
+    mockGetUserByDiscordId.mockResolvedValue(null);
+    mockGetUserById.mockResolvedValue({
+      ...mockUser,
+      id: 42,
+      discordId: null,
+    });
+    mockLinkDiscordAccount.mockResolvedValue({ ...mockUser, id: 42 });
+
+    const result = await handleDiscordLink(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockLinkDiscordAccount).toHaveBeenCalledTimes(1);
   });
 });

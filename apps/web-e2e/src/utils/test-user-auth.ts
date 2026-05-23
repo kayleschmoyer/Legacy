@@ -67,7 +67,10 @@ function resolveOAuthBaseUrl(): string {
  *   with wrong credentials if the test user already exists (the common case
  *   in CI, where test users are provisioned ahead of time).
  * - Falls back to `POST /oauth/register` only if login fails (first-time
- *   provisioning on a fresh environment).
+ *   provisioning on a fresh environment). `/oauth/register` no longer
+ *   returns a JWT (LS-2549 — uniform response to prevent account
+ *   enumeration), so a second `POST /oauth/login` is issued after a
+ *   successful register to obtain the JWT.
  */
 export async function getTestUserJwt(
   creds: TestUserCredentials,
@@ -114,7 +117,10 @@ async function registerOrLogin(
   const loginStatus = loginRes.status;
   const loginErrorText = await loginRes.text().catch(() => 'unknown');
 
-  // Login failed — try register (user may not exist yet)
+  // Login failed — try register (user may not exist yet). The register
+  // endpoint returns a uniform 200 with no JWT regardless of whether the
+  // email was new or already existed (LS-2549), so we must always
+  // follow up with a second login to obtain the JWT.
   const registerRes = await fetch(`${oauthUrl}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -125,16 +131,38 @@ async function registerOrLogin(
     }),
   });
 
-  if (registerRes.ok) {
-    const data = (await registerRes.json()) as AuthResponse;
+  if (!registerRes.ok) {
+    const registerErrorText = await registerRes.text().catch(() => 'unknown');
+    throw new Error(
+      `Failed to authenticate test user ${creds.email}: ` +
+        `login failed with ${loginStatus} ${loginErrorText}, ` +
+        `then register failed with ${registerRes.status} ${registerErrorText}`,
+    );
+  }
+
+  // Register succeeded — log in to obtain a JWT.
+  const postRegisterLoginRes = await fetch(`${oauthUrl}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: creds.email,
+      password: creds.password,
+    }),
+  });
+
+  if (postRegisterLoginRes.ok) {
+    const data = (await postRegisterLoginRes.json()) as AuthResponse;
     return data.jwt;
   }
 
-  const registerErrorText = await registerRes.text().catch(() => 'unknown');
+  const postLoginErrorText = await postRegisterLoginRes
+    .text()
+    .catch(() => 'unknown');
   throw new Error(
     `Failed to authenticate test user ${creds.email}: ` +
-      `login failed with ${loginStatus} ${loginErrorText}, ` +
-      `then register failed with ${registerRes.status} ${registerErrorText}`,
+      `initial login failed with ${loginStatus} ${loginErrorText}, ` +
+      `register succeeded, but post-register login failed with ` +
+      `${postRegisterLoginRes.status} ${postLoginErrorText}`,
   );
 }
 
