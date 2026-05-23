@@ -1,5 +1,3 @@
-import * as Device from 'expo-device';
+import { isDevice } from 'expo-device';
 
-/** Type-safe accessor — expo-device has no type declarations in this monorepo. */
-export const isPhysicalDevice: boolean =
-  (Device as { isDevice?: boolean }).isDevice ?? false;
+export const isPhysicalDevice: boolean = isDevice ?? false;
