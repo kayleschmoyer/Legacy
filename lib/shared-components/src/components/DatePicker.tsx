@@ -10,6 +10,8 @@ export interface DatePickerProps {
   disabled?: boolean;
   minDate?: Date;
   maxDate?: Date;
+  error?: boolean;
+  errorMessage?: string;
   /**
    * Whether to use native HTML5 date input on web
    * @default true - uses native input on web, custom calendar on mobile
@@ -25,6 +27,8 @@ export function DatePicker({
   disabled = false,
   minDate,
   maxDate,
+  error = false,
+  errorMessage,
   useNativeInput = true,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -67,18 +71,15 @@ export function DatePicker({
 
     const days: Date[] = [];
 
-    // Add empty cells for days before the first day of the month
     const firstDayOfWeek = firstDay.getDay();
     for (let i = 0; i < firstDayOfWeek; i++) {
       days.push(new Date(year, monthIndex, -firstDayOfWeek + i + 1));
     }
 
-    // Add all days of the current month
     for (let day = 1; day <= lastDay.getDate(); day++) {
       days.push(new Date(year, monthIndex, day));
     }
 
-    // Add days from next month to fill the grid
     const totalCells = Math.ceil(days.length / 7) * 7;
     const remainingCells = totalCells - days.length;
     for (let day = 1; day <= remainingCells; day++) {
@@ -125,7 +126,6 @@ export function DatePicker({
 
   // On web, optionally use native date input
   if (Platform.OS === 'web' && useNativeInput) {
-    // Use a native HTML input element wrapped in Tamagui styling
     return (
       <YStack>
         <input
@@ -143,185 +143,251 @@ export function DatePicker({
           max={maxDate ? formatInputDate(maxDate) : undefined}
           style={{
             width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: '1px solid var(--color-borderColor)',
-            borderRadius: '8px',
-            backgroundColor: 'var(--color-color1)',
+            padding: '11px 14px',
+            fontSize: '14px',
+            fontFamily:
+              "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace",
+            border: error
+              ? '1px solid var(--color-red6)'
+              : '1px solid var(--color-borderColor)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-surfaceCard)',
             color: 'var(--color-color)',
+            boxShadow: error ? '0 0 0 3px rgba(176, 46, 68, 0.22)' : 'none',
+            outline: 'none',
+            colorScheme: 'dark',
+            opacity: disabled ? 0.5 : 1,
+            cursor: disabled ? 'not-allowed' : 'default',
           }}
         />
+        {errorMessage && (
+          <Text fontSize={12} color="$red7" marginTop={4}>
+            {errorMessage}
+          </Text>
+        )}
       </YStack>
     );
   }
 
   // Custom calendar popup for both web and mobile
   return (
-    <Popover
-      size="$5"
-      allowFlip
-      placement="bottom"
-      open={isOpen}
-      onOpenChange={setIsOpen}
-    >
-      <Popover.Trigger asChild>
-        <Button
-          size="$4"
-          backgroundColor="$color1"
-          borderColor="$borderColor"
-          borderWidth={1}
-          justifyContent="space-between"
-          disabled={disabled}
-          pressStyle={{ opacity: 0.8 }}
-          onPress={() => {
-            // Prevent form submission on web - simplified without event handling
-            setIsOpen(!isOpen);
-          }}
-        >
-          <Text color={value ? '$color' : '$placeholderColor'}>
-            {value ? formatDate(value) : placeholder}
-          </Text>
-          <Calendar size="$1" color="$color10" />
-        </Button>
-      </Popover.Trigger>
-
-      <Popover.Content
-        borderWidth={1}
-        borderColor="$borderColor"
-        elevate
-        animation={[
-          'quick',
-          {
-            opacity: {
-              overshootClamping: true,
-            },
-          },
-        ]}
-        enterStyle={{ y: -10, opacity: 0 }}
-        exitStyle={{ y: -10, opacity: 0 }}
-        padding="$3"
-        backgroundColor="$background"
-        minWidth={300}
+    <YStack>
+      <Popover
+        size="$5"
+        allowFlip
+        placement="bottom"
+        open={isOpen}
+        onOpenChange={setIsOpen}
       >
-        <YStack padding="$3" space="$3" backgroundColor="$color1">
-          {/* Month Navigation */}
-          <XStack justifyContent="space-between" alignItems="center">
-            <Button
-              size="$2"
-              chromeless
-              onPress={() => {
-                navigateMonth('prev');
+        <Popover.Trigger asChild>
+          <Button
+            size="$4"
+            backgroundColor="$surfaceCard"
+            borderColor={error ? '$red6' : '$borderColor'}
+            borderWidth={1}
+            borderRadius={6}
+            justifyContent="space-between"
+            disabled={disabled}
+            pressStyle={{ opacity: 0.8 }}
+            style={
+              error
+                ? { boxShadow: '0 0 0 3px rgba(176, 46, 68, 0.22)' }
+                : undefined
+            }
+            onPress={() => {
+              setIsOpen(!isOpen);
+            }}
+          >
+            <Text
+              style={{
+                fontFamily:
+                  "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace",
               }}
-              pressStyle={{ opacity: 0.7 }}
+              fontSize={14}
+              color={value ? '$color' : '$color10'}
             >
-              <ChevronLeft size="$1" />
-            </Button>
-
-            <Text fontSize="$5" fontWeight="600" color="$color">
-              {currentMonth.toLocaleDateString('en-US', {
-                month: 'long',
-                year: 'numeric',
-              })}
+              {value ? formatDate(value) : placeholder}
             </Text>
+            <Calendar size="$1" color="$textMuted" />
+          </Button>
+        </Popover.Trigger>
 
-            <Button
-              size="$2"
-              chromeless
-              onPress={() => {
-                navigateMonth('next');
-              }}
-              pressStyle={{ opacity: 0.7 }}
-            >
-              <ChevronRight size="$1" />
-            </Button>
-          </XStack>
+        <Popover.Content
+          borderWidth={1}
+          borderColor="$borderColor"
+          elevate
+          animation={[
+            'quick',
+            {
+              opacity: {
+                overshootClamping: true,
+              },
+            },
+          ]}
+          enterStyle={{ y: -10, opacity: 0 }}
+          exitStyle={{ y: -10, opacity: 0 }}
+          padding="$3"
+          backgroundColor="$surfaceCard"
+          minWidth={300}
+        >
+          <YStack padding="$3" space="$3" backgroundColor="$surfaceCard">
+            {/* Month Navigation */}
+            <XStack justifyContent="space-between" alignItems="center">
+              <Button
+                size="$2"
+                chromeless
+                onPress={() => {
+                  navigateMonth('prev');
+                }}
+                pressStyle={{ opacity: 0.7 }}
+              >
+                <ChevronLeft size="$1" color="$textMuted" />
+              </Button>
 
-          {/* Weekday Headers */}
-          <XStack>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <Button key={day} size="$2" chromeless flex={1}>
-                <Text fontSize="$2" color="$color10" fontWeight="600">
+              <Text
+                style={{
+                  fontFamily:
+                    "'Big Shoulders Display', 'Oswald', system-ui, sans-serif",
+                }}
+                fontSize={15}
+                fontWeight="700"
+                color="$color"
+                letterSpacing={0.5}
+              >
+                {currentMonth.toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </Text>
+
+              <Button
+                size="$2"
+                chromeless
+                onPress={() => {
+                  navigateMonth('next');
+                }}
+                pressStyle={{ opacity: 0.7 }}
+              >
+                <ChevronRight size="$1" color="$textMuted" />
+              </Button>
+            </XStack>
+
+            {/* Weekday Headers */}
+            <XStack>
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                <Text
+                  key={day}
+                  flex={1}
+                  textAlign="center"
+                  style={{
+                    fontFamily:
+                      "'Big Shoulders Display', 'Oswald', system-ui, sans-serif",
+                  }}
+                  fontSize={11}
+                  fontWeight="700"
+                  letterSpacing={0.1}
+                  color="$textMuted"
+                  paddingVertical={4}
+                >
                   {day}
                 </Text>
-              </Button>
-            ))}
-          </XStack>
+              ))}
+            </XStack>
 
-          {/* Calendar Grid */}
-          <YStack space="$1">
-            {Array.from(
-              { length: Math.ceil(getDaysInMonth(currentMonth).length / 7) },
-              (_, weekIndex) => (
-                <XStack key={weekIndex} space="$1">
-                  {getDaysInMonth(currentMonth)
-                    .slice(weekIndex * 7, (weekIndex + 1) * 7)
-                    .map((date, dayIndex) => {
-                      const disabled = isDateDisabled(date);
-                      const selected = isSelected(date);
-                      const today = isToday(date);
-                      const currentMonthDay = isSameMonth(date, currentMonth);
+            {/* Calendar Grid */}
+            <YStack space="$1">
+              {Array.from(
+                { length: Math.ceil(getDaysInMonth(currentMonth).length / 7) },
+                (_, weekIndex) => (
+                  <XStack key={weekIndex}>
+                    {getDaysInMonth(currentMonth)
+                      .slice(weekIndex * 7, (weekIndex + 1) * 7)
+                      .map((date, dayIndex) => {
+                        const dateDisabled = isDateDisabled(date);
+                        const selected = isSelected(date);
+                        const today = isToday(date);
+                        const currentMonthDay = isSameMonth(date, currentMonth);
 
-                      return (
-                        <Button
-                          key={`${weekIndex}-${dayIndex}`}
-                          size="$3"
-                          flex={1}
-                          chromeless={!selected}
-                          backgroundColor={
-                            selected
-                              ? '$blue9'
-                              : today
-                                ? '$blue4'
-                                : 'transparent'
-                          }
-                          opacity={currentMonthDay ? 1 : 0.3}
-                          disabled={disabled}
-                          onPress={() => {
-                            selectDate(date);
-                          }}
-                          pressStyle={{ opacity: 0.7 }}
-                        >
-                          <Text
-                            fontSize="$3"
-                            color={
+                        return (
+                          <Button
+                            key={`${weekIndex}-${dayIndex}`}
+                            size="$2"
+                            flex={1}
+                            chromeless={!selected}
+                            backgroundColor={
                               selected
-                                ? 'white'
-                                : disabled
-                                  ? '$color6'
-                                  : today
-                                    ? '$blue11'
-                                    : '$color'
+                                ? '$brandNavy'
+                                : today
+                                  ? '$accentMuted'
+                                  : 'transparent'
                             }
-                            fontWeight={today || selected ? '600' : '400'}
+                            borderRadius={4}
+                            opacity={currentMonthDay ? 1 : 0.3}
+                            disabled={dateDisabled}
+                            onPress={() => {
+                              selectDate(date);
+                            }}
+                            pressStyle={{ opacity: 0.7 }}
                           >
-                            {date.getDate()}
-                          </Text>
-                        </Button>
-                      );
-                    })}
-                </XStack>
-              ),
-            )}
-          </YStack>
+                            <Text
+                              style={{
+                                fontFamily:
+                                  "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace",
+                              }}
+                              fontVariant={['tabular-nums']}
+                              fontSize={13}
+                              color={
+                                selected
+                                  ? '$textOnAccent'
+                                  : dateDisabled
+                                    ? '$color6'
+                                    : '$color'
+                              }
+                              fontWeight={selected ? '600' : '400'}
+                            >
+                              {date.getDate()}
+                            </Text>
+                          </Button>
+                        );
+                      })}
+                  </XStack>
+                ),
+              )}
+            </YStack>
 
-          {/* Today Button */}
-          <Button
-            size="$2"
-            chromeless
-            onPress={() => {
-              const today = new Date();
-              if (!isDateDisabled(today)) {
-                selectDate(today);
-              }
-            }}
-            disabled={isDateDisabled(new Date())}
-          >
-            <Text fontSize="$3" color="$blue10">
-              Today
-            </Text>
-          </Button>
-        </YStack>
-      </Popover.Content>
-    </Popover>
+            {/* Today Button */}
+            <Button
+              size="$2"
+              chromeless
+              onPress={() => {
+                const today = new Date();
+                if (!isDateDisabled(today)) {
+                  selectDate(today);
+                }
+              }}
+              disabled={isDateDisabled(new Date())}
+            >
+              <Text
+                style={{
+                  fontFamily:
+                    "'Big Shoulders Display', 'Oswald', system-ui, sans-serif",
+                }}
+                fontSize={12}
+                fontWeight="700"
+                letterSpacing={0.08}
+                color="$brandNavy"
+              >
+                TODAY
+              </Text>
+            </Button>
+          </YStack>
+        </Popover.Content>
+      </Popover>
+      {errorMessage && (
+        <Text fontSize={12} color="$red7" marginTop={4}>
+          {errorMessage}
+        </Text>
+      )}
+    </YStack>
   );
 }
