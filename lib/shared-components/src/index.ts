@@ -188,6 +188,12 @@ export * from './components/scoreboard';
 // when consumers want the new design-system version.
 export { Input, Textarea } from './components/Input';
 export type { InputProps, InputSize, TextareaProps } from './components/Input';
+export { SearchBar } from './components/SearchBar';
+export type {
+  SearchBarProps,
+  SearchBarResultItem,
+  SearchFilterChipData,
+} from './components/SearchBar';
 export { Chip, PositionChip } from './components/Chip';
 export type {
   ChipProps,
