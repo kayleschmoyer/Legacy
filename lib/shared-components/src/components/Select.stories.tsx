@@ -39,6 +39,14 @@ function DefaultDemo(): React.JSX.Element {
 
 export const Default: Story = { render: () => <DefaultDemo /> };
 
+export const WithSelection: Story = {
+  render: () => (
+    <YStack width={320}>
+      <Select label="Era" value="dead" options={ERAS} />
+    </YStack>
+  ),
+};
+
 export const Disabled: Story = {
   render: () => (
     <YStack width={320}>

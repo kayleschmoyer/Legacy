@@ -44,10 +44,12 @@ export function Select({
     <YStack gap="$1" minWidth={200}>
       {label ? (
         <Text
-          fontFamily="$body"
-          fontSize={12}
+          fontFamily="$heading"
+          fontSize={11}
           color="$textMuted"
-          fontWeight="600"
+          fontWeight="700"
+          letterSpacing={1.2}
+          textTransform="uppercase"
         >
           {label}
         </Text>
@@ -59,22 +61,22 @@ export function Select({
       >
         <TamaguiSelect.Trigger
           width="100%"
-          height={40}
           borderRadius={6}
           borderWidth={1}
           borderColor="$outlineStrong"
-          backgroundColor="$surfacePanel"
-          paddingHorizontal={12}
+          backgroundColor="$surfaceCard"
+          paddingHorizontal={14}
+          paddingVertical={11}
           disabled={disabled}
-          opacity={disabled ? 0.6 : 1}
+          opacity={disabled ? 0.5 : 1}
           iconAfter={<ChevronDown size={16} color="$textMuted" />}
-          hoverStyle={{ borderColor: '$brandNavyLight' }}
-          focusStyle={{ borderColor: '$brandNavyLight' }}
+          hoverStyle={{ borderColor: '$focusRing' }}
+          focusStyle={{ borderColor: '$focusRing' }}
         >
           <XStack gap="$2" alignItems="center" flex={1}>
             {leading}
             <TamaguiSelect.Value placeholder={placeholder}>
-              <Text fontFamily="$body" fontSize={14} color="$color">
+              <Text fontFamily="$body" fontSize={15} color="$color">
                 {options.find((o) => o.value === value)?.label ?? placeholder}
               </Text>
             </TamaguiSelect.Value>
@@ -95,34 +97,47 @@ export function Select({
         <TamaguiSelect.Content zIndex={200000}>
           <TamaguiSelect.Viewport
             backgroundColor="$surfaceCard"
-            borderRadius={12}
+            borderRadius={8}
             borderWidth={1}
-            borderColor="$glassBorder"
-            padding={4}
+            borderColor="$outlineStrong"
+            padding={6}
             minWidth={200}
+            boxShadow="0 4px 14px rgba(8, 12, 20, 0.55)"
           >
             <TamaguiSelect.Group>
-              {options.map((opt, i) => (
-                <TamaguiSelect.Item
-                  key={opt.value}
-                  index={i}
-                  value={opt.value}
-                  disabled={opt.disabled}
-                  borderRadius={8}
-                  paddingVertical={8}
-                  paddingHorizontal={10}
-                  hoverStyle={{ backgroundColor: '$surfaceInteractive' }}
-                >
-                  <TamaguiSelect.ItemText>
-                    <Text fontFamily="$body" fontSize={14} color="$color">
-                      {opt.label}
-                    </Text>
-                  </TamaguiSelect.ItemText>
-                  <TamaguiSelect.ItemIndicator marginLeft="auto">
-                    <Check size={14} color="$brandGold" />
-                  </TamaguiSelect.ItemIndicator>
-                </TamaguiSelect.Item>
-              ))}
+              {options.map((opt, i) => {
+                const isSelected = opt.value === value;
+                return (
+                  <TamaguiSelect.Item
+                    key={opt.value}
+                    index={i}
+                    value={opt.value}
+                    disabled={opt.disabled}
+                    borderRadius={6}
+                    paddingVertical={9}
+                    paddingHorizontal={12}
+                    backgroundColor={isSelected ? '$brandNavy' : 'transparent'}
+                    hoverStyle={{
+                      backgroundColor: isSelected
+                        ? '$brandNavy'
+                        : '$backgroundHover',
+                    }}
+                  >
+                    <TamaguiSelect.ItemText>
+                      <Text
+                        fontFamily="$body"
+                        fontSize={14}
+                        color={isSelected ? '$textOnAccent' : '$color11'}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TamaguiSelect.ItemText>
+                    <TamaguiSelect.ItemIndicator marginLeft="auto">
+                      <Check size={14} color="$textOnAccent" />
+                    </TamaguiSelect.ItemIndicator>
+                  </TamaguiSelect.Item>
+                );
+              })}
             </TamaguiSelect.Group>
           </TamaguiSelect.Viewport>
         </TamaguiSelect.Content>
