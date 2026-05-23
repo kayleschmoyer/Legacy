@@ -243,10 +243,10 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
 
     // If the bot has an active (non-dismissed) APPROVED review, it has already
     // adjudicated all threads — including JUSTIFY threads accepted in Cycle 2.
-    // cleanup-on-push dismisses the bot approval on every new push, so a
-    // non-dismissed APPROVED review is always current. Skip the thread check to
-    // avoid false positives where Cycle-1 threads remain physically unresolved
-    // after a Cycle-2 LGTM.
+    // The branch ruleset's dismiss_stale_reviews_on_push ensures the bot APPROVE
+    // is dismissed on every new push, so a non-dismissed APPROVED review is always
+    // current. Skip the thread check to avoid false positives where Cycle-1 threads
+    // remain physically unresolved after a Cycle-2 LGTM.
     const hasBotApproval = await checkBotApproval(pr.number);
     if (!hasBotApproval) {
       const unresolvedResult = await checkUnresolvedReviewThreads(pr.number);

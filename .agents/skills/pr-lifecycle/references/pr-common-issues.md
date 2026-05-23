@@ -31,17 +31,17 @@ twig github setup
 
 ### Issue: Reviewer W1 is SKIPPED and bot LGTM was dismissed
 
-**Cause:** A commit was pushed while the PR had `merge-when-ready`. The `cleanup-on-push` job removed the label and dismissed the bot's APPROVE review. Normally it also applies `bot:ready-for-review` to re-trigger Reviewer W1 — but if `cleanup-on-push` was skipped (e.g. the label was already absent) or the label application failed, W1 never re-runs.
+**Cause:** A commit was pushed to the PR branch. The branch ruleset's `dismiss_stale_reviews_on_push` policy auto-dismissed the bot's APPROVE review, and W1 did not re-run because `bot:ready-for-review` was absent (e.g. it was manually removed, or the PR was opened before the label was applied).
 
 **Symptom:** `Reviewer (W1)` check shows SKIPPED; the bot's LGTM review shows DISMISSED; `bot:ready-for-review` label is absent.
 
-**Fix:** Apply `bot:ready-for-review` manually to trigger a new review cycle:
+**Fix:** Apply `bot:ready-for-review` to trigger a new review cycle:
 
 ```
 github_manage_labels(prs: [PR#], add: ["bot:ready-for-review"])
 ```
 
-W1 will run, post a new review, and — if LGTM — re-add `merge-when-ready` automatically.
+W1 fires on `synchronize` when `bot:ready-for-review` is present, so the label only needs to be added once — all future pushes will automatically re-trigger a new cycle. W1 will run, post a new review, and — if LGTM — re-add `merge-when-ready` automatically.
 
 ---
 

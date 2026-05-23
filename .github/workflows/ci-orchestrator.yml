@@ -451,8 +451,9 @@ jobs:
             }
 
             // Only restore if the bot approval is still active (not dismissed).
-            // A push dismisses the approval via merge-queue.yml, so absence of
-            // an active approval means the author needs a new review cycle.
+            // The branch ruleset's dismiss_stale_reviews_on_push policy dismisses
+            // the approval on every push, so absence of an active approval means
+            // the author needs a new review cycle.
             const BOT_LOGIN = 'legacy-sports-review-bot[bot]';
             let allReviews = [];
             let page = 1;

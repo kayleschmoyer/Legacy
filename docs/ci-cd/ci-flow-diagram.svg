@@ -296,9 +296,8 @@
     <text x="1010" y="832" text-anchor="middle" class="box-sub">calls REST `merge` (squash).</text>
     <text x="1010" y="856" text-anchor="middle" class="box-sub">Post-merge:</text>
     <text x="860" y="876" class="box-sub">• Jira Branch Sync → ticket → "Done"</text>
-    <text x="860" y="894" class="box-sub">• cleanup-on-push removes merge labels</text>
-    <text x="860" y="912" class="box-sub">• PR Preview teardown</text>
-    <text x="860" y="930" class="box-sub">• Deploy may run on push to main</text>
+    <text x="860" y="894" class="box-sub">• PR Preview teardown</text>
+    <text x="860" y="912" class="box-sub">• Deploy may run on push to main</text>
   </g>
 
   <!-- Orchestrator → Merge Queue (green primary) -->
