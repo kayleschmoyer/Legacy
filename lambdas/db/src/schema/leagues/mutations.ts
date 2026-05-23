@@ -2068,259 +2068,260 @@ builder.mutationField('renewLeague', (t) =>
         throw new Error('Failed to generate unique invite code');
       }
 
-      // 10. Create the new league (copying all settings, linking lineage)
-      const [newLeague] = await context.db
-        .insert(PublicSchema.leagues)
-        .values({
-          name: oldLeague.name,
-          owner: oldLeague.owner,
-          maxRosterSize: oldLeague.maxRosterSize,
-          currentMatchup: null,
-          currentWeek: null,
-          draftStatus: keepRosters ? 'completed' : 'not-started',
-          leaguePhase: keepRosters ? 'offseason' : 'pre-draft',
-          inviteCode: newInviteCode,
-          minGamesPerSeason: oldLeague.minGamesPerSeason,
-          gamesPerMatchup: oldLeague.gamesPerMatchup,
-          tradeDeadlineWeek: oldLeague.tradeDeadlineWeek,
-          rosterLockTiming: oldLeague.rosterLockTiming,
-          schedulingStrategy: oldLeague.schedulingStrategy,
-          playerPool: oldLeague.playerPool,
-          eraFilter: oldLeague.eraFilter,
-          hofOnly: oldLeague.hofOnly,
-          customEraStartYear: oldLeague.customEraStartYear,
-          customEraEndYear: oldLeague.customEraEndYear,
-          waiverType: oldLeague.waiverType,
-          waiverEnabled: oldLeague.waiverEnabled,
-          faabBudgetDefault: oldLeague.faabBudgetDefault,
-          spStartsPerMatchup: oldLeague.spStartsPerMatchup,
-          minCareerGames: oldLeague.minCareerGames,
-          minCareerSeasons: oldLeague.minCareerSeasons,
-          totalMatchups: oldLeague.totalMatchups,
-          numberOfDivisions: oldLeague.numberOfDivisions,
-          playoffEnabled: oldLeague.playoffEnabled,
-          playoffFormat: oldLeague.playoffFormat,
-          playoffMultiWeek: oldLeague.playoffMultiWeek,
-          isPublic: oldLeague.isPublic,
-          logoUrl: oldLeague.logoUrl,
-          bannerUrl: oldLeague.bannerUrl,
-          primaryColor: oldLeague.primaryColor,
-          secondaryColor: oldLeague.secondaryColor,
-          previousLeagueId: leagueId,
-          seasonNumber: (oldLeague.seasonNumber ?? 1) + 1,
-          weekAdvanceStatus: 'idle',
-          isMockDraft: false,
-          // Salary cap settings carried forward (LS-645)
-          salaryCapEnabled: oldLeague.salaryCapEnabled,
-          salaryCap: oldLeague.salaryCap,
-          salaryFloor: oldLeague.salaryFloor,
-          luxuryTaxThreshold: oldLeague.luxuryTaxThreshold,
-          minSalary: oldLeague.minSalary,
-          salaryEscalationPct: oldLeague.salaryEscalationPct,
-          salaryDecayPct: oldLeague.salaryDecayPct,
-          auctionBudget: oldLeague.auctionBudget,
-          auctionMinBid: oldLeague.auctionMinBid,
-        })
-        .returning();
+      // Steps 10–17 run inside a single transaction so the new league, all
+      // derived rows, and the frozenAt flip on the old league either all
+      // succeed or all roll back together (LS-2498).
+      const result = await context.db.transaction(async (tx) => {
+        // 10. Create the new league (copying all settings, linking lineage)
+        const [newLeague] = await tx
+          .insert(PublicSchema.leagues)
+          .values({
+            name: oldLeague.name,
+            owner: oldLeague.owner,
+            maxRosterSize: oldLeague.maxRosterSize,
+            currentMatchup: null,
+            currentWeek: null,
+            draftStatus: keepRosters ? 'completed' : 'not-started',
+            leaguePhase: keepRosters ? 'offseason' : 'pre-draft',
+            inviteCode: newInviteCode,
+            minGamesPerSeason: oldLeague.minGamesPerSeason,
+            gamesPerMatchup: oldLeague.gamesPerMatchup,
+            tradeDeadlineWeek: oldLeague.tradeDeadlineWeek,
+            rosterLockTiming: oldLeague.rosterLockTiming,
+            schedulingStrategy: oldLeague.schedulingStrategy,
+            playerPool: oldLeague.playerPool,
+            eraFilter: oldLeague.eraFilter,
+            hofOnly: oldLeague.hofOnly,
+            customEraStartYear: oldLeague.customEraStartYear,
+            customEraEndYear: oldLeague.customEraEndYear,
+            waiverType: oldLeague.waiverType,
+            waiverEnabled: oldLeague.waiverEnabled,
+            faabBudgetDefault: oldLeague.faabBudgetDefault,
+            spStartsPerMatchup: oldLeague.spStartsPerMatchup,
+            minCareerGames: oldLeague.minCareerGames,
+            minCareerSeasons: oldLeague.minCareerSeasons,
+            totalMatchups: oldLeague.totalMatchups,
+            numberOfDivisions: oldLeague.numberOfDivisions,
+            playoffEnabled: oldLeague.playoffEnabled,
+            playoffFormat: oldLeague.playoffFormat,
+            playoffMultiWeek: oldLeague.playoffMultiWeek,
+            isPublic: oldLeague.isPublic,
+            logoUrl: oldLeague.logoUrl,
+            bannerUrl: oldLeague.bannerUrl,
+            primaryColor: oldLeague.primaryColor,
+            secondaryColor: oldLeague.secondaryColor,
+            previousLeagueId: leagueId,
+            seasonNumber: (oldLeague.seasonNumber ?? 1) + 1,
+            weekAdvanceStatus: 'idle',
+            isMockDraft: false,
+            // Salary cap settings carried forward (LS-645)
+            salaryCapEnabled: oldLeague.salaryCapEnabled,
+            salaryCap: oldLeague.salaryCap,
+            salaryFloor: oldLeague.salaryFloor,
+            luxuryTaxThreshold: oldLeague.luxuryTaxThreshold,
+            minSalary: oldLeague.minSalary,
+            salaryEscalationPct: oldLeague.salaryEscalationPct,
+            salaryDecayPct: oldLeague.salaryDecayPct,
+            auctionBudget: oldLeague.auctionBudget,
+            auctionMinBid: oldLeague.auctionMinBid,
+          })
+          .returning();
 
-      // 11. Create new teams � same names and division structure
-      const newTeams = await context.db
-        .insert(PublicSchema.teams)
-        .values(
-          oldTeams.map((team) => ({
-            name: team.name,
-            leagueId: newLeague.id,
-            divisionId: team.divisionId,
-            waiverOrder: team.waiverOrder,
-            faabBudget: oldLeague.faabBudgetDefault,
-            logoUrl: team.logoUrl,
-            primaryColor: team.primaryColor,
-            secondaryColor: team.secondaryColor,
-            avatarUrl: team.avatarUrl,
-          })),
-        )
-        .returning();
-
-      // Build a map from old teamId ? new teamId (positional, same order)
-      const teamIdMap = new Map<number, number>();
-      for (let i = 0; i < oldTeams.length; i++) {
-        teamIdMap.set(oldTeams[i].id, newTeams[i].id);
-      }
-
-      // 12. Copy league members (preserving permission levels and team assignments)
-      if (oldMembers.length > 0) {
-        await context.db.insert(PublicSchema.leagueMembers).values(
-          oldMembers.map((m) => ({
-            leagueId: newLeague.id,
-            userId: m.userId,
-            teamId: m.teamId != null ? (teamIdMap.get(m.teamId) ?? null) : null,
-            permissionLevel: m.permissionLevel,
-          })),
-        );
-      }
-
-      // 13. Copy roster position slots � get new IDs for the roster copy
-      const positionIdMap = new Map<number, number>();
-      if (oldPositions.length > 0) {
-        const newPositions = await context.db
-          .insert(PublicSchema.leaguePosition)
+        // 11. Create new teams � same names and division structure
+        const newTeams = await tx
+          .insert(PublicSchema.teams)
           .values(
-            oldPositions.map((p) => ({
+            oldTeams.map((team) => ({
+              name: team.name,
               leagueId: newLeague.id,
-              positionType: p.positionType,
+              divisionId: team.divisionId,
+              waiverOrder: team.waiverOrder,
+              faabBudget: oldLeague.faabBudgetDefault,
+              logoUrl: team.logoUrl,
+              primaryColor: team.primaryColor,
+              secondaryColor: team.secondaryColor,
+              avatarUrl: team.avatarUrl,
             })),
           )
           .returning();
 
-        for (let i = 0; i < oldPositions.length; i++) {
-          positionIdMap.set(oldPositions[i].id, newPositions[i].id);
+        // Build a map from old teamId ? new teamId (positional, same order)
+        const teamIdMap = new Map<number, number>();
+        for (let i = 0; i < oldTeams.length; i++) {
+          teamIdMap.set(oldTeams[i].id, newTeams[i].id);
         }
-      }
 
-      // 14. Copy rosters if keepRosters is requested
-      // Collects carriedOverPlayerIds so LS-645 can apply salary escalation
-      const carriedOverPlayerIds = new Set<number>();
-      if (keepRosters && oldRostersByTeamId.size > 0) {
-        const rosterRows: (typeof PublicSchema.teamMembers.$inferInsert)[] = [];
-        for (const [oldTeamId, members] of oldRostersByTeamId.entries()) {
-          const newTeamId = teamIdMap.get(oldTeamId);
-          if (!newTeamId) continue;
-          for (const m of members) {
-            carriedOverPlayerIds.add(m.playerId);
-            const salaryRow = oldPlayerSalariesMap.get(m.playerId);
-            const escalatedSalary =
-              salaryRow != null
-                ? applyEscalation(
-                    salaryRow.currentSalary,
-                    oldLeague.salaryEscalationPct,
-                  )
-                : null;
-            rosterRows.push({
-              teamId: newTeamId,
+        // 12. Copy league members (preserving permission levels and team assignments)
+        if (oldMembers.length > 0) {
+          await tx.insert(PublicSchema.leagueMembers).values(
+            oldMembers.map((m) => ({
               leagueId: newLeague.id,
-              playerId: m.playerId,
-              positionId:
-                m.positionId != null
-                  ? (positionIdMap.get(m.positionId) ?? null)
-                  : null,
-              acquisitionType: 'rollover',
-              onTradeBlock: false,
-              salary: escalatedSalary,
-            });
-          }
-        }
-        if (rosterRows.length > 0) {
-          await context.db.insert(PublicSchema.teamMembers).values(rosterRows);
-        }
-      }
-
-      // 14b. Identify free agents (previously rostered but not carried over)
-      // LS-645 will use this to apply salary decay and increment freeAgentYears
-      const allOldRosteredPlayerIds = new Set<number>();
-      for (const members of oldRostersByTeamId.values()) {
-        for (const m of members) allOldRosteredPlayerIds.add(m.playerId);
-      }
-      const freeAgentPlayerIds = new Set(
-        [...allOldRosteredPlayerIds].filter(
-          (id) => !carriedOverPlayerIds.has(id),
-        ),
-      );
-
-      LOGGER.info('Season renewal roster summary', {
-        carriedOver: carriedOverPlayerIds.size,
-        freeAgents: freeAgentPlayerIds.size,
-        newLeagueId: newLeague.id,
-      });
-
-      // 14c. Propagate player_salaries to the new league with escalation/decay
-      //   - Carried-over (rostered) players: salary escalates by salaryEscalationPct
-      //   - All others: salary decays by salaryDecayPct; freeAgentYears increments
-      if (oldLeague.salaryCapEnabled && oldPlayerSalariesMap.size > 0) {
-        const { salaryEscalationPct, salaryDecayPct, minSalary } = oldLeague;
-        const oldSeasonNumber = oldLeague.seasonNumber ?? 1;
-
-        const newSalaryRows: (typeof PublicSchema.playerSalaries.$inferInsert)[] =
-          [];
-        let escalatedCount = 0;
-        let decayedCount = 0;
-
-        for (const [playerId, row] of oldPlayerSalariesMap.entries()) {
-          if (carriedOverPlayerIds.has(playerId)) {
-            // Escalation: Math.ceil(current * (100 + pct) / 100)
-            const newSalary = applyEscalation(
-              row.currentSalary,
-              salaryEscalationPct,
-            );
-            newSalaryRows.push({
-              leagueId: newLeague.id,
-              playerId,
-              currentSalary: newSalary,
-              initialSalary: row.initialSalary,
-              acquisitionType: row.acquisitionType,
-              yearAcquired: row.yearAcquired,
-              lastRosteredSeason: oldSeasonNumber,
-              freeAgentYears: 0,
-            });
-            escalatedCount++;
-          } else {
-            // Decay: Math.max(minSalary, Math.floor(current * (100 - pct) / 100))
-            const newSalary = applyDecay(
-              row.currentSalary,
-              salaryDecayPct,
-              minSalary,
-            );
-            newSalaryRows.push({
-              leagueId: newLeague.id,
-              playerId,
-              currentSalary: newSalary,
-              initialSalary: row.initialSalary,
-              acquisitionType: row.acquisitionType,
-              yearAcquired: row.yearAcquired,
-              lastRosteredSeason: row.lastRosteredSeason,
-              freeAgentYears: row.freeAgentYears + 1,
-            });
-            decayedCount++;
-          }
+              userId: m.userId,
+              teamId:
+                m.teamId != null ? (teamIdMap.get(m.teamId) ?? null) : null,
+              permissionLevel: m.permissionLevel,
+            })),
+          );
         }
 
-        if (newSalaryRows.length > 0) {
-          await context.db
-            .insert(PublicSchema.playerSalaries)
-            .values(newSalaryRows);
-        }
-
-        LOGGER.info('Salary escalation and decay applied', {
-          newLeagueId: newLeague.id,
-          escalated: escalatedCount,
-          decayed: decayedCount,
-        });
-      }
-
-      // 15. Create a draft record for the new league
-      await context.db.insert(PublicSchema.drafts).values({
-        leagueId: newLeague.id,
-        draftMode: oldDraft?.draftMode ?? 'live',
-        selectionMethod: oldDraft?.selectionMethod ?? 'standard',
-        draftOrder: oldDraft?.draftOrder ?? 'snake',
-      });
-
-      // 16. Copy the active scoring profile to the new league
-      if (oldProfile) {
-        const [newProfile] = await context.db
-          .insert(PublicSchema.leagueScoringProfiles)
-          .values({
-            leagueId: newLeague.id,
-            profileName: oldProfile.profileName,
-            status: 'active',
-            isDefault: true,
-            copiedFromProfileId: oldProfile.id,
-          })
-          .returning();
-
-        if (profileEntries.length > 0) {
-          await context.db
-            .insert(PublicSchema.leagueScoringProfileEntries)
+        // 13. Copy roster position slots � get new IDs for the roster copy
+        const positionIdMap = new Map<number, number>();
+        if (oldPositions.length > 0) {
+          const newPositions = await tx
+            .insert(PublicSchema.leaguePosition)
             .values(
+              oldPositions.map((p) => ({
+                leagueId: newLeague.id,
+                positionType: p.positionType,
+              })),
+            )
+            .returning();
+
+          for (let i = 0; i < oldPositions.length; i++) {
+            positionIdMap.set(oldPositions[i].id, newPositions[i].id);
+          }
+        }
+
+        // 14. Copy rosters if keepRosters is requested
+        // Collects carriedOverPlayerIds so LS-645 can apply salary escalation
+        const carriedOverPlayerIds = new Set<number>();
+        if (keepRosters && oldRostersByTeamId.size > 0) {
+          const rosterRows: (typeof PublicSchema.teamMembers.$inferInsert)[] =
+            [];
+          for (const [oldTeamId, members] of oldRostersByTeamId.entries()) {
+            const newTeamId = teamIdMap.get(oldTeamId);
+            if (!newTeamId) continue;
+            for (const m of members) {
+              carriedOverPlayerIds.add(m.playerId);
+              const salaryRow = oldPlayerSalariesMap.get(m.playerId);
+              const escalatedSalary =
+                salaryRow != null
+                  ? applyEscalation(
+                      salaryRow.currentSalary,
+                      oldLeague.salaryEscalationPct,
+                    )
+                  : null;
+              rosterRows.push({
+                teamId: newTeamId,
+                leagueId: newLeague.id,
+                playerId: m.playerId,
+                positionId:
+                  m.positionId != null
+                    ? (positionIdMap.get(m.positionId) ?? null)
+                    : null,
+                acquisitionType: 'rollover',
+                onTradeBlock: false,
+                salary: escalatedSalary,
+              });
+            }
+          }
+          if (rosterRows.length > 0) {
+            await tx.insert(PublicSchema.teamMembers).values(rosterRows);
+          }
+        }
+
+        // 14b. Identify free agents (previously rostered but not carried over)
+        // LS-645 will use this to apply salary decay and increment freeAgentYears
+        const allOldRosteredPlayerIds = new Set<number>();
+        for (const members of oldRostersByTeamId.values()) {
+          for (const m of members) allOldRosteredPlayerIds.add(m.playerId);
+        }
+        const freeAgentPlayerIds = new Set(
+          [...allOldRosteredPlayerIds].filter(
+            (id) => !carriedOverPlayerIds.has(id),
+          ),
+        );
+
+        const rosterSummary = {
+          carriedOver: carriedOverPlayerIds.size,
+          freeAgents: freeAgentPlayerIds.size,
+        };
+
+        // 14c. Propagate player_salaries to the new league with escalation/decay
+        //   - Carried-over (rostered) players: salary escalates by salaryEscalationPct
+        //   - All others: salary decays by salaryDecayPct; freeAgentYears increments
+        let salarySummary: { escalated: number; decayed: number } | null = null;
+        if (oldLeague.salaryCapEnabled && oldPlayerSalariesMap.size > 0) {
+          const { salaryEscalationPct, salaryDecayPct, minSalary } = oldLeague;
+          const oldSeasonNumber = oldLeague.seasonNumber ?? 1;
+
+          const newSalaryRows: (typeof PublicSchema.playerSalaries.$inferInsert)[] =
+            [];
+          let escalatedCount = 0;
+          let decayedCount = 0;
+
+          for (const [playerId, row] of oldPlayerSalariesMap.entries()) {
+            if (carriedOverPlayerIds.has(playerId)) {
+              // Escalation: Math.ceil(current * (100 + pct) / 100)
+              const newSalary = applyEscalation(
+                row.currentSalary,
+                salaryEscalationPct,
+              );
+              newSalaryRows.push({
+                leagueId: newLeague.id,
+                playerId,
+                currentSalary: newSalary,
+                initialSalary: row.initialSalary,
+                acquisitionType: row.acquisitionType,
+                yearAcquired: row.yearAcquired,
+                lastRosteredSeason: oldSeasonNumber,
+                freeAgentYears: 0,
+              });
+              escalatedCount++;
+            } else {
+              // Decay: Math.max(minSalary, Math.floor(current * (100 - pct) / 100))
+              const newSalary = applyDecay(
+                row.currentSalary,
+                salaryDecayPct,
+                minSalary,
+              );
+              newSalaryRows.push({
+                leagueId: newLeague.id,
+                playerId,
+                currentSalary: newSalary,
+                initialSalary: row.initialSalary,
+                acquisitionType: row.acquisitionType,
+                yearAcquired: row.yearAcquired,
+                lastRosteredSeason: row.lastRosteredSeason,
+                freeAgentYears: row.freeAgentYears + 1,
+              });
+              decayedCount++;
+            }
+          }
+
+          if (newSalaryRows.length > 0) {
+            await tx.insert(PublicSchema.playerSalaries).values(newSalaryRows);
+          }
+
+          salarySummary = {
+            escalated: escalatedCount,
+            decayed: decayedCount,
+          };
+        }
+
+        // 15. Create a draft record for the new league
+        await tx.insert(PublicSchema.drafts).values({
+          leagueId: newLeague.id,
+          draftMode: oldDraft?.draftMode ?? 'live',
+          selectionMethod: oldDraft?.selectionMethod ?? 'standard',
+          draftOrder: oldDraft?.draftOrder ?? 'snake',
+        });
+
+        // 16. Copy the active scoring profile to the new league
+        if (oldProfile) {
+          const [newProfile] = await tx
+            .insert(PublicSchema.leagueScoringProfiles)
+            .values({
+              leagueId: newLeague.id,
+              profileName: oldProfile.profileName,
+              status: 'active',
+              isDefault: true,
+              copiedFromProfileId: oldProfile.id,
+            })
+            .returning();
+
+          if (profileEntries.length > 0) {
+            await tx.insert(PublicSchema.leagueScoringProfileEntries).values(
               profileEntries.map((e) => ({
                 profileId: newProfile.id,
                 statDefinitionId: e.statDefinitionId,
@@ -2328,14 +2329,33 @@ builder.mutationField('renewLeague', (t) =>
                 isEnabled: e.isEnabled,
               })),
             );
+          }
         }
-      }
 
-      // 17. Freeze the old league
-      await context.db
-        .update(PublicSchema.leagues)
-        .set({ frozenAt: new Date() })
-        .where(eq(PublicSchema.leagues.id, leagueId));
+        // 17. Freeze the old league
+        await tx
+          .update(PublicSchema.leagues)
+          .set({ frozenAt: new Date() })
+          .where(eq(PublicSchema.leagues.id, leagueId));
+
+        return { newLeague, rosterSummary, salarySummary };
+      });
+
+      const { newLeague, rosterSummary, salarySummary } = result;
+
+      LOGGER.info('Season renewal roster summary', {
+        carriedOver: rosterSummary.carriedOver,
+        freeAgents: rosterSummary.freeAgents,
+        newLeagueId: newLeague.id,
+      });
+
+      if (salarySummary) {
+        LOGGER.info('Salary escalation and decay applied', {
+          newLeagueId: newLeague.id,
+          escalated: salarySummary.escalated,
+          decayed: salarySummary.decayed,
+        });
+      }
 
       LOGGER.info('Season renewal complete', {
         oldLeagueId: leagueId,
