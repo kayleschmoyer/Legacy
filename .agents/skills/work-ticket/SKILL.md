@@ -490,9 +490,9 @@ To Do descendants (8 total):
 
 AskUserQuestion → user picks "Spawn chips for all"
 
-Claiming LS-4603 (To Do → In Progress) ✓
 Spawning chip "Work LS-4603 (Stats Page header)" with context docs/design/stats-header/ ✓
 …(repeats for LS-4604 … LS-4632)…
+(Each chip claims its own ticket atomically via jira_claim_ticket as its first action)
 
 Dispatched 8 chips. Each chip will drive its ticket to merge in its own session/worktree.
 Stopping.
@@ -611,11 +611,4 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
 - **`getJiraIssue` Atlassian plugin bug** — in worktree sessions (`.claude/worktrees/<name>/`) `jira_view` is unavailable and the Atlassian plugin is the only Jira interface. The plugin's `getJiraIssue` tool is broken: it returns the parent epic's children list instead of the requested issue (LS-3715). **Never call `mcp__*__getJiraIssue`.** Use `searchJiraIssuesUsingJql(jql: "key = LS-XXXX", maxResults: 1)` to fetch a single issue reliably.
 - **Bug fixes require proof** — for Bug-type tickets, code changes alone are not sufficient. You must reproduce the broken behavior before fixing, and verify the fix resolves it after. See the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type) for the specific method per bug category (UI screenshots, failing tests, integration tests, or query results)
 - **Paginate child listings** — `jira_list_children` defaults to 25 results per page; `jira_search` defaults to 15. Always pass `limit: 100` and keep paginating via `pageToken` until `nextPageToken` is absent. Use the absence of `nextPageToken` (not a `total` comparison) as the truncation signal — `jira_list_children`'s `total` field reflects the current page size, not the full result set. Failing to paginate caused premature parent transitions in the LS-2079 incident (agent saw 10 of 50 children, declared the epic done)
-- **Sub-agent prompts must include MCP tool hints** — sub-agents spawned via the `Agent` tool do **not** inherit AGENTS.md context and default to raw shell commands. When spawning background agents for parallel child-ticket work, use the canonical setup + tool preferences block from [`.agents/shared/subagent-setup.md`](references/subagent-setup.md), then append these work-ticket-specific lines:
-  ```
-  - Use make_run(target: "...", worktreePath: "...") for make targets
-  - Use github_create_pr(...) MCP tool for PR creation
-  - Use github_pr_dashboard(state: "all", limit: 50) to check for existing PRs by ticket key (never gh pr list --state all | grep LS-####)
-  ```
-  The shared file is the single source of truth for setup steps and tool preferences (Glob/Grep/Read, worktree_commit/push, worktree_diff, worktree_status). In that context, `git -C` / `make -C` are undesirable when the corresponding MCP tools are available (though still acceptable shell fallbacks when needed), and `gh pr create` should be replaced with the `github_create_pr(...)` MCP tool.
-  Omitting these hints is the root cause of subagents falling back to shell commands unnecessarily (LS-2847).
+- **⛔ Never use the `Agent` tool to dispatch child tickets** — `mcp__ccd_session__spawn_task` is the **only** correct mechanism for spawning chips in both Parent Dispatch Mode and batch mode. The `Agent` tool creates an in-context subagent that shares the parent session's context window and cannot create its own worktree or drive a PR to merge independently. `mcp__ccd_session__spawn_task` creates a fully independent Claude Code session with its own worktree, MCP connections, and drive-to-merge lifecycle. Using `Agent(...)` instead of `mcp__ccd_session__spawn_task(...)` is not a fallback — it is a different operation that will not produce the correct result. If `mcp__ccd_session__spawn_task` is unavailable (ToolSearch returns no result), stop and inform the user rather than substituting the Agent tool.
