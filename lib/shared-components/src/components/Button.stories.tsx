@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
+import { XStack, YStack } from 'tamagui';
 import { Button } from '../Button';
 
 const meta: Meta<typeof Button> = {
@@ -9,7 +10,8 @@ const meta: Meta<typeof Button> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A customizable button component built with Tamagui',
+        component:
+          'Brand button — Big Shoulders Display, uppercase tracking. Navy primary, gold for prominent positive actions, seam red for danger, ghost for low-emphasis. Pill modifier for compact navigational chips.',
       },
     },
   },
@@ -18,70 +20,77 @@ const meta: Meta<typeof Button> = {
     onPress: { action: 'pressed' },
     variant: {
       control: 'select',
-      options: ['default', 'outlined', 'ghost'],
-      description: 'Button variant style',
+      options: ['primary', 'secondary', 'gold', 'danger', 'ghost', 'outlined'],
     },
     size: {
       control: 'select',
       options: ['sm', 'md', 'lg'],
-      description: 'Button size',
     },
-    disabled: {
-      control: 'boolean',
-      description: 'Whether the button is disabled',
-    },
+    pill: { control: 'boolean' },
+    loading: { control: 'boolean' },
+    disabled: { control: 'boolean' },
   },
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  args: {
-    children: 'Default Button',
-  },
+export const Primary: Story = {
+  args: { children: 'Create a League', variant: 'primary' },
 };
 
-export const Outlined: Story = {
-  args: {
-    children: 'Outlined Button',
-    variant: 'outlined',
-  },
+export const Gold: Story = {
+  args: { children: 'View League', variant: 'gold' },
+};
+
+export const Danger: Story = {
+  args: { children: 'Join Draft', variant: 'danger' },
 };
 
 export const Ghost: Story = {
-  args: {
-    children: 'Ghost Button',
-    variant: 'ghost',
-  },
+  args: { children: 'Cancel', variant: 'ghost' },
 };
 
-export const Small: Story = {
-  args: {
-    children: 'Small Button',
-    size: 'sm',
-  },
+export const Pill: Story = {
+  args: { children: 'Week 14/22', variant: 'primary', pill: true, size: 'sm' },
 };
 
-export const Medium: Story = {
-  args: {
-    children: 'Medium Button',
-    size: 'md',
-  },
+export const Sizes: Story = {
+  render: () => (
+    <XStack gap={12} alignItems="center">
+      <Button size="sm">Small</Button>
+      <Button size="md">Medium</Button>
+      <Button size="lg">Large</Button>
+    </XStack>
+  ),
 };
 
-export const Large: Story = {
-  args: {
-    children: 'Large Button',
-    size: 'lg',
-  },
+export const Variants: Story = {
+  render: () => (
+    <YStack gap={16}>
+      <XStack gap={12} flexWrap="wrap" alignItems="center">
+        <Button variant="primary">Create a League</Button>
+        <Button variant="gold">View League</Button>
+        <Button variant="danger">Join Draft</Button>
+        <Button variant="ghost">Cancel</Button>
+        <Button variant="primary" pill size="sm">
+          Week 14/22
+        </Button>
+      </XStack>
+    </YStack>
+  ),
 };
 
-export const Disabled: Story = {
-  args: {
-    children: 'Disabled Button',
-    disabled: true,
-  },
+export const States: Story = {
+  render: () => (
+    <YStack gap={12}>
+      <XStack gap={12} alignItems="center">
+        <Button>Default</Button>
+        <Button loading>Loading</Button>
+        <Button disabled>Disabled</Button>
+      </XStack>
+    </YStack>
+  ),
 };
 
 export const LongText: Story = {
@@ -92,20 +101,14 @@ export const LongText: Story = {
 
 export const WithInteraction: Story = {
   args: {
-    children: 'Click Me!',
+    children: 'Click Me',
     onPress: fn(),
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const button = canvas.getByRole('button');
-
-    // Test that button is rendered
     await expect(button).toBeInTheDocument();
-
-    // Test button click
     await userEvent.click(button);
-
-    // Verify the onPress function was called
     await expect(args.onPress).toHaveBeenCalled();
   },
   tags: ['test'],

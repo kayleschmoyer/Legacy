@@ -64,6 +64,7 @@ const brandDark = {
   brandNavyDark: '#143050', // darker navy for press states
   brandSeamRed: '#C41E3A', // baseball seam red
   brandSeamRedLight: '#E63950', // lighter seam red for hover/glow
+  brandSeamRedDark: '#8B1A2B', // darker seam red for press states
   brandGold: '#C5A55A', // aged gold — trophies, pennants, vintage borders
   brandGoldLight: '#D4BB78', // lighter gold for hover
   brandGoldDark: '#A68B3E', // darker gold for press states
@@ -214,6 +215,7 @@ const brandLight = {
   brandNavyDark: '#143050',
   brandSeamRed: '#C41E3A',
   brandSeamRedLight: '#E63950',
+  brandSeamRedDark: '#8B1A2B',
   brandGold: '#B8942B',
   brandGoldLight: '#D4B24A',
   brandGoldDark: '#967828',
