@@ -147,21 +147,26 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
   }
 
   getRollbarConfigFromEnv(): RollbarConfig | null {
+    // Expo inlines `EXPO_PUBLIC_*` env vars into the JS bundle at build time
+    // (https://docs.expo.dev/guides/environment-variables/). We deliberately
+    // do NOT fall back to the bare `ROLLBAR_ACCESS_TOKEN` here: that name is
+    // the server-side (post_server_item) token used by Lambdas, and pulling
+    // it into the client bundle would expose privileged credentials. The
+    // client token is sourced from EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN, which
+    // apps/app/app.config.js aliases from VITE_ROLLBAR_ACCESS_TOKEN
+    // (post_client_item) at config-load time.
     const isDev = process.env['NODE_ENV'] === 'development';
-    const accessToken = process.env['ROLLBAR_ACCESS_TOKEN'] ?? '';
+    const accessToken = process.env['EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN'] || '';
     const environment = isDev ? 'development' : 'production';
 
     if (!accessToken) {
       LOGGER.warn(
-        'ROLLBAR_ACCESS_TOKEN not set, Rollbar will not be initialized',
+        'EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN not set, Rollbar will not be initialized',
       );
       return null;
     }
 
-    const release =
-      process.env['APP_VERSION'] ||
-      process.env['EXPO_PUBLIC_APP_VERSION'] ||
-      undefined;
+    const release = process.env['EXPO_PUBLIC_APP_VERSION'] || undefined;
 
     return {
       accessToken,
