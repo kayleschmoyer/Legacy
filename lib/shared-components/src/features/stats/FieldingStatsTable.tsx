@@ -52,7 +52,8 @@ function FieldingStatsTable({
   title = 'Fielding Statistics',
   maxHeight,
 }: FieldingStatsTableProps) {
-  const tableData: StatsTableRow[] = stats.map((record) => ({
+  const tableData: StatsTableRow[] = stats.map((record, index) => ({
+    id: `${record.player?.name ?? 'unknown'}-${record.pos ?? 'pos'}-${index}`,
     player: record.player?.name ?? 'Unknown',
     pos: record.pos ?? '',
     g: record.g ?? 0,

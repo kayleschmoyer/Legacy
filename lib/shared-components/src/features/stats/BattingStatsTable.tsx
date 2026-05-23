@@ -61,7 +61,8 @@ function BattingStatsTable({
   onPlayerPress,
 }: BattingStatsTableProps) {
   // Transform the data to match the table format
-  const tableData: StatsTableRow[] = stats.map((record) => ({
+  const tableData: StatsTableRow[] = stats.map((record, index) => ({
+    id: `${record.player?.name ?? 'unknown'}-${index}`,
     player: record.player?.name || 'Unknown',
     g: record.g ?? 0,
     pa: record.pa ?? 0,

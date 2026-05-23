@@ -215,6 +215,7 @@ export interface StatsTableColumn {
 }
 
 export interface StatsTableRow {
+  id: string | number;
   [key: string]: string | number | undefined;
 }
 

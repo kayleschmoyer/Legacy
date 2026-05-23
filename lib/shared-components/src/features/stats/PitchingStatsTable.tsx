@@ -65,7 +65,8 @@ function PitchingStatsTable({
   onPlayerPress,
 }: PitchingStatsTableProps) {
   // Transform the data to match the table format
-  const tableData: StatsTableRow[] = stats.map((record) => ({
+  const tableData: StatsTableRow[] = stats.map((record, index) => ({
+    id: `${record.player?.name ?? 'unknown'}-${index}`,
     player: record.player?.name || 'Unknown',
     w: record.w ?? 0,
     l: record.l ?? 0,

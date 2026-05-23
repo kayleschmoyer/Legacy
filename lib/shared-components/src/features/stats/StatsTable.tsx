@@ -100,7 +100,7 @@ function StatsTable({
 
   const renderRow = (row: StatsTableRow, index: number) => (
     <Button
-      key={index}
+      key={row.id}
       flexDirection="row"
       borderBottomWidth={1}
       borderBottomColor="$border"

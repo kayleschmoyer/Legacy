@@ -60,6 +60,7 @@ const battingColumns: StatsTableColumn[] = [
 
 const battingData: StatsTableRow[] = [
   {
+    id: 'mike-trout',
     player: 'Mike Trout',
     team: 'LAA',
     avg: 0.283,
@@ -69,6 +70,7 @@ const battingData: StatsTableRow[] = [
     ops: 0.987,
   },
   {
+    id: 'mookie-betts',
     player: 'Mookie Betts',
     team: 'LAD',
     avg: 0.307,
@@ -78,6 +80,7 @@ const battingData: StatsTableRow[] = [
     ops: 0.945,
   },
   {
+    id: 'ronald-acuna-jr',
     player: 'Ronald Acuña Jr.',
     team: 'ATL',
     avg: 0.337,
@@ -87,6 +90,7 @@ const battingData: StatsTableRow[] = [
     ops: 1.012,
   },
   {
+    id: 'freddie-freeman',
     player: 'Freddie Freeman',
     team: 'LAD',
     avg: 0.331,
@@ -96,6 +100,7 @@ const battingData: StatsTableRow[] = [
     ops: 0.918,
   },
   {
+    id: 'aaron-judge',
     player: 'Aaron Judge',
     team: 'NYY',
     avg: 0.311,
@@ -105,6 +110,7 @@ const battingData: StatsTableRow[] = [
     ops: 1.056,
   },
   {
+    id: 'jose-altuve',
     player: 'Jose Altuve',
     team: 'HOU',
     avg: 0.306,
@@ -114,6 +120,7 @@ const battingData: StatsTableRow[] = [
     ops: 0.823,
   },
   {
+    id: 'juan-soto',
     player: 'Juan Soto',
     team: 'SD',
     avg: 0.275,
@@ -136,6 +143,7 @@ const footballColumns: StatsTableColumn[] = [
 
 const footballData: StatsTableRow[] = [
   {
+    id: 'josh-allen',
     player: 'Josh Allen',
     position: 'QB',
     team: 'BUF',
@@ -144,6 +152,7 @@ const footballData: StatsTableRow[] = [
     avg: 7.8,
   },
   {
+    id: 'tyreek-hill',
     player: 'Tyreek Hill',
     position: 'WR',
     team: 'MIA',
@@ -152,6 +161,7 @@ const footballData: StatsTableRow[] = [
     avg: 13.5,
   },
   {
+    id: 'christian-mccaffrey',
     player: 'Christian McCaffrey',
     position: 'RB',
     team: 'SF',
@@ -160,6 +170,7 @@ const footballData: StatsTableRow[] = [
     avg: 5.4,
   },
   {
+    id: 'travis-kelce',
     player: 'Travis Kelce',
     position: 'TE',
     team: 'KC',
@@ -168,6 +179,7 @@ const footballData: StatsTableRow[] = [
     avg: 9.0,
   },
   {
+    id: 'stefon-diggs',
     player: 'Stefon Diggs',
     position: 'WR',
     team: 'BUF',
@@ -184,9 +196,9 @@ const minimalColumns: StatsTableColumn[] = [
 ];
 
 const minimalData: StatsTableRow[] = [
-  { name: 'Item 1', value: 100 },
-  { name: 'Item 2', value: 85 },
-  { name: 'Item 3', value: 92 },
+  { id: 'item-1', name: 'Item 1', value: 100 },
+  { id: 'item-2', name: 'Item 2', value: 85 },
+  { id: 'item-3', name: 'Item 3', value: 92 },
 ];
 
 export const Default: Story = {
@@ -281,6 +293,7 @@ export const LargeDataset: Story = {
     data: [
       ...battingData,
       {
+        id: 'vladimir-guerrero-jr',
         player: 'Vladimir Guerrero Jr.',
         team: 'TOR',
         avg: 0.264,
@@ -290,6 +303,7 @@ export const LargeDataset: Story = {
         ops: 0.788,
       },
       {
+        id: 'pete-alonso',
         player: 'Pete Alonso',
         team: 'NYM',
         avg: 0.23,
@@ -299,6 +313,7 @@ export const LargeDataset: Story = {
         ops: 0.821,
       },
       {
+        id: 'matt-olson',
         player: 'Matt Olson',
         team: 'ATL',
         avg: 0.283,
@@ -308,6 +323,7 @@ export const LargeDataset: Story = {
         ops: 0.923,
       },
       {
+        id: 'corey-seager',
         player: 'Corey Seager',
         team: 'TEX',
         avg: 0.327,
@@ -317,6 +333,7 @@ export const LargeDataset: Story = {
         ops: 0.947,
       },
       {
+        id: 'gleyber-torres',
         player: 'Gleyber Torres',
         team: 'NYY',
         avg: 0.273,
@@ -326,6 +343,7 @@ export const LargeDataset: Story = {
         ops: 0.81,
       },
       {
+        id: 'bo-bichette',
         player: 'Bo Bichette',
         team: 'TOR',
         avg: 0.306,
@@ -335,6 +353,7 @@ export const LargeDataset: Story = {
         ops: 0.827,
       },
       {
+        id: 'kyle-schwarber',
         player: 'Kyle Schwarber',
         team: 'PHI',
         avg: 0.197,
@@ -344,6 +363,7 @@ export const LargeDataset: Story = {
         ops: 0.792,
       },
       {
+        id: 'austin-riley',
         player: 'Austin Riley',
         team: 'ATL',
         avg: 0.273,
@@ -371,6 +391,7 @@ export const MixedDataTypes: Story = {
     ],
     data: [
       {
+        id: 'mike-trout',
         player: 'Mike Trout',
         age: 32,
         status: 'Active',
@@ -378,6 +399,7 @@ export const MixedDataTypes: Story = {
         draft_year: 2009,
       },
       {
+        id: 'shohei-ohtani',
         player: 'Shohei Ohtani',
         age: 29,
         status: 'Active',
@@ -385,6 +407,7 @@ export const MixedDataTypes: Story = {
         draft_year: 2017,
       },
       {
+        id: 'clayton-kershaw',
         player: 'Clayton Kershaw',
         age: 35,
         status: 'Active',
@@ -392,6 +415,7 @@ export const MixedDataTypes: Story = {
         draft_year: 2006,
       },
       {
+        id: 'jacob-degrom',
         player: 'Jacob deGrom',
         age: 35,
         status: 'Injured',
@@ -458,6 +482,7 @@ export const CompactTable: Story = {
       { key: 'hr', label: 'HR', sortable: true },
     ],
     data: battingData.map((row) => ({
+      id: row.id,
       player: row.player,
       avg: row.avg,
       hr: row.hr,
