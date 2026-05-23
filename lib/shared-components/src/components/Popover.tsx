@@ -29,22 +29,23 @@ export function Popover({
       <TamaguiPopover.Trigger asChild>{trigger}</TamaguiPopover.Trigger>
       <TamaguiPopover.Content
         borderWidth={1}
-        borderColor="$glassBorder"
+        borderColor="$outlineStrong"
         backgroundColor="$surfaceCard"
-        borderRadius={12}
-        padding="$3"
+        borderRadius={8}
+        padding={14}
+        minWidth={300}
         elevate
         animation="quick"
         enterStyle={{ y: -4, opacity: 0 }}
         exitStyle={{ y: -4, opacity: 0 }}
-        shadowColor="rgba(8, 12, 20, 0.55)"
-        shadowOffset={{ width: 0, height: 8 }}
-        shadowRadius={24}
+        shadowColor="rgba(8, 12, 20, 0.65)"
+        shadowOffset={{ width: 0, height: 12 }}
+        shadowRadius={32}
       >
         {arrow ? (
-          <TamaguiPopover.Arrow borderWidth={1} borderColor="$glassBorder" />
+          <TamaguiPopover.Arrow borderWidth={1} borderColor="$outlineStrong" />
         ) : null}
-        <YStack gap="$2">{children}</YStack>
+        <YStack gap={10}>{children}</YStack>
       </TamaguiPopover.Content>
     </TamaguiPopover>
   );
