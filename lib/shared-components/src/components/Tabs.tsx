@@ -34,12 +34,12 @@ export function Tabs({
     return (
       <YStack gap="$3">
         <XStack
-          gap={2}
+          gap={0}
           padding={3}
           borderRadius={9999}
-          backgroundColor="$surfaceSubtle"
+          backgroundColor="$surfaceCard"
           borderWidth={1}
-          borderColor="$outlineSubtle"
+          borderColor="$outlineStrong"
           alignSelf="flex-start"
         >
           {items.map((it) => {
@@ -47,8 +47,8 @@ export function Tabs({
             return (
               <XStack
                 key={it.value}
-                paddingHorizontal={12}
-                paddingVertical={6}
+                paddingHorizontal={14}
+                paddingVertical={7}
                 borderRadius={9999}
                 backgroundColor={active ? '$brandNavy' : 'transparent'}
                 onPress={() => !it.disabled && onValueChange(it.value)}
@@ -59,10 +59,10 @@ export function Tabs({
                 <Text
                   fontFamily="$heading"
                   fontWeight="700"
-                  fontSize={12}
-                  letterSpacing={0.6}
+                  fontSize={11}
+                  letterSpacing={0.88}
                   textTransform="uppercase"
-                  color={active ? '$color12' : '$textMuted'}
+                  color={active ? '$textOnAccent' : '$textMuted'}
                 >
                   {it.label}
                 </Text>
@@ -84,8 +84,8 @@ export function Tabs({
     >
       <TamaguiTabs.List
         borderBottomWidth={1}
-        borderColor="$glassBorder"
-        gap="$5"
+        borderColor="$outlineStrong"
+        gap={0}
         paddingBottom={0}
       >
         {items.map((it) => {
@@ -96,22 +96,23 @@ export function Tabs({
               value={it.value}
               disabled={it.disabled}
               unstyled
-              paddingHorizontal={4}
-              paddingVertical={10}
+              paddingHorizontal={18}
+              paddingVertical={14}
               borderBottomWidth={2}
               borderColor={active ? '$brandGold' : 'transparent'}
               cursor={it.disabled ? 'not-allowed' : 'pointer'}
               opacity={it.disabled ? 0.5 : 1}
+              animation="quick"
               hoverStyle={
                 !active ? { borderColor: '$outlineStrong' } : undefined
               }
             >
-              <XStack gap="$2" alignItems="center">
+              <XStack gap={6} alignItems="center">
                 <Text
                   fontFamily="$heading"
                   fontWeight="700"
                   fontSize={13}
-                  letterSpacing={0.6}
+                  letterSpacing={0.78}
                   textTransform="uppercase"
                   color={active ? '$color12' : '$textMuted'}
                 >
@@ -121,11 +122,14 @@ export function Tabs({
                   <Text
                     fontFamily="$mono"
                     fontSize={11}
-                    color="$textMuted"
+                    fontVariant={['tabular-nums']}
+                    color={active ? '$brandGoldLight' : '$color11'}
                     paddingHorizontal={6}
                     paddingVertical={1}
                     borderRadius={9999}
-                    backgroundColor="$surfaceSubtle"
+                    backgroundColor={
+                      active ? 'rgba(197, 165, 90, 0.18)' : '$surfaceCard'
+                    }
                   >
                     {it.count}
                   </Text>
