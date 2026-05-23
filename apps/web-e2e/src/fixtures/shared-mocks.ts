@@ -48,6 +48,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
     },
   },
   getuserleagues: { data: { userLeagues: [] } },
+  getpublicleagues: { data: { publicLeagues: [] } },
 
   // ── Home page ─────────────────────────────────────────────────────
   getuserleaguesummaries: { data: { getUserLeagueSummaries: [] } },

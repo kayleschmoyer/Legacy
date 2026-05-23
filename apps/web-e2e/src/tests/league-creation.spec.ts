@@ -322,13 +322,11 @@ test.describe('League Creation @critical', () => {
     // Verify the Draft Date & Time label is visible
     await expect(page.getByText('Draft Date & Time')).toBeVisible();
 
-    // DateTimePicker renders as a button (useNativeInput=false) showing the
-    // placeholder when no value is set. The default draftDate is undefined, so
-    // the button displays the placeholder text.
-    const datePickerButton = page
-      .locator('button')
-      .filter({ hasText: /select draft date and time/i });
-    await expect(datePickerButton.first()).toBeVisible();
+    // DateTimePicker (useNativeInput=false) renders two side-by-side trigger
+    // sub-fields. When no value is set, they show the "Date…" and "Time…"
+    // placeholders alongside Calendar/Clock icons.
+    await expect(page.getByText('Date…')).toBeVisible();
+    await expect(page.getByText('Time…')).toBeVisible();
   });
 
   test('timezone label is shown when no draft date is selected @regression', async ({
