@@ -18,6 +18,7 @@ import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
+import { checkRosterCapacity } from '../../../services/roster-service';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -271,6 +272,20 @@ builder.mutationField('commissionerPick', (t) =>
 
           if (existingPick.length > 0) {
             throw UserInputError('Player has already been drafted');
+          }
+
+          // Validate roster limit — count existing team members
+          const { isFull: rosterFull } = await checkRosterCapacity(
+            tx,
+            currentPickInfo.teamId,
+            draft.league_id,
+            league.maxRosterSize,
+          );
+
+          if (rosterFull) {
+            throw UserInputError(
+              `Team roster is full (${league.maxRosterSize} players maximum)`,
+            );
           }
 
           // Commit the pick: insert pick row, advance draft state, and add player to roster.
