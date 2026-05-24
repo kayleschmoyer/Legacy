@@ -19,6 +19,7 @@ export * from '../components/EmptyState';
 export * from '../components/ErrorState';
 export * from '../components/PanelCard';
 export * from '../components/UnifiedLoadingPanel';
+export * from '../components/Table';
 export * from '../features/common/SearchBar';
 export {
   OAuthProvider,
@@ -26,7 +27,6 @@ export {
   PlatformProviders,
   PlatformUtils,
   Icon,
-  Table,
   FlatList,
   Alert,
   Picker,
