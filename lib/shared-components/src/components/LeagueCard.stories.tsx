@@ -14,6 +14,27 @@ type Story = StoryObj<typeof meta>;
 
 const M = (...names: string[]) => names.map((n) => ({ name: n }));
 
+export const WithMatchup: Story = {
+  args: {
+    name: 'Dead Ball Dynasty',
+    meta: 'Week 14/22 · 12 teams',
+    matchup: {
+      away: {
+        abbr: 'NYY Yankees',
+        record: '8-4 · 1st',
+        score: 127.5,
+        colorVariant: 'navy',
+      },
+      home: {
+        abbr: 'BOS Red Sox',
+        record: '7-5 · 2nd',
+        score: 112.3,
+        colorVariant: 'red',
+      },
+    },
+  },
+};
+
 export const Active: Story = {
   args: {
     name: 'Cooperstown Society',
@@ -59,16 +80,28 @@ export const Grid: Story = {
   render: () => (
     <XStack gap="$3" flexWrap="wrap" maxWidth={760}>
       <LeagueCard
+        name="Dead Ball Dynasty"
+        meta="Week 14/22 · 12 teams"
+        matchup={{
+          away: {
+            abbr: 'NYY Yankees',
+            record: '8-4 · 1st',
+            score: 127.5,
+            colorVariant: 'navy',
+          },
+          home: {
+            abbr: 'BOS Red Sox',
+            record: '7-5 · 2nd',
+            score: 112.3,
+            colorVariant: 'red',
+          },
+        }}
+      />
+      <LeagueCard
         name="Cooperstown Society"
         meta="12 teams · Week 14/22"
         status={{ label: 'Active', variant: 'active' }}
         members={M('A', 'B', 'C', 'D')}
-      />
-      <LeagueCard
-        name="Brooklyn Bridegrooms"
-        meta="10 teams · Round 4"
-        status={{ label: 'Draft Live', variant: 'draftLive' }}
-        members={M('A', 'B', 'C', 'D', 'E', 'F')}
       />
     </XStack>
   ),

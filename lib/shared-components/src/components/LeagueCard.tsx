@@ -2,10 +2,21 @@ import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 import { StatusBadge, type StatusBadgeVariant } from './StatusBadge';
 
+export interface LeagueTeam {
+  /** Display string e.g. "NYY Yankees" */
+  abbr: string;
+  /** Record + standing e.g. "8-4 · 1st" */
+  record?: string;
+  score: number;
+  colorVariant?: 'navy' | 'red';
+}
+
 export interface LeagueCardProps {
   name: string;
-  /** e.g. "12 teams · Week 14/22" */
+  /** e.g. "Week 14/22 · 12 teams" */
   meta?: string;
+  /** When provided, renders score rows for the current matchup. */
+  matchup?: { home: LeagueTeam; away: LeagueTeam };
   status?: { label: string; variant: StatusBadgeVariant };
   /** Up to 4 avatar URLs/initials for the stack. */
   members?: { name: string; src?: string }[];
@@ -15,6 +26,70 @@ export interface LeagueCardProps {
   premium?: boolean;
   onPress?: () => void;
 }
+
+const TeamDot = ({
+  colorVariant = 'navy',
+}: {
+  colorVariant?: 'navy' | 'red';
+}): React.JSX.Element => (
+  <YStack
+    width={28}
+    height={28}
+    borderRadius={9999}
+    backgroundColor={
+      colorVariant === 'red' ? '$brandSeamRedLight' : '$brandNavyLight'
+    }
+    borderWidth={1}
+    borderColor="rgba(255,255,255,0.12)"
+  />
+);
+
+const ScoreRow = ({
+  team,
+  isWinner,
+}: {
+  team: LeagueTeam;
+  isWinner: boolean;
+}): React.JSX.Element => (
+  <XStack
+    alignItems="center"
+    justifyContent="space-between"
+    paddingVertical={14}
+    paddingHorizontal={16}
+    backgroundColor="rgba(255, 255, 255, 0.02)"
+    borderRadius={8}
+    marginBottom={8}
+  >
+    <XStack alignItems="center" gap={10}>
+      <TeamDot colorVariant={team.colorVariant} />
+      <YStack>
+        <Text
+          fontFamily="$heading"
+          fontWeight="700"
+          fontSize={15}
+          letterSpacing={0.6}
+          color="$color12"
+        >
+          {team.abbr}
+        </Text>
+        {team.record ? (
+          <Text fontFamily="$mono" fontSize={12} color="$textMuted">
+            {team.record}
+          </Text>
+        ) : null}
+      </YStack>
+    </XStack>
+    <Text
+      fontFamily="$heading"
+      fontWeight="800"
+      fontSize={28}
+      color={isWinner ? '$color12' : '$textMuted'}
+      style={{ fontVariantNumeric: 'tabular-nums' } as never}
+    >
+      {team.score.toFixed(1)}
+    </Text>
+  </XStack>
+);
 
 const Initials = ({ name }: { name: string }): React.JSX.Element => {
   const initials = name
@@ -47,27 +122,27 @@ const Initials = ({ name }: { name: string }): React.JSX.Element => {
   );
 };
 
-/**
- * Dashboard "My Leagues" tile. Header: title + status; Footer: meta /
- * member stack. Premium variant gets the aged-gold border + glow.
- */
+/** Dashboard "My Leagues" tile — score rows when matchup is provided, member stack otherwise. */
 export function LeagueCard({
   name,
   meta,
+  matchup,
   status,
   members = [],
   footer,
   premium = false,
   onPress,
 }: LeagueCardProps): React.JSX.Element {
+  const homeWinner = matchup ? matchup.home.score >= matchup.away.score : false;
+
   return (
     <YStack
       borderRadius={16}
       borderWidth={1}
       borderColor={premium ? '$brandGold' : '$glassBorder'}
       backgroundColor="$surfaceCard"
-      padding="$4"
-      gap="$3"
+      padding={20}
+      maxWidth={420}
       width="100%"
       cursor={onPress ? 'pointer' : undefined}
       onPress={onPress}
@@ -85,19 +160,28 @@ export function LeagueCard({
       shadowOffset={{ width: 0, height: 4 }}
       shadowRadius={14}
     >
-      <XStack alignItems="flex-start" justifyContent="space-between" gap="$3">
-        <YStack flex={1} gap={4}>
+      {/* Header row */}
+      <XStack
+        alignItems="flex-start"
+        justifyContent="space-between"
+        marginBottom={16}
+      >
+        <YStack flex={1}>
           <Text
             fontFamily="$heading"
             fontWeight="800"
             fontSize={20}
-            letterSpacing={-0.2}
             color="$color12"
           >
             {name}
           </Text>
           {meta ? (
-            <Text fontFamily="$body" fontSize={13} color="$textMuted">
+            <Text
+              fontFamily="$body"
+              fontSize={13}
+              color="$textMuted"
+              marginTop={4}
+            >
               {meta}
             </Text>
           ) : null}
@@ -107,7 +191,16 @@ export function LeagueCard({
         ) : null}
       </XStack>
 
-      {members.length > 0 ? (
+      {/* Matchup score rows */}
+      {matchup ? (
+        <YStack>
+          <ScoreRow team={matchup.away} isWinner={!homeWinner} />
+          <ScoreRow team={matchup.home} isWinner={homeWinner} />
+        </YStack>
+      ) : null}
+
+      {/* Member avatar stack — shown when no matchup is present */}
+      {!matchup && members.length > 0 ? (
         <XStack gap={-8} alignItems="center">
           {members.slice(0, 4).map((m) => (
             <Initials key={m.name} name={m.name} />
