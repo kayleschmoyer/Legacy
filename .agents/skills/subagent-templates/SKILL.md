@@ -103,7 +103,7 @@ For subagents that explore or modify **MCP server code** (e.g. adding a new tool
 
 ## Work Subagents (Multi-Ticket Orchestrators)
 
-> **Note on dispatch model**: `/sweep-prs`, `/work-bugs`, and `/work-mcp-gaps` now dispatch **chips** via `mcp__ccd_session__spawn_task` instead of subagents. Each chip is its own Claude Code session that runs the native worktree flow internally — it does NOT need the setup block below. The work-subagent template here applies to `Agent(isolation: "worktree")` callers (currently `/work-ticket` Parent Mode and any orchestrator falling back when chips are unavailable).
+> **Note on dispatch model**: all current multi-ticket orchestrators — `/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, and `/work-ticket` Parent Mode — dispatch **chips** via `mcp__ccd_session__spawn_task`. Each chip is its own Claude Code session that runs the native worktree flow internally — it does NOT need the setup block below. The work-subagent template here is the **fallback** for any orchestrator running in an environment where `mcp__ccd_session__spawn_task` is unavailable (ToolSearch returns no result).
 
 For **work subagents** dispatched via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty.
 
@@ -111,7 +111,7 @@ The canonical setup + tool preferences block lives in [`.agents/shared/subagent-
 
 @../../shared/subagent-setup.md
 
-Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Multi-ticket orchestrators should always use `Agent(isolation: "worktree")` rather than session-launcher worktrees for each ticket.
+Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Use this pattern only when `mcp__ccd_session__spawn_task` is confirmed unavailable — chips are always preferred over `Agent(isolation: "worktree")` for multi-ticket orchestration.
 
 ## Parent-Agent Recovery
 

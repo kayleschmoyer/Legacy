@@ -13,7 +13,7 @@ This skill is a **router**. It describes the two worktree flows, when to use eac
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | **Native ephemeral (primary)**   | Single-ticket leaf work. Session spawned with Claude Code launcher `worktree` checkbox checked.                                                                                                                                    | See "Native Flow" below + [AGENTS.md Workflow Step 4](../../../AGENTS.md) + [work-ticket SKILL.md](../work-ticket/SKILL.md) |
 | **Chip dispatch (multi-ticket)** | Multi-ticket orchestrators: `/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`. Orchestrator spawns one chip per ticket/PR via `mcp__ccd_session__spawn_task`; each chip is an independent session that uses the native flow internally. | See "Chip Dispatch" below + orchestrator command files                                                                      |
-| **Subagent dispatch (legacy)**   | Parent/epic iteration via `Agent(isolation: "worktree")`. Used by `/work-ticket` Parent Mode and fallback paths when chips are unavailable.                                                                                        | See "Subagent Dispatch" below + orchestrator command files                                                                  |
+| **Subagent dispatch (legacy)**   | Fallback when chips (`mcp__ccd_session__spawn_task`) are unavailable. All current multi-ticket orchestrators (including `/work-ticket` Parent Mode) use chip dispatch instead.                                                     | See "Subagent Dispatch" below + orchestrator command files                                                                  |
 | **Sibling worktree (legacy)**    | Fallback when `Agent(isolation: "worktree")` is unavailable, or chained branch stacks requiring twig.                                                                                                                              | See [references/sibling/sibling-worktree-flow.md](references/sibling/sibling-worktree-flow.md)                              |
 
 > **Both flows keep `D:\code\legacy-sports` on `main`.** Working in the main repo directory with HEAD on a feature branch is forbidden. The native flow puts the branch in `.claude/worktrees/<name>/`; the sibling flow puts it in `D:\code\legacy-sports-worktrees\<ticket>\`.
@@ -97,7 +97,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 
 ## Subagent Dispatch (legacy / parent-ticket iteration)
 
-`/work-ticket` Parent Mode (and any orchestrator running in an environment where chips are unavailable) dispatches **`Agent(isolation: "worktree")` subagents** for each child ticket. The orchestrator itself only makes API calls — it never modifies its own working tree.
+**`/work-ticket` Parent Mode dispatches chips** via `mcp__ccd_session__spawn_task` — use that first. `Agent(isolation: "worktree")` subagents are the **fallback** for environments where `mcp__ccd_session__spawn_task` is unavailable (ToolSearch returns no result). The orchestrator itself only makes API calls — it never modifies its own working tree.
 
 **Why subagents?**
 

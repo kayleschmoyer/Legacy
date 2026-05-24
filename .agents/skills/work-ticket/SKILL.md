@@ -35,6 +35,10 @@ The `--batch` flag is also implied when:
 - The user's natural-language request contains phrases like "work all tickets under", "process the full backlog", or "implement all children of".
 - The input ticket is a **recognized bucket epic** (its key matches what `jira_get_bucket_epic` returns for any known bucket: `design-sync`, `mcp-gaps`, `client-bugs`). For bucket epics, auto-batch is the default — no user prompt is needed.
 
+## Critical Rules
+
+> **⛔ CHIP DISPATCH: use `mcp__ccd_session__spawn_task`, NEVER the `Agent` tool.** When this skill needs to spawn an independent agent session for a child ticket (Parent Dispatch Mode step 5, batch mode step 3, or follow-up ticket dispatch in Leaf Mode step 4), the **only** correct mechanism is `mcp__ccd_session__spawn_task`. The `Agent(...)` tool creates an in-context subagent that shares the parent session's context window and **cannot** create its own worktree or drive a PR to merge independently. Using `Agent(...)` instead of `mcp__ccd_session__spawn_task(...)` is not a fallback — it produces a fundamentally different (and incorrect) result. If `mcp__ccd_session__spawn_task` is unavailable (ToolSearch returns no result), stop and inform the user rather than substituting the `Agent` tool.
+
 ## Steps
 
 > **⛔ NON-NEGOTIABLE: Any ticket that produces a code change MUST result in a merged PR. The workflow is not complete at `make pc`. The workflow is not complete when the PR is created. The workflow is complete when the PR is MERGED. Stopping before PR creation is the single most common agent failure mode — it is never acceptable.**
