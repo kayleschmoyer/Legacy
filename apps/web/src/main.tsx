@@ -107,6 +107,11 @@ const PUBLIC_PATHS = [
   // /donate is publicly accessible so unauthenticated users can
   // support the platform without signing in (LS-3777).
   `${basePath}/donate`,
+  // /preferences is publicly accessible — Appearance and Sports
+  // settings are localStorage-only and work without auth. The
+  // Notifications section shows a sign-in card when unauthed
+  // (LS-4791).
+  `${basePath}/preferences`,
 ];
 
 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
