@@ -1,6 +1,5 @@
 import React from 'react';
-import { Button, Sheet as TamaguiSheet, Text, XStack, YStack } from 'tamagui';
-import { X } from '@tamagui/lucide-icons';
+import { Sheet as TamaguiSheet, Text, YStack } from 'tamagui';
 
 export interface SheetProps {
   open: boolean;
@@ -11,10 +10,23 @@ export interface SheetProps {
   children?: React.ReactNode;
 }
 
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return reduced;
+}
+
 /**
  * Bottom sheet — used for mobile filter pickers and contextual actions.
- * Drag handle, optional title row, full-bleed body. Snap points default
- * to half-height + near-full-screen.
+ * Drag handle, optional title, full-bleed body. Snap points default to
+ * half-height + near-full-screen.
  */
 export function Sheet({
   open,
@@ -23,6 +35,9 @@ export function Sheet({
   snapPoints = [50, 90],
   children,
 }: SheetProps): React.JSX.Element {
+  const reducedMotion = useReducedMotion();
+  const animation = reducedMotion ? '100ms' : 'medium';
+
   return (
     <TamaguiSheet
       modal
@@ -31,45 +46,47 @@ export function Sheet({
       snapPointsMode="percent"
       snapPoints={snapPoints}
       dismissOnSnapToBottom
-      animation="medium"
+      animation={animation}
     >
       <TamaguiSheet.Overlay
-        animation="medium"
-        backgroundColor="#000"
-        opacity={0.55}
+        animation={animation}
+        backgroundColor="rgba(8, 12, 20, 0.55)"
+        style={{ backdropFilter: 'blur(4px)' } as never}
         enterStyle={{ opacity: 0 }}
         exitStyle={{ opacity: 0 }}
       />
       <TamaguiSheet.Frame
-        backgroundColor="$surfaceCard"
+        backgroundColor="$surfacePanel"
+        borderTopWidth={1}
+        borderTopColor="$surfacePanelBorder"
         borderTopLeftRadius={20}
         borderTopRightRadius={20}
-        padding="$4"
-        gap="$3"
+        shadowColor="rgba(8, 12, 20, 0.75)"
+        shadowOffset={{ width: 0, height: 20 }}
+        shadowRadius={48}
+        paddingTop={18}
+        paddingHorizontal={20}
+        paddingBottom={28}
+        gap={14}
       >
-        <TamaguiSheet.Handle backgroundColor="$outlineStrong" />
+        <TamaguiSheet.Handle
+          width={40}
+          height={4}
+          backgroundColor="$outlineStrong"
+          alignSelf="center"
+          marginBottom={6}
+        />
         {title ? (
-          <XStack alignItems="center" justifyContent="space-between">
-            <Text
-              fontFamily="$heading"
-              fontWeight="800"
-              fontSize={20}
-              letterSpacing={-0.2}
-              color="$color12"
-            >
-              {title}
-            </Text>
-            <Button
-              size="$2"
-              circular
-              chromeless
-              onPress={() => onOpenChange(false)}
-              icon={<X size={16} color="$textMuted" />}
-              aria-label="Close"
-            />
-          </XStack>
+          <Text
+            fontFamily="$heading"
+            fontWeight="800"
+            fontSize={20}
+            color="$color12"
+          >
+            {title}
+          </Text>
         ) : null}
-        <YStack flex={1} gap="$3">
+        <YStack flex={1} gap={14}>
           {children}
         </YStack>
       </TamaguiSheet.Frame>
