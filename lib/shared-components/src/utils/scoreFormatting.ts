@@ -53,6 +53,24 @@ export function getScoreDeltaColor(delta: number): string {
 }
 
 /**
+ * Format a fantasy points total for display in a standings table.
+ * Applies comma thousands-separators and one decimal place (e.g. 1548.2 → "1,548.2").
+ * Returns "—" for null/undefined/non-finite values.
+ */
+export function formatPoints(
+  value: number | null | undefined,
+  placeholder = '—',
+): string {
+  if (value == null || !Number.isFinite(value)) {
+    return placeholder;
+  }
+
+  const parts = value.toFixed(1).split('.');
+  const whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${whole}.${parts[1] ?? '0'}`;
+}
+
+/**
  * Determine which team is leading based on scores.
  * Returns 1 if team1 leads, 2 if team2 leads, 0 if tied.
  */

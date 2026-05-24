@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import { Chip } from './Chip';
+import { formatPoints } from '../utils/scoreFormatting';
+import { TABULAR_NUMS } from '../utils/typography';
 
 export interface StandingsRow {
   rank: number;
@@ -9,31 +10,41 @@ export interface StandingsRow {
   wins: number;
   losses: number;
   ties?: number;
-  gamesBack?: number;
+  pct: string;
+  pf: number;
+  pa: number;
   /** "W3", "L1", etc. */
   streak?: string;
+  /** Dim avatar and italicize name for teams on bye week. */
+  onBye?: boolean;
 }
 
 export interface StandingsTableProps {
   rows: StandingsRow[];
-  title?: string;
+  label?: string;
 }
+
+const STREAK_WIN = '#6fd39a';
+const STREAK_LOSS = '#e07a8c';
 
 const HCell = ({
   children,
   width,
+  flex,
   align = 'left',
 }: {
-  children: React.ReactNode;
-  width: number | string;
-  align?: 'left' | 'right' | 'center';
+  children?: React.ReactNode;
+  width?: number;
+  flex?: number;
+  align?: 'left' | 'right';
 }) => (
   <Text
     width={width as never}
+    flex={flex as never}
     fontFamily="$heading"
-    fontSize={11}
     fontWeight="700"
-    letterSpacing={1.4}
+    fontSize={10}
+    letterSpacing={1.0}
     textTransform="uppercase"
     color="$textMuted"
     textAlign={align}
@@ -42,153 +53,190 @@ const HCell = ({
   </Text>
 );
 
-const Cell = ({
+const DCell = ({
   children,
   width,
+  flex,
   align = 'left',
-  mono = false,
-  gold = false,
+  color = '$color11',
 }: {
   children: React.ReactNode;
-  width: number | string;
-  align?: 'left' | 'right' | 'center';
-  mono?: boolean;
-  gold?: boolean;
+  width?: number;
+  flex?: number;
+  align?: 'left' | 'right';
+  color?: string;
 }) => (
   <Text
     width={width as never}
-    fontFamily={mono ? '$mono' : '$body'}
+    flex={flex as never}
+    fontFamily="$mono"
     fontSize={13}
-    color={gold ? '$brandGold' : '$color'}
+    color={color as never}
     textAlign={align}
-    style={{ fontVariantNumeric: 'tabular-nums' } as never}
+    {...TABULAR_NUMS}
   >
     {children}
   </Text>
 );
 
-/**
- * Vertical league standings list. The leader row gets the gold-rim
- * treatment per the design handoff.
- */
 export function StandingsTable({
   rows,
-  title,
+  label,
 }: StandingsTableProps): React.JSX.Element {
   return (
-    <YStack
-      borderRadius={16}
-      borderWidth={1}
-      borderColor="$glassBorder"
-      backgroundColor="$surfaceCard"
-      overflow="hidden"
-      width="100%"
-    >
-      {title ? (
-        <XStack padding="$4" borderBottomWidth={1} borderColor="$glassBorder">
-          <Text
-            fontFamily="$heading"
-            fontSize={16}
-            fontWeight="800"
-            color="$color12"
-            letterSpacing={-0.1}
-          >
-            {title}
-          </Text>
-        </XStack>
+    <YStack width="100%">
+      {label ? (
+        <Text
+          fontFamily="$heading"
+          fontWeight="700"
+          fontSize={11}
+          letterSpacing={1.4}
+          textTransform="uppercase"
+          color="$textMuted"
+          marginBottom={8}
+        >
+          {label}
+        </Text>
       ) : null}
 
-      <XStack
-        paddingHorizontal="$4"
-        paddingVertical={10}
-        borderBottomWidth={1}
-        borderColor="$glassBorder"
+      <YStack
+        borderRadius={16}
+        borderWidth={1}
+        borderColor="$surfacePanelBorder"
+        backgroundColor="$surfacePanel"
+        overflow="hidden"
+        width="100%"
       >
-        <HCell width={36}>#</HCell>
-        <HCell width="40%">Team</HCell>
-        <HCell width={48} align="right">
-          W
-        </HCell>
-        <HCell width={48} align="right">
-          L
-        </HCell>
-        <HCell width={56} align="right">
-          GB
-        </HCell>
-        <HCell width={56} align="right">
-          Streak
-        </HCell>
-      </XStack>
+        {/* Header */}
+        <XStack
+          paddingHorizontal={14}
+          paddingVertical={12}
+          backgroundColor="$surfaceCard"
+          borderBottomWidth={1}
+          borderBottomColor="$outlineStrong"
+          alignItems="center"
+        >
+          <HCell width={24} />
+          <HCell flex={1}>Team</HCell>
+          <HCell width={72} align="right">
+            W-L-T
+          </HCell>
+          <HCell width={48} align="right">
+            PCT
+          </HCell>
+          <HCell width={72} align="right">
+            PF
+          </HCell>
+          <HCell width={72} align="right">
+            PA
+          </HCell>
+          <HCell width={36} align="right">
+            Strk
+          </HCell>
+        </XStack>
 
-      <YStack>
-        {rows.map((r, i) => {
-          const leader = r.rank === 1;
-          return (
-            <XStack
-              key={r.teamAbbr}
-              paddingHorizontal="$4"
-              paddingVertical={12}
-              alignItems="center"
-              backgroundColor={leader ? 'rgba(197,165,90,0.08)' : 'transparent'}
-              borderTopWidth={leader ? 1 : 0}
-              borderBottomWidth={leader ? 1 : i < rows.length - 1 ? 1 : 0}
-              borderColor={leader ? '$brandGold' : '$glassBorder'}
-              hoverStyle={{ backgroundColor: '$surfaceInteractive' }}
-            >
-              <Cell width={36} mono gold={leader}>
-                {r.rank}
-              </Cell>
-              <YStack width="40%">
-                <XStack gap="$2" alignItems="baseline">
-                  <Text
-                    fontFamily="$heading"
-                    fontWeight="800"
-                    fontSize={14}
-                    color={leader ? '$brandGold' : '$color12'}
-                    letterSpacing={0.6}
+        {/* Rows */}
+        <YStack>
+          {rows.map((r, i) => {
+            const leader = r.rank === 1;
+            const last = i === rows.length - 1;
+            const streakColor = r.streak?.startsWith('W')
+              ? STREAK_WIN
+              : r.streak?.startsWith('L')
+                ? STREAK_LOSS
+                : undefined;
+
+            return (
+              <XStack
+                key={`${r.rank}-${r.teamAbbr}`}
+                paddingHorizontal={14}
+                paddingVertical={12}
+                alignItems="center"
+                borderBottomWidth={last ? 0 : 1}
+                borderBottomColor="$outlineSubtle"
+                hoverStyle={{ backgroundColor: '$surfaceInteractive' }}
+                animation="quick"
+              >
+                {/* Rank */}
+                <Text
+                  width={24}
+                  fontFamily="$heading"
+                  fontWeight="800"
+                  fontSize={leader ? 14 : 13}
+                  color={leader ? '$brandGold' : '$textMuted'}
+                  textAlign="center"
+                >
+                  {r.rank}
+                </Text>
+
+                {/* Team */}
+                <XStack flex={1} alignItems="center" gap={10}>
+                  <YStack
+                    width={24}
+                    height={24}
+                    borderRadius={12}
+                    backgroundColor={leader ? '$brandGold' : '$brandNavy'}
+                    borderWidth={leader ? 1 : 0}
+                    borderColor="$brandGold"
+                    alignItems="center"
+                    justifyContent="center"
+                    opacity={r.onBye ? 0.5 : 1}
                   >
-                    {r.teamAbbr}
-                  </Text>
+                    <Text
+                      fontFamily="$heading"
+                      fontWeight="800"
+                      fontSize={10}
+                      color={leader ? '#1A1206' : '$brandGoldLight'}
+                      lineHeight={1}
+                      textAlign="center"
+                    >
+                      {r.teamAbbr.substring(0, 2).toUpperCase()}
+                    </Text>
+                  </YStack>
                   <Text
+                    flex={1}
                     fontFamily="$body"
-                    fontSize={13}
-                    color="$textMuted"
+                    fontSize={14}
+                    color={r.onBye ? '$color10' : '$color12'}
+                    fontStyle={r.onBye ? 'italic' : undefined}
                     numberOfLines={1}
                   >
                     {r.teamName}
                   </Text>
                 </XStack>
-              </YStack>
-              <Cell width={48} align="right" mono>
-                {r.wins}
-              </Cell>
-              <Cell width={48} align="right" mono>
-                {r.losses}
-                {typeof r.ties === 'number' ? `-${r.ties}` : ''}
-              </Cell>
-              <Cell width={56} align="right" mono>
-                {r.gamesBack === 0 || r.gamesBack === undefined
-                  ? '—'
-                  : r.gamesBack.toFixed(1)}
-              </Cell>
-              <XStack width={56} justifyContent="flex-end">
-                {r.streak ? (
-                  <Chip
-                    label={r.streak}
-                    size="sm"
-                    tone={
-                      r.streak.startsWith('W')
-                        ? 'success'
-                        : r.streak.startsWith('L')
-                          ? 'seam'
-                          : 'neutral'
-                    }
-                  />
-                ) : null}
+
+                {/* W-L-T */}
+                <DCell width={72} align="right">
+                  {r.wins}-{r.losses}-{r.ties ?? 0}
+                </DCell>
+
+                {/* PCT */}
+                <DCell width={48} align="right">
+                  {r.pct}
+                </DCell>
+
+                {/* PF */}
+                <DCell width={72} align="right">
+                  {formatPoints(r.pf)}
+                </DCell>
+
+                {/* PA */}
+                <DCell width={72} align="right">
+                  {formatPoints(r.pa)}
+                </DCell>
+
+                {/* Streak */}
+                <DCell
+                  width={36}
+                  align="right"
+                  color={streakColor ?? '$color11'}
+                >
+                  {r.streak ?? '—'}
+                </DCell>
               </XStack>
-            </XStack>
-          );
-        })}
+            );
+          })}
+        </YStack>
       </YStack>
     </YStack>
   );
