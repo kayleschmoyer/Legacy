@@ -624,14 +624,13 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
             </H1>
           </YStack>
           <YStack alignItems="flex-end" gap="$1">
-            <XStack alignItems="baseline" gap="$1">
+            <XStack alignItems="baseline" gap="$1" testID="clue-counter">
               <Text
                 fontSize={40}
                 lineHeight={40}
                 fontWeight="800"
                 color="$brandGoldLight"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
-                testID="clue-counter"
               >
                 {revealedClues.length}
               </Text>
@@ -640,7 +639,7 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
                 color="$textMuted"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               >
-                /{totalClues}
+                {` / ${totalClues}`}
               </Text>
             </XStack>
             <Eyebrow color="$textMuted">Clues</Eyebrow>

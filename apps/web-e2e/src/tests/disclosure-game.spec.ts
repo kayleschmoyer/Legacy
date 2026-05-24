@@ -278,7 +278,7 @@ test.describe('Progressive Disclosure Game @minigame', () => {
       timeout: 5000,
     });
     await expect(page.getByTestId('result-headline')).toContainText(
-      'Better luck',
+      'Flag raised',
     );
     await expect(page.getByTestId('result-correct-player')).toContainText(
       String(CORRECT_PLAYER_ID),
