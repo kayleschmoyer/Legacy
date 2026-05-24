@@ -245,27 +245,24 @@ test.describe('Roster Management – layout @regression', () => {
     const rosterRegion = page.getByRole('region', {
       name: /roster management/i,
     });
-    await expect(
-      rosterRegion.getByText('Lineup', { exact: true }).first(),
-    ).toBeVisible();
+    // QuickStat labels render with CSS text-transform:uppercase; use case-insensitive regex
+    await expect(rosterRegion.getByText(/^lineup$/i).first()).toBeVisible();
   });
 
   test('shows Bench quickstat', async ({ page }) => {
     const rosterRegion = page.getByRole('region', {
       name: /roster management/i,
     });
-    await expect(
-      rosterRegion.getByText('Bench', { exact: true }).first(),
-    ).toBeVisible();
+    // Bench is now shown as separate Hitters / Pitchers quickstats (UI redesign)
+    await expect(rosterRegion.getByText(/^hitters$/i).first()).toBeVisible();
   });
 
   test('shows Open quickstat', async ({ page }) => {
     const rosterRegion = page.getByRole('region', {
       name: /roster management/i,
     });
-    await expect(
-      rosterRegion.getByText('Open', { exact: true }).first(),
-    ).toBeVisible();
+    // QuickStat labels render with CSS text-transform:uppercase; use case-insensitive regex
+    await expect(rosterRegion.getByText(/^open$/i).first()).toBeVisible();
   });
 });
 
@@ -292,10 +289,14 @@ test.describe('Roster Management – player data @regression', () => {
   });
 
   test('shows SP position type label', async ({ page }) => {
-    // The Pitching roster section contains SP slot labels; scope to that section
-    // to avoid colliding with other "SP" occurrences elsewhere on the page.
+    // The Starting Pitchers section contains SP slot labels; scope to avoid
+    // collisions with other "SP" text elsewhere on the page.
+    // Section title "Starting Pitchers" → data-testid="roster-section-starting-pitchers"
     await expect(
-      page.getByTestId('roster-section-pitching').getByText('SP').first(),
+      page
+        .getByTestId('roster-section-starting-pitchers')
+        .getByText('SP')
+        .first(),
     ).toBeVisible();
   });
 });
@@ -308,7 +309,11 @@ test.describe('Roster Management – bench/bullpen regions @regression', () => {
   });
 
   test('shows Bench region', async ({ page }) => {
-    await expect(page.getByRole('region', { name: /bench/i })).toBeVisible();
+    // Bench is now split into "Bench Hitters" and "Bench Pitchers" panels.
+    // Scope to the hitters panel to avoid a strict-mode violation from two matches.
+    await expect(
+      page.getByRole('region', { name: /bench hitters/i }),
+    ).toBeVisible();
   });
 });
 
