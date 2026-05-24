@@ -308,7 +308,8 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/baseball/mock-draft',
     '/management',
     '/profile/settings',
-    '/preferences',
+    // /preferences is publicly accessible (LS-4791) — see preferences.spec.ts for
+    // unauthenticated coverage (appearance section, NotificationsSignInCard).
     // /help is publicly accessible (LS-3513) — see Public Routes section below.
     // /games/season-draft/create is authenticated-only (LS-3543). An automated
     // scanner attempted to click the landing-page CTA with the invalid

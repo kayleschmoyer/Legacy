@@ -9,6 +9,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Separator, styled, Text } from 'tamagui';
 import {
   Check,
@@ -409,8 +410,21 @@ const TESTIMONIALS = [
 
 export default function PricingPage() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // EnhancedAuthGuard sits above BrowserRouter and only re-checks the path on
+  // a fresh page load, not on client-side navigation.  Unauthenticated users
+  // need a full navigation so the guard intercepts at "/" and shows the sign-in
+  // page.  Authenticated users keep the SPA transition (no reload, no state loss).
+  const navigateToHome = () => {
+    if (isAuthenticated) {
+      navigate('/');
+    } else {
+      window.location.assign('/');
+    }
+  };
 
   const prices = useStripePrices();
   const monthlyPrice = prices.monthlyPrice;
@@ -536,7 +550,7 @@ export default function PricingPage() {
                 </Paragraph>
               </PlanHeader>
 
-              <OutlineButton onPress={() => navigate('/')}>
+              <OutlineButton onPress={navigateToHome}>
                 Get Started Free
               </OutlineButton>
 
@@ -901,7 +915,7 @@ export default function PricingPage() {
               >
                 Upgrade to Premium
               </ActionButton>
-              <OutlineButton onPress={() => navigate('/')} width={180}>
+              <OutlineButton onPress={navigateToHome} width={180}>
                 Get Started Free
               </OutlineButton>
             </XStack>

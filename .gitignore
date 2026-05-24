@@ -351,3 +351,4 @@ scratch/*
 
 # Copilot CLI session marker (runtime file written by session-start hook)
 .copilot-session
+.twig
