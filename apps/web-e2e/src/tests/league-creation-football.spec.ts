@@ -106,7 +106,8 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await expect(
       page.getByRole('heading', { name: /Create Baseball League/i }),
     ).toBeVisible();
-    // Baseball-specific era card.
+    // Baseball-specific era card — expand the era section first.
+    await expandSection(page, 'era-history');
     await expect(page.getByText(/Dead Ball/i)).toBeVisible();
     // Football beta banner is hidden in baseball mode.
     await expect(page.getByTestId('football-beta-banner')).toHaveCount(0);
@@ -129,9 +130,11 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await expect(
       page.getByRole('heading', { name: /Create Football League/i }),
     ).toBeVisible();
-    // Football-specific era card.
+    // Football-specific era card — expand the era section first.
+    await expandSection(page, 'era-history');
     await expect(page.getByText(/Super Bowl Era/i)).toBeVisible();
-    // Football conference pool button.
+    // Football conference pool button — expand roster section first.
+    await expandSection(page, 'roster-schedule');
     await expect(
       page.getByRole('button', { name: 'NFC', exact: true }),
     ).toBeVisible();
@@ -152,6 +155,8 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await expect(
       page.getByRole('heading', { name: /Create Football League/i }),
     ).toBeVisible();
+    // Football-specific era card — expand the era section first.
+    await expandSection(page, 'era-history');
     await expect(page.getByText(/Super Bowl Era/i)).toBeVisible();
   });
 
@@ -166,6 +171,8 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await expect(
       page.getByRole('heading', { name: /Create Baseball League/i }),
     ).toBeVisible();
+    // Baseball-specific era card — expand the era section first.
+    await expandSection(page, 'era-history');
     await expect(page.getByText(/Dead Ball/i)).toBeVisible();
   });
 
