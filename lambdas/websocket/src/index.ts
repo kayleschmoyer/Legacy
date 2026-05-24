@@ -55,21 +55,8 @@ LOGGER.info('WebSocket Lambda initialized', {
 });
 
 const dynamoClient = new DynamoDBClient({});
-const connectionsTable = process.env['CONNECTIONS_TABLE_NAME'];
-const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'];
-
-// Validate required environment variables
-if (!connectionsTable) {
-  const errorMsg = 'CONNECTIONS_TABLE_NAME environment variable is required';
-  LOGGER.error(errorMsg);
-  throw new Error(errorMsg);
-}
-
-if (!JWT_SECRET_NAME) {
-  const errorMsg = 'JWT_SECRET_NAME environment variable is required';
-  LOGGER.error(errorMsg);
-  throw new Error(errorMsg);
-}
+const connectionsTable = process.env['CONNECTIONS_TABLE_NAME'] ?? '';
+const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] ?? '';
 
 /**
  * Coerce an unknown caught value to an Error instance.
@@ -923,6 +910,22 @@ async function handleDefault(
 const baseWebSocketHandler = async (
   event: APIGatewayProxyWebsocketEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
+  // Validate required environment variables on each invocation rather than at
+  // module load time. Throwing at module load makes the module untestable
+  // (static imports are hoisted before env-var setup in Jest) and causes
+  // Rollbar noise when the module is loaded in test environments.
+  if (!connectionsTable || !JWT_SECRET_NAME) {
+    LOGGER.error(
+      'Missing required environment variables',
+      new Error('CONNECTIONS_TABLE_NAME and JWT_SECRET_NAME must be set'),
+      {
+        CONNECTIONS_TABLE_NAME: connectionsTable ? 'SET' : 'MISSING',
+        JWT_SECRET_NAME: JWT_SECRET_NAME ? 'SET' : 'MISSING',
+      },
+    );
+    return { statusCode: 500, body: 'Server configuration error' };
+  }
+
   const connectionId = event.requestContext.connectionId;
   const routeKey = event.requestContext.routeKey;
 

@@ -87,18 +87,28 @@ jest.mock('drizzle-orm', () => ({
   eq: jest.fn((a: unknown, b: unknown) => [a, b]),
 }));
 
-// Set required env vars before import
+import { verify } from 'jsonwebtoken';
+import { LOGGER } from '@legacy-sports/logging';
+// Type-only import erased at compile time — produces no `require('./index')` at
+// runtime, so it does not interfere with the env-var setup below.
+import type * as IndexModule from './index';
+
+// Set required env vars before requiring the module under test.
+// Static `import` is hoisted to the top of the compiled CommonJS output by
+// TypeScript, which means `import { ... } from './index'` would execute before
+// these assignments and trigger the env-var validation. Using `require()` here
+// keeps the module load in-place (after the assignments).
 process.env['CONNECTIONS_TABLE_NAME'] = 'test-connections';
 process.env['JWT_SECRET_NAME'] = 'test-jwt-secret-name';
 
-import { verify } from 'jsonwebtoken';
-import { LOGGER } from '@legacy-sports/logging';
-import {
+/* eslint-disable @typescript-eslint/no-require-imports */
+const {
   __resetCachedJwtSecret,
   broadcastMessage,
   handler,
   sendMessageToConnection,
-} from './index';
+} = require('./index') as typeof IndexModule;
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 const mockLogger = LOGGER as { error: jest.Mock };
 
