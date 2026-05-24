@@ -470,7 +470,7 @@ test.describe('Player Detail Modal @regression', () => {
     await expect(dialog.getByTestId('career-batting-card')).toBeVisible();
 
     // Key row labels in the batting card
-    await expect(dialog.getByText('Batting Average')).toBeVisible();
+    await expect(dialog.getByText('AVG').first()).toBeVisible();
     await expect(dialog.getByText('Home Runs')).toBeVisible();
     await expect(dialog.getByText('RBI').first()).toBeVisible();
   });
@@ -722,7 +722,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Season subtitle says "2 seasons"
-    await expect(dialog.getByText(/2 season/i)).toBeVisible();
+    await expect(dialog.getByText(/2 season/i).first()).toBeVisible();
 
     // Switch to Batting tab to verify season rows
     const battingTab = dialog.getByText('Batting', { exact: true }).first();

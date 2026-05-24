@@ -500,7 +500,7 @@ test.describe('Player Detail Modal – bio display @smoke', () => {
     await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Subtitle says "2 seasons"
-    await expect(dialog.getByText(/2 season/i)).toBeVisible();
+    await expect(dialog.getByText(/2 season/i).first()).toBeVisible();
   });
 });
 
