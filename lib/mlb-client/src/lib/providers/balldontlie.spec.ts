@@ -229,4 +229,41 @@ describe('BallDontLieProvider.getScoreboard', () => {
 
     expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
   });
+
+  it('returns stale cache when all retries fail with 429', async () => {
+    const provider = makeProvider();
+
+    // Populate cache with a successful fetch.
+    mockedAxiosGet.mockResolvedValueOnce(BDL_RESPONSE);
+    await provider.getScoreboard('2024-07-11');
+
+    // Expire the cache entry manually.
+    const cacheMap = (
+      provider as unknown as {
+        cache: Map<string, { data: unknown; expiry: number }>;
+      }
+    ).cache;
+    const entry = cacheMap.get('scoreboard:2024-07-11');
+    if (entry) entry.expiry = Date.now() - 1;
+
+    // API rate-limits all subsequent attempts.
+    mockedAxiosGet.mockRejectedValue(makeAxiosError(429));
+
+    const result = await provider.getScoreboard('2024-07-11');
+
+    expect(result.date).toBe('2024-07-11');
+    expect(result.games).toHaveLength(1);
+    // 1 initial populate + 3 rate-limited attempts (1 + MAX_RETRIES)
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(4);
+  });
+
+  it('throws 429 when rate-limited and no stale cache is available', async () => {
+    const provider = makeProvider();
+    mockedAxiosGet.mockRejectedValue(makeAxiosError(429));
+
+    await expect(provider.getScoreboard('2024-07-12')).rejects.toThrow(
+      'HTTP 429',
+    );
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(3);
+  });
 });

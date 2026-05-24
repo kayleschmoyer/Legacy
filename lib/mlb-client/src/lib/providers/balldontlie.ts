@@ -161,11 +161,14 @@ export class BallDontLieProvider implements MlbDataProvider {
 
   private getCached<T>(key: string): T | null {
     const entry = this.cache.get(key);
-    if (!entry || Date.now() > entry.expiry) {
-      this.cache.delete(key);
-      return null;
-    }
+    if (!entry || Date.now() > entry.expiry) return null;
     return entry.data as T;
+  }
+
+  /** Returns the cached value regardless of expiry — used as stale fallback. */
+  private getStaleCached<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    return entry ? (entry.data as T) : null;
   }
 
   private setCached(key: string, data: unknown, ttlMs: number): void {
@@ -182,6 +185,7 @@ export class BallDontLieProvider implements MlbDataProvider {
 
     LOGGER.debug('[balldontlie] fetching scoreboard', { date });
 
+    let lastErr: unknown;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const response = await axios.get<BdlGamesResponse>(
@@ -205,9 +209,8 @@ export class BallDontLieProvider implements MlbDataProvider {
         this.setCached(cacheKey, scoreboard, ttl);
         return scoreboard;
       } catch (err) {
-        if (!isRetryableError(err) || attempt >= MAX_RETRIES) {
-          throw err;
-        }
+        lastErr = err;
+        if (!isRetryableError(err) || attempt >= MAX_RETRIES) break;
         const delay = retryDelay(err, attempt);
         LOGGER.warn('[balldontlie] transient error, retrying', {
           attempt,
@@ -218,9 +221,19 @@ export class BallDontLieProvider implements MlbDataProvider {
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-    // Unreachable: loop always returns or throws inside the catch.
-    /* istanbul ignore next */
-    throw new Error('[balldontlie] unexpected retry loop exit');
+
+    // When rate-limited, serve stale cache rather than surfacing a 429 error.
+    if (axios.isAxiosError(lastErr) && lastErr.response?.status === 429) {
+      const stale = this.getStaleCached<Scoreboard>(cacheKey);
+      if (stale) {
+        LOGGER.warn('[balldontlie] rate-limited; serving stale cache', {
+          date,
+          cacheKey,
+        });
+        return stale;
+      }
+    }
+    throw lastErr;
   }
 
   getGameFeed(_gamePk: number): Promise<GameFeed> {
