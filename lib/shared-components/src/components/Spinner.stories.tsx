@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Text, XStack, YStack } from 'tamagui';
+import { Text, YStack } from 'tamagui';
 import { Skeleton, SkeletonRow, Spinner } from './Spinner';
 
 const meta: Meta<typeof Spinner> = {
@@ -16,11 +16,59 @@ export const Default: Story = { args: { label: 'Loading the dugout…' } };
 
 export const Sizes: Story = {
   render: () => (
-    <XStack gap="$5" alignItems="center">
-      <Spinner size="small" />
-      <Spinner size="large" />
-      <Spinner size="large" color="$brandSeamRed" />
-    </XStack>
+    <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+      <Spinner size="sm" />
+      <Spinner size="md" />
+      <Spinner size="lg" />
+    </div>
+  ),
+};
+
+export const ColorVariants: Story = {
+  render: () => (
+    <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+      <Spinner size="md" />
+      <Spinner size="md" color="$brandSeamRed" />
+      <Spinner size="md" color="#4aae7c" />
+    </div>
+  ),
+};
+
+export const LoadingPanelDefault: Story = {
+  render: () => (
+    <div
+      style={{
+        background: '#111B2F',
+        border: '1px solid #1F2D48',
+        borderRadius: 16,
+        padding: 24,
+        minHeight: 120,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Spinner size="lg" label="Loading roster…" />
+    </div>
+  ),
+};
+
+export const LoadingPanelInline: Story = {
+  render: () => (
+    <div
+      style={{
+        background: '#111B2F',
+        border: '1px solid #1F2D48',
+        borderRadius: 16,
+        padding: 24,
+        minHeight: 120,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Spinner size="md" label="Pulling latest stats" inline />
+    </div>
   ),
 };
 
@@ -46,7 +94,6 @@ export const Skeletons: Story = {
       >
         SKELETON ROWS
       </Text>
-      <SkeletonRow />
       <SkeletonRow />
       <SkeletonRow />
     </YStack>

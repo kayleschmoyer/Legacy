@@ -1,90 +1,127 @@
-import React from 'react';
-import { Spinner as TamaguiSpinner, Text, XStack, YStack } from 'tamagui';
+import React, { useEffect } from 'react';
+import { Text, YStack } from 'tamagui';
+import { FONT_DISPLAY } from '../utils/typography';
 
-export interface SpinnerProps {
-  /** Spinner size. Defaults to "large". */
-  size?: 'small' | 'large';
-  /** Tamagui color token (e.g. "$brandGold") or hex. Defaults to brand gold. */
-  color?: string;
-  /** Optional caption rendered below the spinner. */
-  label?: string;
-  /** Centred full-page variant. */
-  fullPage?: boolean;
+export type { SkeletonProps } from './Skeleton';
+export { Skeleton, SkeletonRow } from './Skeleton';
+
+// Inject keyframes + prefers-reduced-motion pause rule once per page (web only).
+let _stylesInjected = false;
+function injectSpinnerStyles(): void {
+  if (typeof document === 'undefined' || _stylesInjected) return;
+  _stylesInjected = true;
+  const el = document.createElement('style');
+  el.id = 'ls-spinner-styles';
+  el.textContent =
+    '@keyframes ls-spin{to{transform:rotate(360deg)}}' +
+    '@media(prefers-reduced-motion:reduce){.ls-ring{animation-play-state:paused!important}}';
+  document.head.appendChild(el);
 }
 
-/**
- * Loading spinner. Defaults to brand-gold so it reads as a heritage
- * accent on the dark "night stadium" backdrop.
- */
+const SIZE_MAP = {
+  sm: { px: 18, bw: 2 },
+  md: { px: 28, bw: 3 },
+  lg: { px: 42, bw: 3 },
+} as const;
+
+// Map Tamagui brand token strings (e.g. "$brandGold") to CSS hex so callers can pass them unchanged.
+const TOKEN_TO_HEX: Record<string, string> = {
+  $brandGold: '#C5A55A',
+  $brandGoldLight: '#D4BB78',
+  $brandGoldDark: '#A68B3E',
+  $brandSeamRed: '#C41E3A',
+  $brandSeamRedLight: '#E63950',
+  $brandNavy: '#1B3A5C',
+  $brandNavyLight: '#2C4A7C',
+};
+
+function resolveColor(c: string): string {
+  return TOKEN_TO_HEX[c] ?? c;
+}
+
+export interface SpinnerProps {
+  /** Ring size. Defaults to "lg" (42 px). */
+  size?: 'sm' | 'md' | 'lg';
+  /** Accent color for the leading edge of the ring. Accepts hex, CSS color,
+   *  or a Tamagui brand token string (e.g. "$brandGold"). Defaults to brand gold. */
+  color?: string;
+  /** Optional message rendered below (or beside, when `inline`) the ring. */
+  label?: string;
+  /** Render as a centred full-page overlay. */
+  fullPage?: boolean;
+  /** Render label beside the ring instead of below it. */
+  inline?: boolean;
+}
+
+/** Brand-spec CSS ring spinner. Sizes: sm/md/lg. Honors prefers-reduced-motion. */
 export function Spinner({
+  size = 'lg',
+  color = '$brandGold',
   label,
   fullPage = false,
-  color = '$brandGold',
-  size = 'large',
+  inline = false,
 }: SpinnerProps): React.JSX.Element {
-  const inner = (
-    <YStack alignItems="center" gap="$2">
-      <TamaguiSpinner size={size} color={color} />
-      {label ? (
-        <Text fontFamily="$body" fontSize={13} color="$textMuted">
-          {label}
-        </Text>
-      ) : null}
-    </YStack>
+  useEffect(injectSpinnerStyles, []);
+
+  const { px, bw } = SIZE_MAP[size];
+  const topColor = resolveColor(color);
+
+  const ring = (
+    <div
+      className="ls-ring"
+      style={{
+        width: px,
+        height: px,
+        borderRadius: '50%',
+        border: `${bw}px solid rgba(255,255,255,0.12)`,
+        borderTopColor: topColor,
+        animation: 'ls-spin 0.9s linear infinite',
+        flexShrink: 0,
+      }}
+    />
   );
+
+  const labelEl = label ? (
+    <Text
+      fontFamily={FONT_DISPLAY}
+      fontWeight="700"
+      fontSize={11}
+      letterSpacing={1.2}
+      textTransform="uppercase"
+      color="$textMuted"
+    >
+      {label}
+    </Text>
+  ) : null;
+
+  const inner =
+    labelEl !== null ? (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: inline ? 'row' : 'column',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        {ring}
+        {labelEl}
+      </div>
+    ) : (
+      ring
+    );
+
   if (!fullPage) return inner;
+
   return (
     <YStack
-      width="100%"
-      height="100%"
       flex={1}
+      width="100%"
       alignItems="center"
       justifyContent="center"
       padding="$6"
     >
       {inner}
     </YStack>
-  );
-}
-
-export interface SkeletonProps {
-  width?: number | string;
-  height?: number | string;
-  radius?: number;
-}
-
-/**
- * Pulsing skeleton placeholder block. Composes vertically/horizontally
- * to mock list rows or card layouts before content arrives.
- */
-export function Skeleton({
-  width = '100%',
-  height = 14,
-  radius = 6,
-}: SkeletonProps): React.JSX.Element {
-  return (
-    <YStack
-      width={width}
-      height={height}
-      borderRadius={radius}
-      backgroundColor="$surfaceCard"
-      opacity={0.65}
-      animation="medium"
-      enterStyle={{ opacity: 0.4 }}
-      hoverStyle={{ opacity: 0.75 }}
-    />
-  );
-}
-
-/** Pre-composed row skeleton — 1 thumb + 2 stacked text bars. */
-export function SkeletonRow(): React.JSX.Element {
-  return (
-    <XStack gap="$3" padding="$3" alignItems="center" width="100%">
-      <Skeleton width={40} height={40} radius={9999} />
-      <YStack flex={1} gap="$2">
-        <Skeleton width="60%" height={12} />
-        <Skeleton width="35%" height={10} />
-      </YStack>
-    </XStack>
   );
 }
