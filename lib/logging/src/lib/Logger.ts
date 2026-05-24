@@ -78,7 +78,14 @@ export class Logger implements ILogger {
 
         destination.write(entry);
       } catch (error) {
-        console.error(`Error writing to log destination:`, error);
+        if ((error as NodeJS.ErrnoException).code === 'EPIPE') {
+          return;
+        }
+        try {
+          console.error(`Error writing to log destination:`, error);
+        } catch {
+          // Swallow EPIPE from the fallback write as well
+        }
       }
     });
   }
