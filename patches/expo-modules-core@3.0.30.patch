@@ -1,0 +1,16 @@
+diff --git a/build/ts-declarations/global.d.ts b/build/ts-declarations/global.d.ts
+index 42c216451068b0211aa6955ebc485cf11365d537..e909363f7560664efd850a50b26500420d53ec82 100644
+--- a/build/ts-declarations/global.d.ts
++++ b/build/ts-declarations/global.d.ts
+@@ -19,11 +19,9 @@ export interface ExpoProcessEnv {
+     EXPO_BASE_URL?: string;
+     /** Build-time representation of the `Platform.OS` value that the current JavaScript was bundled for. Does not support platform shaking wrapped require statements. */
+     EXPO_OS?: string;
+-    [key: string]: any;
+ }
+ export interface ExpoProcess {
+     env: ExpoProcessEnv;
+-    [key: string]: any;
+ }
+ /**
+  * Global object containing all the native bindings installed by Expo.

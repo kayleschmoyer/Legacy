@@ -383,6 +383,7 @@
       }
     },
     "patchedDependencies": {
+      "expo-modules-core@3.0.30": "patches/expo-modules-core@3.0.30.patch",
       "tr46@0.0.3": "patches/tr46@0.0.3.patch",
       "tr46@3.0.0": "patches/tr46@3.0.0.patch",
       "whatwg-url-without-unicode@8.0.0-3": "patches/whatwg-url-without-unicode@8.0.0-3.patch"
