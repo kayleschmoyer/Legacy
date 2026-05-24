@@ -187,6 +187,7 @@ export function useDraftActions({
         setUrgentMessage('');
         await makeDraftPick({
           variables: { draftId, playerId },
+          context: { suppressGlobalError: true },
         });
         void refetchCurrentPick({ draftId });
         void refetchPickHistory();

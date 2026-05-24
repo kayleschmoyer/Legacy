@@ -117,6 +117,7 @@ describe('useDraftActions re-entry guards (LS-2681)', () => {
     expect(mockMakeDraftPick).toHaveBeenCalledTimes(1);
     expect(mockMakeDraftPick).toHaveBeenCalledWith({
       variables: { draftId: 42, playerId: 101 },
+      context: { suppressGlobalError: true },
     });
 
     await act(async () => {
@@ -134,6 +135,7 @@ describe('useDraftActions re-entry guards (LS-2681)', () => {
     expect(mockMakeDraftPick).toHaveBeenCalledTimes(2);
     expect(mockMakeDraftPick).toHaveBeenLastCalledWith({
       variables: { draftId: 42, playerId: 303 },
+      context: { suppressGlobalError: true },
     });
   });
 
