@@ -1,266 +1,86 @@
 # IconButton Component
 
-A modern, animated icon button component with hover effects and gradient shadows, inspired by contemporary mobile UI design patterns. Built with Tamagui for cross-platform compatibility.
+A square icon button aligned with the Legacy Sports design system. Five brand variants, three sizes, and optional inline label. Built on Tamagui for cross-platform use.
 
-## Features
+## Breaking Changes (LS-4716 — design system alignment)
 
-- ✨ **Smooth Animations**: Scale and shadow animations on hover and press
-- 🎨 **Gradient Effects**: Customizable gradient overlays with multiple color schemes
-- 📱 **Cross-Platform**: Works seamlessly on web and React Native
-- 🎯 **Multiple Variants**: Default, primary, secondary, and accent styles
-- 📏 **Flexible Sizing**: Small, medium, and large size options
-- ♿ **Accessibility**: Built-in accessibility support with labels
-- 🎭 **Tamagui Integration**: Uses your project's design tokens and themes
+The following API surface was changed to match the design system spec:
+
+| Removed                      | Replacement                                                              |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `variant: 'secondary'`       | `variant: 'ghost'` (low-emphasis)                                        |
+| `variant: 'accent'`          | `variant: 'seam'` (alert/destructive) or `variant: 'gold'` (achievement) |
+| `colorScheme` prop           | Removed — colours are now determined by `variant`                        |
+| `showGradient` prop          | Removed — gradient overlay system removed                                |
+| `IconButtonColorScheme` type | Removed                                                                  |
+
+**Impact**: `IconButton` had no consumers outside its own Storybook stories at the time of this change. The stories have been updated to use the new API.
 
 ## Basic Usage
 
 ```tsx
 import { IconButton } from '@legacy-sports/shared-components';
 
-// Simple icon button
-<IconButton
-  icon="home"
-  label="Home"
-  onPress={() => console.log('Home pressed')}
-/>;
+// Icon-only (sm=36, md=44, lg=56 px)
+<IconButton icon="home" variant="primary" size="md" onPress={() => {}} />
+
+// With inline label
+<IconButton icon="plus" label="Add Player" variant="default" onPress={() => {}} />
 ```
 
 ## Props
 
-| Prop                 | Type                                                | Default     | Description                    |
-| -------------------- | --------------------------------------------------- | ----------- | ------------------------------ |
-| `icon`               | `string`                                            | -           | Icon name (required)           |
-| `label`              | `string`                                            | -           | Optional text label below icon |
-| `size`               | `'sm' \| 'md' \| 'lg'`                              | `'md'`      | Button size                    |
-| `variant`            | `'default' \| 'primary' \| 'secondary' \| 'accent'` | `'default'` | Visual style variant           |
-| `colorScheme`        | `'blue' \| 'purple' \| 'green' \| 'red' \| 'gold'`  | `'blue'`    | Color scheme for gradients     |
-| `showGradient`       | `boolean`                                           | `true`      | Enable gradient shadow effects |
-| `onPress`            | `() => void`                                        | -           | Press handler function         |
-| `disabled`           | `boolean`                                           | `false`     | Disable the button             |
-| `accessibilityLabel` | `string`                                            | -           | Custom accessibility label     |
-| `testID`             | `string`                                            | -           | Test identifier                |
+| Prop                 | Type                                                    | Default     | Description           |
+| -------------------- | ------------------------------------------------------- | ----------- | --------------------- |
+| `icon`               | `string`                                                | —           | Icon name (required)  |
+| `label`              | `string`                                                | —           | Optional inline label |
+| `size`               | `'sm' \| 'md' \| 'lg'`                                  | `'md'`      | Button size           |
+| `variant`            | `'default' \| 'primary' \| 'seam' \| 'gold' \| 'ghost'` | `'default'` | Visual style          |
+| `onPress`            | `() => void`                                            | —           | Press handler         |
+| `disabled`           | `boolean`                                               | `false`     | Disable the button    |
+| `accessibilityLabel` | `string`                                                | —           | Custom a11y label     |
+| `testID`             | `string`                                                | —           | Test identifier       |
 
-## Examples
+## Sizes
 
-### Navigation Bar
-
-```tsx
-<XStack gap="$4" alignItems="center">
-  <IconButton
-    icon="home"
-    label="Home"
-    variant="primary"
-    colorScheme="blue"
-    onPress={() => navigate('home')}
-  />
-  <IconButton
-    icon="search"
-    label="Search"
-    variant="default"
-    colorScheme="blue"
-    onPress={() => navigate('search')}
-  />
-  <IconButton
-    icon="user"
-    label="Profile"
-    variant="default"
-    colorScheme="blue"
-    onPress={() => navigate('profile')}
-  />
-</XStack>
-```
-
-### Action Grid
-
-```tsx
-<YStack gap="$4">
-  <XStack gap="$4">
-    <IconButton
-      icon="plus"
-      label="Add"
-      variant="primary"
-      colorScheme="green"
-      size="lg"
-      onPress={() => addPlayer()}
-    />
-    <IconButton
-      icon="edit"
-      label="Edit"
-      variant="secondary"
-      colorScheme="blue"
-      size="lg"
-      onPress={() => editPlayer()}
-    />
-  </XStack>
-  <XStack gap="$4">
-    <IconButton
-      icon="star"
-      label="Favorite"
-      variant="accent"
-      colorScheme="gold"
-      size="lg"
-      onPress={() => toggleFavorite()}
-    />
-    <IconButton
-      icon="delete"
-      label="Remove"
-      variant="primary"
-      colorScheme="red"
-      size="lg"
-      onPress={() => removePlayer()}
-    />
-  </XStack>
-</YStack>
-```
-
-### Different Sizes
-
-```tsx
-<XStack gap="$4" alignItems="center">
-  <IconButton
-    icon="star"
-    label="Small"
-    size="sm"
-    variant="primary"
-    onPress={() => {}}
-  />
-  <IconButton
-    icon="star"
-    label="Medium"
-    size="md"
-    variant="primary"
-    onPress={() => {}}
-  />
-  <IconButton
-    icon="star"
-    label="Large"
-    size="lg"
-    variant="primary"
-    onPress={() => {}}
-  />
-</XStack>
-```
-
-### Color Schemes
-
-```tsx
-<XStack gap="$4" alignItems="center">
-  <IconButton
-    icon="heart"
-    label="Like"
-    variant="primary"
-    colorScheme="red"
-    onPress={() => {}}
-  />
-  <IconButton
-    icon="check"
-    label="Done"
-    variant="accent"
-    colorScheme="green"
-    onPress={() => {}}
-  />
-  <IconButton
-    icon="settings"
-    label="Settings"
-    variant="secondary"
-    colorScheme="purple"
-    onPress={() => {}}
-  />
-</XStack>
-```
-
-### Without Gradient Effects
-
-```tsx
-<IconButton
-  icon="home"
-  label="Simple"
-  showGradient={false}
-  onPress={() => {}}
-/>
-```
+| Size | Dimensions | Icon  | Use case            |
+| ---- | ---------- | ----- | ------------------- |
+| `sm` | 36 × 36 px | 14 px | Compact toolbars    |
+| `md` | 44 × 44 px | 18 px | Standard navigation |
+| `lg` | 56 × 56 px | 22 px | Hero actions        |
 
 ## Variants
 
-### Default
+| Variant   | Background               | Foreground | Use case                             |
+| --------- | ------------------------ | ---------- | ------------------------------------ |
+| `default` | `$color3` (surface-card) | `$color11` | Secondary / low-priority actions     |
+| `primary` | `$brandNavy`             | `#fff`     | Primary interactive actions          |
+| `seam`    | `$brandSeamRed`          | `#fff`     | Destructive / alert actions          |
+| `gold`    | `$brandGold`             | `#111`     | Achievement / premium states         |
+| `ghost`   | transparent              | `$color11` | Minimal-chrome, low-emphasis actions |
 
-- Background: `$color3`
-- Suitable for secondary actions
-- Subtle hover effects
+## Label Behaviour
 
-### Primary
+When `label` is provided the button expands to auto-width:
 
-- Background: `$blue4`
-- For main call-to-action buttons
-- Enhanced hover animations
+- `padding: 0 14 px`, `gap: 8 px`
+- `border-radius` changes from 14 px to 12 px
+- Label text: Big Shoulders Display 700, 13 px, letter-spacing 0.04 em (matches `$heading` token)
 
-### Secondary
-
-- Background: `$purple4`
-- For secondary but important actions
-- Purple-themed gradient effects
-
-### Accent
-
-- Background: `$green4`
-- For success states and positive actions
-- Green-themed gradient effects
-
-## Size Guidelines
-
-| Size | Dimensions | Icon Size | Use Case                    |
-| ---- | ---------- | --------- | --------------------------- |
-| `sm` | 60×60px    | 20px      | Compact layouts, toolbars   |
-| `md` | 80×80px    | 28px      | Standard navigation, forms  |
-| `lg` | 100×100px  | 36px      | Hero actions, main features |
-
-## Color Schemes
-
-- **Blue**: Default scheme for navigation and informational actions
-- **Purple**: Creative and secondary actions
-- **Green**: Success states, confirmations, additions
-- **Red**: Destructive actions, deletions, errors
-- **Gold**: Premium features, favorites, achievements
-
-## Platform Behavior
-
-### Web
-
-- Hover effects with scale and shadow animations
-- CSS transitions for smooth interactions
-- Mouse cursor changes on hover
-
-### React Native
-
-- Touch feedback with scale animations
-- Native shadow effects on supported platforms
-- Haptic feedback integration ready
+```tsx
+<IconButton icon="plus" label="Add Player" variant="default" onPress={() => {}} />
+<IconButton icon="star"  label="Export"     variant="primary" onPress={() => {}} />
+```
 
 ## Accessibility
 
-The IconButton component includes built-in accessibility features:
-
-- Automatic accessibility labels based on the `label` prop
-- Custom accessibility labels via `accessibilityLabel`
-- Screen reader support
-- Keyboard navigation support (web)
-- Touch target size compliance (44px minimum)
-
-## Integration with Legacy Sports Design System
-
-This component integrates seamlessly with your existing Tamagui configuration:
-
-- Uses design tokens from `@legacy-sports/tamagui-config`
-- Respects dark/light theme preferences
-- Follows the established color palette
-- Matches spacing and typography scales
+- `accessibilityLabel` defaults to `label` prop, then `"<icon> button"`
+- Touch target meets 44 px minimum for `md` and `lg`; `sm` targets (36 px) should only appear in dense toolbars
 
 ## Storybook
-
-View all component variations and test interactions in Storybook:
 
 ```bash
 pnpm run storybook
 ```
 
-Navigate to `Components/IconButton` to see all examples and documentation.
+Navigate to **Components / IconButton**.

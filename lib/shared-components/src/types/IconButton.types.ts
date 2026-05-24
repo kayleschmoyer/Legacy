@@ -1,127 +1,54 @@
 import type { ButtonProps as TamaguiButtonProps } from 'tamagui';
 
-/**
- * Icon button size variants
- */
+/** Size variants for the IconButton component. */
 export type IconButtonSize = 'sm' | 'md' | 'lg';
 
 /**
- * Icon button visual variants
+ * Visual variant options for IconButton.
+ *
+ * - `default`  — surface-card background with outline border; secondary actions
+ * - `primary`  — brand navy background; primary interactive actions
+ * - `seam`     — seam-red background; destructive / alert actions
+ * - `gold`     — heritage-gold background; achievement / premium states
+ * - `ghost`    — transparent background with navy hover; low-emphasis actions
  */
-export type IconButtonVariant = 'default' | 'primary' | 'secondary' | 'accent';
+export type IconButtonVariant =
+  | 'default'
+  | 'primary'
+  | 'seam'
+  | 'gold'
+  | 'ghost';
 
-/**
- * Color scheme options for gradient effects
- */
-export type IconButtonColorScheme =
-  | 'blue'
-  | 'purple'
-  | 'green'
-  | 'red'
-  | 'gold';
-
-/**
- * Props for the IconButton component
- */
+/** Props for the IconButton component. */
 export interface IconButtonProps extends Omit<
   TamaguiButtonProps,
-  'variant' | 'icon'
+  'variant' | 'icon' | 'size'
 > {
-  /**
-   * Icon name to display - should match available icons in the platform-specific Icon component
-   */
+  /** Icon name passed to the platform Icon component (e.g. `'home'`, `'star'`). */
   icon: string;
 
   /**
-   * Optional text label to display below the icon
+   * Optional label rendered inline beside the icon (Big Shoulders Display 700
+   * 13 px). When present the button expands to auto-width with `padding: 0 14px`
+   * and `border-radius` collapses from 14 px to 12 px.
    */
   label?: string;
 
   /**
-   * Size of the icon button
+   * Button dimensions — sm 36×36, md 44×44, lg 56×56 (icon 14/18/22 px).
    * @default 'md'
    */
   size?: IconButtonSize;
 
   /**
-   * Visual variant of the button
+   * Visual treatment applied to the button surface.
    * @default 'default'
    */
   variant?: IconButtonVariant;
 
-  /**
-   * Color scheme for the gradient effect
-   * @default 'blue'
-   */
-  colorScheme?: IconButtonColorScheme;
-
-  /**
-   * Whether to show the gradient shadow effect on hover
-   * @default true
-   */
-  showGradient?: boolean;
-
-  /**
-   * Accessibility label for screen readers
-   */
+  /** Accessibility label for screen readers. Falls back to `label` then `"<icon> button"`. */
   accessibilityLabel?: string;
 
-  /**
-   * Test ID for testing purposes
-   */
+  /** Test ID for automated testing selectors. */
   testID?: string;
-}
-
-/**
- * Style variant mappings for Tamagui styled components
- */
-export interface IconButtonStyleVariants {
-  size: {
-    [key in IconButtonSize]: {
-      width: number;
-      height: number;
-      padding: number;
-    };
-  };
-
-  variant: {
-    [key in IconButtonVariant]: {
-      backgroundColor: string;
-      hoverStyle: {
-        backgroundColor: string;
-        scale: number;
-      };
-      pressStyle: {
-        backgroundColor: string;
-        scale: number;
-      };
-    };
-  };
-
-  showGradient: {
-    true: {
-      shadowColor: string;
-      shadowOffset: { width: number; height: number };
-      shadowOpacity: number;
-      shadowRadius: number;
-      elevation: number;
-      hoverStyle: {
-        shadowOffset: { width: number; height: number };
-        shadowOpacity: number;
-        shadowRadius: number;
-        elevation: number;
-      };
-    };
-  };
-}
-
-/**
- * Gradient overlay style variants
- */
-export interface GradientOverlayVariants {
-  colorScheme: {
-    [key in IconButtonColorScheme]: {
-      backgroundColor: string;
-    };
-  };
 }

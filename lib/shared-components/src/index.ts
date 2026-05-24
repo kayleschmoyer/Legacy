@@ -48,7 +48,6 @@ export type {
   IconButtonProps,
   IconButtonSize,
   IconButtonVariant,
-  IconButtonColorScheme,
 } from './types/IconButton.types';
 
 // Export all shared components and types
