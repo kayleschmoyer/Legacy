@@ -13,28 +13,53 @@ import { Check, Minus } from '@tamagui/lucide-icons';
 // ─── Switch ──────────────────────────────────────────────────────────────────
 export interface SwitchProps extends GetProps<typeof TamaguiSwitch> {
   label?: string;
+  subLabel?: string;
 }
 
-/** Brand switch — relies on the parent theme for the on-color. */
-export function Switch({ label, ...props }: SwitchProps): React.JSX.Element {
+export function Switch({
+  label,
+  subLabel,
+  ...props
+}: SwitchProps): React.JSX.Element {
   const sw = (
     <TamaguiSwitch
       size="$3"
+      width={42}
+      height={24}
       backgroundColor="$surfaceCard"
       borderColor="$outlineStrong"
       borderWidth={1}
+      $checked={{
+        backgroundColor: '$brandNavy',
+        borderColor: '$brandNavyLight',
+      }}
       {...props}
     >
-      <TamaguiSwitch.Thumb animation="quick" backgroundColor="$brandGold" />
+      <TamaguiSwitch.Thumb
+        animation="quick"
+        backgroundColor="white"
+        shadowColor="rgba(0,0,0,0.4)"
+        shadowOffset={{ width: 0, height: 1 }}
+        shadowRadius={3}
+        shadowOpacity={1}
+        $checked={{ backgroundColor: '$brandGold' }}
+      />
     </TamaguiSwitch>
   );
   if (!label) return sw;
   return (
-    <XStack gap="$2" alignItems="center">
+    <XStack alignItems="center" justifyContent="space-between" gap="$3">
+      <YStack gap={2}>
+        <Text fontFamily="$body" fontSize={14} color="$color">
+          {label}
+        </Text>
+        {subLabel != null && (
+          <Text fontFamily="$body" fontSize={12} color="$textMuted">
+            {subLabel}
+          </Text>
+        )}
+      </YStack>
       {sw}
-      <Text fontFamily="$body" fontSize={14} color="$color">
-        {label}
-      </Text>
     </XStack>
   );
 }
@@ -57,17 +82,23 @@ export function Checkbox({
   const checkbox = (
     <TamaguiCheckbox
       size="$3"
+      width={18}
+      height={18}
       backgroundColor="$surfaceCard"
       borderColor="$outlineStrong"
-      borderWidth={1}
+      borderWidth={1.5}
       borderRadius={4}
+      $checked={{
+        backgroundColor: '$brandNavy',
+        borderColor: '$brandNavy',
+      }}
       {...props}
     >
       <TamaguiCheckbox.Indicator>
         {indeterminate ? (
-          <Minus size={14} color="white" />
+          <Minus size={12} color="white" />
         ) : (
-          <Check size={14} color="white" />
+          <Check size={12} color="white" />
         )}
       </TamaguiCheckbox.Indicator>
     </TamaguiCheckbox>
@@ -105,35 +136,52 @@ export function Radio({
   options,
   name,
 }: RadioProps): React.JSX.Element {
+  const [localValue, setLocalValue] = React.useState(defaultValue ?? '');
+  const controlled = value !== undefined;
+  const currentValue = controlled ? value : localValue;
+
+  const handleValueChange = React.useCallback(
+    (val: string) => {
+      if (!controlled) setLocalValue(val);
+      onValueChange?.(val);
+    },
+    [controlled, onValueChange],
+  );
+
   return (
     <RadioGroup
       value={value}
       defaultValue={defaultValue}
-      onValueChange={onValueChange}
+      onValueChange={handleValueChange}
       name={name}
     >
       <YStack gap="$2">
-        {options.map((opt) => (
-          <XStack key={opt.value} gap="$2" alignItems="center">
-            <RadioGroup.Item
-              value={opt.value}
-              size="$3"
-              disabled={opt.disabled}
-              backgroundColor="$surfaceCard"
-              borderColor="$outlineStrong"
-              borderWidth={1}
-            >
-              <RadioGroup.Indicator backgroundColor="$brandNavy" />
-            </RadioGroup.Item>
-            <Text
-              fontFamily="$body"
-              fontSize={14}
-              color={opt.disabled ? '$textMuted' : '$color'}
-            >
-              {opt.label}
-            </Text>
-          </XStack>
-        ))}
+        {options.map((opt) => {
+          const isSelected = currentValue === opt.value;
+          return (
+            <XStack key={opt.value} gap="$2" alignItems="center">
+              <RadioGroup.Item
+                value={opt.value}
+                size="$3"
+                width={18}
+                height={18}
+                disabled={opt.disabled}
+                backgroundColor="$surfaceCard"
+                borderColor={isSelected ? '$brandGold' : '$outlineStrong'}
+                borderWidth={1.5}
+              >
+                <RadioGroup.Indicator backgroundColor="$brandGold" />
+              </RadioGroup.Item>
+              <Text
+                fontFamily="$body"
+                fontSize={14}
+                color={opt.disabled ? '$textMuted' : '$color'}
+              >
+                {opt.label}
+              </Text>
+            </XStack>
+          );
+        })}
       </YStack>
     </RadioGroup>
   );
@@ -176,7 +224,7 @@ export function SegmentedControl({
   const letterSpacing = isBox ? 1 : 0.6;
   return (
     <XStack
-      backgroundColor={isBox ? '$surfacePanel' : '$surfaceSubtle'}
+      backgroundColor={isBox ? '$surfaceCard' : '$surfaceSubtle'}
       borderRadius={containerRadius}
       borderWidth={1}
       borderColor={isBox ? '$outlineStrong' : '$outlineSubtle'}
