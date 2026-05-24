@@ -72,12 +72,10 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
     await expect(page.getByRole('alertdialog')).toBeVisible();
-    // The dialog text varies by access level:
-    // - admin: "Are you sure you want to delete ALL leagues you are a member of?"
-    // - non-admin: "Are you sure you want to delete ALL leagues you own?"
-    await expect(
-      page.getByText(/are you sure you want to delete all.*leagues/i),
-    ).toBeVisible();
+    // Body text varies by access level:
+    // - admin: "You're about to delete all leagues you are a member of."
+    // - non-admin: "You're about to delete all leagues you own."
+    await expect(page.getByText(/about to delete all leagues/i)).toBeVisible();
   });
 
   test('first confirmation dialog lists affected data', async ({ page }) => {
@@ -86,14 +84,14 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
 
-    // Key data items listed in the dialog (text varies by access level)
+    // Dialog body describes what will be deleted (text varies by access level)
     await expect(
       dialog
         .getByText(/all leagues you own|all leagues you are a member of/i)
         .first(),
     ).toBeVisible();
-    await expect(dialog.getByText(/all teams in those leagues/i)).toBeVisible();
-    await expect(dialog.getByText(/all roster data/i)).toBeVisible();
+    // First dialog confirms it's step 1 of 2
+    await expect(dialog.getByText(/first of two confirmations/i)).toBeVisible();
   });
 
   test('canceling from the first dialog closes it', async ({ page }) => {
@@ -102,7 +100,7 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
 
-    await page.getByRole('button', { name: 'Dialog Close' }).click();
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).not.toBeVisible();
   });
 
@@ -119,11 +117,9 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     // Final confirmation dialog should now be visible
     await expect(page.locator('div[role="alertdialog"]')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /final confirmation/i }),
+      page.getByRole('heading', { name: /this cannot be undone/i }),
     ).toBeVisible();
-    await expect(
-      page.getByText(/this is your last chance to cancel/i),
-    ).toBeVisible();
+    await expect(page.getByText(/permanently removed/i)).toBeVisible();
   });
 
   test('canceling from the final confirmation dialog closes it', async ({
@@ -137,11 +133,11 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     // Advance to second dialog
     await firstDialog.getByRole('button', { name: /continue/i }).click();
     await expect(
-      page.getByRole('heading', { name: /final confirmation/i }),
+      page.getByRole('heading', { name: /this cannot be undone/i }),
     ).toBeVisible();
 
     const finalDialog = page.locator('div[role="alertdialog"]');
-    await page.getByRole('button', { name: 'Dialog Close' }).click();
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(finalDialog).not.toBeVisible();
   });
 
@@ -176,17 +172,13 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
 
     // Step 3: confirm in final dialog
     await expect(
-      page.getByRole('heading', { name: /final confirmation/i }),
+      page.getByRole('heading', { name: /this cannot be undone/i }),
     ).toBeVisible();
 
-    // Arm the dialog handler before clicking so the event is never missed
-    const dialogPromise = page.waitForEvent('dialog');
     const finalDialog = page.locator('div[role="alertdialog"]');
     await finalDialog
       .getByRole('button', { name: /yes, delete everything/i })
       .click();
-    const successDialog = await dialogPromise;
-    await successDialog.accept();
 
     // Mutation should have been called
     await expect.poll(() => mutationCalled).toBe(true);
