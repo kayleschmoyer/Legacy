@@ -5048,6 +5048,7 @@ export type LeagueFragment = {
   hofOnly?: boolean | null;
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
+  tradeDeadlineWeek?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -5127,6 +5128,7 @@ export type GetLeagueByIdQuery = {
     hofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5193,6 +5195,7 @@ export type CreateLeagueAndTeamsMutation = {
       hofOnly?: boolean | null;
       customEraStartYear?: number | null;
       customEraEndYear?: number | null;
+      tradeDeadlineWeek?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -5256,6 +5259,7 @@ export type GetUserLeaguesQuery = {
     hofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5351,6 +5355,7 @@ export type StartDraftMutation = {
     hofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5553,6 +5558,7 @@ export type UpdateLeagueSettingsMutation = {
     hofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5660,6 +5666,7 @@ export type RenewLeagueMutation = {
     hofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5724,6 +5731,7 @@ export type StartSeasonMutation = {
     hofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -9466,6 +9474,7 @@ export const LeagueFragmentDoc = gql`
     hofOnly
     customEraStartYear
     customEraEndYear
+    tradeDeadlineWeek
     userMembership {
       ...LeagueMember
     }

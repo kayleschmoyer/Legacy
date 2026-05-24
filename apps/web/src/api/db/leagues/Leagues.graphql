@@ -45,6 +45,7 @@ fragment League on League {
   hofOnly
   customEraStartYear
   customEraEndYear
+  tradeDeadlineWeek
   userMembership {
     ...LeagueMember
   }
