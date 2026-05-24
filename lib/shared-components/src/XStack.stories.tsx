@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { Paragraph, XStack } from './Layout';
+import { XStack } from './components/Stack';
+import { Separator } from './components/Separator';
+import { Paragraph } from './Layout';
 import { Button } from './Button';
 
-// XStack Stories
 const XStackMeta: Meta<typeof XStack> = {
   title: 'Layout/XStack',
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui component type gap with Storybook Meta
@@ -13,23 +14,23 @@ const XStackMeta: Meta<typeof XStack> = {
     docs: {
       description: {
         component:
-          'A horizontal stack component that arranges children side by side',
+          'Horizontal layout primitive. Default gap $3 (12 px), items centered on the cross axis. Pass `separator` for inline dividers.',
       },
     },
   },
   tags: ['autodocs'],
   argTypes: {
-    space: {
+    gap: {
       control: 'select',
-      options: ['$1', '$2', '$3', '$4', '$5'],
-      description: 'Space between children',
+      options: ['$1', '$2', '$3', '$4', '$5', '$6'],
+      description: 'Space between children (spacing-scale token)',
     },
-    ai: {
+    alignItems: {
       control: 'select',
       options: ['flex-start', 'center', 'flex-end', 'stretch'],
-      description: 'Cross-axis alignment (alignItems shorthand)',
+      description: 'Cross-axis alignment',
     },
-    jc: {
+    justifyContent: {
       control: 'select',
       options: [
         'flex-start',
@@ -38,7 +39,7 @@ const XStackMeta: Meta<typeof XStack> = {
         'space-between',
         'space-around',
       ],
-      description: 'Main axis alignment (justifyContent shorthand)',
+      description: 'Main-axis alignment',
     },
   },
 };
@@ -94,19 +95,14 @@ export const SpaceBetweenXStack: XStackStory = {
   },
 };
 
-export const LargeSpaceXStack: XStackStory = {
-  args: {
-    space: '$5',
-    children: [
-      <Button key="1" onPress={fn()}>
-        Wide
-      </Button>,
-      <Button key="2" onPress={fn()}>
-        Spacing
-      </Button>,
-      <Button key="3" onPress={fn()}>
-        Example
-      </Button>,
-    ],
-  },
+export const WithSeparator: XStackStory = {
+  render: () => (
+    <XStack gap="$3" height={48}>
+      <Button onPress={fn()}>12 Teams</Button>
+      <Separator vertical />
+      <Button onPress={fn()}>Week 14</Button>
+      <Separator vertical />
+      <Button onPress={fn()}>Live</Button>
+    </XStack>
+  ),
 };

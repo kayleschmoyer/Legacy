@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { H1, H2, H3, Paragraph, Separator, YStack } from './Layout';
+import { YStack } from './components/Stack';
+import { Separator } from './components/Separator';
+import { H1, H2, H3, Paragraph } from './Layout';
 import { Button } from './Button';
 
-// YStack Stories
 const YStackMeta: Meta<typeof YStack> = {
   title: 'Layout/YStack',
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui component type gap with Storybook Meta
@@ -13,23 +14,23 @@ const YStackMeta: Meta<typeof YStack> = {
     docs: {
       description: {
         component:
-          'A vertical stack component that arranges children vertically',
+          'Vertical layout primitive. Default gap $2 (8 px). All Tamagui YStack props pass through.',
       },
     },
   },
   tags: ['autodocs'],
   argTypes: {
-    space: {
+    gap: {
       control: 'select',
-      options: ['$1', '$2', '$3', '$4', '$5'],
-      description: 'Space between children',
+      options: ['$1', '$2', '$3', '$4', '$5', '$6'],
+      description: 'Space between children (spacing-scale token)',
     },
-    ai: {
+    alignItems: {
       control: 'select',
       options: ['flex-start', 'center', 'flex-end', 'stretch'],
-      description: 'Cross-axis alignment (alignItems shorthand)',
+      description: 'Cross-axis alignment',
     },
-    jc: {
+    justifyContent: {
       control: 'select',
       options: [
         'flex-start',
@@ -38,7 +39,7 @@ const YStackMeta: Meta<typeof YStack> = {
         'space-between',
         'space-around',
       ],
-      description: 'Main axis alignment',
+      description: 'Main-axis alignment',
     },
   },
 };
@@ -75,7 +76,7 @@ export const CenteredYStack: YStackStory = {
 
 export const SpacedYStack: YStackStory = {
   args: {
-    space: '$4',
+    gap: '$4',
     children: [
       <H2 key="1">Large Spacing Example</H2>,
       <Paragraph key="2">There's more space between these elements.</Paragraph>,
@@ -90,7 +91,7 @@ export const SpacedYStack: YStackStory = {
 
 export const FormLayoutYStack: YStackStory = {
   args: {
-    space: '$3',
+    gap: '$3',
     width: 300,
     children: [
       <H3 key="1">User Information</H3>,

@@ -185,6 +185,13 @@ export * from './components/scoreboard';
 // MatchupCard / StandingsTable). Matchup-cluster components are NOT
 // re-exported here — import them directly from `./components/<Name>`
 // when consumers want the new design-system version.
+
+// XStack/YStack from `./components/Stack` are the design-system versions with
+// spec-matching gap defaults. They shadow the bare Tamagui re-exports from
+// `./Layout` (star export) — named exports take precedence (LS-4729).
+export { XStack, YStack } from './components/Stack';
+export type { XStackProps, YStackProps } from './components/Stack';
+
 export { Input, Textarea } from './components/Input';
 export type { InputProps, InputSize, TextareaProps } from './components/Input';
 export { SearchBar } from './components/SearchBar';
