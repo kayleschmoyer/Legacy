@@ -235,6 +235,9 @@ export type {
 } from './components/NotificationBell';
 export { NavBar } from './components/NavBar';
 export type { NavBarProps, NavLink } from './components/NavBar';
+// Aliased to avoid collision with the legacy PlayerCard in features/players.
+export { PlayerCard as DSPlayerCard } from './components/PlayerCard';
+export type { PlayerCardProps as DSPlayerCardProps } from './components/PlayerCard';
 
 // Shared formatting utilities
 export * from './utils/scoreFormatting';
