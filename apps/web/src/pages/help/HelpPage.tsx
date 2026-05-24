@@ -147,6 +147,7 @@ interface NumberedFaqItemProps extends HelpFaqItem {
 
 function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
   const [open, setOpen] = useState(false);
+  const [hovering, setHovering] = useState(false);
   const slug = question
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -161,21 +162,13 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
       borderBottomWidth={1}
       borderBottomColor="rgba(30, 45, 69, 1)"
     >
-      <XStack
-        tag="button"
+      <button
         type="button"
-        onPress={() => setOpen((v) => !v)}
+        onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={faqId}
-        alignItems="center"
-        width="100%"
-        paddingHorizontal={24}
-        paddingVertical={22}
-        borderWidth={0}
-        backgroundColor="transparent"
-        cursor="pointer"
-        animation="quick"
-        hoverStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
         style={{
           display: 'grid',
           gridTemplateColumns: 'auto 1fr auto',
@@ -183,6 +176,17 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
           textAlign: 'left',
           color: '#E8EDF5',
           minHeight: 44,
+          alignItems: 'center',
+          width: '100%',
+          paddingLeft: 24,
+          paddingRight: 24,
+          paddingTop: 22,
+          paddingBottom: 22,
+          border: 'none',
+          backgroundColor: hovering
+            ? 'rgba(255, 255, 255, 0.02)'
+            : 'transparent',
+          cursor: 'pointer',
         }}
       >
         <span
@@ -218,7 +222,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
             transition: 'transform 150ms ease',
           }}
         />
-      </XStack>
+      </button>
       {open && (
         <YStack
           id={faqId}
