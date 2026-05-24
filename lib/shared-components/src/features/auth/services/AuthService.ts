@@ -179,12 +179,12 @@ export class AuthService {
       if (typeof status === 'number' && status >= 400 && status < 500) {
         LOGGER.warn(
           'AuthService: Secure OAuth authentication failed:',
-          String(error),
+          error instanceof Error ? error : String(error),
         );
       } else {
         LOGGER.error(
           'AuthService: Secure OAuth authentication failed:',
-          String(error),
+          error instanceof Error ? error : String(error),
         );
       }
 
@@ -251,7 +251,7 @@ export class AuthService {
     } catch (error) {
       LOGGER.error(
         'AuthService: Discord authentication failed:',
-        String(error),
+        error instanceof Error ? error : String(error),
       );
       throw error instanceof Error
         ? error
@@ -374,7 +374,10 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      LOGGER.error('AuthService: Email authentication failed:', String(error));
+      LOGGER.error(
+        'AuthService: Email authentication failed:',
+        error instanceof Error ? error : String(error),
+      );
       throw new Error(
         error instanceof Error ? error.message : 'Email login failed',
       );
@@ -524,7 +527,10 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      LOGGER.error('Failed to decode JWT:', String(error));
+      LOGGER.error(
+        'Failed to decode JWT:',
+        error instanceof Error ? error : String(error),
+      );
       throw new Error('Invalid authentication token');
     }
   }
@@ -564,7 +570,10 @@ export class AuthService {
         }
       }
     } catch (error) {
-      LOGGER.error('Failed to store auth tokens:', String(error));
+      LOGGER.error(
+        'Failed to store auth tokens:',
+        error instanceof Error ? error : String(error),
+      );
     }
   }
 
@@ -615,7 +624,10 @@ export class AuthService {
       this.csrfTokenFallback = '';
       this.csrfStaleStorageValue = null;
     } catch (error) {
-      LOGGER.error('Failed to clear auth tokens:', String(error));
+      LOGGER.error(
+        'Failed to clear auth tokens:',
+        error instanceof Error ? error : String(error),
+      );
     }
   }
 
@@ -630,7 +642,10 @@ export class AuthService {
       // Local JWT validation - check if token is properly formatted and not expired
       return this.isTokenValidLocally(jwt);
     } catch (error) {
-      LOGGER.error('Token verification failed:', String(error));
+      LOGGER.error(
+        'Token verification failed:',
+        error instanceof Error ? error : String(error),
+      );
       return false;
     }
   }
@@ -726,7 +741,10 @@ export class AuthService {
       // Re-throw AuthSessionExpiredError so callers can detect 401/403 specifically
       // and log the user out rather than silently retrying.
       if (error instanceof AuthSessionExpiredError) throw error;
-      LOGGER.error('AuthService: JWT refresh request failed:', String(error));
+      LOGGER.error(
+        'AuthService: JWT refresh request failed:',
+        error instanceof Error ? error : String(error),
+      );
       return null;
     }
   }
@@ -749,7 +767,10 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      LOGGER.error('Remote token verification failed:', String(error));
+      LOGGER.error(
+        'Remote token verification failed:',
+        error instanceof Error ? error : String(error),
+      );
       return false;
     }
   }
@@ -789,7 +810,10 @@ export class AuthService {
       // Token is valid and not expired
       return true;
     } catch (error) {
-      LOGGER.error('Failed to validate JWT locally:', String(error));
+      LOGGER.error(
+        'Failed to validate JWT locally:',
+        error instanceof Error ? error : String(error),
+      );
       return false;
     }
   }
@@ -807,7 +831,10 @@ export class AuthService {
         localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.error('Failed to store user profile:', String(error));
+      LOGGER.error(
+        'Failed to store user profile:',
+        error instanceof Error ? error : String(error),
+      );
     }
   }
 
@@ -850,7 +877,10 @@ export class AuthService {
         localStorage.setItem(ADMIN_PROFILE_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.error('Failed to store admin profile:', String(error));
+      LOGGER.error(
+        'Failed to store admin profile:',
+        error instanceof Error ? error : String(error),
+      );
     }
   }
 
@@ -889,7 +919,10 @@ export class AuthService {
         localStorage.setItem(IMPERSONATED_USER_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.error('Failed to store impersonated user profile:', String(error));
+      LOGGER.error(
+        'Failed to store impersonated user profile:',
+        error instanceof Error ? error : String(error),
+      );
     }
   }
 
@@ -1004,7 +1037,10 @@ export class AuthService {
         credentials: 'include',
       });
     } catch (error) {
-      LOGGER.error('AuthService: Logout request failed:', String(error));
+      LOGGER.error(
+        'AuthService: Logout request failed:',
+        error instanceof Error ? error : String(error),
+      );
     }
   }
 
