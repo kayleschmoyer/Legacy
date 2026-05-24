@@ -16,26 +16,70 @@ export const WithUnread: Story = {
     items: [
       {
         id: '1',
-        title: 'You are on the clock',
-        body: 'Pick 4.07 — 1:42 remaining',
-        time: 'now',
+        type: 'draft',
+        title: 'Dead Ball Dynasty draft',
+        body: [
+          { bold: 'Dead Ball Dynasty' },
+          ' draft starts in 1 hour. Round 1, pick #3.',
+        ],
+        time: 'just now',
         unread: true,
       },
       {
         id: '2',
-        title: 'Trade offer accepted',
-        body: 'Babe Ruth → Brooklyn for Cy Young',
-        time: '12m',
+        type: 'trade',
+        title: 'Trade offer from Iron Horse',
+        body: [
+          'Trade offer from ',
+          { bold: 'Iron Horse' },
+          ': Lou Gehrig + 2nd pick for Babe Ruth.',
+        ],
+        time: '12 min',
         unread: true,
       },
       {
         id: '3',
-        title: 'Matchup score updated',
-        body: 'NYY 87.4 — BOS 102.6 (Top 7th)',
-        time: '1h',
+        type: 'matchup',
+        title: 'Matchup lead — Week 14',
+        body: [
+          'You took the lead in Week 14: ',
+          { bold: '127.5' },
+          ' vs 112.3',
+        ],
+        time: '2h',
+        unread: true,
       },
-      { id: '4', title: 'Weekly recap is ready', time: 'Mon' },
+      {
+        id: '4',
+        type: 'system',
+        title: 'Trade deadline moved',
+        body: 'Trade deadline moved to Friday Apr 19 at 8:00 PM ET.',
+        time: 'yesterday',
+      },
+      {
+        id: '5',
+        type: 'trade',
+        title: 'Trade accepted',
+        body: [
+          'Trade with ',
+          { bold: 'Cooperstown' },
+          ' accepted. Roster updated.',
+        ],
+        time: '2d',
+      },
     ],
+  },
+};
+
+export const CountBadge: Story = {
+  args: {
+    items: Array.from({ length: 101 }, (_, i) => ({
+      id: String(i + 1),
+      type: 'system' as const,
+      title: `Notification ${i + 1}`,
+      time: `${i + 1}m`,
+      unread: true,
+    })),
   },
 };
 
