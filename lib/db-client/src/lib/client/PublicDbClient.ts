@@ -1379,15 +1379,17 @@ export type {
   MatchupStatusCounts,
 } from './matchup-history';
 
+/**
+ * @internal Used only by getMatchupFootballPlayerGameStats. No callers exist outside
+ * lib/db-client. The `offense` field consolidates the former separate passing/rushing/
+ * receiving/kicking fields via the game_football_player_offense_stats view (LS-4758).
+ */
 export interface FootballMatchupPlayerGameStats {
   playerId: number;
   matchupPlayerId: number;
   gameNum: number;
   gameIdentifier: string;
-  passing: typeof Schema.gameFootballPassing.$inferSelect | null;
-  rushing: typeof Schema.gameFootballRushing.$inferSelect | null;
-  receiving: typeof Schema.gameFootballReceiving.$inferSelect | null;
-  kicking: typeof Schema.gameFootballKicking.$inferSelect | null;
+  offense: typeof Schema.gameFootballPlayerOffenseStats.$inferSelect | null;
   defense: typeof Schema.gameFootballDefense.$inferSelect | null;
   idpDefense: typeof Schema.gameFootballDefenseIdp.$inferSelect | null;
 }
@@ -1500,73 +1502,25 @@ export async function getMatchupFootballPlayerGameStats(
   const statKey = (playerId: number, season: number, gameNum: number) =>
     `${playerId}_${season}_${gameNum}`;
 
-  // Batch fetch offensive stats (passing, rushing, receiving, kicking)
-  const passingMap = new Map<
+  // Batch fetch offensive stats via flattened view (single query)
+  const offenseMap = new Map<
     string,
-    typeof Schema.gameFootballPassing.$inferSelect
-  >();
-  const rushingMap = new Map<
-    string,
-    typeof Schema.gameFootballRushing.$inferSelect
-  >();
-  const receivingMap = new Map<
-    string,
-    typeof Schema.gameFootballReceiving.$inferSelect
-  >();
-  const kickingMap = new Map<
-    string,
-    typeof Schema.gameFootballKicking.$inferSelect
+    typeof Schema.gameFootballPlayerOffenseStats.$inferSelect
   >();
   if (offGames.length > 0) {
     const playerIds = [...new Set(offGames.map((g) => g.playerId))];
     const gameNums = [...new Set(offGames.map((g) => g.gameNum))];
-    const [passingRows, rushingRows, receivingRows, kickingRows] =
-      await Promise.all([
-        db
-          .select()
-          .from(Schema.gameFootballPassing)
-          .where(
-            and(
-              inArray(Schema.gameFootballPassing.playerId, playerIds),
-              inArray(Schema.gameFootballPassing.gameNum, gameNums),
-            ),
-          ),
-        db
-          .select()
-          .from(Schema.gameFootballRushing)
-          .where(
-            and(
-              inArray(Schema.gameFootballRushing.playerId, playerIds),
-              inArray(Schema.gameFootballRushing.gameNum, gameNums),
-            ),
-          ),
-        db
-          .select()
-          .from(Schema.gameFootballReceiving)
-          .where(
-            and(
-              inArray(Schema.gameFootballReceiving.playerId, playerIds),
-              inArray(Schema.gameFootballReceiving.gameNum, gameNums),
-            ),
-          ),
-        db
-          .select()
-          .from(Schema.gameFootballKicking)
-          .where(
-            and(
-              inArray(Schema.gameFootballKicking.playerId, playerIds),
-              inArray(Schema.gameFootballKicking.gameNum, gameNums),
-            ),
-          ),
-      ]);
-    for (const r of passingRows)
-      passingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
-    for (const r of rushingRows)
-      rushingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
-    for (const r of receivingRows)
-      receivingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
-    for (const r of kickingRows)
-      kickingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
+    const offenseRows = await db
+      .select()
+      .from(Schema.gameFootballPlayerOffenseStats)
+      .where(
+        and(
+          inArray(Schema.gameFootballPlayerOffenseStats.playerId, playerIds),
+          inArray(Schema.gameFootballPlayerOffenseStats.gameNum, gameNums),
+        ),
+      );
+    for (const r of offenseRows)
+      offenseMap.set(statKey(r.playerId, r.season, r.gameNum), r);
   }
 
   // Batch fetch DST defense stats
@@ -1622,10 +1576,7 @@ export async function getMatchupFootballPlayerGameStats(
       matchupPlayerId: game.matchupPlayerId,
       gameNum: game.gameNum,
       gameIdentifier: game.gameIdentifier,
-      passing: passingMap.get(key) ?? null,
-      rushing: rushingMap.get(key) ?? null,
-      receiving: receivingMap.get(key) ?? null,
-      kicking: kickingMap.get(key) ?? null,
+      offense: offenseMap.get(key) ?? null,
       defense: defenseMap.get(key) ?? null,
       idpDefense: idpDefenseMap.get(key) ?? null,
     });

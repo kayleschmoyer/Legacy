@@ -223,6 +223,54 @@ export const gameFootballDefense = pgTable(
   }),
 );
 
+export const gameFootballPlayerOffenseStats = pgView(
+  'game_football_player_offense_stats',
+  {
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    gameNum: integer('game_num').notNull(),
+    gameIdentifier: varchar('game_identifier', { length: 20 }).notNull(),
+    // passing
+    cmp: integer('cmp'),
+    passAtt: integer('pass_att'),
+    passYds: integer('pass_yds'),
+    passTd: integer('pass_td'),
+    interceptions: integer('interceptions'),
+    sacked: integer('sacked'),
+    sackYds: integer('sack_yds'),
+    rating: doublePrecision('rating'),
+    // rushing
+    rushAtt: integer('rush_att'),
+    rushYds: integer('rush_yds'),
+    rushTd: integer('rush_td'),
+    rushLng: integer('rush_lng'),
+    rushFumbles: integer('rush_fumbles'),
+    // receiving
+    rec: integer('rec'),
+    tgt: integer('tgt'),
+    recYds: integer('rec_yds'),
+    recTd: integer('rec_td'),
+    recLng: integer('rec_lng'),
+    recFumbles: integer('rec_fumbles'),
+    // kicking
+    fgm: integer('fgm'),
+    fga: integer('fga'),
+    fg0_19m: integer('fg_0_19m'),
+    fg0_19a: integer('fg_0_19a'),
+    fg20_29m: integer('fg_20_29m'),
+    fg20_29a: integer('fg_20_29a'),
+    fg30_39m: integer('fg_30_39m'),
+    fg30_39a: integer('fg_30_39a'),
+    fg40_49m: integer('fg_40_49m'),
+    fg40_49a: integer('fg_40_49a'),
+    fg50m: integer('fg_50m'),
+    fg50a: integer('fg_50a'),
+    xpm: integer('xpm'),
+    xpa: integer('xpa'),
+    kLng: integer('k_lng'),
+  },
+).as(sql``);
+
 /**
  * Per-game individual defensive player (IDP) stats.
  * Distinct from game_football_defense (DST team-level aggregates).
