@@ -219,6 +219,11 @@ jest.mock('../components/baseball', () => ({
   BaseballScreen: () => <div>Baseball Screen</div>,
 }));
 
+// Mock football screen
+jest.mock('../components/football', () => ({
+  FootballScreen: () => <div>Football Screen</div>,
+}));
+
 // Mock hooks
 jest.mock('../hooks/usePageTracking', () => ({
   usePageTracking: () => null,
@@ -480,7 +485,7 @@ describe('App', () => {
   });
 
   describe('FootballScreen', () => {
-    it('should render football screen when navigating to /football', () => {
+    it('should render football screen when navigating to /football', async () => {
       const { container } = render(
         <MemoryRouter
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -490,7 +495,9 @@ describe('App', () => {
         </MemoryRouter>,
       );
 
-      // Since we now show authenticated content immediately, no need to advance timers
+      // Flush React.lazy's Promise (timers don't help; microtask flush does)
+      await act(() => Promise.resolve());
+
       // Verify football screen content is rendered
       expect(container).toHaveTextContent('Football Screen');
       expect(

@@ -31,6 +31,7 @@ fragment League on League {
   previousLeagueId
   frozenAt
   seasonNumber
+  sport
   # Salary cap settings (LS-646)
   salaryCapEnabled
   salaryCap

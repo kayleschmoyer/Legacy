@@ -5035,6 +5035,7 @@ export type LeagueFragment = {
   previousLeagueId?: number | null;
   frozenAt?: string | null;
   seasonNumber?: number | null;
+  sport?: Sport | null;
   salaryCapEnabled?: boolean | null;
   salaryCap?: number | null;
   salaryFloor?: number | null;
@@ -5115,6 +5116,7 @@ export type GetLeagueByIdQuery = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5182,6 +5184,7 @@ export type CreateLeagueAndTeamsMutation = {
       previousLeagueId?: number | null;
       frozenAt?: string | null;
       seasonNumber?: number | null;
+      sport?: Sport | null;
       salaryCapEnabled?: boolean | null;
       salaryCap?: number | null;
       salaryFloor?: number | null;
@@ -5246,6 +5249,7 @@ export type GetUserLeaguesQuery = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5342,6 +5346,7 @@ export type StartDraftMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5545,6 +5550,7 @@ export type UpdateLeagueSettingsMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5653,6 +5659,7 @@ export type RenewLeagueMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5718,6 +5725,7 @@ export type StartSeasonMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -9461,6 +9469,7 @@ export const LeagueFragmentDoc = gql`
     previousLeagueId
     frozenAt
     seasonNumber
+    sport
     salaryCapEnabled
     salaryCap
     salaryFloor

@@ -2,7 +2,6 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
-import { FootballScreen } from '@legacy-sports/shared-components/sports';
 import { PlayersScreen } from '@legacy-sports/shared-components/players';
 import { styled } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons';
@@ -33,6 +32,11 @@ const HomePage = lazyWithRetry(() => import('../pages/home/HomePage'));
 const BaseballScreen = lazyWithRetry(() =>
   import('../components/baseball').then((m) => ({
     default: m.BaseballScreen,
+  })),
+);
+const FootballScreen = lazyWithRetry(() =>
+  import('../components/football').then((m) => ({
+    default: m.FootballScreen,
   })),
 );
 const PlayerStatsPage = lazyWithRetry(() =>
