@@ -81,6 +81,31 @@ function isApiGatewayEvent(
   return !('Records' in event);
 }
 
+// ─── SNS message redaction ───────────────────────────────────────────────────
+
+// Logs length + preview (or keys for JSON objects) — never the full body, to prevent PII/secret leakage.
+export function redactMessage(message: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(message) as unknown;
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed)
+    ) {
+      return {
+        length: message.length,
+        keys: Object.keys(parsed as Record<string, unknown>),
+      };
+    }
+  } catch {
+    // not JSON — fall through to preview-only path
+  }
+  return {
+    length: message.length,
+    preview: message.length > 100 ? `${message.slice(0, 100)}…` : message,
+  };
+}
+
 // ─── SNS handler (CloudWatch Alarms + Budget Notifications) ─────────────────
 
 function isBudgetNotification(parsed: unknown): parsed is BudgetNotification {
@@ -191,16 +216,14 @@ async function handleSnsEvent(event: SNSEvent): Promise<void> {
           LOGGER.info(`Posted budget alert "${budget.budgetName}" to Discord`);
         } catch (error) {
           LOGGER.warn('Failed to post budget notification to Discord', {
-            message,
+            message: redactMessage(message),
             error,
           });
         }
       } else {
         LOGGER.warn(
           'Failed to parse SNS message as JSON or plain-text budget',
-          {
-            message,
-          },
+          { message: redactMessage(message) },
         );
       }
       continue;
@@ -217,12 +240,12 @@ async function handleSnsEvent(event: SNSEvent): Promise<void> {
         LOGGER.info(`Posted alarm "${parsed.AlarmName}" to Discord`);
       } else {
         LOGGER.warn('SNS message is not a recognized notification type', {
-          message,
+          message: redactMessage(message),
         });
       }
     } catch (error) {
       LOGGER.warn('Failed to post SNS notification to Discord', {
-        message,
+        message: redactMessage(message),
         error,
       });
     }

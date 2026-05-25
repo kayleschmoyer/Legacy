@@ -34,7 +34,11 @@ globalThis.fetch = mockFetch;
 process.env['DISCORD_WEBHOOK_URL_SECRET_NAME'] = 'discord-webhook-url';
 process.env['ROLLBAR_WEBHOOK_SECRET_SECRET_NAME'] = 'rollbar-webhook-secret';
 
-import { baseHandler, parsePlainTextBudgetNotification } from './index';
+import {
+  baseHandler,
+  parsePlainTextBudgetNotification,
+  redactMessage,
+} from './index';
 
 const VALID_AUTH_TOKEN = 'test-rollbar-webhook-secret';
 
@@ -138,6 +142,47 @@ describe('parsePlainTextBudgetNotification', () => {
 
   it('returns null for empty string', () => {
     expect(parsePlainTextBudgetNotification('')).toBeNull();
+  });
+});
+
+describe('redactMessage', () => {
+  it('returns length and truncated preview for non-JSON text', () => {
+    const msg = 'secret=abc123 ' + 'x'.repeat(200);
+    const result = redactMessage(msg);
+    expect(result['length']).toBe(msg.length);
+    expect(typeof result['preview']).toBe('string');
+    expect((result['preview'] as string).length).toBe(101); // 100 chars + ellipsis
+    expect((result['preview'] as string).endsWith('…')).toBe(true);
+    expect(result['keys']).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain(msg);
+  });
+
+  it('returns length and preview without ellipsis for short non-JSON text', () => {
+    const msg = 'plain text';
+    const result = redactMessage(msg);
+    expect(result['length']).toBe(10);
+    expect(result['preview']).toBe('plain text');
+    expect(result['keys']).toBeUndefined();
+  });
+
+  it('returns only length and keys for a JSON object — no values', () => {
+    const sensitive = {
+      secretToken: 'super-secret',
+      accountId: '123456789012',
+    };
+    const msg = JSON.stringify(sensitive);
+    const result = redactMessage(msg);
+    expect(result['length']).toBe(msg.length);
+    expect(result['keys']).toEqual(['secretToken', 'accountId']);
+    expect(result['preview']).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('super-secret');
+  });
+
+  it('falls back to preview for JSON arrays (not objects)', () => {
+    const msg = '[1,2,3]';
+    const result = redactMessage(msg);
+    expect(result['preview']).toBe('[1,2,3]');
+    expect(result['keys']).toBeUndefined();
   });
 });
 
