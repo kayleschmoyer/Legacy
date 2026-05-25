@@ -153,8 +153,8 @@ adminTest.describe('Admin Dashboard – users section @regression', () => {
 
   adminTest('shows Users section with user count badge', async ({ page }) => {
     await expect(page.getByText('Users', { exact: true })).toBeVisible();
-    // Badge shows number of users (3 in mock)
-    await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
+    // Badge shows total user count — component renders "${count} TOTAL"
+    await expect(page.getByText('3 TOTAL')).toBeVisible();
   });
 
   adminTest('shows user email addresses', async ({ page }) => {
@@ -234,15 +234,16 @@ adminTest.describe('Admin Dashboard – JWT decoder @regression', () => {
   });
 
   adminTest('shows JWT decoder UI', async ({ page }) => {
-    // The JWT decoder is in a collapsible accordion — expand it first
-    const jwtDecoderSectionToggle = page.getByRole('button', {
-      name: /jwt decoder/i,
+    // The JWT decoder accordion toggle is a generic element (not a <button>),
+    // so locate by the heading inside it and click to expand.
+    const jwtDecoderHeading = page.getByRole('heading', {
+      name: 'JWT Decoder',
     });
-    await expect(jwtDecoderSectionToggle).toBeVisible();
-    await jwtDecoderSectionToggle.click();
+    await expect(jwtDecoderHeading).toBeVisible();
+    await jwtDecoderHeading.click();
 
     // After expanding, the Decode button should be visible
-    const decodeButton = page.getByRole('button', { name: /decode/i }).first();
+    const decodeButton = page.getByRole('button', { name: /^decode$/i });
     await expect(decodeButton).toBeVisible();
   });
 });

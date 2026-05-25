@@ -222,12 +222,11 @@ adminTest.describe('Admin Console — Users section @regression', () => {
         page.getByText('AdminUser', { exact: true }).first(),
       ).toBeVisible();
 
-      // All 3 users (AdminUser, alice, bob) currently show Impersonate
-      // buttons. The component renders the button for every user card.
+      // AdminUser is admin — no Impersonate button. Only alice and bob (non-admin) get one.
       const impersonateButtons = page.getByRole('button', {
         name: /impersonate/i,
       });
-      await expect(impersonateButtons).toHaveCount(3);
+      await expect(impersonateButtons).toHaveCount(2);
     },
   );
 });
@@ -344,8 +343,8 @@ adminTest.describe('Admin Console — JWT Decoder @regression', () => {
       await page.getByPlaceholder(/paste jwt here/i).fill(testJwt);
       await page.getByRole('button', { name: /^decode$/i }).click();
 
-      await expect(page.getByText('Payload')).toBeVisible();
-      await expect(page.getByText('Header')).toBeVisible();
+      await expect(page.getByText('Payload', { exact: true })).toBeVisible();
+      await expect(page.getByText('Header', { exact: true })).toBeVisible();
     },
   );
 
