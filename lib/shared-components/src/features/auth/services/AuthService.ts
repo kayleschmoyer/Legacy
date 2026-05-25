@@ -741,10 +741,19 @@ export class AuthService {
       // Re-throw AuthSessionExpiredError so callers can detect 401/403 specifically
       // and log the user out rather than silently retrying.
       if (error instanceof AuthSessionExpiredError) throw error;
-      LOGGER.error(
-        'AuthService: JWT refresh request failed:',
-        error instanceof Error ? error : String(error),
-      );
+      // Network errors (offline, DNS, CORS) are expected transient failures —
+      // swallow silently so they don't create Rollbar noise.
+      const isNetworkError =
+        error instanceof TypeError &&
+        (error.message === 'Failed to fetch' ||
+          error.message === 'NetworkError when attempting to fetch resource.' ||
+          error.message === 'Network request failed');
+      if (!isNetworkError) {
+        LOGGER.error(
+          'AuthService: JWT refresh request failed:',
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
       return null;
     }
   }
