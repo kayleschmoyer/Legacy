@@ -5376,6 +5376,7 @@ export type LeagueFragment = {
   id?: number | null;
   name?: string | null;
   owner?: number | null;
+  sport?: Sport | null;
   maxRosterSize?: number | null;
   currentMatchup?: number | null;
   currentWeekNumber?: number | null;
@@ -5405,7 +5406,6 @@ export type LeagueFragment = {
   previousLeagueId?: number | null;
   frozenAt?: string | null;
   seasonNumber?: number | null;
-  sport?: Sport | null;
   salaryCapEnabled?: boolean | null;
   salaryCap?: number | null;
   salaryFloor?: number | null;
@@ -5457,6 +5457,7 @@ export type GetLeagueByIdQuery = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -5486,7 +5487,6 @@ export type GetLeagueByIdQuery = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
-    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5525,6 +5525,7 @@ export type CreateLeagueAndTeamsMutation = {
       id?: number | null;
       name?: string | null;
       owner?: number | null;
+      sport?: Sport | null;
       maxRosterSize?: number | null;
       currentMatchup?: number | null;
       currentWeekNumber?: number | null;
@@ -5554,7 +5555,6 @@ export type CreateLeagueAndTeamsMutation = {
       previousLeagueId?: number | null;
       frozenAt?: string | null;
       seasonNumber?: number | null;
-      sport?: Sport | null;
       salaryCapEnabled?: boolean | null;
       salaryCap?: number | null;
       salaryFloor?: number | null;
@@ -5590,6 +5590,7 @@ export type GetUserLeaguesQuery = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -5619,7 +5620,6 @@ export type GetUserLeaguesQuery = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
-    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5687,6 +5687,7 @@ export type StartDraftMutation = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -5716,7 +5717,6 @@ export type StartDraftMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
-    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -5891,6 +5891,7 @@ export type UpdateLeagueSettingsMutation = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -5920,7 +5921,6 @@ export type UpdateLeagueSettingsMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
-    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -6000,6 +6000,7 @@ export type RenewLeagueMutation = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6029,7 +6030,6 @@ export type RenewLeagueMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
-    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -6066,6 +6066,7 @@ export type StartSeasonMutation = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6095,7 +6096,6 @@ export type StartSeasonMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
-    sport?: Sport | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -9810,6 +9810,7 @@ export const LeagueFragmentDoc = gql`
     id
     name
     owner
+    sport
     maxRosterSize
     currentMatchup
     currentWeekNumber

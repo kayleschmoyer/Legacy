@@ -2,6 +2,7 @@ fragment League on League {
   id
   name
   owner
+  sport
   maxRosterSize
   currentMatchup
   currentWeekNumber

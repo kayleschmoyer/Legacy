@@ -58,6 +58,11 @@ const PlayerComparisonPage = lazyWithRetry(() =>
 const LeagueCreatePage = lazyWithRetry(
   () => import('../pages/baseball/LeagueCreatePage'),
 );
+const CreateLeagueWizardPage = lazyWithRetry(() =>
+  import('../components/leagues/CreateLeagueWizard').then((m) => ({
+    default: m.CreateLeagueWizard,
+  })),
+);
 const LeagueDetailPage = lazyWithRetry(
   () => import('../pages/baseball/league-detail-v2/LeagueDetailPageV2'),
 );
@@ -496,6 +501,7 @@ function App() {
                 </FootballGate>
               }
             />
+            <Route path="/league/create" element={<CreateLeagueWizardPage />} />
             <Route
               path="/football/league/create"
               element={
