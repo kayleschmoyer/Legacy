@@ -1,8 +1,15 @@
 import { LOGGER } from '@legacy-sports/logging';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { ScrollView } from 'react-native';
 import { secureStorage } from '@legacy-sports/shared-components';
 import {
+  Button,
   H1,
   Paragraph,
   Separator,
@@ -12,6 +19,9 @@ import {
   YStack,
 } from 'tamagui';
 import { useThemeContext } from '../../context/ThemeContext';
+import { AUTHORIZED_CONTEXT } from '../../common/auth/AuthorizedUserContext';
+import { useDeviceLoggingPreference } from '../../features/device-logs/useDeviceLoggingPreference';
+import { shareCurrentLogFile } from '../../features/device-logs/deviceLogs';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
 const BRAND_NAVY_LIGHT = '#2C4A7C';
@@ -72,9 +82,16 @@ interface PrefToggleProps {
   onChange: (v: boolean) => void;
   label: string;
   description?: string;
+  testID?: string;
 }
 
-function PrefToggle({ value, onChange, label, description }: PrefToggleProps) {
+function PrefToggle({
+  value,
+  onChange,
+  label,
+  description,
+  testID,
+}: PrefToggleProps) {
   return (
     <XStack alignItems="center" justifyContent="space-between" gap="$4">
       <YStack gap="$1" flex={1}>
@@ -92,6 +109,7 @@ function PrefToggle({ value, onChange, label, description }: PrefToggleProps) {
         checked={value}
         onCheckedChange={onChange}
         backgroundColor={value ? BRAND_NAVY_LIGHT : '$color5'}
+        testID={testID}
       >
         <Switch.Thumb animation="quick" />
       </Switch>
@@ -199,8 +217,60 @@ function SectionCard({ icon, title, subtitle, children }: SectionProps) {
 
 /* ─── Main Component ─── */
 
+function AdminToolsSection(): React.JSX.Element {
+  const { enabled, setEnabled } = useDeviceLoggingPreference(true);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  const onShare = useCallback(() => {
+    setShareError(null);
+    shareCurrentLogFile().catch((error) => {
+      const err = error instanceof Error ? error : new Error(String(error));
+      LOGGER.error('Failed to share device log file', err);
+      setShareError(err.message);
+    });
+  }, []);
+
+  return (
+    <SectionCard
+      icon="🛠️"
+      title="Admin Tools"
+      subtitle="Diagnostic tooling — only visible to admins"
+    >
+      <PrefToggle
+        value={enabled}
+        onChange={(v) => {
+          void setEnabled(v);
+        }}
+        label="Write logs to device"
+        description="Persist log entries to a daily file on this device. Keeps the last 7 days."
+        testID="device-logs-toggle"
+      />
+
+      <Separator />
+
+      <YStack gap="$2">
+        <Button
+          size="$3"
+          disabled={!enabled}
+          opacity={enabled ? 1 : 0.5}
+          onPress={onShare}
+          testID="device-logs-share-button"
+        >
+          Share log file
+        </Button>
+        {shareError ? (
+          <Paragraph size="$2" color="$red10">
+            {shareError}
+          </Paragraph>
+        ) : null}
+      </YStack>
+    </SectionCard>
+  );
+}
+
 export default function PreferencesScreen(): React.JSX.Element {
   const { themePreference, setThemePreference } = useThemeContext();
+  const currentUser = useContext(AUTHORIZED_CONTEXT);
   const [prefs, setPrefs] = useState<UserPreferences>({
     ...DEFAULT_PREFS,
     theme: themePreference,
@@ -390,6 +460,8 @@ export default function PreferencesScreen(): React.JSX.Element {
             description="Display cumulative season stats alongside per-game stats"
           />
         </SectionCard>
+
+        {currentUser?.isAdmin ? <AdminToolsSection /> : null}
       </YStack>
     </ScrollView>
   );

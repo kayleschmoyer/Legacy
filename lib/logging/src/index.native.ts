@@ -10,6 +10,10 @@ export {
   createCustomLogger,
 } from './lib/factories.native';
 export { ConsoleOutputDestination } from './lib/destinations';
+export {
+  DeviceFileOutputDestination,
+  type DeviceFileOutputDestinationOptions,
+} from './lib/destinations/DeviceFileOutputDestination.native';
 export type {
   ILogger,
   LoggerConfig,
