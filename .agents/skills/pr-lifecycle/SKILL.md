@@ -195,15 +195,21 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 ```
 # MCP (preferred) — full post-creation sequence
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
-github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
+github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])   # while still draft — MUST come before bot:ready-for-review
 github_mark_pr_ready(number: <PR#>)
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MUST be last label op — see note below
 mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # Claude Code built-in ONLY — NOT in legacy-sports-github; unavailable in cloud/headless; fallback: poll via github_view_pr + ci_list_runs with ScheduleWakeup
 github_request_review(prs: [<PR#>])
 jira_transition(key: "LS-####", status: "In Review")
 
 # After EACH fix-and-push round (resolve threads → push → re-trigger review + CI)
 github_resolve_threads(threadIds: [...], prNumber: <PR#>)
-github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MANDATORY — fires Reviewer (W1) → bot review → CI Orchestrator. Plain pushes do NOT trigger CI.
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MANDATORY and MUST be last label op — fires Reviewer (W1) → bot review → CI Orchestrator. Plain pushes do NOT trigger CI.
+
+# ⛔ Why bot:ready-for-review must be last: Reviewer (W1) uses concurrency.cancel-in-progress: true.
+# Any label applied after bot:ready-for-review queues a new W1 run that cancels the reviewer before
+# it posts, then skips itself (non-qualifying label). The PR silently stalls with no review posted.
+# If agent-in-progress is missing when you reach this step, apply it first, then bot:ready-for-review.
 
 # Enable auto-merge (worktree-safe — use instead of `gh pr merge --auto`)
 github_pr_enable_auto_merge(number: <PR#>)                         # SQUASH (default)
