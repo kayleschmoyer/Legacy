@@ -49,7 +49,7 @@ export const addBreadcrumb = (
 
 export const withRollbar = <TArgs extends unknown[], TResult>(
   handler: (...args: TArgs) => TResult | Promise<TResult>,
-): ((...args: TArgs) => TResult | Promise<TResult>) => {
+): ((...args: TArgs) => Promise<TResult>) => {
   return rollbar.withRollbar(handler);
 };
 

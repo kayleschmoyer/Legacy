@@ -159,7 +159,7 @@ class NodeRollbarImplementation implements RollbarInterface {
 
   withRollbar<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
-  ): (...args: TArgs) => TResult | Promise<TResult> {
+  ): (...args: TArgs) => Promise<TResult> {
     return async (...args: TArgs): Promise<TResult> => {
       try {
         const result = await handler(...args);
