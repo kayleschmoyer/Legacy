@@ -28,6 +28,9 @@ inputs:
   step-results:
     description: "JSON object with step results"
     required: false
+  failure-excerpts:
+    description: "JSON object mapping failed step name to its distilled log excerpt"
+    required: false
   workflow-duration:
     description: "Total workflow duration in seconds"
     required: false
@@ -125,6 +128,7 @@ runs:
       env:
         PR_NUMBER: ${{ inputs.pr-number }}
         STEP_RESULTS: ${{ inputs.step-results }}
+        FAILURE_EXCERPTS: ${{ inputs.failure-excerpts }}
         QUALITY_GATES_SUBSECTIONS: ${{ inputs.quality-gates-subsections }}
         PROJECT_FAILURES: ${{ inputs.project-failures }}
         EXECUTION_MODE: ${{ inputs.execution-mode }}

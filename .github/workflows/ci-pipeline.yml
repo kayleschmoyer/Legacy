@@ -132,6 +132,8 @@ jobs:
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    outputs:
+      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
     env:
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     steps:
@@ -150,7 +152,17 @@ jobs:
           include-optional-deps: false
 
       - name: "Lint"
-        run: pnpm exec nx affected -t lint
+        run: |
+          set -o pipefail
+          pnpm exec nx affected -t lint 2>&1 | tee "$RUNNER_TEMP/ci-lint.log"
+
+      - name: "Capture lint failure"
+        id: capture
+        if: failure()
+        uses: ./.github/actions/capture-ci-failure
+        with:
+          tool: lint
+          log: ${{ runner.temp }}/ci-lint.log
 
   format:
     name: "format"
@@ -158,6 +170,8 @@ jobs:
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    outputs:
+      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -175,17 +189,29 @@ jobs:
 
       - name: "Format Check"
         run: |
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          set -o pipefail
+          run_format() {
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
 
-          if [ -z "$BASE_SHA" ]; then
-            echo "No pull request base SHA; running Prettier check on the repository."
-            pnpm exec prettier --check --ignore-unknown .
-            exit 0
-          fi
+            if [ -z "$BASE_SHA" ]; then
+              echo "No pull request base SHA; running Prettier check on the repository."
+              pnpm exec prettier --check --ignore-unknown .
+              return
+            fi
 
-          git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
-            | xargs -0 -r pnpm exec prettier --check --ignore-unknown
+            git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
+              | xargs -0 -r pnpm exec prettier --check --ignore-unknown
+          }
+          run_format 2>&1 | tee "$RUNNER_TEMP/ci-format.log"
+
+      - name: "Capture format failure"
+        id: capture
+        if: failure()
+        uses: ./.github/actions/capture-ci-failure
+        with:
+          tool: format
+          log: ${{ runner.temp }}/ci-format.log
 
   test:
     name: "test"
@@ -193,6 +219,8 @@ jobs:
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    outputs:
+      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
     env:
       # Cap per-process heap lower than the global 4096 so that NX_PARALLEL=2 + Jest
       # workers don't collectively OOM the runner when all projects are affected
@@ -215,7 +243,17 @@ jobs:
           include-optional-deps: false
 
       - name: "Typecheck & Test"
-        run: pnpm exec nx affected -t typecheck test
+        run: |
+          set -o pipefail
+          pnpm exec nx affected -t typecheck test 2>&1 | tee "$RUNNER_TEMP/ci-test.log"
+
+      - name: "Capture test failure"
+        id: capture
+        if: failure()
+        uses: ./.github/actions/capture-ci-failure
+        with:
+          tool: test
+          log: ${{ runner.temp }}/ci-test.log
 
   build:
     name: "build"
@@ -227,6 +265,7 @@ jobs:
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     outputs:
       artifacts-ready: ${{ steps.build-validation.outputs.artifacts-ready }}
+      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -275,12 +314,24 @@ jobs:
           path: dist/apps/web
           if-no-files-found: error
 
+      # build-validation tees each build to build-*.log and terraform to
+      # terraform-*-{init,validate}.log; distil whichever failed.
+      - name: "Capture build failure"
+        id: capture
+        if: failure()
+        uses: ./.github/actions/capture-ci-failure
+        with:
+          tool: build
+          log: build-*.log,terraform-*-init.log,terraform-*-validate.log
+
   custom-checks:
     name: "custom-checks"
     needs: [detect-changes]
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    outputs:
+      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -299,11 +350,17 @@ jobs:
       - name: "Setup uv"
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
+      # Each custom-checks step tees into one shared log so that, on failure,
+      # the capture step can distil whichever check broke.
       - name: "Lint Agent Skills"
-        run: node scripts/lint-skills.js
+        run: |
+          set -o pipefail
+          node scripts/lint-skills.js 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
       - name: "Migration Immutability Check"
-        run: node scripts/check-migration-immutability.js --branch
+        run: |
+          set -o pipefail
+          node scripts/check-migration-immutability.js --branch 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
       - name: "Touch-Map Documentation Freshness"
         continue-on-error: true
@@ -312,20 +369,34 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: node scripts/lint-touch-map.js
+        run: |
+          set -o pipefail
+          node scripts/lint-touch-map.js 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
       - name: "Run Custom Check Scripts"
         run: |
+          set -o pipefail
           # Each .github/checks/*.sh script is an independent required check.
           # Per design §9.4: adding a check = adding a script here.
-          CHECKS_DIR=".github/checks"
-          if compgen -G "$CHECKS_DIR/*.sh" > /dev/null 2>&1; then
-            for script in "$CHECKS_DIR"/*.sh; do
-              echo "Running $script..."
-              bash "$script"
-            done
-          fi
-          echo "All custom checks passed"
+          run_custom_checks() {
+            CHECKS_DIR=".github/checks"
+            if compgen -G "$CHECKS_DIR/*.sh" > /dev/null 2>&1; then
+              for script in "$CHECKS_DIR"/*.sh; do
+                echo "Running $script..."
+                bash "$script"
+              done
+            fi
+            echo "All custom checks passed"
+          }
+          run_custom_checks 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
+
+      - name: "Capture custom-checks failure"
+        id: capture
+        if: failure()
+        uses: ./.github/actions/capture-ci-failure
+        with:
+          tool: custom-checks
+          log: ${{ runner.temp }}/ci-custom-checks.log
 
   # ============================================================================
   # STAGE 3 — E2E tests (runs after lint, format, test, AND build all pass)
@@ -625,6 +696,37 @@ jobs:
           execution-plan: "{}"
           environment: "production"
 
+      # Collect each failed job's distilled excerpt (exposed as a job output by
+      # the capture-ci-failure action) into a single JSON map for the reporter.
+      - name: "Assemble Failure Excerpts"
+        id: excerpts
+        if: steps.collect-results.outputs.overall-status == 'failure'
+        shell: bash
+        env:
+          EX_LINT: ${{ needs.lint.outputs.failure-excerpt }}
+          EX_FORMAT: ${{ needs.format.outputs.failure-excerpt }}
+          EX_TEST: ${{ needs.test.outputs.failure-excerpt }}
+          EX_BUILD: ${{ needs.build.outputs.failure-excerpt }}
+          EX_CUSTOM: ${{ needs.custom-checks.outputs.failure-excerpt }}
+        run: |
+          JSON=$(jq -n \
+            --arg lint "$EX_LINT" \
+            --arg format "$EX_FORMAT" \
+            --arg test "$EX_TEST" \
+            --arg build "$EX_BUILD" \
+            --arg customChecks "$EX_CUSTOM" \
+            '{lint: $lint, format: $format, test: $test, build: $build, "custom-checks": $customChecks}
+             | with_entries(select(
+                 .value != null and .value != ""
+                 and (.value | test("No log file was captured|Failed to distil") | not)
+               ))')
+          DELIM="EXJSON_$(date +%s%N)"
+          {
+            echo "json<<$DELIM"
+            echo "$JSON"
+            echo "$DELIM"
+          } >> "$GITHUB_OUTPUT"
+
       - name: "CI Pipeline Reporting"
         id: ci-reporting
         uses: ./.github/actions/ci-reporting
@@ -636,6 +738,7 @@ jobs:
           execution-mode: "local"
           optimal-agents: "4"
           step-results: ${{ steps.collect-results.outputs.step-results }}
+          failure-excerpts: ${{ steps.excerpts.outputs.json }}
           workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
           run-id: ${{ github.run_id }}
           quality-gates-subsections: |

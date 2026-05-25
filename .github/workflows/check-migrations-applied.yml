@@ -167,7 +167,9 @@ jobs:
           CI_READONLY_DB_NAME: ${{ steps.db-creds.outputs.db_name }}
           CI_READONLY_DB_SSL: "true"
           NODE_EXTRA_CA_CERTS: ${{ steps.rds-ca.outputs.ca_bundle }}
-        run: node scripts/check-migrations-applied.js
+        run: |
+          set -o pipefail
+          node scripts/check-migrations-applied.js 2>&1 | tee "$RUNNER_TEMP/migrations.log"
 
       - name: "Label PR on Migration Failure"
         if: always() && github.event.pull_request.number
@@ -222,3 +224,52 @@ jobs:
               }));
               core.info(`Label removed: ${label}`);
             }
+
+      - name: "Update CI status comment (migrations section)"
+        if: always() && github.event.pull_request.number
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          MIGRATION_OUTCOME: ${{ steps.migration-check.outcome }}
+          MIGRATION_LOG: ${{ runner.temp }}/migrations.log
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { applySection } = require('./.github/scripts/ci-failure-capture/sticky-comment.js');
+            const { statusHeading, detailsBlock, fixLine } = require('./.github/scripts/ci-failure-capture/render.js');
+            const { distill } = require('./.github/scripts/ci-failure-capture/extract.js');
+
+            const prNumber = context.issue.number;
+            if (!prNumber) return;
+
+            const failed = process.env.MIGRATION_OUTCOME === 'failure';
+            const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
+
+            if (!failed) {
+              await applySection({ github, context, prNumber, key: 'migrations', content: null, producer: 'check-migrations' });
+              return;
+            }
+
+            let log = '';
+            try { log = fs.readFileSync(process.env.MIGRATION_LOG, 'utf8'); } catch {}
+            const { summary, excerpt } = distill({ tool: 'generic', text: log, runUrl });
+
+            const content = [
+              statusHeading('Migrations', 'fail', summary || 'unapplied migrations'),
+              '',
+              detailsBlock({
+                check: 'migrations',
+                label: 'migrations not applied',
+                sublabel: summary || '',
+                excerpt,
+              }),
+              '',
+              fixLine('apply the pending migrations to the database', runUrl),
+            ].join('\n').trim();
+
+            await applySection({
+              github, context, prNumber,
+              key: 'migrations',
+              content,
+              producer: 'check-migrations',
+            });

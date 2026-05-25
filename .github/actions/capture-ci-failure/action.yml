@@ -1,0 +1,54 @@
+name: "Capture CI Failure"
+description: "Distil a failed step's log into a short, redacted excerpt and expose it as a job output for the summarize job to post to the PR."
+
+inputs:
+  tool:
+    description: "Distiller profile: lint | format | test | build | custom-checks | generic"
+    required: true
+  log:
+    description: "Comma-separated log file paths or globs to distil"
+    required: true
+  max-lines:
+    description: "Maximum excerpt length"
+    required: false
+    default: "60"
+
+outputs:
+  excerpt:
+    description: "Distilled, redacted failure excerpt (empty if nothing was captured)"
+    value: ${{ steps.run.outputs.excerpt }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: run
+      shell: bash
+      env:
+        INPUT_TOOL: ${{ inputs.tool }}
+        INPUT_LOG: ${{ inputs.log }}
+        INPUT_MAX_LINES: ${{ inputs.max-lines }}
+      run: |
+        set -uo pipefail
+
+        EXCERPT_FILE="$RUNNER_TEMP/ci-failure-excerpt.md"
+        RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+        # Pass the raw comma-separated patterns to extract.js as a single
+        # argument. Glob resolution happens in Node (readdir + matcher), so the
+        # shell never word-splits, globs, or command-expands the value.
+        node "$GITHUB_ACTION_PATH/../../scripts/ci-failure-capture/extract.js" \
+          --tool "$INPUT_TOOL" \
+          --log "$INPUT_LOG" \
+          --max-lines "$INPUT_MAX_LINES" \
+          --run-url "$RUN_URL" \
+          --out "$EXCERPT_FILE" \
+          || printf 'Failed to distil the %s log; see the Actions run.\n' "$INPUT_TOOL" > "$EXCERPT_FILE"
+
+        # Emit as a multiline job output using a random heredoc delimiter so the
+        # excerpt content can never collide with the terminator.
+        DELIM="CIEXCERPT_$(date +%s%N)_$RANDOM"
+        {
+          echo "excerpt<<$DELIM"
+          cat "$EXCERPT_FILE"
+          echo "$DELIM"
+        } >> "$GITHUB_OUTPUT"

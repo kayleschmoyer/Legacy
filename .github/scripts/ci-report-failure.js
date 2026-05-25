@@ -1,255 +1,149 @@
 /**
- * CI Failure Report Generator
+ * CI Pipeline failure reporter.
  *
- * Generates comprehensive failure reports for PR comments with:
- * - Detailed step-by-step status
- * - Quality gates subsection breakdown
- * - Project-level failure tracking
- * - Targeted debugging guidance
- * - Reproduction commands
+ * Renders the `pipeline` section of the shared CI sticky comment: a compact
+ * step-status table plus, for each failed step, a collapsed <details> block
+ * containing a distilled, redacted excerpt of that step's log (produced by the
+ * capture-ci-failure action via extract.js and passed in as FAILURE_EXCERPTS).
+ *
+ * Only the `pipeline` section is touched — sections owned by other checks
+ * (schema, migrations) are preserved. See ci-failure-capture/sticky-comment.js.
  */
 
-/**
- * Retry a GitHub API call up to `retries` times on transient 5xx errors.
- */
-async function withRetry(fn, retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const status = err.status || err.response?.status || 0;
-      if (attempt < retries && status >= 500) {
-        const delay = attempt * 2000;
-        console.log(
-          `GitHub API error (${status}), retrying in ${delay}ms (attempt ${attempt}/${retries})...`,
-        );
-        await new Promise((r) => setTimeout(r, delay));
-      } else {
-        throw err;
-      }
-    }
+'use strict';
+
+const { applySection } = require('./ci-failure-capture/sticky-comment.js');
+const {
+  statusHeading,
+  detailsBlock,
+  fixLine,
+} = require('./ci-failure-capture/render.js');
+
+// Step → (tool excerpt key, human label, local fix command).
+const STEP_META = {
+  lint: { key: 'lint', label: 'lint', fix: 'make lint-fix' },
+  format: { key: 'format', label: 'format', fix: 'make fmt' },
+  test: { key: 'test', label: 'test (typecheck + unit)', fix: 'make pc' },
+  build: { key: 'build', label: 'build', fix: 'make build' },
+  'custom-checks': {
+    key: 'custom-checks',
+    label: 'custom-checks',
+    fix: 'make pc',
+  },
+  'e2e-testing': { key: null, label: 'E2E tests', fix: 'make test-e2e' },
+};
+
+const STATUS_CELL = {
+  success: '✅ pass',
+  failure: '❌ fail',
+  cancelled: '⛔ cancelled',
+  skipped: '⏭️ skip',
+};
+
+function parseJsonEnv(name) {
+  const raw = process.env[name];
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
   }
 }
 
-module.exports = async ({ github, context, core }) => {
-  const commentMarker = '<!-- CI-PIPELINE-STATUS -->';
+// extract.js emits "<summary>\n\n<body>"; split so the summary becomes the
+// <details> sublabel and the body becomes the fenced excerpt.
+function splitExcerpt(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return { sublabel: '', body: '' };
+  const lines = trimmed.split('\n');
+  if (lines.length >= 2 && lines[1].trim() === '') {
+    return {
+      sublabel: lines[0].trim(),
+      body: lines.slice(2).join('\n').trim(),
+    };
+  }
+  return { sublabel: '', body: trimmed };
+}
 
-  // Parse step results from environment
-  let stepResults = {};
-  try {
-    const stepResultsInput = process.env.STEP_RESULTS
-      ? JSON.parse(process.env.STEP_RESULTS)
-      : null;
-    if (stepResultsInput && Object.keys(stepResultsInput).length > 0) {
-      stepResults = stepResultsInput;
+function buildStepTable(stepResults) {
+  const rows = Object.entries(stepResults)
+    .filter(([, v]) => typeof v === 'string')
+    .map(([step, result]) => {
+      const label = STEP_META[step]?.label || step.replace(/[-_]/g, ' ');
+      return `| ${label} | ${STATUS_CELL[result] || result} |`;
+    });
+  if (rows.length === 0) return '';
+  return ['| Step | Status |', '|------|--------|', ...rows].join('\n');
+}
+
+module.exports = async ({ github, context, core }) => {
+  const prNumber = parseInt(process.env.PR_NUMBER, 10);
+  if (!prNumber) return { skipped: true };
+
+  const stepResults = parseJsonEnv('STEP_RESULTS');
+  const excerpts = parseJsonEnv('FAILURE_EXCERPTS');
+  const runId = process.env.RUN_ID;
+  const repoUrl = context.payload.repository.html_url;
+  const runUrl = runId ? `${repoUrl}/actions/runs/${runId}` : '';
+
+  const failedSteps = Object.entries(stepResults)
+    .filter(([, v]) => v === 'failure' || v === 'cancelled')
+    .map(([step]) => step);
+
+  const summary =
+    failedSteps.length > 0
+      ? `${failedSteps.length} check${failedSteps.length === 1 ? '' : 's'} failed`
+      : 'failed';
+
+  const parts = [statusHeading('CI Pipeline', 'fail', summary), ''];
+
+  const table = buildStepTable(stepResults);
+  if (table) parts.push(table, '');
+
+  // Per-failed-step detail blocks.
+  const fixes = new Set();
+  for (const step of failedSteps) {
+    const meta = STEP_META[step];
+    if (meta?.fix) fixes.add(meta.fix);
+
+    if (meta && meta.key && excerpts[meta.key]) {
+      const { sublabel, body } = splitExcerpt(excerpts[meta.key]);
+      parts.push(
+        detailsBlock({
+          check: meta.key,
+          label: meta.label,
+          sublabel,
+          excerpt: body,
+        }),
+        '',
+      );
+    } else if (step === 'e2e-testing') {
+      parts.push(
+        '> **E2E tests failed.** Failing specs and traces are in the ' +
+          '🎭 Playwright Report comment on this PR; full output is in the ' +
+          'Actions logs (credentials are used in E2E, so raw output is not ' +
+          'inlined here).',
+        '',
+      );
     }
-  } catch (e) {
-    console.log('No step results provided or parsing failed');
   }
 
-  // Find existing CI comment to update
-  const prNumber = parseInt(process.env.PR_NUMBER);
-  const comments = await withRetry(() =>
-    github.rest.issues.listComments({
-      issue_number: prNumber,
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-    }),
-  );
+  const fixHint = [...fixes].join(' && ') || 'make pc';
+  parts.push(fixLine(fixHint, runUrl));
 
-  let existingComment = comments.data.find(
-    (comment) => comment.body && comment.body.includes(commentMarker),
-  );
+  const content = parts.join('\n').trim();
 
-  // Determine specific failure context and provide targeted guidance
-  let failureReason = 'CI pipeline failure detected';
-  let reproCommand = 'make pc';
-  let agentCommand = 'make_run({ target: "pc" })';
-  let debugSection =
-    'A CI step failed. Run the reproduction command to identify the specific issue.';
-
-  // Step analysis for targeted guidance
-  const stepAnalysis = {
-    lint: {
-      reason: 'ESLint validation failed',
-      command: 'make lint-fix',
-      agentCommand:
-        'nx_run_affected({ target: "lint", fix: true })  // or: make lint-fix',
-      debug:
-        'ESLint found code quality issues. Run the command above to attempt automatic fixes.',
-    },
-    format: {
-      reason: 'Code formatting check failed',
-      command: 'make fmt',
-      agentCommand: 'make_run({ target: "fmt" })',
-      debug:
-        'Code is not properly formatted. Run the command above to auto-fix formatting issues.',
-    },
-    test: {
-      reason: 'TypeScript typecheck or unit tests failed',
-      command: 'make pc',
-      agentCommand:
-        'nx_run_affected({ target: "typecheck" }) && nx_run_affected({ target: "test" })  // or: make pc',
-      debug:
-        'TypeScript type errors or failing unit tests detected. Run typecheck and test to identify the issue.',
-    },
-    build: {
-      reason: 'Build validation failed',
-      command: 'make build',
-      agentCommand: 'nx_run_affected({ target: "build" })  // or: make build',
-      debug:
-        'Build validation failed. Check for compilation errors, missing dependencies, or configuration issues.',
-    },
-    'custom-checks': {
-      reason: 'Custom checks failed (migration immutability or check scripts)',
-      command: 'node scripts/check-migration-immutability.js --branch',
-      agentCommand:
-        'make_run({ target: "pc" })  // custom-checks run as part of make pc',
-      debug:
-        'Migration immutability check or a custom check script failed. Check which script failed in the CI logs.',
-    },
-    'e2e-testing': {
-      reason: 'End-to-end tests failed',
-      command: 'make test-e2e',
-      agentCommand: 'make_run({ target: "test-e2e" })',
-      debug:
-        'E2E tests are failing. Check for UI changes, API issues, or test environment problems.',
-    },
-  };
-
-  // Analyze step results for specific guidance
-  let failedSteps = [];
-  let detailedFailureReason = failureReason;
-
-  Object.entries(stepResults).forEach(([step, result]) => {
-    if (result === 'failure') {
-      failedSteps.push(step);
-
-      if (stepAnalysis[step] && !reproCommand.includes('make fmt')) {
-        failureReason = stepAnalysis[step].reason;
-        detailedFailureReason = failureReason;
-        reproCommand = stepAnalysis[step].command;
-        agentCommand = stepAnalysis[step].agentCommand;
-        debugSection = stepAnalysis[step].debug;
-      }
-    }
+  const commentId = await applySection({
+    github,
+    context,
+    prNumber,
+    key: 'pipeline',
+    content,
+    producer: 'ci-pipeline',
   });
 
-  // Create step status table
-  let stepStatusTable = '';
-  if (Object.keys(stepResults).length > 0) {
-    stepStatusTable =
-      '\n### Step Status Details\n' +
-      '| Step | Status |\n' +
-      '|------|--------|\n';
-    Object.entries(stepResults).forEach(([step, result]) => {
-      // Skip non-string entries (e.g., metadata object injected by collect-results)
-      if (typeof result !== 'string') return;
-
-      const icon =
-        result === 'success'
-          ? 'PASS'
-          : result === 'failure'
-            ? 'FAIL'
-            : result === 'skipped'
-              ? 'SKIP'
-              : 'UNKNOWN';
-      const stepName = step
-        .replace(/[-_]/g, ' ')
-        .replace(/\b\w/g, (l) => l.toUpperCase());
-      stepStatusTable += `| ${stepName} | ${icon} ${result || 'unknown'} |\n`;
-    });
-    stepStatusTable += '\n';
-  }
-
-  // Build execution context
-  const executionMode = process.env.EXECUTION_MODE;
-  const agents = process.env.OPTIMAL_AGENTS;
-  const runId = process.env.RUN_ID;
-
-  let executionContext = '### Execution Context\n';
-  executionContext += '- **Mode**: Local GitHub Actions\n';
-  executionContext += '- **Agents/Processes**: ' + agents + '\n';
-  if (failedSteps.length > 0) {
-    executionContext += '- **Failed Steps**: ' + failedSteps.join(', ') + '\n';
-  }
-
-  // Build comment
-  const comment =
-    commentMarker +
-    '\n' +
-    '## CI Pipeline Failed\n\n' +
-    '**Failure**: ' +
-    detailedFailureReason +
-    '\n\n' +
-    '### Quick Debug\n' +
-    debugSection +
-    '\n\n' +
-    stepStatusTable +
-    '### How to Fix\n' +
-    '**Humans** (shell):\n' +
-    '```bash\n' +
-    '# Reproduce the failure:\n' +
-    reproCommand +
-    '\n\n' +
-    '# Full local CI simulation:\n' +
-    'make pc\n' +
-    '```\n\n' +
-    '**Agents** (use MCP tools — do not run raw `pnpm exec nx` commands):\n' +
-    '```\n' +
-    agentCommand +
-    '\n\n' +
-    '# Full pre-commit check:\n' +
-    'make_run({ target: "pc" })\n' +
-    '```\n\n' +
-    executionContext +
-    '\n' +
-    '### Next Steps\n' +
-    '1. **Run the reproduction command** above to identify the specific issue\n' +
-    '2. **Fix the failing tests/lint/build** issues\n' +
-    '3. **Push your changes** - CI will automatically re-run\n' +
-    '4. **Check our [troubleshooting guide](./docs/troubleshooting.md)** for common issues\n\n' +
-    '### Useful Links\n' +
-    (runId
-      ? '- [Workflow Run Details](' +
-        context.payload.repository.html_url +
-        '/actions/runs/' +
-        runId +
-        ')\n'
-      : '') +
-    '- [CI Documentation](' +
-    context.payload.repository.html_url +
-    '/blob/main/README.md#ci-pipeline)\n' +
-    '- [Troubleshooting Guide](' +
-    context.payload.repository.html_url +
-    '/blob/main/docs/troubleshooting.md)\n\n' +
-    '---\n' +
-    '*This comment is automatically updated by CI on each run.*\n';
-
-  // Update or create comment
-  if (existingComment) {
-    await withRetry(() =>
-      github.rest.issues.updateComment({
-        comment_id: existingComment.id,
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        body: comment,
-      }),
-    );
-    console.log('Updated existing CI failure comment #' + existingComment.id);
-    core.setOutput('comment_id', existingComment.id);
-    return { comment_id: existingComment.id };
-  } else {
-    const newComment = await withRetry(() =>
-      github.rest.issues.createComment({
-        issue_number: prNumber,
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        body: comment,
-      }),
-    );
-    console.log('Created new CI failure comment #' + newComment.data.id);
-    core.setOutput('comment_id', newComment.data.id);
-    return { comment_id: newComment.data.id };
-  }
+  if (core && commentId) core.setOutput('comment_id', commentId);
+  console.log(`CI pipeline failure section written (comment #${commentId}).`);
+  return { comment_id: commentId };
 };

@@ -95,6 +95,7 @@ jobs:
           else
             echo "drift=true" >> "$GITHUB_OUTPUT"
             echo "❌  schema.graphql is out of sync with the implementation"
+            git diff lambdas/db/schema.graphql > "$RUNNER_TEMP/schema.diff" || true
           fi
 
       - name: "Show diff"
@@ -112,32 +113,6 @@ jobs:
           echo ""
           echo "--- Diff (committed vs generated) ---"
           git diff lambdas/db/schema.graphql
-
-      - name: "Post PR comment on drift"
-        if: >-
-          steps.drift-check.outputs.drift == 'true' &&
-          github.event_name == 'pull_request'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: [
-                '## ❌ GraphQL Schema Out of Sync',
-                '',
-                '`lambdas/db/schema.graphql` does not match the Pothos schema implementation.',
-                '',
-                'Please regenerate it and include the updated file in this PR:',
-                '',
-                '```bash',
-                'pnpm exec nx run db:print-schema',
-                'git add lambdas/db/schema.graphql',
-                '```',
-              ].join('\n'),
-            });
 
       - name: "Fail on drift"
         if: steps.drift-check.outputs.drift == 'true'
@@ -157,7 +132,9 @@ jobs:
           # pnpm run codegen also runs scripts/fix-apollo-codegen.js as a
           # post-processing step (see root package.json "codegen" script).
           GRAPHQL_SCHEMA: ${{ github.workspace }}/lambdas/db/schema.graphql
-        run: pnpm run codegen
+        run: |
+          set -o pipefail
+          pnpm run codegen 2>&1 | tee "$RUNNER_TEMP/schema-codegen.log"
 
       - name: "Label PR on Schema Drift"
         if: always() && github.event.pull_request.number
@@ -213,3 +190,71 @@ jobs:
               }));
               core.info(`Label removed: ${label}`);
             }
+
+      - name: "Update CI status comment (schema section)"
+        if: always() && github.event.pull_request.number
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          DRIFT: ${{ steps.drift-check.outputs.drift }}
+          CODEGEN_OUTCOME: ${{ steps.codegen-check.outcome }}
+          DIFF_FILE: ${{ runner.temp }}/schema.diff
+          CODEGEN_LOG: ${{ runner.temp }}/schema-codegen.log
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { applySection } = require('./.github/scripts/ci-failure-capture/sticky-comment.js');
+            const { statusHeading, detailsBlock, fixLine } = require('./.github/scripts/ci-failure-capture/render.js');
+            const { distill } = require('./.github/scripts/ci-failure-capture/extract.js');
+
+            const prNumber = context.issue.number;
+            if (!prNumber) return;
+
+            const drift = process.env.DRIFT === 'true';
+            const codegenFailed = process.env.CODEGEN_OUTCOME === 'failure';
+            const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
+
+            // Both green → clear the schema section (heals a previously-failing PR).
+            if (!drift && !codegenFailed) {
+              await applySection({ github, context, prNumber, key: 'schema', content: null, producer: 'check-schema' });
+              return;
+            }
+
+            const summary = drift ? 'schema.graphql out of sync' : 'codegen failed';
+            const parts = [statusHeading('GraphQL Schema', 'fail', summary), ''];
+
+            if (drift) {
+              let diff = '';
+              try { diff = fs.readFileSync(process.env.DIFF_FILE, 'utf8'); } catch {}
+              const lines = diff.split('\n');
+              const capped = lines.length > 50
+                ? [...lines.slice(0, 50), `… (${lines.length - 50} more lines — full diff in the run)`]
+                : lines;
+              parts.push(detailsBlock({
+                check: 'schema-drift',
+                label: 'schema drift',
+                sublabel: 'committed vs generated',
+                excerpt: capped.join('\n'),
+              }), '');
+            }
+
+            if (codegenFailed) {
+              let log = '';
+              try { log = fs.readFileSync(process.env.CODEGEN_LOG, 'utf8'); } catch {}
+              const { summary: cgSummary, excerpt } = distill({ tool: 'generic', text: log, runUrl });
+              parts.push(detailsBlock({
+                check: 'schema-codegen',
+                label: 'codegen',
+                sublabel: cgSummary || '',
+                excerpt,
+              }), '');
+            }
+
+            parts.push(fixLine('pnpm exec nx run db:print-schema && pnpm run codegen', runUrl));
+
+            await applySection({
+              github, context, prNumber,
+              key: 'schema',
+              content: parts.join('\n').trim(),
+              producer: 'check-schema',
+            });
