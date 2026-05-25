@@ -3,6 +3,11 @@ import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
 import {
+  GrowthBook,
+  GrowthBookProvider,
+  useFeatureIsOn,
+} from '@growthbook/growthbook-react';
+import {
   getRollbarConfigFromEnv,
   initRollbar,
 } from '@legacy-sports/rollbar/native';
@@ -26,6 +31,18 @@ import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
+const growthbook = new GrowthBook({
+  apiHost: 'https://cdn.growthbook.io',
+  clientKey: process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY ?? '',
+  enableDevMode: __DEV__,
+  trackingCallback: (experiment, result) => {
+    LOGGER.info('[GrowthBook] Experiment viewed:', {
+      experiment: experiment.key,
+      variationId: result.variationId,
+    });
+  },
+});
+
 // Initialize Rollbar for mobile app
 const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
@@ -48,8 +65,7 @@ function MobileHomeScreen() {
   );
 }
 
-// Define your app routes
-const routes: Route[] = [
+const ALL_ROUTES: Route[] = [
   {
     name: 'Home',
     path: '/home',
@@ -105,6 +121,11 @@ function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
   const { resolvedTheme } = useThemeContext();
   const { user } = useAuth();
+  const footballEnabled = useFeatureIsOn('football_enabled');
+
+  const routes = footballEnabled
+    ? ALL_ROUTES
+    : ALL_ROUTES.filter((r) => r.name !== 'Football');
 
   return (
     <AppProvider
@@ -150,6 +171,16 @@ function InnerLayout(): React.JSX.Element {
  * Uses EnhancedAuthGuard at root level for consistent behavior
  */
 export default function Layout() {
+  useEffect(() => {
+    if (!process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY) return;
+    growthbook.loadFeatures({ autoRefresh: true }).catch((err: unknown) => {
+      LOGGER.warn(
+        '[GrowthBook] Feature load failed (non-fatal):',
+        err as Error,
+      );
+    });
+  }, []);
+
   return (
     // TamaguiProvider must wrap ErrorBoundary: ErrorBoundary's fallback UI
     // uses tamagui components (YStack/Text/Button), which call useTheme().
@@ -162,12 +193,14 @@ export default function Layout() {
       config={tamaguiConfig}
       defaultTheme="dark"
     >
-      <ErrorBoundary>
-        {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
-        <ThemeProvider>
-          <InnerLayout />
-        </ThemeProvider>
-      </ErrorBoundary>
+      <GrowthBookProvider growthbook={growthbook}>
+        <ErrorBoundary>
+          {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
+          <ThemeProvider>
+            <InnerLayout />
+          </ThemeProvider>
+        </ErrorBoundary>
+      </GrowthBookProvider>
     </TamaguiProvider>
   );
 }

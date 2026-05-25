@@ -15,6 +15,7 @@ import {
 import { BRAND_GOLD, TEXT_MUTED } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
+import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 
 // Color passed separately via Tamagui `color` prop so it adapts to theme.
 const titleStyle: React.CSSProperties = {
@@ -41,9 +42,10 @@ export const SportsDropdown: React.FC = () => {
   const location = useLocation();
   const buttonId = 'sports-menu-button';
   const menuId = 'sports-menu';
+  const footballEnabled = useFeatureIsOn('football_enabled');
 
   const isActive =
-    location.pathname === '/football' ||
+    (footballEnabled && location.pathname === '/football') ||
     location.pathname.startsWith('/baseball');
   const isHighlighted = isActive || isOpen;
 
@@ -137,34 +139,36 @@ export const SportsDropdown: React.FC = () => {
             animation: NAV_DROPDOWN_ANIMATION,
           }}
         >
-          <Link
-            to="/football"
-            style={{ textDecoration: 'none', display: 'block' }}
-          >
-            <MenuItem
-              onPress={() => setIsOpen(false)}
-              role="menuitem"
-              active={isFootball}
+          {footballEnabled && (
+            <Link
+              to="/football"
+              style={{ textDecoration: 'none', display: 'block' }}
             >
-              <XStack alignItems="flex-start" gap={12} flex={1}>
-                <YStack flexShrink={0} marginTop={1}>
-                  <FootballIcon
-                    size={17}
-                    color={isFootball ? BRAND_GOLD : TEXT_MUTED}
-                  />
-                </YStack>
-                <YStack flex={1} gap={0}>
-                  <Paragraph
-                    color={isFootball ? BRAND_GOLD : '$color'}
-                    style={titleStyle}
-                  >
-                    Football
-                  </Paragraph>
-                  <Paragraph style={descStyle}>NFL fantasy leagues</Paragraph>
-                </YStack>
-              </XStack>
-            </MenuItem>
-          </Link>
+              <MenuItem
+                onPress={() => setIsOpen(false)}
+                role="menuitem"
+                active={isFootball}
+              >
+                <XStack alignItems="flex-start" gap={12} flex={1}>
+                  <YStack flexShrink={0} marginTop={1}>
+                    <FootballIcon
+                      size={17}
+                      color={isFootball ? BRAND_GOLD : TEXT_MUTED}
+                    />
+                  </YStack>
+                  <YStack flex={1} gap={0}>
+                    <Paragraph
+                      color={isFootball ? BRAND_GOLD : '$color'}
+                      style={titleStyle}
+                    >
+                      Football
+                    </Paragraph>
+                    <Paragraph style={descStyle}>NFL fantasy leagues</Paragraph>
+                  </YStack>
+                </XStack>
+              </MenuItem>
+            </Link>
+          )}
 
           <Link
             to="/baseball"

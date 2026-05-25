@@ -63,6 +63,16 @@ if (
   process.env.EXPO_PUBLIC_APP_VERSION = process.env.APP_VERSION;
 }
 
+// Mirror VITE_GROWTHBOOK_CLIENT_KEY → EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY so
+// mobile uses the same GrowthBook project as web without a separate .env entry.
+if (
+  !process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY?.trim() &&
+  process.env.VITE_GROWTHBOOK_CLIENT_KEY?.trim()
+) {
+  process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY =
+    process.env.VITE_GROWTHBOOK_CLIENT_KEY;
+}
+
 // Spread the static config from app.json. The `config` argument Expo passes
 // here already includes the parsed app.json contents, but reading it
 // explicitly makes the dependency obvious and survives future Expo CLI

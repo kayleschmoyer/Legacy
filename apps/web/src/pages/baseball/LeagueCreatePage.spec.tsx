@@ -25,6 +25,14 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
+// Default football_enabled = true so both sport tabs are visible in tests.
+jest.mock('../../context/GrowthBookProvider', () => ({
+  useFeatureIsOn: jest.fn(() => true),
+  useFeatureValue: jest.fn(() => null),
+  GrowthBookProvider: ({ children }: any) => <>{children}</>,
+  growthbook: {},
+}));
+
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../components/PremiumGate', () => ({
   PremiumGate: ({ children }: any) => <>{children}</>,

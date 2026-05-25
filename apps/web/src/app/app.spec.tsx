@@ -148,6 +148,17 @@ jest.mock('../hooks/useAnalyticsIdentify', () => ({
   useAnalyticsIdentify: () => undefined,
 }));
 
+// Default football_enabled = true so existing football route tests remain green.
+// Tests that want to assert flag-off behavior should override useFeatureIsOn locally.
+jest.mock('../context/GrowthBookProvider', () => ({
+  useFeatureIsOn: jest.fn(() => true),
+  useFeatureValue: jest.fn(() => null),
+  GrowthBookProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  growthbook: {},
+}));
+
 // Mock the styled function to avoid Tamagui issues
 jest.mock('tamagui', () => ({
   styled: (component: React.ComponentType<unknown>) => component,

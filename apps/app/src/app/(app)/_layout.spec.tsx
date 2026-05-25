@@ -118,6 +118,14 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Mock @growthbook/growthbook-react
+jest.mock('@growthbook/growthbook-react', () => ({
+  useFeatureIsOn: jest.fn(() => true),
+  useFeatureValue: jest.fn(() => null),
+  GrowthBookProvider: ({ children }: { children: React.ReactNode }) => children,
+  GrowthBook: jest.fn(),
+}));
+
 // Mock @legacy-sports/shared-components
 jest.mock('@legacy-sports/shared-components', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports

@@ -23,6 +23,7 @@ import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { NAV_Z_INDEX } from '../constants/dimensions';
+import { useFeatureValue } from '../context/GrowthBookProvider';
 
 /* ────────────────────────────────────────────────────────
  * Lazy-loaded routes — these pages are split into separate
@@ -136,6 +137,20 @@ function AdminGuard({
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
   if (user?.accessLevel !== 'admin') return <Navigate to="/" replace />;
+  return children;
+}
+
+/** Redirects to home when the football_enabled GrowthBook flag is explicitly off.
+ * Uses `true` as the fallback so the gate doesn't redirect while features are
+ * still loading (avoids a flash redirect on first render or when GrowthBook is
+ * unconfigured — e.g. E2E environments without a client key). */
+function FootballGate({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
+  const footballEnabled = useFeatureValue('football_enabled', true);
+  if (footballEnabled === false) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -473,16 +488,45 @@ function App() {
             {/* All routes are now authenticated by default */}
             <Route path="/" element={<NavigableHomeScreen />} />
             <Route path="/home" element={<Navigate to="/" replace />} />
-            <Route path="/football" element={<FootballScreen />} />
+            <Route
+              path="/football"
+              element={
+                <FootballGate>
+                  <FootballScreen />
+                </FootballGate>
+              }
+            />
             <Route
               path="/football/league/create"
-              element={<LeagueCreatePage />}
+              element={
+                <FootballGate>
+                  <LeagueCreatePage />
+                </FootballGate>
+              }
             />
-            <Route path="/football/leagues" element={<LeagueDiscoveryPage />} />
-            <Route path="/football/league/:id" element={<LeagueDetailPage />} />
+            <Route
+              path="/football/leagues"
+              element={
+                <FootballGate>
+                  <LeagueDiscoveryPage />
+                </FootballGate>
+              }
+            />
+            <Route
+              path="/football/league/:id"
+              element={
+                <FootballGate>
+                  <LeagueDetailPage />
+                </FootballGate>
+              }
+            />
             <Route
               path="/football/league/:id/:tab"
-              element={<LeagueDetailPage />}
+              element={
+                <FootballGate>
+                  <LeagueDetailPage />
+                </FootballGate>
+              }
             />
             <Route path="/baseball" element={<BaseballScreen />} />
             <Route

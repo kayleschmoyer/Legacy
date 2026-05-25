@@ -34,6 +34,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
+import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
@@ -367,12 +368,14 @@ interface SportSwitcherProps {
   value: SportId;
   onSelect: (sport: SportId) => void;
   disabled?: boolean;
+  sports?: ReadonlyArray<(typeof SPORTS)[number]>;
 }
 
 function SportSwitcher({
   value,
   onSelect,
   disabled,
+  sports = SPORTS,
 }: SportSwitcherProps): React.JSX.Element {
   const themePrimary = THEME_PRIMARY_BY_SPORT[value];
   return (
@@ -385,7 +388,7 @@ function SportSwitcher({
       borderRadius="$5"
       $sm={{ flexDirection: 'column' }}
     >
-      {SPORTS.map((s) => {
+      {sports.map((s) => {
         const selected = value === s.id;
         return (
           <Button
@@ -1103,6 +1106,10 @@ export function LeagueCreatePage(): React.JSX.Element {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
+  const footballEnabled = useFeatureIsOn('football_enabled');
+  const visibleSports: ReadonlyArray<(typeof SPORTS)[number]> = footballEnabled
+    ? SPORTS
+    : SPORTS.filter((s) => s.id !== 'football');
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] = useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
 
@@ -1442,6 +1449,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             value={selectedSport}
             onSelect={handleSportSelect}
             disabled={isFormDisabled}
+            sports={visibleSports}
           />
           {selectedSport === 'football' && (
             <XStack

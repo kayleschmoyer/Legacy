@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, XStack, YStack } from 'tamagui';
 import { getExpoPushTokenAsync } from 'expo-notifications';
+import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { LOGGER } from '@legacy-sports/logging';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 
@@ -187,6 +188,10 @@ function CustomDrawerContent(
   const [disableDeviceToken] = useDisableDeviceTokenMutation();
   const { data: unreadData } = useGetUnreadNotificationCountQuery();
   const unreadCount = unreadData?.getUnreadNotificationCount ?? 0;
+  const footballEnabled = useFeatureIsOn('football_enabled');
+  const visibleRoutes = footballEnabled
+    ? ROUTES
+    : ROUTES.filter((r) => r.route !== 'football/index');
 
   const doLogout = async () => {
     // Best-effort: deactivate push token before clearing credentials
@@ -220,7 +225,7 @@ function CustomDrawerContent(
       backgroundColor="$background"
       padding="$4"
     >
-      {ROUTES.map((r) => (
+      {visibleRoutes.map((r) => (
         <XStack
           testID={`drawer-item-${r.route.replace(/\//g, '-')}`}
           key={r.route}
