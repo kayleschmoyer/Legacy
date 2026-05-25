@@ -37,10 +37,10 @@ if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
 
-// Initialize WebSocket notification service
-const notificationService = createNotificationService();
-
 const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  // Initialized per-invocation rather than at module level to avoid LOGGER.warn
+  // (CONNECTIONS_TABLE_NAME missing) firing during module load in test contexts.
+  const notificationService = createNotificationService();
   // Security: Log only safe metadata (not full event payload which can be large and contain sensitive data)
   LOGGER.debug('Processing SQS event', {
     recordCount: event.Records.length,
