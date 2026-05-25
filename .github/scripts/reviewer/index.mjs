@@ -286,6 +286,51 @@ async function main() {
     }
   }
 
+  // Auto-reset when new commits are pushed during arbitration (LS-4857).
+  // A synchronize event means the author pushed new code that has not been
+  // reviewed yet — it deserves a fresh cycle even if the prior cycle limit
+  // was hit. Mirrors the admin bot:reset-cycle-counter path but fires
+  // automatically so the author does not need maintainer intervention for
+  // every post-arbitration fix push.
+  const triggeredBySynchronize =
+    process.env.TRIGGERED_BY_SYNCHRONIZE === 'true';
+  if (
+    isEscalationRequired(cycle) &&
+    triggeredBySynchronize &&
+    prLabels.includes(NEEDS_HUMAN_ARBITRATION_LABEL)
+  ) {
+    const priorBotReviews = allReviews.filter((r) =>
+      REVIEWER_BOT_LOGINS.has(r.userLogin),
+    );
+    const dismissibleStates = new Set(['CHANGES_REQUESTED', 'APPROVED']);
+    const reviewsToDismiss = priorBotReviews.filter(
+      (r) =>
+        r.state !== 'DISMISSED' &&
+        dismissibleStates.has(r.state) &&
+        !isInfraErrorReview(r),
+    );
+    for (const r of reviewsToDismiss) {
+      dismissReview(
+        prNumber,
+        r.id,
+        'Superseded by post-arbitration push — cycle counter auto-reset',
+      );
+      r.state = 'DISMISSED';
+    }
+    const now = new Date().toISOString();
+    postEscalationComment(
+      prNumber,
+      `> [!NOTE]\n> New commit(s) pushed after arbitration at ${now}. ` +
+        `Cycle counter auto-reset (${reviewsToDismiss.length} prior bot review(s) dismissed). ` +
+        `Bot will treat this review as Cycle 1.`,
+    );
+    removeLabel(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
+    cycle = 1;
+    process.stdout.write(
+      `[reviewer] Auto-reset cycle counter after post-arbitration push; ${reviewsToDismiss.length} review(s) dismissed\n`,
+    );
+  }
+
   // Cycle > MAX_CYCLE → escalate instead of reviewing
   if (isEscalationRequired(cycle)) {
     const lastReviewForEscalation =
@@ -1068,7 +1113,9 @@ function buildCycleLimitArbitrationComment(cycle, lastBotReview) {
   }
   lines.push(
     '',
-    '**What to do:** read the latest bot review and the author replies, then decide for each thread whether to (a) push a fix, (b) apply `review-bot-override` if the bot is wrong, or (c) apply `bot:reset-cycle-counter` to give the author another cycle.',
+    '**Author agent:** push new commits addressing the outstanding findings above. The bot will automatically reset the cycle counter and post a fresh review on the next push — no manual `bot:reset-cycle-counter` needed.',
+    '',
+    '**Maintainer:** if the author cannot push a code fix (e.g. the bot is wrong), apply `review-bot-override` to bypass, or `bot:reset-cycle-counter` to manually grant another cycle without requiring a push.',
   );
   return lines.join('\n');
 }

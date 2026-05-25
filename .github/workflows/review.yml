@@ -68,6 +68,7 @@ jobs:
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
           CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
+          TRIGGERED_BY_SYNCHRONIZE: ${{ github.event.action == 'synchronize' && 'true' || '' }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then
             node .github/scripts/reviewer/index.mjs

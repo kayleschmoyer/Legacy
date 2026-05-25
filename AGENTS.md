@@ -107,7 +107,7 @@ Single source of truth for which actor applies which label. If guidance elsewher
 | `review-bot-override`         | Maintainer       | Formal escape hatch when Reviewer Bot is wrong                  | Never touch. See §5 of the Author Agent Contract.                                                                                                                                                                                                  |
 | `security-review-override`    | Maintainer       | After human security review on `needs-human-security-review` PR | Never touch. See §6 of the Author Agent Contract.                                                                                                                                                                                                  |
 | `needs-human-security-review` | Reviewer Bot     | Critical security finding                                       | Never touch.                                                                                                                                                                                                                                       |
-| `needs-human-arbitration`     | Reviewer Bot     | Cycle exceeds MAX_CYCLE or `CANNOT-COMPLY` filed                | Never touch.                                                                                                                                                                                                                                       |
+| `needs-human-arbitration`     | Reviewer Bot     | Cycle exceeds MAX_CYCLE or `CANNOT-COMPLY` filed                | Push new commits to address outstanding findings — the bot auto-removes this label and resets the cycle counter on the next push. Never apply or remove manually. See §4a of the Author Agent Contract.                                            |
 | `review-bot-degraded`         | Reviewer Bot     | Cycle was rate-limited                                          | Re-apply `bot:ready-for-review` to retry. See `fix-reviews.md` step 8.                                                                                                                                                                             |
 | `CI: *` failure labels        | CI Orchestrator  | Auto, when a check fails                                        | Never touch — they clear automatically when the failing check passes.                                                                                                                                                                              |
 
@@ -167,6 +167,18 @@ This change requires modifying a generated file that must not be edited manually
 ```
 
 > `CANNOT-COMPLY:` is a Cycle 3+ token. Using it in Cycle 2 will be treated as malformed.
+
+### 4a. If the bot escalates to `needs-human-arbitration` (cycle limit hit)
+
+When the cycle limit (MAX_CYCLE = 3) is reached, the bot posts an arbitration comment listing the outstanding findings, applies `needs-human-arbitration`, and sets `bot-review` to failure.
+
+**Author agent response:**
+
+1. Push new commits addressing each outstanding finding listed in the arbitration comment.
+2. The bot **automatically resets the cycle counter** on the next push (`synchronize` event with `needs-human-arbitration` present): it dismisses prior reviews, removes the `needs-human-arbitration` label, and posts a fresh Cycle 1 review. No `bot:reset-cycle-counter` or maintainer action is needed.
+3. Ensure `bot:ready-for-review` is present (it is preserved by the bot through merge — re-apply only if it was stripped).
+
+> **Do NOT** ask the maintainer to apply `bot:reset-cycle-counter` just because the cycle limit was hit and you have new code to push. The auto-reset handles this. `bot:reset-cycle-counter` is only needed if you cannot push new commits (e.g. the bot finding is wrong and you are using `review-bot-override`, or a maintainer wants to reset without requiring a push).
 
 ### 5. If bot-review remains blocked after CANNOT-COMPLY
 
