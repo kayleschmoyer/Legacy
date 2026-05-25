@@ -7,6 +7,7 @@ import {
   useGetLeagueTradeOffersQuery,
   useRejectTradeMutation,
 } from '../../../../api/db/graphql.generated';
+import { LeagueTradeBlock } from '../../../../features/baseball/LeagueTradeBlock';
 import { I } from '../Icons';
 import {
   Banner,
@@ -365,6 +366,10 @@ export const TradesTab: React.FC<TradesTabProps> = ({
             })}
           </div>
         )}
+      </Section>
+
+      <Section title="Trade Block">
+        <LeagueTradeBlock leagueId={leagueId} userTeamId={myTeamId} />
       </Section>
 
       <Section
