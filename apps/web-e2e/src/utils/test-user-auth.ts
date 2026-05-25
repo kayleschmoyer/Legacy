@@ -84,6 +84,31 @@ export async function getTestUserJwt(
   return jwt;
 }
 
+/** Plain timer sleep for rate-limit backoff — no Playwright coupling. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * fetch() wrapper that retries on HTTP 429 (rate limited) with exponential
+ * backoff. All other status codes are returned immediately.
+ *
+ * Backoff schedule (maxAttempts=4): no wait → 1 s → 2 s → 4 s, then give up.
+ */
+async function fetchWithRateLimitRetry(
+  url: string,
+  options: RequestInit,
+  maxAttempts = 4,
+): Promise<Response> {
+  let last!: Response;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    last = await fetch(url, options);
+    if (last.status !== 429 || attempt === maxAttempts) return last;
+    await sleep(1_000 * Math.pow(2, attempt - 1));
+  }
+  return last;
+}
+
 async function registerOrLogin(
   oauthUrl: string,
   creds: TestUserCredentials,
@@ -96,8 +121,10 @@ async function registerOrLogin(
     );
   }
 
-  // Try login first — avoids accidentally creating a user with wrong credentials
-  const loginRes = await fetch(`${oauthUrl}/login`, {
+  // Try login first — avoids accidentally creating a user with wrong credentials.
+  // Retries up to 4 times on 429 with exponential backoff (handles parallel
+  // nightly runs all authenticating at the same time).
+  const loginRes = await fetchWithRateLimitRetry(`${oauthUrl}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -121,7 +148,7 @@ async function registerOrLogin(
   // endpoint returns a uniform 200 with no JWT regardless of whether the
   // email was new or already existed (LS-2549), so we must always
   // follow up with a second login to obtain the JWT.
-  const registerRes = await fetch(`${oauthUrl}/register`, {
+  const registerRes = await fetchWithRateLimitRetry(`${oauthUrl}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -141,14 +168,17 @@ async function registerOrLogin(
   }
 
   // Register succeeded — log in to obtain a JWT.
-  const postRegisterLoginRes = await fetch(`${oauthUrl}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: creds.email,
-      password: creds.password,
-    }),
-  });
+  const postRegisterLoginRes = await fetchWithRateLimitRetry(
+    `${oauthUrl}/login`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: creds.email,
+        password: creds.password,
+      }),
+    },
+  );
 
   if (postRegisterLoginRes.ok) {
     const data = (await postRegisterLoginRes.json()) as AuthResponse;
