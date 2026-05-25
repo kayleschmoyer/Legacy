@@ -345,7 +345,7 @@ describe('postToDiscord', () => {
 
     await expect(
       postToDiscord('https://discord.com/api/webhooks/test', embed),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('Discord webhook failed: 429 Too Many Requests');
   });
 
   it('throws on other non-ok responses', async () => {
@@ -364,6 +364,6 @@ describe('postToDiscord', () => {
 
     await expect(
       postToDiscord('https://discord.com/api/webhooks/test', embed),
-    ).rejects.toThrow('Discord webhook returned 500');
+    ).rejects.toThrow('Discord webhook failed: 500 Internal Server Error');
   });
 });

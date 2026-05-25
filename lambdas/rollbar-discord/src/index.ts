@@ -179,7 +179,7 @@ async function handleSnsEvent(event: SNSEvent): Promise<void> {
           await postToDiscord(discordUrl, embed);
           LOGGER.info(`Posted budget alert "${budget.budgetName}" to Discord`);
         } catch (error) {
-          LOGGER.error('Failed to post budget notification to Discord', {
+          LOGGER.warn('Failed to post budget notification to Discord', {
             message,
             error,
           });
@@ -210,7 +210,7 @@ async function handleSnsEvent(event: SNSEvent): Promise<void> {
         });
       }
     } catch (error) {
-      LOGGER.error('Failed to post SNS notification to Discord', {
+      LOGGER.warn('Failed to post SNS notification to Discord', {
         message,
         error,
       });
@@ -268,7 +268,14 @@ export async function handleApiGatewayEvent(
     }
 
     const discordUrl = await getDiscordWebhookUrl();
-    await postToDiscord(discordUrl, embed);
+    try {
+      await postToDiscord(discordUrl, embed);
+    } catch (error) {
+      // Log at warn (not error) so this never routes back to Rollbar and
+      // triggers another webhook to this lambda, creating a feedback loop.
+      LOGGER.warn('Failed to post Rollbar event to Discord', { error });
+      return jsonResponse(200, { status: 'discord_error' });
+    }
 
     LOGGER.info(`Posted Rollbar event "${payload.event_name}" to Discord`);
     return jsonResponse(200, { status: 'ok' });
