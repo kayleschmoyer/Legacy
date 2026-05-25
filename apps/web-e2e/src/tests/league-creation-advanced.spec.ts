@@ -86,16 +86,14 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expandSection(page, 'roster-schedule');
 
     // All preset roster sizes should be visible
-    for (const size of ['20', '22', '25', '30', '35', '40']) {
+    for (const size of ['20', '22', '24', '26', '28', '30', '35', '40']) {
       await expect(
         page.getByRole('button', { name: size, exact: true }),
       ).toBeVisible();
     }
 
     // Hint text is visible
-    await expect(
-      page.getByText('Number of players each team can have'),
-    ).toBeVisible();
+    await expect(page.getByText('Active + bench.')).toBeVisible();
   });
 
   test('should select a roster size when clicked', async ({ page }) => {
@@ -132,7 +130,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       page.getByRole('button', { name: 'American League' }),
     ).toBeVisible();
 
-    await expect(page.getByText('Which players can be drafted')).toBeVisible();
+    await expect(
+      page.getByText("Narrow the league to a single league's talent"),
+    ).toBeVisible();
   });
 
   test('should allow selecting National League player pool', async ({
