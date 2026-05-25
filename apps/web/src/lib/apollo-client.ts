@@ -328,9 +328,16 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
           ? "We couldn't reach the server right now — please try again in a moment."
           : `Server error (${error.statusCode.toString()}): please try again.`,
       );
-      captureError(error instanceof Error ? error : new Error(String(error)), {
-        context: `apollo:${operation.operationName}`,
-      });
+      // 502/503/504 are transient gateway errors — not actionable bugs.
+      // Capturing them floods Rollbar without adding diagnostic value.
+      if (!isUpstreamUnreachable) {
+        captureError(
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            context: `apollo:${operation.operationName}`,
+          },
+        );
+      }
     } else if (error instanceof Error) {
       // Transient network errors (e.g. "Failed to fetch") surface a
       // user-friendly message instead of the raw TypeError text.

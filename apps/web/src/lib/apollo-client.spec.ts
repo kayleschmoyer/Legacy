@@ -18,6 +18,7 @@ import {
   Observable,
   ServerError,
 } from '@apollo/client';
+import { captureError } from '@legacy-sports/rollbar/web';
 import {
   decodeJwtPayload,
   errorLink,
@@ -403,5 +404,38 @@ describe('errorLink', () => {
     expect(sessionExpiredEvents).toHaveLength(0);
 
     dispatchSpy.mockRestore();
+  });
+
+  it.each([502, 503, 504])(
+    'does NOT call captureError for upstream-unreachable status %i',
+    async (statusCode) => {
+      jest.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+
+      const serverError = new ServerError('Bad Gateway', {
+        response: { status: statusCode } as Response,
+        bodyText: 'Bad Gateway',
+      });
+
+      await runWithError(serverError, {});
+
+      expect(captureError).not.toHaveBeenCalled();
+    },
+  );
+
+  it('DOES call captureError for non-upstream server errors (e.g. 500)', async () => {
+    jest.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+
+    const serverError500 = new ServerError('Internal Server Error', {
+      response: { status: 500 } as Response,
+      bodyText: 'Internal Server Error',
+    });
+
+    await runWithError(serverError500, {});
+
+    expect(captureError).toHaveBeenCalledTimes(1);
+    expect(captureError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'apollo:TestOp' }),
+    );
   });
 });
