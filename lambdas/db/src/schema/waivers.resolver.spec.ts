@@ -92,6 +92,7 @@ describe('Waivers Resolver', () => {
           salaryCapEnabled: 'salaryCapEnabled',
           minSalary: 'minSalary',
           salaryCap: 'salaryCap',
+          sport: 'sport',
         },
         leagueMembers: {
           leagueId: 'leagueId',
@@ -273,6 +274,44 @@ describe('Waivers Resolver', () => {
         hallOfFame: true,
       });
     });
+
+    it('includes sport filter in SQL for a football league', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          minCareerGames: 0,
+          minCareerSeasons: 0,
+          playerPool: null,
+          sport: 'football',
+        },
+      ]);
+      mockDb.execute.mockResolvedValueOnce({ rows: [] });
+
+      const resolver = getQuery('freeAgents');
+      await resolver({}, { leagueId: 1 }, mockContext, undefined as never);
+
+      const executeCalls = mockDb.execute.mock.calls as unknown[][];
+      const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+      expect(sqlText).toContain('football');
+    });
+
+    it('defaults sport filter to baseball when league sport is null', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          minCareerGames: 0,
+          minCareerSeasons: 0,
+          playerPool: null,
+          sport: null,
+        },
+      ]);
+      mockDb.execute.mockResolvedValueOnce({ rows: [] });
+
+      const resolver = getQuery('freeAgents');
+      await resolver({}, { leagueId: 1 }, mockContext, undefined as never);
+
+      const executeCalls = mockDb.execute.mock.calls as unknown[][];
+      const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+      expect(sqlText).toContain('baseball');
+    });
   });
 
   // ── teamWaiverClaims ───────────────────────────────────────────────────────
@@ -435,7 +474,6 @@ describe('Waivers Resolver', () => {
     it('throws when draft is not completed (new league)', async () => {
       mockDb.limit
         .mockResolvedValueOnce([{ teamId: 2 }]) // membership
-        .mockResolvedValueOnce([]) // existingClaim
         .mockResolvedValueOnce([
           {
             draftStatus: 'not-started',
@@ -446,7 +484,7 @@ describe('Waivers Resolver', () => {
             minSalary: 1,
             salaryCap: null,
           },
-        ]); // leagueRow
+        ]); // leagueRow → draftStatus !== 'completed' → throws
 
       const resolver = getMutation('claimFreeAgent');
       await expect(
@@ -464,7 +502,6 @@ describe('Waivers Resolver', () => {
     it('throws when draft is in-progress (not yet completed)', async () => {
       mockDb.limit
         .mockResolvedValueOnce([{ teamId: 2 }]) // membership
-        .mockResolvedValueOnce([]) // existingClaim
         .mockResolvedValueOnce([
           {
             draftStatus: 'in-progress',
@@ -475,7 +512,7 @@ describe('Waivers Resolver', () => {
             minSalary: 1,
             salaryCap: null,
           },
-        ]); // leagueRow
+        ]); // leagueRow → draftStatus !== 'completed' → throws
 
       const resolver = getMutation('claimFreeAgent');
       await expect(

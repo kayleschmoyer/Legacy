@@ -40,6 +40,7 @@ builder.queryField('freeAgents', (t) =>
           minCareerGames: PublicSchema.leagues.minCareerGames,
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
           playerPool: PublicSchema.leagues.playerPool,
+          sport: PublicSchema.leagues.sport,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, leagueId))
@@ -79,6 +80,10 @@ builder.queryField('freeAgents', (t) =>
           ) sb_pool ON sb_pool.player_id = p.id`,
         );
       }
+
+      // Filter by league sport so football and baseball players never mix
+      const leagueSport = (league.sport ?? 'baseball') as string;
+      sqlConditions.push(sql`p.sport = ${leagueSport}`);
 
       // Apply career minimums
       const minCareerGames = league.minCareerGames ?? 50;

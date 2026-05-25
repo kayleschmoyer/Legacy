@@ -25,6 +25,7 @@ import { SPORT_LOBBY_CHROME, type SportKind, toSportKind } from './sportChrome';
 import {
   SeasonDraftGameMode,
   SeasonDraftPlayerType,
+  Sport,
   useCancelSeasonDraftGameMutation,
   useGetSeasonDraftGamePlayerOptionsLazyQuery,
   useGetSeasonDraftGameQuery,
@@ -357,10 +358,14 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     (searchTerm: string) => {
       if (searchTerm.length < 2) return;
       void searchPlayersQuery({
-        variables: { search: searchTerm, limit: 10 },
+        variables: {
+          search: searchTerm,
+          limit: 10,
+          sport: sport === 'football' ? Sport.Football : Sport.Baseball,
+        },
       });
     },
-    [searchPlayersQuery],
+    [searchPlayersQuery, sport],
   );
 
   const handleTriggerStatLoading = useCallback(

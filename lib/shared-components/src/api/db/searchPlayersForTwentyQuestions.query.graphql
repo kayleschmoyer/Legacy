@@ -1,5 +1,9 @@
-query SearchPlayersForTwentyQuestions($searchTerm: String!, $limit: Int) {
-  searchPlayers(searchTerm: $searchTerm, limit: $limit) {
+query SearchPlayersForTwentyQuestions(
+  $searchTerm: String!
+  $limit: Int
+  $sport: Sport
+) {
+  searchPlayers(searchTerm: $searchTerm, limit: $limit, sport: $sport) {
     id
     firstName
     lastName

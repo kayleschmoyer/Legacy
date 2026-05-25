@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
-import { useSearchPlayersForTwentyQuestionsLazyQuery } from '../../api/db/graphql.generated';
+import {
+  Sport,
+  useSearchPlayersForTwentyQuestionsLazyQuery,
+} from '../../api/db/graphql.generated';
 
 interface PlayerSuggestion {
   id: number;
@@ -11,11 +14,13 @@ interface PlayerSuggestion {
 interface PlayerGuessProps {
   onGuess: (playerId: number) => void;
   guessing: boolean;
+  sport?: Sport;
 }
 
 export const PlayerGuess: React.FC<PlayerGuessProps> = ({
   onGuess,
   guessing,
+  sport,
 }) => {
   const [guessText, setGuessText] = useState('');
   const [suggestions, setSuggestions] = useState<PlayerSuggestion[]>([]);
@@ -34,7 +39,7 @@ export const PlayerGuess: React.FC<PlayerGuessProps> = ({
       return;
     }
     const { data } = await searchPlayers({
-      variables: { searchTerm: text, limit: 8 },
+      variables: { searchTerm: text, limit: 8, sport },
     });
     const players = (data?.searchPlayers ?? []).filter(
       (p): p is PlayerSuggestion => p.id != null,

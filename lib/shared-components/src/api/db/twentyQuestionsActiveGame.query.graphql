@@ -3,6 +3,7 @@ query TwentyQuestionsActiveGame {
     id
     status
     difficulty
+    sport
     questionsUsed
     maxQuestions
     tokensEarned

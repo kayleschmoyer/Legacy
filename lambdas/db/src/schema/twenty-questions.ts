@@ -8,6 +8,7 @@ import { desc, eq, inArray } from 'drizzle-orm';
 import { builder } from './builder';
 import { PlayerRef } from './players';
 import { AuthenticationError, UserInputError } from './graphql-errors';
+import { SportKindEnum } from './leagues/types';
 
 // --- Enums ---
 
@@ -90,6 +91,11 @@ TwentyQuestionsGameRef.implement({
     }),
     questionsUsed: t.exposeInt('questionsUsed'),
     maxQuestions: t.exposeInt('maxQuestions'),
+    sport: t.field({
+      type: SportKindEnum,
+      description: 'Sport the player pool was drawn from',
+      resolve: (g) => g.sport ?? 'baseball',
+    }),
     tokensEarned: t.exposeInt('tokensEarned', { nullable: true }),
     startedAt: t.exposeString('startedAt'),
     completedAt: t.exposeString('completedAt', { nullable: true }),
@@ -189,13 +195,20 @@ builder.mutationFields((t) => ({
         type: TwentyQuestionsDifficultyEnum,
         defaultValue: 'medium',
       }),
+      sport: t.arg({
+        type: SportKindEnum,
+        required: false,
+        description:
+          'Sport for the player pool. Defaults to baseball when omitted.',
+      }),
     },
-    resolve: async (_parent, { difficulty }, context) => {
+    resolve: async (_parent, { difficulty, sport }, context) => {
       if (!context.user?.id) throw AuthenticationError();
       const game = await TwentyQuestionsService.startGame(
         context.db,
         context.user.id,
         difficulty ?? 'medium',
+        sport ?? 'baseball',
       );
       return { ...game, questions: [] };
     },

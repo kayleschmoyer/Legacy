@@ -2325,6 +2325,7 @@ export type MutationTwentyQuestionsGuessArgs = {
 
 export type MutationTwentyQuestionsStartArgs = {
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type MutationUndoLastDraftPickArgs = {
@@ -3303,6 +3304,7 @@ export type QueryPlayersArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryPublicLeaguesArgs = {
@@ -3320,6 +3322,7 @@ export type QueryScoreboardArgs = {
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
+  sport?: InputMaybe<Sport>;
 };
 
 export type QuerySearchUsersArgs = {
@@ -4167,6 +4170,8 @@ export type TwentyQuestionsGame = {
   maxQuestions?: Maybe<Scalars['Int']['output']>;
   questions?: Maybe<Array<TwentyQuestionsQuestion>>;
   questionsUsed?: Maybe<Scalars['Int']['output']>;
+  /** Sport the player pool was drawn from */
+  sport?: Maybe<Sport>;
   startedAt?: Maybe<Scalars['String']['output']>;
   status?: Maybe<TwentyQuestionsStatus>;
   /** Revealed only when status is won or lost */

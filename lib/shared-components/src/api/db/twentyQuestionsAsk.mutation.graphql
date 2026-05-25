@@ -3,6 +3,7 @@ mutation TwentyQuestionsAsk($input: TwentyQuestionsAskInput!) {
     id
     status
     difficulty
+    sport
     questionsUsed
     maxQuestions
     tokensEarned

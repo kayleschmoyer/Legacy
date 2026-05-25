@@ -18,7 +18,12 @@ jest.mock('../client/Helpers', () => ({
 
 jest.mock('../client/PublicDbClient', () => ({
   PublicSchema: {
-    players: { id: 'id' },
+    players: {
+      id: 'id',
+      firstName: 'first_name',
+      lastName: 'last_name',
+      sport: 'sport',
+    },
     careerBatting: { playerId: 'player_id', g: 'g' },
     playerEligiblePositions: {
       playerId: 'player_id',
@@ -257,5 +262,81 @@ describe('PlayerService — scoring sort', () => {
       expect(result).toHaveLength(2);
       expect(mockDb.execute).toHaveBeenCalledTimes(1);
     }
+  });
+});
+
+describe('PlayerService — searchPlayers', () => {
+  const options = { type: 'pg-local' } as DbOptions;
+  let service: PlayerService;
+  let mockDb: {
+    select: jest.Mock;
+    from: jest.Mock;
+    where: jest.Mock;
+    limit: jest.Mock;
+  };
+
+  const MOCK_PLAYER_ROW = {
+    id: 1,
+    firstName: 'Babe',
+    lastName: 'Ruth',
+    brefId: 'ruthba01',
+    mlbPlayerId: null,
+    sport: 'baseball' as const,
+    hallOfFame: true,
+    allStarSelections: 0,
+    goldGloves: 0,
+    silverSluggers: 0,
+    mvpAwards: 0,
+    cyYoungAwards: 0,
+    worldSeriesRings: 0,
+    rookieOfTheYear: false,
+    statsLastFetchedAt: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new PlayerService(options);
+
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+    };
+
+    mockedHelpers.runWithPublicClient.mockImplementation((_opts, handler) =>
+      handler(mockDb as never),
+    );
+  });
+
+  it('returns players matching the search term', async () => {
+    mockDb.limit.mockResolvedValueOnce([MOCK_PLAYER_ROW]);
+
+    const result = await service.searchPlayers('Babe', 10);
+
+    expect(result).toHaveLength(1);
+    expect(mockDb.select).toHaveBeenCalled();
+    expect(mockDb.from).toHaveBeenCalled();
+    expect(mockDb.where).toHaveBeenCalled();
+    expect(mockDb.limit).toHaveBeenCalledWith(10);
+  });
+
+  it('applies sport filter when sport is provided', async () => {
+    mockDb.limit.mockResolvedValueOnce([]);
+
+    await service.searchPlayers('Jones', 5, 'football');
+
+    expect(mockDb.where).toHaveBeenCalledTimes(1);
+    expect(mockDb.limit).toHaveBeenCalledWith(5);
+  });
+
+  it('omits sport filter when sport is undefined', async () => {
+    mockDb.limit.mockResolvedValueOnce([MOCK_PLAYER_ROW]);
+
+    const result = await service.searchPlayers('Ruth', 10, undefined);
+
+    expect(result).toHaveLength(1);
+    expect(mockDb.where).toHaveBeenCalledTimes(1);
+    expect(mockDb.limit).toHaveBeenCalledWith(10);
   });
 });

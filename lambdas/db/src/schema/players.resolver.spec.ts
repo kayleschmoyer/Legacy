@@ -116,6 +116,7 @@ describe('players resolver', () => {
           baseballHofOnly: 'baseballHofOnly',
           customEraStartYear: 'customEraStartYear',
           customEraEndYear: 'customEraEndYear',
+          sport: 'sport',
         },
         teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
         leagueMembers: {
@@ -294,9 +295,36 @@ describe('players resolver', () => {
         filters: expect.objectContaining({
           minCareerGames: 100,
           minCareerSeasons: 5,
-          eraFilter: 'modern',
+          baseballEraFilter: 'modern',
           baseballHofOnly: false,
         }),
+      }),
+    );
+  });
+
+  it('players: forwards sport arg to dbService when no leagueId', async () => {
+    mockPlayersService.getPlayers.mockResolvedValueOnce([MOCK_PLAYER]);
+
+    await getQueryResolver('players')(
+      {},
+      {
+        limit: null,
+        offset: null,
+        orderBy: null,
+        orderDirection: null,
+        position: null,
+        search: null,
+        excludeEmptyNames: false,
+        leagueId: null,
+        sport: 'football',
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(mockPlayersService.getPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.objectContaining({ sport: 'football' }),
       }),
     );
   });
@@ -388,13 +416,17 @@ describe('players resolver', () => {
 
     const result = await getQueryResolver('searchPlayers')(
       {},
-      { searchTerm: 'Babe', limit: null },
+      { searchTerm: 'Babe', limit: null, sport: null },
       mockContext,
       undefined as never,
     );
 
     expect(result).toEqual([MOCK_PLAYER]);
-    expect(mockPlayersService.searchPlayers).toHaveBeenCalledWith('Babe', 10);
+    expect(mockPlayersService.searchPlayers).toHaveBeenCalledWith(
+      'Babe',
+      10,
+      undefined,
+    );
   });
 
   it('searchPlayers: passes explicit limit to dbService', async () => {
@@ -402,12 +434,33 @@ describe('players resolver', () => {
 
     await getQueryResolver('searchPlayers')(
       {},
-      { searchTerm: 'Ruth', limit: 25 },
+      { searchTerm: 'Ruth', limit: 25, sport: null },
       mockContext,
       undefined as never,
     );
 
-    expect(mockPlayersService.searchPlayers).toHaveBeenCalledWith('Ruth', 25);
+    expect(mockPlayersService.searchPlayers).toHaveBeenCalledWith(
+      'Ruth',
+      25,
+      undefined,
+    );
+  });
+
+  it('searchPlayers: forwards sport filter to dbService', async () => {
+    mockPlayersService.searchPlayers.mockResolvedValueOnce([MOCK_PLAYER]);
+
+    await getQueryResolver('searchPlayers')(
+      {},
+      { searchTerm: 'Jones', limit: null, sport: 'football' },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(mockPlayersService.searchPlayers).toHaveBeenCalledWith(
+      'Jones',
+      10,
+      'football',
+    );
   });
 
   // ── playerByMlbId ─────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { type AskPayload, QuestionBuilder } from './QuestionBuilder';
 import { QuestionHistory, type QuestionRecord } from './QuestionHistory';
 import { TwentyQuestionsEntry } from './TwentyQuestionsEntry';
 import {
+  Sport,
   TwentyQuestionsCategory,
   TwentyQuestionsDifficulty,
   TwentyQuestionsStatus,
@@ -33,6 +34,7 @@ type Phase = 'entry' | 'playing' | 'result';
 interface RawGame {
   id?: string | null;
   status?: TwentyQuestionsStatus | null;
+  sport?: Sport | null;
   questionsUsed?: number | null;
   maxQuestions?: number | null;
   tokensEarned?: number | null;
@@ -54,6 +56,7 @@ interface RawGame {
 interface GameState {
   id: string;
   status: TwentyQuestionsStatus;
+  sport: Sport;
   questionsUsed: number;
   maxQuestions: number;
   tokensEarned: number | null;
@@ -68,6 +71,8 @@ interface GameState {
 
 export interface TwentyQuestionsGameProps {
   onBack: () => void;
+  /** Sport for the player pool; when supplied the user cannot change it (league context). */
+  sport?: Sport;
 }
 
 function mapGame(raw: RawGame): GameState | null {
@@ -75,6 +80,7 @@ function mapGame(raw: RawGame): GameState | null {
   return {
     id: raw.id,
     status: raw.status ?? TwentyQuestionsStatus.Active,
+    sport: raw.sport ?? Sport.Baseball,
     questionsUsed: raw.questionsUsed ?? 0,
     maxQuestions: raw.maxQuestions ?? 20,
     tokensEarned: raw.tokensEarned ?? null,
@@ -103,10 +109,14 @@ function mapGame(raw: RawGame): GameState | null {
 
 export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
   onBack,
+  sport: sportProp,
 }) => {
   const [phase, setPhase] = useState<Phase>('entry');
   const [difficulty, setDifficulty] = useState(
     TwentyQuestionsDifficulty.Medium,
+  );
+  const [selectedSport, setSelectedSport] = useState<Sport>(
+    sportProp ?? Sport.Baseball,
   );
   const [game, setGame] = useState<GameState | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -131,6 +141,7 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
         const mapped = mapGame(active);
         if (mapped) {
           setGame(mapped);
+          setSelectedSport(mapped.sport);
           setHasActiveGame(true);
         }
       }
@@ -147,11 +158,14 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
     }
     // New game
     try {
-      const { data } = await startGame({ variables: { difficulty } });
+      const { data } = await startGame({
+        variables: { difficulty, sport: selectedSport },
+      });
       const raw = data?.twentyQuestionsStart;
       const mapped = mapGame(raw ?? {});
       if (!mapped) throw new Error('Failed to start game');
       setGame(mapped);
+      setSelectedSport(mapped.sport);
       setPhase('playing');
     } catch (e) {
       setErrorMsg(
@@ -247,6 +261,7 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
     setGame(null);
     setHasActiveGame(false);
     setErrorMsg(null);
+    setSelectedSport(sportProp ?? Sport.Baseball);
     setPhase('entry');
   };
 
@@ -262,6 +277,8 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
           <TwentyQuestionsEntry
             difficulty={difficulty}
             onDifficultyChange={setDifficulty}
+            sport={selectedSport}
+            onSportChange={sportProp == null ? setSelectedSport : undefined}
             onStart={() => void handleStart()}
             starting={starting}
             hasActiveGame={hasActiveGame}
@@ -351,6 +368,7 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
           <PlayerGuess
             onGuess={(id) => void handleGuess(id)}
             guessing={guessing}
+            sport={game?.sport ?? selectedSport}
           />
         </YStack>
 

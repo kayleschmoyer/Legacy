@@ -7,6 +7,7 @@ import {
   foreignKey,
   index,
 } from 'drizzle-orm/pg-core';
+import { sportKind } from './Enums';
 import { players } from './Players';
 
 export const twentyQuestionsGames = pgTable(
@@ -21,6 +22,7 @@ export const twentyQuestionsGames = pgTable(
     maxQuestions: integer('max_questions').notNull().default(20),
     // CHECK: 'easy' | 'medium' | 'hard'
     difficulty: text('difficulty').notNull(),
+    sport: sportKind('sport').notNull().default('baseball'),
     tokensEarned: integer('tokens_earned'),
     startedAt: timestamp('started_at', { withTimezone: true, mode: 'string' })
       .defaultNow()

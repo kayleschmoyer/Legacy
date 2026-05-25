@@ -2368,6 +2368,11 @@ type Mutation {
   """
   twentyQuestionsStart(
     difficulty: TwentyQuestionsDifficulty = medium
+
+    """
+    Sport for the player pool. Defaults to baseball when omitted.
+    """
+    sport: Sport
   ): TwentyQuestionsGame
   undoLastDraftPick(draftId: Int!): DraftPick
 
@@ -3160,7 +3165,7 @@ type Query {
     excludeEmptyNames: Boolean = false
 
     """
-    League ID for scoring-based sorting and player pool filtering (career minimums). Uses league-specific scoring multipliers when provided, system defaults otherwise.
+    League ID for scoring-based sorting and player pool filtering (career minimums, sport). Uses league-specific scoring multipliers when provided, system defaults otherwise.
     """
     leagueId: Int
     limit: Int
@@ -3169,6 +3174,11 @@ type Query {
     orderDirection: String
     position: String
     search: String
+
+    """
+    Filter by sport. When leagueId is provided, the league sport takes precedence.
+    """
+    sport: Sport
   ): [Player!]
 
   """
@@ -3193,7 +3203,15 @@ type Query {
     date: String
   ): Scoreboard
   scoringDefinitions: [ScoringStatDefinition!]
-  searchPlayers(limit: Int, searchTerm: String!): [Player!]
+  searchPlayers(
+    limit: Int
+    searchTerm: String!
+
+    """
+    Filter results to players of this sport.
+    """
+    sport: Sport
+  ): [Player!]
   searchUsers(limit: Int, searchTerm: String!): [User!]
   seasonBattingStats(
     limit: Int
@@ -4135,6 +4153,11 @@ type TwentyQuestionsGame {
   maxQuestions: Int
   questions: [TwentyQuestionsQuestion!]
   questionsUsed: Int
+
+  """
+  Sport the player pool was drawn from
+  """
+  sport: Sport
   startedAt: String
   status: TwentyQuestionsStatus
 

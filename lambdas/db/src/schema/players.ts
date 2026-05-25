@@ -7,6 +7,8 @@ import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
+import { UserInputError } from './graphql-errors';
+import { SportKindEnum } from './leagues/types';
 import { CareerBattingRef, CareerPitchingRef } from './statistics';
 
 /** Map a career midpoint year to a human-readable baseball era label. */
@@ -17,6 +19,18 @@ function getEraFromYear(midpointYear: number): string {
   if (midpointYear <= 1993) return 'Free Agency Era';
   if (midpointYear <= 2005) return 'Steroid Era';
   return 'Modern Era';
+}
+
+const ALLOWED_SPORTS = ['baseball', 'football'] as const;
+
+function validateSportArg(sport: unknown): 'baseball' | 'football' | undefined {
+  if (sport == null) return undefined;
+  if (!(ALLOWED_SPORTS as readonly unknown[]).includes(sport)) {
+    throw UserInputError(
+      `Invalid sport. Allowed values: ${ALLOWED_SPORTS.join(', ')}.`,
+    );
+  }
+  return sport as 'baseball' | 'football';
 }
 
 // Create a single database service instance to reuse across all resolvers
@@ -304,7 +318,13 @@ builder.queryField('players', (t) =>
       leagueId: t.arg.int({
         required: false,
         description:
-          'League ID for scoring-based sorting and player pool filtering (career minimums). Uses league-specific scoring multipliers when provided, system defaults otherwise.',
+          'League ID for scoring-based sorting and player pool filtering (career minimums, sport). Uses league-specific scoring multipliers when provided, system defaults otherwise.',
+      }),
+      sport: t.arg({
+        type: SportKindEnum,
+        required: false,
+        description:
+          'Filter by sport. When leagueId is provided, the league sport takes precedence.',
       }),
     },
     resolve: async (root, args, context) => {
@@ -317,8 +337,9 @@ builder.queryField('players', (t) =>
       let leagueHofOnly: boolean | undefined;
       let leagueCustomEraStartYear: number | undefined;
       let leagueCustomEraEndYear: number | undefined;
+      let sportFilter = validateSportArg(args.sport);
 
-      // When a leagueId is provided, fetch the league's career minimums
+      // When a leagueId is provided, fetch the league's career minimums and sport
       if (args.leagueId != null) {
         const [leagueSettings] = await context.db
           .select({
@@ -328,6 +349,7 @@ builder.queryField('players', (t) =>
             baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            sport: PublicSchema.leagues.sport,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, args.leagueId))
@@ -341,6 +363,7 @@ builder.queryField('players', (t) =>
           leagueCustomEraStartYear =
             leagueSettings.customEraStartYear ?? undefined;
           leagueCustomEraEndYear = leagueSettings.customEraEndYear ?? undefined;
+          sportFilter = leagueSettings.sport ?? 'baseball';
         }
       }
 
@@ -360,6 +383,7 @@ builder.queryField('players', (t) =>
           baseballHofOnly: leagueHofOnly,
           customEraStartYear: leagueCustomEraStartYear,
           customEraEndYear: leagueCustomEraEndYear,
+          sport: sportFilter,
         },
       });
     },
@@ -398,9 +422,18 @@ builder.queryField('searchPlayers', (t) =>
     args: {
       searchTerm: t.arg.string({ required: true }),
       limit: t.arg.int({ required: false }),
+      sport: t.arg({
+        type: SportKindEnum,
+        required: false,
+        description: 'Filter results to players of this sport.',
+      }),
     },
     resolve: async (parent, args) => {
-      return dbService.players.searchPlayers(args.searchTerm, args.limit || 10);
+      return dbService.players.searchPlayers(
+        args.searchTerm,
+        args.limit || 10,
+        validateSportArg(args.sport),
+      );
     },
   }),
 );

@@ -3,6 +3,7 @@ mutation TwentyQuestionsGuess($gameId: String!, $playerId: Int!) {
     id
     status
     difficulty
+    sport
     questionsUsed
     maxQuestions
     tokensEarned

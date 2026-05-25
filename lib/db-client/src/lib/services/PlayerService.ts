@@ -105,6 +105,8 @@ export interface PlayerFilters {
   customEraEndYear?: number | null;
   /** When true, only include Hall of Fame inductees */
   baseballHofOnly?: boolean;
+  /** Filter by sport ('baseball' | 'football'). Omit for no restriction. */
+  sport?: 'baseball' | 'football';
 }
 
 /** Sort options that require a join to career_batting */
@@ -258,18 +260,26 @@ export class PlayerService {
   /**
    * Search players by name (searches first name, last name, and full name)
    */
-  async searchPlayers(searchTerm: string, limit = 10): Promise<Player[]> {
+  async searchPlayers(
+    searchTerm: string,
+    limit = 10,
+    sport?: 'baseball' | 'football',
+  ): Promise<Player[]> {
     return runWithPublicClient(this.options, async (db) => {
+      const nameCondition = or(
+        ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
+        ilike(PublicSchema.players.lastName, `%${searchTerm}%`),
+        sql`(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}) ILIKE ${'%' + searchTerm + '%'}`,
+      );
+
+      const whereCondition = sport
+        ? and(nameCondition, eq(PublicSchema.players.sport, sport))
+        : nameCondition;
+
       return db
         .select()
         .from(PublicSchema.players)
-        .where(
-          or(
-            ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
-            ilike(PublicSchema.players.lastName, `%${searchTerm}%`),
-            sql`(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}) ILIKE ${'%' + searchTerm + '%'}`,
-          ),
-        )
+        .where(whereCondition)
         .limit(limit);
     });
   }
@@ -385,6 +395,10 @@ export class PlayerService {
     // Hall of Fame only filter
     if (filters.baseballHofOnly) {
       conditions.push(eq(PublicSchema.players.hallOfFame, true));
+    }
+
+    if (filters.sport) {
+      conditions.push(eq(PublicSchema.players.sport, filters.sport));
     }
 
     return conditions;
@@ -526,6 +540,10 @@ export class PlayerService {
         // Hall of Fame only
         if (queryOptions.filters?.baseballHofOnly) {
           rawConditions.push(sql`p.hall_of_fame = true`);
+        }
+
+        if (queryOptions.filters?.sport) {
+          rawConditions.push(sql`p.sport = ${queryOptions.filters.sport}`);
         }
 
         // Era-based player pool filter

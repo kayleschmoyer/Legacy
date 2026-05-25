@@ -2331,6 +2331,7 @@ export type MutationTwentyQuestionsGuessArgs = {
 
 export type MutationTwentyQuestionsStartArgs = {
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type MutationUndoLastDraftPickArgs = {
@@ -3309,6 +3310,7 @@ export type QueryPlayersArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryPublicLeaguesArgs = {
@@ -3326,6 +3328,7 @@ export type QueryScoreboardArgs = {
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
+  sport?: InputMaybe<Sport>;
 };
 
 export type QuerySearchUsersArgs = {
@@ -4173,6 +4176,8 @@ export type TwentyQuestionsGame = {
   maxQuestions?: Maybe<Scalars['Int']['output']>;
   questions?: Maybe<Array<TwentyQuestionsQuestion>>;
   questionsUsed?: Maybe<Scalars['Int']['output']>;
+  /** Sport the player pool was drawn from */
+  sport?: Maybe<Sport>;
   startedAt?: Maybe<Scalars['String']['output']>;
   status?: Maybe<TwentyQuestionsStatus>;
   /** Revealed only when status is won or lost */
@@ -7900,6 +7905,7 @@ export type SearchPlayersForDisclosureQuery = {
 export type SearchPlayersForDraftQueryVariables = Exact<{
   search: Scalars['String']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  sport?: InputMaybe<Sport>;
 }>;
 
 export type SearchPlayersForDraftQuery = {
@@ -7917,6 +7923,7 @@ export type SearchPlayersForDraftQuery = {
 export type SearchPlayersForTwentyQuestionsQueryVariables = Exact<{
   searchTerm: Scalars['String']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  sport?: InputMaybe<Sport>;
 }>;
 
 export type SearchPlayersForTwentyQuestionsQuery = {
@@ -8696,6 +8703,7 @@ export type TwentyQuestionsAbandonMutation = {
     id?: string | null;
     status?: TwentyQuestionsStatus | null;
     difficulty?: TwentyQuestionsDifficulty | null;
+    sport?: Sport | null;
     questionsUsed?: number | null;
     maxQuestions?: number | null;
     tokensEarned?: number | null;
@@ -8728,6 +8736,7 @@ export type TwentyQuestionsActiveGameQuery = {
     id?: string | null;
     status?: TwentyQuestionsStatus | null;
     difficulty?: TwentyQuestionsDifficulty | null;
+    sport?: Sport | null;
     questionsUsed?: number | null;
     maxQuestions?: number | null;
     tokensEarned?: number | null;
@@ -8760,6 +8769,7 @@ export type TwentyQuestionsAskMutation = {
     id?: string | null;
     status?: TwentyQuestionsStatus | null;
     difficulty?: TwentyQuestionsDifficulty | null;
+    sport?: Sport | null;
     questionsUsed?: number | null;
     maxQuestions?: number | null;
     tokensEarned?: number | null;
@@ -8793,6 +8803,7 @@ export type TwentyQuestionsGuessMutation = {
     id?: string | null;
     status?: TwentyQuestionsStatus | null;
     difficulty?: TwentyQuestionsDifficulty | null;
+    sport?: Sport | null;
     questionsUsed?: number | null;
     maxQuestions?: number | null;
     tokensEarned?: number | null;
@@ -8816,6 +8827,7 @@ export type TwentyQuestionsGuessMutation = {
 
 export type TwentyQuestionsStartMutationVariables = Exact<{
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
+  sport?: InputMaybe<Sport>;
 }>;
 
 export type TwentyQuestionsStartMutation = {
@@ -8825,6 +8837,7 @@ export type TwentyQuestionsStartMutation = {
     id?: string | null;
     status?: TwentyQuestionsStatus | null;
     difficulty?: TwentyQuestionsDifficulty | null;
+    sport?: Sport | null;
     questionsUsed?: number | null;
     maxQuestions?: number | null;
     tokensEarned?: number | null;
@@ -17796,8 +17809,8 @@ export type SearchPlayersForDisclosureQueryResult = Apollo.QueryResult<
   SearchPlayersForDisclosureQueryVariables
 >;
 export const SearchPlayersForDraft = gql`
-  query SearchPlayersForDraft($search: String!, $limit: Int) {
-    players(search: $search, limit: $limit) {
+  query SearchPlayersForDraft($search: String!, $limit: Int, $sport: Sport) {
+    players(search: $search, limit: $limit, sport: $sport) {
       ...Player
     }
   }
@@ -17818,6 +17831,7 @@ export const SearchPlayersForDraft = gql`
  *   variables: {
  *      search: // value for 'search'
  *      limit: // value for 'limit'
+ *      sport: // value for 'sport'
  *   },
  * });
  */
@@ -17888,8 +17902,12 @@ export type SearchPlayersForDraftQueryResult = Apollo.QueryResult<
   SearchPlayersForDraftQueryVariables
 >;
 export const SearchPlayersForTwentyQuestions = gql`
-  query SearchPlayersForTwentyQuestions($searchTerm: String!, $limit: Int) {
-    searchPlayers(searchTerm: $searchTerm, limit: $limit) {
+  query SearchPlayersForTwentyQuestions(
+    $searchTerm: String!
+    $limit: Int
+    $sport: Sport
+  ) {
+    searchPlayers(searchTerm: $searchTerm, limit: $limit, sport: $sport) {
       id
       firstName
       lastName
@@ -17911,6 +17929,7 @@ export const SearchPlayersForTwentyQuestions = gql`
  *   variables: {
  *      searchTerm: // value for 'searchTerm'
  *      limit: // value for 'limit'
+ *      sport: // value for 'sport'
  *   },
  * });
  */
@@ -19697,6 +19716,7 @@ export const TwentyQuestionsAbandon = gql`
       id
       status
       difficulty
+      sport
       questionsUsed
       maxQuestions
       tokensEarned
@@ -19765,6 +19785,7 @@ export const TwentyQuestionsActiveGame = gql`
       id
       status
       difficulty
+      sport
       questionsUsed
       maxQuestions
       tokensEarned
@@ -19868,6 +19889,7 @@ export const TwentyQuestionsAsk = gql`
       id
       status
       difficulty
+      sport
       questionsUsed
       maxQuestions
       tokensEarned
@@ -19936,6 +19958,7 @@ export const TwentyQuestionsGuess = gql`
       id
       status
       difficulty
+      sport
       questionsUsed
       maxQuestions
       tokensEarned
@@ -20000,11 +20023,15 @@ export type TwentyQuestionsGuessMutationOptions = BaseMutationOptions<
   TwentyQuestionsGuessMutationVariables
 >;
 export const TwentyQuestionsStart = gql`
-  mutation TwentyQuestionsStart($difficulty: TwentyQuestionsDifficulty) {
-    twentyQuestionsStart(difficulty: $difficulty) {
+  mutation TwentyQuestionsStart(
+    $difficulty: TwentyQuestionsDifficulty
+    $sport: Sport
+  ) {
+    twentyQuestionsStart(difficulty: $difficulty, sport: $sport) {
       id
       status
       difficulty
+      sport
       questionsUsed
       maxQuestions
       tokensEarned
@@ -20043,6 +20070,7 @@ export type TwentyQuestionsStartMutationFn = MutationFunction<
  * const [twentyQuestionsStartMutation, { data, loading, error }] = useTwentyQuestionsStartMutation({
  *   variables: {
  *      difficulty: // value for 'difficulty'
+ *      sport: // value for 'sport'
  *   },
  * });
  */

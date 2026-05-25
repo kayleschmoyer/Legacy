@@ -1,8 +1,12 @@
-mutation TwentyQuestionsStart($difficulty: TwentyQuestionsDifficulty) {
-  twentyQuestionsStart(difficulty: $difficulty) {
+mutation TwentyQuestionsStart(
+  $difficulty: TwentyQuestionsDifficulty
+  $sport: Sport
+) {
+  twentyQuestionsStart(difficulty: $difficulty, sport: $sport) {
     id
     status
     difficulty
+    sport
     questionsUsed
     maxQuestions
     tokensEarned

@@ -3,6 +3,7 @@ mutation TwentyQuestionsAbandon($gameId: String!) {
     id
     status
     difficulty
+    sport
     questionsUsed
     maxQuestions
     tokensEarned

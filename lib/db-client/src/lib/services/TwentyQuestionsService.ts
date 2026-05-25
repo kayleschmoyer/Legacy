@@ -21,6 +21,7 @@ export interface GameStateWithQuestions {
   questionsUsed: number;
   maxQuestions: number;
   difficulty: string;
+  sport: 'baseball' | 'football';
   tokensEarned: number | null;
   startedAt: string;
   completedAt: string | null;
@@ -57,6 +58,7 @@ export class TwentyQuestionsService {
     db: PublicDb,
     userId: number,
     difficulty: 'easy' | 'medium' | 'hard',
+    sport: 'baseball' | 'football' = 'baseball',
   ): Promise<typeof PublicSchema.twentyQuestionsGames.$inferSelect> {
     const [existingActive] = await db
       .select({ id: PublicSchema.twentyQuestionsGames.id })
@@ -75,7 +77,11 @@ export class TwentyQuestionsService {
       );
     }
 
-    const pool = await TwentyQuestionsService.getPlayerPool(db, difficulty);
+    const pool = await TwentyQuestionsService.getPlayerPool(
+      db,
+      difficulty,
+      sport,
+    );
     if (pool.length === 0) {
       throw new Error(
         `No eligible players found for difficulty: ${difficulty}`,
@@ -93,11 +99,12 @@ export class TwentyQuestionsService {
         questionsUsed: 0,
         maxQuestions: 20,
         difficulty,
+        sport,
       })
       .returning();
 
     LOGGER.info(
-      `Started 20 Questions game ${game.id} for user ${userId} (${difficulty})`,
+      `Started 20 Questions game ${game.id} for user ${userId} (${difficulty}, ${sport})`,
     );
 
     return game;
@@ -341,30 +348,37 @@ export class TwentyQuestionsService {
   static async getPlayerPool(
     db: PublicDb,
     difficulty: 'easy' | 'medium' | 'hard',
+    sport: 'baseball' | 'football' = 'baseball',
   ): Promise<number[]> {
     let rows: Array<{ id: number }>;
+
+    const sportCondition = eq(PublicSchema.players.sport, sport);
 
     if (difficulty === 'easy') {
       rows = await db
         .select({ id: PublicSchema.players.id })
         .from(PublicSchema.players)
         .where(
-          or(
-            eq(PublicSchema.players.hallOfFame, true),
-            gte(PublicSchema.players.allStarSelections, 1),
+          and(
+            sportCondition,
+            or(
+              eq(PublicSchema.players.hallOfFame, true),
+              gte(PublicSchema.players.allStarSelections, 1),
+            ),
           ),
         );
     } else if (difficulty === 'medium') {
       rows = await db
         .select({ id: PublicSchema.players.id })
         .from(PublicSchema.players)
-        .where(gte(PublicSchema.players.totalGames, 100));
+        .where(and(sportCondition, gte(PublicSchema.players.totalGames, 100)));
     } else {
       rows = await db
         .select({ id: PublicSchema.players.id })
         .from(PublicSchema.players)
         .where(
           and(
+            sportCondition,
             lte(PublicSchema.players.totalGames, 99),
             gte(PublicSchema.players.totalGames, 1),
           ),

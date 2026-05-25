@@ -203,6 +203,56 @@ describe('twenty-questions resolvers', () => {
 
   const unauthCtx = { user: null, db: null };
 
+  // ── twentyQuestionsStart mutation ────────────────────────────────────────
+
+  describe('twentyQuestionsStart mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('twentyQuestionsStart');
+      await expect(
+        resolver(
+          {},
+          { difficulty: 'medium', sport: null },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('calls startGame with default baseball sport when sport is omitted', async () => {
+      const resolver = getMutation('twentyQuestionsStart');
+      await resolver(
+        {},
+        { difficulty: 'medium', sport: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockTwentyQuestionsService.startGame).toHaveBeenCalledWith(
+        mockContext.db,
+        42,
+        'medium',
+        'baseball',
+      );
+    });
+
+    it('calls startGame with provided sport', async () => {
+      const resolver = getMutation('twentyQuestionsStart');
+      await resolver(
+        {},
+        { difficulty: 'hard', sport: 'football' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockTwentyQuestionsService.startGame).toHaveBeenCalledWith(
+        mockContext.db,
+        42,
+        'hard',
+        'football',
+      );
+    });
+  });
+
   // ── twentyQuestionsAsk mutation ───────────────────────────────────────────
 
   describe('twentyQuestionsAsk mutation', () => {
