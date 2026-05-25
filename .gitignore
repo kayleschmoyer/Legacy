@@ -352,3 +352,6 @@ scratch/*
 # Copilot CLI session marker (runtime file written by session-start hook)
 .copilot-session
 .twig
+
+# Worktree SSL cert symlink (created by make wt-setup; machine-local path)
+certs
