@@ -600,11 +600,11 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
     page,
   }) => {
     await page.goto('/football');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
     const footballContent = await page.locator('body').textContent();
 
     await page.goto('/baseball');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
     const baseballContent = await page.locator('body').textContent();
 
     // The two pages should have meaningfully different content.

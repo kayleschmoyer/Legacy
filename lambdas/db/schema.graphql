@@ -913,6 +913,114 @@ type FootballCareerStats {
 }
 
 """
+Per-game DST (team defense) stats for a football matchup player
+"""
+type FootballGameDefenseStats {
+  defTd: Int
+  fumRec: Int
+  int: Int
+  ptsAllowed: Int
+  sacks: Float
+  safeties: Int
+  ydsAllowed: Int
+}
+
+"""
+Per-game IDP (individual defensive player) stats
+"""
+type FootballGameIDPStats {
+  astTkl: Int
+  defTd: Int
+  ff: Int
+  fr: Int
+  int: Int
+  pd: Int
+  sacks: Float
+  safeties: Int
+  soloTkl: Int
+}
+
+"""
+Per-game kicking stats for a football matchup player
+"""
+type FootballGameKickingStats {
+  fga: Int
+  fgm: Int
+  xpa: Int
+  xpm: Int
+}
+
+"""
+Per-game passing stats for a football matchup player
+"""
+type FootballGamePassingStats {
+  att: Int
+  cmp: Int
+  int: Int
+  td: Int
+  yds: Int
+}
+
+"""
+Per-game receiving stats for a football matchup player
+"""
+type FootballGameReceivingStats {
+  rec: Int
+  td: Int
+  tgt: Int
+  yds: Int
+}
+
+"""
+Per-game rushing stats for a football matchup player
+"""
+type FootballGameRushingStats {
+  att: Int
+  td: Int
+  yds: Int
+}
+
+"""
+A player on a football fantasy team in a matchup
+"""
+type FootballMatchupPlayer {
+  games: [FootballMatchupPlayerGame!]
+  isDst: Boolean
+  nflTeam: String
+  playerId: Int
+  playerName: String
+  position: String
+  totalPoints: Float
+}
+
+"""
+A single NFL game played by a football matchup player
+"""
+type FootballMatchupPlayerGame {
+  defense: FootballGameDefenseStats
+  fantasyPoints: Float
+  gameDate: String
+  gameIdentifier: String
+  gameNum: Int
+  idp: FootballGameIDPStats
+  kicking: FootballGameKickingStats
+  opponent: String
+  passing: FootballGamePassingStats
+  receiving: FootballGameReceivingStats
+  rushing: FootballGameRushingStats
+}
+
+"""
+Stats for one team in a football matchup
+"""
+type FootballMatchupStats {
+  players: [FootballMatchupPlayer!]
+  teamId: Int
+  teamName: String
+  totalPoints: Float
+}
+
+"""
 A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255)
 """
 type FootballPlayer {

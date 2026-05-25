@@ -1,0 +1,9 @@
+fragment FootballPlayer on FootballPlayer {
+  id
+  firstName
+  lastName
+  position
+  isDst
+  nflTeam
+  pfrId
+}

@@ -801,6 +801,105 @@ export type FootballCareerStats = {
   rushing?: Maybe<FootballCareerRushing>;
 };
 
+/** Per-game DST (team defense) stats for a football matchup player */
+export type FootballGameDefenseStats = {
+  __typename?: 'FootballGameDefenseStats';
+  defTd?: Maybe<Scalars['Int']['output']>;
+  fumRec?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  ptsAllowed?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  ydsAllowed?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game IDP (individual defensive player) stats */
+export type FootballGameIdpStats = {
+  __typename?: 'FootballGameIDPStats';
+  astTkl?: Maybe<Scalars['Int']['output']>;
+  defTd?: Maybe<Scalars['Int']['output']>;
+  ff?: Maybe<Scalars['Int']['output']>;
+  fr?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  pd?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  soloTkl?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game kicking stats for a football matchup player */
+export type FootballGameKickingStats = {
+  __typename?: 'FootballGameKickingStats';
+  fga?: Maybe<Scalars['Int']['output']>;
+  fgm?: Maybe<Scalars['Int']['output']>;
+  xpa?: Maybe<Scalars['Int']['output']>;
+  xpm?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game passing stats for a football matchup player */
+export type FootballGamePassingStats = {
+  __typename?: 'FootballGamePassingStats';
+  att?: Maybe<Scalars['Int']['output']>;
+  cmp?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game receiving stats for a football matchup player */
+export type FootballGameReceivingStats = {
+  __typename?: 'FootballGameReceivingStats';
+  rec?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  tgt?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game rushing stats for a football matchup player */
+export type FootballGameRushingStats = {
+  __typename?: 'FootballGameRushingStats';
+  att?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player on a football fantasy team in a matchup */
+export type FootballMatchupPlayer = {
+  __typename?: 'FootballMatchupPlayer';
+  games?: Maybe<Array<FootballMatchupPlayerGame>>;
+  isDst?: Maybe<Scalars['Boolean']['output']>;
+  nflTeam?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  totalPoints?: Maybe<Scalars['Float']['output']>;
+};
+
+/** A single NFL game played by a football matchup player */
+export type FootballMatchupPlayerGame = {
+  __typename?: 'FootballMatchupPlayerGame';
+  defense?: Maybe<FootballGameDefenseStats>;
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  gameDate?: Maybe<Scalars['String']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  idp?: Maybe<FootballGameIdpStats>;
+  kicking?: Maybe<FootballGameKickingStats>;
+  opponent?: Maybe<Scalars['String']['output']>;
+  passing?: Maybe<FootballGamePassingStats>;
+  receiving?: Maybe<FootballGameReceivingStats>;
+  rushing?: Maybe<FootballGameRushingStats>;
+};
+
+/** Stats for one team in a football matchup */
+export type FootballMatchupStats = {
+  __typename?: 'FootballMatchupStats';
+  players?: Maybe<Array<FootballMatchupPlayer>>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  totalPoints?: Maybe<Scalars['Float']['output']>;
+};
+
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
 export type FootballPlayer = {
   __typename?: 'FootballPlayer';
@@ -4890,6 +4989,420 @@ export type CreateSeasonDraftGameMutation = {
   createSeasonDraftGame?: number | null;
 };
 
+export type FootballGamePassingStatsFragment = {
+  __typename?: 'FootballGamePassingStats';
+  att?: number | null;
+  cmp?: number | null;
+  yds?: number | null;
+  td?: number | null;
+  int?: number | null;
+};
+
+export type FootballGameRushingStatsFragment = {
+  __typename?: 'FootballGameRushingStats';
+  att?: number | null;
+  yds?: number | null;
+  td?: number | null;
+};
+
+export type FootballGameReceivingStatsFragment = {
+  __typename?: 'FootballGameReceivingStats';
+  tgt?: number | null;
+  rec?: number | null;
+  yds?: number | null;
+  td?: number | null;
+};
+
+export type FootballGameKickingStatsFragment = {
+  __typename?: 'FootballGameKickingStats';
+  fgm?: number | null;
+  fga?: number | null;
+  xpm?: number | null;
+  xpa?: number | null;
+};
+
+export type FootballGameDefenseStatsFragment = {
+  __typename?: 'FootballGameDefenseStats';
+  sacks?: number | null;
+  int?: number | null;
+  fumRec?: number | null;
+  defTd?: number | null;
+  ptsAllowed?: number | null;
+  ydsAllowed?: number | null;
+  safeties?: number | null;
+};
+
+export type FootballGameIdpStatsFragment = {
+  __typename?: 'FootballGameIDPStats';
+  soloTkl?: number | null;
+  astTkl?: number | null;
+  sacks?: number | null;
+  int?: number | null;
+  pd?: number | null;
+  ff?: number | null;
+  fr?: number | null;
+  defTd?: number | null;
+  safeties?: number | null;
+};
+
+export type FootballMatchupPlayerGameFragment = {
+  __typename?: 'FootballMatchupPlayerGame';
+  gameNum?: number | null;
+  gameIdentifier?: string | null;
+  gameDate?: string | null;
+  opponent?: string | null;
+  fantasyPoints?: number | null;
+  passing?: {
+    __typename?: 'FootballGamePassingStats';
+    att?: number | null;
+    cmp?: number | null;
+    yds?: number | null;
+    td?: number | null;
+    int?: number | null;
+  } | null;
+  rushing?: {
+    __typename?: 'FootballGameRushingStats';
+    att?: number | null;
+    yds?: number | null;
+    td?: number | null;
+  } | null;
+  receiving?: {
+    __typename?: 'FootballGameReceivingStats';
+    tgt?: number | null;
+    rec?: number | null;
+    yds?: number | null;
+    td?: number | null;
+  } | null;
+  kicking?: {
+    __typename?: 'FootballGameKickingStats';
+    fgm?: number | null;
+    fga?: number | null;
+    xpm?: number | null;
+    xpa?: number | null;
+  } | null;
+  defense?: {
+    __typename?: 'FootballGameDefenseStats';
+    sacks?: number | null;
+    int?: number | null;
+    fumRec?: number | null;
+    defTd?: number | null;
+    ptsAllowed?: number | null;
+    ydsAllowed?: number | null;
+    safeties?: number | null;
+  } | null;
+  idp?: {
+    __typename?: 'FootballGameIDPStats';
+    soloTkl?: number | null;
+    astTkl?: number | null;
+    sacks?: number | null;
+    int?: number | null;
+    pd?: number | null;
+    ff?: number | null;
+    fr?: number | null;
+    defTd?: number | null;
+    safeties?: number | null;
+  } | null;
+};
+
+export type FootballMatchupPlayerFragment = {
+  __typename?: 'FootballMatchupPlayer';
+  playerId?: number | null;
+  playerName?: string | null;
+  position?: string | null;
+  isDst?: boolean | null;
+  nflTeam?: string | null;
+  totalPoints?: number | null;
+  games?: Array<{
+    __typename?: 'FootballMatchupPlayerGame';
+    gameNum?: number | null;
+    gameIdentifier?: string | null;
+    gameDate?: string | null;
+    opponent?: string | null;
+    fantasyPoints?: number | null;
+    passing?: {
+      __typename?: 'FootballGamePassingStats';
+      att?: number | null;
+      cmp?: number | null;
+      yds?: number | null;
+      td?: number | null;
+      int?: number | null;
+    } | null;
+    rushing?: {
+      __typename?: 'FootballGameRushingStats';
+      att?: number | null;
+      yds?: number | null;
+      td?: number | null;
+    } | null;
+    receiving?: {
+      __typename?: 'FootballGameReceivingStats';
+      tgt?: number | null;
+      rec?: number | null;
+      yds?: number | null;
+      td?: number | null;
+    } | null;
+    kicking?: {
+      __typename?: 'FootballGameKickingStats';
+      fgm?: number | null;
+      fga?: number | null;
+      xpm?: number | null;
+      xpa?: number | null;
+    } | null;
+    defense?: {
+      __typename?: 'FootballGameDefenseStats';
+      sacks?: number | null;
+      int?: number | null;
+      fumRec?: number | null;
+      defTd?: number | null;
+      ptsAllowed?: number | null;
+      ydsAllowed?: number | null;
+      safeties?: number | null;
+    } | null;
+    idp?: {
+      __typename?: 'FootballGameIDPStats';
+      soloTkl?: number | null;
+      astTkl?: number | null;
+      sacks?: number | null;
+      int?: number | null;
+      pd?: number | null;
+      ff?: number | null;
+      fr?: number | null;
+      defTd?: number | null;
+      safeties?: number | null;
+    } | null;
+  }> | null;
+};
+
+export type FootballMatchupStatsFragment = {
+  __typename?: 'FootballMatchupStats';
+  teamId?: number | null;
+  teamName?: string | null;
+  totalPoints?: number | null;
+  players?: Array<{
+    __typename?: 'FootballMatchupPlayer';
+    playerId?: number | null;
+    playerName?: string | null;
+    position?: string | null;
+    isDst?: boolean | null;
+    nflTeam?: string | null;
+    totalPoints?: number | null;
+    games?: Array<{
+      __typename?: 'FootballMatchupPlayerGame';
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      gameDate?: string | null;
+      opponent?: string | null;
+      fantasyPoints?: number | null;
+      passing?: {
+        __typename?: 'FootballGamePassingStats';
+        att?: number | null;
+        cmp?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        int?: number | null;
+      } | null;
+      rushing?: {
+        __typename?: 'FootballGameRushingStats';
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      } | null;
+      receiving?: {
+        __typename?: 'FootballGameReceivingStats';
+        tgt?: number | null;
+        rec?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      } | null;
+      kicking?: {
+        __typename?: 'FootballGameKickingStats';
+        fgm?: number | null;
+        fga?: number | null;
+        xpm?: number | null;
+        xpa?: number | null;
+      } | null;
+      defense?: {
+        __typename?: 'FootballGameDefenseStats';
+        sacks?: number | null;
+        int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
+        ptsAllowed?: number | null;
+        ydsAllowed?: number | null;
+        safeties?: number | null;
+      } | null;
+      idp?: {
+        __typename?: 'FootballGameIDPStats';
+        soloTkl?: number | null;
+        astTkl?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        pd?: number | null;
+        ff?: number | null;
+        fr?: number | null;
+        defTd?: number | null;
+        safeties?: number | null;
+      } | null;
+    }> | null;
+  }> | null;
+};
+
+export type FootballPlayerFragment = {
+  __typename?: 'FootballPlayer';
+  id: number;
+  firstName: string;
+  lastName: string;
+  position?: string | null;
+  isDst: boolean;
+  nflTeam?: string | null;
+  pfrId?: string | null;
+};
+
+export type FootballSeasonPassingStatsFragment = {
+  __typename?: 'FootballSeasonPassing';
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  gs?: number | null;
+  cmp?: number | null;
+  att?: number | null;
+  yds?: number | null;
+  td?: number | null;
+  int?: number | null;
+  rating?: number | null;
+};
+
+export type FootballSeasonRushingStatsFragment = {
+  __typename?: 'FootballSeasonRushing';
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  att?: number | null;
+  yds?: number | null;
+  td?: number | null;
+};
+
+export type FootballSeasonReceivingStatsFragment = {
+  __typename?: 'FootballSeasonReceiving';
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  tgt?: number | null;
+  rec?: number | null;
+  yds?: number | null;
+  td?: number | null;
+};
+
+export type FootballSeasonKickingStatsFragment = {
+  __typename?: 'FootballSeasonKicking';
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  fgm?: number | null;
+  fga?: number | null;
+  xpm?: number | null;
+  xpa?: number | null;
+};
+
+export type FootballSeasonDefenseStatsFragment = {
+  __typename?: 'FootballSeasonDefense';
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  sacks?: number | null;
+  int?: number | null;
+  fumRec?: number | null;
+  defTd?: number | null;
+  ptsAllowed?: number | null;
+};
+
+export type FootballSeasonDefenseIdpStatsFragment = {
+  __typename?: 'FootballSeasonDefenseIdp';
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  soloTkl?: number | null;
+  astTkl?: number | null;
+  sacks?: number | null;
+  int?: number | null;
+  pd?: number | null;
+  ff?: number | null;
+  fr?: number | null;
+  defTd?: number | null;
+  safeties?: number | null;
+};
+
+export type FootballPlayerSeasonStatsFragment = {
+  __typename?: 'FootballPlayerSeasonStats';
+  passing?: Array<{
+    __typename?: 'FootballSeasonPassing';
+    season?: number | null;
+    team?: string | null;
+    g?: number | null;
+    gs?: number | null;
+    cmp?: number | null;
+    att?: number | null;
+    yds?: number | null;
+    td?: number | null;
+    int?: number | null;
+    rating?: number | null;
+  }> | null;
+  rushing?: Array<{
+    __typename?: 'FootballSeasonRushing';
+    season?: number | null;
+    team?: string | null;
+    g?: number | null;
+    att?: number | null;
+    yds?: number | null;
+    td?: number | null;
+  }> | null;
+  receiving?: Array<{
+    __typename?: 'FootballSeasonReceiving';
+    season?: number | null;
+    team?: string | null;
+    g?: number | null;
+    tgt?: number | null;
+    rec?: number | null;
+    yds?: number | null;
+    td?: number | null;
+  }> | null;
+  kicking?: Array<{
+    __typename?: 'FootballSeasonKicking';
+    season?: number | null;
+    team?: string | null;
+    g?: number | null;
+    fgm?: number | null;
+    fga?: number | null;
+    xpm?: number | null;
+    xpa?: number | null;
+  }> | null;
+  defense?: Array<{
+    __typename?: 'FootballSeasonDefense';
+    season?: number | null;
+    team?: string | null;
+    g?: number | null;
+    sacks?: number | null;
+    int?: number | null;
+    fumRec?: number | null;
+    defTd?: number | null;
+    ptsAllowed?: number | null;
+  }> | null;
+  idp?: Array<{
+    __typename?: 'FootballSeasonDefenseIdp';
+    season?: number | null;
+    team?: string | null;
+    g?: number | null;
+    soloTkl?: number | null;
+    astTkl?: number | null;
+    sacks?: number | null;
+    int?: number | null;
+    pd?: number | null;
+    ff?: number | null;
+    fr?: number | null;
+    defTd?: number | null;
+    safeties?: number | null;
+  }> | null;
+};
+
 export type GetAllPlayersQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -5050,6 +5563,183 @@ export type GetDisclosureGameBestScoreQueryVariables = Exact<{
 export type GetDisclosureGameBestScoreQuery = {
   __typename?: 'Query';
   disclosureGameBestScore?: number | null;
+};
+
+export type GetFootballPlayerQueryVariables = Exact<{
+  id: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetFootballPlayerQuery = {
+  __typename?: 'Query';
+  footballPlayer?: {
+    __typename?: 'FootballPlayer';
+    id: number;
+    firstName: string;
+    lastName: string;
+    position?: string | null;
+    isDst: boolean;
+    nflTeam?: string | null;
+    pfrId?: string | null;
+    seasonStats?: {
+      __typename?: 'FootballPlayerSeasonStats';
+      passing?: Array<{
+        __typename?: 'FootballSeasonPassing';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        gs?: number | null;
+        cmp?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        int?: number | null;
+        rating?: number | null;
+      }> | null;
+      rushing?: Array<{
+        __typename?: 'FootballSeasonRushing';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      }> | null;
+      receiving?: Array<{
+        __typename?: 'FootballSeasonReceiving';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        tgt?: number | null;
+        rec?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      }> | null;
+      kicking?: Array<{
+        __typename?: 'FootballSeasonKicking';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        fgm?: number | null;
+        fga?: number | null;
+        xpm?: number | null;
+        xpa?: number | null;
+      }> | null;
+      defense?: Array<{
+        __typename?: 'FootballSeasonDefense';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
+        ptsAllowed?: number | null;
+      }> | null;
+      idp?: Array<{
+        __typename?: 'FootballSeasonDefenseIdp';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        soloTkl?: number | null;
+        astTkl?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        pd?: number | null;
+        ff?: number | null;
+        fr?: number | null;
+        defTd?: number | null;
+        safeties?: number | null;
+      }> | null;
+    } | null;
+    careerStats?: {
+      __typename?: 'FootballCareerStats';
+      passing?: {
+        __typename?: 'FootballCareerPassing';
+        g?: number | null;
+        cmp?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        int?: number | null;
+        rating?: number | null;
+      } | null;
+      rushing?: {
+        __typename?: 'FootballCareerRushing';
+        g?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      } | null;
+      receiving?: {
+        __typename?: 'FootballCareerReceiving';
+        g?: number | null;
+        rec?: number | null;
+        tgt?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      } | null;
+      kicking?: {
+        __typename?: 'FootballCareerKicking';
+        g?: number | null;
+        fgm?: number | null;
+        fga?: number | null;
+        xpm?: number | null;
+        xpa?: number | null;
+      } | null;
+      defense?: {
+        __typename?: 'FootballCareerDefense';
+        g?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
+        ptsAllowedPerG?: number | null;
+        ydsAllowedPerG?: number | null;
+      } | null;
+      idp?: {
+        __typename?: 'FootballCareerIdp';
+        g?: number | null;
+        soloTkl?: number | null;
+        astTkl?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        pd?: number | null;
+        ff?: number | null;
+        fr?: number | null;
+        defTd?: number | null;
+        safeties?: number | null;
+      } | null;
+    } | null;
+  } | null;
+};
+
+export type GetFootballPlayersQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetFootballPlayersQuery = {
+  __typename?: 'Query';
+  footballPlayers?: {
+    __typename?: 'FootballPlayersConnection';
+    nodes: Array<{
+      __typename?: 'FootballPlayer';
+      id: number;
+      firstName: string;
+      lastName: string;
+      position?: string | null;
+      isDst: boolean;
+      nflTeam?: string | null;
+      pfrId?: string | null;
+    }>;
+    pageInfo: {
+      __typename?: 'FootballPlayersPageInfo';
+      hasNextPage: boolean;
+      endCursor?: string | null;
+    };
+  } | null;
 };
 
 export type GetLeagueAnalyticsQueryVariables = Exact<{
@@ -8331,6 +9021,233 @@ export const AchievementRestrictionFragmentDoc = gql`
     updatedAt
   }
 `;
+export const FootballGamePassingStatsFragmentDoc = gql`
+  fragment FootballGamePassingStats on FootballGamePassingStats {
+    att
+    cmp
+    yds
+    td
+    int
+  }
+`;
+export const FootballGameRushingStatsFragmentDoc = gql`
+  fragment FootballGameRushingStats on FootballGameRushingStats {
+    att
+    yds
+    td
+  }
+`;
+export const FootballGameReceivingStatsFragmentDoc = gql`
+  fragment FootballGameReceivingStats on FootballGameReceivingStats {
+    tgt
+    rec
+    yds
+    td
+  }
+`;
+export const FootballGameKickingStatsFragmentDoc = gql`
+  fragment FootballGameKickingStats on FootballGameKickingStats {
+    fgm
+    fga
+    xpm
+    xpa
+  }
+`;
+export const FootballGameDefenseStatsFragmentDoc = gql`
+  fragment FootballGameDefenseStats on FootballGameDefenseStats {
+    sacks
+    int
+    fumRec
+    defTd
+    ptsAllowed
+    ydsAllowed
+    safeties
+  }
+`;
+export const FootballGameIdpStatsFragmentDoc = gql`
+  fragment FootballGameIDPStats on FootballGameIDPStats {
+    soloTkl
+    astTkl
+    sacks
+    int
+    pd
+    ff
+    fr
+    defTd
+    safeties
+  }
+`;
+export const FootballMatchupPlayerGameFragmentDoc = gql`
+  fragment FootballMatchupPlayerGame on FootballMatchupPlayerGame {
+    gameNum
+    gameIdentifier
+    gameDate
+    opponent
+    fantasyPoints
+    passing {
+      ...FootballGamePassingStats
+    }
+    rushing {
+      ...FootballGameRushingStats
+    }
+    receiving {
+      ...FootballGameReceivingStats
+    }
+    kicking {
+      ...FootballGameKickingStats
+    }
+    defense {
+      ...FootballGameDefenseStats
+    }
+    idp {
+      ...FootballGameIDPStats
+    }
+  }
+  ${FootballGamePassingStatsFragmentDoc}
+  ${FootballGameRushingStatsFragmentDoc}
+  ${FootballGameReceivingStatsFragmentDoc}
+  ${FootballGameKickingStatsFragmentDoc}
+  ${FootballGameDefenseStatsFragmentDoc}
+  ${FootballGameIdpStatsFragmentDoc}
+`;
+export const FootballMatchupPlayerFragmentDoc = gql`
+  fragment FootballMatchupPlayer on FootballMatchupPlayer {
+    playerId
+    playerName
+    position
+    isDst
+    nflTeam
+    totalPoints
+    games {
+      ...FootballMatchupPlayerGame
+    }
+  }
+  ${FootballMatchupPlayerGameFragmentDoc}
+`;
+export const FootballMatchupStatsFragmentDoc = gql`
+  fragment FootballMatchupStats on FootballMatchupStats {
+    teamId
+    teamName
+    totalPoints
+    players {
+      ...FootballMatchupPlayer
+    }
+  }
+  ${FootballMatchupPlayerFragmentDoc}
+`;
+export const FootballPlayerFragmentDoc = gql`
+  fragment FootballPlayer on FootballPlayer {
+    id
+    firstName
+    lastName
+    position
+    isDst
+    nflTeam
+    pfrId
+  }
+`;
+export const FootballSeasonPassingStatsFragmentDoc = gql`
+  fragment FootballSeasonPassingStats on FootballSeasonPassing {
+    season
+    team
+    g
+    gs
+    cmp
+    att
+    yds
+    td
+    int
+    rating
+  }
+`;
+export const FootballSeasonRushingStatsFragmentDoc = gql`
+  fragment FootballSeasonRushingStats on FootballSeasonRushing {
+    season
+    team
+    g
+    att
+    yds
+    td
+  }
+`;
+export const FootballSeasonReceivingStatsFragmentDoc = gql`
+  fragment FootballSeasonReceivingStats on FootballSeasonReceiving {
+    season
+    team
+    g
+    tgt
+    rec
+    yds
+    td
+  }
+`;
+export const FootballSeasonKickingStatsFragmentDoc = gql`
+  fragment FootballSeasonKickingStats on FootballSeasonKicking {
+    season
+    team
+    g
+    fgm
+    fga
+    xpm
+    xpa
+  }
+`;
+export const FootballSeasonDefenseStatsFragmentDoc = gql`
+  fragment FootballSeasonDefenseStats on FootballSeasonDefense {
+    season
+    team
+    g
+    sacks
+    int
+    fumRec
+    defTd
+    ptsAllowed
+  }
+`;
+export const FootballSeasonDefenseIdpStatsFragmentDoc = gql`
+  fragment FootballSeasonDefenseIdpStats on FootballSeasonDefenseIdp {
+    season
+    team
+    g
+    soloTkl
+    astTkl
+    sacks
+    int
+    pd
+    ff
+    fr
+    defTd
+    safeties
+  }
+`;
+export const FootballPlayerSeasonStatsFragmentDoc = gql`
+  fragment FootballPlayerSeasonStats on FootballPlayerSeasonStats {
+    passing {
+      ...FootballSeasonPassingStats
+    }
+    rushing {
+      ...FootballSeasonRushingStats
+    }
+    receiving {
+      ...FootballSeasonReceivingStats
+    }
+    kicking {
+      ...FootballSeasonKickingStats
+    }
+    defense {
+      ...FootballSeasonDefenseStats
+    }
+    idp {
+      ...FootballSeasonDefenseIdpStats
+    }
+  }
+  ${FootballSeasonPassingStatsFragmentDoc}
+  ${FootballSeasonRushingStatsFragmentDoc}
+  ${FootballSeasonReceivingStatsFragmentDoc}
+  ${FootballSeasonKickingStatsFragmentDoc}
+  ${FootballSeasonDefenseStatsFragmentDoc}
+  ${FootballSeasonDefenseIdpStatsFragmentDoc}
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -10874,6 +11791,249 @@ export type GetDisclosureGameBestScoreSuspenseQueryHookResult = ReturnType<
 export type GetDisclosureGameBestScoreQueryResult = Apollo.QueryResult<
   GetDisclosureGameBestScoreQuery,
   GetDisclosureGameBestScoreQueryVariables
+>;
+export const GetFootballPlayer = gql`
+  query GetFootballPlayer($id: Int!, $season: Int) {
+    footballPlayer(id: $id) {
+      ...FootballPlayer
+      seasonStats(season: $season) {
+        ...FootballPlayerSeasonStats
+      }
+      careerStats {
+        passing {
+          g
+          cmp
+          att
+          yds
+          td
+          int
+          rating
+        }
+        rushing {
+          g
+          att
+          yds
+          td
+        }
+        receiving {
+          g
+          rec
+          tgt
+          yds
+          td
+        }
+        kicking {
+          g
+          fgm
+          fga
+          xpm
+          xpa
+        }
+        defense {
+          g
+          sacks
+          int
+          fumRec
+          defTd
+          ptsAllowedPerG
+          ydsAllowedPerG
+        }
+        idp {
+          g
+          soloTkl
+          astTkl
+          sacks
+          int
+          pd
+          ff
+          fr
+          defTd
+          safeties
+        }
+      }
+    }
+  }
+  ${FootballPlayerFragmentDoc}
+  ${FootballPlayerSeasonStatsFragmentDoc}
+`;
+
+/**
+ * __useGetFootballPlayerQuery__
+ *
+ * To run a query within a React component, call `useGetFootballPlayerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFootballPlayerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFootballPlayerQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *      season: // value for 'season'
+ *   },
+ * });
+ */
+export function useGetFootballPlayerQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetFootballPlayerQuery,
+    GetFootballPlayerQueryVariables
+  > &
+    (
+      | { variables: GetFootballPlayerQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetFootballPlayerQuery,
+    GetFootballPlayerQueryVariables
+  >(GetFootballPlayer, options);
+}
+export function useGetFootballPlayerLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetFootballPlayerQuery,
+    GetFootballPlayerQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetFootballPlayerQuery,
+    GetFootballPlayerQueryVariables
+  >(GetFootballPlayer, options);
+}
+export function useGetFootballPlayerSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetFootballPlayerQuery,
+        GetFootballPlayerQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetFootballPlayerQuery,
+    GetFootballPlayerQueryVariables
+  >(
+    GetFootballPlayer,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetFootballPlayerQuery,
+          GetFootballPlayerQueryVariables
+        >,
+  );
+}
+export type GetFootballPlayerQueryHookResult = ReturnType<
+  typeof useGetFootballPlayerQuery
+>;
+export type GetFootballPlayerLazyQueryHookResult = ReturnType<
+  typeof useGetFootballPlayerLazyQuery
+>;
+export type GetFootballPlayerSuspenseQueryHookResult = ReturnType<
+  typeof useGetFootballPlayerSuspenseQuery
+>;
+export type GetFootballPlayerQueryResult = Apollo.QueryResult<
+  GetFootballPlayerQuery,
+  GetFootballPlayerQueryVariables
+>;
+export const GetFootballPlayers = gql`
+  query GetFootballPlayers($search: String, $position: String, $after: String) {
+    footballPlayers(search: $search, position: $position, after: $after) {
+      nodes {
+        ...FootballPlayer
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+  ${FootballPlayerFragmentDoc}
+`;
+
+/**
+ * __useGetFootballPlayersQuery__
+ *
+ * To run a query within a React component, call `useGetFootballPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFootballPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFootballPlayersQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *      position: // value for 'position'
+ *      after: // value for 'after'
+ *   },
+ * });
+ */
+export function useGetFootballPlayersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetFootballPlayersQuery,
+    GetFootballPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetFootballPlayersQuery,
+    GetFootballPlayersQueryVariables
+  >(GetFootballPlayers, options);
+}
+export function useGetFootballPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetFootballPlayersQuery,
+    GetFootballPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetFootballPlayersQuery,
+    GetFootballPlayersQueryVariables
+  >(GetFootballPlayers, options);
+}
+export function useGetFootballPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetFootballPlayersQuery,
+        GetFootballPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetFootballPlayersQuery,
+    GetFootballPlayersQueryVariables
+  >(
+    GetFootballPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetFootballPlayersQuery,
+          GetFootballPlayersQueryVariables
+        >,
+  );
+}
+export type GetFootballPlayersQueryHookResult = ReturnType<
+  typeof useGetFootballPlayersQuery
+>;
+export type GetFootballPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetFootballPlayersLazyQuery
+>;
+export type GetFootballPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetFootballPlayersSuspenseQuery
+>;
+export type GetFootballPlayersQueryResult = Apollo.QueryResult<
+  GetFootballPlayersQuery,
+  GetFootballPlayersQueryVariables
 >;
 export const GetLeagueAnalytics = gql`
   query GetLeagueAnalytics($leagueId: Int!) {

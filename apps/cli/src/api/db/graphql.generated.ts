@@ -795,6 +795,105 @@ export type FootballCareerStats = {
   rushing?: Maybe<FootballCareerRushing>;
 };
 
+/** Per-game DST (team defense) stats for a football matchup player */
+export type FootballGameDefenseStats = {
+  __typename?: 'FootballGameDefenseStats';
+  defTd?: Maybe<Scalars['Int']['output']>;
+  fumRec?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  ptsAllowed?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  ydsAllowed?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game IDP (individual defensive player) stats */
+export type FootballGameIdpStats = {
+  __typename?: 'FootballGameIDPStats';
+  astTkl?: Maybe<Scalars['Int']['output']>;
+  defTd?: Maybe<Scalars['Int']['output']>;
+  ff?: Maybe<Scalars['Int']['output']>;
+  fr?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  pd?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  soloTkl?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game kicking stats for a football matchup player */
+export type FootballGameKickingStats = {
+  __typename?: 'FootballGameKickingStats';
+  fga?: Maybe<Scalars['Int']['output']>;
+  fgm?: Maybe<Scalars['Int']['output']>;
+  xpa?: Maybe<Scalars['Int']['output']>;
+  xpm?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game passing stats for a football matchup player */
+export type FootballGamePassingStats = {
+  __typename?: 'FootballGamePassingStats';
+  att?: Maybe<Scalars['Int']['output']>;
+  cmp?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game receiving stats for a football matchup player */
+export type FootballGameReceivingStats = {
+  __typename?: 'FootballGameReceivingStats';
+  rec?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  tgt?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Per-game rushing stats for a football matchup player */
+export type FootballGameRushingStats = {
+  __typename?: 'FootballGameRushingStats';
+  att?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player on a football fantasy team in a matchup */
+export type FootballMatchupPlayer = {
+  __typename?: 'FootballMatchupPlayer';
+  games?: Maybe<Array<FootballMatchupPlayerGame>>;
+  isDst?: Maybe<Scalars['Boolean']['output']>;
+  nflTeam?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  totalPoints?: Maybe<Scalars['Float']['output']>;
+};
+
+/** A single NFL game played by a football matchup player */
+export type FootballMatchupPlayerGame = {
+  __typename?: 'FootballMatchupPlayerGame';
+  defense?: Maybe<FootballGameDefenseStats>;
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  gameDate?: Maybe<Scalars['String']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  idp?: Maybe<FootballGameIdpStats>;
+  kicking?: Maybe<FootballGameKickingStats>;
+  opponent?: Maybe<Scalars['String']['output']>;
+  passing?: Maybe<FootballGamePassingStats>;
+  receiving?: Maybe<FootballGameReceivingStats>;
+  rushing?: Maybe<FootballGameRushingStats>;
+};
+
+/** Stats for one team in a football matchup */
+export type FootballMatchupStats = {
+  __typename?: 'FootballMatchupStats';
+  players?: Maybe<Array<FootballMatchupPlayer>>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  totalPoints?: Maybe<Scalars['Float']['output']>;
+};
+
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
 export type FootballPlayer = {
   __typename?: 'FootballPlayer';

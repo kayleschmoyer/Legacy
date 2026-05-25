@@ -1,0 +1,96 @@
+fragment FootballGamePassingStats on FootballGamePassingStats {
+  att
+  cmp
+  yds
+  td
+  int
+}
+
+fragment FootballGameRushingStats on FootballGameRushingStats {
+  att
+  yds
+  td
+}
+
+fragment FootballGameReceivingStats on FootballGameReceivingStats {
+  tgt
+  rec
+  yds
+  td
+}
+
+fragment FootballGameKickingStats on FootballGameKickingStats {
+  fgm
+  fga
+  xpm
+  xpa
+}
+
+fragment FootballGameDefenseStats on FootballGameDefenseStats {
+  sacks
+  int
+  fumRec
+  defTd
+  ptsAllowed
+  ydsAllowed
+  safeties
+}
+
+fragment FootballGameIDPStats on FootballGameIDPStats {
+  soloTkl
+  astTkl
+  sacks
+  int
+  pd
+  ff
+  fr
+  defTd
+  safeties
+}
+
+fragment FootballMatchupPlayerGame on FootballMatchupPlayerGame {
+  gameNum
+  gameIdentifier
+  gameDate
+  opponent
+  fantasyPoints
+  passing {
+    ...FootballGamePassingStats
+  }
+  rushing {
+    ...FootballGameRushingStats
+  }
+  receiving {
+    ...FootballGameReceivingStats
+  }
+  kicking {
+    ...FootballGameKickingStats
+  }
+  defense {
+    ...FootballGameDefenseStats
+  }
+  idp {
+    ...FootballGameIDPStats
+  }
+}
+
+fragment FootballMatchupPlayer on FootballMatchupPlayer {
+  playerId
+  playerName
+  position
+  isDst
+  nflTeam
+  totalPoints
+  games {
+    ...FootballMatchupPlayerGame
+  }
+}
+
+fragment FootballMatchupStats on FootballMatchupStats {
+  teamId
+  teamName
+  totalPoints
+  players {
+    ...FootballMatchupPlayer
+  }
+}

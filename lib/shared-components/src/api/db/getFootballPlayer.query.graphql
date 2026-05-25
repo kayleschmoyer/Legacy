@@ -1,0 +1,63 @@
+#import "./footballPlayer.fragment.graphql"
+#import "./footballSeasonStats.fragment.graphql"
+
+query GetFootballPlayer($id: Int!, $season: Int) {
+  footballPlayer(id: $id) {
+    ...FootballPlayer
+    seasonStats(season: $season) {
+      ...FootballPlayerSeasonStats
+    }
+    careerStats {
+      passing {
+        g
+        cmp
+        att
+        yds
+        td
+        int
+        rating
+      }
+      rushing {
+        g
+        att
+        yds
+        td
+      }
+      receiving {
+        g
+        rec
+        tgt
+        yds
+        td
+      }
+      kicking {
+        g
+        fgm
+        fga
+        xpm
+        xpa
+      }
+      defense {
+        g
+        sacks
+        int
+        fumRec
+        defTd
+        ptsAllowedPerG
+        ydsAllowedPerG
+      }
+      idp {
+        g
+        soloTkl
+        astTkl
+        sacks
+        int
+        pd
+        ff
+        fr
+        defTd
+        safeties
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+fragment FootballSeasonPassingStats on FootballSeasonPassing {
+  season
+  team
+  g
+  gs
+  cmp
+  att
+  yds
+  td
+  int
+  rating
+}
+
+fragment FootballSeasonRushingStats on FootballSeasonRushing {
+  season
+  team
+  g
+  att
+  yds
+  td
+}
+
+fragment FootballSeasonReceivingStats on FootballSeasonReceiving {
+  season
+  team
+  g
+  tgt
+  rec
+  yds
+  td
+}
+
+fragment FootballSeasonKickingStats on FootballSeasonKicking {
+  season
+  team
+  g
+  fgm
+  fga
+  xpm
+  xpa
+}
+
+fragment FootballSeasonDefenseStats on FootballSeasonDefense {
+  season
+  team
+  g
+  sacks
+  int
+  fumRec
+  defTd
+  ptsAllowed
+}
+
+fragment FootballSeasonDefenseIdpStats on FootballSeasonDefenseIdp {
+  season
+  team
+  g
+  soloTkl
+  astTkl
+  sacks
+  int
+  pd
+  ff
+  fr
+  defTd
+  safeties
+}
+
+fragment FootballPlayerSeasonStats on FootballPlayerSeasonStats {
+  passing {
+    ...FootballSeasonPassingStats
+  }
+  rushing {
+    ...FootballSeasonRushingStats
+  }
+  receiving {
+    ...FootballSeasonReceivingStats
+  }
+  kicking {
+    ...FootballSeasonKickingStats
+  }
+  defense {
+    ...FootballSeasonDefenseStats
+  }
+  idp {
+    ...FootballSeasonDefenseIdpStats
+  }
+}

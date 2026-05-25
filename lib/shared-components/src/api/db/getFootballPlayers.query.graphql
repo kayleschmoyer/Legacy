@@ -1,0 +1,13 @@
+#import "./footballPlayer.fragment.graphql"
+
+query GetFootballPlayers($search: String, $position: String, $after: String) {
+  footballPlayers(search: $search, position: $position, after: $after) {
+    nodes {
+      ...FootballPlayer
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

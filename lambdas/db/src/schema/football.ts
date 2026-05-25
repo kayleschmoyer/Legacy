@@ -9,6 +9,7 @@
  * Season stats tables (LS-247): football_season_passing/rushing/receiving/kicking/defense.
  * IDP season stats (LS-4155): football_season_defense_idp + career_football_defense_idp view.
  * Career stat tables (LS-250): career_football_passing/rushing/receiving/kicking/defense.
+ * Matchup game-level stat types (LS-4765): used by LS-4151 matchup resolver.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, eq, gt, ilike, or, SQL } from 'drizzle-orm';
@@ -1147,3 +1148,276 @@ builder.queryField('footballPlayer', (t) =>
     },
   }),
 );
+
+// ── Game-level stat types (matchup player game display, LS-4765) ──────────────
+
+export const FootballGamePassingStatsRef = builder.objectRef<{
+  cmp: number | null;
+  att: number | null;
+  yds: number | null;
+  td: number | null;
+  int: number | null;
+}>('FootballGamePassingStats');
+
+FootballGamePassingStatsRef.implement({
+  description: 'Per-game passing stats for a football matchup player',
+  fields: (t) => ({
+    cmp: t.exposeInt('cmp', { nullable: true }),
+    att: t.exposeInt('att', { nullable: true }),
+    yds: t.exposeInt('yds', { nullable: true }),
+    td: t.exposeInt('td', { nullable: true }),
+    int: t.exposeInt('int', { nullable: true }),
+  }),
+});
+
+export const FootballGameRushingStatsRef = builder.objectRef<{
+  att: number | null;
+  yds: number | null;
+  td: number | null;
+}>('FootballGameRushingStats');
+
+FootballGameRushingStatsRef.implement({
+  description: 'Per-game rushing stats for a football matchup player',
+  fields: (t) => ({
+    att: t.exposeInt('att', { nullable: true }),
+    yds: t.exposeInt('yds', { nullable: true }),
+    td: t.exposeInt('td', { nullable: true }),
+  }),
+});
+
+export const FootballGameReceivingStatsRef = builder.objectRef<{
+  rec: number | null;
+  tgt: number | null;
+  yds: number | null;
+  td: number | null;
+}>('FootballGameReceivingStats');
+
+FootballGameReceivingStatsRef.implement({
+  description: 'Per-game receiving stats for a football matchup player',
+  fields: (t) => ({
+    rec: t.exposeInt('rec', { nullable: true }),
+    tgt: t.exposeInt('tgt', { nullable: true }),
+    yds: t.exposeInt('yds', { nullable: true }),
+    td: t.exposeInt('td', { nullable: true }),
+  }),
+});
+
+export const FootballGameKickingStatsRef = builder.objectRef<{
+  fgm: number | null;
+  fga: number | null;
+  xpm: number | null;
+  xpa: number | null;
+}>('FootballGameKickingStats');
+
+FootballGameKickingStatsRef.implement({
+  description: 'Per-game kicking stats for a football matchup player',
+  fields: (t) => ({
+    fgm: t.exposeInt('fgm', { nullable: true }),
+    fga: t.exposeInt('fga', { nullable: true }),
+    xpm: t.exposeInt('xpm', { nullable: true }),
+    xpa: t.exposeInt('xpa', { nullable: true }),
+  }),
+});
+
+export const FootballGameDefenseStatsRef = builder.objectRef<{
+  sacks: number | null;
+  int: number | null;
+  fumRec: number | null;
+  defTd: number | null;
+  safeties: number | null;
+  ptsAllowed: number | null;
+  ydsAllowed: number | null;
+}>('FootballGameDefenseStats');
+
+FootballGameDefenseStatsRef.implement({
+  description:
+    'Per-game DST (team defense) stats for a football matchup player',
+  fields: (t) => ({
+    sacks: t.exposeFloat('sacks', { nullable: true }),
+    int: t.exposeInt('int', { nullable: true }),
+    fumRec: t.exposeInt('fumRec', { nullable: true }),
+    defTd: t.exposeInt('defTd', { nullable: true }),
+    safeties: t.exposeInt('safeties', { nullable: true }),
+    ptsAllowed: t.exposeInt('ptsAllowed', { nullable: true }),
+    ydsAllowed: t.exposeInt('ydsAllowed', { nullable: true }),
+  }),
+});
+
+export const FootballGameIDPStatsRef = builder.objectRef<{
+  soloTkl: number | null;
+  astTkl: number | null;
+  sacks: number | null;
+  int: number | null;
+  pd: number | null;
+  ff: number | null;
+  fr: number | null;
+  defTd: number | null;
+  safeties: number | null;
+}>('FootballGameIDPStats');
+
+FootballGameIDPStatsRef.implement({
+  description: 'Per-game IDP (individual defensive player) stats',
+  fields: (t) => ({
+    soloTkl: t.exposeInt('soloTkl', { nullable: true }),
+    astTkl: t.exposeInt('astTkl', { nullable: true }),
+    sacks: t.exposeFloat('sacks', { nullable: true }),
+    int: t.exposeInt('int', { nullable: true }),
+    pd: t.exposeInt('pd', { nullable: true }),
+    ff: t.exposeInt('ff', { nullable: true }),
+    fr: t.exposeInt('fr', { nullable: true }),
+    defTd: t.exposeInt('defTd', { nullable: true }),
+    safeties: t.exposeInt('safeties', { nullable: true }),
+  }),
+});
+
+// ── Matchup player game type ──────────────────────────────────────────────────
+
+export interface FootballMatchupPlayerGameShape {
+  gameNum: number;
+  gameIdentifier: string;
+  opponent: string | null;
+  gameDate: string | null;
+  passing: {
+    cmp: number | null;
+    att: number | null;
+    yds: number | null;
+    td: number | null;
+    int: number | null;
+  } | null;
+  rushing: { att: number | null; yds: number | null; td: number | null } | null;
+  receiving: {
+    rec: number | null;
+    tgt: number | null;
+    yds: number | null;
+    td: number | null;
+  } | null;
+  kicking: {
+    fgm: number | null;
+    fga: number | null;
+    xpm: number | null;
+    xpa: number | null;
+  } | null;
+  defense: {
+    sacks: number | null;
+    int: number | null;
+    fumRec: number | null;
+    defTd: number | null;
+    safeties: number | null;
+    ptsAllowed: number | null;
+    ydsAllowed: number | null;
+  } | null;
+  idp: {
+    soloTkl: number | null;
+    astTkl: number | null;
+    sacks: number | null;
+    int: number | null;
+    pd: number | null;
+    ff: number | null;
+    fr: number | null;
+    defTd: number | null;
+    safeties: number | null;
+  } | null;
+  fantasyPoints: number;
+}
+
+export const FootballMatchupPlayerGameRef =
+  builder.objectRef<FootballMatchupPlayerGameShape>(
+    'FootballMatchupPlayerGame',
+  );
+
+FootballMatchupPlayerGameRef.implement({
+  description: 'A single NFL game played by a football matchup player',
+  fields: (t) => ({
+    gameNum: t.exposeInt('gameNum'),
+    gameIdentifier: t.exposeString('gameIdentifier'),
+    opponent: t.exposeString('opponent', { nullable: true }),
+    gameDate: t.exposeString('gameDate', { nullable: true }),
+    passing: t.field({
+      type: FootballGamePassingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.passing ?? null,
+    }),
+    rushing: t.field({
+      type: FootballGameRushingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.rushing ?? null,
+    }),
+    receiving: t.field({
+      type: FootballGameReceivingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.receiving ?? null,
+    }),
+    kicking: t.field({
+      type: FootballGameKickingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.kicking ?? null,
+    }),
+    defense: t.field({
+      type: FootballGameDefenseStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.defense ?? null,
+    }),
+    idp: t.field({
+      type: FootballGameIDPStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.idp ?? null,
+    }),
+    fantasyPoints: t.exposeFloat('fantasyPoints'),
+  }),
+});
+
+// ── Matchup player type ───────────────────────────────────────────────────────
+
+export interface FootballMatchupPlayerShape {
+  playerId: number;
+  playerName: string;
+  position: string;
+  nflTeam: string | null;
+  isDst: boolean;
+  games: FootballMatchupPlayerGameShape[];
+  totalPoints: number;
+}
+
+export const FootballMatchupPlayerRef =
+  builder.objectRef<FootballMatchupPlayerShape>('FootballMatchupPlayer');
+
+FootballMatchupPlayerRef.implement({
+  description: 'A player on a football fantasy team in a matchup',
+  fields: (t) => ({
+    playerId: t.exposeInt('playerId'),
+    playerName: t.exposeString('playerName'),
+    position: t.exposeString('position'),
+    nflTeam: t.exposeString('nflTeam', { nullable: true }),
+    isDst: t.exposeBoolean('isDst'),
+    games: t.field({
+      type: [FootballMatchupPlayerGameRef],
+      resolve: (parent) => parent.games,
+    }),
+    totalPoints: t.exposeFloat('totalPoints'),
+  }),
+});
+
+// ── Matchup stats type ────────────────────────────────────────────────────────
+
+export interface FootballMatchupStatsShape {
+  teamId: number;
+  teamName: string;
+  totalPoints: number;
+  players: FootballMatchupPlayerShape[];
+}
+
+export const FootballMatchupStatsRef =
+  builder.objectRef<FootballMatchupStatsShape>('FootballMatchupStats');
+
+FootballMatchupStatsRef.implement({
+  description: 'Stats for one team in a football matchup',
+  fields: (t) => ({
+    teamId: t.exposeInt('teamId'),
+    teamName: t.exposeString('teamName'),
+    totalPoints: t.exposeFloat('totalPoints'),
+    players: t.field({
+      type: [FootballMatchupPlayerRef],
+      resolve: (parent) => parent.players,
+    }),
+  }),
+});
