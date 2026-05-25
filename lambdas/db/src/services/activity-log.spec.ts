@@ -114,6 +114,33 @@ describe('logDraftPickActivity', () => {
     expect(mockError).not.toHaveBeenCalled();
   });
 
+  it('logs warn (not error) and does not throw when insert fails', async () => {
+    const dbError = new Error('connection pool exhausted');
+    const values = jest.fn().mockRejectedValue(dbError);
+    const insert = jest.fn().mockReturnValue({ values });
+    const context = {
+      db: {
+        select: jest
+          .fn()
+          .mockReturnValueOnce(
+            makeSelectChain([{ firstName: 'Mike', lastName: 'Trout' }]),
+          )
+          .mockReturnValueOnce(makeSelectChain([{ name: 'Angels' }])),
+        insert,
+      },
+    };
+
+    await expect(
+      logDraftPickActivity(context as never, baseData),
+    ).resolves.toBeUndefined();
+    expect(mockWarn).toHaveBeenCalledWith(
+      'Failed to insert activity log entry',
+      dbError,
+      expect.objectContaining({ eventType: 'draft_pick_made', leagueId: 1 }),
+    );
+    expect(mockError).not.toHaveBeenCalled();
+  });
+
   it('omits teamName from payload when teamId is null', async () => {
     const { insert, values } = makeInsertChain();
     const context = {

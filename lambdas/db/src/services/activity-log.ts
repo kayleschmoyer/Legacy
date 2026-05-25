@@ -37,11 +37,11 @@ export async function insertActivityLog(
       payload: data.payload ?? {},
     });
   } catch (err) {
-    LOGGER.error('Failed to insert activity log entry', {
-      eventType: data.eventType,
-      leagueId: data.leagueId,
-      err: err instanceof Error ? err.message : String(err),
-    });
+    LOGGER.warn(
+      'Failed to insert activity log entry',
+      err instanceof Error ? err : new Error(String(err)),
+      { eventType: data.eventType, leagueId: data.leagueId },
+    );
   }
 }
 
