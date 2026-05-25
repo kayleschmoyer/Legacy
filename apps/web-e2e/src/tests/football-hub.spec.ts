@@ -636,6 +636,13 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
   test('/football/league/create is pre-selected to football sport', async ({
     page,
   }) => {
+    // football_enabled flag is not configured in CI (no VITE_GROWTHBOOK_CLIENT_KEY),
+    // so seed it before the bundle loads to make the sport tab visible.
+    await page.addInitScript(() => {
+      (window as Record<string, unknown>)['__gbSeededFeatures'] = {
+        football_enabled: { defaultValue: true },
+      };
+    });
     await page.goto('/football/league/create');
     await page.waitForLoadState('networkidle');
 

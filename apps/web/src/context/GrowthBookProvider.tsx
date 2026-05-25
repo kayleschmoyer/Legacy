@@ -19,6 +19,7 @@
 
 import { type ReactNode, useEffect } from 'react';
 import {
+  type FeatureDefinition,
   GrowthBookProvider as GBProvider,
   GrowthBook,
 } from '@growthbook/growthbook-react';
@@ -28,11 +29,21 @@ import { env } from '../config/environment';
 // Re-export hooks so consumers have a single import path if desired
 export { useFeatureIsOn, useFeatureValue } from '@growthbook/growthbook-react';
 
+// Allow E2E tests to pre-seed features via window.__gbSeededFeatures (set via
+// Playwright addInitScript before navigation). No-op in production where the
+// property is never set.
+const seededFeatures = (
+  typeof globalThis !== 'undefined'
+    ? (globalThis as Record<string, unknown>)['__gbSeededFeatures']
+    : undefined
+) as Record<string, FeatureDefinition> | undefined;
+
 // Singleton GrowthBook instance — created once at module load
 export const growthbook = new GrowthBook({
   apiHost: 'https://cdn.growthbook.io',
   clientKey: env.growthbookClientKey ?? '',
   enableDevMode: env.isDev,
+  features: seededFeatures,
   trackingCallback: (experiment, result) => {
     // Report to GA4 so experiment results can be analyzed in GA4 Explorations
     if (window.gtag && env.googleAnalyticsMeasurementId) {

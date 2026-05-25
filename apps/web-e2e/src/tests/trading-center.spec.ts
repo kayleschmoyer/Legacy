@@ -260,7 +260,7 @@ test.describe('Trades tab — sections @critical', () => {
 
   test('shows "Pending Trade Offers" section heading', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Pending Trade Offers' }),
+      page.getByRole('heading', { name: 'Pending Trade Offers', exact: true }),
     ).toBeVisible();
   });
 
