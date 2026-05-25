@@ -470,9 +470,9 @@ export function PublicLandingPage(): React.JSX.Element {
         });
         setIsConfigured(true);
       } catch (error) {
-        LOGGER.error(
+        LOGGER.warn(
           'Failed to configure OAuth on landing page:',
-          String(error),
+          error instanceof Error ? error : String(error),
         );
       } finally {
         setIsConfiguring(false);

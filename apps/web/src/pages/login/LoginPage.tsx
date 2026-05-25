@@ -271,7 +271,10 @@ export function LoginPage(): React.JSX.Element {
         });
         setIsConfigured(true);
       } catch (error) {
-        LOGGER.error('Failed to configure OAuth on login page:', String(error));
+        LOGGER.warn(
+          'Failed to configure OAuth on login page:',
+          error instanceof Error ? error : String(error),
+        );
       } finally {
         setIsConfiguring(false);
       }

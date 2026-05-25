@@ -118,7 +118,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         // Start entrance animation with simple visibility
         setTimeout(() => setIsVisible(true), 100);
       } catch (error) {
-        LOGGER.error('Failed to configure OAuth:', String(error));
+        LOGGER.warn(
+          'Failed to configure OAuth:',
+          error instanceof Error ? error : String(error),
+        );
         setErrorMessage('Failed to initialize authentication');
         onError?.(
           error instanceof Error ? error : new Error('Configuration failed'),
