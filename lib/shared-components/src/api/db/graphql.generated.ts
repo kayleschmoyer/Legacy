@@ -415,6 +415,7 @@ export type CreateLeagueAndTeamsInput = {
   auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  defensiveFormat?: InputMaybe<DefensiveFormat>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;
@@ -487,6 +488,12 @@ export type DataRequest = {
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
+
+/** Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). */
+export enum DefensiveFormat {
+  Dst = 'dst',
+  Idp = 'idp',
+}
 
 export type DeviceToken = {
   __typename?: 'DeviceToken';
@@ -701,6 +708,253 @@ export type ExpireSubscriptionGracePeriodsResult = {
   expired?: Maybe<Scalars['Int']['output']>;
 };
 
+export type FootballCareerDefense = {
+  __typename?: 'FootballCareerDefense';
+  defTd?: Maybe<Scalars['Int']['output']>;
+  fumRec?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  ptsAllowedPerG?: Maybe<Scalars['Float']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  ydsAllowedPerG?: Maybe<Scalars['Float']['output']>;
+};
+
+/** Career IDP totals aggregated from season_defense_idp (LS-4155) */
+export type FootballCareerIdp = {
+  __typename?: 'FootballCareerIdp';
+  astTkl?: Maybe<Scalars['Int']['output']>;
+  defTd?: Maybe<Scalars['Int']['output']>;
+  ff?: Maybe<Scalars['Int']['output']>;
+  fr?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  pd?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  soloTkl?: Maybe<Scalars['Int']['output']>;
+  totalTkl?: Maybe<Scalars['Int']['output']>;
+};
+
+export type FootballCareerKicking = {
+  __typename?: 'FootballCareerKicking';
+  fg019a?: Maybe<Scalars['Int']['output']>;
+  fg019m?: Maybe<Scalars['Int']['output']>;
+  fg50a?: Maybe<Scalars['Int']['output']>;
+  fg50m?: Maybe<Scalars['Int']['output']>;
+  fg2029a?: Maybe<Scalars['Int']['output']>;
+  fg2029m?: Maybe<Scalars['Int']['output']>;
+  fg3039a?: Maybe<Scalars['Int']['output']>;
+  fg3039m?: Maybe<Scalars['Int']['output']>;
+  fg4049a?: Maybe<Scalars['Int']['output']>;
+  fg4049m?: Maybe<Scalars['Int']['output']>;
+  fga?: Maybe<Scalars['Int']['output']>;
+  fgm?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  xpa?: Maybe<Scalars['Int']['output']>;
+  xpm?: Maybe<Scalars['Int']['output']>;
+};
+
+export type FootballCareerPassing = {
+  __typename?: 'FootballCareerPassing';
+  att?: Maybe<Scalars['Int']['output']>;
+  cmp?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  rating?: Maybe<Scalars['Float']['output']>;
+  sackYds?: Maybe<Scalars['Int']['output']>;
+  sacked?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+export type FootballCareerReceiving = {
+  __typename?: 'FootballCareerReceiving';
+  fumbles?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  rec?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  tgt?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+export type FootballCareerRushing = {
+  __typename?: 'FootballCareerRushing';
+  att?: Maybe<Scalars['Int']['output']>;
+  fumbles?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Career stat totals across all stat categories (LS-250, LS-4155) */
+export type FootballCareerStats = {
+  __typename?: 'FootballCareerStats';
+  defense?: Maybe<FootballCareerDefense>;
+  idp?: Maybe<FootballCareerIdp>;
+  kicking?: Maybe<FootballCareerKicking>;
+  passing?: Maybe<FootballCareerPassing>;
+  receiving?: Maybe<FootballCareerReceiving>;
+  rushing?: Maybe<FootballCareerRushing>;
+};
+
+/** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
+export type FootballPlayer = {
+  __typename?: 'FootballPlayer';
+  careerStats?: Maybe<FootballCareerStats>;
+  firstName: Scalars['String']['output'];
+  id: Scalars['Int']['output'];
+  isDst: Scalars['Boolean']['output'];
+  lastName: Scalars['String']['output'];
+  nflTeam?: Maybe<Scalars['String']['output']>;
+  pfrId?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  seasonStats?: Maybe<FootballPlayerSeasonStats>;
+};
+
+/** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
+export type FootballPlayerSeasonStatsArgs = {
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** All season stats across stat categories for a football player (LS-255) */
+export type FootballPlayerSeasonStats = {
+  __typename?: 'FootballPlayerSeasonStats';
+  defense?: Maybe<Array<FootballSeasonDefense>>;
+  idp?: Maybe<Array<FootballSeasonDefenseIdp>>;
+  kicking?: Maybe<Array<FootballSeasonKicking>>;
+  passing?: Maybe<Array<FootballSeasonPassing>>;
+  receiving?: Maybe<Array<FootballSeasonReceiving>>;
+  rushing?: Maybe<Array<FootballSeasonRushing>>;
+};
+
+/** Cursor-paginated list of football players (LS-255) */
+export type FootballPlayersConnection = {
+  __typename?: 'FootballPlayersConnection';
+  nodes: Array<FootballPlayer>;
+  pageInfo: FootballPlayersPageInfo;
+};
+
+export type FootballPlayersPageInfo = {
+  __typename?: 'FootballPlayersPageInfo';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage: Scalars['Boolean']['output'];
+};
+
+/** Season DST (team defense/special teams) stats for a football player (LS-247) */
+export type FootballSeasonDefense = {
+  __typename?: 'FootballSeasonDefense';
+  defTd?: Maybe<Scalars['Int']['output']>;
+  fumRec?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  passYdsAllowed?: Maybe<Scalars['Int']['output']>;
+  ptsAllowed?: Maybe<Scalars['Int']['output']>;
+  rushYdsAllowed?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  ydsAllowed?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Season individual defensive player (IDP) stats for a football player (LS-4155) */
+export type FootballSeasonDefenseIdp = {
+  __typename?: 'FootballSeasonDefenseIdp';
+  astTkl?: Maybe<Scalars['Int']['output']>;
+  defTd?: Maybe<Scalars['Int']['output']>;
+  ff?: Maybe<Scalars['Int']['output']>;
+  fr?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gs?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  pd?: Maybe<Scalars['Int']['output']>;
+  sacks?: Maybe<Scalars['Float']['output']>;
+  safeties?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  soloTkl?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  totalTkl?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Season kicking stats for a football player (LS-247) */
+export type FootballSeasonKicking = {
+  __typename?: 'FootballSeasonKicking';
+  fg019a?: Maybe<Scalars['Int']['output']>;
+  fg019m?: Maybe<Scalars['Int']['output']>;
+  fg50a?: Maybe<Scalars['Int']['output']>;
+  fg50m?: Maybe<Scalars['Int']['output']>;
+  fg2029a?: Maybe<Scalars['Int']['output']>;
+  fg2029m?: Maybe<Scalars['Int']['output']>;
+  fg3039a?: Maybe<Scalars['Int']['output']>;
+  fg3039m?: Maybe<Scalars['Int']['output']>;
+  fg4049a?: Maybe<Scalars['Int']['output']>;
+  fg4049m?: Maybe<Scalars['Int']['output']>;
+  fgPct?: Maybe<Scalars['Float']['output']>;
+  fga?: Maybe<Scalars['Int']['output']>;
+  fgm?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  xpa?: Maybe<Scalars['Int']['output']>;
+  xpm?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Season passing stats for a football player (LS-247) */
+export type FootballSeasonPassing = {
+  __typename?: 'FootballSeasonPassing';
+  att?: Maybe<Scalars['Int']['output']>;
+  cmp?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gs?: Maybe<Scalars['Int']['output']>;
+  int?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  rating?: Maybe<Scalars['Float']['output']>;
+  sackYds?: Maybe<Scalars['Int']['output']>;
+  sacked?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Season receiving stats for a football player (LS-247) */
+export type FootballSeasonReceiving = {
+  __typename?: 'FootballSeasonReceiving';
+  firstDowns?: Maybe<Scalars['Int']['output']>;
+  fumbles?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gs?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  rec?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  tgt?: Maybe<Scalars['Int']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+  ydsPerRec?: Maybe<Scalars['Float']['output']>;
+};
+
+/** Season rushing stats for a football player (LS-247) */
+export type FootballSeasonRushing = {
+  __typename?: 'FootballSeasonRushing';
+  att?: Maybe<Scalars['Int']['output']>;
+  firstDowns?: Maybe<Scalars['Int']['output']>;
+  fumbles?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gs?: Maybe<Scalars['Int']['output']>;
+  lng?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  td?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  yds?: Maybe<Scalars['Int']['output']>;
+  ydsPerAtt?: Maybe<Scalars['Float']['output']>;
+};
+
 export type ForceAddPlayerInput = {
   leagueId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
@@ -854,6 +1108,8 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   customEraEndYear?: Maybe<Scalars['Int']['output']>;
   customEraStartYear?: Maybe<Scalars['Int']['output']>;
+  /** Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). (LS-246) */
+  defensiveFormat?: Maybe<DefensiveFormat>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
@@ -2394,6 +2650,10 @@ export type Query = {
   donationPaymentLink?: Maybe<DonationPaymentLinkResult>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
+  /** Fetch a single football player by ID (LS-255) */
+  footballPlayer?: Maybe<FootballPlayer>;
+  /** Paginated list of football players, optionally filtered by position (LS-255) */
+  footballPlayers?: Maybe<FootballPlayersConnection>;
   freeAgents?: Maybe<Array<Player>>;
   /** Detailed state for a single MLB game by its primary key (gamePk). Returns null until LS-1864 delivers @legacy-sports/mlb-client. */
   game?: Maybe<ScoreboardGame>;
@@ -2621,6 +2881,17 @@ export type QueryCommissionerAuditLogsArgs = {
 
 export type QueryDisclosureGameSessionArgs = {
   sessionId: Scalars['Int']['input'];
+};
+
+export type QueryFootballPlayerArgs = {
+  id: Scalars['Int']['input'];
+};
+
+export type QueryFootballPlayersArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryFreeAgentsArgs = {

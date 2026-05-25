@@ -2,8 +2,38 @@ import { and, count, eq, ilike, inArray, ne, or, sql, SQL } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicDb, PublicSchema } from '../client/PublicDbClient';
-import { Player } from '../../types/DatabaseTypes';
+import { Player, PlayerPosition } from '../../types/DatabaseTypes';
 import { PlayerCareerScore } from '../../types/ScoringTypes';
+
+const VALID_PLAYER_POSITIONS: ReadonlyArray<PlayerPosition> = [
+  'SP',
+  'RP',
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'RF',
+  'LF',
+  'CF',
+  'DH',
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DL',
+  'LB',
+  'DB',
+  'DST',
+] as const;
+
+function toPlayerPosition(value: string | null): PlayerPosition | null {
+  if (value == null) return null;
+  return (VALID_PLAYER_POSITIONS as ReadonlyArray<string>).includes(value)
+    ? (value as PlayerPosition)
+    : null;
+}
 
 /** Shape of rows returned by the compute_career_scores raw SQL query */
 interface ScoringResultRow {
@@ -39,6 +69,7 @@ interface ScoringResultRow {
   pfr_id: string | null;
   is_dst: boolean;
   nfl_team: string | null;
+  position: string | null;
 }
 
 export interface PlayerFilters {
@@ -555,7 +586,7 @@ export class PlayerService {
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             p.bat_hand, p.throw_hand,
-            p.sport, p.pfr_id, p.is_dst, p.nfl_team,
+            p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
             ${fieldingScoreExpr} AS fielding_score,
@@ -603,6 +634,7 @@ export class PlayerService {
           pfrId: row.pfr_id ?? null,
           isDst: row.is_dst ?? false,
           nflTeam: row.nfl_team ?? null,
+          position: toPlayerPosition(row.position),
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

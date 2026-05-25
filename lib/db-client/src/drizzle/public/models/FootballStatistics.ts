@@ -311,6 +311,208 @@ export const gameFootballDefenseIdp = pgTable(
   }),
 );
 
+// ── Football season stat tables (LS-247) ────────────────────────────────────
+
+export const footballSeasonPassing = pgTable(
+  'football_season_passing',
+  {
+    playerId: integer('player_id').notNull(),
+    season: smallint('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    g: smallint('g'),
+    gs: smallint('gs'),
+    cmp: smallint('cmp'),
+    att: smallint('att'),
+    yds: integer('yds'),
+    td: smallint('td'),
+    int: smallint('int'),
+    firstDowns: smallint('first_downs'),
+    sacked: smallint('sacked'),
+    sackYds: smallint('sack_yds'),
+    lng: smallint('lng'),
+    rating: numeric('rating', { precision: 5, scale: 1 }),
+    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.playerId, table.season, table.team, table.pfrRowId],
+      name: 'football_season_passing_pk',
+    }),
+    playerIdIdx: index('football_season_passing_player_id_idx').on(
+      table.playerId,
+    ),
+    playerSeasonIdx: index('football_season_passing_player_season_idx').on(
+      table.playerId,
+      table.season,
+    ),
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'football_season_passing_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const footballSeasonRushing = pgTable(
+  'football_season_rushing',
+  {
+    playerId: integer('player_id').notNull(),
+    season: smallint('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    g: smallint('g'),
+    gs: smallint('gs'),
+    att: smallint('att'),
+    yds: integer('yds'),
+    td: smallint('td'),
+    lng: smallint('lng'),
+    firstDowns: smallint('first_downs'),
+    fumbles: smallint('fumbles'),
+    ydsPerAtt: numeric('yds_per_att', { precision: 4, scale: 1 }),
+    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.playerId, table.season, table.team, table.pfrRowId],
+      name: 'football_season_rushing_pk',
+    }),
+    playerIdIdx: index('football_season_rushing_player_id_idx').on(
+      table.playerId,
+    ),
+    playerSeasonIdx: index('football_season_rushing_player_season_idx').on(
+      table.playerId,
+      table.season,
+    ),
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'football_season_rushing_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const footballSeasonReceiving = pgTable(
+  'football_season_receiving',
+  {
+    playerId: integer('player_id').notNull(),
+    season: smallint('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    g: smallint('g'),
+    gs: smallint('gs'),
+    rec: smallint('rec'),
+    tgt: smallint('tgt'),
+    yds: integer('yds'),
+    td: smallint('td'),
+    lng: smallint('lng'),
+    firstDowns: smallint('first_downs'),
+    fumbles: smallint('fumbles'),
+    ydsPerRec: numeric('yds_per_rec', { precision: 4, scale: 1 }),
+    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.playerId, table.season, table.team, table.pfrRowId],
+      name: 'football_season_receiving_pk',
+    }),
+    playerIdIdx: index('football_season_receiving_player_id_idx').on(
+      table.playerId,
+    ),
+    playerSeasonIdx: index('football_season_receiving_player_season_idx').on(
+      table.playerId,
+      table.season,
+    ),
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'football_season_receiving_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const footballSeasonKicking = pgTable(
+  'football_season_kicking',
+  {
+    playerId: integer('player_id').notNull(),
+    season: smallint('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    g: smallint('g'),
+    fgm: smallint('fgm'),
+    fga: smallint('fga'),
+    fgPct: numeric('fg_pct', { precision: 4, scale: 1 }),
+    fg019m: smallint('fg_0_19m'),
+    fg019a: smallint('fg_0_19a'),
+    fg2029m: smallint('fg_20_29m'),
+    fg2029a: smallint('fg_20_29a'),
+    fg3039m: smallint('fg_30_39m'),
+    fg3039a: smallint('fg_30_39a'),
+    fg4049m: smallint('fg_40_49m'),
+    fg4049a: smallint('fg_40_49a'),
+    fg50m: smallint('fg_50m'),
+    fg50a: smallint('fg_50a'),
+    xpm: smallint('xpm'),
+    xpa: smallint('xpa'),
+    lng: smallint('lng'),
+    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.playerId, table.season, table.team, table.pfrRowId],
+      name: 'football_season_kicking_pk',
+    }),
+    playerIdIdx: index('football_season_kicking_player_id_idx').on(
+      table.playerId,
+    ),
+    playerSeasonIdx: index('football_season_kicking_player_season_idx').on(
+      table.playerId,
+      table.season,
+    ),
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'football_season_kicking_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const footballSeasonDefense = pgTable(
+  'football_season_defense',
+  {
+    playerId: integer('player_id').notNull(),
+    season: smallint('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    g: smallint('g'),
+    sacks: numeric('sacks', { precision: 5, scale: 1 }),
+    int: smallint('int'),
+    fumRec: smallint('fum_rec'),
+    defTd: smallint('def_td'),
+    safeties: smallint('safeties'),
+    ptsAllowed: smallint('pts_allowed'),
+    ydsAllowed: integer('yds_allowed'),
+    passYdsAllowed: integer('pass_yds_allowed'),
+    rushYdsAllowed: integer('rush_yds_allowed'),
+    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.playerId, table.season, table.team, table.pfrRowId],
+      name: 'football_season_defense_pk',
+    }),
+    playerIdIdx: index('football_season_defense_player_id_idx').on(
+      table.playerId,
+    ),
+    playerSeasonIdx: index('football_season_defense_player_season_idx').on(
+      table.playerId,
+      table.season,
+    ),
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'football_season_defense_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+// ── IDP season stats (LS-4155) ───────────────────────────────────────────────
+
 export const footballSeasonDefenseIdp = pgTable(
   'football_season_defense_idp',
   {
@@ -347,6 +549,124 @@ export const footballSeasonDefenseIdp = pgTable(
     playerIdSeasonIdx: index(
       'football_season_defense_idp_player_id_season_idx',
     ).on(table.playerId, table.season),
+  }),
+);
+
+// ── Football career stat tables (LS-250) ────────────────────────────────────
+
+export const careerFootballPassing = pgTable(
+  'career_football_passing',
+  {
+    playerId: integer('player_id').primaryKey().notNull(),
+    g: smallint('g'),
+    cmp: smallint('cmp'),
+    att: smallint('att'),
+    yds: integer('yds'),
+    td: smallint('td'),
+    int: smallint('int'),
+    sacked: smallint('sacked'),
+    sackYds: smallint('sack_yds'),
+    rating: numeric('rating', { precision: 5, scale: 1 }),
+  },
+  (table) => ({
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'career_football_passing_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const careerFootballRushing = pgTable(
+  'career_football_rushing',
+  {
+    playerId: integer('player_id').primaryKey().notNull(),
+    g: smallint('g'),
+    att: smallint('att'),
+    yds: integer('yds'),
+    td: smallint('td'),
+    lng: smallint('lng'),
+    fumbles: smallint('fumbles'),
+  },
+  (table) => ({
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'career_football_rushing_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const careerFootballReceiving = pgTable(
+  'career_football_receiving',
+  {
+    playerId: integer('player_id').primaryKey().notNull(),
+    g: smallint('g'),
+    rec: smallint('rec'),
+    tgt: smallint('tgt'),
+    yds: integer('yds'),
+    td: smallint('td'),
+    lng: smallint('lng'),
+    fumbles: smallint('fumbles'),
+  },
+  (table) => ({
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'career_football_receiving_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const careerFootballKicking = pgTable(
+  'career_football_kicking',
+  {
+    playerId: integer('player_id').primaryKey().notNull(),
+    g: smallint('g'),
+    fgm: smallint('fgm'),
+    fga: smallint('fga'),
+    fg019m: smallint('fg_0_19m'),
+    fg019a: smallint('fg_0_19a'),
+    fg2029m: smallint('fg_20_29m'),
+    fg2029a: smallint('fg_20_29a'),
+    fg3039m: smallint('fg_30_39m'),
+    fg3039a: smallint('fg_30_39a'),
+    fg4049m: smallint('fg_40_49m'),
+    fg4049a: smallint('fg_40_49a'),
+    fg50m: smallint('fg_50m'),
+    fg50a: smallint('fg_50a'),
+    xpm: smallint('xpm'),
+    xpa: smallint('xpa'),
+    lng: smallint('lng'),
+  },
+  (table) => ({
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'career_football_kicking_player_id_fk',
+    }).onDelete('cascade'),
+  }),
+);
+
+export const careerFootballDefense = pgTable(
+  'career_football_defense',
+  {
+    playerId: integer('player_id').primaryKey().notNull(),
+    g: smallint('g'),
+    sacks: numeric('sacks', { precision: 5, scale: 1 }),
+    int: smallint('int'),
+    fumRec: smallint('fum_rec'),
+    defTd: smallint('def_td'),
+    safeties: smallint('safeties'),
+    ptsAllowedPerG: numeric('pts_allowed_per_g', { precision: 5, scale: 2 }),
+    ydsAllowedPerG: numeric('yds_allowed_per_g', { precision: 6, scale: 2 }),
+  },
+  (table) => ({
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'career_football_defense_player_id_fk',
+    }).onDelete('cascade'),
   }),
 );
 

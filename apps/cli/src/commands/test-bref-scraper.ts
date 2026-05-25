@@ -62,6 +62,7 @@ async function main() {
     pfrId: null,
     isDst: false,
     nflTeam: null,
+    position: null,
   };
 
   const season = parseInt(options.season, 10);

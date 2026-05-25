@@ -1,4 +1,5 @@
 export * from './models/ActivityLog';
+export * from './models/FootballStatistics';
 export * from './models/Badges';
 export * from './models/Chat';
 export * from './models/Dues';

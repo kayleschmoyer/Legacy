@@ -17,6 +17,7 @@ import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   DEFAULT_ROSTER_POSITIONS,
+  DefensiveFormatEnum,
   League,
   LeagueMember,
   LeaguePosition,
@@ -63,6 +64,8 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       leagueName: t.string({ required: true }),
       // Sport for the league. Defaults to 'baseball' when omitted (LS-4628).
       sport: t.field({ type: SportKindEnum, required: false }),
+      // Defensive scoring format for football leagues (LS-246).
+      defensiveFormat: t.field({ type: DefensiveFormatEnum, required: false }),
       numberOfTeams: t.int({ required: true }),
       numberOfDivisions: t.int({ required: false }), // default 2 (two divisions)
       schedulingStrategy: t.string({ required: false }), // 'round-robin' | 'divisional' | 'random' (optional, defaults to 'divisional')
@@ -191,6 +194,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const {
         leagueName,
         sport: inputSport,
+        defensiveFormat: inputDefensiveFormat,
         numberOfTeams,
         numberOfDivisions,
         schedulingStrategy: inputSchedulingStrategy,
@@ -369,6 +373,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           ownerId: userId,
           ownerUsername: username,
           sport: inputSport ?? 'baseball',
+          defensiveFormat:
+            inputDefensiveFormat === 'idp' ? 'idp' : ('dst' as const),
           maxRosterSize: maxRosterSize || 25,
           numberOfTeams,
           numberOfDivisions: resolvedNumberOfDivisions,

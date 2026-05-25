@@ -455,6 +455,7 @@ input CreateLeagueAndTeamsInput {
   auctionMinBid: Int
   customEraEndYear: Int
   customEraStartYear: Int
+  defensiveFormat: DefensiveFormat
   draftMode: String
   draftOrder: String
   eraFilter: String
@@ -525,6 +526,14 @@ type DataRequest {
   status: String
   updatedAt: String
   userId: Int
+}
+
+"""
+Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players).
+"""
+enum DefensiveFormat {
+  dst
+  idp
 }
 
 type DeviceToken {
@@ -813,6 +822,253 @@ type ExpireSubscriptionGracePeriodsResult {
   expired: Int
 }
 
+type FootballCareerDefense {
+  defTd: Int
+  fumRec: Int
+  g: Int
+  int: Int
+  ptsAllowedPerG: Float
+  sacks: Float
+  safeties: Int
+  ydsAllowedPerG: Float
+}
+
+"""
+Career IDP totals aggregated from season_defense_idp (LS-4155)
+"""
+type FootballCareerIdp {
+  astTkl: Int
+  defTd: Int
+  ff: Int
+  fr: Int
+  g: Int
+  int: Int
+  pd: Int
+  sacks: Float
+  safeties: Int
+  soloTkl: Int
+  totalTkl: Int
+}
+
+type FootballCareerKicking {
+  fg019a: Int
+  fg019m: Int
+  fg50a: Int
+  fg50m: Int
+  fg2029a: Int
+  fg2029m: Int
+  fg3039a: Int
+  fg3039m: Int
+  fg4049a: Int
+  fg4049m: Int
+  fga: Int
+  fgm: Int
+  g: Int
+  lng: Int
+  xpa: Int
+  xpm: Int
+}
+
+type FootballCareerPassing {
+  att: Int
+  cmp: Int
+  g: Int
+  int: Int
+  rating: Float
+  sackYds: Int
+  sacked: Int
+  td: Int
+  yds: Int
+}
+
+type FootballCareerReceiving {
+  fumbles: Int
+  g: Int
+  lng: Int
+  rec: Int
+  td: Int
+  tgt: Int
+  yds: Int
+}
+
+type FootballCareerRushing {
+  att: Int
+  fumbles: Int
+  g: Int
+  lng: Int
+  td: Int
+  yds: Int
+}
+
+"""
+Career stat totals across all stat categories (LS-250, LS-4155)
+"""
+type FootballCareerStats {
+  defense: FootballCareerDefense
+  idp: FootballCareerIdp
+  kicking: FootballCareerKicking
+  passing: FootballCareerPassing
+  receiving: FootballCareerReceiving
+  rushing: FootballCareerRushing
+}
+
+"""
+A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255)
+"""
+type FootballPlayer {
+  careerStats: FootballCareerStats
+  firstName: String!
+  id: Int!
+  isDst: Boolean!
+  lastName: String!
+  nflTeam: String
+  pfrId: String
+  position: String
+  seasonStats(season: Int): FootballPlayerSeasonStats
+}
+
+"""
+All season stats across stat categories for a football player (LS-255)
+"""
+type FootballPlayerSeasonStats {
+  defense: [FootballSeasonDefense!]
+  idp: [FootballSeasonDefenseIdp!]
+  kicking: [FootballSeasonKicking!]
+  passing: [FootballSeasonPassing!]
+  receiving: [FootballSeasonReceiving!]
+  rushing: [FootballSeasonRushing!]
+}
+
+"""
+Cursor-paginated list of football players (LS-255)
+"""
+type FootballPlayersConnection {
+  nodes: [FootballPlayer!]!
+  pageInfo: FootballPlayersPageInfo!
+}
+
+type FootballPlayersPageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+"""
+Season DST (team defense/special teams) stats for a football player (LS-247)
+"""
+type FootballSeasonDefense {
+  defTd: Int
+  fumRec: Int
+  g: Int
+  int: Int
+  passYdsAllowed: Int
+  ptsAllowed: Int
+  rushYdsAllowed: Int
+  sacks: Float
+  safeties: Int
+  season: Int
+  team: String
+  ydsAllowed: Int
+}
+
+"""
+Season individual defensive player (IDP) stats for a football player (LS-4155)
+"""
+type FootballSeasonDefenseIdp {
+  astTkl: Int
+  defTd: Int
+  ff: Int
+  fr: Int
+  g: Int
+  gs: Int
+  int: Int
+  pd: Int
+  sacks: Float
+  safeties: Int
+  season: Int
+  soloTkl: Int
+  team: String
+  totalTkl: Int
+}
+
+"""
+Season kicking stats for a football player (LS-247)
+"""
+type FootballSeasonKicking {
+  fg019a: Int
+  fg019m: Int
+  fg50a: Int
+  fg50m: Int
+  fg2029a: Int
+  fg2029m: Int
+  fg3039a: Int
+  fg3039m: Int
+  fg4049a: Int
+  fg4049m: Int
+  fgPct: Float
+  fga: Int
+  fgm: Int
+  g: Int
+  lng: Int
+  season: Int
+  team: String
+  xpa: Int
+  xpm: Int
+}
+
+"""
+Season passing stats for a football player (LS-247)
+"""
+type FootballSeasonPassing {
+  att: Int
+  cmp: Int
+  g: Int
+  gs: Int
+  int: Int
+  lng: Int
+  rating: Float
+  sackYds: Int
+  sacked: Int
+  season: Int
+  td: Int
+  team: String
+  yds: Int
+}
+
+"""
+Season receiving stats for a football player (LS-247)
+"""
+type FootballSeasonReceiving {
+  firstDowns: Int
+  fumbles: Int
+  g: Int
+  gs: Int
+  lng: Int
+  rec: Int
+  season: Int
+  td: Int
+  team: String
+  tgt: Int
+  yds: Int
+  ydsPerRec: Float
+}
+
+"""
+Season rushing stats for a football player (LS-247)
+"""
+type FootballSeasonRushing {
+  att: Int
+  firstDowns: Int
+  fumbles: Int
+  g: Int
+  gs: Int
+  lng: Int
+  season: Int
+  td: Int
+  team: String
+  yds: Int
+  ydsPerAtt: Float
+}
+
 input ForceAddPlayerInput {
   leagueId: Int!
   playerId: Int!
@@ -970,6 +1226,11 @@ type League {
   currentWeekNumber: Int
   customEraEndYear: Int
   customEraStartYear: Int
+
+  """
+  Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). (LS-246)
+  """
+  defensiveFormat: DefensiveFormat
   draftStatus: String
   eraFilter: String
   faabBudgetDefault: Int
@@ -2544,6 +2805,21 @@ type Query {
   Get a complete export of all personal data for the authenticated user
   """
   exportMyData: UserDataExport
+
+  """
+  Fetch a single football player by ID (LS-255)
+  """
+  footballPlayer(id: Int!): FootballPlayer
+
+  """
+  Paginated list of football players, optionally filtered by position (LS-255)
+  """
+  footballPlayers(
+    after: String
+    first: Int
+    position: String
+    search: String
+  ): FootballPlayersConnection
   freeAgents(leagueId: Int!): [Player!]
 
   """

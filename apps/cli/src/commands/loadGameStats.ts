@@ -56,6 +56,28 @@ async function loadPlayerGameStats(
     pfrId: string | null;
     isDst: boolean;
     nflTeam: string | null;
+    position:
+      | 'SP'
+      | 'RP'
+      | 'C'
+      | '1B'
+      | '2B'
+      | '3B'
+      | 'SS'
+      | 'RF'
+      | 'LF'
+      | 'CF'
+      | 'DH'
+      | 'QB'
+      | 'RB'
+      | 'WR'
+      | 'TE'
+      | 'K'
+      | 'DL'
+      | 'LB'
+      | 'DB'
+      | 'DST'
+      | null;
   } = {
     id: playerId,
     firstName: '',
@@ -78,6 +100,7 @@ async function loadPlayerGameStats(
     pfrId: null,
     isDst: false,
     nflTeam: null,
+    position: null,
   };
 
   // Load batting stats

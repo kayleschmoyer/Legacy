@@ -106,6 +106,8 @@ builder.queryField('league', (t) =>
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
             // Trade deadline (LS-4099)
             tradeDeadlineWeek: PublicSchema.leagues.tradeDeadlineWeek,
+            // Defensive format for football leagues (LS-246)
+            defensiveFormat: PublicSchema.leagues.defensiveFormat,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -152,6 +154,8 @@ builder.queryField('league', (t) =>
           id: league.id,
           name: league.name,
           owner: league.owner,
+          sport: league.sport,
+          defensiveFormat: league.defensiveFormat as 'dst' | 'idp' | null,
           maxRosterSize: league.maxRosterSize,
           currentMatchup: league.currentMatchup,
           currentWeek: league.currentWeek,
@@ -265,6 +269,8 @@ builder.queryField('userLeagues', (t) =>
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
             // Tier downgrade freeze (LS-846)
             tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
+            // Defensive format for football leagues (LS-246)
+            defensiveFormat: PublicSchema.leagues.defensiveFormat,
           })
           .from(PublicSchema.leagues)
           .innerJoin(
@@ -283,6 +289,8 @@ builder.queryField('userLeagues', (t) =>
           id: league.id,
           name: league.name,
           owner: league.owner,
+          sport: league.sport,
+          defensiveFormat: league.defensiveFormat as 'dst' | 'idp' | null,
           maxRosterSize: league.maxRosterSize,
           currentMatchup: league.currentMatchup,
           currentWeek: league.currentWeek,

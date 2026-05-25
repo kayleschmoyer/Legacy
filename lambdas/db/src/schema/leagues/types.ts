@@ -17,6 +17,13 @@ export const SportKindEnum = builder.enumType('Sport', {
   description: 'Sport for a league (baseball or football).',
 });
 
+// Defensive format enum (LS-255) — discriminator for football defensive scoring.
+export const DefensiveFormatEnum = builder.enumType('DefensiveFormat', {
+  values: ['dst', 'idp'] as const,
+  description:
+    'Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players).',
+});
+
 // Default roster positions for new leagues
 // These represent a standard fantasy baseball roster configuration
 export const DEFAULT_ROSTER_POSITIONS = [
@@ -53,6 +60,8 @@ export const League = builder.objectRef<{
    *  parent select did not include it — every league has a non-null value
    *  in the DB (LS-4628). */
   sport?: 'baseball' | 'football';
+  /** Defensive scoring format for football leagues (LS-246). Defaults to 'dst'. */
+  defensiveFormat?: 'dst' | 'idp' | null;
   maxRosterSize: number;
   currentMatchup: number | null;
   /** Authoritative current week number — replaces the currentMatchup FK pointer. */
@@ -131,6 +140,13 @@ League.implement({
       type: SportKindEnum,
       description: 'Sport for this league (baseball or football). (LS-4628)',
       resolve: (parent) => parent.sport ?? 'baseball',
+    }),
+    defensiveFormat: t.field({
+      type: DefensiveFormatEnum,
+      nullable: true,
+      description:
+        'Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). (LS-246)',
+      resolve: (parent) => parent.defensiveFormat ?? null,
     }),
     maxRosterSize: t.exposeInt('maxRosterSize'),
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),

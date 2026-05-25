@@ -79,6 +79,10 @@ export interface CreateLeagueOptions {
   ownerUsername: string;
   /** Sport for this league (LS-4628). Defaults to baseball. */
   sport?: SportKind;
+  /** Defensive scoring format for football leagues (LS-246).
+   *  'dst' = team defense; 'idp' = individual defensive players.
+   *  Ignored for baseball leagues. Defaults to 'dst'. */
+  defensiveFormat?: 'dst' | 'idp';
   maxRosterSize?: number;
   numberOfTeams?: number;
   numberOfDivisions?: number;
@@ -192,6 +196,7 @@ export class LeagueService {
       waiverEnabled = true,
       faabBudgetDefault = 100,
       isPublic = false,
+      defensiveFormat = 'dst',
       salaryCapEnabled = false,
       salaryCap = null,
       salaryFloor = null,
@@ -244,6 +249,7 @@ export class LeagueService {
             schedulingStrategy,
             numberOfDivisions,
             isPublic,
+            defensiveFormat,
             // Salary cap settings
             salaryCapEnabled,
             salaryCap,

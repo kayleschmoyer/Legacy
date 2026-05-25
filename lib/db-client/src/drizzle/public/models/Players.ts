@@ -49,6 +49,7 @@ export const players = pgTable(
     pfrId: varchar('pfr_id', { length: 20 }),
     isDst: boolean('is_dst').notNull().default(false),
     nflTeam: varchar('nfl_team', { length: 10 }),
+    position: playerPosition('position'),
   },
   (table) => {
     return {
