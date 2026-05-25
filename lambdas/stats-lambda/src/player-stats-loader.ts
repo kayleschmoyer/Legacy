@@ -49,6 +49,10 @@ export async function loadPlayerGameStats(
     totalGames: number;
     batHand: string | null;
     throwHand: string | null;
+    sport: 'baseball' | 'football';
+    pfrId: string | null;
+    isDst: boolean;
+    nflTeam: string | null;
   } = {
     id: playerId,
     firstName: '',
@@ -67,6 +71,10 @@ export async function loadPlayerGameStats(
     totalGames: 0,
     batHand: null,
     throwHand: null,
+    sport: 'baseball',
+    pfrId: null,
+    isDst: false,
+    nflTeam: null,
   };
 
   try {

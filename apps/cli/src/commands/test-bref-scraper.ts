@@ -58,6 +58,10 @@ async function main() {
     totalGames: 0,
     batHand: null,
     throwHand: null,
+    sport: 'baseball',
+    pfrId: null,
+    isDst: false,
+    nflTeam: null,
   };
 
   const season = parseInt(options.season, 10);

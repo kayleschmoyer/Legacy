@@ -1,6 +1,7 @@
 import {
   pgTable,
   unique,
+  uniqueIndex,
   serial,
   text,
   varchar,
@@ -12,8 +13,9 @@ import {
   bigint,
   boolean,
 } from 'drizzle-orm/pg-core';
-import { playerPosition } from './Enums';
+import { playerPosition, sportKind } from './Enums';
 import { sql } from 'drizzle-orm';
+import { nflTeams } from './FootballTeams';
 
 export const players = pgTable(
   'players',
@@ -42,12 +44,26 @@ export const players = pgTable(
     // migration 20260418_000000_add_twenty_questions_tables.
     batHand: text('bat_hand'),
     throwHand: text('throw_hand'),
+    // Football identity columns (LS-246)
+    sport: sportKind('sport').notNull().default('baseball'),
+    pfrId: varchar('pfr_id', { length: 20 }),
+    isDst: boolean('is_dst').notNull().default(false),
+    nflTeam: varchar('nfl_team', { length: 10 }),
   },
   (table) => {
     return {
       playersUkBrefId: unique('players_uk_bref_id').on(table.brefId),
       // GIN trigram index for LIKE '%name%' search: idx_players_name_trgm (LS-905)
       // Managed by migration — cannot be modeled in Drizzle (expression + pg_trgm ops class)
+      // Partial unique index: one row per pfr_id when non-null (LS-246)
+      playersPfrIdUnique: uniqueIndex('players_pfr_id_unique')
+        .on(table.pfrId)
+        .where(sql`pfr_id IS NOT NULL`),
+      playersNflTeamFk: foreignKey({
+        columns: [table.nflTeam],
+        foreignColumns: [nflTeams.abbreviation],
+        name: 'players_nfl_team_fk',
+      }).onDelete('set null'),
     };
   },
 );

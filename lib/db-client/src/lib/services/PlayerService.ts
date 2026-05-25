@@ -34,6 +34,11 @@ interface ScoringResultRow {
   mlb_player_id: number | null;
   bat_hand: string | null;
   throw_hand: string | null;
+  // Football identity columns (LS-246)
+  sport: 'baseball' | 'football';
+  pfr_id: string | null;
+  is_dst: boolean;
+  nfl_team: string | null;
 }
 
 export interface PlayerFilters {
@@ -550,6 +555,7 @@ export class PlayerService {
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             p.bat_hand, p.throw_hand,
+            p.sport, p.pfr_id, p.is_dst, p.nfl_team,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
             ${fieldingScoreExpr} AS fielding_score,
@@ -593,6 +599,10 @@ export class PlayerService {
           mlbPlayerId: row.mlb_player_id ?? null,
           batHand: row.bat_hand ?? null,
           throwHand: row.throw_hand ?? null,
+          sport: row.sport ?? 'baseball',
+          pfrId: row.pfr_id ?? null,
+          isDst: row.is_dst ?? false,
+          nflTeam: row.nfl_team ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

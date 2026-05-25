@@ -45,6 +45,12 @@ export const leagues = pgTable(
     /** Sport discriminator for multi-sport leagues (LS-4628). Defaults to
      *  baseball; football lands as part of LS-4568. */
     sport: sportKind('sport').notNull().default('baseball'),
+    /** Defensive format for football leagues (LS-246).
+     *  'dst' = team defense/special teams (default); 'idp' = individual defensive players.
+     *  Only meaningful when sport = 'football'; baseball leagues leave this as default. */
+    defensiveFormat: varchar('defensive_format', { length: 10 })
+      .notNull()
+      .default('dst'),
     maxRosterSize: integer('max_roster_size').notNull().default(25),
     currentMatchup: integer('current_matchup'),
     /** Canonical current active week number. Replaces the currentMatchup FK as the
