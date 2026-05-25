@@ -416,6 +416,24 @@ unauthTest.describe('Public Routes @critical', () => {
     },
   );
 
+  // LS-4791: /preferences was added to publicPaths so unauthenticated users can
+  // access their account preferences before completing onboarding. Direct
+  // navigation must show the Preferences page — not the marketing landing page.
+  unauthTest(
+    'shows Preferences page content on /preferences when not authenticated (LS-4791)',
+    async ({ page }) => {
+      await page.goto('/preferences');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('heading', { name: /preferences/i, level: 1 }),
+      ).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('body')).not.toContainText(
+        'Build Your Dynasty',
+      );
+    },
+  );
+
   unauthTest(
     'shows Pricing page content on /pricing when not authenticated',
     async ({ page }) => {
