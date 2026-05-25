@@ -1,14 +1,18 @@
 import {
   pgTable,
+  pgView,
   integer,
   varchar,
   doublePrecision,
   smallint,
   numeric,
+  bigint,
   unique,
   index,
   foreignKey,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { players } from './Players';
 
 export const gameFootballPassing = pgTable(
@@ -222,7 +226,7 @@ export const gameFootballDefense = pgTable(
 /**
  * Per-game individual defensive player (IDP) stats.
  * Distinct from game_football_defense (DST team-level aggregates).
- * sacks uses DECIMAL(4,1) to support half-sacks (LS-4155).
+ * sacks uses DECIMAL(4,1) to support half-sacks.
  */
 export const gameFootballDefenseIdp = pgTable(
   'game_football_defense_idp',
@@ -258,3 +262,74 @@ export const gameFootballDefenseIdp = pgTable(
     ).on(table.gameIdentifier),
   }),
 );
+
+export const footballSeasonDefenseIdp = pgTable(
+  'football_season_defense_idp',
+  {
+    playerId: integer('player_id').notNull(),
+    season: smallint('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    g: smallint('g'),
+    gs: smallint('gs'),
+    soloTkl: smallint('solo_tkl'),
+    astTkl: smallint('ast_tkl'),
+    totalTkl: smallint('total_tkl'),
+    sacks: numeric('sacks', { precision: 5, scale: 1 }),
+    int: smallint('int'),
+    pd: smallint('pd'),
+    ff: smallint('ff'),
+    fr: smallint('fr'),
+    defTd: smallint('def_td'),
+    safeties: smallint('safeties'),
+    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.playerId, table.season, table.team, table.pfrRowId],
+      name: 'football_season_defense_idp_pk',
+    }),
+    playerIdFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'football_season_defense_idp_player_id_fk',
+    }).onDelete('cascade'),
+    playerIdIdx: index('football_season_defense_idp_player_id_idx').on(
+      table.playerId,
+    ),
+    playerIdSeasonIdx: index(
+      'football_season_defense_idp_player_id_season_idx',
+    ).on(table.playerId, table.season),
+  }),
+);
+
+export const careerFootballDefenseIdp = pgView('career_football_defense_idp', {
+  playerId: integer('player_id'),
+  // SUM(SMALLINT) returns BIGINT in Postgres
+  g: bigint('g', { mode: 'number' }),
+  soloTkl: bigint('solo_tkl', { mode: 'number' }),
+  astTkl: bigint('ast_tkl', { mode: 'number' }),
+  totalTkl: bigint('total_tkl', { mode: 'number' }),
+  sacks: numeric('sacks'),
+  int: bigint('int', { mode: 'number' }),
+  pd: bigint('pd', { mode: 'number' }),
+  ff: bigint('ff', { mode: 'number' }),
+  fr: bigint('fr', { mode: 'number' }),
+  defTd: bigint('def_td', { mode: 'number' }),
+  safeties: bigint('safeties', { mode: 'number' }),
+}).as(sql`
+  SELECT
+    player_id,
+    SUM(g)         AS g,
+    SUM(solo_tkl)  AS solo_tkl,
+    SUM(ast_tkl)   AS ast_tkl,
+    SUM(total_tkl) AS total_tkl,
+    SUM(sacks)     AS sacks,
+    SUM(int)       AS int,
+    SUM(pd)        AS pd,
+    SUM(ff)        AS ff,
+    SUM(fr)        AS fr,
+    SUM(def_td)    AS def_td,
+    SUM(safeties)  AS safeties
+  FROM football_season_defense_idp
+  GROUP BY player_id
+`);

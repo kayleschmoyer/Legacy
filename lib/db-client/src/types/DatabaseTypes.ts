@@ -7,8 +7,10 @@ import {
   aggregateSeasonPitching,
   careerBatting,
   careerFielding,
+  careerFootballDefenseIdp,
   careerPitching,
   commissionerAuditLog,
+  footballSeasonDefenseIdp,
   gameBatting,
   gameFielding,
   gameFootballDefense,
@@ -56,11 +58,16 @@ type InferEnumValue<T> =
   T extends PgEnum<infer TValues> ? TValues[number] : never;
 
 export type CareerBatting = InferModelFromView<typeof careerBatting>;
+export type CareerFootballDefenseIdp = InferModelFromView<
+  typeof careerFootballDefenseIdp
+>;
 export type CareerFielding = InferModelFromView<typeof careerFielding>;
 export type CareerPitching = InferModelFromView<typeof careerPitching>;
 export type GameBatting = typeof gameBatting.$inferSelect;
 export type GameFielding = typeof gameFielding.$inferSelect;
 export type GameFootballDefense = typeof gameFootballDefense.$inferSelect;
+export type FootballSeasonDefenseIdp =
+  typeof footballSeasonDefenseIdp.$inferSelect;
 export type GameFootballDefenseIdp = typeof gameFootballDefenseIdp.$inferSelect;
 export type GameFootballKicking = typeof gameFootballKicking.$inferSelect;
 export type GameFootballPassing = typeof gameFootballPassing.$inferSelect;
