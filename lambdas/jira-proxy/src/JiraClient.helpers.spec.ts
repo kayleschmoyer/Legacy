@@ -106,7 +106,8 @@ describe('textToAdf (tested via createJiraBug description field)', () => {
     expect(desc.content.length).toBeGreaterThanOrEqual(1);
     expect(desc.content[0].type).toBe('paragraph');
     expect(desc.content[0].content[0].type).toBe('text');
-    expect(desc.content[0].content[0].text).toContain('First paragraph');
+    // buildDescription prepends a "## Bug Report" header, so user content starts at index 1
+    expect(desc.content[1].content[0].text).toContain('First paragraph');
   });
 
   it('handles description with no double newlines as single paragraph', async () => {
@@ -174,7 +175,7 @@ describe('buildDescription (tested via createJiraBug metadata fields)', () => {
     // The description ADF should contain metadata
     expect(bodyStr).toContain('App Version: 1.2.3');
     expect(bodyStr).toContain('Environment: production');
-    expect(bodyStr).toContain('Reported by: user@example.com');
+    expect(bodyStr).toContain('Reporter: user@example.com');
     expect(bodyStr).toContain('Username: testuser');
     expect(bodyStr).toContain('Page URL: https://app.example.com/page');
     expect(bodyStr).toContain('User Agent: Mozilla/5.0');

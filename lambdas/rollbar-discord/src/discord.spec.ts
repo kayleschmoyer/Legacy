@@ -321,11 +321,11 @@ describe('postToDiscord', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://discord.com/api/webhooks/test',
-      {
+      expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ embeds: [embed] }),
-      },
+      }),
     );
   });
 

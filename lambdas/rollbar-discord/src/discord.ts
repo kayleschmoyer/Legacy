@@ -4,6 +4,7 @@ import type {
   DiscordEmbed,
   RollbarEvent,
 } from './types';
+import { fetchWithTimeout } from './fetch-utils';
 
 // Discord embed color constants
 const COLOR_ERROR = 0xed4245; // Red
@@ -241,11 +242,15 @@ export async function postToDiscord(
 ): Promise<void> {
   const body = JSON.stringify({ embeds: [embed] });
 
-  const response = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
+  const response = await fetchWithTimeout(
+    webhookUrl,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    },
+    5_000,
+  );
 
   if (!response.ok) {
     throw new Error(

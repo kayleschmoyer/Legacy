@@ -2,6 +2,7 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
+import { fetchWithTimeout } from './fetch-utils';
 
 export interface OAuthCredentials {
   client_id: string;
@@ -71,15 +72,19 @@ async function getOAuthCredentials(
 async function requestAccessToken(secretName: string): Promise<string> {
   const creds = await getOAuthCredentials(secretName);
 
-  const response = await fetch(ATLASSIAN_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'client_credentials',
-      client_id: creds.client_id,
-      client_secret: creds.client_secret,
-    }),
-  });
+  const response = await fetchWithTimeout(
+    ATLASSIAN_TOKEN_URL,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'client_credentials',
+        client_id: creds.client_id,
+        client_secret: creds.client_secret,
+      }),
+    },
+    5_000,
+  );
 
   if (!response.ok) {
     const body = await response.text();

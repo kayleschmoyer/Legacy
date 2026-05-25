@@ -1,5 +1,9 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { getAccessToken, getApiBaseUrl, getSiteUrl } from './oauth';
+import { fetchWithTimeout } from './fetch-utils';
+
+const TIMEOUT_SHORT_MS = 5_000;
+const TIMEOUT_LONG_MS = 10_000;
 
 // Module-scope cache — survives warm invocations, reset on cold start.
 // Keyed by "<apiBaseUrl>:<projectKey>" so different tenants/projects don't collide.
@@ -25,7 +29,7 @@ async function findCurrentBugEpicViaJql(
       maxResults: '1',
       fields: 'none',
     });
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${apiBaseUrl}/rest/api/3/search?${params.toString()}`,
       {
         headers: {
@@ -33,6 +37,7 @@ async function findCurrentBugEpicViaJql(
           Accept: 'application/json',
         },
       },
+      TIMEOUT_LONG_MS,
     );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -67,7 +72,7 @@ export async function resolveCurrentBugEpicKey(
     return cached.key;
   }
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${apiBaseUrl}/rest/api/3/project/${projectKey}/properties/bucket.client-bugs`,
       {
         headers: {
@@ -75,6 +80,7 @@ export async function resolveCurrentBugEpicKey(
           Accept: 'application/json',
         },
       },
+      TIMEOUT_LONG_MS,
     );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -309,7 +315,7 @@ async function attachFilesToJiraIssue(
       const formData = new FormData();
       formData.append('file', blob, sanitizeFilename(attachment.name));
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${apiBaseUrl}/rest/api/3/issue/${issueKey}/attachments`,
         {
           method: 'POST',
@@ -321,6 +327,7 @@ async function attachFilesToJiraIssue(
           },
           body: formData,
         },
+        TIMEOUT_LONG_MS,
       );
 
       if (!response.ok) {
@@ -350,12 +357,16 @@ async function findJiraUserAccountId(
 ): Promise<string | null> {
   try {
     const url = `${apiBaseUrl}/rest/api/3/user/search?query=${encodeURIComponent(email)}`;
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
       },
-    });
+      TIMEOUT_SHORT_MS,
+    );
 
     if (!response.ok) {
       LOGGER.warn(`Jira user search failed with status ${response.status}`);
@@ -432,15 +443,19 @@ export async function createJiraBug(
 
   LOGGER.info(`Creating Jira bug in project ${projectKey}: ${input.summary}`);
 
-  const response = await fetch(`${apiBaseUrl}/rest/api/3/issue`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+  const response = await fetchWithTimeout(
+    `${apiBaseUrl}/rest/api/3/issue`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ fields }),
     },
-    body: JSON.stringify({ fields }),
-  });
+    TIMEOUT_LONG_MS,
+  );
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -500,7 +515,7 @@ export async function searchJiraBugs(
     fields: 'summary,status',
   });
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${apiBaseUrl}/rest/api/3/search?${params.toString()}`,
     {
       headers: {
@@ -508,6 +523,7 @@ export async function searchJiraBugs(
         Accept: 'application/json',
       },
     },
+    TIMEOUT_LONG_MS,
   );
 
   if (!response.ok) {
