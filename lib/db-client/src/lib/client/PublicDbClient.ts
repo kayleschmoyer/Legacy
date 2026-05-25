@@ -1378,3 +1378,258 @@ export type {
   PlayoffQualification,
   MatchupStatusCounts,
 } from './matchup-history';
+
+export interface FootballMatchupPlayerGameStats {
+  playerId: number;
+  matchupPlayerId: number;
+  gameNum: number;
+  gameIdentifier: string;
+  passing: typeof Schema.gameFootballPassing.$inferSelect | null;
+  rushing: typeof Schema.gameFootballRushing.$inferSelect | null;
+  receiving: typeof Schema.gameFootballReceiving.$inferSelect | null;
+  kicking: typeof Schema.gameFootballKicking.$inferSelect | null;
+  defense: typeof Schema.gameFootballDefense.$inferSelect | null;
+  idpDefense: typeof Schema.gameFootballDefenseIdp.$inferSelect | null;
+}
+
+export async function getMatchupFootballPlayerGameStats(
+  db: PublicDb,
+  matchupId: number,
+): Promise<FootballMatchupPlayerGameStats[]> {
+  const matchupInfo = await db
+    .select({
+      leagueId: Schema.matchups.leagueId,
+      weekNumber: Schema.matchups.weekNumber,
+    })
+    .from(Schema.matchups)
+    .where(eq(Schema.matchups.id, matchupId))
+    .limit(1);
+
+  if (matchupInfo.length === 0) {
+    return [];
+  }
+
+  const { leagueId, weekNumber } = matchupInfo[0];
+
+  const matchupPlayersResult = await db
+    .select({
+      matchupPlayerId: Schema.matchupPlayers.id,
+      playerId: Schema.matchupPlayers.playerId,
+      season: Schema.leagueWeekPlayerSeasons.season,
+      positionType: Schema.leaguePosition.positionType,
+    })
+    .from(Schema.matchupPlayers)
+    .leftJoin(
+      Schema.leagueWeekPlayerSeasons,
+      and(
+        eq(Schema.leagueWeekPlayerSeasons.leagueId, leagueId),
+        eq(Schema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+        eq(
+          Schema.leagueWeekPlayerSeasons.playerId,
+          Schema.matchupPlayers.playerId,
+        ),
+      ),
+    )
+    .leftJoin(
+      Schema.leaguePosition,
+      eq(Schema.leaguePosition.id, Schema.matchupPlayers.positionId),
+    )
+    .where(eq(Schema.matchupPlayers.matchupId, matchupId));
+
+  if (matchupPlayersResult.length === 0) {
+    return [];
+  }
+
+  const matchupPlayerIds = matchupPlayersResult.map((mp) => mp.matchupPlayerId);
+
+  const gamesResult = await db
+    .select()
+    .from(Schema.matchupPlayerGames)
+    .where(
+      inArray(Schema.matchupPlayerGames.matchupPlayerId, matchupPlayerIds),
+    );
+
+  const matchupPlayerMap = new Map<
+    number,
+    { playerId: number; season: number; isDst: boolean; isIdp: boolean }
+  >();
+
+  for (const mp of matchupPlayersResult) {
+    if (mp.season === null) continue;
+    const isDst = mp.positionType === 'DST';
+    const isIdp =
+      mp.positionType === 'DL' ||
+      mp.positionType === 'LB' ||
+      mp.positionType === 'DB' ||
+      mp.positionType === 'DP';
+    matchupPlayerMap.set(mp.matchupPlayerId, {
+      playerId: mp.playerId,
+      season: mp.season,
+      isDst,
+      isIdp,
+    });
+  }
+
+  type GameEntry = {
+    playerId: number;
+    season: number;
+    gameNum: number;
+    matchupPlayerId: number;
+    gameIdentifier: string;
+  };
+
+  const dstGames: GameEntry[] = [];
+  const idpGames: GameEntry[] = [];
+  const offGames: GameEntry[] = [];
+
+  for (const game of gamesResult) {
+    const mpInfo = matchupPlayerMap.get(game.matchupPlayerId);
+    if (!mpInfo || !game.gameIdentifier) continue;
+    const entry: GameEntry = {
+      playerId: mpInfo.playerId,
+      season: mpInfo.season,
+      gameNum: game.gameNum,
+      matchupPlayerId: game.matchupPlayerId,
+      gameIdentifier: game.gameIdentifier,
+    };
+    if (mpInfo.isDst) dstGames.push(entry);
+    else if (mpInfo.isIdp) idpGames.push(entry);
+    else offGames.push(entry);
+  }
+
+  const statKey = (playerId: number, season: number, gameNum: number) =>
+    `${playerId}_${season}_${gameNum}`;
+
+  // Batch fetch offensive stats (passing, rushing, receiving, kicking)
+  const passingMap = new Map<
+    string,
+    typeof Schema.gameFootballPassing.$inferSelect
+  >();
+  const rushingMap = new Map<
+    string,
+    typeof Schema.gameFootballRushing.$inferSelect
+  >();
+  const receivingMap = new Map<
+    string,
+    typeof Schema.gameFootballReceiving.$inferSelect
+  >();
+  const kickingMap = new Map<
+    string,
+    typeof Schema.gameFootballKicking.$inferSelect
+  >();
+  if (offGames.length > 0) {
+    const playerIds = [...new Set(offGames.map((g) => g.playerId))];
+    const gameNums = [...new Set(offGames.map((g) => g.gameNum))];
+    const [passingRows, rushingRows, receivingRows, kickingRows] =
+      await Promise.all([
+        db
+          .select()
+          .from(Schema.gameFootballPassing)
+          .where(
+            and(
+              inArray(Schema.gameFootballPassing.playerId, playerIds),
+              inArray(Schema.gameFootballPassing.gameNum, gameNums),
+            ),
+          ),
+        db
+          .select()
+          .from(Schema.gameFootballRushing)
+          .where(
+            and(
+              inArray(Schema.gameFootballRushing.playerId, playerIds),
+              inArray(Schema.gameFootballRushing.gameNum, gameNums),
+            ),
+          ),
+        db
+          .select()
+          .from(Schema.gameFootballReceiving)
+          .where(
+            and(
+              inArray(Schema.gameFootballReceiving.playerId, playerIds),
+              inArray(Schema.gameFootballReceiving.gameNum, gameNums),
+            ),
+          ),
+        db
+          .select()
+          .from(Schema.gameFootballKicking)
+          .where(
+            and(
+              inArray(Schema.gameFootballKicking.playerId, playerIds),
+              inArray(Schema.gameFootballKicking.gameNum, gameNums),
+            ),
+          ),
+      ]);
+    for (const r of passingRows)
+      passingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
+    for (const r of rushingRows)
+      rushingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
+    for (const r of receivingRows)
+      receivingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
+    for (const r of kickingRows)
+      kickingMap.set(statKey(r.playerId, r.season, r.gameNum), r);
+  }
+
+  // Batch fetch DST defense stats
+  const defenseMap = new Map<
+    string,
+    typeof Schema.gameFootballDefense.$inferSelect
+  >();
+  if (dstGames.length > 0) {
+    const playerIds = [...new Set(dstGames.map((g) => g.playerId))];
+    const gameNums = [...new Set(dstGames.map((g) => g.gameNum))];
+    const rows = await db
+      .select()
+      .from(Schema.gameFootballDefense)
+      .where(
+        and(
+          inArray(Schema.gameFootballDefense.playerId, playerIds),
+          inArray(Schema.gameFootballDefense.gameNum, gameNums),
+        ),
+      );
+    for (const r of rows)
+      defenseMap.set(statKey(r.playerId, r.season, r.gameNum), r);
+  }
+
+  // Batch fetch IDP defense stats
+  const idpDefenseMap = new Map<
+    string,
+    typeof Schema.gameFootballDefenseIdp.$inferSelect
+  >();
+  if (idpGames.length > 0) {
+    const playerIds = [...new Set(idpGames.map((g) => g.playerId))];
+    const gameNums = [...new Set(idpGames.map((g) => g.gameNum))];
+    const rows = await db
+      .select()
+      .from(Schema.gameFootballDefenseIdp)
+      .where(
+        and(
+          inArray(Schema.gameFootballDefenseIdp.playerId, playerIds),
+          inArray(Schema.gameFootballDefenseIdp.gameNum, gameNums),
+        ),
+      );
+    for (const r of rows)
+      idpDefenseMap.set(
+        statKey(r.playerId, Number(r.season), Number(r.gameNum)),
+        r,
+      );
+  }
+
+  const results: FootballMatchupPlayerGameStats[] = [];
+  for (const game of [...dstGames, ...idpGames, ...offGames]) {
+    const key = statKey(game.playerId, game.season, game.gameNum);
+    results.push({
+      playerId: game.playerId,
+      matchupPlayerId: game.matchupPlayerId,
+      gameNum: game.gameNum,
+      gameIdentifier: game.gameIdentifier,
+      passing: passingMap.get(key) ?? null,
+      rushing: rushingMap.get(key) ?? null,
+      receiving: receivingMap.get(key) ?? null,
+      kicking: kickingMap.get(key) ?? null,
+      defense: defenseMap.get(key) ?? null,
+      idpDefense: idpDefenseMap.get(key) ?? null,
+    });
+  }
+
+  return results;
+}

@@ -18,3 +18,4 @@ export * from './models/SalaryCap';
 export * from './models/DisclosureGame';
 export * from './models/TwentyQuestionsGame';
 export * from './models/TwentyQuestionsQuestion';
+export * from './models/FootballStatistics';

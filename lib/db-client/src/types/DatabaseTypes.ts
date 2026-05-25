@@ -11,6 +11,12 @@ import {
   commissionerAuditLog,
   gameBatting,
   gameFielding,
+  gameFootballDefense,
+  gameFootballDefenseIdp,
+  gameFootballKicking,
+  gameFootballPassing,
+  gameFootballReceiving,
+  gameFootballRushing,
   gamePitching,
   leagueMembers,
   leaguePosition,
@@ -54,6 +60,12 @@ export type CareerFielding = InferModelFromView<typeof careerFielding>;
 export type CareerPitching = InferModelFromView<typeof careerPitching>;
 export type GameBatting = typeof gameBatting.$inferSelect;
 export type GameFielding = typeof gameFielding.$inferSelect;
+export type GameFootballDefense = typeof gameFootballDefense.$inferSelect;
+export type GameFootballDefenseIdp = typeof gameFootballDefenseIdp.$inferSelect;
+export type GameFootballKicking = typeof gameFootballKicking.$inferSelect;
+export type GameFootballPassing = typeof gameFootballPassing.$inferSelect;
+export type GameFootballReceiving = typeof gameFootballReceiving.$inferSelect;
+export type GameFootballRushing = typeof gameFootballRushing.$inferSelect;
 export type GamePitching = typeof gamePitching.$inferSelect;
 export type InternalUser = typeof usersInAppInternal.$inferSelect;
 export type Matchup = typeof matchups.$inferSelect;
