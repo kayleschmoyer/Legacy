@@ -656,6 +656,9 @@ export const gameFielding = pgTable(
       gameIdentifierIdx: index('game_fielding_game_identifier_idx').on(
         table.gameIdentifier,
       ),
+      playerIdGameIdentifierIdx: index(
+        'game_fielding_player_id_game_identifier_idx',
+      ).on(table.playerId, table.gameIdentifier),
       playerIdSeasonGameIdentifierIdx: index(
         'game_fielding_player_id_season_game_identifier_idx',
       ).on(table.playerId, table.season, table.gameIdentifier),
