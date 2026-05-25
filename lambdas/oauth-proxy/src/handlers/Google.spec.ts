@@ -323,9 +323,9 @@ describe('handleSecureGoogleAuth — redirect_uri validation', () => {
 });
 
 describe('handleSecureGoogleAuth — error logging', () => {
-  const loggerMock = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
-    '@legacy-sports/logging',
-  );
+  const loggerMock = jest.requireMock<{
+    LOGGER: { error: jest.Mock; warn: jest.Mock };
+  }>('@legacy-sports/logging');
   const googleMock = jest.requireMock<{
     OAuth2Client: jest.Mock;
     getMockVerifyIdToken: () => jest.Mock;
@@ -354,7 +354,7 @@ describe('handleSecureGoogleAuth — error logging', () => {
     );
   });
 
-  it('passes the full Error to LOGGER.error when ID token verification fails (credential flow)', async () => {
+  it('passes the full Error to LOGGER.warn when ID token verification fails (credential flow)', async () => {
     const cause = new Error('Token has been expired or revoked');
     googleMock.getMockVerifyIdToken().mockRejectedValueOnce(cause);
 
@@ -363,7 +363,7 @@ describe('handleSecureGoogleAuth — error logging', () => {
     );
 
     expect(result.statusCode).toBe(400);
-    expect(loggerMock.LOGGER.error).toHaveBeenCalledWith(
+    expect(loggerMock.LOGGER.warn).toHaveBeenCalledWith(
       expect.stringContaining('Failed to verify ID token'),
       cause,
       expect.objectContaining({ context: 'id_token_verification' }),

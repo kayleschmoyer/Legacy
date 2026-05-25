@@ -392,7 +392,7 @@ export const handleSecureGoogleAuth = async (
 
         LOGGER.debug('Email verified from ID token successfully');
       } catch (error) {
-        LOGGER.error(
+        LOGGER.warn(
           'Failed to verify ID token for email extraction:',
           error instanceof Error ? error : new Error(String(error)),
           {
@@ -647,9 +647,9 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       googleEmail = payload.email;
       googlePicture = payload.picture;
     } catch (error) {
-      LOGGER.error(
+      LOGGER.warn(
         'ID token verification failed:',
-        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error : new Error(String(error)),
       );
       throw new Error('Invalid ID token from Google!');
     }
