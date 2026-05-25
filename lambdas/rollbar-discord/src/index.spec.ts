@@ -291,6 +291,85 @@ describe('baseHandler', () => {
       await baseHandler(event);
       expect(mockFetch).not.toHaveBeenCalled();
     });
+
+    it('rejects alarm missing Trigger (composite alarm shape)', async () => {
+      // Composite alarms and some EventBridge-routed alarms omit Trigger entirely.
+      // The type guard must reject these so formatAlarmEmbed never receives them.
+      const compositeAlarm = {
+        AlarmName: 'composite-alarm',
+        NewStateValue: 'ALARM',
+        NewStateReason: 'Child alarms triggered',
+        StateChangeTime: '2024-01-15T10:30:00Z',
+        Region: 'us-east-1',
+        // Trigger intentionally absent
+      };
+      const event = makeSnsEvent(JSON.stringify(compositeAlarm));
+      await baseHandler(event);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects alarm missing Region', async () => {
+      const alarm = {
+        AlarmName: 'test-alarm',
+        NewStateValue: 'ALARM',
+        NewStateReason: 'Threshold crossed',
+        StateChangeTime: '2024-01-15T10:30:00Z',
+        // Region intentionally absent
+        Trigger: {
+          MetricName: 'CPUUtilization',
+          Namespace: 'AWS/EC2',
+          Period: 60,
+          Statistic: 'Average',
+          Threshold: 90,
+          ComparisonOperator: 'GreaterThanThreshold',
+        },
+      };
+      const event = makeSnsEvent(JSON.stringify(alarm));
+      await baseHandler(event);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects alarm missing NewStateReason', async () => {
+      const alarm = {
+        AlarmName: 'test-alarm',
+        NewStateValue: 'ALARM',
+        // NewStateReason intentionally absent
+        StateChangeTime: '2024-01-15T10:30:00Z',
+        Region: 'us-east-1',
+        Trigger: {
+          MetricName: 'CPUUtilization',
+          Namespace: 'AWS/EC2',
+          Period: 60,
+          Statistic: 'Average',
+          Threshold: 90,
+          ComparisonOperator: 'GreaterThanThreshold',
+        },
+      };
+      const event = makeSnsEvent(JSON.stringify(alarm));
+      await baseHandler(event);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects alarm with Trigger missing MetricName', async () => {
+      const alarm = {
+        AlarmName: 'test-alarm',
+        NewStateValue: 'ALARM',
+        NewStateReason: 'Threshold crossed',
+        StateChangeTime: '2024-01-15T10:30:00Z',
+        Region: 'us-east-1',
+        Trigger: {
+          // MetricName intentionally absent
+          Namespace: 'AWS/EC2',
+          Period: 60,
+          Statistic: 'Average',
+          Threshold: 90,
+          ComparisonOperator: 'GreaterThanThreshold',
+        },
+      };
+      const event = makeSnsEvent(JSON.stringify(alarm));
+      await baseHandler(event);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('SNS — Budget Notification (plain text)', () => {

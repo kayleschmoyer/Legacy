@@ -98,9 +98,20 @@ function isBudgetNotification(parsed: unknown): parsed is BudgetNotification {
 function isCloudWatchAlarm(parsed: unknown): parsed is CloudWatchAlarm {
   if (parsed === null || typeof parsed !== 'object') return false;
   const obj = parsed as Record<string, unknown>;
+  if (
+    typeof obj['AlarmName'] !== 'string' ||
+    typeof obj['NewStateValue'] !== 'string' ||
+    typeof obj['NewStateReason'] !== 'string' ||
+    typeof obj['StateChangeTime'] !== 'string' ||
+    typeof obj['Region'] !== 'string'
+  ) {
+    return false;
+  }
+  const trigger = obj['Trigger'];
+  if (trigger === null || typeof trigger !== 'object') return false;
+  const t = trigger as Record<string, unknown>;
   return (
-    typeof obj['AlarmName'] === 'string' &&
-    typeof obj['NewStateValue'] === 'string'
+    typeof t['MetricName'] === 'string' && typeof t['Namespace'] === 'string'
   );
 }
 
