@@ -254,6 +254,8 @@ Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scr
 
 `apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (19+ shared libraries) · `terraform/` · `.agents/skills/`
 
+The codebase supports **multiple sports** (baseball, football) under a single data model. Every league and player carries a `sport` discriminator (`'baseball' | 'football'`). Sport-specific stat tables, scoring rules, and position configs are gated on this field. See **[`docs/architecture/multi-sport.md`](docs/architecture/multi-sport.md)** for the full multi-sport design and [how to add a third sport](docs/architecture/multi-sport.md#how-to-add-a-third-sport).
+
 See `.agents/skills/architecture/SKILL.md` for system overview. For a fast capability → file path lookup (use before Glob sweeps): **`.agents/skills/architecture/FILE-MAP.md`**.
 
 ## Design Context

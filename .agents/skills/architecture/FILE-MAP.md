@@ -23,19 +23,19 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 
 ## Lambdas
 
-| Lambda          | Root path                      | Notes                                |
-| --------------- | ------------------------------ | ------------------------------------ |
-| GraphQL API     | `lambdas/db/src/`              | Apollo Server; Pothos schema builder |
-| OAuth / auth    | `lambdas/oauth-proxy/src/`     | Google OAuth + JWT issuing           |
-| Stats ingest    | `lambdas/stats-lambda/src/`    | MLB stats ingestion                  |
-| Draft processor | `lambdas/draft-processor/src/` | Draft pick processing                |
-| Game selection  | `lambdas/game-selection/src/`  | Fantasy game-selection logic         |
-| Notifications   | `lambdas/notifications/src/`   | WebSocket + push notifications       |
-| Stripe webhook  | `lambdas/stripe-webhook/src/`  | Stripe payment events                |
-| GitHub webhook  | `lambdas/github-webhook/src/`  | GitHub event handling                |
-| Image upload    | `lambdas/image-upload/src/`    | S3 image upload presigning           |
-| WebSocket       | `lambdas/websocket/src/`       | WebSocket connect/disconnect         |
-| Jira proxy      | `lambdas/jira-proxy/src/`      | Jira API proxy for agents            |
+| Lambda          | Root path                      | Notes                                                                                                                                                |
+| --------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GraphQL API     | `lambdas/db/src/`              | Apollo Server; Pothos schema builder                                                                                                                 |
+| OAuth / auth    | `lambdas/oauth-proxy/src/`     | Google OAuth + JWT issuing                                                                                                                           |
+| Stats ingest    | `lambdas/stats-lambda/src/`    | Multi-sport stats ingestion; routes by SQS message shape (not sport); baseball sourced from Baseball Reference, football from Pro Football Reference |
+| Draft processor | `lambdas/draft-processor/src/` | Draft pick processing                                                                                                                                |
+| Game selection  | `lambdas/game-selection/src/`  | Fantasy game-selection logic                                                                                                                         |
+| Notifications   | `lambdas/notifications/src/`   | WebSocket + push notifications                                                                                                                       |
+| Stripe webhook  | `lambdas/stripe-webhook/src/`  | Stripe payment events                                                                                                                                |
+| GitHub webhook  | `lambdas/github-webhook/src/`  | GitHub event handling                                                                                                                                |
+| Image upload    | `lambdas/image-upload/src/`    | S3 image upload presigning                                                                                                                           |
+| WebSocket       | `lambdas/websocket/src/`       | WebSocket connect/disconnect                                                                                                                         |
+| Jira proxy      | `lambdas/jira-proxy/src/`      | Jira API proxy for agents                                                                                                                            |
 
 ---
 
@@ -44,7 +44,7 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 | Library                   | Package name                       | Root path                                        | What it contains                            |
 | ------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------------------------------- |
 | Database / ORM            | `@legacy-sports/db-client`         | `lib/db-client/src/`                             | Drizzle schema, services, migrations        |
-| Database schema           | —                                  | `lib/db-client/src/lib/schema/`                  | All table definitions                       |
+| Database schema           | —                                  | `lib/db-client/src/drizzle/public/models/`       | All table definitions (baseball + football) |
 | DB migrations             | —                                  | `lib/db-client/migrations/`                      | SQL migration files                         |
 | DB services               | —                                  | `lib/db-client/src/lib/services/`                | `LeagueService`, `PlayerService`, etc.      |
 | GraphQL types (codegen)   | `@legacy-sports/api`               | `lib/api/src/`                                   | Generated TS types from GraphQL schema      |
@@ -58,12 +58,29 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 | AWS utilities             | `@legacy-sports/aws-utils`         | `lib/aws-utils/src/`                             | SSM, Secrets Manager helpers                |
 | Scoring                   | `@legacy-sports/scoring`           | `lib/scoring/src/`                               | Fantasy scoring logic                       |
 | Scheduling                | `@legacy-sports/scheduling`        | `lib/scheduling/src/`                            | Cron / schedule utilities                   |
-| MLB client                | `@legacy-sports/mlb-client`        | `lib/mlb-client/src/`                            | MLB Stats API client                        |
+| MLB client                | `@legacy-sports/mlb-client`        | `lib/mlb-client/src/`                            | MLB Stats API client (baseball only)        |
 | Utils                     | `@legacy-sports/utils`             | `lib/utils/src/`                                 | General-purpose utilities                   |
 | Test fixtures             | `@legacy-sports/test-fixtures`     | `lib/test-fixtures/src/`                         | Shared test data / factories                |
 | Analytics                 | `@legacy-sports/analytics`         | `lib/analytics/src/`                             | Event tracking                              |
 | Sentry                    | `@legacy-sports/sentry`            | `lib/sentry/src/`                                | Error reporting setup                       |
 | WebSocket client          | `@legacy-sports/websocket-client`  | `lib/websocket-client/src/`                      | Client-side WS connection                   |
+
+---
+
+## Multi-Sport Key Files
+
+| What                           | Path                                                            |
+| ------------------------------ | --------------------------------------------------------------- |
+| Sport config (SPORT_CONFIGS)   | `lib/shared-components/src/config/sports.ts`                    |
+| Sport kind type (SportKind)    | `lib/shared-components/src/config/sports.ts`                    |
+| Leagues sport discriminator    | `lib/db-client/src/drizzle/public/models/Leagues.ts`            |
+| Players sport + pfrId columns  | `lib/db-client/src/drizzle/public/models/Players.ts`            |
+| Football stat tables (Drizzle) | `lib/db-client/src/drizzle/public/models/FootballStatistics.ts` |
+| NFL teams table (Drizzle)      | `lib/db-client/src/drizzle/public/models/FootballTeams.ts`      |
+| Sport-tagged lookup tables     | `lib/db-client/src/drizzle/public/models/Sports.ts`             |
+| Stats-lambda message router    | `lambdas/stats-lambda/src/index.ts`                             |
+| Football draft strategy        | `lambdas/db/src/schema/drafts/strategies/football.ts`           |
+| Multi-sport architecture doc   | `docs/architecture/multi-sport.md`                              |
 
 ---
 

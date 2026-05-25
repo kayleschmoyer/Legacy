@@ -93,13 +93,23 @@ Used for DbOptions, SecureStorage, AwsSecrets:
 - `public` — Fantasy league data (matchups, players, stats, scoring)
 - `app_internal` — Authentication and system tables (users, game_stats, events)
 
-**Pattern**: Season → Career aggregation
+**Sport discriminator**: Every `league` row carries `leagues.sport` (`'baseball' | 'football'`); every `player` row carries `players.sport`. Stat tables are sport-specific — baseball and football never share a stats table.
 
-- `season_batting/pitching/fielding` — source data (tables)
-- `career_*` — aggregated totals (views, read-only, AL/NL only)
-- Drizzle ORM for type-safe queries
+**Baseball stat pattern**: Season → Career aggregation
 
-See [cli-usage](../cli-usage/SKILL.md) for database query tools and [repo-tooling](../repo-tooling/SKILL.md) for migration workflow.
+- `game_batting/pitching/fielding` — per-game source data
+- `season_batting/pitching/fielding` — per-season aggregates
+- `career_batting/pitching/fielding` — career totals (views, read-only; AL/NL only for career aggregation)
+
+**Football stat pattern**: Per-game tables by position group
+
+- `game_football_passing/rushing/receiving/kicking/defense` — per-game data
+- `game_football_defense_idp` / `football_season_defense_idp` — IDP variant
+- `career_football_defense_idp` — career totals (view, IDP only)
+
+**Sport-scoped lookup tables**: `sport_player_pools`, `sport_eras` — keyed on `(sport, key)` so baseball and football define independent pool and era vocabularies without code changes.
+
+See [cli-usage](../cli-usage/SKILL.md) for database query tools and [repo-tooling](../repo-tooling/SKILL.md) for migration workflow. For the full multi-sport model, see [docs/architecture/multi-sport.md](../../docs/architecture/multi-sport.md).
 
 ---
 
@@ -191,9 +201,10 @@ These summaries were previously inline in AGENTS.md:
 
 - **GraphQL API**: Lives in `lambdas/db` (Apollo Server on Lambda). Schema changes require Drizzle migrations in `lib/db-client/migrations/` and regenerating types via `make codegen`.
 - **Cross-platform components**: `lib/shared-components/src/platform-components/` -- `.native.ts` files are auto-resolved by Metro. The `__PLATFORM_COMPONENTS__` magic string is used for build-time resolution of more complex platform splits.
-- **Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `db_migration_status` and `db_migrate` MCP tools before `make pc`.
+- **Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `db_migration_status` and `db_migrate` MCP tools before `make pc`. Sport-specific stat tables exist for both baseball and football — see [multi-sport architecture](../../docs/architecture/multi-sport.md).
 - **Logging**: Import `LOGGER` from `@legacy-sports/logging`. ESLint enforces `no-console`.
 - **Testing**: Unit/integration: Jest (`make test`). Web E2E: Playwright (hermetic -- `route.fulfill()` only). Mobile E2E: WebdriverIO.
+- **Multi-sport**: `leagues.sport` and `players.sport` are the canonical sport discriminators. `SPORT_CONFIGS` in `lib/shared-components/src/config/sports.ts` holds per-sport UI config (positions, stat labels, colors). Basketball and hockey entries exist as future scaffolding.
 
 ## Quick File Lookup
 

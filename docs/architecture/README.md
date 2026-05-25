@@ -6,6 +6,7 @@ This directory contains technical architecture documentation for the Legacy Spor
 
 ### Core Architecture
 
+- **[Multi-Sport Architecture](multi-sport.md)** - How baseball and football share a single data model; sport discriminator pattern; how to add a third sport
 - **[Build System](build-system.md)** - Nx monorepo, dependency management, and build workflows
 - **[Cross-Platform System](cross-platform-system.md)** - Magic strings and native module resolution
 - **[Database Schema](database-schema.md)** - Complete database design and entity relationships
