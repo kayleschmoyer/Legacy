@@ -163,6 +163,8 @@ resource "aws_instance" "nat_instance" {
   # - Nitro instances (including t3) use predictable interface names
   #   (e.g. `ens5`) rather than `eth0`, so we resolve the primary interface
   #   from the default route instead of hardcoding it.
+  user_data_replace_on_change = false
+
   user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
     set -euo pipefail

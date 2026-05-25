@@ -30,12 +30,15 @@ on:
         default: false
         type: boolean
 
-# CRITICAL: cancel-in-progress allows batching multiple Lambda updates
-# If Lambda A and B both upload, the first Terraform run gets cancelled
-# and the second run deploys BOTH changes (Terraform detects via SSM)
+# cancel-in-progress is intentionally FALSE: cancelling a running apply
+# mid-destroy+create cycle can leave Terraform state inconsistent (resource
+# destroyed in state but not yet re-created in AWS). With false, a queued
+# trigger waits for the running apply to finish; since Terraform detects all
+# pending SSM version changes at plan time, the queued run is usually a no-op.
+# The 30s debounce below still batches most same-window Lambda uploads.
 concurrency:
   group: terraform-lambda-infrastructure
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-1
