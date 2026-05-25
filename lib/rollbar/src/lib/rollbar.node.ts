@@ -56,7 +56,7 @@ class NodeRollbarImplementation implements RollbarInterface {
     } catch (error) {
       LOGGER.error(
         'Failed to fetch Rollbar access token from Secrets Manager',
-        error as Error,
+        error instanceof Error ? error : new Error(String(error)),
         { secretName: config.accessTokenSecretName },
       );
     }
@@ -94,7 +94,10 @@ class NodeRollbarImplementation implements RollbarInterface {
       );
       LOGGER.addDestination(this.rollbarDestination);
     } catch (error) {
-      LOGGER.error('Failed to initialize Rollbar', error as Error);
+      LOGGER.error(
+        'Failed to initialize Rollbar',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
@@ -132,7 +135,12 @@ class NodeRollbarImplementation implements RollbarInterface {
       }
       this.reportedErrors.add(error);
     } catch (captureError) {
-      LOGGER.error('Failed to capture error in Rollbar', captureError as Error);
+      LOGGER.error(
+        'Failed to capture error in Rollbar',
+        captureError instanceof Error
+          ? captureError
+          : new Error(String(captureError)),
+      );
       LOGGER.error('Original error was:', error);
     }
   }
