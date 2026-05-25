@@ -4956,6 +4956,7 @@ export type GetLeagueTradeBlockQuery = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5188,6 +5189,16 @@ export type GetMatchupsByWeekQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -5214,6 +5225,16 @@ export type GetMatchupsForLeagueQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -5487,6 +5508,7 @@ export type GetTeamMembersQuery = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -6233,6 +6255,16 @@ export type MatchupFragment = {
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
+  team1?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  team2?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
 };
 
 export type MatchupPlayerFragment = {
@@ -7227,6 +7259,7 @@ export type SetTradeBlockMutation = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7291,6 +7324,7 @@ export type TeamMemberFragment = {
   onTradeBlock?: boolean | null;
   salary?: number | null;
   askingPrice?: string | null;
+  nickname?: string | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -8105,6 +8139,14 @@ export const MatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
+    team1 {
+      id
+      name
+    }
+    team2 {
+      id
+      name
+    }
   }
 `;
 export const MatchupPlayerFragmentDoc = gql`
@@ -8419,6 +8461,7 @@ export const TeamMemberFragmentDoc = gql`
     onTradeBlock
     salary
     askingPrice
+    nickname
     player {
       id
       firstName
