@@ -10,6 +10,7 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { getNotificationCopy } from '@legacy-sports/utils';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { assertAuthorized } from './scheduled-mutations';
@@ -137,6 +138,7 @@ builder.mutationField('sendDiscordScoreAlerts', (t) =>
           name: PublicSchema.leagues.name,
           discordWebhookUrl: PublicSchema.leagues.discordWebhookUrl,
           currentWeek: PublicSchema.leagues.currentWeek,
+          sport: PublicSchema.leagues.sport,
         })
         .from(PublicSchema.leagues)
         .where(and(...leagueConditions));
@@ -244,12 +246,13 @@ builder.mutationField('sendDiscordScoreAlerts', (t) =>
                 ? COLOR_CLOSE_MATCHUP
                 : COLOR_SCORE_UPDATE;
 
+          const scoreCopy = getNotificationCopy('score_alert', league.sport);
           embeds.push({
             title,
             description: scoreLines.join('\n'),
             color,
             timestamp: new Date().toISOString(),
-            footer: { text: 'Legacy Sports Scores' },
+            footer: { text: `${scoreCopy.footerText} Scores` },
           });
 
           // Post to Discord

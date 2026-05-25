@@ -10,6 +10,7 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { getNotificationCopy } from '@legacy-sports/utils';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { assertAuthorized } from './scheduled-mutations';
@@ -142,6 +143,7 @@ builder.mutationField('sendDiscordWeeklyRecaps', (t) =>
           name: PublicSchema.leagues.name,
           discordWebhookUrl: PublicSchema.leagues.discordWebhookUrl,
           currentWeek: PublicSchema.leagues.currentWeek,
+          sport: PublicSchema.leagues.sport,
         })
         .from(PublicSchema.leagues)
         .where(and(...leagueConditions));
@@ -332,9 +334,10 @@ builder.mutationField('sendDiscordWeeklyRecaps', (t) =>
           });
 
           // ── Build Embeds ──
+          const recapCopy = getNotificationCopy('matchup_recap', league.sport);
           const embeds: DiscordEmbed[] = [
             {
-              title: `Week ${recapWeek} Recap — ${league.name}`,
+              title: `Week ${recapWeek} ${recapCopy.sportLabel} Recap — ${league.name}`,
               description: resultLines.join('\n'),
               color: COLOR_RECAP,
               fields: [
@@ -352,7 +355,7 @@ builder.mutationField('sendDiscordWeeklyRecaps', (t) =>
                 },
               ],
               timestamp: new Date().toISOString(),
-              footer: { text: 'Legacy Sports Weekly Recap' },
+              footer: { text: `${recapCopy.footerText} Weekly Recap` },
             },
             {
               title: `Standings after Week ${recapWeek}`,

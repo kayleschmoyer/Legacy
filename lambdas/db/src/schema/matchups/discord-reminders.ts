@@ -18,6 +18,7 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { getNotificationCopy } from '@legacy-sports/utils';
 import { and, asc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm';
 
 import { assertAuthorized } from './system-auth';
@@ -209,6 +210,7 @@ builder.mutationField('sendDiscordLineupReminders', (t) =>
             PublicSchema.leagues.discordLastReminderMatchupId,
           currentWeek: PublicSchema.leagues.currentWeek,
           rosterLockTiming: PublicSchema.leagues.rosterLockTiming,
+          sport: PublicSchema.leagues.sport,
         })
         .from(PublicSchema.leagues)
         .where(and(...leagueConditions));
@@ -312,9 +314,13 @@ builder.mutationField('sendDiscordLineupReminders', (t) =>
             timeStyle: 'short',
           });
 
+          const reminderCopy = getNotificationCopy(
+            'lineup_reminder',
+            league.sport,
+          );
           const sent = await postToDiscord(league.discordWebhookUrl, {
             title: 'Lineup Lock Reminder',
-            description: `Rosters lock in **${timeLabel}**! Make sure your lineup is set for Week ${league.currentWeek}.`,
+            description: `Rosters lock in **${timeLabel}**! Make sure your ${reminderCopy.sportLabel} lineup is set for Week ${league.currentWeek}.`,
             color: 0xffa500, // Orange
             fields: [
               {
@@ -329,7 +335,7 @@ builder.mutationField('sendDiscordLineupReminders', (t) =>
               },
             ],
             timestamp: new Date().toISOString(),
-            footer: { text: 'Legacy Sports' },
+            footer: { text: reminderCopy.footerText },
           });
 
           if (sent) {
