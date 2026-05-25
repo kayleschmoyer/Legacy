@@ -20,8 +20,9 @@ name: "Check Migrations Applied"
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "lib/db-client/migrations/*.ts"
+  # paths filter intentionally omitted: this is a required status check and must
+  # fire on every PR targeting main. A path-filtered required check never triggers
+  # on non-migration PRs, leaving them stuck at "Expected" and unable to merge.
   # push-to-main trigger removed: migration status is verified on PRs before
   # merge.  Use workflow_dispatch for ad-hoc checks post-merge.
   workflow_dispatch:

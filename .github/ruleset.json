@@ -49,6 +49,10 @@
             "context": "No Merge Conflicts"
           },
           {
+            "_comment": "Verifies all migration files in lib/db-client/migrations/ are applied to the production RDS before merge. Blocks PRs that add a migration file without running it first. Defined in check-migrations-applied.yml; runs on every PR (no paths filter) so this required check always fires. LS-4843.",
+            "context": "Verify All Migrations Applied"
+          },
+          {
             "_comment": "ESLint job in ci-pipeline.yml, surfaced as a composite check via workflow_call from ci-orchestrator.yml. Context name = outer job display name + ' / ' + inner job name. integration_id:15368 (GitHub Actions) is required so the ruleset evaluator matches the check-run; without it, GitHub shows 'Expected — Waiting for status to be reported' despite CI passing (LS-4345).",
             "_calledWorkflow": true,
             "context": "🚀 CI Pipeline / lint",
