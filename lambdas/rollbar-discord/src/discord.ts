@@ -250,6 +250,15 @@ export async function postToDiscord(
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
+    if (response.status === 429) {
+      LOGGER.warn(
+        'Discord webhook rate limited (429) — skipping notification',
+        {
+          body: text,
+        },
+      );
+      return;
+    }
     LOGGER.error(
       `Discord webhook failed: ${response.status} ${response.statusText}`,
       { body: text },

@@ -329,7 +329,7 @@ describe('postToDiscord', () => {
     );
   });
 
-  it('throws on non-ok response', async () => {
+  it('swallows 429 rate-limit responses without throwing', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 429,
@@ -345,6 +345,25 @@ describe('postToDiscord', () => {
 
     await expect(
       postToDiscord('https://discord.com/api/webhooks/test', embed),
-    ).rejects.toThrow('Discord webhook returned 429');
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws on other non-ok responses', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: jest.fn().mockResolvedValue('server error'),
+    });
+
+    const embed = {
+      title: 'Test',
+      description: 'Test embed',
+      color: 0xed4245,
+    };
+
+    await expect(
+      postToDiscord('https://discord.com/api/webhooks/test', embed),
+    ).rejects.toThrow('Discord webhook returned 500');
   });
 });
