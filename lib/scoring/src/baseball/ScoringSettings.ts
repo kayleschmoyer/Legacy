@@ -1,4 +1,6 @@
-export type ScoringDictionary = Partial<Record<string, number>>;
+import type { ScoringDictionary } from '../ScoringTypes';
+
+export type { ScoringDictionary };
 
 export interface BaseballScoringSettings {
   readonly batting: ScoringDictionary;
