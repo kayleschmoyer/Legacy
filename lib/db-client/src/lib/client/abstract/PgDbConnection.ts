@@ -116,14 +116,35 @@ export class PgDbConnection<
       schema: this.schema,
     });
 
-    // Get one client to verify connection works, then immediately release it
-    try {
-      const testClient = await pgPool.connect();
-      testClient.release();
-    } catch (err) {
-      // If connection test fails, clean up the pool
+    // Get one client to verify connection works, then immediately release it.
+    // Retry up to 3 times with a 1-second delay — Lambda cold starts in a VPC
+    // can produce transient "Connection terminated unexpectedly" errors on the
+    // first connect attempt while the ENI warms up.
+    const MAX_CONNECT_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 1000;
+    let lastErr: Error | undefined;
+    for (let attempt = 1; attempt <= MAX_CONNECT_ATTEMPTS; attempt++) {
+      try {
+        const testClient = await pgPool.connect();
+        testClient.release();
+        lastErr = undefined;
+        break;
+      } catch (err) {
+        lastErr = err instanceof Error ? err : new Error(String(err));
+        if (attempt < MAX_CONNECT_ATTEMPTS) {
+          LOGGER.warn(
+            `[DB Pool] Initial connection attempt ${attempt} failed, retrying in ${RETRY_DELAY_MS}ms...`,
+            lastErr,
+          );
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, RETRY_DELAY_MS),
+          );
+        }
+      }
+    }
+    if (lastErr !== undefined) {
       await pgPool.end();
-      throw err;
+      throw lastErr;
     }
 
     return {
