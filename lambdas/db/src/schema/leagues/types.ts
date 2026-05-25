@@ -24,32 +24,11 @@ export const DefensiveFormatEnum = builder.enumType('DefensiveFormat', {
     'Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players).',
 });
 
-// Default roster positions for new leagues
-// These represent a standard fantasy baseball roster configuration
-export const DEFAULT_ROSTER_POSITIONS = [
-  // Batting positions
-  'C', // Catcher
-  '1B', // First Base
-  '2B', // Second Base
-  '3B', // Third Base
-  'SS', // Shortstop
-  'OF', // Outfield (3 slots)
-  'OF',
-  'OF',
-  'DH', // Designated Hitter
-  // Pitching positions
-  'SP', // Starting Pitcher (5 slots)
-  'SP',
-  'SP',
-  'SP',
-  'SP',
-  'RP', // Relief Pitcher (3 slots)
-  'RP',
-  'RP',
-  // Utility positions
-  'IF', // Infield utility
-  'XDH', // Extra DH/utility
-] as const;
+export {
+  DEFAULT_BASEBALL_ROSTER_POSITIONS as DEFAULT_ROSTER_POSITIONS,
+  DEFAULT_FOOTBALL_ROSTER_POSITIONS,
+  DEFAULT_ROSTER_POSITIONS_BY_SPORT,
+} from '@legacy-sports/utils';
 
 // League type - matches database schema with proper nullability
 export const League = builder.objectRef<{

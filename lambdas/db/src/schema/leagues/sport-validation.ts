@@ -12,7 +12,9 @@
  * (LS-4685).
  */
 
-export type SportKind = 'baseball' | 'football';
+export type { SportKind } from '@legacy-sports/utils';
+import type { SportKind } from '@legacy-sports/utils';
+export { DEFAULT_ROSTER_SIZE_BY_SPORT } from '@legacy-sports/utils';
 
 /** Era IDs that are valid for each sport. `all` and `custom` are shared. */
 export const VALID_ERAS_BY_SPORT: Record<SportKind, ReadonlySet<string>> = {

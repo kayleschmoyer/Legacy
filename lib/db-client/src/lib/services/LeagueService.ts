@@ -1,33 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
+import {
+  DEFAULT_ROSTER_POSITIONS_BY_SPORT,
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
+} from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
 import type { DraftMode, DraftOrder, SelectionMethod } from '../DraftUtils';
-
-// Default roster positions for new leagues
-// Standard fantasy baseball roster configuration
-const DEFAULT_ROSTER_POSITIONS = [
-  // Batting positions
-  'C', // Catcher
-  '1B', // First Base
-  '2B', // Second Base
-  '3B', // Third Base
-  'SS', // Shortstop
-  'OF', // Outfield (3 slots)
-  'OF',
-  'OF',
-  'DH', // Designated Hitter
-  // Pitching positions
-  'SP', // Starting Pitcher (5 slots)
-  'SP',
-  'SP',
-  'SP',
-  'SP',
-  'RP', // Relief Pitcher (3 slots)
-  'RP',
-  'RP',
-] as const;
 
 // Default team names (owner's team name is generated dynamically)
 const DEFAULT_TEAM_NAMES = [
@@ -180,7 +160,7 @@ export class LeagueService {
       ownerId,
       ownerUsername,
       sport = 'baseball',
-      maxRosterSize = 25,
+      maxRosterSize: maxRosterSizeInput,
       numberOfTeams = 12,
       numberOfDivisions = 2,
       schedulingStrategy = 'divisional',
@@ -208,6 +188,9 @@ export class LeagueService {
       auctionMinBid = 1,
       startDate,
     } = input;
+
+    const maxRosterSize =
+      maxRosterSizeInput ?? DEFAULT_ROSTER_SIZE_BY_SPORT[sport];
 
     if (numberOfTeams < 1) {
       throw new Error(`numberOfTeams must be at least 1, got ${numberOfTeams}`);
@@ -330,8 +313,9 @@ export class LeagueService {
         };
         await tx.insert(PublicSchema.leagueMembers).values(ownerMember);
 
-        // 4. Create roster positions
-        const positionData = DEFAULT_ROSTER_POSITIONS.map((positionType) => ({
+        // 4. Create roster positions using sport-appropriate defaults (LS-4761)
+        const rosterPositions = DEFAULT_ROSTER_POSITIONS_BY_SPORT[sport];
+        const positionData = rosterPositions.map((positionType) => ({
           leagueId: league.id,
           positionType,
         }));

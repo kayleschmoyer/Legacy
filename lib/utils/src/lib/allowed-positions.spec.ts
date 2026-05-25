@@ -42,13 +42,17 @@ describe('ALLOWED_POSITIONS (baseball back-compat alias)', () => {
 describe('ALLOWED_POSITIONS_BY_SPORT.football', () => {
   const football = ALLOWED_POSITIONS_BY_SPORT.football;
 
-  it('QB/RB/WR/TE/K/DEF accept only their own position', () => {
+  it('QB/RB/WR/TE/K accept only their own position', () => {
     expect(football['QB']).toEqual(['QB']);
     expect(football['RB']).toEqual(['RB']);
     expect(football['WR']).toEqual(['WR']);
     expect(football['TE']).toEqual(['TE']);
     expect(football['K']).toEqual(['K']);
-    expect(football['DEF']).toEqual(['DEF']);
+  });
+
+  it('DST slot accepts only DST position (team defense/special teams, LS-245)', () => {
+    expect(football['DST']).toEqual(['DST']);
+    expect(football['DEF']).toBeUndefined();
   });
 
   it('FLEX accepts RB, WR, TE', () => {
@@ -56,7 +60,7 @@ describe('ALLOWED_POSITIONS_BY_SPORT.football', () => {
   });
 
   it('BENCH accepts all offensive + defensive position values', () => {
-    expect(football['BENCH']).toEqual(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
+    expect(football['BENCH']).toEqual(['QB', 'RB', 'WR', 'TE', 'K', 'DST']);
   });
 
   it('every football slot has a non-empty allowed list', () => {
@@ -97,14 +101,18 @@ describe('OFFENSIVE_POSITIONS (football)', () => {
     expect(OFFENSIVE_POSITIONS.has('FLEX')).toBe(true);
   });
 
-  it('does not include DEF', () => {
-    expect(OFFENSIVE_POSITIONS.has('DEF')).toBe(false);
+  it('does not include DST', () => {
+    expect(OFFENSIVE_POSITIONS.has('DST')).toBe(false);
   });
 });
 
 describe('DEFENSIVE_POSITIONS (football)', () => {
-  it('includes DEF', () => {
-    expect(DEFENSIVE_POSITIONS.has('DEF')).toBe(true);
+  it('includes DST (team defense/special teams)', () => {
+    expect(DEFENSIVE_POSITIONS.has('DST')).toBe(true);
+  });
+
+  it('does not include DEF (renamed to DST in LS-245)', () => {
+    expect(DEFENSIVE_POSITIONS.has('DEF')).toBe(false);
   });
 
   it('does not include offensive positions', () => {

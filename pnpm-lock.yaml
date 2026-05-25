@@ -1594,6 +1594,9 @@ importers:
       '@legacy-sports/ui-abstractions':
         specifier: workspace:*
         version: link:../ui-abstractions
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@legacy-sports/websocket-client':
         specifier: workspace:*
         version: link:../websocket-client

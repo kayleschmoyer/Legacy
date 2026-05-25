@@ -16,7 +16,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
-  DEFAULT_ROSTER_POSITIONS,
+  DEFAULT_ROSTER_POSITIONS_BY_SPORT,
   DefensiveFormatEnum,
   League,
   LeagueMember,
@@ -25,6 +25,7 @@ import {
   Team,
 } from './types';
 import {
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
   isEraFreeForSport,
   isEraValidForSport,
   isPoolValidForSport,
@@ -375,7 +376,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           sport: inputSport ?? 'baseball',
           defensiveFormat:
             inputDefensiveFormat === 'idp' ? 'idp' : ('dst' as const),
-          maxRosterSize: maxRosterSize || 25,
+          maxRosterSize:
+            maxRosterSize ?? DEFAULT_ROSTER_SIZE_BY_SPORT[resolvedSport],
           numberOfTeams,
           numberOfDivisions: resolvedNumberOfDivisions,
           schedulingStrategy:
@@ -497,26 +499,29 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
           .limit(1);
 
         if (existingPositions.length > 0) {
-          throw new Error('League already has positions configured');
+          throw UserInputError('League already has positions configured');
         }
 
-        // Get the league's maxRosterSize
+        // Get the league's sport and maxRosterSize
         const league = await context.db
           .select({
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            sport: PublicSchema.leagues.sport,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
           .limit(1);
 
         if (league.length === 0) {
-          throw new Error('League not found');
+          throw UserInputError('League not found');
         }
 
-        // Create roster positions for the league
-        // Only create the defined starter positions, bench spots are inferred
-        const allPositions = DEFAULT_ROSTER_POSITIONS.slice();
-        const positionData = allPositions.map((positionType) => ({
+        // Create sport-appropriate starter positions (LS-4761)
+        const sport = league[0].sport ?? 'baseball';
+        const defaultPositions =
+          DEFAULT_ROSTER_POSITIONS_BY_SPORT[sport] ??
+          DEFAULT_ROSTER_POSITIONS_BY_SPORT.baseball;
+        const positionData = defaultPositions.map((positionType) => ({
           leagueId: leagueId,
           positionType: positionType,
         }));

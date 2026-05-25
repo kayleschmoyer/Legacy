@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@legacy-sports/api": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
     "@legacy-sports/design-tokens": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/tamagui-config": "workspace:*",

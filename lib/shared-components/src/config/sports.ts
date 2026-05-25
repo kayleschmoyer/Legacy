@@ -1,3 +1,7 @@
+import {
+  DEFAULT_BASEBALL_ROSTER_POSITIONS,
+  DEFAULT_FOOTBALL_ROSTER_POSITIONS,
+} from '@legacy-sports/utils';
 import { SportConfig } from '../types';
 
 /**
@@ -7,7 +11,7 @@ import { SportConfig } from '../types';
  * basketball and hockey for future reach, but `SportKind` is the type that
  * components accept as their `sport` prop.
  */
-export type SportKind = 'baseball' | 'football';
+export type { SportKind } from '@legacy-sports/utils';
 
 export const SPORT_CONFIGS: Record<string, SportConfig> = {
   baseball: {
@@ -222,3 +226,71 @@ export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 
 // Alias for backward compatibility
 export const sportsConfig = SPORT_CONFIGS;
+
+/**
+ * Describes a complete lineup/roster template for a league.
+ * `starters` is an ordered list of position slots (repeats allowed, e.g. two 'RB' entries).
+ * `bench` is the number of generic bench spots.
+ * `ir` is the number of injured-reserve spots.
+ */
+export interface LineupTemplate {
+  readonly starters: readonly string[];
+  readonly bench: number;
+  readonly ir: number;
+}
+
+/**
+ * Default lineup templates per sport and defensive format.
+ * Football has two variants — `dst` (team defense/special teams) and `idp`
+ * (individual defensive players) — matching the league `defensiveFormat` field.
+ * Baseball only has one format.
+ *
+ * Slot names match the `position_slot` Postgres enum (LS-245).
+ * The league creation wizard (LS-256) pre-fills from these but lets the
+ * commissioner adjust before the draft.
+ */
+export const DEFAULT_LINEUP_BY_SPORT = {
+  baseball: {
+    dst: {
+      starters: DEFAULT_BASEBALL_ROSTER_POSITIONS,
+      bench: 5,
+      ir: 0,
+    } satisfies LineupTemplate,
+  },
+  football: {
+    dst: {
+      starters: DEFAULT_FOOTBALL_ROSTER_POSITIONS,
+      bench: 6,
+      ir: 1,
+    } satisfies LineupTemplate,
+    idp: {
+      starters: [
+        'QB',
+        'RB',
+        'RB',
+        'WR',
+        'WR',
+        'TE',
+        'FLEX',
+        'K',
+        'DL',
+        'DL',
+        'LB',
+        'LB',
+        'DB',
+        'DB',
+        'DP',
+      ],
+      bench: 6,
+      ir: 1,
+    } satisfies LineupTemplate,
+  },
+} as const;
+
+/**
+ * Default maximum roster size per sport applied when the commissioner does not
+ * override during league creation.  Football's tighter cap (16) reflects the
+ * standard 9-starter + 6-bench + 1-IR configuration; baseball's larger pool (25)
+ * accommodates the deeper pitching staff.
+ */
+export { DEFAULT_ROSTER_SIZE_BY_SPORT } from '@legacy-sports/utils';

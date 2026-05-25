@@ -44,9 +44,11 @@ const FOOTBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
     WR: ['WR'],
     TE: ['TE'],
     K: ['K'],
-    DEF: ['DEF'],
+    /** DST slot maps to the synthetic DST team-defense player (LS-245). */
+    DST: ['DST'],
+    /** FLEX accepts RB, WR, or TE — the canonical football flex eligibility rule. */
     FLEX: ['RB', 'WR', 'TE'],
-    BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'],
+    BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST'],
   });
 
 /**
@@ -82,7 +84,7 @@ export const OFFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
   new Set(['QB', 'RB', 'WR', 'TE', 'K', 'FLEX']),
 );
 
-/** Football positions that count as defense. */
+/** Football positions that count as defense (DST = team defense/special teams, LS-245). */
 export const DEFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
-  new Set(['DEF']),
+  new Set(['DST']),
 );
