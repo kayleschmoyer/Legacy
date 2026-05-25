@@ -27,9 +27,13 @@ export class ConsoleOutputDestination implements OutputDestination {
         default:
           console.log(formattedMessage);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // EPIPE means the pipe consumer (e.g. test runner, shell pipe) closed — not a real error
-      if ((error as NodeJS.ErrnoException).code !== 'EPIPE') {
+      if (
+        !(error instanceof Error) ||
+        !('code' in error) ||
+        (error as NodeJS.ErrnoException).code !== 'EPIPE'
+      ) {
         throw error;
       }
     }

@@ -1,6 +1,6 @@
+import { ConsoleOutputDestination } from './destinations/ConsoleOutputDestination';
 import { formatLogEntry } from './types';
 import type { LogEntry } from './types';
-import { ConsoleOutputDestination } from './destinations/ConsoleOutputDestination';
 
 function makeEntry(args: LogEntry['args']): LogEntry {
   return {
@@ -69,37 +69,47 @@ describe('logging', () => {
 });
 
 describe('ConsoleOutputDestination — EPIPE handling', () => {
-  it('silently swallows EPIPE errors from console writes', () => {
-    const dest = new ConsoleOutputDestination();
+  const dest = new ConsoleOutputDestination();
+
+  function makeLogEntry(level: LogEntry['level']): LogEntry {
+    return { level, message: 'test', args: [], timestamp: new Date() };
+  }
+
+  function epipeFor(level: LogEntry['level']): jest.SpyInstance {
     const epipe = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
-    jest.spyOn(console, 'info').mockImplementation(() => {
+    const method: keyof Console =
+      level === 'debug'
+        ? 'debug'
+        : level === 'info'
+          ? 'info'
+          : level === 'warn'
+            ? 'warn'
+            : 'error';
+    return jest.spyOn(console, method).mockImplementation(() => {
       throw epipe;
     });
-    expect(() =>
-      dest.write({
-        level: 'info',
-        message: 'test',
-        args: [],
-        timestamp: new Date(),
-      }),
-    ).not.toThrow();
+  }
+
+  const levels: LogEntry['level'][] = [
+    'debug',
+    'info',
+    'warn',
+    'error',
+    'fatal',
+  ];
+
+  it.each(levels)('silently swallows EPIPE for level=%s', (level) => {
+    epipeFor(level);
+    expect(() => dest.write(makeLogEntry(level))).not.toThrow();
     jest.restoreAllMocks();
   });
 
-  it('re-throws non-EPIPE errors from console writes', () => {
-    const dest = new ConsoleOutputDestination();
-    const boom = new Error('something else');
-    jest.spyOn(console, 'info').mockImplementation(() => {
+  it('re-throws non-EPIPE errors', () => {
+    const boom = new Error('unexpected');
+    jest.spyOn(console, 'warn').mockImplementation(() => {
       throw boom;
     });
-    expect(() =>
-      dest.write({
-        level: 'info',
-        message: 'test',
-        args: [],
-        timestamp: new Date(),
-      }),
-    ).toThrow('something else');
+    expect(() => dest.write(makeLogEntry('warn'))).toThrow('unexpected');
     jest.restoreAllMocks();
   });
 });
