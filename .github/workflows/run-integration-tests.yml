@@ -70,7 +70,7 @@ jobs:
             echo "::error::Invalid PR number: $PR_NUMBER"
             exit 1
           fi
-          META=$(gh pr view "$PR_NUMBER" --json headRefName,baseRefName,headRefOid)
+          META=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefName,baseRefName,headRefOid)
           HEAD_REF=$(echo "$META" | jq -r '.headRefName')
           BASE_REF=$(echo "$META" | jq -r '.baseRefName')
           HEAD_SHA=$(echo "$META" | jq -r '.headRefOid')
@@ -101,6 +101,7 @@ jobs:
             mapfile -t CHANGED < <(git diff --name-only --diff-filter=AMR "$MERGE_BASE"..HEAD)
             SPECS=()
             CONFIG_TOUCHED=false
+            INFRA_TOUCHED=false
             for f in "${CHANGED[@]}"; do
               if [[ "$f" == apps/web-e2e/src/integration/tests/*.integration.spec.ts ]]; then
                 SPECS+=("$f")
@@ -108,10 +109,19 @@ jobs:
               if [[ "$f" == apps/web-e2e/playwright.integration.config.ts ]]; then
                 CONFIG_TOUCHED=true
               fi
+              # Changes to the integration runner workflow or shared test utilities
+              # are infra-level: run every spec so the infrastructure change is
+              # exercised end-to-end.
+              if [[ "$f" == .github/workflows/run-integration-tests.yml ]] \
+                 || [[ "$f" == apps/web-e2e/src/utils/*.ts ]] \
+                 || [[ "$f" == apps/web-e2e/src/integration/fixtures/*.ts ]] \
+                 || [[ "$f" == apps/web-e2e/src/integration/helpers/*.ts ]]; then
+                INFRA_TOUCHED=true
+              fi
             done
-            # If only the config file changed, run every integration spec so the
-            # config change is exercised end-to-end.
-            if [ "${#SPECS[@]}" -eq 0 ] && [ "$CONFIG_TOUCHED" = "true" ]; then
+            # If only the config, workflow, or shared utilities changed, run every
+            # integration spec so the infrastructure change is exercised end-to-end.
+            if [ "${#SPECS[@]}" -eq 0 ] && { [ "$CONFIG_TOUCHED" = "true" ] || [ "$INFRA_TOUCHED" = "true" ]; }; then
               mapfile -t SPECS < <(find apps/web-e2e/src/integration/tests -type f -name '*.integration.spec.ts' | sort)
             fi
           fi
@@ -164,9 +174,6 @@ jobs:
         shell: bash
         env:
           CI: "true"
-          # Force the json reporter to write to a file (default is stdout, which
-          # would interleave with the line reporter output and break parsing).
-          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results.json
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
           E2E_COMMISSIONER_EMAIL: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
           E2E_COMMISSIONER_PASSWORD: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
@@ -185,11 +192,13 @@ jobs:
           IFS=',' read -ra SPEC_ARGS <<< "$TOUCHED_SPECS"
           echo "Running ${#SPEC_ARGS[@]} touched integration spec(s):"
           printf '  - %s\n' "${SPEC_ARGS[@]}"
-          # Reporters: line for live console, json for the comment formatter.
+          # Reporters: line for live console output; json writes to a named file
+          # so the results comment step can find it regardless of stdout piping.
           pnpm exec playwright test \
             --config=apps/web-e2e/playwright.integration.config.ts \
             --workers=1 \
-            --reporter=line,json \
+            --reporter=line \
+            --reporter=json:test-results.json \
             -- "${SPEC_ARGS[@]}" \
             | tee playwright-output.log
         continue-on-error: true
