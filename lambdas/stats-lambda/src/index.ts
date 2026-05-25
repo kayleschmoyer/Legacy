@@ -15,6 +15,18 @@ import {
   isMlbStatsMessage,
   handler as mlbStatsHandler,
 } from './load-mlb-stats';
+import {
+  handler as footballGameHandler,
+  isFootballGameMessage,
+} from './load-football-game';
+import {
+  handler as footballSeasonHandler,
+  isFootballSeasonMessage,
+} from './load-football-season';
+import {
+  handler as footballScoreHandler,
+  isFootballScoreMessage,
+} from './handlers/calculate-football-matchup-scores';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -56,6 +68,24 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     if (isMlbStatsMessage(firstMessage)) {
       LOGGER.debug('Routing to MLB stats handler');
       return mlbStatsHandler(event);
+    }
+
+    // Football game stats messages have type: 'football-game-stats'
+    if (isFootballGameMessage(firstMessage)) {
+      LOGGER.debug('Routing to football game stats handler');
+      return footballGameHandler(event);
+    }
+
+    // Football season stats messages have type: 'football-season-stats'
+    if (isFootballSeasonMessage(firstMessage)) {
+      LOGGER.debug('Routing to football season stats handler');
+      return footballSeasonHandler(event);
+    }
+
+    // Football score calculation messages have type: 'football-calculate-scores'
+    if (isFootballScoreMessage(firstMessage)) {
+      LOGGER.debug('Routing to football score calculation handler');
+      return footballScoreHandler(event);
     }
 
     // NEW: Matchup stats messages have matchupId and players array

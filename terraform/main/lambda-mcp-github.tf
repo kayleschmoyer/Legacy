@@ -14,8 +14,8 @@ resource "aws_iam_role" "mcp_github_lambda" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
       }
     ]
@@ -86,11 +86,11 @@ resource "aws_lambda_function" "mcp_github" {
 
   environment {
     variables = {
-      GITHUB_TOKEN_SECRET_NAME             = aws_secretsmanager_secret.mcp_github_token.name
-      NODE_ENV                             = var.environment
-      LOG_LEVEL                            = "info"
-      AWS_NODEJS_CONNECTION_REUSE_ENABLED  = "1"
-      ROLLBAR_ACCESS_TOKEN_SECRET_NAME     = aws_secretsmanager_secret.rollbar_access_token.name
+      GITHUB_TOKEN_SECRET_NAME            = aws_secretsmanager_secret.mcp_github_token.name
+      NODE_ENV                            = var.environment
+      LOG_LEVEL                           = "info"
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME    = aws_secretsmanager_secret.rollbar_access_token.name
     }
   }
 

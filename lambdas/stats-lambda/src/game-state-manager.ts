@@ -1,6 +1,7 @@
 import { and, count, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import { IDP_POSITIONS } from './constants';
 
 /**
  * Select random unique game identifiers and update matchup_player_games
@@ -165,6 +166,210 @@ export async function selectAndAssignGameIdentifiers(
 
   LOGGER.info(
     `Successfully assigned game identifiers for matchup player ${matchupPlayerId}`,
+  );
+}
+
+/**
+ * Select random unique game identifiers for football players and update matchup_player_games.
+ * Mirrors selectAndAssignGameIdentifiers but queries the appropriate football stat table
+ * based on player type: DST → gameFootballDefense, IDP → gameFootballDefenseIdp,
+ * offensive/kicking → gameFootballPassing (falling back to rushing/receiving/kicking).
+ */
+export async function selectAndAssignFootballGameIdentifiers(
+  db: PublicDb,
+  matchupPlayerId: number,
+  playerId: number,
+  season: number,
+  isDst: boolean,
+  position: string,
+): Promise<void> {
+  LOGGER.info(
+    `Selecting football game identifiers for matchup player ${matchupPlayerId}`,
+  );
+
+  let uniqueGames: { gameIdentifier: string | null }[] = [];
+
+  if (isDst) {
+    uniqueGames = await db
+      .selectDistinct({
+        gameIdentifier: PublicSchema.gameFootballDefense.gameIdentifier,
+      })
+      .from(PublicSchema.gameFootballDefense)
+      .where(
+        and(
+          eq(PublicSchema.gameFootballDefense.playerId, playerId),
+          eq(PublicSchema.gameFootballDefense.season, season),
+        ),
+      );
+  } else if (IDP_POSITIONS.includes(position)) {
+    uniqueGames = await db
+      .selectDistinct({
+        gameIdentifier: PublicSchema.gameFootballDefenseIdp.gameIdentifier,
+      })
+      .from(PublicSchema.gameFootballDefenseIdp)
+      .where(
+        and(
+          eq(PublicSchema.gameFootballDefenseIdp.playerId, playerId),
+          eq(PublicSchema.gameFootballDefenseIdp.season, season),
+        ),
+      );
+  } else {
+    // Offensive/kicking: try passing first, then rushing, then receiving, then kicking
+    const passingGames = await db
+      .selectDistinct({
+        gameIdentifier: PublicSchema.gameFootballPassing.gameIdentifier,
+      })
+      .from(PublicSchema.gameFootballPassing)
+      .where(
+        and(
+          eq(PublicSchema.gameFootballPassing.playerId, playerId),
+          eq(PublicSchema.gameFootballPassing.season, season),
+        ),
+      );
+
+    if (passingGames.length > 0) {
+      uniqueGames = passingGames;
+    } else {
+      const rushingGames = await db
+        .selectDistinct({
+          gameIdentifier: PublicSchema.gameFootballRushing.gameIdentifier,
+        })
+        .from(PublicSchema.gameFootballRushing)
+        .where(
+          and(
+            eq(PublicSchema.gameFootballRushing.playerId, playerId),
+            eq(PublicSchema.gameFootballRushing.season, season),
+          ),
+        );
+
+      if (rushingGames.length > 0) {
+        uniqueGames = rushingGames;
+      } else {
+        const receivingGames = await db
+          .selectDistinct({
+            gameIdentifier: PublicSchema.gameFootballReceiving.gameIdentifier,
+          })
+          .from(PublicSchema.gameFootballReceiving)
+          .where(
+            and(
+              eq(PublicSchema.gameFootballReceiving.playerId, playerId),
+              eq(PublicSchema.gameFootballReceiving.season, season),
+            ),
+          );
+
+        if (receivingGames.length > 0) {
+          uniqueGames = receivingGames;
+        } else {
+          uniqueGames = await db
+            .selectDistinct({
+              gameIdentifier: PublicSchema.gameFootballKicking.gameIdentifier,
+            })
+            .from(PublicSchema.gameFootballKicking)
+            .where(
+              and(
+                eq(PublicSchema.gameFootballKicking.playerId, playerId),
+                eq(PublicSchema.gameFootballKicking.season, season),
+              ),
+            );
+        }
+      }
+    }
+  }
+
+  const validGames = uniqueGames.filter(
+    (g): g is { gameIdentifier: string } =>
+      g.gameIdentifier !== '' && g.gameIdentifier !== null,
+  );
+
+  if (validGames.length === 0) {
+    LOGGER.warn(
+      `No valid football game identifiers for player ${playerId} season ${season}, marking unassigned slots as spSkipped`,
+    );
+    await db
+      .update(PublicSchema.matchupPlayerGames)
+      .set({ spSkipped: true, statsLoadingStatus: 'completed' })
+      .where(
+        and(
+          eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+          isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+        ),
+      );
+    return;
+  }
+
+  LOGGER.info(
+    `Found ${validGames.length} unique football games for player ${playerId} season ${season}`,
+  );
+
+  const unassignedGames = await db
+    .select()
+    .from(PublicSchema.matchupPlayerGames)
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+        eq(PublicSchema.matchupPlayerGames.spSkipped, false),
+      ),
+    );
+
+  if (unassignedGames.length === 0) {
+    LOGGER.info(
+      `All game slots already have game_identifiers for matchup player ${matchupPlayerId}`,
+    );
+    return;
+  }
+
+  const usedGames = await db
+    .select({ gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier })
+    .from(PublicSchema.matchupPlayerGames)
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+      ),
+    );
+
+  const usedIds = new Set(
+    usedGames
+      .map((g) => g.gameIdentifier)
+      .filter((id): id is string => id !== null),
+  );
+
+  const availableGames = validGames.filter(
+    (g) => !usedIds.has(g.gameIdentifier),
+  );
+
+  const selected: string[] = availableGames
+    .map((g) => ({ gameIdentifier: g.gameIdentifier, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, unassignedGames.length)
+    .map((g) => g.gameIdentifier)
+    .filter((id): id is string => id !== null);
+
+  if (selected.length < unassignedGames.length) {
+    const recyclePool = validGames
+      .map((g) => g.gameIdentifier)
+      .filter((id): id is string => id !== null);
+    const needed = unassignedGames.length - selected.length;
+    LOGGER.warn(
+      `Only ${availableGames.length} unique football games available for ${unassignedGames.length} slots (matchup player ${matchupPlayerId}); recycling ${needed} identifier(s)`,
+    );
+    for (let i = 0; i < needed && recyclePool.length > 0; i++) {
+      selected.push(
+        recyclePool[Math.floor(Math.random() * recyclePool.length)],
+      );
+    }
+  }
+
+  for (let i = 0; i < selected.length && i < unassignedGames.length; i++) {
+    await db
+      .update(PublicSchema.matchupPlayerGames)
+      .set({ gameIdentifier: selected[i] })
+      .where(eq(PublicSchema.matchupPlayerGames.id, unassignedGames[i].id));
+  }
+
+  LOGGER.info(
+    `Assigned ${selected.length} football game identifiers for matchup player ${matchupPlayerId}`,
   );
 }
 

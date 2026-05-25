@@ -15,7 +15,9 @@
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/pfr-client": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",
+    "@legacy-sports/scoring": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*"
   },

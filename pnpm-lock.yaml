@@ -1402,9 +1402,15 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
+      '@legacy-sports/pfr-client':
+        specifier: workspace:*
+        version: link:../../lib/pfr-client
       '@legacy-sports/rollbar':
         specifier: workspace:*
         version: link:../../lib/rollbar
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../../lib/scoring
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1544,6 +1550,12 @@ importers:
         version: 2.8.1
 
   lib/narrative: {}
+
+  lib/pfr-client:
+    dependencies:
+      tslib:
+        specifier: '*'
+        version: 2.8.1
 
   lib/rollbar:
     dependencies:

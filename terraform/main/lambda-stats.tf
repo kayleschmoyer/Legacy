@@ -75,7 +75,8 @@ resource "aws_iam_policy" "stats_lambda_sqs" {
         ]
         Resource = [
           aws_sqs_queue.load_season_stats.arn,
-          aws_sqs_queue.load_game_stats.arn
+          aws_sqs_queue.load_game_stats.arn,
+          aws_sqs_queue.load_football_stats.arn
         ]
       },
       {
@@ -323,6 +324,24 @@ resource "aws_lambda_event_source_mapping" "stats_sqs_season" {
   depends_on = [
     aws_lambda_function.stats,
     aws_sqs_queue.load_season_stats
+  ]
+}
+
+# SQS Event Source Mapping for Stats Lambda (Football Stats)
+# Reuses the existing stats Lambda — no new function resource needed.
+resource "aws_lambda_event_source_mapping" "stats_sqs_football" {
+  event_source_arn = aws_sqs_queue.load_football_stats.arn
+  function_name    = aws_lambda_function.stats.arn
+
+  # batch_size=1 mirrors load_game_stats: one matchup per invocation keeps
+  # PFR scrape requests well within the Lambda timeout budget.
+  batch_size = 1
+
+  function_response_types = ["ReportBatchItemFailures"]
+
+  depends_on = [
+    aws_lambda_function.stats,
+    aws_sqs_queue.load_football_stats
   ]
 }
 

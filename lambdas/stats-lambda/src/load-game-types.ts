@@ -31,3 +31,36 @@ export interface RetryableError extends Error {
   isRetryableTimeout: boolean;
   isRateLimit: boolean;
 }
+
+export interface LoadFootballMatchupStatsMessage {
+  type: 'football-game-stats';
+  matchupId: number;
+  batchIndex?: number;
+  totalBatches?: number;
+  players: Array<{
+    matchupPlayerId: number;
+    playerId: number;
+    pfrId: string;
+    season: number;
+    isDst: boolean;
+    position: string;
+    nflTeam?: string | null;
+  }>;
+}
+
+export interface LoadFootballSeasonStatsMessage {
+  type: 'football-season-stats';
+  players: Array<{
+    playerId: number;
+    pfrId: string;
+    season: number;
+    isDst: boolean;
+    position: string;
+    nflTeam?: string | null;
+  }>;
+}
+
+export interface CalculateFootballScoresMessage {
+  type: 'football-calculate-scores';
+  matchupId: number;
+}

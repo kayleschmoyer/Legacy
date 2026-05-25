@@ -134,6 +134,80 @@ resource "aws_sqs_queue_policy" "load_game_stats" {
   })
 }
 
+# SQS Queue for loading football game and season stats (shared with existing stats-lambda)
+resource "aws_sqs_queue" "load_football_stats_dlq" {
+  name = "${local.name_prefix}-load-football-stats-dlq.fifo"
+
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue" "load_football_stats" {
+  name = "${local.name_prefix}-load-football-stats.fifo"
+
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  # Message settings — same profile as load_game_stats (HTTP scrape workload)
+  visibility_timeout_seconds = 900     # 15 minutes (longer than lambda timeout)
+  message_retention_seconds  = 1209600 # 14 days
+  receive_wait_time_seconds  = 10      # Long polling
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.load_football_stats_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue_policy" "load_football_stats" {
+  queue_url = aws_sqs_queue.load_football_stats.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "${local.name_prefix}-load-football-stats-policy"
+    Statement = [
+      {
+        Sid    = "AllowLambdaServiceAccess"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.load_football_stats.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.stats.arn
+          }
+        }
+      },
+      {
+        Sid    = "AllowApplicationSendMessages"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.load_football_stats.arn
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = data.aws_region.current.id
+          }
+        }
+      }
+    ]
+  })
+}
+
 # SQS Queue for game selection
 resource "aws_sqs_queue" "select_game_dlq" {
   name = "${local.name_prefix}-select-game-dlq.fifo"
