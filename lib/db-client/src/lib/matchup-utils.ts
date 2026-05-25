@@ -222,7 +222,7 @@ export interface CreateMatchupParams {
   team1Id: number | null;
   team2Id: number | null;
   gamesPerMatchup: number | null;
-  spStartsPerMatchup?: number | null;
+  pitcherStartsPerMatchup?: number | null;
   status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 }
 
@@ -407,14 +407,15 @@ export class MatchupService {
     const leagueSettings = await db
       .select({
         gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-        spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+        pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
       })
       .from(PublicSchema.leagues)
       .where(eq(PublicSchema.leagues.id, leagueId))
       .limit(1);
 
     const gamesPerMatchup = leagueSettings[0]?.gamesPerMatchup ?? 5;
-    const spStartsPerMatchup = leagueSettings[0]?.spStartsPerMatchup ?? 1;
+    const pitcherStartsPerMatchup =
+      leagueSettings[0]?.pitcherStartsPerMatchup ?? 1;
 
     for (const matchup of scheduleResult.matchups) {
       await db.insert(PublicSchema.matchups).values({
@@ -423,7 +424,7 @@ export class MatchupService {
         team1Id: matchup.team1Id,
         team2Id: matchup.team2Id,
         gamesPerMatchup,
-        spStartsPerMatchup,
+        pitcherStartsPerMatchup,
         status: matchup.status,
         team1Score: null,
         team2Score: null,
@@ -460,7 +461,7 @@ export class MatchupService {
         team1Id: params.team1Id,
         team2Id: params.team2Id,
         gamesPerMatchup: params.gamesPerMatchup,
-        spStartsPerMatchup: params.spStartsPerMatchup ?? null,
+        pitcherStartsPerMatchup: params.pitcherStartsPerMatchup ?? null,
         status: params.status ?? 'scheduled',
         team1Score: null,
         team2Score: null,
@@ -1065,7 +1066,7 @@ export async function createAllMatchupsForLeague(
       id: PublicSchema.leagues.id,
       totalMatchups: PublicSchema.leagues.totalMatchups,
       gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-      spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+      pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
       schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
     })
     .from(PublicSchema.leagues)
@@ -1079,7 +1080,7 @@ export async function createAllMatchupsForLeague(
   const league = leagueResult[0];
   const totalMatchups = league.totalMatchups ?? 10;
   const gamesPerMatchup = league.gamesPerMatchup ?? 5;
-  const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
+  const pitcherStartsPerMatchup = league.pitcherStartsPerMatchup ?? 1;
   const strategyType = league.schedulingStrategy ?? 'round-robin';
 
   const scheduleResult = await MatchupService.generateSchedule(db, {
@@ -1113,7 +1114,7 @@ export async function createAllMatchupsForLeague(
         team1Id: matchup.team1Id,
         team2Id: matchup.team2Id,
         gamesPerMatchup,
-        spStartsPerMatchup,
+        pitcherStartsPerMatchup,
         status: 'scheduled',
         team1Score: null,
         team2Score: null,

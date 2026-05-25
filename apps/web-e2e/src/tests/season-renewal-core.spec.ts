@@ -251,7 +251,7 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
   }) => {
     const originalLeague = makeLeague({
       gamesPerMatchup: 7,
-      spStartsPerMatchup: 2,
+      pitcherStartsPerMatchup: 2,
       totalMatchups: 12,
       maxBatters: 16,
       maxPitchers: 11,
@@ -267,7 +267,7 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
     // The renewed league should reflect the same settings
     const renewedLeague = makeRenewedLeague({
       gamesPerMatchup: 7,
-      spStartsPerMatchup: 2,
+      pitcherStartsPerMatchup: 2,
       totalMatchups: 12,
       maxBatters: 16,
       maxPitchers: 11,

@@ -12,7 +12,7 @@ export interface LoadMatchupStatsMessage {
     playerId: number;
     brefId: string;
     season: number;
-    fieldingGamePos: string;
+    gamePosition: string;
   }>;
 }
 

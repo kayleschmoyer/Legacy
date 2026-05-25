@@ -168,6 +168,9 @@ jobs:
           E2E_MANAGER_3_PASSWORD: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
           GOOGLE_TEST_EMAIL: ${{ secrets.GOOGLE_TEST_EMAIL }}
           GOOGLE_TEST_PASSWORD: ${{ secrets.GOOGLE_TEST_PASSWORD }}
+          # Playwright's json reporter reads this env var to set the output file.
+          # The "json:file" CLI colon syntax is not supported in Playwright 1.59.
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results.json
         run: |
           set -euo pipefail
           # Convert the comma-separated touched-specs list into discrete args so
@@ -175,13 +178,13 @@ jobs:
           IFS=',' read -ra SPEC_ARGS <<< "$TOUCHED_SPECS"
           echo "Running ${#SPEC_ARGS[@]} touched integration spec(s):"
           printf '  - %s\n' "${SPEC_ARGS[@]}"
-          # Reporters: line for live console output; json writes to a named file
-          # so the results comment step can find it regardless of stdout piping.
+          # Reporters: line for live console output; json writes to test-results.json
+          # (path set via PLAYWRIGHT_JSON_OUTPUT_NAME above).
           pnpm exec playwright test \
             --config=apps/web-e2e/playwright.integration.config.ts \
             --workers=1 \
             --reporter=line \
-            --reporter=json:test-results.json \
+            --reporter=json \
             -- "${SPEC_ARGS[@]}" \
             | tee playwright-output.log
         continue-on-error: true

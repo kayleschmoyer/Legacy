@@ -9,7 +9,7 @@ fragment Matchup on Matchup {
   status
   statsLoadingStatus
   gamesPerMatchup
-  spStartsPerMatchup
+  pitcherStartsPerMatchup
   selectedGamesCount
   startTime
   endTime
@@ -158,9 +158,9 @@ fragment MatchupPlayer on MatchupPlayer {
     matchupPlayerId
     gameNum
     gameIdentifier
-    fieldingGamePos
+    gamePosition
     statsLoadingStatus
-    spSkipped
+    pitcherStartSkipped
     battingGame {
       playerId
       season

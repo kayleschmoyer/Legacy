@@ -262,7 +262,7 @@ async function displayStatus(args: StatsLoadingStatusArgs): Promise<void> {
           gameNum: PublicSchema.matchupPlayerGames.gameNum,
           gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier,
           status: PublicSchema.matchupPlayerGames.statsLoadingStatus,
-          fieldingPos: PublicSchema.matchupPlayerGames.fieldingGamePos,
+          fieldingPos: PublicSchema.matchupPlayerGames.gamePosition,
         })
         .from(PublicSchema.matchupPlayerGames)
         .innerJoin(

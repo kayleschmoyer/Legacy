@@ -160,7 +160,7 @@ mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
   updateLeagueSettings(input: $input) {
     id
     gamesPerMatchup
-    spStartsPerMatchup
+    pitcherStartsPerMatchup
     minCareerGames
     minCareerSeasons
     totalMatchups

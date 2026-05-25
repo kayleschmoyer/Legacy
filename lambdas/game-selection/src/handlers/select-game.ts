@@ -47,7 +47,7 @@ async function queueStatsLoadingForMatchup(
     matchupPlayerId: number;
     playerId: number;
     season: number;
-    fieldingGamePos: string | null;
+    gamePosition: string | null;
   }>,
 ): Promise<void> {
   if (!GAME_STATS_QUEUE_URL) {
@@ -79,7 +79,7 @@ async function queueStatsLoadingForMatchup(
     playerId: p.playerId,
     brefId: brefIdMap.get(p.playerId) ?? '',
     season: p.season,
-    fieldingGamePos: p.fieldingGamePos ?? '',
+    gamePosition: p.gamePosition ?? '',
   }));
 
   // Split players into batches of 8 to avoid Lambda timeouts

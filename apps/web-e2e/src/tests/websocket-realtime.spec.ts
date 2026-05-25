@@ -119,7 +119,7 @@ function mockMatchup(
     status: 'in_progress',
     statsLoadingStatus: 'complete',
     gamesPerMatchup: 10,
-    spStartsPerMatchup: 2,
+    pitcherStartsPerMatchup: 2,
     selectedGamesCount: 5,
     startTime: null,
     endTime: null,

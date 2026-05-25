@@ -324,8 +324,8 @@ builder.queryField('players', (t) =>
           .select({
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
-            eraFilter: PublicSchema.leagues.eraFilter,
-            hofOnly: PublicSchema.leagues.hofOnly,
+            eraFilter: PublicSchema.leagues.baseballEraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
           })
@@ -337,7 +337,7 @@ builder.queryField('players', (t) =>
           minCareerGames = leagueSettings.minCareerGames ?? 50;
           minCareerSeasons = leagueSettings.minCareerSeasons ?? 3;
           leagueEraFilter = leagueSettings.eraFilter ?? 'all';
-          leagueHofOnly = leagueSettings.hofOnly ?? false;
+          leagueHofOnly = leagueSettings.baseballHofOnly ?? false;
           leagueCustomEraStartYear =
             leagueSettings.customEraStartYear ?? undefined;
           leagueCustomEraEndYear = leagueSettings.customEraEndYear ?? undefined;
@@ -356,8 +356,8 @@ builder.queryField('players', (t) =>
           fullNameLike: args.search || undefined,
           minCareerGames,
           minCareerSeasons,
-          eraFilter: leagueEraFilter,
-          hofOnly: leagueHofOnly,
+          baseballEraFilter: leagueEraFilter,
+          baseballHofOnly: leagueHofOnly,
           customEraStartYear: leagueCustomEraStartYear,
           customEraEndYear: leagueCustomEraEndYear,
         },

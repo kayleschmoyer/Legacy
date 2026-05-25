@@ -61,8 +61,8 @@ export interface CreateLeagueFormData {
   // Extended fields
   isPublic: boolean;
   maxRosterSize: number;
-  eraFilter: EraFilter;
-  hofOnly: boolean;
+  baseballEraFilter: EraFilter;
+  baseballHofOnly: boolean;
   customEraStartYear?: number;
   customEraEndYear?: number;
   waiverType: 'standard' | 'faab';
@@ -180,8 +180,8 @@ const DEFAULT_FORM: Omit<CreateLeagueFormData, 'sport'> = {
   playerPool: PlayerPool.ALL,
   schedulingStrategy: 'divisional',
   maxRosterSize: 26,
-  eraFilter: EraFilter.ALL,
-  hofOnly: false,
+  baseballEraFilter: EraFilter.ALL,
+  baseballHofOnly: false,
   customEraStartYear: undefined,
   customEraEndYear: undefined,
   draftMode: DraftMode.LIVE,
@@ -521,7 +521,7 @@ function validateForm(f: CreateLeagueFormData): Record<string, string> {
       'Divisions must evenly divide the number of teams.';
   if (f.maxRosterSize < 15 || f.maxRosterSize > 50)
     errs.maxRosterSize = 'Roster must be 15–50.';
-  if (f.eraFilter === EraFilter.CUSTOM) {
+  if (f.baseballEraFilter === EraFilter.CUSTOM) {
     if (f.customEraStartYear == null || f.customEraEndYear == null)
       errs.customEra = 'Both start and end year required.';
     else if (f.customEraStartYear > f.customEraEndYear)
@@ -758,13 +758,13 @@ function EraStep({
       <YStack gap="$1">
         <FieldLabel>Era Filter</FieldLabel>
         <EraGrid
-          value={f.eraFilter}
+          value={f.baseballEraFilter}
           onChange={(v) => {
             if (ERA_OPTIONS.find((e) => e.value === v)?.premium && !isPremium) {
               onUpgrade('Historical eras');
               return;
             }
-            set({ eraFilter: v });
+            set({ baseballEraFilter: v });
           }}
           isPremium={isPremium}
           disabled={disabled}
@@ -774,7 +774,7 @@ function EraStep({
         </FieldHint>
       </YStack>
 
-      {f.eraFilter === EraFilter.CUSTOM && (
+      {f.baseballEraFilter === EraFilter.CUSTOM && (
         <XStack gap="$3">
           <YStack flex={1} gap="$1">
             <FieldLabel required>Start Year</FieldLabel>
@@ -818,13 +818,13 @@ function EraStep({
       <YStack gap="$1">
         <FieldLabel>Hall of Fame Only</FieldLabel>
         <Toggle
-          value={f.hofOnly}
+          value={f.baseballHofOnly}
           onChange={(v) => {
             if (v && !isPremium) {
               onUpgrade('Hall of Fame filter');
               return;
             }
-            set({ hofOnly: v });
+            set({ baseballHofOnly: v });
           }}
           disabled={disabled}
         />
@@ -1100,9 +1100,9 @@ function WaiversStep({
 // ─── Scorecard strip ────────────────────────────────────────────────────────
 
 function Scorecard({ f }: { f: CreateLeagueFormData }) {
-  const era = ERA_OPTIONS.find((e) => e.value === f.eraFilter);
+  const era = ERA_OPTIONS.find((e) => e.value === f.baseballEraFilter);
   const eraLabel =
-    f.eraFilter === EraFilter.CUSTOM
+    f.baseballEraFilter === EraFilter.CUSTOM
       ? `${f.customEraStartYear || '—'} – ${f.customEraEndYear || '—'}`
       : (era?.label ?? '—');
 
@@ -1143,7 +1143,7 @@ function Scorecard({ f }: { f: CreateLeagueFormData }) {
         <Text fontSize={12} color={COLORS.fg2} fontFamily="$body">
           {f.numberOfTeams} TEAMS · {f.numberOfDivisions} DIV ·{' '}
           {eraLabel.toUpperCase()}
-          {f.hofOnly ? ' · HOF' : ''}
+          {f.baseballHofOnly ? ' · HOF' : ''}
         </Text>
         <Text fontSize={12} color={COLORS.fg2} fontFamily="$body">
           {f.draftMode.toUpperCase()} · {f.selectionMethod.toUpperCase()} ·{' '}
@@ -1330,16 +1330,16 @@ function CreateLeagueModal({
     if (!isPremium) {
       setFormData((prev) => {
         const isPremiumEra =
-          prev.eraFilter !== EraFilter.ALL &&
-          prev.eraFilter !== EraFilter.MODERN;
+          prev.baseballEraFilter !== EraFilter.ALL &&
+          prev.baseballEraFilter !== EraFilter.MODERN;
         return {
           ...prev,
-          eraFilter: isPremiumEra ? EraFilter.ALL : prev.eraFilter,
+          eraFilter: isPremiumEra ? EraFilter.ALL : prev.baseballEraFilter,
           customEraStartYear: isPremiumEra
             ? undefined
             : prev.customEraStartYear,
           customEraEndYear: isPremiumEra ? undefined : prev.customEraEndYear,
-          hofOnly: false,
+          baseballHofOnly: false,
           waiverType: prev.waiverType === 'faab' ? 'standard' : prev.waiverType,
           salaryCapEnabled: false,
         };

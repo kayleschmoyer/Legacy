@@ -116,7 +116,7 @@ export function computeMatchupScores({
     const actualScore =
       player.games?.reduce((sum, game) => sum + calculateGameScore(game), 0) ??
       0;
-    // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+    // Use player-specific numberOfGames (SP gets pitcherStartsPerMatchup, others get gamesPerMatchup)
     const playerTotalGames = player.numberOfGames ?? gamesPerMatchup;
     const remaining = playerTotalGames - gamesPlayed;
 

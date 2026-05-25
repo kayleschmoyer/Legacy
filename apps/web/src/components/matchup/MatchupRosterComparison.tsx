@@ -789,7 +789,7 @@ export function MatchupRosterComparison({
       const gamesPlayed = player.games?.length ?? 0;
       const actualScore =
         player.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ?? 0;
-      // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+      // Use player-specific numberOfGames (SP gets pitcherStartsPerMatchup, others get gamesPerMatchup)
       const playerTotalGames = player.numberOfGames ?? gamesPerMatchup;
       const gamesRemaining = playerTotalGames - gamesPlayed;
 

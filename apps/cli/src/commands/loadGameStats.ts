@@ -28,7 +28,7 @@ async function loadPlayerGameStats(
   playerId: number,
   brefId: string,
   season: number,
-  fieldingGamePos: string | null,
+  gamePosition: string | null,
 ): Promise<void> {
   LOGGER.info(
     `Loading game stats for player ${playerId} (${brefId}), season ${season}`,
@@ -175,7 +175,7 @@ async function loadPlayerGameStats(
 
   // Load fielding stats
   LOGGER.info(`🧤 Loading fielding stats...`);
-  LOGGER.debug(`Fielding position: ${fieldingGamePos ?? 'NULL'}`);
+  LOGGER.debug(`Fielding position: ${gamePosition ?? 'NULL'}`);
   const existingFielding = await db
     .select()
     .from(PublicSchema.gameFielding)
@@ -194,7 +194,7 @@ async function loadPlayerGameStats(
     const allFieldingStats = await getAllGameFieldingStats(
       playerObj,
       season,
-      fieldingGamePos,
+      gamePosition,
     );
     if (allFieldingStats && allFieldingStats.length > 0) {
       await db
@@ -206,7 +206,7 @@ async function loadPlayerGameStats(
       );
     } else {
       LOGGER.info(
-        `No fielding stats found for player ${playerId} (position: ${fieldingGamePos ?? 'NULL'})`,
+        `No fielding stats found for player ${playerId} (position: ${gamePosition ?? 'NULL'})`,
       );
     }
   } else {

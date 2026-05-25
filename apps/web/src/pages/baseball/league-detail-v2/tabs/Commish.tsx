@@ -171,7 +171,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
           leagueId={leagueId}
           draftStatus={league.draftStatus}
           currentGamesPerMatchup={league.gamesPerMatchup ?? 1}
-          currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
+          currentSpStartsPerMatchup={league.pitcherStartsPerMatchup ?? 1}
           currentMinCareerGames={league.minCareerGames ?? 50}
           currentMinCareerSeasons={league.minCareerSeasons ?? 3}
           currentTotalMatchups={league.totalMatchups ?? 10}
@@ -202,7 +202,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
           draftStatus={league.draftStatus}
           playerPool={league.playerPool}
           eraFilter={league.eraFilter}
-          hofOnly={league.hofOnly}
+          baseballHofOnly={league.baseballHofOnly}
           customEraStartYear={league.customEraStartYear ?? undefined}
           customEraEndYear={league.customEraEndYear ?? undefined}
         />

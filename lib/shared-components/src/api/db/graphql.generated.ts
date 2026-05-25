@@ -413,6 +413,7 @@ export enum ConsentType {
 export type CreateLeagueAndTeamsInput = {
   auctionBudget?: InputMaybe<Scalars['Int']['input']>;
   auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
+  baseballHofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
   defensiveFormat?: InputMaybe<DefensiveFormat>;
@@ -420,7 +421,6 @@ export type CreateLeagueAndTeamsInput = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;
   faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
-  hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
@@ -1201,6 +1201,7 @@ export type League = {
   auctionBudget?: Maybe<Scalars['Int']['output']>;
   auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
+  baseballHofOnly?: Maybe<Scalars['Boolean']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
@@ -1214,7 +1215,6 @@ export type League = {
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   frozenAt?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
-  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
@@ -1230,6 +1230,7 @@ export type League = {
   minSalary?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
+  pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
   playoffEnabled?: Maybe<Scalars['Boolean']['output']>;
   playoffFormat?: Maybe<Scalars['String']['output']>;
@@ -1244,7 +1245,6 @@ export type League = {
   scoringProfile?: Maybe<ScoringConfig>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
-  spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Sport for this league (baseball or football). (LS-4628) */
   sport?: Maybe<Sport>;
   /** ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues. */
@@ -1400,11 +1400,11 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Auto-generated narrative recap, only available for completed matchups. */
   recap?: Maybe<MatchupRecap>;
   /** Number of unique games selected for this matchup */
   selectedGamesCount?: Maybe<Scalars['Int']['output']>;
-  spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
   statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
@@ -1532,7 +1532,7 @@ export type MatchupPlayer = {
   games?: Maybe<Array<MatchupPlayerGame>>;
   id?: Maybe<Scalars['ID']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
-  /** Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup) */
+  /** Number of games this player is expected to play in this matchup (SP uses pitcherStartsPerMatchup, others use gamesPerMatchup) */
   numberOfGames?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
@@ -1548,13 +1548,13 @@ export type MatchupPlayerGame = {
   __typename?: 'MatchupPlayerGame';
   battingGame?: Maybe<GameBatting>;
   fieldingGame?: Maybe<GameFielding>;
-  fieldingGamePos?: Maybe<Scalars['String']['output']>;
   gameIdentifier?: Maybe<Scalars['String']['output']>;
   gameNum?: Maybe<Scalars['Int']['output']>;
+  gamePosition?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
+  pitcherStartSkipped?: Maybe<Scalars['Boolean']['output']>;
   pitchingGame?: Maybe<GamePitching>;
-  spSkipped?: Maybe<Scalars['Boolean']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
 };
 
@@ -4205,12 +4205,12 @@ export type UpdateCommissionerNoteInput = {
 };
 
 export type UpdateDraftSettingsInput = {
+  baseballHofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;
-  hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   leagueId: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
@@ -4259,6 +4259,7 @@ export type UpdateLeagueSettingsInput = {
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   minSalary?: InputMaybe<Scalars['Int']['input']>;
+  pitcherStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   playoffEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   playoffFormat?: InputMaybe<Scalars['String']['input']>;
   playoffMultiWeek?: InputMaybe<Scalars['Boolean']['input']>;
@@ -4269,7 +4270,6 @@ export type UpdateLeagueSettingsInput = {
   salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
-  spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -4957,7 +4957,7 @@ export type UpdateLeagueSettingsMutation = {
     __typename?: 'League';
     id?: number | null;
     gamesPerMatchup?: number | null;
-    spStartsPerMatchup?: number | null;
+    pitcherStartsPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
@@ -5812,7 +5812,7 @@ export type GetLeagueByIdQuery = {
     waiverType?: string | null;
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
-    spStartsPerMatchup?: number | null;
+    pitcherStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
@@ -5840,7 +5840,7 @@ export type GetLeagueByIdQuery = {
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
     eraFilter?: string | null;
-    hofOnly?: boolean | null;
+    baseballHofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
@@ -6024,9 +6024,9 @@ export type GetMatchupPlayersQuery = {
       matchupPlayerId?: number | null;
       gameNum?: number | null;
       gameIdentifier?: string | null;
-      fieldingGamePos?: string | null;
+      gamePosition?: string | null;
       statsLoadingStatus?: string | null;
-      spSkipped?: boolean | null;
+      pitcherStartSkipped?: boolean | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -6146,7 +6146,7 @@ export type GetMatchupsByWeekQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
-    spStartsPerMatchup?: number | null;
+    pitcherStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -6182,7 +6182,7 @@ export type GetMatchupsForLeagueQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
-    spStartsPerMatchup?: number | null;
+    pitcherStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -6557,7 +6557,7 @@ export type LeagueFragment = {
   waiverType?: string | null;
   waiverEnabled?: boolean | null;
   faabBudgetDefault?: number | null;
-  spStartsPerMatchup?: number | null;
+  pitcherStartsPerMatchup?: number | null;
   gamesPerMatchup?: number | null;
   minCareerGames?: number | null;
   minCareerSeasons?: number | null;
@@ -6585,7 +6585,7 @@ export type LeagueFragment = {
   auctionBudget?: number | null;
   auctionMinBid?: number | null;
   eraFilter?: string | null;
-  hofOnly?: boolean | null;
+  baseballHofOnly?: boolean | null;
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
   tradeDeadlineWeek?: number | null;
@@ -7212,7 +7212,7 @@ export type MatchupFragment = {
   status?: MatchupStatus | null;
   statsLoadingStatus?: StatsLoadingStatus | null;
   gamesPerMatchup?: number | null;
-  spStartsPerMatchup?: number | null;
+  pitcherStartsPerMatchup?: number | null;
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
@@ -7312,9 +7312,9 @@ export type MatchupPlayerFragment = {
     matchupPlayerId?: number | null;
     gameNum?: number | null;
     gameIdentifier?: string | null;
-    fieldingGamePos?: string | null;
+    gamePosition?: string | null;
     statsLoadingStatus?: string | null;
-    spSkipped?: boolean | null;
+    pitcherStartSkipped?: boolean | null;
     battingGame?: {
       __typename?: 'GameBatting';
       playerId?: number | null;
@@ -7699,7 +7699,7 @@ export type RenewLeagueMutation = {
     waiverType?: string | null;
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
-    spStartsPerMatchup?: number | null;
+    pitcherStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
@@ -7727,7 +7727,7 @@ export type RenewLeagueMutation = {
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
     eraFilter?: string | null;
-    hofOnly?: boolean | null;
+    baseballHofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
@@ -9273,7 +9273,7 @@ export const LeagueFragmentDoc = gql`
     waiverType
     waiverEnabled
     faabBudgetDefault
-    spStartsPerMatchup
+    pitcherStartsPerMatchup
     gamesPerMatchup
     minCareerGames
     minCareerSeasons
@@ -9301,7 +9301,7 @@ export const LeagueFragmentDoc = gql`
     auctionBudget
     auctionMinBid
     eraFilter
-    hofOnly
+    baseballHofOnly
     customEraStartYear
     customEraEndYear
     tradeDeadlineWeek
@@ -9323,7 +9323,7 @@ export const MatchupFragmentDoc = gql`
     status
     statsLoadingStatus
     gamesPerMatchup
-    spStartsPerMatchup
+    pitcherStartsPerMatchup
     selectedGamesCount
     startTime
     endTime
@@ -9416,9 +9416,9 @@ export const MatchupPlayerFragmentDoc = gql`
       matchupPlayerId
       gameNum
       gameIdentifier
-      fieldingGamePos
+      gamePosition
       statsLoadingStatus
-      spSkipped
+      pitcherStartSkipped
       battingGame {
         playerId
         season
@@ -11130,7 +11130,7 @@ export const UpdateLeagueSettings = gql`
     updateLeagueSettings(input: $input) {
       id
       gamesPerMatchup
-      spStartsPerMatchup
+      pitcherStartsPerMatchup
       minCareerGames
       minCareerSeasons
       totalMatchups

@@ -60,12 +60,12 @@ export async function selectAndAssignGameIdentifiers(
 
   if (uniqueGames.length === 0) {
     LOGGER.warn(
-      `No valid game identifiers found for player ${playerId} season ${season} (checked batting and pitching), marking unassigned slots as spSkipped`,
+      `No valid game identifiers found for player ${playerId} season ${season} (checked batting and pitching), marking unassigned slots as pitcherStartSkipped`,
     );
-    // Bulk-mark all unassigned slots as spSkipped in one round-trip.
+    // Bulk-mark all unassigned slots as pitcherStartSkipped in one round-trip.
     await db
       .update(PublicSchema.matchupPlayerGames)
-      .set({ spSkipped: true, statsLoadingStatus: 'completed' })
+      .set({ pitcherStartSkipped: true, statsLoadingStatus: 'completed' })
       .where(
         and(
           eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
@@ -80,7 +80,7 @@ export async function selectAndAssignGameIdentifiers(
   );
 
   // Get records that need game_identifier assignment (null gameIdentifier, not SP-skipped).
-  // spSkipped rows are intentional placeholders — never assign them a real game.
+  // pitcherStartSkipped rows are intentional placeholders — never assign them a real game.
   const unassignedGames = await db
     .select()
     .from(PublicSchema.matchupPlayerGames)
@@ -88,7 +88,7 @@ export async function selectAndAssignGameIdentifiers(
       and(
         eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
         isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
-        eq(PublicSchema.matchupPlayerGames.spSkipped, false),
+        eq(PublicSchema.matchupPlayerGames.pitcherStartSkipped, false),
       ),
     );
 
@@ -283,11 +283,11 @@ export async function selectAndAssignFootballGameIdentifiers(
 
   if (validGames.length === 0) {
     LOGGER.warn(
-      `No valid football game identifiers for player ${playerId} season ${season}, marking unassigned slots as spSkipped`,
+      `No valid football game identifiers for player ${playerId} season ${season}, marking unassigned slots as pitcherStartSkipped`,
     );
     await db
       .update(PublicSchema.matchupPlayerGames)
-      .set({ spSkipped: true, statsLoadingStatus: 'completed' })
+      .set({ pitcherStartSkipped: true, statsLoadingStatus: 'completed' })
       .where(
         and(
           eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
@@ -308,7 +308,7 @@ export async function selectAndAssignFootballGameIdentifiers(
       and(
         eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
         isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
-        eq(PublicSchema.matchupPlayerGames.spSkipped, false),
+        eq(PublicSchema.matchupPlayerGames.pitcherStartSkipped, false),
       ),
     );
 

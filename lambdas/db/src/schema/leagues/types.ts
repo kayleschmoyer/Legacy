@@ -59,7 +59,7 @@ export const League = builder.objectRef<{
   waiverType?: 'standard' | 'faab';
   waiverEnabled?: boolean;
   faabBudgetDefault?: number;
-  spStartsPerMatchup?: number;
+  pitcherStartsPerMatchup?: number;
   gamesPerMatchup?: number;
   minCareerGames?: number;
   minCareerSeasons?: number;
@@ -97,8 +97,8 @@ export const League = builder.objectRef<{
   auctionBudget?: number;
   auctionMinBid?: number;
   // Era filter settings
-  eraFilter?: string;
-  hofOnly?: boolean;
+  baseballEraFilter?: string;
+  baseballHofOnly?: boolean;
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
   userMembership?: {
@@ -142,7 +142,9 @@ League.implement({
     waiverType: t.exposeString('waiverType', { nullable: true }),
     waiverEnabled: t.exposeBoolean('waiverEnabled', { nullable: true }),
     faabBudgetDefault: t.exposeInt('faabBudgetDefault', { nullable: true }),
-    spStartsPerMatchup: t.exposeInt('spStartsPerMatchup', { nullable: true }),
+    pitcherStartsPerMatchup: t.exposeInt('pitcherStartsPerMatchup', {
+      nullable: true,
+    }),
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
     minCareerGames: t.exposeInt('minCareerGames', { nullable: true }),
     minCareerSeasons: t.exposeInt('minCareerSeasons', { nullable: true }),
@@ -206,8 +208,8 @@ League.implement({
     auctionBudget: t.exposeInt('auctionBudget', { nullable: true }),
     auctionMinBid: t.exposeInt('auctionMinBid', { nullable: true }),
     // Era filter settings
-    eraFilter: t.exposeString('eraFilter', { nullable: true }),
-    hofOnly: t.exposeBoolean('hofOnly', { nullable: true }),
+    eraFilter: t.exposeString('baseballEraFilter', { nullable: true }),
+    baseballHofOnly: t.exposeBoolean('baseballHofOnly', { nullable: true }),
     customEraStartYear: t.exposeInt('customEraStartYear', { nullable: true }),
     customEraEndYear: t.exposeInt('customEraEndYear', { nullable: true }),
     userMembership: t.field({

@@ -76,9 +76,9 @@ fragment MatchupPlayer on MatchupPlayer {
     matchupPlayerId
     gameNum
     gameIdentifier
-    fieldingGamePos
+    gamePosition
     statsLoadingStatus
-    spSkipped
+    pitcherStartSkipped
     battingGame {
       playerId
       season

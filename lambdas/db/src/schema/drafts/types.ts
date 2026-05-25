@@ -246,7 +246,7 @@ export const UpdateDraftSettingsInput = builder.inputType(
       pickTimeLimitSeconds: t.int({ required: false }), // seconds per pick (default 120)
       // Era-based league settings (LS-295)
       eraFilter: t.string({ required: false }), // 'all' | 'dead_ball' | 'golden_age' | 'expansion' | 'free_agency' | 'steroid_era' | 'modern' | 'custom'
-      hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers only
+      baseballHofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers only
       customEraStartYear: t.int({ required: false }), // commissioner-defined era start year
       customEraEndYear: t.int({ required: false }), // commissioner-defined era end year
       /** ISO-8601 datetime for when the draft should auto-start (LS-423). Null clears the schedule. */

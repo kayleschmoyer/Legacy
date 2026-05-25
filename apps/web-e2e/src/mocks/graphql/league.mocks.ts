@@ -44,7 +44,7 @@ export interface MockLeague {
   weekAdvanceStatus: string | null;
   waiverType: string | null;
   faabBudgetDefault: number | null;
-  spStartsPerMatchup: number | null;
+  pitcherStartsPerMatchup: number | null;
   gamesPerMatchup: number;
   minCareerGames: number;
   minCareerSeasons: number;
@@ -67,7 +67,7 @@ export interface MockLeague {
   auctionBudget: number | null;
   auctionMinBid: number | null;
   eraFilter: string | null;
-  hofOnly: boolean;
+  baseballHofOnly: boolean;
   customEraStartYear: number | null;
   customEraEndYear: number | null;
   userMembership: MockLeagueMember | null;
@@ -104,7 +104,7 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     weekAdvanceStatus: null,
     waiverType: null,
     faabBudgetDefault: null,
-    spStartsPerMatchup: null,
+    pitcherStartsPerMatchup: null,
     gamesPerMatchup: 1,
     minCareerGames: 50,
     minCareerSeasons: 3,
@@ -127,7 +127,7 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     auctionBudget: null,
     auctionMinBid: null,
     eraFilter: null,
-    hofOnly: false,
+    baseballHofOnly: false,
     customEraStartYear: null,
     customEraEndYear: null,
     userMembership: {

@@ -52,7 +52,7 @@ builder.mutationField('createMatchup', (t) =>
         .select({
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           minGamesPerSeason: PublicSchema.leagues.minGamesPerSeason,
-          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+          pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, args.input.leagueId))
@@ -64,7 +64,7 @@ builder.mutationField('createMatchup', (t) =>
 
       const gamesPerMatchup =
         args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
-      const spStartsPerMatchup = league[0].spStartsPerMatchup ?? 1;
+      const pitcherStartsPerMatchup = league[0].pitcherStartsPerMatchup ?? 1;
 
       // Insert the matchup
       const results = await context.db
@@ -75,7 +75,7 @@ builder.mutationField('createMatchup', (t) =>
           team1Id: args.input.team1Id ?? null,
           team2Id: args.input.team2Id ?? null,
           gamesPerMatchup,
-          spStartsPerMatchup,
+          pitcherStartsPerMatchup,
           startTime: args.input.startTime ?? null,
           endTime: args.input.endTime ?? null,
           status: 'scheduled',
@@ -532,7 +532,7 @@ export async function adjustMatchupsForNewTotal(
     const leagueResult = await db
       .select({
         gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-        spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+        pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
         schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
       })
       .from(PublicSchema.leagues)
@@ -543,7 +543,7 @@ export async function adjustMatchupsForNewTotal(
     if (!league) throw new Error('League not found');
 
     const gamesPerMatchup = league.gamesPerMatchup ?? 5;
-    const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
+    const pitcherStartsPerMatchup = league.pitcherStartsPerMatchup ?? 1;
 
     // Generate the full schedule for the total number of weeks so the
     // round-robin cycle continues seamlessly from the existing schedule.
@@ -571,7 +571,7 @@ export async function adjustMatchupsForNewTotal(
           team1Id: matchup.team1Id,
           team2Id: matchup.team2Id,
           gamesPerMatchup,
-          spStartsPerMatchup,
+          pitcherStartsPerMatchup,
           status: 'scheduled' as const,
           team1Score: null,
           team2Score: null,
@@ -913,7 +913,7 @@ builder.mutationField('adminRegenerateLeagueSchedule', (t) =>
         .select({
           totalMatchups: PublicSchema.leagues.totalMatchups,
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+          pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
           schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
         })
         .from(PublicSchema.leagues)
@@ -927,7 +927,7 @@ builder.mutationField('adminRegenerateLeagueSchedule', (t) =>
       const league = leagueResult[0];
       const totalMatchups = league.totalMatchups ?? 10;
       const gamesPerMatchup = league.gamesPerMatchup ?? 5;
-      const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
+      const pitcherStartsPerMatchup = league.pitcherStartsPerMatchup ?? 1;
       const strategyType = league.schedulingStrategy ?? 'round-robin';
 
       // 2. Find the last week that has already started or finished
@@ -1012,7 +1012,7 @@ builder.mutationField('adminRegenerateLeagueSchedule', (t) =>
             team1Id: matchup.team1Id,
             team2Id: matchup.team2Id,
             gamesPerMatchup,
-            spStartsPerMatchup,
+            pitcherStartsPerMatchup,
             status: 'scheduled',
             team1Score: null,
             team2Score: null,

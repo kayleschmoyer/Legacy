@@ -53,7 +53,7 @@ export function makeLeague(overrides: Record<string, unknown> = {}) {
     minCareerSeasons: 3,
     waiverType: 'standard',
     gamesPerMatchup: 5,
-    spStartsPerMatchup: 1,
+    pitcherStartsPerMatchup: 1,
     totalMatchups: 10,
     playoffEnabled: true,
     playoffFormat: '4-team',

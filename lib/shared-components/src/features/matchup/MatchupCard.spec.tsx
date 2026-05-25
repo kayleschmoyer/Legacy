@@ -20,7 +20,7 @@ const createMatchup = (
   status: MatchupStatus.InProgress,
   statsLoadingStatus: null,
   gamesPerMatchup: 7,
-  spStartsPerMatchup: 2,
+  pitcherStartsPerMatchup: 2,
   selectedGamesCount: 5,
   startTime: null,
   endTime: null,

@@ -213,7 +213,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           minCareerGames: PublicSchema.leagues.minCareerGames,
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+          pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
@@ -398,11 +398,11 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
 
       if (orderByKey === 'projectedMatchupPoints') {
         // Sort by projected fantasy points per matchup: accounts for the league's schedule
-        // (gamesPerMatchup for batters/fielders, spStartsPerMatchup for pitchers).
+        // (gamesPerMatchup for batters/fielders, pitcherStartsPerMatchup for pitchers).
         // Uses pre-computed per-game category rates from player_scoring_cache (*_ppg columns).
         // sql.raw is safe here: gpm and spm are integers sourced from our own DB.
         const gpm = league?.gamesPerMatchup ?? 5;
-        const spm = league?.spStartsPerMatchup ?? 1;
+        const spm = league?.pitcherStartsPerMatchup ?? 1;
         const projExpr = sql.raw(
           `COALESCE(cs.batting_ppg, 0) * ${gpm} + COALESCE(cs.pitching_ppg, 0) * ${spm} + COALESCE(cs.fielding_ppg, 0) * ${gpm}`,
         );

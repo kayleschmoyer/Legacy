@@ -75,14 +75,18 @@ export const leagues = pgTable(
       .default('idle'),
     playerPool: playerPool('player_pool').notNull().default('all'),
     // Era-based league settings (LS-295)
-    eraFilter: eraFilter('era_filter').notNull().default('all'),
-    hofOnly: boolean('hof_only').notNull().default(false),
+    baseballEraFilter: eraFilter('baseball_era_filter')
+      .notNull()
+      .default('all'),
+    baseballHofOnly: boolean('baseball_hof_only').notNull().default(false),
     customEraStartYear: integer('custom_era_start_year'),
     customEraEndYear: integer('custom_era_end_year'),
     waiverType: waiverType('waiver_type').notNull().default('standard'),
     waiverEnabled: boolean('waiver_enabled').notNull().default(true),
     faabBudgetDefault: integer('faab_budget_default').notNull().default(100),
-    spStartsPerMatchup: integer('sp_starts_per_matchup').notNull().default(1),
+    pitcherStartsPerMatchup: integer('pitcher_starts_per_matchup')
+      .notNull()
+      .default(1),
     minCareerGames: integer('min_career_games').notNull().default(50),
     minCareerSeasons: integer('min_career_seasons').notNull().default(3),
     totalMatchups: integer('total_matchups').notNull().default(10),

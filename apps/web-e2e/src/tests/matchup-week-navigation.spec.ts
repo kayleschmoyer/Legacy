@@ -106,7 +106,7 @@ function makeMatchup(overrides: Record<string, unknown> = {}) {
     status: 'IN_PROGRESS',
     statsLoadingStatus: 'COMPLETE',
     gamesPerMatchup: 7,
-    spStartsPerMatchup: 2,
+    pitcherStartsPerMatchup: 2,
     selectedGamesCount: 4,
     startTime: null,
     endTime: null,

@@ -60,7 +60,7 @@ export const Matchup = builder.objectRef<{
     | 'failed'
     | 'retry';
   gamesPerMatchup: number | null;
-  spStartsPerMatchup: number | null;
+  pitcherStartsPerMatchup: number | null;
   startTime: string | null;
   endTime: string | null;
 }>('Matchup');
@@ -102,7 +102,9 @@ builder.objectType(Matchup, {
       resolve: (matchup) => matchup.statsLoadingStatus,
     }),
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
-    spStartsPerMatchup: t.exposeInt('spStartsPerMatchup', { nullable: true }),
+    pitcherStartsPerMatchup: t.exposeInt('pitcherStartsPerMatchup', {
+      nullable: true,
+    }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
     // Relational fields - using Team type imported from leagues.ts
@@ -342,7 +344,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
       | 'failed'
       | 'retry';
     gamesPerMatchup: number | null;
-    spStartsPerMatchup: number | null;
+    pitcherStartsPerMatchup: number | null;
     startTime: string | null;
     endTime: string | null;
   }>;
@@ -554,10 +556,10 @@ builder.objectType(MatchupPlayer, {
     positionId: t.exposeInt('positionId', { nullable: true }),
     season: t.exposeInt('season', { nullable: true }),
     // Computed field: number of games this player will play in the matchup
-    // SP players get spStartsPerMatchup; all others get gamesPerMatchup
+    // SP players get pitcherStartsPerMatchup; all others get gamesPerMatchup
     numberOfGames: t.int({
       description:
-        'Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup)',
+        'Number of games this player is expected to play in this matchup (SP uses pitcherStartsPerMatchup, others use gamesPerMatchup)',
       resolve: async (matchupPlayer, _args, context) => {
         try {
           const matchup = await context.loaders.matchupsById.load(
@@ -568,7 +570,10 @@ builder.objectType(MatchupPlayer, {
           const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
           // If no position assigned or no spStarts setting, use full games
-          if (!matchupPlayer.positionId || matchup.spStartsPerMatchup == null) {
+          if (
+            !matchupPlayer.positionId ||
+            matchup.pitcherStartsPerMatchup == null
+          ) {
             return gamesPerMatchup;
           }
 
@@ -577,7 +582,7 @@ builder.objectType(MatchupPlayer, {
             matchupPlayer.positionId,
           );
           if (position?.positionType === 'SP') {
-            return matchup.spStartsPerMatchup;
+            return matchup.pitcherStartsPerMatchup;
           }
 
           return gamesPerMatchup;
@@ -711,10 +716,10 @@ export const MatchupPlayerGameRef = builder.objectRef<{
   matchupPlayerId: number;
   gameNum: number;
   gameIdentifier: string | null;
-  fieldingGamePos: string | null;
+  gamePosition: string | null;
   statsLoadingStatus: string | null;
   /** True when an SP was probabilistically skipped for this game day */
-  spSkipped: boolean;
+  pitcherStartSkipped: boolean;
 }>('MatchupPlayerGame');
 
 MatchupPlayerGameRef.implement({
@@ -723,12 +728,12 @@ MatchupPlayerGameRef.implement({
     matchupPlayerId: t.exposeInt('matchupPlayerId'),
     gameNum: t.exposeInt('gameNum'),
     gameIdentifier: t.exposeString('gameIdentifier', { nullable: true }),
-    fieldingGamePos: t.exposeString('fieldingGamePos', { nullable: true }),
+    gamePosition: t.exposeString('gamePosition', { nullable: true }),
     statsLoadingStatus: t.exposeString('statsLoadingStatus', {
       nullable: true,
     }),
     /** True when an SP was probabilistically skipped for this game day (not starting). */
-    spSkipped: t.exposeBoolean('spSkipped'),
+    pitcherStartSkipped: t.exposeBoolean('pitcherStartSkipped'),
 
     // Resolve the actual game stats for this selected game
     battingGame: t.field({
@@ -828,7 +833,7 @@ MatchupPlayerGameRef.implement({
             await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
           if (season === null) return null;
 
-          // Use the raw game fielding loader; augment with fieldingGamePos after
+          // Use the raw game fielding loader; augment with gamePosition after
           const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
           const fieldingStat = await context.loaders.gameFielding.load(statKey);
           if (!fieldingStat) return null;
@@ -839,7 +844,7 @@ MatchupPlayerGameRef.implement({
             season: fieldingStat.season,
             gameNum: fieldingStat.gameNum,
             gameIdentifier: fieldingStat.gameIdentifier,
-            pos: game.fieldingGamePos ?? 'UT',
+            pos: game.gamePosition ?? 'UT',
             g: null,
             gs: null,
             inn: fieldingStat.innDef,

@@ -76,7 +76,7 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       draftOrder: t.string({ required: false }), // 'snake' | 'linear' (optional, defaults to 'snake')
       // Era-based league settings (LS-295)
       eraFilter: t.string({ required: false }), // 'all' | 'dead_ball' | 'golden_age' | 'expansion' | 'free_agency' | 'steroid_era' | 'modern' | 'custom'
-      hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers
+      baseballHofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers
       customEraStartYear: t.int({ required: false }), // commissioner-defined era start
       customEraEndYear: t.int({ required: false }), // commissioner-defined era end
       isPublic: t.boolean({ required: false }),
@@ -208,7 +208,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         waiverType: inputWaiverType,
         faabBudgetDefault: inputFaabBudgetDefault,
         eraFilter: inputEraFilter,
-        hofOnly: inputHofOnly,
+        baseballHofOnly: inputHofOnly,
         customEraStartYear: inputCustomEraStartYear,
         customEraEndYear: inputCustomEraEndYear,
         isPublic: inputIsPublic,
@@ -409,7 +409,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               | 'custom'
               | null
               | undefined) ?? 'all',
-          hofOnly: inputHofOnly ?? false,
+          baseballHofOnly: inputHofOnly ?? false,
           customEraStartYear: inputCustomEraStartYear ?? null,
           customEraEndYear: inputCustomEraEndYear ?? null,
           isPublic: inputIsPublic ?? false,
@@ -1249,7 +1249,7 @@ const UpdateLeagueSettingsInput = builder.inputType(
   {
     fields: (t) => ({
       leagueId: t.int({ required: true }),
-      spStartsPerMatchup: t.int({ required: false }),
+      pitcherStartsPerMatchup: t.int({ required: false }),
       gamesPerMatchup: t.int({ required: false }),
       minCareerGames: t.int({ required: false }),
       minCareerSeasons: t.int({ required: false }),
@@ -1276,7 +1276,7 @@ const UpdateLeagueSettingsInput = builder.inputType(
 );
 
 // Mutation: updateLeagueSettings - Update league-level settings
-// When spStartsPerMatchup is changed, also updates any scheduled (not in-progress)
+// When pitcherStartsPerMatchup is changed, also updates any scheduled (not in-progress)
 // matchups for the league to keep them in sync.
 builder.mutationField('updateLeagueSettings', (t) =>
   t.field({
@@ -1291,7 +1291,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
       const {
         leagueId,
-        spStartsPerMatchup,
+        pitcherStartsPerMatchup,
         gamesPerMatchup,
         minCareerGames,
         minCareerSeasons,
@@ -1349,7 +1349,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
       // Build update payload for the league
       const leagueUpdate: {
-        spStartsPerMatchup?: number;
+        pitcherStartsPerMatchup?: number;
         gamesPerMatchup?: number;
         minCareerGames?: number;
         minCareerSeasons?: number;
@@ -1373,15 +1373,19 @@ builder.mutationField('updateLeagueSettings', (t) =>
         auctionMinBid?: number;
       } = {};
 
-      if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
-        if (spStartsPerMatchup < 1) {
+      if (
+        pitcherStartsPerMatchup !== null &&
+        pitcherStartsPerMatchup !== undefined
+      ) {
+        if (pitcherStartsPerMatchup < 1) {
           throw new Error('SP starts per matchup must be at least 1');
         }
 
         // Fetch current value for the change description
         const current = await context.db
           .select({
-            spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+            pitcherStartsPerMatchup:
+              PublicSchema.leagues.pitcherStartsPerMatchup,
             gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           })
           .from(PublicSchema.leagues)
@@ -1390,18 +1394,18 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
         const currentGames =
           gamesPerMatchup ?? current[0]?.gamesPerMatchup ?? 5;
-        if (spStartsPerMatchup > currentGames) {
+        if (pitcherStartsPerMatchup > currentGames) {
           throw new Error(
-            `SP starts per matchup (${spStartsPerMatchup}) cannot exceed games per matchup (${currentGames})`,
+            `SP starts per matchup (${pitcherStartsPerMatchup}) cannot exceed games per matchup (${currentGames})`,
           );
         }
 
-        const oldValue = current[0]?.spStartsPerMatchup ?? 1;
+        const oldValue = current[0]?.pitcherStartsPerMatchup ?? 1;
 
-        if (oldValue !== spStartsPerMatchup) {
-          leagueUpdate.spStartsPerMatchup = spStartsPerMatchup;
+        if (oldValue !== pitcherStartsPerMatchup) {
+          leagueUpdate.pitcherStartsPerMatchup = pitcherStartsPerMatchup;
           changeDescriptions.push(
-            `SP starts per matchup: ${oldValue} → ${spStartsPerMatchup}`,
+            `SP starts per matchup: ${oldValue} → ${pitcherStartsPerMatchup}`,
           );
         }
       }
@@ -1411,21 +1415,22 @@ builder.mutationField('updateLeagueSettings', (t) =>
           throw new Error('Games per matchup must be at least 1');
         }
 
-        // Validate spStartsPerMatchup doesn't exceed new gamesPerMatchup
+        // Validate pitcherStartsPerMatchup doesn't exceed new gamesPerMatchup
         const effectiveSpStarts =
-          spStartsPerMatchup ?? leagueUpdate.spStartsPerMatchup;
+          pitcherStartsPerMatchup ?? leagueUpdate.pitcherStartsPerMatchup;
         if (effectiveSpStarts === undefined) {
-          // Need to fetch current spStartsPerMatchup
+          // Need to fetch current pitcherStartsPerMatchup
           const current = await context.db
             .select({
-              spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+              pitcherStartsPerMatchup:
+                PublicSchema.leagues.pitcherStartsPerMatchup,
               gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
             })
             .from(PublicSchema.leagues)
             .where(eq(PublicSchema.leagues.id, leagueId))
             .limit(1);
 
-          const currentSpStarts = current[0]?.spStartsPerMatchup ?? 1;
+          const currentSpStarts = current[0]?.pitcherStartsPerMatchup ?? 1;
           if (currentSpStarts > gamesPerMatchup) {
             throw new Error(
               `Games per matchup (${gamesPerMatchup}) cannot be less than SP starts per matchup (${currentSpStarts})`,
@@ -1664,11 +1669,12 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
       // 2. Propagate settings to any scheduled (not yet in-progress) matchups
       const matchupUpdate: {
-        spStartsPerMatchup?: number;
+        pitcherStartsPerMatchup?: number;
         gamesPerMatchup?: number;
       } = {};
-      if (leagueUpdate.spStartsPerMatchup !== undefined) {
-        matchupUpdate.spStartsPerMatchup = leagueUpdate.spStartsPerMatchup;
+      if (leagueUpdate.pitcherStartsPerMatchup !== undefined) {
+        matchupUpdate.pitcherStartsPerMatchup =
+          leagueUpdate.pitcherStartsPerMatchup;
       }
       if (leagueUpdate.gamesPerMatchup !== undefined) {
         matchupUpdate.gamesPerMatchup = leagueUpdate.gamesPerMatchup;
@@ -2101,14 +2107,14 @@ builder.mutationField('renewLeague', (t) =>
             rosterLockTiming: oldLeague.rosterLockTiming,
             schedulingStrategy: oldLeague.schedulingStrategy,
             playerPool: oldLeague.playerPool,
-            eraFilter: oldLeague.eraFilter,
-            hofOnly: oldLeague.hofOnly,
+            baseballEraFilter: oldLeague.baseballEraFilter,
+            baseballHofOnly: oldLeague.baseballHofOnly,
             customEraStartYear: oldLeague.customEraStartYear,
             customEraEndYear: oldLeague.customEraEndYear,
             waiverType: oldLeague.waiverType,
             waiverEnabled: oldLeague.waiverEnabled,
             faabBudgetDefault: oldLeague.faabBudgetDefault,
-            spStartsPerMatchup: oldLeague.spStartsPerMatchup,
+            pitcherStartsPerMatchup: oldLeague.pitcherStartsPerMatchup,
             minCareerGames: oldLeague.minCareerGames,
             minCareerSeasons: oldLeague.minCareerSeasons,
             totalMatchups: oldLeague.totalMatchups,

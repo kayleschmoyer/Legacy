@@ -156,7 +156,7 @@ describe('season-game-selector', () => {
 
       expect(result.statsAreCached).toBe(true);
       expect(result.gameIdentifier).toBe('game-2023-001');
-      expect(result.fieldingGamePos).toBe('SS');
+      expect(result.gamePosition).toBe('SS');
     });
 
     it('should return statsAreCached=false when no batting stats exist for non-pitcher', async () => {
@@ -436,7 +436,7 @@ describe('season-game-selector', () => {
             id: 1,
             leagueId: 10,
             weekNumber: 1,
-            spStartsPerMatchup: 1,
+            pitcherStartsPerMatchup: 1,
             gamesPerMatchup: 5,
           },
         ],
@@ -497,7 +497,7 @@ describe('season-game-selector', () => {
             id: 1,
             leagueId: 10,
             weekNumber: 1,
-            spStartsPerMatchup: 1,
+            pitcherStartsPerMatchup: 1,
             gamesPerMatchup: 5,
           },
         ],
@@ -584,7 +584,7 @@ describe('season-game-selector', () => {
             weekNumber: 2,
             team1Id: 5,
             team2Id: 6,
-            spStartsPerMatchup: 1,
+            pitcherStartsPerMatchup: 1,
             gamesPerMatchup: 2,
           },
         ],
@@ -671,7 +671,7 @@ describe('season-game-selector', () => {
             weekNumber: 2,
             team1Id: 5,
             team2Id: 6,
-            spStartsPerMatchup: 1,
+            pitcherStartsPerMatchup: 1,
             gamesPerMatchup: 2,
           },
         ],

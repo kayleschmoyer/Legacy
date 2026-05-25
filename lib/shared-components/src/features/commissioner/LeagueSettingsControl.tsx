@@ -427,7 +427,7 @@ export function LeagueSettingsControl({
           input: {
             leagueId,
             gamesPerMatchup,
-            spStartsPerMatchup: spStarts,
+            pitcherStartsPerMatchup: spStarts,
             minCareerGames,
             minCareerSeasons,
             totalMatchups,

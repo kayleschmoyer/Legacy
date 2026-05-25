@@ -31,7 +31,7 @@ export interface DraftSettingsControlProps {
   playerPool: string | null | undefined;
   /** Current era filter for the league (editable before draft starts). */
   eraFilter?: string | null | undefined;
-  hofOnly?: boolean | null | undefined;
+  baseballHofOnly?: boolean | null | undefined;
   customEraStartYear?: number | null | undefined;
   customEraEndYear?: number | null | undefined;
   onSuccess?: (message: string) => void;
@@ -129,7 +129,7 @@ export function DraftSettingsControl({
   draftStatus,
   playerPool: leaguePlayerPool,
   eraFilter,
-  hofOnly,
+  baseballHofOnly,
   customEraStartYear,
   customEraEndYear,
   onSuccess,
@@ -202,8 +202,8 @@ export function DraftSettingsControl({
   }, [eraFilter]);
 
   useEffect(() => {
-    setHofOnlyLocal(hofOnly ?? false);
-  }, [hofOnly]);
+    setHofOnlyLocal(baseballHofOnly ?? false);
+  }, [baseballHofOnly]);
 
   useEffect(() => {
     setCustomEraStartYearLocal(customEraStartYear ?? undefined);
@@ -238,7 +238,7 @@ export function DraftSettingsControl({
       );
       const originalPlayerPool = String(leaguePlayerPool ?? 'all');
       const originalEraFilter = String(eraFilter ?? 'all');
-      const originalHofOnly = hofOnly ?? false;
+      const originalHofOnly = baseballHofOnly ?? false;
       const originalScheduledAt = draftData?.getLeagueDraft?.scheduledAt
         ? new Date(draftData.getLeagueDraft.scheduledAt)
             .toISOString()
@@ -267,7 +267,7 @@ export function DraftSettingsControl({
       draftData,
       leaguePlayerPool,
       eraFilter,
-      hofOnly,
+      baseballHofOnly,
       customEraStartYear,
       customEraEndYear,
     ],
@@ -448,7 +448,7 @@ export function DraftSettingsControl({
             playerPool,
             pickTimeLimitSeconds: parseInt(pickTimeLimitSeconds, 10),
             eraFilter: eraFilterLocal,
-            hofOnly: hofOnlyLocal,
+            baseballHofOnly: hofOnlyLocal,
             customEraStartYear:
               eraFilterLocal === 'custom'
                 ? (customEraStartYearLocal ?? null)
@@ -500,7 +500,7 @@ export function DraftSettingsControl({
       String(draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120),
     );
     setEraFilterLocal(eraFilter ?? 'all');
-    setHofOnlyLocal(hofOnly ?? false);
+    setHofOnlyLocal(baseballHofOnly ?? false);
     setCustomEraStartYearLocal(customEraStartYear ?? undefined);
     setCustomEraEndYearLocal(customEraEndYear ?? undefined);
     setScheduledAt(originalScheduledAt);

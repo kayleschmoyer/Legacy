@@ -49,7 +49,7 @@ export interface CandidatePool {
 /** League settings needed for candidate pool queries. */
 interface LeagueSettings {
   gamesPerMatchup: number;
-  spStartsPerMatchup: number;
+  pitcherStartsPerMatchup: number;
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export async function fetchCandidatePool(
 
   const settings: LeagueSettings = {
     gamesPerMatchup: league.gamesPerMatchup ?? 5,
-    spStartsPerMatchup: league.spStartsPerMatchup ?? 1,
+    pitcherStartsPerMatchup: league.pitcherStartsPerMatchup ?? 1,
   };
 
   // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected FPG
@@ -164,7 +164,7 @@ async function fetchUndraftedCandidates(
   league: typeof PublicSchema.leagues.$inferSelect,
   settings: LeagueSettings,
 ): Promise<number[]> {
-  const { gamesPerMatchup, spStartsPerMatchup } = settings;
+  const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
 
   // Rank undrafted candidates by projected FPG from player_scoring_cache
   // (default/NULL league row). The cache stores per-game scoring components
@@ -176,7 +176,7 @@ async function fetchUndraftedCandidates(
     sql`SELECT p.id,
         (
           COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
-          COALESCE(cs.pitching_ppg, 0) * ${spStartsPerMatchup} +
+          COALESCE(cs.pitching_ppg, 0) * ${pitcherStartsPerMatchup} +
           COALESCE(cs.fielding_ppg, 0) * ${gamesPerMatchup}
         ) AS fpg
       FROM players p
@@ -199,8 +199,8 @@ async function fetchUndraftedCandidates(
       playerPool: league.playerPool,
       minCareerGames: league.minCareerGames ?? 0,
       minCareerSeasons: league.minCareerSeasons ?? 0,
-      hofOnly: league.hofOnly ?? false,
-      eraFilter: league.eraFilter ?? 'all',
+      baseballHofOnly: league.baseballHofOnly ?? false,
+      baseballEraFilter: league.baseballEraFilter ?? 'all',
       customEraStartYear: league.customEraStartYear ?? null,
       customEraEndYear: league.customEraEndYear ?? null,
     },
@@ -222,7 +222,7 @@ async function computePlayerDraftInfo(
   playerDraftInfo: Map<number, PlayerDraftInfo>;
   rankedEligibleIds: number[];
 }> {
-  const { gamesPerMatchup, spStartsPerMatchup } = settings;
+  const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
 
   // Projected FPG from player_scoring_cache
   const statsRows = await db.execute(
@@ -230,7 +230,7 @@ async function computePlayerDraftInfo(
       p.id AS player_id,
       (
         COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
-        COALESCE(cs.pitching_ppg, 0) * ${spStartsPerMatchup} +
+        COALESCE(cs.pitching_ppg, 0) * ${pitcherStartsPerMatchup} +
         COALESCE(cs.fielding_ppg, 0) * ${gamesPerMatchup}
       ) AS projected_fpg
     FROM players p

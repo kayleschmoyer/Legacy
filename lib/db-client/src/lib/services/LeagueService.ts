@@ -71,7 +71,7 @@ export interface CreateLeagueOptions {
   /** Era-based player pool filter. Default 'all' (no restriction). */
   eraFilter?: EraFilterValue;
   /** When true, only Hall of Fame inductees appear in the draft pool. */
-  hofOnly?: boolean;
+  baseballHofOnly?: boolean;
   /** Start year for a custom era (only used when eraFilter = 'custom'). */
   customEraStartYear?: number | null;
   /** End year for a custom era (only used when eraFilter = 'custom'). */
@@ -116,7 +116,7 @@ export interface CreateLeagueResult {
     inviteCode: string;
     playerPool: PlayerPoolValue;
     eraFilter?: EraFilterValue;
-    hofOnly?: boolean;
+    baseballHofOnly?: boolean;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     waiverType?: 'standard' | 'faab';
@@ -166,7 +166,7 @@ export class LeagueService {
       schedulingStrategy = 'divisional',
       playerPool = 'all',
       eraFilter = 'all',
-      hofOnly = false,
+      baseballHofOnly = false,
       customEraStartYear = null,
       customEraEndYear = null,
       draftMode = 'live',
@@ -222,8 +222,8 @@ export class LeagueService {
             currentMatchup: null,
             inviteCode,
             playerPool,
-            eraFilter,
-            hofOnly,
+            baseballEraFilter: eraFilter,
+            baseballHofOnly,
             customEraStartYear,
             customEraEndYear,
             waiverType,
@@ -256,8 +256,8 @@ export class LeagueService {
             leaguePhase: PublicSchema.leagues.leaguePhase,
             inviteCode: PublicSchema.leagues.inviteCode,
             playerPool: PublicSchema.leagues.playerPool,
-            eraFilter: PublicSchema.leagues.eraFilter,
-            hofOnly: PublicSchema.leagues.hofOnly,
+            eraFilter: PublicSchema.leagues.baseballEraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
             waiverType: PublicSchema.leagues.waiverType,

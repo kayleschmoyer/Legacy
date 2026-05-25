@@ -20,7 +20,7 @@ interface LeagueState {
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
     gamesPerMatchup?: number | null;
-    spStartsPerMatchup?: number | null;
+    pitcherStartsPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
@@ -35,7 +35,7 @@ interface LeagueState {
     frozenAt?: string | null;
     seasonNumber?: number | null;
     eraFilter?: string | null;
-    hofOnly?: boolean | null;
+    baseballHofOnly?: boolean | null;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
   } | null;

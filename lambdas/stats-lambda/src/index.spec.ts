@@ -107,7 +107,7 @@ describe('stats-lambda router', () => {
           playerId: 10,
           brefId: 'foo01',
           season: 1990,
-          fieldingGamePos: 'SS',
+          gamePosition: 'SS',
         },
       ],
     });
@@ -168,7 +168,7 @@ describe('stats-lambda router', () => {
           playerId: 1,
           brefId: 'x',
           season: 2000,
-          fieldingGamePos: 'C',
+          gamePosition: 'C',
         },
       ],
     });

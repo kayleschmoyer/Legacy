@@ -57,7 +57,7 @@ export const matchups = pgTable(
       .notNull()
       .default('not_started'),
     gamesPerMatchup: integer('games_per_matchup'),
-    spStartsPerMatchup: integer('sp_starts_per_matchup'),
+    pitcherStartsPerMatchup: integer('pitcher_starts_per_matchup'),
     startTime: timestamp('start_time', { mode: 'string' }),
     endTime: timestamp('end_time', { mode: 'string' }),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -200,12 +200,14 @@ export const matchupPlayerGames = pgTable(
     matchupPlayerId: integer('matchup_player_id').notNull(),
     gameNum: integer('game_num').notNull(),
     gameIdentifier: varchar('game_identifier', { length: 20 }),
-    fieldingGamePos: char('fielding_game_pos', { length: 2 }),
+    gamePosition: char('game_position', { length: 2 }),
     statsLoadingStatus: varchar('stats_loading_status', { length: 20 }).default(
       'pending',
     ),
     /** True when an SP was probabilistically skipped for this game day (not starting). */
-    spSkipped: boolean('sp_skipped').notNull().default(false),
+    pitcherStartSkipped: boolean('pitcher_start_skipped')
+      .notNull()
+      .default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

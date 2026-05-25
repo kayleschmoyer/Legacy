@@ -116,7 +116,7 @@ describe('gdpr resolver', () => {
           minCareerGames: 'minCareerGames',
           minCareerSeasons: 'minCareerSeasons',
           eraFilter: 'eraFilter',
-          hofOnly: 'hofOnly',
+          baseballHofOnly: 'baseballHofOnly',
           customEraStartYear: 'customEraStartYear',
           customEraEndYear: 'customEraEndYear',
         },

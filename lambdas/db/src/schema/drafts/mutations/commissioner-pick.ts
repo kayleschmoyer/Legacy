@@ -130,14 +130,17 @@ builder.mutationField('commissionerPick', (t) =>
         }
 
         // Validate Hall of Fame eligibility (LS-295)
-        if (leaguePre.hofOnly && !player.hallOfFame) {
+        if (leaguePre.baseballHofOnly && !player.hallOfFame) {
           throw UserInputError(
             'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
           );
         }
 
         // Validate era eligibility (LS-295)
-        if (leaguePre.eraFilter && leaguePre.eraFilter !== 'all') {
+        if (
+          leaguePre.baseballEraFilter &&
+          leaguePre.baseballEraFilter !== 'all'
+        ) {
           const ERA_RANGES: Record<string, [number, number]> = {
             dead_ball: [1871, 1919],
             golden_age: [1920, 1960],
@@ -148,11 +151,11 @@ builder.mutationField('commissionerPick', (t) =>
           };
           let eraStart: number | null = null;
           let eraEnd: number | null = null;
-          if (leaguePre.eraFilter === 'custom') {
+          if (leaguePre.baseballEraFilter === 'custom') {
             eraStart = leaguePre.customEraStartYear ?? null;
             eraEnd = leaguePre.customEraEndYear ?? null;
           } else {
-            const range = ERA_RANGES[leaguePre.eraFilter];
+            const range = ERA_RANGES[leaguePre.baseballEraFilter];
             if (range) {
               [eraStart, eraEnd] = range;
             }
@@ -174,7 +177,7 @@ builder.mutationField('commissionerPick', (t) =>
               ) era_check LIMIT 1`,
             );
             if (!eraCheckResult.rows[0]) {
-              const eraLabel = leaguePre.eraFilter
+              const eraLabel = leaguePre.baseballEraFilter
                 .replace(/_/g, ' ')
                 .replace(/\b\w/g, (c: string) => c.toUpperCase());
               throw UserInputError(

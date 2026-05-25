@@ -593,7 +593,8 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               const leagueSettingsResult = await context.db
                 .select({
                   gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-                  spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+                  pitcherStartsPerMatchup:
+                    PublicSchema.leagues.pitcherStartsPerMatchup,
                 })
                 .from(PublicSchema.leagues)
                 .where(eq(PublicSchema.leagues.id, league.id))
@@ -601,8 +602,8 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
 
               const gamesPerMatchup =
                 leagueSettingsResult[0]?.gamesPerMatchup ?? 5;
-              const spStartsPerMatchup =
-                leagueSettingsResult[0]?.spStartsPerMatchup ?? 1;
+              const pitcherStartsPerMatchup =
+                leagueSettingsResult[0]?.pitcherStartsPerMatchup ?? 1;
 
               // Prior week roster positions for carry-forward
               const priorMatchupPlayers = await context.db
@@ -695,7 +696,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                     team1Id: pm.highSeedTeamId,
                     team2Id: pm.lowSeedTeamId,
                     gamesPerMatchup,
-                    spStartsPerMatchup,
+                    pitcherStartsPerMatchup,
                     status: 'scheduled' as const,
                     team1Score: null,
                     team2Score: null,

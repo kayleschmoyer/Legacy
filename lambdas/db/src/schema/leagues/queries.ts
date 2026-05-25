@@ -70,7 +70,8 @@ builder.queryField('league', (t) =>
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
             // Matchup settings
-            spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+            pitcherStartsPerMatchup:
+              PublicSchema.leagues.pitcherStartsPerMatchup,
             gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
@@ -100,8 +101,8 @@ builder.queryField('league', (t) =>
             auctionBudget: PublicSchema.leagues.auctionBudget,
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
             // Era filter settings (LS-887)
-            eraFilter: PublicSchema.leagues.eraFilter,
-            hofOnly: PublicSchema.leagues.hofOnly,
+            baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
             // Trade deadline (LS-4099)
@@ -169,7 +170,7 @@ builder.queryField('league', (t) =>
           faabBudgetDefault: league.faabBudgetDefault,
           isPublic: league.isPublic,
           // Matchup settings
-          spStartsPerMatchup: league.spStartsPerMatchup,
+          pitcherStartsPerMatchup: league.pitcherStartsPerMatchup,
           gamesPerMatchup: league.gamesPerMatchup ?? undefined,
           minCareerGames: league.minCareerGames,
           minCareerSeasons: league.minCareerSeasons,
@@ -199,8 +200,8 @@ builder.queryField('league', (t) =>
           auctionBudget: league.auctionBudget,
           auctionMinBid: league.auctionMinBid,
           // Era filter settings (LS-887)
-          eraFilter: league.eraFilter,
-          hofOnly: league.hofOnly,
+          baseballEraFilter: league.baseballEraFilter,
+          baseballHofOnly: league.baseballHofOnly,
           customEraStartYear: league.customEraStartYear,
           customEraEndYear: league.customEraEndYear,
           // Trade deadline (LS-4099)

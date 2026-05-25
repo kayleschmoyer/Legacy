@@ -85,7 +85,7 @@ export const createMatchupsLoader = (
       leagueId: number;
       weekNumber: number;
       gamesPerMatchup: number | null;
-      spStartsPerMatchup: number | null;
+      pitcherStartsPerMatchup: number | null;
     } | null
   >(async (keys) => {
     const ids = [...new Set(keys)] as number[];
@@ -95,7 +95,7 @@ export const createMatchupsLoader = (
         leagueId: PublicSchema.matchups.leagueId,
         weekNumber: PublicSchema.matchups.weekNumber,
         gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
-        spStartsPerMatchup: PublicSchema.matchups.spStartsPerMatchup,
+        pitcherStartsPerMatchup: PublicSchema.matchups.pitcherStartsPerMatchup,
       })
       .from(PublicSchema.matchups)
       .where(inArray(PublicSchema.matchups.id, ids));
@@ -106,7 +106,7 @@ export const createMatchupsLoader = (
         leagueId: number;
         weekNumber: number;
         gamesPerMatchup: number | null;
-        spStartsPerMatchup: number | null;
+        pitcherStartsPerMatchup: number | null;
       }
     >();
     for (const row of rows) {
@@ -114,7 +114,7 @@ export const createMatchupsLoader = (
         leagueId: row.leagueId,
         weekNumber: row.weekNumber,
         gamesPerMatchup: row.gamesPerMatchup,
-        spStartsPerMatchup: row.spStartsPerMatchup,
+        pitcherStartsPerMatchup: row.pitcherStartsPerMatchup,
       });
     }
     return keys.map((key) => mMap.get(key) ?? null);

@@ -69,7 +69,7 @@ const matchup: MatchupFragment = {
   status: MatchupStatus.Scheduled,
   statsLoadingStatus: null,
   gamesPerMatchup: 10,
-  spStartsPerMatchup: 2,
+  pitcherStartsPerMatchup: 2,
   selectedGamesCount: 5,
   startTime: null,
   endTime: null,

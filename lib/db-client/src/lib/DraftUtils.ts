@@ -302,12 +302,12 @@ export interface LeagueEligibilitySettings {
   /** Minimum distinct seasons a player must have appeared in */
   minCareerSeasons: number;
   /** When true, restrict to Hall of Fame players only */
-  hofOnly?: boolean;
+  baseballHofOnly?: boolean;
   /** Era filter ('all' or named era or 'custom') */
-  eraFilter?: string;
-  /** Start year for custom era filter */
+  baseballEraFilter?: string;
+  /** Start year for custom era (only used when baseballEraFilter = 'custom') */
   customEraStartYear?: number | null;
-  /** End year for custom era filter */
+  /** End year for custom era (only used when baseballEraFilter = 'custom') */
   customEraEndYear?: number | null;
 }
 
@@ -548,7 +548,7 @@ export async function filterPlayerIdsByLeagueEligibility(
   }
 
   // 4. Hall of Fame filter
-  if (settings.hofOnly && currentIds.length > 0) {
+  if (settings.baseballHofOnly && currentIds.length > 0) {
     const rows = await db.execute(
       sql`
         SELECT id FROM players
@@ -568,7 +568,7 @@ export async function filterPlayerIdsByLeagueEligibility(
   }
 
   // 5. Era filter
-  const eraFilter = settings.eraFilter;
+  const eraFilter = settings.baseballEraFilter;
   if (eraFilter && eraFilter !== 'all' && currentIds.length > 0) {
     let eraStart: number | null = null;
     let eraEnd: number | null = null;

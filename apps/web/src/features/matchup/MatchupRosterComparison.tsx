@@ -680,10 +680,11 @@ export function MatchupRosterComparison({
     const calculatePlayerProjection = (
       player: MatchupPlayerFragment,
     ): number => {
-      const gamesPlayed = player.games?.filter((g) => !g.spSkipped).length ?? 0;
+      const gamesPlayed =
+        player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
       const actualScore =
         player.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ?? 0;
-      // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+      // Use player-specific numberOfGames (SP gets pitcherStartsPerMatchup, others get gamesPerMatchup)
       const playerTotalGames = player.numberOfGames ?? gamesPerMatchup;
       const gamesRemaining = playerTotalGames - gamesPlayed;
 
@@ -1240,15 +1241,17 @@ export function MatchupRosterComparison({
 
     // Check if any games have been played
     const team1HasPlayed =
-      (team1Player?.games?.filter((g) => !g.spSkipped).length ?? 0) > 0;
+      (team1Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
+      0;
     const team2HasPlayed =
-      (team2Player?.games?.filter((g) => !g.spSkipped).length ?? 0) > 0;
+      (team2Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
+      0;
 
     // Calculate expected score based on games played (for color coding)
     const team1GamesPlayed =
-      team1Player?.games?.filter((g) => !g.spSkipped).length ?? 0;
+      team1Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
     const team2GamesPlayed =
-      team2Player?.games?.filter((g) => !g.spSkipped).length ?? 0;
+      team2Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
     const team1ExpectedForGamesPlayed =
       team1GamesPlayed > 0
         ? (team1Proj / gamesPerMatchup) * team1GamesPlayed
@@ -1363,22 +1366,27 @@ export function MatchupRosterComparison({
                         <Text color="$green10">
                           {' '}
                           •{' '}
-                          {team1Player.games.filter((g) => !g.spSkipped).length}
+                          {
+                            team1Player.games.filter(
+                              (g) => !g.pitcherStartSkipped,
+                            ).length
+                          }
                           /{team1Player.numberOfGames ?? gamesPerMatchup} games
                         </Text>
                         {(() => {
                           const skippedCount = team1Player.games.filter(
-                            (g) => g.spSkipped,
+                            (g) => g.pitcherStartSkipped,
                           ).length;
                           const loadingCount = team1Player.games.filter(
                             (g) =>
-                              !g.spSkipped &&
+                              !g.pitcherStartSkipped &&
                               (g.statsLoadingStatus === 'loading' ||
                                 g.statsLoadingStatus === 'pending'),
                           ).length;
                           const failedCount = team1Player.games.filter(
                             (g) =>
-                              !g.spSkipped && g.statsLoadingStatus === 'failed',
+                              !g.pitcherStartSkipped &&
+                              g.statsLoadingStatus === 'failed',
                           ).length;
 
                           if (loadingCount > 0) {
@@ -1583,22 +1591,27 @@ export function MatchupRosterComparison({
                         <Text color="$green10">
                           {' '}
                           •{' '}
-                          {team2Player.games.filter((g) => !g.spSkipped).length}
+                          {
+                            team2Player.games.filter(
+                              (g) => !g.pitcherStartSkipped,
+                            ).length
+                          }
                           /{team2Player.numberOfGames ?? gamesPerMatchup} games
                         </Text>
                         {(() => {
                           const skippedCount = team2Player.games.filter(
-                            (g) => g.spSkipped,
+                            (g) => g.pitcherStartSkipped,
                           ).length;
                           const loadingCount = team2Player.games.filter(
                             (g) =>
-                              !g.spSkipped &&
+                              !g.pitcherStartSkipped &&
                               (g.statsLoadingStatus === 'loading' ||
                                 g.statsLoadingStatus === 'pending'),
                           ).length;
                           const failedCount = team2Player.games.filter(
                             (g) =>
-                              !g.spSkipped && g.statsLoadingStatus === 'failed',
+                              !g.pitcherStartSkipped &&
+                              g.statsLoadingStatus === 'failed',
                           ).length;
 
                           if (loadingCount > 0) {

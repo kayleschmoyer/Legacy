@@ -50,9 +50,9 @@ export interface MockMatchupPlayerGame {
   matchupPlayerId: number;
   gameNum: number;
   gameIdentifier: string;
-  fieldingGamePos: string | null;
+  gamePosition: string | null;
   statsLoadingStatus: MockStatsLoadingStatus;
-  spSkipped: boolean;
+  pitcherStartSkipped: boolean;
 }
 
 /** Individual game selection record for a matchup player. */
@@ -65,9 +65,9 @@ export function mockMatchupPlayerGame(
     matchupPlayerId: 1,
     gameNum: 1,
     gameIdentifier: 'ARI202504150',
-    fieldingGamePos: null,
+    gamePosition: null,
     statsLoadingStatus: 'not_started',
-    spSkipped: false,
+    pitcherStartSkipped: false,
     ...overrides,
   };
 }
@@ -92,7 +92,7 @@ export interface MockMatchupWithGames {
   status: MockMatchupStatus;
   statsLoadingStatus: MockStatsLoadingStatus;
   gamesPerMatchup: number;
-  spStartsPerMatchup: number;
+  pitcherStartsPerMatchup: number;
   startTime: string | null;
   endTime: string | null;
   games: MockMatchupPlayerGame[];
@@ -165,7 +165,7 @@ export function mockMatchupWithGames(
     status: 'scheduled',
     statsLoadingStatus: 'not_started',
     gamesPerMatchup: gameCount,
-    spStartsPerMatchup: 2,
+    pitcherStartsPerMatchup: 2,
     startTime: null,
     endTime: null,
     games,

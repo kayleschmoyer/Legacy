@@ -99,8 +99,8 @@ interface CreateLeagueFormData {
   waiverType: 'standard' | 'faab';
   faabBudgetDefault: number;
   isPublic: boolean;
-  eraFilter: string;
-  hofOnly: boolean;
+  baseballEraFilter: string;
+  baseballHofOnly: boolean;
   customEraStartYear?: number;
   customEraEndYear?: number;
   salaryCapEnabled: boolean;
@@ -301,7 +301,7 @@ function applySportSwitch(
     sport: nextSport,
     numberOfTeams: fresh.numberOfTeams,
     maxRosterSize: fresh.maxRosterSize,
-    eraFilter: 'all',
+    baseballEraFilter: 'all',
     playerPool: 'all',
     customEraStartYear: undefined,
     customEraEndYear: undefined,
@@ -311,10 +311,13 @@ function applySportSwitch(
 // ── Display helpers for the summary sidebar ─────────────────────────────────
 
 function eraDisplayLabel(f: CreateLeagueFormData): string {
-  if (f.eraFilter === 'custom') {
+  if (f.baseballEraFilter === 'custom') {
     return `${f.customEraStartYear ?? '—'} – ${f.customEraEndYear ?? '—'}`;
   }
-  return ERAS_BY_SPORT[f.sport].find((e) => e.id === f.eraFilter)?.name ?? '—';
+  return (
+    ERAS_BY_SPORT[f.sport].find((e) => e.id === f.baseballEraFilter)?.name ??
+    '—'
+  );
 }
 
 function scheduleDisplayLabel(v: string): string {
@@ -351,7 +354,7 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
   const range = ROSTER_RANGE_BY_SPORT[f.sport];
   if (f.maxRosterSize < range.min || f.maxRosterSize > range.max)
     errs.maxRosterSize = `Roster must be ${range.min}–${range.max}.`;
-  if (f.eraFilter === 'custom') {
+  if (f.baseballEraFilter === 'custom') {
     if (f.customEraStartYear == null || f.customEraEndYear == null)
       errs.customEra = 'Both start and end year required.';
     else if (f.customEraStartYear > f.customEraEndYear)
@@ -1034,9 +1037,9 @@ function SummarySidePanel({
           <SummaryRow
             label="Era"
             value={eraDisplayLabel(f)}
-            gold={f.eraFilter !== 'all'}
+            gold={f.baseballEraFilter !== 'all'}
           />
-          {f.hofOnly && <SummaryRow label="HOF Only" value="On" gold />}
+          {f.baseballHofOnly && <SummaryRow label="HOF Only" value="On" gold />}
           <SummaryRow label="Draft" value={draftLabel} />
           <SummaryRow label="Waivers" value={waiversLabel} />
           {f.salaryCapEnabled && (
@@ -1148,8 +1151,8 @@ export function LeagueCreatePage(): React.JSX.Element {
       waiverType: 'standard',
       faabBudgetDefault: 100,
       isPublic: false,
-      eraFilter: 'all',
-      hofOnly: false,
+      baseballEraFilter: 'all',
+      baseballHofOnly: false,
       salaryCapEnabled: false,
       salaryCap: undefined,
       auctionBudget: 200,
@@ -1260,7 +1263,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     }
     if (
       (!isPremium || premiumLoading) &&
-      !FREE_ERA_IDS_BY_SPORT[formData.sport].has(formData.eraFilter)
+      !FREE_ERA_IDS_BY_SPORT[formData.sport].has(formData.baseballEraFilter)
     ) {
       trackPremiumFeatureClick('Historical Era Selection');
       setShowEraUpgradeModal(true);
@@ -1297,14 +1300,14 @@ export function LeagueCreatePage(): React.JSX.Element {
             waiverEnabled: true,
             waiverType: formData.waiverType,
             faabBudgetDefault: formData.faabBudgetDefault,
-            eraFilter: formData.eraFilter,
-            hofOnly: formData.hofOnly,
+            eraFilter: formData.baseballEraFilter,
+            baseballHofOnly: formData.baseballHofOnly,
             customEraStartYear:
-              formData.eraFilter === 'custom'
+              formData.baseballEraFilter === 'custom'
                 ? formData.customEraStartYear
                 : undefined,
             customEraEndYear:
-              formData.eraFilter === 'custom'
+              formData.baseballEraFilter === 'custom'
                 ? formData.customEraEndYear
                 : undefined,
             salaryCapEnabled: formData.salaryCapEnabled,
@@ -1760,7 +1763,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 summary={
                   <span>
                     <strong>{eraDisplayLabel(formData)}</strong>
-                    {formData.hofOnly ? ' · HOF only' : ''}
+                    {formData.baseballHofOnly ? ' · HOF only' : ''}
                   </span>
                 }
                 open={openSections.has('era-history')}
@@ -1835,8 +1838,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 >
                   <EraCardGrid
                     sport={formData.sport}
-                    value={formData.eraFilter}
-                    onChange={(v) => handleInputChange('eraFilter', v)}
+                    value={formData.baseballEraFilter}
+                    onChange={(v) => handleInputChange('baseballEraFilter', v)}
                     isPremium={!!isPremium && !premiumLoading}
                     disabled={isFormDisabled}
                     onUpgrade={() => {
@@ -1847,7 +1850,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </FieldRow>
 
                 {/* Custom era year range */}
-                {formData.eraFilter === 'custom' && (
+                {formData.baseballEraFilter === 'custom' && (
                   <XStack gap="$3" alignItems="flex-end" flexWrap="wrap">
                     <YStack flex={1} gap="$2">
                       <Label
@@ -1947,10 +1950,10 @@ export function LeagueCreatePage(): React.JSX.Element {
                   hint="Restrict the player pool to HOF inductees — smaller, more legendary."
                 >
                   <PillToggle
-                    value={formData.hofOnly}
+                    value={formData.baseballHofOnly}
                     offLabel="🏆 Hall of Famers Only — OFF"
                     onLabel="🏆 Hall of Famers Only — ON"
-                    onChange={(v) => handleInputChange('hofOnly', v)}
+                    onChange={(v) => handleInputChange('baseballHofOnly', v)}
                     disabled={isFormDisabled}
                   />
                 </FieldRow>

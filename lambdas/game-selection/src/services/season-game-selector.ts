@@ -28,7 +28,7 @@ import {
 
 export interface GameSelectionResult {
   gameIdentifier: string | null;
-  fieldingGamePos: string | null;
+  gamePosition: string | null;
   statsAreCached: boolean;
   /** True if game was skipped due to SP start probability */
   skipped?: boolean;
@@ -427,7 +427,7 @@ export async function selectGamesForMatchupPlayer(
         );
         return {
           gameIdentifier: null,
-          fieldingGamePos: fieldingPos,
+          gamePosition: fieldingPos,
           statsAreCached: false,
         };
       }
@@ -487,20 +487,20 @@ export async function selectGamesForMatchupPlayer(
           );
           return {
             gameIdentifier: null,
-            fieldingGamePos: fieldingPos,
+            gamePosition: fieldingPos,
             statsAreCached: false,
           };
         }
         return {
           gameIdentifier: recycled,
-          fieldingGamePos: fieldingPos,
+          gamePosition: fieldingPos,
           statsAreCached: true,
         };
       }
 
       return {
         gameIdentifier,
-        fieldingGamePos: fieldingPos,
+        gamePosition: fieldingPos,
         statsAreCached: true,
       };
     }
@@ -510,7 +510,7 @@ export async function selectGamesForMatchupPlayer(
     );
     return {
       gameIdentifier: null,
-      fieldingGamePos: fieldingPos,
+      gamePosition: fieldingPos,
       statsAreCached: false,
     };
   }
@@ -562,13 +562,13 @@ export async function selectGamesForMatchupPlayer(
       );
       return {
         gameIdentifier: null,
-        fieldingGamePos: fieldingPos,
+        gamePosition: fieldingPos,
         statsAreCached: false,
       };
     }
     return {
       gameIdentifier: recycled,
-      fieldingGamePos: fieldingPos,
+      gamePosition: fieldingPos,
       statsAreCached: true,
     };
   }
@@ -579,7 +579,7 @@ export async function selectGamesForMatchupPlayer(
 
   return {
     gameIdentifier,
-    fieldingGamePos: fieldingPos,
+    gamePosition: fieldingPos,
     statsAreCached: true,
   };
 }
@@ -635,16 +635,16 @@ async function batchGetPlayerPitcherRoles(
  * - If numberOfStarts >= gamesRemaining, always select (100%).
  * - Otherwise, roll a random number against the probability.
  *
- * @param spStartsPerMatchup - Max starts allowed for SP in this matchup
+ * @param pitcherStartsPerMatchup - Max starts allowed for SP in this matchup
  * @param startsAlreadySelected - How many starts this SP already has in this matchup
  * @param gamesRemaining - How many game slots remain in this matchup (including current)
  */
 function shouldSelectSpGame(
-  spStartsPerMatchup: number,
+  pitcherStartsPerMatchup: number,
   startsAlreadySelected: number,
   gamesRemaining: number,
 ): boolean {
-  const startsNeeded = spStartsPerMatchup - startsAlreadySelected;
+  const startsNeeded = pitcherStartsPerMatchup - startsAlreadySelected;
 
   // SP already has their full allotment
   if (startsNeeded <= 0) {
@@ -667,7 +667,7 @@ function shouldSelectSpGame(
  * Uses game_identifier for real game selection - all stat types come from the same game.
  *
  * Position-based rules:
- * - SP (Starting Pitcher): probabilistic selection based on spStartsPerMatchup,
+ * - SP (Starting Pitcher): probabilistic selection based on pitcherStartsPerMatchup,
  *   only games where GS=1 in game_pitching
  * - RP (Relief Pitcher): selects every game, only games where GS=0
  * - All other positions: selects every game, no GS filtering
@@ -683,7 +683,7 @@ export async function selectGamesForMatchup(
     matchupPlayerId: number;
     playerId: number;
     season: number;
-    fieldingGamePos: string | null;
+    gamePosition: string | null;
   }>;
 }> {
   // First, get the matchup to retrieve league and week information
@@ -697,13 +697,13 @@ export async function selectGamesForMatchup(
     throw new Error(`Matchup ${matchupId} not found`);
   }
 
-  const spStartsPerMatchup = matchup.spStartsPerMatchup ?? 1;
+  const pitcherStartsPerMatchup = matchup.pitcherStartsPerMatchup ?? 1;
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 5;
   const gamesRemainingInMatchup = gamesPerMatchup - gameNumber + 1;
 
   LOGGER.info(
     `Selecting games for matchup ${matchupId}, game ${gameNumber} ` +
-      `(spStarts=${spStartsPerMatchup}, gamesPerMatchup=${gamesPerMatchup})`,
+      `(spStarts=${pitcherStartsPerMatchup}, gamesPerMatchup=${gamesPerMatchup})`,
   );
 
   // Update matchup stats loading status to 'loading' (transitioning from 'queued')
@@ -752,7 +752,7 @@ export async function selectGamesForMatchup(
     matchupPlayerId: number;
     playerId: number;
     season: number;
-    fieldingGamePos: string | null;
+    gamePosition: string | null;
   }> = [];
 
   for (const matchupPlayer of matchupPlayers) {
@@ -812,25 +812,25 @@ export async function selectGamesForMatchup(
 
       if (
         !shouldSelectSpGame(
-          spStartsPerMatchup,
+          pitcherStartsPerMatchup,
           startsAlreadySelected,
           gamesRemainingInMatchup,
         )
       ) {
         LOGGER.debug(
           `SP player ${matchupPlayer.playerId} skipped for game ${gameNumber} ` +
-            `(starts=${startsAlreadySelected}/${spStartsPerMatchup}, ` +
+            `(starts=${startsAlreadySelected}/${pitcherStartsPerMatchup}, ` +
             `remaining=${gamesRemainingInMatchup})`,
         );
 
-        // Insert a record with null gameIdentifier and spSkipped=true to indicate intentional skip
+        // Insert a record with null gameIdentifier and pitcherStartSkipped=true to indicate intentional skip
         await db.insert(PublicSchema.matchupPlayerGames).values({
           gameNum: gameNumber,
           matchupPlayerId: matchupPlayer.id,
           gameIdentifier: null,
-          fieldingGamePos: null,
+          gamePosition: null,
           statsLoadingStatus: 'completed',
-          spSkipped: true,
+          pitcherStartSkipped: true,
         });
         continue;
       }
@@ -855,7 +855,7 @@ export async function selectGamesForMatchup(
       gameNum: gameNumber,
       matchupPlayerId: matchupPlayer.id,
       gameIdentifier: result.gameIdentifier,
-      fieldingGamePos: result.fieldingGamePos,
+      gamePosition: result.gamePosition,
       // Set status based on whether stats are cached
       statsLoadingStatus: result.statsAreCached ? 'completed' : 'pending',
     });
@@ -871,7 +871,7 @@ export async function selectGamesForMatchup(
         matchupPlayerId: matchupPlayer.id,
         playerId: matchupPlayer.playerId,
         season: playerSeason,
-        fieldingGamePos: result.fieldingGamePos,
+        gamePosition: result.gamePosition,
       });
     }
   }

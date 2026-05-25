@@ -184,7 +184,7 @@ export const handleRetryFailedPlayers = async (
         leagueId: PublicSchema.matchups.leagueId,
         brefId: PublicSchema.players.brefId,
         season: PublicSchema.leagueWeekPlayerSeasons.season,
-        fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
+        gamePosition: PublicSchema.matchupPlayerGames.gamePosition,
       })
       .from(PublicSchema.matchupPlayerGames)
       .innerJoin(
@@ -236,7 +236,7 @@ export const handleRetryFailedPlayers = async (
           playerId: number;
           brefId: string;
           season: number;
-          fieldingGamePos: string;
+          gamePosition: string;
         }>;
         gameIds: number[];
       }
@@ -257,7 +257,7 @@ export const handleRetryFailedPlayers = async (
         playerId: game.playerId,
         brefId: game.brefId || '',
         season: game.season,
-        fieldingGamePos: game.fieldingGamePos || 'XX',
+        gamePosition: game.gamePosition || 'XX',
       });
       entry.gameIds.push(game.gameId);
     }

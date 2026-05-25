@@ -61,7 +61,7 @@ const GET_LEAGUE_SETTINGS = `
       playoffFormat
       playoffMultiWeek
       gamesPerMatchup
-      spStartsPerMatchup
+      pitcherStartsPerMatchup
       totalMatchups
     }
   }

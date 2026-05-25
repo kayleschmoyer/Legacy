@@ -98,13 +98,13 @@ export interface PlayerFilters {
    * custom      : uses customEraStartYear / customEraEndYear
    * all         : no restriction
    */
-  eraFilter?: string;
-  /** Start year for custom era (only used when eraFilter = 'custom') */
+  baseballEraFilter?: string;
+  /** Start year for custom era (only used when baseballEraFilter = 'custom') */
   customEraStartYear?: number | null;
-  /** End year for custom era (only used when eraFilter = 'custom') */
+  /** End year for custom era (only used when baseballEraFilter = 'custom') */
   customEraEndYear?: number | null;
   /** When true, only include Hall of Fame inductees */
-  hofOnly?: boolean;
+  baseballHofOnly?: boolean;
 }
 
 /** Sort options that require a join to career_batting */
@@ -383,7 +383,7 @@ export class PlayerService {
     }
 
     // Hall of Fame only filter
-    if (filters.hofOnly) {
+    if (filters.baseballHofOnly) {
       conditions.push(eq(PublicSchema.players.hallOfFame, true));
     }
 
@@ -524,7 +524,7 @@ export class PlayerService {
         }
 
         // Hall of Fame only
-        if (queryOptions.filters?.hofOnly) {
+        if (queryOptions.filters?.baseballHofOnly) {
           rawConditions.push(sql`p.hall_of_fame = true`);
         }
 
@@ -663,7 +663,7 @@ export class PlayerService {
    * Returns null when no era restriction should be applied ('all' or no filter).
    */
   private buildRawEraFilter(filters?: PlayerFilters): SQL | null {
-    const eraFilter = filters?.eraFilter;
+    const eraFilter = filters?.baseballEraFilter;
     if (!eraFilter || eraFilter === 'all') return null;
 
     // Map preset era names to year ranges

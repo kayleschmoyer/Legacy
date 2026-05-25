@@ -483,7 +483,7 @@ test.describe
                 id: number;
                 gameIdentifier: string | null;
                 gameNum: number | null;
-                spSkipped: boolean | null;
+                pitcherStartSkipped: boolean | null;
               }> | null;
             }>;
           }>(
@@ -491,7 +491,7 @@ test.describe
             `query MatchupPlayers($matchupId: Int!) {
                    getMatchupPlayers(matchupId: $matchupId) {
                      id playerId
-                     games { id gameIdentifier gameNum spSkipped }
+                     games { id gameIdentifier gameNum pitcherStartSkipped }
                    }
                  }`,
             { matchupId: Number(matchup.id) },
@@ -503,11 +503,11 @@ test.describe
           );
           expect(playersWithGames.length).toBeGreaterThan(0);
 
-          // gameIdentifier === null iff spSkipped === true (intentional SP-skip slots).
+          // gameIdentifier === null iff pitcherStartSkipped === true (intentional SP-skip slots).
           // Non-skipped games must always have a real identifier.
           for (const mp of playersWithGames) {
             for (const g of mp.games ?? []) {
-              if (g.spSkipped) {
+              if (g.pitcherStartSkipped) {
                 expect(g.gameIdentifier).toBeNull();
               } else {
                 expect(g.gameIdentifier).toBeTruthy();
@@ -517,7 +517,7 @@ test.describe
 
           // At least some games across all players should be real (non-skipped)
           const realGames = playersWithGames.flatMap((mp) =>
-            (mp.games ?? []).filter((g) => !g.spSkipped),
+            (mp.games ?? []).filter((g) => !g.pitcherStartSkipped),
           );
           expect(realGames.length).toBeGreaterThan(0);
         }

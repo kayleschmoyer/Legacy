@@ -237,13 +237,13 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
       );
 
       // Determine number of games for this pitcher based on position type
-      // SP uses spStartsPerMatchup, RP uses gamesPerMatchup
+      // SP uses pitcherStartsPerMatchup, RP uses gamesPerMatchup
       const posSlot = pitchingSlots.find(
         (s) => s?.id != null && Number(s.id) === pitcher.positionId,
       );
       const pitcherGames =
         posSlot?.positionType === 'SP'
-          ? (matchup?.spStartsPerMatchup ?? matchup?.gamesPerMatchup ?? 1)
+          ? (matchup?.pitcherStartsPerMatchup ?? matchup?.gamesPerMatchup ?? 1)
           : (matchup?.gamesPerMatchup ?? 1);
 
       result[pitcher.playerId] = value * pitcherGames;

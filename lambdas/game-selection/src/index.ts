@@ -157,7 +157,7 @@ async function queueMatchupStatsLoad(
     playerId: number;
     brefId: string;
     season: number;
-    fieldingGamePos: string;
+    gamePosition: string;
   }>,
 ): Promise<void> {
   if (!GAME_STATS_QUEUE_URL) {
@@ -318,7 +318,7 @@ async function selectGameForMatchup(
       playerId: p.playerId,
       brefId: brefIdMap.get(p.playerId) ?? '',
       season: p.season,
-      fieldingGamePos: p.fieldingGamePos ?? 'XX',
+      gamePosition: p.gamePosition ?? 'XX',
     }));
 
     await queueMatchupStatsLoad(matchupId, matchupData.leagueId, gamesToQueue);
@@ -406,7 +406,7 @@ async function createMatchupForLeagueWeek(
           playerId: PublicSchema.matchupPlayers.playerId,
           brefId: PublicSchema.players.brefId,
           season: PublicSchema.leagueWeekPlayerSeasons.season,
-          fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
+          gamePosition: PublicSchema.matchupPlayerGames.gamePosition,
         })
         .from(PublicSchema.matchupPlayerGames)
         .innerJoin(
@@ -478,7 +478,7 @@ async function createMatchupForLeagueWeek(
           playerId: game.playerId,
           brefId: game.brefId || '',
           season: game.season,
-          fieldingGamePos: game.fieldingGamePos || 'XX',
+          gamePosition: game.gamePosition || 'XX',
         }));
 
         await queueMatchupStatsLoad(matchup.id, matchup.leagueId, gamesToQueue);

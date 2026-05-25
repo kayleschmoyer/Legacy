@@ -453,6 +453,7 @@ enum ConsentType {
 input CreateLeagueAndTeamsInput {
   auctionBudget: Int
   auctionMinBid: Int
+  baseballHofOnly: Boolean
   customEraEndYear: Int
   customEraStartYear: Int
   defensiveFormat: DefensiveFormat
@@ -460,7 +461,6 @@ input CreateLeagueAndTeamsInput {
   draftOrder: String
   eraFilter: String
   faabBudgetDefault: Int
-  hofOnly: Boolean
   isPublic: Boolean
   leagueName: String!
   luxuryTaxThreshold: Int
@@ -1325,6 +1325,7 @@ type League {
   auctionBudget: Int
   auctionMinBid: Int
   bannerUrl: String
+  baseballHofOnly: Boolean
   currentMatchup: Int
   currentWeek: Int
 
@@ -1344,7 +1345,6 @@ type League {
   faabBudgetDefault: Int
   frozenAt: String
   gamesPerMatchup: Int
-  hofOnly: Boolean
   id: Int
   inviteCode: String
   isMockDraft: Boolean
@@ -1363,6 +1363,7 @@ type League {
   minSalary: Int
   name: String
   owner: Int
+  pitcherStartsPerMatchup: Int
   playerPool: String
   playoffEnabled: Boolean
   playoffFormat: String
@@ -1377,7 +1378,6 @@ type League {
   scoringProfile: ScoringConfig
   seasonNumber: Int
   secondaryColor: String
-  spStartsPerMatchup: Int
 
   """
   Sport for this league (baseball or football). (LS-4628)
@@ -1558,6 +1558,7 @@ type Matchup {
   gamesPerMatchup: Int
   id: ID
   leagueId: Int
+  pitcherStartsPerMatchup: Int
 
   """
   Auto-generated narrative recap, only available for completed matchups.
@@ -1568,7 +1569,6 @@ type Matchup {
   Number of unique games selected for this matchup
   """
   selectedGamesCount: Int
-  spStartsPerMatchup: Int
   startTime: String
   statsLoadingStatus: StatsLoadingStatus
   status: MatchupStatus
@@ -1712,7 +1712,7 @@ type MatchupPlayer {
   matchupId: Int
 
   """
-  Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup)
+  Number of games this player is expected to play in this matchup (SP uses pitcherStartsPerMatchup, others use gamesPerMatchup)
   """
   numberOfGames: Int
   player: Player
@@ -1728,13 +1728,13 @@ type MatchupPlayer {
 type MatchupPlayerGame {
   battingGame: GameBatting
   fieldingGame: GameFielding
-  fieldingGamePos: String
   gameIdentifier: String
   gameNum: Int
+  gamePosition: String
   id: Int
   matchupPlayerId: Int
+  pitcherStartSkipped: Boolean
   pitchingGame: GamePitching
-  spSkipped: Boolean
   statsLoadingStatus: String
 }
 
@@ -4174,12 +4174,12 @@ input UpdateCommissionerNoteInput {
 }
 
 input UpdateDraftSettingsInput {
+  baseballHofOnly: Boolean
   customEraEndYear: Int
   customEraStartYear: Int
   draftMode: String
   draftOrder: String
   eraFilter: String
-  hofOnly: Boolean
   leagueId: Int!
   pickTimeLimitSeconds: Int
   playerPool: String
@@ -4229,6 +4229,7 @@ input UpdateLeagueSettingsInput {
   minCareerGames: Int
   minCareerSeasons: Int
   minSalary: Int
+  pitcherStartsPerMatchup: Int
   playoffEnabled: Boolean
   playoffFormat: String
   playoffMultiWeek: Boolean
@@ -4239,7 +4240,6 @@ input UpdateLeagueSettingsInput {
   salaryEscalationPct: Int
   salaryFloor: Int
   secondaryColor: String
-  spStartsPerMatchup: Int
   totalMatchups: Int
 }
 

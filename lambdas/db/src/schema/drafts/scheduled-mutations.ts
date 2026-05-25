@@ -345,8 +345,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                       playerPool: league.playerPool,
                       minCareerGames: league.minCareerGames,
                       minCareerSeasons: league.minCareerSeasons,
-                      hofOnly: league.hofOnly,
-                      eraFilter: league.eraFilter,
+                      baseballHofOnly: league.baseballHofOnly,
+                      eraFilter: league.baseballEraFilter,
                     },
                   },
                 );

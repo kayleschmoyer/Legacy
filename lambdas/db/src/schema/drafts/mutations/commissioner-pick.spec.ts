@@ -217,7 +217,7 @@ describe('commissionerPick resolver', () => {
       id: 1,
       draftStatus: 'in-progress',
       playerPool: 'all',
-      hofOnly: false,
+      baseballHofOnly: false,
       eraFilter: null,
       minCareerGames: 0,
       minCareerSeasons: 0,

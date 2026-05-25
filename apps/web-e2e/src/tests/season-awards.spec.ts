@@ -49,7 +49,7 @@ const MOCK_LEAGUE = {
   minCareerGames: 50,
   minCareerSeasons: 3,
   waiverType: 'standard',
-  spStartsPerMatchup: null,
+  pitcherStartsPerMatchup: null,
   gamesPerMatchup: 7,
   totalMatchups: 12,
   playoffTeams: 4,
@@ -57,7 +57,7 @@ const MOCK_LEAGUE = {
   salaryCap: null,
   salaryCapEnabled: false,
   eraFilter: null,
-  hofOnly: false,
+  baseballHofOnly: false,
   customEraStartYear: null,
   customEraEndYear: null,
 };

@@ -1290,7 +1290,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       }
 
       // Calculate projection
-      // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+      // Use player-specific numberOfGames (SP gets pitcherStartsPerMatchup, others get gamesPerMatchup)
       const playerTotalGames = mp.numberOfGames ?? gamesPerMatchup;
       const gamesRemaining = playerTotalGames - gamesPlayed;
       let projection = actualScore;
@@ -3451,7 +3451,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             draftStatus={league.draftStatus}
             playerPool={league.playerPool}
             eraFilter={league.eraFilter}
-            hofOnly={league.hofOnly}
+            baseballHofOnly={league.baseballHofOnly}
             customEraStartYear={league.customEraStartYear}
             customEraEndYear={league.customEraEndYear}
             onDirtyChange={setHasDraftSettingsChanges}
@@ -3519,7 +3519,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             leagueId={leagueId}
             draftStatus={league.draftStatus}
             currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
-            currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
+            currentSpStartsPerMatchup={league.pitcherStartsPerMatchup ?? 1}
             currentMinCareerGames={league.minCareerGames ?? 50}
             currentMinCareerSeasons={league.minCareerSeasons ?? 3}
             currentTotalMatchups={league.totalMatchups ?? 10}

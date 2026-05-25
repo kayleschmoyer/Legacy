@@ -35,7 +35,7 @@ builder.mutationField('updateDraftSettings', (t) =>
         playerPool,
         pickTimeLimitSeconds,
         eraFilter,
-        hofOnly,
+        baseballHofOnly,
         customEraStartYear,
         customEraEndYear,
         scheduledAt: scheduledAtInput,
@@ -50,8 +50,8 @@ builder.mutationField('updateDraftSettings', (t) =>
             owner: PublicSchema.leagues.owner,
             draftStatus: PublicSchema.leagues.draftStatus,
             playerPool: PublicSchema.leagues.playerPool,
-            eraFilter: PublicSchema.leagues.eraFilter,
-            hofOnly: PublicSchema.leagues.hofOnly,
+            eraFilter: PublicSchema.leagues.baseballEraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
           })
@@ -175,10 +175,10 @@ builder.mutationField('updateDraftSettings', (t) =>
             | 'al';
         }
         if (eraFilter != null) {
-          leagueEligibilityUpdates['eraFilter'] = eraFilter;
+          leagueEligibilityUpdates['baseballEraFilter'] = eraFilter;
         }
-        if (hofOnly != null) {
-          leagueEligibilityUpdates['hofOnly'] = hofOnly;
+        if (baseballHofOnly != null) {
+          leagueEligibilityUpdates['baseballHofOnly'] = baseballHofOnly;
         }
         if (customEraStartYear !== undefined) {
           leagueEligibilityUpdates['customEraStartYear'] = customEraStartYear;
@@ -285,8 +285,8 @@ builder.mutationField('updateDraftSettings', (t) =>
         if (draftOrder) changedFields.push(`order → ${draftOrder}`);
         if (playerPool) changedFields.push(`player pool → ${playerPool}`);
         if (eraFilter) changedFields.push(`era filter → ${eraFilter}`);
-        if (hofOnly != null)
-          changedFields.push(`HOF only → ${hofOnly ? 'on' : 'off'}`);
+        if (baseballHofOnly != null)
+          changedFields.push(`HOF only → ${baseballHofOnly ? 'on' : 'off'}`);
         if (pickTimeLimitSeconds)
           changedFields.push(`pick timer → ${pickTimeLimitSeconds}s`);
         if (parsedScheduledAt !== undefined) {

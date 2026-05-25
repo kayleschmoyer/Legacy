@@ -44,7 +44,7 @@ const MOCK_MATCHUP = {
   status: 'in_progress',
   statsLoadingStatus: 'complete',
   gamesPerMatchup: 7,
-  spStartsPerMatchup: 2,
+  pitcherStartsPerMatchup: 2,
   selectedGamesCount: 4,
   startTime: null,
   endTime: null,

@@ -51,7 +51,7 @@ const MOCK_LEAGUE = {
   leaguePhase: null,
   weekAdvanceStatus: null,
   faabBudgetDefault: null,
-  spStartsPerMatchup: 1,
+  pitcherStartsPerMatchup: 1,
   gamesPerMatchup: 5,
   totalMatchups: 10,
   playoffEnabled: true,
@@ -72,7 +72,7 @@ const MOCK_LEAGUE = {
   auctionBudget: null,
   auctionMinBid: null,
   eraFilter: null,
-  hofOnly: false,
+  baseballHofOnly: false,
   customEraStartYear: null,
   customEraEndYear: null,
 };

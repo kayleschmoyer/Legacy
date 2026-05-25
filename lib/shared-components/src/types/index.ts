@@ -140,10 +140,10 @@ export interface League {
   /** Era-based player pool filter */
   eraFilter?: EraFilter | string;
   /** When true, only Hall of Fame inductees are in the draft pool */
-  hofOnly?: boolean;
-  /** Custom commissioner-defined era start year */
+  baseballHofOnly?: boolean;
+  /** Custom commissioner-defined era start year (only used when eraFilter = 'custom') */
   customEraStartYear?: number | null;
-  /** Custom commissioner-defined era end year */
+  /** Custom commissioner-defined era end year (only used when eraFilter = 'custom') */
   customEraEndYear?: number | null;
   ownerId: string;
   teams?: TeamType[];

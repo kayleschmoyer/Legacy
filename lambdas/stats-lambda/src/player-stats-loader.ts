@@ -25,7 +25,7 @@ export async function loadPlayerGameStats(
   leagueId: number | null,
   notificationService: WebSocketNotificationService | null,
 ): Promise<void> {
-  const { playerId, brefId, season, fieldingGamePos } = player;
+  const { playerId, brefId, season, gamePosition } = player;
 
   LOGGER.info(
     `Loading stats for player ${playerId} (${brefId}), season ${season}`,
@@ -196,7 +196,7 @@ export async function loadPlayerGameStats(
       const allFieldingStats = await getAllGameFieldingStats(
         playerObj,
         season,
-        fieldingGamePos,
+        gamePosition,
       );
       if (allFieldingStats && allFieldingStats.length > 0) {
         await db

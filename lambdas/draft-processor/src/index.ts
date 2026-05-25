@@ -382,7 +382,7 @@ async function buildPlayerPool(
     playerPool: string;
     minCareerGames: number;
     minCareerSeasons: number;
-    hofOnly: boolean;
+    baseballHofOnly: boolean;
     eraFilter: string;
     customEraStartYear: number | null;
     customEraEndYear: number | null;
@@ -395,7 +395,7 @@ async function buildPlayerPool(
     playerPool,
     minCareerGames,
     minCareerSeasons,
-    hofOnly,
+    baseballHofOnly,
     eraFilter,
     customEraStartYear,
     customEraEndYear,
@@ -524,8 +524,8 @@ async function buildPlayerPool(
       playerPool,
       minCareerGames,
       minCareerSeasons,
-      hofOnly,
-      eraFilter,
+      baseballHofOnly,
+      baseballEraFilter: eraFilter,
       customEraStartYear,
       customEraEndYear,
     },
@@ -666,8 +666,8 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
             playerPool: PublicSchema.leagues.playerPool,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
-            hofOnly: PublicSchema.leagues.hofOnly,
-            eraFilter: PublicSchema.leagues.eraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+            eraFilter: PublicSchema.leagues.baseballEraFilter,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
@@ -685,7 +685,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       const playerPool = leagueConfig[0]?.playerPool ?? 'all';
       const minCareerGames = leagueConfig[0]?.minCareerGames ?? 50;
       const minCareerSeasons = leagueConfig[0]?.minCareerSeasons ?? 3;
-      const hofOnly = leagueConfig[0]?.hofOnly ?? false;
+      const baseballHofOnly = leagueConfig[0]?.baseballHofOnly ?? false;
       const eraFilter = leagueConfig[0]?.eraFilter ?? 'all';
       const customEraStartYear = leagueConfig[0]?.customEraStartYear ?? null;
       const customEraEndYear = leagueConfig[0]?.customEraEndYear ?? null;
@@ -697,7 +697,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         playerPool,
         minCareerGames,
         minCareerSeasons,
-        hofOnly,
+        baseballHofOnly,
         eraFilter,
         leagueId,
       });
@@ -723,7 +723,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           playerPool,
           minCareerGames,
           minCareerSeasons,
-          hofOnly,
+          baseballHofOnly,
           eraFilter,
           customEraStartYear,
           customEraEndYear,
@@ -978,8 +978,8 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
             playerPool: PublicSchema.leagues.playerPool,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
-            hofOnly: PublicSchema.leagues.hofOnly,
-            eraFilter: PublicSchema.leagues.eraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+            eraFilter: PublicSchema.leagues.baseballEraFilter,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
           })
@@ -1092,7 +1092,7 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
           playerPool: config.playerPool,
           minCareerGames: config.minCareerGames,
           minCareerSeasons: config.minCareerSeasons,
-          hofOnly: config.hofOnly,
+          baseballHofOnly: config.baseballHofOnly,
           eraFilter: config.eraFilter,
           customEraStartYear: config.customEraStartYear,
           customEraEndYear: config.customEraEndYear,

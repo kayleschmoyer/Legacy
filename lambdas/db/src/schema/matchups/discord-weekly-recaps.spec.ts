@@ -78,7 +78,7 @@ jest.mock('@legacy-sports/db-client', () => ({
       draftStatus: 'leagues.draft_status',
       gamesPerMatchup: 'leagues.games_per_matchup',
       weekAdvanceStatus: 'leagues.week_advance_status',
-      spStartsPerMatchup: 'leagues.sp_starts_per_matchup',
+      pitcherStartsPerMatchup: 'leagues.sp_starts_per_matchup',
       totalMatchups: 'leagues.total_matchups',
     },
     matchups: {
@@ -92,7 +92,7 @@ jest.mock('@legacy-sports/db-client', () => ({
       team2Score: 'matchups.team2_score',
       gamesPerMatchup: 'matchups.games_per_matchup',
       statsLoadingStatus: 'matchups.stats_loading_status',
-      spStartsPerMatchup: 'matchups.sp_starts_per_matchup',
+      pitcherStartsPerMatchup: 'matchups.sp_starts_per_matchup',
       startTime: 'matchups.start_time',
       endTime: 'matchups.end_time',
     },
