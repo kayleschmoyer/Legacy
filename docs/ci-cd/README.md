@@ -10,6 +10,10 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 | **[ci-greenfield-gap-analysis.md](ci-greenfield-gap-analysis.md)**             | **← Why we rebuilt.** Problems with the old system, required checks summary, phase timeline           |
 | **[ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md)** | **← Bot review design.** Copilot CLI integration, RAISE/ADJUDICATE/VERIFY cycle protocol              |
 
+## Integration Safety
+
+- **[integration-safety-system.md](integration-safety-system.md)** — **← Preventing breaking changes at integration points.** Tiered defense (GraphQL contract gate, terraform plan gate, selective integration + advisory) that shifts UI/backend and terraform breakage detection left, off the nightly suite and onto the PR that causes it.
+
 ## Operational Guides
 
 - **[ci-system-documentation.md](ci-system-documentation.md)** — Quick reference: workflows, trigger model, common operations

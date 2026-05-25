@@ -85,7 +85,7 @@ jobs:
           ref: ${{ steps.resolve.outputs.pr-head-sha }}
           fetch-depth: 0
 
-      - name: "List touched integration specs"
+      - name: "Select affected integration specs"
         id: diff
         env:
           BASE_REF: ${{ steps.resolve.outputs.pr-base-ref }}
@@ -93,37 +93,20 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
-          MERGE_BASE=$(git merge-base "origin/$BASE_REF" HEAD || echo "")
+          MERGE_BASE=$(git merge-base "origin/$BASE_REF" HEAD || git merge-base FETCH_HEAD HEAD || echo "")
           if [ -z "$MERGE_BASE" ]; then
             echo "::warning::Could not compute merge-base — falling back to running every integration spec."
             mapfile -t SPECS < <(find apps/web-e2e/src/integration/tests -type f -name '*.integration.spec.ts' | sort)
           else
-            mapfile -t CHANGED < <(git diff --name-only --diff-filter=AMR "$MERGE_BASE"..HEAD)
-            SPECS=()
-            CONFIG_TOUCHED=false
-            INFRA_TOUCHED=false
-            for f in "${CHANGED[@]}"; do
-              if [[ "$f" == apps/web-e2e/src/integration/tests/*.integration.spec.ts ]]; then
-                SPECS+=("$f")
-              fi
-              if [[ "$f" == apps/web-e2e/playwright.integration.config.ts ]]; then
-                CONFIG_TOUCHED=true
-              fi
-              # Changes to the integration runner workflow or shared test utilities
-              # are infra-level: run every spec so the infrastructure change is
-              # exercised end-to-end.
-              if [[ "$f" == .github/workflows/run-integration-tests.yml ]] \
-                 || [[ "$f" == apps/web-e2e/src/utils/*.ts ]] \
-                 || [[ "$f" == apps/web-e2e/src/integration/fixtures/*.ts ]] \
-                 || [[ "$f" == apps/web-e2e/src/integration/helpers/*.ts ]]; then
-                INFRA_TOUCHED=true
-              fi
-            done
-            # If only the config, workflow, or shared utilities changed, run every
-            # integration spec so the infrastructure change is exercised end-to-end.
-            if [ "${#SPECS[@]}" -eq 0 ] && { [ "$CONFIG_TOUCHED" = "true" ] || [ "$INFRA_TOUCHED" = "true" ]; }; then
-              mapfile -t SPECS < <(find apps/web-e2e/src/integration/tests -type f -name '*.integration.spec.ts' | sort)
-            fi
+            # Surface-aware selection: the manifest maps each spec to the source
+            # areas it exercises, so a PR that changes a feature/route/lambda (not
+            # just the spec file) still runs the right specs. Shared/backend-schema
+            # changes select every spec (runAll). See
+            # .github/scripts/integration-select/select-specs.mjs.
+            git diff --name-only --diff-filter=AMRD "$MERGE_BASE"..HEAD > /tmp/changed.txt
+            mapfile -t SPECS < <(node .github/scripts/integration-select/select-specs.mjs \
+              --manifest apps/web-e2e/src/integration/integration-surface-map.json \
+              --changed-from-stdin < /tmp/changed.txt)
           fi
           if [ "${#SPECS[@]}" -eq 0 ]; then
             echo "has-touched-specs=false" >> "$GITHUB_OUTPUT"

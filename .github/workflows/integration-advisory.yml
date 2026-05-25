@@ -1,0 +1,95 @@
+name: "Integration Advisory"
+
+# =============================================================================
+# Non-blocking advisory (integration-safety system, Tier 2).
+#
+# On every PR, maps the changed files to the integration specs that exercise the
+# affected surfaces (apps/web-e2e/src/integration/integration-surface-map.json)
+# and posts a comment telling the author/reviewer which specs cover their change
+# and how to run them (the `run:integration` label). This is the cheap,
+# always-on signal that turns "we forgot to run integration for this risky
+# change" into an explicit, visible recommendation — without spending any
+# live-backend CI time.
+#
+# It does NOT run any tests and never fails the PR. Running the selected specs
+# is still an explicit opt-in via the `run:integration` label
+# (run-integration-tests.yml), which uses the same selector.
+# =============================================================================
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: integration-advisory-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  advise:
+    name: "Recommend affected integration specs"
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Checkout PR head"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: "Compute affected integration specs"
+        id: select
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
+          MERGE_BASE=$(git merge-base FETCH_HEAD HEAD || echo "")
+          if [ -z "$MERGE_BASE" ]; then
+            echo "::warning::Could not compute merge-base; skipping advisory."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only --diff-filter=AMRD "$MERGE_BASE"..HEAD > /tmp/changed.txt
+          node .github/scripts/integration-select/select-specs.mjs \
+            --manifest apps/web-e2e/src/integration/integration-surface-map.json \
+            --changed-from-stdin --json < /tmp/changed.txt > /tmp/select.json
+          cat /tmp/select.json
+          node -e "const r=require('/tmp/select.json'); console.log('run_all='+r.runAll); console.log('count='+r.specs.length)" >> "$GITHUB_OUTPUT"
+
+      - name: "Upsert advisory comment"
+        if: steps.select.outputs.skip != 'true' && (steps.select.outputs.run_all == 'true' || steps.select.outputs.count != '0')
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const result = JSON.parse(fs.readFileSync('/tmp/select.json', 'utf8'));
+            const marker = '<!-- integration-advisory -->';
+            const list = result.specs
+              .map((s) => `- \`${s.replace('apps/web-e2e/src/integration/tests/', '')}\``)
+              .join('\n');
+            const header = result.runAll
+              ? '## Integration advisory — broad change detected\n\nThis PR changes a shared surface (backend schema, shared components, or integration helpers), so **all** integration specs are recommended:'
+              : `## Integration advisory — ${result.specs.length} spec(s) cover your change\n\nThese live-backend integration specs exercise the surfaces this PR touches:`;
+            const body = [
+              marker,
+              header,
+              '',
+              list,
+              '',
+              'To run them on this PR, add the **`run:integration`** label (it runs exactly this set and is removed automatically when done). Reviewers: treat this as a prompt to verify the affected flows before merge — these are the flows most likely to break the nightly suite.',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

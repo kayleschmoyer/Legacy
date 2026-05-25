@@ -8,10 +8,17 @@ name: "GraphQL Schema Check"
 #      PR comment with the diff if they differ.
 #   3. Runs every project's codegen target against the generated schema.
 #      Fails if any codegen target exits non-zero.
+#   4. Contract gate (LS integration-safety system, Tier 0): diffs the PR
+#      schema against the base branch for breaking changes and validates every
+#      committed UI operation against the new schema. Breaking changes block
+#      unless the `schema-breaking-ok` label acknowledges them; invalid
+#      operations always block.
 #
 # Fix locally:
 #   pnpm exec nx run db:print-schema          # regen schema.graphql
 #   pnpm run codegen                          # regen all codegen outputs
+#   node .github/scripts/schema-contract/check-contract.mjs \
+#     --old <base schema> --new lambdas/db/schema.graphql   # contract gate
 # =============================================================================
 
 on:
@@ -135,6 +142,101 @@ jobs:
         run: |
           set -o pipefail
           pnpm run codegen 2>&1 | tee "$RUNNER_TEMP/schema-codegen.log"
+
+      # --- Contract gate: breaking-change diff + operation validation ---
+      # Runs even when codegen failed (always()) so the clean, human-readable
+      # contract report is produced regardless. The breaking-change diff is the
+      # net-new signal over the codegen check: it catches field/enum/arg/
+      # nullability removals that are type-valid for current operations but
+      # break deployed clients and the nightly live-backend suite.
+
+      - name: "Fetch base branch schema"
+        if: always() && steps.drift-check.outcome == 'success'
+        id: base-schema
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_REF:-}" ]; then
+            echo "no-base=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No base ref (manual run) — validating operations only, skipping breaking-change diff."
+            exit 0
+          fi
+          # Fetch only the base tip; FETCH_HEAD then points at it regardless of
+          # whether the shallow checkout populated refs/remotes/origin/<base>.
+          git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
+          if git show "FETCH_HEAD:lambdas/db/schema.graphql" > /tmp/base-schema.graphql 2>/dev/null; then
+            echo "no-base=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "no-base=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Base branch has no lambdas/db/schema.graphql — validating operations only."
+          fi
+
+      - name: "GraphQL contract gate"
+        if: always() && steps.drift-check.outcome == 'success'
+        id: contract
+        shell: bash
+        run: |
+          set +e
+          OLD_ARG=""
+          if [ "${{ steps.base-schema.outputs.no-base }}" != "true" ]; then
+            OLD_ARG="--old /tmp/base-schema.graphql"
+          fi
+          node .github/scripts/schema-contract/check-contract.mjs \
+            $OLD_ARG --new lambdas/db/schema.graphql --json > /tmp/contract.json
+          node -e "const r=require('/tmp/contract.json'); process.stdout.write(r.body + '\n')" | tee /tmp/contract.md
+          node -e "const r=require('/tmp/contract.json'); console.log('has_breaking='+(r.hasBreaking?'true':'false')); console.log('has_invalid='+(r.hasInvalidOps?'true':'false'))" >> "$GITHUB_OUTPUT"
+
+      - name: "Post contract gate comment"
+        if: >-
+          always() && github.event_name == 'pull_request' &&
+          (steps.contract.outputs.has_breaking == 'true' || steps.contract.outputs.has_invalid == 'true')
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- contract-gate -->';
+            const body = marker + '\n' + fs.readFileSync('/tmp/contract.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: "Fail on contract violation"
+        if: always() && steps.drift-check.outcome == 'success'
+        shell: bash
+        env:
+          HAS_BREAKING: ${{ steps.contract.outputs.has_breaking }}
+          HAS_INVALID: ${{ steps.contract.outputs.has_invalid }}
+          ACK: ${{ contains(github.event.pull_request.labels.*.name, 'schema-breaking-ok') }}
+        run: |
+          set -euo pipefail
+          # Fail closed: empty outputs mean the contract step errored (e.g. the
+          # schema failed to build) and produced no result — never pass vacuously.
+          if [ -z "${HAS_BREAKING:-}" ] || [ -z "${HAS_INVALID:-}" ]; then
+            echo "::error::Contract gate produced no result — the 'GraphQL contract gate' step errored. Inspect its logs."
+            exit 1
+          fi
+          if [ "$HAS_INVALID" = "true" ]; then
+            echo "::error::Committed GraphQL operations no longer validate against the schema in this PR. See the contract gate comment for the affected files."
+            exit 1
+          fi
+          if [ "$HAS_BREAKING" = "true" ] && [ "$ACK" != "true" ]; then
+            echo "::error::Breaking schema changes detected. Update affected clients/integration specs, or add the 'schema-breaking-ok' label to acknowledge an intentional break."
+            exit 1
+          fi
+          if [ "$HAS_BREAKING" = "true" ]; then
+            echo "✅ Contract gate passed (breaking changes acknowledged via schema-breaking-ok label)."
+          else
+            echo "✅ Contract gate passed."
+          fi
 
       - name: "Label PR on Schema Drift"
         if: always() && github.event.pull_request.number

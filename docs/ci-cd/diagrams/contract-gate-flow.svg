@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 600" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#1B3A5C">GraphQL contract gate — decision flow</text>
+  <text x="24" y="56" fill="#475569">Runs in check-schema.yml on every PR touching GraphQL. Static, no live backend, no new dependencies.</text>
+
+  <!-- start -->
+  <rect x="360" y="80" width="260" height="44" rx="22" fill="#1B3A5C"/>
+  <text x="490" y="107" fill="#fff" text-anchor="middle" font-weight="700">PR changes schema or operations</text>
+
+  <!-- gen schema -->
+  <rect x="350" y="150" width="280" height="44" rx="8" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="490" y="177" text-anchor="middle" fill="#334155">nx run db:print-schema → drift check</text>
+  <line x1="490" y1="124" x2="490" y2="150" stroke="#334155" stroke-width="1.5" marker-end="url(#af)"/>
+
+  <!-- fetch base -->
+  <rect x="330" y="220" width="320" height="44" rx="8" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="490" y="247" text-anchor="middle" fill="#334155">fetch base-branch schema (origin/main)</text>
+  <line x1="490" y1="194" x2="490" y2="220" stroke="#334155" stroke-width="1.5" marker-end="url(#af)"/>
+
+  <!-- two parallel checks -->
+  <line x1="490" y1="264" x2="490" y2="290" stroke="#334155" stroke-width="1.5"/>
+  <line x1="230" y1="290" x2="750" y2="290" stroke="#334155" stroke-width="1.5"/>
+  <line x1="230" y1="290" x2="230" y2="316" stroke="#334155" stroke-width="1.5" marker-end="url(#af)"/>
+  <line x1="750" y1="290" x2="750" y2="316" stroke="#334155" stroke-width="1.5" marker-end="url(#af)"/>
+
+  <rect x="90" y="316" width="280" height="60" rx="8" fill="#eff6ff" stroke="#3b82f6"/>
+  <text x="230" y="340" text-anchor="middle" fill="#1e40af" font-weight="700">findBreakingChanges(old,new)</text>
+  <text x="230" y="360" text-anchor="middle" fill="#334155" font-size="12">removed/narrowed API surface?</text>
+
+  <rect x="610" y="316" width="280" height="60" rx="8" fill="#eff6ff" stroke="#3b82f6"/>
+  <text x="750" y="340" text-anchor="middle" fill="#1e40af" font-weight="700">validate(ops vs new schema)</text>
+  <text x="750" y="360" text-anchor="middle" fill="#334155" font-size="12">UI op references a missing field?</text>
+
+  <!-- breaking decision -->
+  <polygon points="230,406 330,446 230,486 130,446" fill="#fffbeb" stroke="#C5A55A" stroke-width="1.5"/>
+  <text x="230" y="442" text-anchor="middle" fill="#92600e" font-size="12">breaking &amp;&amp;</text>
+  <text x="230" y="458" text-anchor="middle" fill="#92600e" font-size="12">no ack label?</text>
+  <line x1="230" y1="376" x2="230" y2="406" stroke="#334155" stroke-width="1.5" marker-end="url(#af)"/>
+
+  <!-- invalid ops decision -->
+  <polygon points="750,406 850,446 750,486 650,446" fill="#fef2f2" stroke="#C41E3A" stroke-width="1.5"/>
+  <text x="750" y="450" text-anchor="middle" fill="#991b1b" font-size="12">invalid ops?</text>
+  <line x1="750" y1="376" x2="750" y2="406" stroke="#334155" stroke-width="1.5" marker-end="url(#af)"/>
+
+  <!-- block -->
+  <rect x="360" y="510" width="260" height="50" rx="8" fill="#fef2f2" stroke="#C41E3A" stroke-width="1.5"/>
+  <text x="490" y="533" text-anchor="middle" fill="#991b1b" font-weight="700">BLOCK + comment</text>
+  <text x="490" y="551" text-anchor="middle" fill="#991b1b" font-size="12">lists offending changes / files</text>
+
+  <path d="M230,486 L230,535 L360,535" fill="none" stroke="#C41E3A" stroke-width="1.5" marker-end="url(#af)"/>
+  <text x="250" y="505" fill="#C41E3A" font-size="12">yes</text>
+  <path d="M750,486 L750,535 L620,535" fill="none" stroke="#C41E3A" stroke-width="1.5" marker-end="url(#af)"/>
+  <text x="700" y="505" fill="#C41E3A" font-size="12">yes</text>
+
+  <!-- pass -->
+  <rect x="380" y="430" width="220" height="44" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="490" y="457" text-anchor="middle" fill="#065f46" font-weight="700">PASS</text>
+  <path d="M330,446 L380,448" fill="none" stroke="#10b981" stroke-width="1.5" marker-end="url(#af)"/>
+  <text x="345" y="436" fill="#10b981" font-size="12">no</text>
+  <path d="M650,446 L600,450" fill="none" stroke="#10b981" stroke-width="1.5" marker-end="url(#af)"/>
+  <text x="615" y="436" fill="#10b981" font-size="12">no</text>
+
+  <text x="24" y="588" fill="#64748b" font-size="12">Acknowledge an intentional break with the schema-breaking-ok label; invalid operations always block (the schema and its clients disagree).</text>
+</svg>

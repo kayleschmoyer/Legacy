@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#1B3A5C">Integration-safety system — defense-in-depth tiers</text>
+  <text x="24" y="56" fill="#475569">Each PR is routed through cheap static gates first; the expensive live suite is reserved for affected work and post-merge attribution.</text>
+
+  <!-- cost axis -->
+  <text x="20" y="300" fill="#94a3b8" font-size="12" transform="rotate(-90 20 300)">cost / time per PR  →  increasing</text>
+  <line x1="46" y1="108" x2="46" y2="520" stroke="#cbd5e1" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Tier 0 -->
+  <rect x="70" y="100" width="880" height="92" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="90" y="128" font-weight="700" fill="#065f46" font-size="15">Tier 0 — Contract gate (every PR · seconds · no backend)</text>
+  <text x="90" y="150" fill="#334155">GraphQL breaking-change diff vs main + UI operation validation · schema drift + codegen · terraform fmt/tflint</text>
+  <text x="90" y="170" fill="#334155">Catches: field/enum/arg/nullability removals, UI ops referencing dropped fields, schema↔resolver drift, HCL lint.</text>
+  <text x="772" y="150" fill="#065f46" font-weight="700">check-schema.yml</text>
+
+  <!-- Tier 1 -->
+  <rect x="70" y="204" width="880" height="92" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="90" y="232" font-weight="700" fill="#1e40af" font-size="15">Tier 1 — Hermetic checks (every PR · minutes · mocked)</text>
+  <text x="90" y="254" fill="#334155">nx affected lint/typecheck/test/build · hermetic E2E (@critical) with route.fulfill mocks</text>
+  <text x="90" y="274" fill="#334155">Catches: UI regressions, type errors, unit failures, build breaks. (Existing — unchanged.)</text>
+  <text x="800" y="254" fill="#1e40af" font-weight="700">ci-pipeline.yml</text>
+
+  <!-- Tier 2 -->
+  <rect x="70" y="308" width="880" height="100" rx="10" fill="#fffbeb" stroke="#C5A55A" stroke-width="1.5"/>
+  <text x="90" y="336" font-weight="700" fill="#92600e" font-size="15">Tier 2 — Selective live (risky PRs only · minutes · live backend / real AWS)</text>
+  <text x="90" y="358" fill="#334155">Advisory comment lists affected specs (surface map) · run:integration runs only that subset</text>
+  <text x="90" y="378" fill="#334155">Speculative terraform plan as read-only plan role — surfaces IAM/refresh/destroy errors before merge.</text>
+  <text x="90" y="398" fill="#334155">Catches: real UI/backend flow breaks, terraform breakage that would block deploys.</text>
+  <text x="690" y="358" fill="#92600e" font-weight="700">integration-advisory.yml</text>
+  <text x="690" y="378" fill="#92600e" font-weight="700">terraform-plan.yml</text>
+
+  <!-- Tier 3 -->
+  <rect x="70" y="420" width="880" height="100" rx="10" fill="#fef2f2" stroke="#C41E3A" stroke-width="1.5"/>
+  <text x="90" y="448" font-weight="700" fill="#991b1b" font-size="15">Tier 3 — Per-merge + nightly (post-merge · full cost · live backend)</text>
+  <text x="90" y="470" fill="#334155">Affected specs run per merge to main for instant attribution · full suite nightly as backstop</text>
+  <text x="90" y="490" fill="#334155">Stop-the-line on red: file + notify with the implicated commit, warn PRs touching the broken area.</text>
+  <text x="90" y="510" fill="#991b1b" font-style="italic">Phase 2 (designed; per-merge attribution + stop-the-line not yet built).</text>
+  <text x="724" y="470" fill="#991b1b" font-weight="700">run-playwright-tests.yml</text>
+</svg>

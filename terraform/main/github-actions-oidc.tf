@@ -1096,7 +1096,9 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:s3:::terraform-state-*/*"
         ]
       },
-      # Terraform state lock (plan acquires a DynamoDB lock to prevent concurrent runs)
+      # Terraform state lock (plan acquires a DynamoDB lock to prevent concurrent
+      # runs) plus the read actions terraform plan needs to refresh the
+      # aws_dynamodb_table.terraform_locks resource itself.
       {
         Sid    = "TerraformStateLock"
         Effect = "Allow"
@@ -1104,7 +1106,10 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "dynamodb:PutItem",
           "dynamodb:GetItem",
           "dynamodb:DeleteItem",
-          "dynamodb:DescribeTable"
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:ListTagsOfResource"
         ]
         Resource = [
           "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks"
@@ -1141,6 +1146,7 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "lambda:GetFunction",
           "lambda:GetFunctionConfiguration",
           "lambda:GetFunctionCodeSigningConfig",
+          "lambda:GetFunctionUrlConfig",
           "lambda:GetPolicy",
           "lambda:ListTags",
           "lambda:ListVersionsByFunction",
@@ -1445,7 +1451,11 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*",
-          "arn:aws:s3:::${local.name_prefix}-*/*"
+          "arn:aws:s3:::${local.name_prefix}-*/*",
+          # terraform plan refreshes aws_s3_bucket.terraform_state (the backend
+          # bucket), which needs bucket-level reads like s3:GetBucketPolicy.
+          # The bucket name has no name_prefix, so it must be listed explicitly.
+          "arn:aws:s3:::legacy-sports-terraform-state"
         ]
       }
     ]

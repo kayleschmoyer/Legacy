@@ -1,0 +1,138 @@
+{
+  "$comment": "Maps each live-backend integration spec to the source surfaces it exercises. Used by .github/scripts/integration-select/select-specs.mjs to run only the affected specs on a PR (Tier 2 of the integration-safety system). This file is the maintained source of truth: when a spec starts covering a new area, add the glob here. Globs support ** (cross-segment) and * (within-segment). Over-selection is safe; under-selection risks a missed regression, so lean broad. When adding a NEW integration spec, add an entry here (a lint check enforces coverage).",
+  "runAllWhenChanged": [
+    "lambdas/db/src/schema/**",
+    "lambdas/db/schema.graphql",
+    "lib/shared-components/src/**",
+    "apps/web-e2e/src/integration/helpers/**",
+    "apps/web-e2e/src/integration/fixtures/**",
+    "apps/web-e2e/src/utils/**",
+    "apps/web-e2e/playwright.integration.config.ts",
+    ".github/workflows/run-integration-tests.yml",
+    "apps/web/src/api/db/**",
+    "apps/web/src/app/**",
+    "apps/web/src/context/**"
+  ],
+  "specs": {
+    "apps/web-e2e/src/integration/tests/commissioner-announcements-ui.integration.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/components/commissioner/**"
+    ],
+    "apps/web-e2e/src/integration/tests/commissioner-settings-ui.integration.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/integration/tests/draft-board-a11y-ui.integration.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/components/a11y/**",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/integration/tests/full-season-ui.integration.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/management/**",
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/pages/standings/**",
+      "apps/web/src/features/**",
+      "apps/web/src/components/league/**",
+      "lambdas/draft-processor/**",
+      "lambdas/game-selection/**"
+    ],
+    "apps/web-e2e/src/integration/tests/full-season.integration.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/management/**",
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/pages/standings/**",
+      "apps/web/src/features/**",
+      "lambdas/draft-processor/**",
+      "lambdas/game-selection/**"
+    ],
+    "apps/web-e2e/src/integration/tests/google-oauth.integration.spec.ts": [
+      "apps/web/src/pages/auth/**",
+      "apps/web/src/pages/login/**",
+      "lambdas/oauth-proxy/**"
+    ],
+    "apps/web-e2e/src/integration/tests/league-activity-feed-ui.integration.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/features/management/**"
+    ],
+    "apps/web-e2e/src/integration/tests/league-qr-invite-ui.integration.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/integration/tests/league-scoring-editor-ui.integration.spec.ts": [
+      "apps/web/src/lib/scoring/**",
+      "apps/web/src/pages/management/**",
+      "apps/web/src/components/commissioner/**"
+    ],
+    "apps/web-e2e/src/integration/tests/live-draft-ui.integration.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "lambdas/draft-processor/**",
+      "lambdas/websocket/**"
+    ],
+    "apps/web-e2e/src/integration/tests/matchup-detail-ui.integration.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**"
+    ],
+    "apps/web-e2e/src/integration/tests/matchup-roster-editor-ui.integration.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/matchup/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/integration/tests/matchup-roster-recap-ui.integration.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**"
+    ],
+    "apps/web-e2e/src/integration/tests/mock-draft-simulator-ui.integration.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/integration/tests/player-search-stats-ui.integration.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/features/baseball/**",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/integration/tests/playoff-bracket-ui.integration.spec.ts": [
+      "apps/web/src/pages/standings/**",
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/integration/tests/roster-management-ui.integration.spec.ts": [
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**",
+      "apps/web/src/pages/matchup/**"
+    ],
+    "apps/web-e2e/src/integration/tests/season-lifecycle.integration.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "lambdas/game-selection/**"
+    ],
+    "apps/web-e2e/src/integration/tests/season-renewal-migration-ui.integration.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**"
+    ],
+    "apps/web-e2e/src/integration/tests/subscription-gating.integration.spec.ts": [
+      "apps/web/src/pages/pricing/**",
+      "apps/web/src/pages/donate/**",
+      "apps/web/src/components/common/**"
+    ],
+    "apps/web-e2e/src/integration/tests/trade-flow-ui.integration.spec.ts": [
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**",
+      "apps/web/src/pages/management/**"
+    ],
+    "apps/web-e2e/src/integration/tests/waiver-processing-ui.integration.spec.ts": [
+      "apps/web/src/features/roster/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/roster/**"
+    ]
+  }
+}

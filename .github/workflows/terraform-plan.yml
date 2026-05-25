@@ -1,0 +1,229 @@
+name: "Terraform Plan (PR)"
+
+# =============================================================================
+# Speculative Terraform plan gate (integration-safety system, Tier 2).
+#
+# WHY: `terraform validate -backend=false` in the build job only checks syntax.
+# Real breakage — missing IAM permissions, plan-time errors, resources that
+# would be destroyed — currently only surfaces in `Apply Lambda Infrastructure`
+# AFTER merge, which blocks ALL backend deploys until a follow-up PR lands. The
+# terraform-permission-planning skill already documents a "Plan job assumes the
+# github_actions_plan role" — this workflow is that job. It moves terraform
+# breakage detection from post-merge (everyone blocked) to pre-merge (one PR
+# blocked).
+#
+# Scope: terraform/main only (the Lambda/API/RDS infra whose apply gates backend
+# deploys). terraform/runners is intentionally out of scope for now — it has a
+# separate state, separate TF_VARs, and does not block backend deploys. Track
+# extending this to runners as a follow-up.
+#
+# The plan runs as the read-only `legacy-sports-dev-github-actions-plan` role
+# (terraform/main/github-actions-oidc.tf) whose OIDC trust already allows
+# `repo:bkrupa/legacy-sports:pull_request`. It uses `-lock=false` so it never
+# contends with the post-merge apply for the state lock.
+# =============================================================================
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "terraform/main/**"
+      - ".tflint.hcl"
+      - ".github/workflows/terraform-plan.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: terraform-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  AWS_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+  PLAN_ROLE_ARN: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions-plan
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Static lint + format — no AWS access. Fast feedback even if the plan job
+  # is skipped (e.g. a fork PR with no OIDC).
+  # ---------------------------------------------------------------------------
+  fmt-lint:
+    name: "Terraform fmt + tflint"
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4
+        with:
+          terraform_version: "~> 1.14"
+          terraform_wrapper: false
+
+      - name: "terraform fmt -check"
+        shell: bash
+        run: |
+          echo "::group::terraform fmt -check -recursive terraform/main"
+          if ! terraform fmt -check -recursive terraform/main; then
+            echo "::error::Terraform files are not formatted. Run 'terraform fmt -recursive terraform/main' and commit."
+            exit 1
+          fi
+          echo "::endgroup::"
+
+      - name: "Setup tflint"
+        uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
+        with:
+          tflint_version: latest
+
+      - name: "tflint"
+        shell: bash
+        run: |
+          echo "::group::tflint --init"
+          tflint --chdir=terraform/main --init
+          echo "::endgroup::"
+          tflint --chdir=terraform/main --format=compact
+
+  # ---------------------------------------------------------------------------
+  # Speculative plan — assumes the read-only plan role and surfaces IAM gaps,
+  # plan errors, and destructive changes before merge.
+  # ---------------------------------------------------------------------------
+  plan:
+    name: "Terraform Plan (terraform/main)"
+    # Skip for forked PRs: they cannot mint an OIDC token for the plan role.
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Configure AWS credentials (read-only plan role)"
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: ${{ env.PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4
+        with:
+          terraform_version: "~> 1.14"
+          terraform_wrapper: false
+
+      - name: "terraform init"
+        working-directory: terraform/main
+        run: terraform init -input=false
+
+      - name: "terraform plan"
+        id: plan
+        working-directory: terraform/main
+        shell: bash
+        # Same TF_VARs the apply workflow sets — required variables have no
+        # defaults, so plan would prompt (and fail under -input=false) without
+        # them. Values are only needed so the plan resolves; the plan role
+        # cannot apply anything.
+        env:
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+        run: |
+          # Disable errexit so a failing plan does NOT abort the step before we
+          # record its exit code — the GitHub Actions default shell runs with
+          # `-e`, which would otherwise skip the echo below and leave the
+          # summary/comment steps with no output to act on. Gating happens in
+          # the dedicated "Fail if plan errored" step.
+          set +e
+          # -lock=false: this is a read-only speculative plan; never contend
+          # with the post-merge apply for the DynamoDB state lock.
+          terraform plan -no-color -input=false -lock=false -out=tfplan 2>&1 | tee plan.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          # Succeed here regardless; the failure is surfaced via the PR comment
+          # and enforced by the later gating step.
+          exit 0
+
+      - name: "Summarize plan"
+        id: summary
+        if: always() && steps.plan.outputs.exit != ''
+        working-directory: terraform/main
+        shell: bash
+        env:
+          PLAN_EXIT: ${{ steps.plan.outputs.exit }}
+        run: |
+          # No errexit: grep returning 1 (no match) or SIGPIPE from head must
+          # not abort or double-print. Capture into variables, then emit.
+          set -u
+          if [ "$PLAN_EXIT" != "0" ]; then
+            HEADER="Plan FAILED — most likely a missing read permission on the plan role (AccessDenied during refresh) or a plan-time configuration error."
+            BODY="$(grep -E -A4 'Error:|AccessDenied|denied|not authorized' plan.log | head -c 4000)"
+            [ -z "$BODY" ] && BODY="$(tail -n 60 plan.log | head -c 4000)"
+          else
+            HEADER=""
+            BODY="$(grep -E '^(Plan:|No changes\.|Terraform will perform)' plan.log | head -c 1000)"
+            [ -z "$BODY" ] && BODY="(plan succeeded)"
+          fi
+          {
+            echo "summary<<PLAN_EOF"
+            if [ -n "$HEADER" ]; then echo "$HEADER"; echo ""; fi
+            echo '```'
+            echo "$BODY"
+            echo '```'
+            echo "PLAN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: "Comment plan result on PR"
+        if: always() && github.event_name == 'pull_request' && steps.plan.outputs.exit != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          PLAN_EXIT: ${{ steps.plan.outputs.exit }}
+          PLAN_SUMMARY: ${{ steps.summary.outputs.summary }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- terraform-plan-gate -->';
+            const ok = process.env.PLAN_EXIT === '0';
+            const summary = process.env.PLAN_SUMMARY || '';
+            const body = [
+              marker,
+              `## Terraform plan gate — \`terraform/main\` ${ok ? '✅ passed' : '❌ failed'}`,
+              '',
+              ok
+                ? 'A speculative plan against live AWS (read-only plan role) succeeded. This change will not break the post-merge apply on the permission/refresh path covered by the plan role.'
+                : 'A speculative plan against live AWS (read-only plan role) failed. Fix before merge — otherwise the post-merge apply will fail and block ALL backend deploys.',
+              '',
+              summary,
+              '',
+              ok
+                ? ''
+                : 'If this is a missing IAM permission, see `.agents/skills/terraform-permission-planning/SKILL.md` (mirror new `Get*`/`List*`/`Describe*` actions into `github_actions_plan_policy`).',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: "Fail if plan errored"
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.plan.outputs.exit }}" != "0" ]; then
+            echo "::error::terraform plan failed for terraform/main — see the PR comment and job log."
+            exit 1
+          fi
+          echo "✅ terraform plan succeeded."
