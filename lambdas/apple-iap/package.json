@@ -20,7 +20,7 @@
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*",
     "jose": "*",
-    "zod": "*"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "*",

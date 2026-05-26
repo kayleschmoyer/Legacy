@@ -7,10 +7,16 @@
 //    in a way the worktrees don't expect). If the lockfile is clean, the install
 //    is safe — it just materializes what's already committed.
 //
-// This runs as a "preinstall" lifecycle script before pnpm touches anything.
-// It catches `pnpm install`, `npm install`, and `yarn install`.
+// ⚠️  TIMING NOTE — Guards 2 & 3 are belt-and-suspenders fallbacks.
+// npm/pnpm lifecycle scripts (preinstall) fire AFTER pnpm has already linked
+// packages into node_modules. That means a direct `pnpm install` call could
+// still create temp artifacts before this script runs.
 //
-// Bypass: set FORCE_INSTALL=1 to skip symlink guards (Guards 1 & 2).
+// The PRIMARY pre-link guard is .pnpmfile.cjs → afterAllResolved, which fires
+// before any node_modules write. This script is kept as a secondary defence
+// (Guard 0 — non-pnpm PM rejection — has no equivalent in .pnpmfile.cjs).
+//
+// Bypass: set FORCE_INSTALL=1 to skip symlink guards (Guards 2 & 3).
 //   $env:FORCE_INSTALL=1; pnpm install    (PowerShell)
 //   FORCE_INSTALL=1 pnpm install          (bash)
 

@@ -27,7 +27,7 @@
     "jsonwebtoken": "*",
     "jwt-decode": "*",
     "memoize-one": "*",
-    "zod": "*"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "*",
