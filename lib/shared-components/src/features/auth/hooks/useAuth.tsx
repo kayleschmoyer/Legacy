@@ -72,6 +72,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const hasWindowEventTarget = (): boolean =>
+  typeof window !== 'undefined' &&
+  typeof window.addEventListener === 'function' &&
+  typeof window.removeEventListener === 'function';
+
 // Export the type for external use
 export type UseAuthResult = AuthContextType;
 
@@ -387,6 +392,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   // the auth state reflects claim changes (e.g. accessLevel promotion)
   // without requiring a full page reload.
   useEffect(() => {
+    if (!hasWindowEventTarget()) return;
+
     // Capture generation at effect setup — if logout fires later and increments
     // authGenRef, events dispatched by a pre-logout refresh will be ignored.
     const effectGen = authGenRef.current;
@@ -425,6 +432,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   // rejected the session. Clear local state so the user is prompted to log in
   // again rather than being stuck in a 401 retry loop with stale credentials.
   useEffect(() => {
+    if (!hasWindowEventTarget()) return;
+
     const handleSessionExpired = () => {
       // Cancel any scheduled proactive refresh so it cannot fire after logout
       // and inadvertently re-trigger network requests or update auth state.

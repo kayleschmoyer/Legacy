@@ -20,6 +20,12 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockAxiosPost = jest.fn();
 mockedAxios.post = mockAxiosPost;
 
+// Mock expo-constants (uses native expo-modules-core which is unavailable in Jest)
+jest.mock('expo-constants', () => ({
+  default: { expoConfig: { extra: {} } },
+  expoConfig: { extra: {} },
+}));
+
 // Mock expo-router
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => {
@@ -60,9 +66,11 @@ const mockRemoveItem = jest.fn((key: string) => {
 // Mock OAuthProvider
 const mockSignIn = jest.fn();
 const mockSignOut = jest.fn();
+const mockConfigure = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('@legacy-sports/shared-components', () => ({
   OAuthProvider: {
+    configure: (...args: unknown[]): unknown => mockConfigure(...args),
     signIn: (...args: unknown[]): unknown => mockSignIn(...args),
     signOut: (...args: unknown[]): unknown => mockSignOut(...args),
   },

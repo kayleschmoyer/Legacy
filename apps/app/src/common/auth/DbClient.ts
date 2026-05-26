@@ -1,5 +1,6 @@
 import {
   ApolloClient,
+  HttpLink,
   InMemoryCache,
   NormalizedCacheObject,
 } from '@apollo/client';
@@ -11,13 +12,16 @@ export class DbClient {
   public readonly apolloClient: ApolloClient<NormalizedCacheObject>;
 
   constructor() {
+    const link = new HttpLink({
+      uri: (operation) =>
+        `${getEnvVarRequired(EnvironmentVariable.GRAPHQL_HOST)}?ref=${
+          operation.operationName
+        }`,
+    });
+
     this.apolloClient = new ApolloClient({
       cache: new InMemoryCache(),
-      uri: (op) =>
-        `${getEnvVarRequired(EnvironmentVariable.GRAPHQL_HOST)}?ref=${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          op.operationName
-        }`,
+      link,
     });
   }
 

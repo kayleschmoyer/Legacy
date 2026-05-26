@@ -160,9 +160,13 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
     const environment = isDev ? 'development' : 'production';
 
     if (!accessToken) {
-      LOGGER.warn(
-        'EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN not set, Rollbar will not be initialized',
-      );
+      const message =
+        'EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN not set, Rollbar will not be initialized';
+      if (isDev) {
+        LOGGER.debug(message);
+      } else {
+        LOGGER.warn(message);
+      }
       return null;
     }
 

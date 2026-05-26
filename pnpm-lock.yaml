@@ -793,6 +793,9 @@ importers:
       expo-router:
         specifier: ~6.0.23
         version: 6.0.23(a5uetjj52bfjlmr4qnfnv4cgye)
+      expo-secure-store:
+        specifier: ~15.0.8
+        version: 15.0.8(expo@54.0.34)
       react:
         specifier: 19.2.5
         version: 19.2.5

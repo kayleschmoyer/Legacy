@@ -1,6 +1,14 @@
 import { Share } from 'react-native';
 import { DeviceFileOutputDestination, LOGGER } from '@legacy-sports/logging';
 
+// Lazily require expo-file-system/legacy so that static analysis tools
+// (esbuild, ts-jest) that process this module in non-Metro environments
+// cannot follow the import chain into react-native Flow syntax and crash.
+// Metro (which runs in the mobile app) resolves dynamic require correctly.
+const FileSystem =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy require prevents esbuild following expo-file-system/legacy into react-native Flow syntax
+  require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+
 export const DEVICE_LOGS_PREF_KEY = 'enable_device_logs';
 const SHARE_MAX_CHARS = 200_000;
 
@@ -65,17 +73,6 @@ export async function shareCurrentLogFile(): Promise<void> {
       'disabled',
     );
   }
-
-  // Indirect identifier defeats esbuild's static `require()` resolution so
-  // the lambda bundles don't try to pull react-native. See the matching
-  // comment in DeviceFileOutputDestination.native.ts for the full rationale
-  // behind the eslint-disable — it's a narrowly-scoped approved exception.
-  const moduleId = ['expo-file-system', 'legacy'].join('/');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const FileSystem = require(moduleId) as {
-    getInfoAsync: (uri: string) => Promise<{ exists: boolean }>;
-    readAsStringAsync: (uri: string) => Promise<string>;
-  };
 
   const info = await FileSystem.getInfoAsync(filePath);
   if (!info.exists) {

@@ -2,40 +2,37 @@ import * as React from 'react';
 import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
-import {
-  GrowthBook,
-  GrowthBookProvider,
-  useFeatureIsOn,
-} from '@growthbook/growthbook-react';
+import { Slot, usePathname } from 'expo-router';
+import { GrowthBook, GrowthBookProvider } from '@growthbook/growthbook-react';
+import { ApolloProvider } from '@apollo/client/react';
 import {
   getRollbarConfigFromEnv,
   initRollbar,
 } from '@legacy-sports/rollbar/native';
 import {
-  AppProvider,
   AuthProvider,
-  BaseballScreen,
   EnhancedAuthGuard,
   ErrorBoundary,
-  FootballScreen,
-  HomeScreen,
-  TamaguiAppNavigator,
   useAuth,
 } from '@legacy-sports/shared-components';
-import type { Route } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { DbClientContext } from '../common/ApolloClientContext';
-import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
+
+const isDev = process.env.NODE_ENV !== 'production';
 
 const growthbook = new GrowthBook({
   apiHost: 'https://cdn.growthbook.io',
   clientKey: process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY ?? '',
-  enableDevMode: __DEV__,
-  trackingCallback: (experiment, result) => {
+  enableDevMode: isDev,
+  trackingCallback: (
+    experiment: { key: string },
+    result: { variationId: string | number },
+  ) => {
     LOGGER.info('[GrowthBook] Experiment viewed:', {
       experiment: experiment.key,
       variationId: result.variationId,
@@ -48,43 +45,6 @@ const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
-
-// Create a wrapper for HomeScreen that provides required props
-function MobileHomeScreen() {
-  const handleSportPress = (sportKey: string) => {
-    LOGGER.info('Mobile app - Sport selected:', sportKey);
-    // In a real app, this would navigate to the sport-specific screen
-  };
-
-  return (
-    <HomeScreen
-      onSportPress={handleSportPress}
-      title="Fantasy Sports Hub"
-      subtitle="Choose your sport to get started"
-    />
-  );
-}
-
-const ALL_ROUTES: Route[] = [
-  {
-    name: 'Home',
-    path: '/home',
-    component: MobileHomeScreen,
-    title: 'Fantasy Sports Hub',
-  },
-  {
-    name: 'Football',
-    path: '/football',
-    component: FootballScreen,
-    title: 'Football',
-  },
-  {
-    name: 'Baseball',
-    path: '/baseball',
-    component: BaseballScreen,
-    title: 'Baseball',
-  },
-];
 
 // Create modern OAuth configuration for mobile
 const authConfig: OAuthConfig = {
@@ -119,26 +79,14 @@ function AnalyticsIdentify({ userId }: { userId: number }): null {
 
 function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
-  const { resolvedTheme } = useThemeContext();
   const { user } = useAuth();
-  const footballEnabled = useFeatureIsOn('football_enabled');
-
-  const routes = footballEnabled
-    ? ALL_ROUTES
-    : ALL_ROUTES.filter((r) => r.name !== 'Football');
 
   return (
-    <AppProvider
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      apolloClient={client.apolloClient}
-      colorScheme={resolvedTheme}
-      isLoading={false}
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      tamaguiConfig={tamaguiConfig}
-    >
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Apollo's StoreValue type includes `any`, making ApolloClient<NormalizedCacheObject> flagged; same pattern as tamaguiConfig on L142
+    <ApolloProvider client={client.apolloClient}>
       {user?.id ? <AnalyticsIdentify userId={user.id} /> : null}
-      <TamaguiAppNavigator routes={routes} initialRoute="Home" />
-    </AppProvider>
+      <Slot />
+    </ApolloProvider>
   );
 }
 
@@ -147,12 +95,15 @@ function AuthenticatedContent(): React.JSX.Element {
  * Placed inside ThemeProvider so it can read resolvedTheme.
  */
 function InnerLayout(): React.JSX.Element {
+  const pathname = usePathname() ?? '';
+
   return (
     <AuthProvider config={authConfig}>
       <EnhancedAuthGuard
+        currentPath={pathname}
         loginTitle="Welcome to Legacy Sports!"
         loginSubtitle="Sign in to access your fantasy leagues and stats"
-        testMode={__DEV__} // Enable test mode in development
+        testMode={isDev} // Enable test mode in development
         onLoginSuccess={() => {
           LOGGER.info('Mobile app login successful!');
         }}
@@ -189,7 +140,7 @@ export default function Layout() {
     // TamaguiProvider it was wrapping has been unmounted along with the
     // errored subtree. That secondary throw escapes and crashes the app.
     <TamaguiProvider
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- tamaguiConfig typed as any internally by tamagui package; safe to pass
       config={tamaguiConfig}
       defaultTheme="dark"
     >

@@ -42,14 +42,19 @@ export interface EnhancedAuthGuardProps {
    */
   onLogoutSuccess?: () => void;
   /**
+   * Current router pathname, supplied by native/router integrations that do not
+   * expose window.location.
+   */
+  currentPath?: string | null;
+  /**
    * Paths that are accessible without authentication.
-   * Matched against window.location.pathname as an exact path or as a prefix when
+   * Matched against the current pathname as an exact path or as a prefix when
    * the current pathname continues with a trailing slash.
    * Entries must not include a trailing slash (for example, use '/about', not
    * '/about/'), otherwise prefix matching will not work as expected.
    * Entries must include the router basename/base-path prefix when deployed under
    * a sub-path (for example, '/pr-123/about' in a preview deploy with BASE_URL='/pr-123/').
-   * Web-only: ignored in React Native where window is undefined.
+   * Native callers should pass currentPath from their router.
    */
   publicPaths?: string[];
   /**
@@ -57,7 +62,7 @@ export interface EnhancedAuthGuardProps {
    * unlike publicPaths, child routes (e.g. /baseball/league/create) are NOT
    * automatically made public when the parent path is listed here.
    * Same basename and no-trailing-slash rules as publicPaths apply.
-   * Web-only: ignored in React Native where window is undefined.
+   * Native callers should pass currentPath from their router.
    */
   publicExactPaths?: string[];
 }
@@ -72,6 +77,7 @@ export function EnhancedAuthGuard({
   onLoginSuccess,
   onLoginFailure,
   onLogoutSuccess: _onLogoutSuccess,
+  currentPath: currentPathOverride,
   publicPaths = [],
   publicExactPaths = [],
 }: EnhancedAuthGuardProps) {
@@ -99,11 +105,13 @@ export function EnhancedAuthGuard({
   // Public paths bypass the auth gate entirely (no login wall, no loading spinner).
   // On web, window.location.pathname is already restored by the companion script in
   // index.html before React renders, so this check works for direct-URL navigation.
-  // In React Native, window is undefined, so skip the check entirely.
+  // In React Native, window can exist without location, so native callers should
+  // provide the router pathname and the fallback must remain safe during startup.
   const currentPath =
-    typeof window !== 'undefined' ? window.location.pathname : null;
+    currentPathOverride ??
+    (typeof window !== 'undefined' ? (window.location?.pathname ?? '') : '');
   const isPublicPath =
-    currentPath !== null &&
+    currentPath.length > 0 &&
     (publicPaths.some(
       (p) => currentPath === p || currentPath.startsWith(p + '/'),
     ) ||
