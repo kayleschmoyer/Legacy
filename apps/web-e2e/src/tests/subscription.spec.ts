@@ -15,7 +15,10 @@
  */
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import {
   createBillingPortalSessionResponse,
   createCheckoutSessionResponse,
@@ -396,12 +399,12 @@ test.describe('Subscription upgrade flow @critical', () => {
     expect(checkoutRequest.postData()).toContain('price_annual_test');
   });
 
-  test('upgrade button shows unavailable alert when GetStripePrices returns null', async ({
+  test('upgrade button shows unavailable banner when GetStripePrices returns null', async ({
     page,
   }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('mysubscription') || op.includes('getmysubscription')) {
+      const op = extractOperationName(route);
+      if (op === 'GetMySubscription') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -410,7 +413,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         return;
       }
       // Return null for stripePrices to trigger the guard.
-      if (op.includes('getstripeprices') || op.includes('stripeprices')) {
+      if (op === 'GetStripePrices') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -419,7 +422,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         return;
       }
       // createCheckoutSession should NOT be called when the guard fires.
-      if (op.includes('createcheckoutsession')) {
+      if (op === 'CreateCheckoutSession') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -443,12 +446,12 @@ test.describe('Subscription upgrade flow @critical', () => {
     await expect(page.getByText(/temporarily unavailable/i)).toBeVisible();
   });
 
-  test('upgrade button shows error alert when createCheckoutSession fails', async ({
+  test('upgrade button shows error banner when createCheckoutSession fails', async ({
     page,
   }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('mysubscription') || op.includes('getmysubscription')) {
+      const op = extractOperationName(route);
+      if (op === 'GetMySubscription') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -456,7 +459,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         });
         return;
       }
-      if (op.includes('getstripeprices') || op.includes('stripeprices')) {
+      if (op === 'GetStripePrices') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -473,7 +476,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         });
         return;
       }
-      if (op.includes('createcheckoutsession')) {
+      if (op === 'CreateCheckoutSession') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

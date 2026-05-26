@@ -478,6 +478,7 @@ export function SeasonAwardsControl({
   );
   const [openingVote, setOpeningVote] = useState(false);
   const [closingVote, setClosingVote] = useState(false);
+  const closingVoteRef = useRef(false);
 
   const [openVoting] = useOpenAwardVotingMutation({
     refetchQueries: [
@@ -513,6 +514,8 @@ export function SeasonAwardsControl({
   }, [selectedAwardTypes, leagueId, season, openVoting, onSuccess, onError]);
 
   const handleCloseVoting = useCallback(async () => {
+    if (closingVoteRef.current) return;
+    closingVoteRef.current = true;
     setClosingVote(true);
     try {
       await closeVoting({ variables: { leagueId, season } });
@@ -520,6 +523,7 @@ export function SeasonAwardsControl({
     } catch (err) {
       onError?.(err instanceof Error ? err : new Error(String(err)));
     } finally {
+      closingVoteRef.current = false;
       setClosingVote(false);
     }
   }, [leagueId, season, closeVoting, onSuccess, onError]);
