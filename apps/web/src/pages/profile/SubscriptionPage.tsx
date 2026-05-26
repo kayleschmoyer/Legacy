@@ -508,6 +508,7 @@ const SubscriptionPage: React.FC = () => {
     'annual',
   );
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -576,10 +577,11 @@ const SubscriptionPage: React.FC = () => {
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   const handleUpgrade = async () => {
+    setCheckoutError(null);
     const priceId = billingCycle === 'annual' ? annualPriceId : monthlyPriceId;
 
     if (!priceId || !priceId.startsWith('price_')) {
-      alert(
+      setCheckoutError(
         'Upgrade is temporarily unavailable. Please try again later or contact support.',
       );
       return;
@@ -604,16 +606,16 @@ const SubscriptionPage: React.FC = () => {
         window.location.href = url;
         return;
       }
-      alert(
-        'Could not start checkout. Please try again later or contact support.',
+      setCheckoutError(
+        'Could not start checkout — please try again or contact support.',
       );
     } catch (error) {
       LOGGER.error(
         'Failed to create checkout session',
         error instanceof Error ? error : new Error(String(error)),
       );
-      alert(
-        'Could not start checkout. Please try again later or contact support.',
+      setCheckoutError(
+        'Could not start checkout — please try again or contact support.',
       );
     }
   };
@@ -980,6 +982,36 @@ const SubscriptionPage: React.FC = () => {
                 >
                   <FeatureComparisonTable />
                 </SectionCard>
+
+                {/* Checkout error */}
+                {checkoutError && (
+                  <XStack
+                    alignItems="flex-start"
+                    gap="$2"
+                    padding="$3"
+                    borderRadius="$4"
+                    style={
+                      {
+                        backgroundColor: withAlpha(RED, 0.08),
+                        borderWidth: 1,
+                        borderColor: withAlpha(RED, 0.3),
+                      } as React.CSSProperties
+                    }
+                  >
+                    <AlertTriangle
+                      size={16}
+                      color={RED}
+                      flexShrink={0}
+                      marginTop={2}
+                    />
+                    <Paragraph
+                      size="$3"
+                      style={{ color: RED } as React.CSSProperties}
+                    >
+                      {checkoutError}
+                    </Paragraph>
+                  </XStack>
+                )}
 
                 {/* CTA */}
                 <CtaButton
