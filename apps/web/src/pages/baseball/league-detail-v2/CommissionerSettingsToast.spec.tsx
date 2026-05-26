@@ -32,6 +32,10 @@ import type { LeagueFragment } from '../../../api/db/graphql.generated';
 // The lucide icons appear inside accordion headers; we don't need their props
 // (size, color) for the role-based queries this test runs, so a parameterless
 // span is enough.
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => ({ user: { id: 42 } }),
+}));
+
 jest.mock('@tamagui/lucide-icons', () => {
   const Icon = () => <span />;
   return {

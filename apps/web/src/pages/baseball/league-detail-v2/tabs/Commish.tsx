@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   DefensiveFormat,
   type LeagueFragment,
@@ -79,6 +80,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   onSettingsError,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isFootball = league.sport === Sport.Football;
   const [openId, setOpenId] = useState<string>('next-step');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
@@ -223,7 +225,11 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       content: leagueId ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <LeagueDuesControl leagueId={leagueId} />
-          <LeagueDuesStatusDashboard leagueId={leagueId} isCommissioner />
+          <LeagueDuesStatusDashboard
+            leagueId={leagueId}
+            isCommissioner
+            currentUserId={user?.id}
+          />
         </div>
       ) : null,
     },

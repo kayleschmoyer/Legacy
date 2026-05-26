@@ -18,6 +18,11 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
 }));
 
+// --- auth ------------------------------------------------------------------
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => ({ user: { id: 42 } }),
+}));
+
 // --- hooks -----------------------------------------------------------------
 jest.mock('../../../../hooks/useMatchup', () => ({
   useMatchupsForLeague: () => ({ matchups: [], refetch: jest.fn() }),
