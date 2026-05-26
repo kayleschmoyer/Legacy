@@ -110,12 +110,14 @@ jest.mock('./config/environment', () => ({
     googleClientId: 'test-google-client-id',
     graphqlUrl: 'http://localhost:5000/graphql',
     isDev: true,
+    imageUploadUrl: undefined,
   },
   getEnvironmentConfig: jest.fn(() => ({
     oauthProxyUrl: 'http://localhost:5001',
     googleClientId: 'test-google-client-id',
     graphqlUrl: 'http://localhost:5000/graphql',
     isDev: true,
+    imageUploadUrl: undefined,
   })),
 }));
 

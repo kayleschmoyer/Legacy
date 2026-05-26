@@ -33,6 +33,8 @@ export interface EnvironmentConfig {
   readonly vapidPublicKey: string;
   /** GrowthBook SDK client key for feature flags and A/B tests. */
   readonly growthbookClientKey?: string;
+  /** Base URL for image upload service (VITE_IMAGE_UPLOAD_URL). */
+  readonly imageUploadUrl?: string;
 }
 
 /**
@@ -109,6 +111,9 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
     | undefined,
   discordClientId:
     (import.meta.env.VITE_DISCORD_CLIENT_ID as string) || undefined,
+  imageUploadUrl: import.meta.env['VITE_IMAGE_UPLOAD_URL'] as
+    | string
+    | undefined,
 });
 
 /**

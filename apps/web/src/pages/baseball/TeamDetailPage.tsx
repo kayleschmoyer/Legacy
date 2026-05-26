@@ -34,10 +34,7 @@ import {
 } from '../../constants/colors';
 import { getCsrfToken } from '../../lib/csrf';
 import { trackTeamViewed } from '../../utils/analytics';
-
-const IMAGE_UPLOAD_BASE_URL = import.meta.env['VITE_IMAGE_UPLOAD_URL'] as
-  | string
-  | undefined;
+import { env } from '../../config/environment';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -353,12 +350,12 @@ export function TeamDetailPage() {
     else setBannerUploading(true);
 
     try {
-      if (!IMAGE_UPLOAD_BASE_URL) {
+      if (!env.imageUploadUrl) {
         throw new Error(
           'Image uploads are not configured. Please set VITE_IMAGE_UPLOAD_URL.',
         );
       }
-      const uploadUrl = `${IMAGE_UPLOAD_BASE_URL}/images/upload?teamId=${teamIdNum}&imageType=${imageType}`;
+      const uploadUrl = `${env.imageUploadUrl}/images/upload?teamId=${teamIdNum}&imageType=${imageType}`;
       const csrfToken = getCsrfToken();
       const response = await fetch(uploadUrl, {
         method: 'POST',
