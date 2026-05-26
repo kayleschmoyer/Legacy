@@ -6,7 +6,6 @@ import {
   updateMatchupScore,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { UserInputError } from '../errors';
 import {
   calculateMatchupScore,
   getDefaultScoringSettings,
@@ -30,6 +29,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
+import { UserInputError } from '../errors';
 
 export interface GameSelectionResult {
   gameIdentifier: string | null;
