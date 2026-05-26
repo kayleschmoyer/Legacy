@@ -154,6 +154,14 @@ describe('FreeAgentsTab', () => {
     );
   });
 
+  it('does not render a claim button for a player whose id is null (LS-4045)', () => {
+    mockPlayers = [makePlayer({ id: null })];
+    render(<FreeAgentsTab league={league} isMember myTeamId={42} />);
+    expect(
+      screen.queryByTestId('claim-free-agent-button'),
+    ).not.toBeInTheDocument();
+  });
+
   it('renders the football player pool placeholder for football leagues', () => {
     render(
       <FreeAgentsTab
