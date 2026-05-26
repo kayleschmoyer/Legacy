@@ -60,6 +60,7 @@ Focus your review budget on high-impact issues. If you must limit comments, prio
 - **Hypothetical future issues**: "if you ever need to X" — review the code that exists, not code that might exist
 - **Single-use abstractions**: don't suggest extracting a helper for code used once
 - **Agent-facing docs**: `.agents/**`, `SKILL.md`, and `AGENTS.md` should be reviewed for accuracy, not prose style; other documentation files remain in scope for normal review
+- **Patterns with an intent comment**: if the flagged line (or an adjacent comment block within 3 lines) contains an inline comment that explicitly signals the pattern is intentional — e.g. one containing `intentional:`, `by design:`, `expected behavior:`, or `// intentional: <reason>` — treat that as documented intent. Confidence for that finding cannot exceed 0.5, which puts it below the 0.7 drop threshold; discard it in the self-critique pass. Do not flag the absence of such a comment; only honor its presence when it exists.
 
 ## Project Context
 
