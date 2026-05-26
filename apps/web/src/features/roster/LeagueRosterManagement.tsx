@@ -177,6 +177,19 @@ export const getPaceColor = (
   return undefined;
 };
 
+/**
+ * Returns true when the given player's matchup data shows the roster is locked.
+ * Used as a pre-mutation guard to intercept stale-state interactions before
+ * a server rejection that would otherwise be silent.
+ */
+export function isPlayerLocked(
+  playerId: number | null | undefined,
+  playerMatchupData: ReadonlyMap<number, PlayerMatchupData> | undefined,
+): boolean {
+  if (playerId == null || !playerMatchupData) return false;
+  return Boolean(playerMatchupData.get(playerId)?.isLocked);
+}
+
 // ── Move-flash CSS keyframe (injected once) ───────────────────────────────────
 
 const FLASH_STYLE_ID = 'roster-move-flash';
@@ -1337,6 +1350,32 @@ function SelectedBanner({
   );
 }
 
+// ── Lineup Locked Banner ──────────────────────────────────────────────────
+
+function LockedBanner(): React.JSX.Element {
+  return (
+    <XStack
+      backgroundColor={withAlpha(AMBER, 0.12)}
+      borderColor={withAlpha(AMBER, 0.4)}
+      borderWidth={1}
+      borderRadius="$4"
+      paddingVertical="$2.5"
+      paddingHorizontal="$3"
+      alignItems="center"
+      gap="$2"
+      animation="bouncy"
+      enterStyle={{ opacity: 0, y: -8 }}
+      role="alert"
+      aria-live="assertive"
+    >
+      <Lock size={16} color="$amber10" />
+      <Text fontSize="$3" fontWeight="600" color="$amber10" flex={1}>
+        Your lineup is locked — this matchup has started.
+      </Text>
+    </XStack>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export interface LeagueRosterManagementProps {
@@ -1427,6 +1466,23 @@ export function LeagueRosterManagement({
     }, FLASH_DURATION_MS);
   }, []);
 
+  // ── Matchup-locked banner ────────────────────────────────────────────────
+
+  const [showLockedBanner, setShowLockedBanner] = useState(false);
+  const lockedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const showLockedMessage = useCallback(() => {
+    if (lockedBannerTimerRef.current)
+      clearTimeout(lockedBannerTimerRef.current);
+    setShowLockedBanner(true);
+    lockedBannerTimerRef.current = setTimeout(
+      () => setShowLockedBanner(false),
+      4000,
+    );
+  }, []);
+
   // ── Split positions into Hitters / Pitchers (design TabRoster.jsx) ──────
 
   const groupedPositions = useMemo(() => {
@@ -1471,6 +1527,10 @@ export function LeagueRosterManagement({
   const handlePlayerAssign = useCallback(
     (player: TeamMemberFragment, position: LeaguePositionFragment) => {
       if (readOnly) return;
+      if (isPlayerLocked(player.playerId, playerMatchupData)) {
+        showLockedMessage();
+        return;
+      }
       onPlayerAssign(player, position);
       if (leagueId) {
         trackRosterAction('position_change', {
@@ -1482,7 +1542,14 @@ export function LeagueRosterManagement({
       setSelectedPlayer(null);
       flashIds(player.id, position.id);
     },
-    [readOnly, onPlayerAssign, flashIds, leagueId],
+    [
+      readOnly,
+      onPlayerAssign,
+      flashIds,
+      leagueId,
+      playerMatchupData,
+      showLockedMessage,
+    ],
   );
 
   const handlePlayerSwap = useCallback(
@@ -1492,6 +1559,13 @@ export function LeagueRosterManagement({
       displacedPlayer: TeamMemberFragment,
     ) => {
       if (readOnly) return;
+      if (
+        isPlayerLocked(incomingPlayer.playerId, playerMatchupData) ||
+        isPlayerLocked(displacedPlayer.playerId, playerMatchupData)
+      ) {
+        showLockedMessage();
+        return;
+      }
       onPlayerSwap(incomingPlayer, targetPosition, displacedPlayer);
       if (leagueId) {
         trackRosterAction('position_change', {
@@ -1503,12 +1577,23 @@ export function LeagueRosterManagement({
       setSelectedPlayer(null);
       flashIds(incomingPlayer.id, displacedPlayer.id, targetPosition.id);
     },
-    [readOnly, onPlayerSwap, flashIds, leagueId],
+    [
+      readOnly,
+      onPlayerSwap,
+      flashIds,
+      leagueId,
+      playerMatchupData,
+      showLockedMessage,
+    ],
   );
 
   const handleBenchPlayer = useCallback(
     (player: TeamMemberFragment) => {
       if (readOnly) return;
+      if (isPlayerLocked(player.playerId, playerMatchupData)) {
+        showLockedMessage();
+        return;
+      }
       const pos = positions.find((p) => p.id === player.positionId);
       if (pos) {
         if (leagueId) {
@@ -1523,7 +1608,15 @@ export function LeagueRosterManagement({
         flashIds(player.id);
       }
     },
-    [readOnly, positions, onPlayerRemove, flashIds, leagueId],
+    [
+      readOnly,
+      positions,
+      onPlayerRemove,
+      flashIds,
+      leagueId,
+      playerMatchupData,
+      showLockedMessage,
+    ],
   );
 
   // ── Computed stats ───────────────────────────────────────────────────────
@@ -1629,6 +1722,13 @@ export function LeagueRosterManagement({
               player={selectedPlayer}
               onClear={() => handlePlayerSelect(null)}
             />
+          </YStack>
+        )}
+
+        {/* ── Lineup locked banner ─────────────────────────────────── */}
+        {showLockedBanner && !readOnly && (
+          <YStack paddingHorizontal="$3">
+            <LockedBanner />
           </YStack>
         )}
 

@@ -1,6 +1,7 @@
 import {
   getLineupGroup,
   getPaceColor,
+  isPlayerLocked,
   PACE_GREEN,
   PACE_RED,
 } from './LeagueRosterManagement';
@@ -131,5 +132,41 @@ describe('getPaceColor', () => {
         baseData({ score: 1, projection: -5, gamesPlayed: 5, totalGames: 10 }),
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('isPlayerLocked', () => {
+  const makeMap = (
+    entries: [number, boolean][],
+  ): ReadonlyMap<number, PlayerMatchupData> =>
+    new Map(
+      entries.map(([id, isLocked]) => [
+        id,
+        { score: 0, projection: 0, gamesPlayed: 0, totalGames: 0, isLocked },
+      ]),
+    );
+
+  it('returns false when playerMatchupData is absent', () => {
+    expect(isPlayerLocked(1, undefined)).toBe(false);
+  });
+
+  it('returns false when playerId is null', () => {
+    expect(isPlayerLocked(null, makeMap([[1, true]]))).toBe(false);
+  });
+
+  it('returns false when playerId is undefined', () => {
+    expect(isPlayerLocked(undefined, makeMap([[1, true]]))).toBe(false);
+  });
+
+  it('returns false when player is not in the matchup data', () => {
+    expect(isPlayerLocked(99, makeMap([[1, true]]))).toBe(false);
+  });
+
+  it('returns false when player matchup data shows unlocked', () => {
+    expect(isPlayerLocked(1, makeMap([[1, false]]))).toBe(false);
+  });
+
+  it('returns true when player matchup data shows locked', () => {
+    expect(isPlayerLocked(1, makeMap([[1, true]]))).toBe(true);
   });
 });
