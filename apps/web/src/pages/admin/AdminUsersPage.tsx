@@ -506,54 +506,45 @@ export default function AdminUsersPage() {
             {pendingToggle &&
               (() => {
                 const willRevoke = pendingToggle.currentLevel === 'admin';
+                const isSelfRevoke = pendingToggle.isSelf && willRevoke;
                 const titleColor = willRevoke ? '$red11' : '$color';
                 return (
                   <>
                     <Dialog.Title id="toggle-admin-title" color={titleColor}>
-                      {willRevoke
-                        ? `Revoke admin from ${pendingToggle.label}?`
-                        : `Promote ${pendingToggle.label} to admin?`}
+                      {isSelfRevoke
+                        ? 'Cannot revoke your own admin access'
+                        : willRevoke
+                          ? `Revoke admin from ${pendingToggle.label}?`
+                          : `Promote ${pendingToggle.label} to admin?`}
                     </Dialog.Title>
                     <Dialog.Description id="toggle-admin-description">
-                      {willRevoke
-                        ? 'This user will lose access to admin tools.'
-                        : 'This user will gain full access to admin tools, including the ability to change other users’ roles.'}
+                      {isSelfRevoke
+                        ? 'You cannot remove your own admin access. Ask another admin to make this change if needed.'
+                        : willRevoke
+                          ? 'This user will lose access to admin tools.'
+                          : 'This user will gain full access to admin tools, including the ability to change other users’ roles.'}
                     </Dialog.Description>
-                    {pendingToggle.isSelf && willRevoke && (
-                      <Card
-                        padding="$3"
-                        backgroundColor="$red2"
-                        borderColor="$red6"
-                        borderWidth={1}
-                      >
-                        <Paragraph color="$red11" fontWeight="700">
-                          You are about to revoke your own admin access.
-                        </Paragraph>
-                        <Paragraph color="$red10" size="$3">
-                          You will be locked out of this page and will need
-                          another admin to restore your access.
-                        </Paragraph>
-                      </Card>
-                    )}
                     <XStack gap="$3" justifyContent="flex-end">
                       <Button
                         onPress={() => setPendingToggle(null)}
                         disabled={updating}
                       >
-                        Cancel
+                        {isSelfRevoke ? 'Close' : 'Cancel'}
                       </Button>
-                      <Button
-                        theme={willRevoke ? 'red' : 'blue'}
-                        onPress={() => {
-                          const { userId, currentLevel } = pendingToggle;
-                          setPendingToggle(null);
-                          void handleToggleRole(userId, currentLevel);
-                        }}
-                        disabled={updating}
-                        icon={updating ? <Spinner /> : undefined}
-                      >
-                        {willRevoke ? 'Revoke admin' : 'Make admin'}
-                      </Button>
+                      {!isSelfRevoke && (
+                        <Button
+                          theme={willRevoke ? 'red' : 'blue'}
+                          onPress={() => {
+                            const { userId, currentLevel } = pendingToggle;
+                            setPendingToggle(null);
+                            void handleToggleRole(userId, currentLevel);
+                          }}
+                          disabled={updating}
+                          icon={updating ? <Spinner /> : undefined}
+                        >
+                          {willRevoke ? 'Revoke admin' : 'Make admin'}
+                        </Button>
+                      )}
                     </XStack>
                   </>
                 );
