@@ -11,6 +11,7 @@ import {
 import { IDPStats } from '@legacy-sports/pfr-client';
 import type { LoadFootballSeasonStatsMessage } from './load-game-types';
 import { IDP_POSITIONS, validatePfrId } from './constants';
+import { emitFootballFailure, emitFootballSuccess } from './football-metrics';
 
 export function isFootballSeasonMessage(
   value: unknown,
@@ -172,6 +173,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           total: message.players.length,
           failed: failedCount,
         });
+        await emitFootballSuccess('season_load');
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         LOGGER.error('Failed to process football season stats record', err, {
@@ -181,6 +183,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           context: 'load-football-season',
           messageId: record.messageId,
         });
+        await emitFootballFailure('season_load');
         batchItemFailures.push({ itemIdentifier: record.messageId });
       }
     }

@@ -24,6 +24,7 @@ import {
   DEFAULT_RUSHING_SCORING,
 } from '@legacy-sports/scoring';
 import type { CalculateFootballScoresMessage } from '../load-game-types';
+import { emitFootballFailure, emitFootballSuccess } from '../football-metrics';
 
 export function isFootballScoreMessage(
   value: unknown,
@@ -256,6 +257,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             team2Score: result.team2Score,
           },
         );
+        await emitFootballSuccess('matchup_score');
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         LOGGER.error('Failed to calculate football scores', err, {
@@ -265,6 +267,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           context: 'calculate-football-matchup-scores',
           messageId: record.messageId,
         });
+        await emitFootballFailure('matchup_score');
         batchItemFailures.push({ itemIdentifier: record.messageId });
       }
     }

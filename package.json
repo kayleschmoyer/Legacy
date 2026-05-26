@@ -108,6 +108,7 @@
     "@apollo/server": "^5.4.0",
     "@as-integrations/aws-lambda": "^4.0.1",
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1025.0",
+    "@aws-sdk/client-cloudwatch": "^3.1053.0",
     "@aws-sdk/client-dynamodb": "^3.1025.0",
     "@aws-sdk/client-lambda": "^3.1025.0",
     "@aws-sdk/client-secrets-manager": "^3.1025.0",

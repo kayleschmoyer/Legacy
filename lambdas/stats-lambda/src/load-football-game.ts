@@ -22,6 +22,7 @@ import {
 } from './game-state-manager';
 import { calculateAndUpdateFootballMatchupScores } from './handlers/calculate-football-matchup-scores';
 import { IDP_POSITIONS, validateNflTeam, validatePfrId } from './constants';
+import { emitFootballFailure, emitFootballSuccess } from './football-metrics';
 
 const MAX_RETRIES = 3;
 
@@ -565,6 +566,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         }
 
         addBreadcrumb(`Processed football matchup ${message.matchupId} stats`);
+        await emitFootballSuccess('game_load');
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         LOGGER.error(
@@ -605,6 +607,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           extra: { messageId: record.messageId, message: parsedMessage },
         });
 
+        await emitFootballFailure('game_load');
         batchItemFailures.push({ itemIdentifier: record.messageId });
       }
     }

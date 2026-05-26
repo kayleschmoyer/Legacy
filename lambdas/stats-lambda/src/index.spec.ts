@@ -27,6 +27,18 @@ jest.mock('@legacy-sports/utils/node', () => ({
 const mockGameHandler = jest.fn<Promise<SQSBatchResponse>, [SQSEvent]>();
 const mockCareerHandler = jest.fn<Promise<SQSBatchResponse>, [SQSEvent]>();
 const mockMlbStatsHandler = jest.fn<SQSBatchResponse, [SQSEvent]>();
+const mockFootballGameHandler = jest.fn<
+  Promise<SQSBatchResponse>,
+  [SQSEvent]
+>();
+const mockFootballSeasonHandler = jest.fn<
+  Promise<SQSBatchResponse>,
+  [SQSEvent]
+>();
+const mockFootballMatchupScoreHandler = jest.fn<
+  Promise<SQSBatchResponse>,
+  [SQSEvent]
+>();
 
 jest.mock('./load-game', () => ({
   handler: (...args: [SQSEvent]) => mockGameHandler(...args),
@@ -41,6 +53,27 @@ jest.mock('./load-mlb-stats', () => ({
     jest.requireActual<typeof import('./load-mlb-stats')>('./load-mlb-stats')
       .isMlbStatsMessage,
   handler: (...args: [SQSEvent]) => mockMlbStatsHandler(...args),
+}));
+
+jest.mock('./load-football-game', () => ({
+  isFootballGameMessage: jest.requireActual<
+    typeof import('./load-football-game')
+  >('./load-football-game').isFootballGameMessage,
+  handler: (...args: [SQSEvent]) => mockFootballGameHandler(...args),
+}));
+
+jest.mock('./load-football-season', () => ({
+  isFootballSeasonMessage: jest.requireActual<
+    typeof import('./load-football-season')
+  >('./load-football-season').isFootballSeasonMessage,
+  handler: (...args: [SQSEvent]) => mockFootballSeasonHandler(...args),
+}));
+
+jest.mock('./handlers/calculate-football-matchup-scores', () => ({
+  isFootballScoreMessage: jest.requireActual<
+    typeof import('./handlers/calculate-football-matchup-scores')
+  >('./handlers/calculate-football-matchup-scores').isFootballScoreMessage,
+  handler: (...args: [SQSEvent]) => mockFootballMatchupScoreHandler(...args),
 }));
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -74,6 +107,54 @@ describe('stats-lambda router', () => {
     mockGameHandler.mockResolvedValue({ batchItemFailures: [] });
     mockCareerHandler.mockResolvedValue({ batchItemFailures: [] });
     mockMlbStatsHandler.mockReturnValue({ batchItemFailures: [] });
+    mockFootballGameHandler.mockResolvedValue({ batchItemFailures: [] });
+    mockFootballSeasonHandler.mockResolvedValue({ batchItemFailures: [] });
+    mockFootballMatchupScoreHandler.mockResolvedValue({
+      batchItemFailures: [],
+    });
+  });
+
+  it('routes football-game-stats messages to the football game handler', async () => {
+    const body = JSON.stringify({
+      type: 'football-game-stats',
+      matchupId: 1,
+      players: [],
+    });
+    const event = makeSqsEvent([body]);
+
+    await handler(event);
+
+    expect(mockFootballGameHandler).toHaveBeenCalledWith(event);
+    expect(mockFootballSeasonHandler).not.toHaveBeenCalled();
+    expect(mockGameHandler).not.toHaveBeenCalled();
+  });
+
+  it('routes football-season-stats messages to the football season handler', async () => {
+    const body = JSON.stringify({
+      type: 'football-season-stats',
+      players: [],
+    });
+    const event = makeSqsEvent([body]);
+
+    await handler(event);
+
+    expect(mockFootballSeasonHandler).toHaveBeenCalledWith(event);
+    expect(mockFootballGameHandler).not.toHaveBeenCalled();
+    expect(mockGameHandler).not.toHaveBeenCalled();
+  });
+
+  it('routes football-calculate-scores messages to the football matchup score handler', async () => {
+    const body = JSON.stringify({
+      type: 'football-calculate-scores',
+      matchupId: 7,
+    });
+    const event = makeSqsEvent([body]);
+
+    await handler(event);
+
+    expect(mockFootballMatchupScoreHandler).toHaveBeenCalledWith(event);
+    expect(mockFootballGameHandler).not.toHaveBeenCalled();
+    expect(mockFootballSeasonHandler).not.toHaveBeenCalled();
   });
 
   it('returns empty batchItemFailures for an empty event', async () => {

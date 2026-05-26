@@ -104,6 +104,110 @@ resource "aws_cloudwatch_metric_alarm" "load_season_stats_dlq_visible" {
   tags = local.common_tags
 }
 
+# ─── Football ingestion alarms ────────────────────────────────────────────────
+# These alarms fire on custom metrics emitted by the football handlers in stats-lambda.
+# Metric namespace: LegacySports/FootballIngest
+# SEV-2 pages on-call immediately; SEV-3 notifies without paging.
+
+# Football load failure rate > 5% over a 15-minute window — SEV-2 page.
+# Covers game_load failures. season_load failures are observable via the DLQ alarm below.
+resource "aws_cloudwatch_metric_alarm" "football_load_failure_rate" {
+  alarm_name          = "${local.name_prefix}-football-load-failure-rate"
+  alarm_description   = "Football stats load failure rate exceeded 5% over 15 minutes. Check stats-lambda logs for football handler errors."
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 5
+  evaluation_periods  = 3
+  # period is not set at the resource level when using metric_query blocks;
+  # each metric sub-block carries its own period.
+
+  treat_missing_data = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+
+  metric_query {
+    id          = "failure_count"
+    return_data = false
+
+    metric {
+      namespace   = "LegacySports/FootballIngest"
+      metric_name = "football.game_load.failure"
+      period      = 300
+      stat        = "Sum"
+    }
+  }
+
+  metric_query {
+    id          = "success_count"
+    return_data = false
+
+    metric {
+      namespace   = "LegacySports/FootballIngest"
+      metric_name = "football.game_load.success"
+      period      = 300
+      stat        = "Sum"
+    }
+  }
+
+  metric_query {
+    id          = "failure_rate"
+    return_data = true
+    expression  = "100 * failure_count / (failure_count + success_count + 0.0001)"
+    label       = "Football Load Failure Rate (%)"
+  }
+
+  tags = local.common_tags
+}
+
+# Football DLQ depth > 0 — SEV-2 page (football messages exhausted retries).
+resource "aws_cloudwatch_metric_alarm" "load_football_stats_dlq_visible" {
+  alarm_name          = "${local.name_prefix}-load-football-stats-dlq-visible"
+  alarm_description   = "Visible messages in load-football-stats-dlq.fifo — football stats batches expired into the DLQ."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 1
+  evaluation_periods  = 1
+  period              = 60
+
+  namespace   = "AWS/SQS"
+  metric_name = "ApproximateNumberOfMessagesVisible"
+  dimensions = {
+    QueueName = aws_sqs_queue.load_football_stats_dlq.name
+  }
+
+  statistic = "Sum"
+
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+
+  treat_missing_data = "notBreaching"
+
+  tags = local.common_tags
+}
+
+# PFR fetch latency p99 > 30 seconds over 30 minutes — SEV-3 notify.
+# Pro Football Reference rate-limiting or connectivity degradation.
+resource "aws_cloudwatch_metric_alarm" "football_pfr_fetch_latency_p99" {
+  alarm_name          = "${local.name_prefix}-football-pfr-fetch-latency-p99"
+  alarm_description   = "PFR fetch latency p99 exceeded 30 seconds over 30 minutes. Pro Football Reference may be rate-limiting or degraded."
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 30000 # 30 seconds in milliseconds
+  evaluation_periods  = 6
+  period              = 300 # 5-minute periods × 6 = 30-minute window
+
+  namespace   = "LegacySports/FootballIngest"
+  metric_name = "football.pfr_fetch.latency_ms"
+  dimensions  = {}
+
+  extended_statistic = "p99"
+
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+
+  treat_missing_data = "notBreaching"
+
+  tags = local.common_tags
+}
+
 # ─── Lambda error alarms ─────────────────────────────────────────────────────
 # One alarm per Lambda function, based on the Lambda Errors metric (count).
 # When the error count breaches the threshold over the configured evaluation

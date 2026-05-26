@@ -900,6 +900,19 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         Effect   = "Allow"
         Action   = ["cognito-idp:DescribeUserPoolDomain"]
         Resource = "*"
+      },
+      # CloudWatch Dashboard permissions for Terraform apply (football-stats-ingest dashboard).
+      # Dashboard ARNs are global (no region component).
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutDashboard",
+          "cloudwatch:DeleteDashboards",
+          "cloudwatch:GetDashboard"
+        ]
+        Resource = [
+          "arn:aws:cloudwatch::${local.account_id}:dashboard/${local.name_prefix}-*"
+        ]
       }
     ]
   })
@@ -1321,6 +1334,16 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Action = ["cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource"]
         Resource = [
           "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:${local.name_prefix}-*"
+        ]
+      },
+      # CloudWatch dashboard read (plan refresh for aws_cloudwatch_dashboard resources)
+      # Dashboard ARNs are global (no region component).
+      {
+        Sid    = "CloudWatchDashboardRead"
+        Effect = "Allow"
+        Action = ["cloudwatch:GetDashboard"]
+        Resource = [
+          "arn:aws:cloudwatch::${local.account_id}:dashboard/${local.name_prefix}-*"
         ]
       },
       # CloudTrail read (plan refresh for aws_cloudtrail resources)

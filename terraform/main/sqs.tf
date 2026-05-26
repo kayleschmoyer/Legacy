@@ -1,4 +1,83 @@
-# SQS Queue for loading season stats
+# ─── Football stats queues ─────────────────────────────────────────────────────
+# Separate FIFO queues for football game and season stats so football and baseball
+# ingestion failures are independently observable and redriv-able.
+
+resource "aws_sqs_queue" "load_football_stats_dlq" {
+  name = "${local.name_prefix}-load-football-stats-dlq.fifo"
+
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue" "load_football_stats" {
+  name = "${local.name_prefix}-load-football-stats.fifo"
+
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  # Message settings — same profile as load-game-stats: one matchup per invocation,
+  # 15-minute visibility window to cover PFR scrape + DB write latency.
+  visibility_timeout_seconds = 900     # 15 minutes
+  message_retention_seconds  = 1209600 # 14 days
+  receive_wait_time_seconds  = 10      # Long polling
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.load_football_stats_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue_policy" "load_football_stats" {
+  queue_url = aws_sqs_queue.load_football_stats.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "${local.name_prefix}-load-football-stats-policy"
+    Statement = [
+      {
+        Sid    = "AllowLambdaServiceAccess"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.load_football_stats.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.stats.arn
+          }
+        }
+      },
+      {
+        Sid    = "AllowApplicationSendMessages"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.load_football_stats.arn
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = data.aws_region.current.id
+          }
+        }
+      }
+    ]
+  })
+}
+
+# ─── Baseball stats queues ─────────────────────────────────────────────────────
+# SQS Queue for loading baseball season stats
 resource "aws_sqs_queue" "load_season_stats_dlq" {
   name = "${local.name_prefix}-load-season-stats-dlq.fifo"
 
@@ -124,80 +203,6 @@ resource "aws_sqs_queue_policy" "load_game_stats" {
           "sqs:SendMessage"
         ]
         Resource = aws_sqs_queue.load_game_stats.arn
-        Condition = {
-          StringEquals = {
-            "aws:RequestedRegion" = data.aws_region.current.id
-          }
-        }
-      }
-    ]
-  })
-}
-
-# SQS Queue for loading football game and season stats (shared with existing stats-lambda)
-resource "aws_sqs_queue" "load_football_stats_dlq" {
-  name = "${local.name_prefix}-load-football-stats-dlq.fifo"
-
-  fifo_queue                  = true
-  content_based_deduplication = true
-
-  tags = local.common_tags
-}
-
-resource "aws_sqs_queue" "load_football_stats" {
-  name = "${local.name_prefix}-load-football-stats.fifo"
-
-  fifo_queue                  = true
-  content_based_deduplication = true
-
-  # Message settings — same profile as load_game_stats (HTTP scrape workload)
-  visibility_timeout_seconds = 900     # 15 minutes (longer than lambda timeout)
-  message_retention_seconds  = 1209600 # 14 days
-  receive_wait_time_seconds  = 10      # Long polling
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.load_football_stats_dlq.arn
-    maxReceiveCount     = 3
-  })
-
-  tags = local.common_tags
-}
-
-resource "aws_sqs_queue_policy" "load_football_stats" {
-  queue_url = aws_sqs_queue.load_football_stats.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Id      = "${local.name_prefix}-load-football-stats-policy"
-    Statement = [
-      {
-        Sid    = "AllowLambdaServiceAccess"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-        Action = [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes"
-        ]
-        Resource = aws_sqs_queue.load_football_stats.arn
-        Condition = {
-          ArnEquals = {
-            "aws:SourceArn" = aws_lambda_function.stats.arn
-          }
-        }
-      },
-      {
-        Sid    = "AllowApplicationSendMessages"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action = [
-          "sqs:SendMessage"
-        ]
-        Resource = aws_sqs_queue.load_football_stats.arn
         Condition = {
           StringEquals = {
             "aws:RequestedRegion" = data.aws_region.current.id

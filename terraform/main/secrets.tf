@@ -97,6 +97,7 @@ variable "cloudflare_ai_api_token" {
 #      variables already exist and can be wired into new aws_secretsmanager_secret_version
 #      resources without changing the bootstrap path
 
+# tflint-ignore: terraform_unused_declarations
 variable "google_oauth_client_secret" {
   description = "Google OAuth client secret. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/google-oauth-client-secret`."
   type        = string
@@ -104,6 +105,7 @@ variable "google_oauth_client_secret" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "jwt_secret_key" {
   description = "JWT signing secret. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/jwt-secret-key`."
   type        = string
@@ -111,6 +113,7 @@ variable "jwt_secret_key" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "oauth_proxy_cookie_secret" {
   description = "OAuth proxy cookie signing secret. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/oauth-proxy/cookie-secret`."
   type        = string
@@ -118,6 +121,7 @@ variable "oauth_proxy_cookie_secret" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "stripe_secret_key" {
   description = "Stripe API secret key. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/stripe-secret-key`."
   type        = string
@@ -125,6 +129,7 @@ variable "stripe_secret_key" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "stripe_webhook_secret" {
   description = "Stripe webhook signing secret. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/stripe-webhook-secret`."
   type        = string
@@ -132,6 +137,7 @@ variable "stripe_webhook_secret" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "jira_credentials" {
   description = "Jira OAuth 2.0 credentials JSON blob (client_id, client_secret, cloud_id, site_url). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/jira-credentials`."
   type        = string
@@ -139,6 +145,7 @@ variable "jira_credentials" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "rollbar_webhook_secret" {
   description = "Rollbar webhook HMAC signing secret. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/rollbar-webhook-secret`."
   type        = string
@@ -146,6 +153,7 @@ variable "rollbar_webhook_secret" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "discord_webhook_url" {
   description = "Discord webhook URL for Rollbar/CloudWatch alarm notifications. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/discord-webhook-url`."
   type        = string
@@ -153,6 +161,7 @@ variable "discord_webhook_url" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "discord_user_signup_webhook_url" {
   description = "Discord webhook URL for new-user signup notifications (oauth-proxy Lambda). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/discord-user-signup-webhook-url --secret-string <value>`."
   type        = string
@@ -160,6 +169,7 @@ variable "discord_user_signup_webhook_url" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "discord_stripe_webhook_url" {
   description = "Discord webhook URL for Stripe event notifications (stripe-webhook Lambda). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/discord-stripe-webhook-url --secret-string <value>`."
   type        = string
@@ -167,6 +177,7 @@ variable "discord_stripe_webhook_url" {
   default     = ""
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "ga_api_secret" {
   description = "GA4 Measurement Protocol API secret for server-side event sending (stripe-webhook Lambda). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/ga-api-secret --secret-string <value>`."
   type        = string
