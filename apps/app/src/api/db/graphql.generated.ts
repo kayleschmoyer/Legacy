@@ -415,6 +415,7 @@ export type CreateLeagueAndTeamsInput = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;
   faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
+  gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;

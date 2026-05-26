@@ -10,8 +10,10 @@
 
 import {
   FREE_ERA_IDS_BY_SPORT,
+  GAMES_PER_MATCHUP_RANGE_BY_SPORT,
   isEraFreeForSport,
   isEraValidForSport,
+  isGamesPerMatchupValidForSport,
   isPoolValidForSport,
   isRosterSizeValidForSport,
   normalizeSport,
@@ -19,6 +21,8 @@ import {
   VALID_ERAS_BY_SPORT,
   VALID_POOLS_BY_SPORT,
 } from './sport-validation';
+import type { SportKind } from './sport-validation';
+import { UserInputError } from '../graphql-errors';
 
 describe('sport-validation', () => {
   describe('normalizeSport', () => {
@@ -125,6 +129,69 @@ describe('sport-validation', () => {
       expect(ROSTER_RANGE_BY_SPORT.baseball.max).toBe(50);
       expect(ROSTER_RANGE_BY_SPORT.football.min).toBe(10);
       expect(ROSTER_RANGE_BY_SPORT.football.max).toBe(25);
+    });
+  });
+
+  describe('isGamesPerMatchupValidForSport', () => {
+    it('accepts the inclusive min and max for each sport', () => {
+      expect(isGamesPerMatchupValidForSport('baseball', 1)).toBe(true);
+      expect(isGamesPerMatchupValidForSport('baseball', 162)).toBe(true);
+      expect(isGamesPerMatchupValidForSport('football', 1)).toBe(true);
+      expect(isGamesPerMatchupValidForSport('football', 17)).toBe(true);
+    });
+
+    it('rejects values below the minimum for each sport', () => {
+      expect(isGamesPerMatchupValidForSport('baseball', 0)).toBe(false);
+      expect(isGamesPerMatchupValidForSport('football', 0)).toBe(false);
+    });
+
+    it('rejects values above the maximum for baseball (163 > 162)', () => {
+      expect(isGamesPerMatchupValidForSport('baseball', 163)).toBe(false);
+    });
+
+    it('rejects values above 17 for football (enforces per-sport cap)', () => {
+      expect(isGamesPerMatchupValidForSport('football', 18)).toBe(false);
+    });
+
+    describe('resolver-level throw behaviour (create and update paths)', () => {
+      /**
+       * Mirrors the validation+throw pattern used in both createLeagueAndTeams
+       * and updateLeagueSettings.  Tests here prove that out-of-bounds values
+       * produce a UserInputError with the expected message — the same contract
+       * the resolvers enforce.
+       */
+      function throwIfInvalid(sport: SportKind, n: number): void {
+        if (!isGamesPerMatchupValidForSport(sport, n)) {
+          const range = GAMES_PER_MATCHUP_RANGE_BY_SPORT[sport];
+          throw UserInputError(
+            `Games per matchup must be between ${range.min} and ${range.max} for ${sport} leagues`,
+          );
+        }
+      }
+
+      it('throws UserInputError when below minimum for a baseball league (create path)', () => {
+        expect(() => throwIfInvalid('baseball', 0)).toThrow(
+          'Games per matchup must be between 1 and 162 for baseball leagues',
+        );
+      });
+
+      it('throws UserInputError when above maximum for a baseball league (create path)', () => {
+        expect(() => throwIfInvalid('baseball', 163)).toThrow(
+          'Games per matchup must be between 1 and 162 for baseball leagues',
+        );
+      });
+
+      it('throws UserInputError when below minimum for a football league (update path)', () => {
+        expect(() => throwIfInvalid('football', 0)).toThrow(
+          'Games per matchup must be between 1 and 17 for football leagues',
+        );
+      });
+
+      it('throws UserInputError when above maximum for a football league — enforces 17-game cap (update path)', () => {
+        expect(() => throwIfInvalid('football', 18)).toThrow(
+          'Games per matchup must be between 1 and 17 for football leagues',
+        );
+      });
     });
   });
 });

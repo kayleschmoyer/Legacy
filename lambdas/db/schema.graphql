@@ -461,6 +461,7 @@ input CreateLeagueAndTeamsInput {
   draftOrder: String
   eraFilter: String
   faabBudgetDefault: Int
+  gamesPerMatchup: Int
   isPublic: Boolean
   leagueName: String!
   luxuryTaxThreshold: Int

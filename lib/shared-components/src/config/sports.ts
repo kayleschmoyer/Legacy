@@ -282,6 +282,8 @@ export function getEraValueFromYear(
 export const SORT_DIRECTIONS = ['ASC', 'DESC'] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 
+export { GAMES_PER_MATCHUP_BY_SPORT } from '@legacy-sports/utils';
+
 // Alias for backward compatibility
 export const sportsConfig = SPORT_CONFIGS;
 

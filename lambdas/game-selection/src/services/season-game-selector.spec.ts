@@ -16,6 +16,10 @@ jest.mock('@legacy-sports/logging', () => ({
 jest.mock('@legacy-sports/utils', () => ({
   cryptoRandomInt: jest.fn((_max: number) => 0),
   cryptoRandomFloat: jest.fn(() => 0.5),
+  GAMES_PER_MATCHUP_BY_SPORT: {
+    baseball: { min: 1, max: 162, default: 5 },
+    football: { min: 1, max: 17, default: 5 },
+  },
 }));
 
 const mockGetMatchupPlayerGameStats = jest.fn().mockResolvedValue([]);
@@ -56,6 +60,7 @@ jest.mock('@legacy-sports/db-client', () => ({
       pos: 'pos',
       g: 'g',
     },
+    leagues: { id: 'id', sport: 'sport' },
     matchups: { id: 'id', leagueId: 'leagueId', weekNumber: 'weekNumber' },
     matchupPlayers: { matchupId: 'matchupId', id: 'id', playerId: 'playerId' },
     leagueWeekPlayerSeasons: {
@@ -440,13 +445,15 @@ describe('season-game-selector', () => {
             gamesPerMatchup: 5,
           },
         ],
-        // 2. get matchup players
+        // 2. get league sport (LS-4762)
+        [{ sport: 'baseball' }],
+        // 3. get matchup players
         [{ id: 100, playerId: 1, matchupId: 1 }],
-        // 3. get player seasons
+        // 4. get player seasons
         [{ playerId: 1, season: 2023 }],
-        // 4. batch pitcher roles
+        // 5. batch pitcher roles
         [],
-        // 5. existingGames check - already has games
+        // 6. existingGames check - already has games
         [{ gameNum: 1, matchupPlayerId: 100 }],
       ];
 
@@ -501,13 +508,15 @@ describe('season-game-selector', () => {
             gamesPerMatchup: 5,
           },
         ],
-        // 2. get matchup players
+        // 2. get league sport (LS-4762)
+        [{ sport: 'baseball' }],
+        // 3. get matchup players
         [{ id: 100, playerId: 1, matchupId: 1 }],
-        // 3. get player seasons - no season assigned for player 1
+        // 4. get player seasons - no season assigned for player 1
         [],
-        // 4. batch pitcher roles
+        // 5. batch pitcher roles
         [],
-        // 5. existingGames check - no existing games
+        // 6. existingGames check - no existing games
         [],
       ];
 
@@ -588,13 +597,15 @@ describe('season-game-selector', () => {
             gamesPerMatchup: 2,
           },
         ],
-        // 2. get matchup players
+        // 2. get league sport (LS-4762)
+        [{ sport: 'baseball' }],
+        // 3. get matchup players
         [{ id: 200, playerId: 99, matchupId: 1 }],
-        // 3. get player seasons
+        // 4. get player seasons
         [{ playerId: 99, season: 2020 }],
-        // 4. batch pitcher roles
+        // 5. batch pitcher roles
         [],
-        // 5. existingGames check — already has games (skip)
+        // 6. existingGames check — already has games (skip)
         [{ gameNum: 1, matchupPlayerId: 200 }],
       ];
 
@@ -675,6 +686,8 @@ describe('season-game-selector', () => {
             gamesPerMatchup: 2,
           },
         ],
+        // get league sport (LS-4762)
+        [{ sport: 'baseball' }],
         [{ id: 200, playerId: 99, matchupId: 1 }],
         [{ playerId: 99, season: 2020 }],
         [],

@@ -21,6 +21,7 @@ import {
 import { AlertCircle, Check, ChevronRight, Lock } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
+import { GAMES_PER_MATCHUP_BY_SPORT } from '@legacy-sports/shared-components/sports';
 import {
   formatDateAsUTC,
   formatDraftDate,
@@ -132,6 +133,7 @@ interface CreateLeagueFormData {
   waiverType: 'standard' | 'faab';
   faabBudgetDefault: number;
   isPublic: boolean;
+  gamesPerMatchup: number;
   baseballEraFilter: string;
   baseballHofOnly: boolean;
   customEraStartYear?: number;
@@ -322,9 +324,14 @@ const ACCENT_BY_SPORT: Record<SportId, string> = {
 function defaultsForSport(sport: SportId): {
   numberOfTeams: number;
   maxRosterSize: number;
+  gamesPerMatchup: number;
 } {
   const s = SPORTS.find((x) => x.id === sport) ?? SPORTS[0];
-  return { numberOfTeams: s.defaultTeams, maxRosterSize: s.defaultRoster };
+  return {
+    numberOfTeams: s.defaultTeams,
+    maxRosterSize: s.defaultRoster,
+    gamesPerMatchup: GAMES_PER_MATCHUP_BY_SPORT[sport]?.default ?? 5,
+  };
 }
 
 function applySportSwitch(
@@ -337,6 +344,7 @@ function applySportSwitch(
     sport: nextSport,
     numberOfTeams: fresh.numberOfTeams,
     maxRosterSize: fresh.maxRosterSize,
+    gamesPerMatchup: fresh.gamesPerMatchup,
     baseballEraFilter: 'all',
     playerPool: 'all',
     customEraStartYear: undefined,
@@ -393,6 +401,12 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
   const range = ROSTER_RANGE_BY_SPORT[f.sport];
   if (f.maxRosterSize < range.min || f.maxRosterSize > range.max)
     errs.maxRosterSize = `Roster must be ${range.min}–${range.max}.`;
+  const gpmRange = GAMES_PER_MATCHUP_BY_SPORT[f.sport];
+  if (
+    gpmRange &&
+    (f.gamesPerMatchup < gpmRange.min || f.gamesPerMatchup > gpmRange.max)
+  )
+    errs.gamesPerMatchup = `Games per matchup must be ${gpmRange.min}–${gpmRange.max} for ${f.sport} leagues.`;
   if (f.baseballEraFilter === 'custom') {
     if (f.customEraStartYear == null || f.customEraEndYear == null)
       errs.customEra = 'Both start and end year required.';
@@ -1200,6 +1214,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       selectionMethod: 'standard',
       draftOrder: 'snake',
       maxRosterSize: initialDefaults.maxRosterSize,
+      gamesPerMatchup: initialDefaults.gamesPerMatchup,
       draftDate: undefined,
       waiverType: 'standard',
       faabBudgetDefault: 100,
@@ -1387,6 +1402,7 @@ export function LeagueCreatePage(): React.JSX.Element {
               formData.selectionMethod === 'auction'
                 ? formData.auctionMinBid
                 : undefined,
+            gamesPerMatchup: formData.gamesPerMatchup,
           },
         },
       });
@@ -1816,6 +1832,41 @@ export function LeagueCreatePage(): React.JSX.Element {
                       disabled={isFormDisabled}
                     />
                   </FieldRow>
+
+                  {/* Games Per Matchup — full width */}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <FieldRow
+                      label="Games Per Matchup"
+                      hint={`Games played in each weekly matchup. Max ${GAMES_PER_MATCHUP_BY_SPORT[formData.sport]?.max ?? 162} for ${formData.sport}.`}
+                    >
+                      <XStack alignItems="center" gap="$3">
+                        <Input
+                          size="$4"
+                          testID="create-league-games-per-matchup-input"
+                          keyboardType="numeric"
+                          value={String(formData.gamesPerMatchup)}
+                          onChangeText={(text: string) => {
+                            const n = parseInt(text, 10);
+                            if (!isNaN(n))
+                              handleInputChange('gamesPerMatchup', n);
+                          }}
+                          borderColor={
+                            validationErrors.gamesPerMatchup
+                              ? '$red8'
+                              : '$borderColor'
+                          }
+                          backgroundColor="$color1"
+                          disabled={isFormDisabled}
+                          width={100}
+                        />
+                        {validationErrors.gamesPerMatchup && (
+                          <Text fontFamily="$body" fontSize={12} color="$red10">
+                            {validationErrors.gamesPerMatchup}
+                          </Text>
+                        )}
+                      </XStack>
+                    </FieldRow>
+                  </div>
                 </div>
               </CollapsibleSection>
 

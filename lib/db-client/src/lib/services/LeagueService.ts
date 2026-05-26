@@ -99,6 +99,8 @@ export interface CreateLeagueOptions {
    *  'standard' = 0 pts/rec, 'half_ppr' = 0.5 pts/rec, 'ppr' = 1 pt/rec (default).
    *  Used to seed the default scoring profile's reception multiplier. */
   scoringFormat?: 'standard' | 'half_ppr' | 'ppr';
+  /** Number of games per matchup week. Defaults to 5. Per-sport max: baseball 162, football 17. */
+  gamesPerMatchup?: number;
 }
 
 export interface CreateLeagueResult {
@@ -192,6 +194,7 @@ export class LeagueService {
       auctionMinBid = 1,
       startDate,
       scoringFormat = 'ppr',
+      gamesPerMatchup,
     } = input;
 
     const maxRosterSize =
@@ -248,6 +251,7 @@ export class LeagueService {
             salaryDecayPct,
             auctionBudget,
             auctionMinBid,
+            ...(gamesPerMatchup !== undefined ? { gamesPerMatchup } : {}),
           })
           .returning({
             id: PublicSchema.leagues.id,

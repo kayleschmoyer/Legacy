@@ -12,6 +12,7 @@ import {
 } from 'tamagui';
 import { AlertTriangle, Check, Lock, Settings } from '@tamagui/lucide-icons';
 import { useUpdateLeagueSettingsMutation } from '../../api/db/graphql.generated';
+import { GAMES_PER_MATCHUP_BY_SPORT } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 // PremiumGate enforces premium access for specific sections. On non-premium
@@ -52,6 +53,8 @@ const PremiumGate: React.FC<{
 
 export interface LeagueSettingsControlProps {
   leagueId: number;
+  /** Sport for the league — determines per-sport gamesPerMatchup bounds. Defaults to 'baseball'. */
+  sport?: string;
   draftStatus?: string | null;
   currentGamesPerMatchup: number;
   currentSpStartsPerMatchup: number;
@@ -70,15 +73,14 @@ export interface LeagueSettingsControlProps {
   onError?: (error: Error) => void;
 }
 
-const GAMES_PER_MATCHUP_OPTIONS = [
-  { label: '1 game', value: 1 },
-  { label: '2 games', value: 2 },
-  { label: '3 games', value: 3 },
-  { label: '4 games', value: 4 },
-  { label: '5 games', value: 5 },
-  { label: '6 games', value: 6 },
-  { label: '7 games', value: 7 },
-] as const;
+function buildGamesPerMatchupOptions(
+  max: number,
+): ReadonlyArray<{ label: string; value: number }> {
+  return Array.from({ length: max }, (_, i) => ({
+    label: i === 0 ? '1 game' : `${i + 1} games`,
+    value: i + 1,
+  }));
+}
 
 const MIN_CAREER_GAMES_OPTIONS = [
   { label: 'Off', value: 0 },
@@ -121,6 +123,7 @@ const PLAYOFF_FORMAT_OPTIONS = [
  */
 export function LeagueSettingsControl({
   leagueId,
+  sport = 'baseball',
   draftStatus,
   currentGamesPerMatchup,
   currentSpStartsPerMatchup,
@@ -155,6 +158,10 @@ export function LeagueSettingsControl({
   );
   const [salaryCap, setSalaryCap] = useState<number | null>(currentSalaryCap);
   const [hasChanges, setHasChanges] = useState(false);
+
+  const resolvedSport = sport === 'football' ? 'football' : 'baseball';
+  const sportBounds = GAMES_PER_MATCHUP_BY_SPORT[resolvedSport];
+  const gamesPerMatchupOptions = buildGamesPerMatchupOptions(sportBounds.max);
 
   const isLocked = draftStatus === 'completed';
   const [updateLeagueSettings, { loading: saving }] =
@@ -526,7 +533,7 @@ export function LeagueSettingsControl({
               </Text>
             </YStack>
             <XStack gap="$2" flexWrap="wrap">
-              {GAMES_PER_MATCHUP_OPTIONS.map((option) => {
+              {gamesPerMatchupOptions.map((option) => {
                 const isSelected = gamesPerMatchup === option.value;
                 return (
                   <Button
@@ -583,47 +590,49 @@ export function LeagueSettingsControl({
               </Text>
             </YStack>
             <XStack gap="$2" flexWrap="wrap">
-              {GAMES_PER_MATCHUP_OPTIONS.filter(
-                (o) => o.value <= gamesPerMatchup,
-              ).map((option) => {
-                const isSelected = spStarts === option.value;
-                return (
-                  <Button
-                    key={option.value}
-                    size="$3"
-                    theme={isSelected ? 'active' : 'alt2'}
-                    backgroundColor={
-                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                    }
-                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                    borderWidth={1}
-                    borderRadius="$3"
-                    onPress={() => handleSpStartsChange(option.value)}
-                    disabled={saving}
-                    opacity={saving ? 0.5 : 1}
-                    icon={isSelected ? <Check size={14} /> : undefined}
-                    aria-pressed={isSelected}
-                    aria-label={`SP starts per matchup: ${option.label}`}
-                    hoverStyle={
-                      saving
-                        ? undefined
-                        : {
-                            backgroundColor: isSelected
-                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                              : '$gray4',
-                          }
-                    }
-                  >
-                    <Text
-                      fontSize="$2"
-                      fontWeight={isSelected ? '700' : '400'}
-                      color={isSelected ? 'white' : '$color'}
+              {gamesPerMatchupOptions
+                .filter((o) => o.value <= gamesPerMatchup)
+                .map((option) => {
+                  const isSelected = spStarts === option.value;
+                  return (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      theme={isSelected ? 'active' : 'alt2'}
+                      backgroundColor={
+                        isSelected
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                          : '$gray3'
+                      }
+                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                      borderWidth={1}
+                      borderRadius="$3"
+                      onPress={() => handleSpStartsChange(option.value)}
+                      disabled={saving}
+                      opacity={saving ? 0.5 : 1}
+                      icon={isSelected ? <Check size={14} /> : undefined}
+                      aria-pressed={isSelected}
+                      aria-label={`SP starts per matchup: ${option.label}`}
+                      hoverStyle={
+                        saving
+                          ? undefined
+                          : {
+                              backgroundColor: isSelected
+                                ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                : '$gray4',
+                            }
+                      }
                     >
-                      {option.label}
-                    </Text>
-                  </Button>
-                );
-              })}
+                      <Text
+                        fontSize="$2"
+                        fontWeight={isSelected ? '700' : '400'}
+                        color={isSelected ? 'white' : '$color'}
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  );
+                })}
             </XStack>
           </YStack>
 

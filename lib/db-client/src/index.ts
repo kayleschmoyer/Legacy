@@ -28,6 +28,7 @@ export * from './lib/validation/ValidationUtils';
 export * from './types';
 export * from './config/database';
 export * from './config/credentials';
+export * from './config/sports-config';
 
 // Database scripts (for CLI usage)
 export { resetDatabase } from './scripts/reset-database';

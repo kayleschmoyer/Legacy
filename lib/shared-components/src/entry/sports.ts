@@ -3,3 +3,4 @@
 // Usage: import { FootballScreen } from '@legacy-sports/shared-components/sports'
 export * from '../features/sports/SportHome';
 export * from '../features/sports/SportScreens';
+export * from '../config/sports';

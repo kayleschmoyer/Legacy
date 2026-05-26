@@ -50,3 +50,12 @@ export const DEFAULT_ROSTER_SIZE_BY_SPORT: Record<SportKind, number> = {
   baseball: 25,
   football: 16,
 };
+
+/** Per-sport gamesPerMatchup bounds. Football regular season cap: 17 games. */
+export const GAMES_PER_MATCHUP_BY_SPORT: Record<
+  SportKind,
+  { min: number; max: number; default: number }
+> = {
+  baseball: { min: 1, max: 162, default: 5 },
+  football: { min: 1, max: 17, default: 5 },
+};

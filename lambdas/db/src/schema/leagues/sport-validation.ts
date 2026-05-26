@@ -14,7 +14,10 @@
 
 export type { SportKind } from '@legacy-sports/utils';
 import type { SportKind } from '@legacy-sports/utils';
-export { DEFAULT_ROSTER_SIZE_BY_SPORT } from '@legacy-sports/utils';
+export {
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
+  GAMES_PER_MATCHUP_BY_SPORT,
+} from '@legacy-sports/utils';
 
 /** Era IDs that are valid for each sport. `all` and `custom` are shared. */
 export const VALID_ERAS_BY_SPORT: Record<SportKind, ReadonlySet<string>> = {
@@ -62,6 +65,20 @@ export const ROSTER_RANGE_BY_SPORT: Record<SportKind, RosterRange> = {
   baseball: { min: 15, max: 50 },
   football: { min: 10, max: 25 },
 };
+
+import { GAMES_PER_MATCHUP_BY_SPORT } from '@legacy-sports/utils';
+
+/** True when gamesPerMatchup is within the sport's allowed range. */
+export function isGamesPerMatchupValidForSport(
+  sport: SportKind,
+  gamesPerMatchup: number,
+): boolean {
+  const range = GAMES_PER_MATCHUP_BY_SPORT[sport];
+  return gamesPerMatchup >= range.min && gamesPerMatchup <= range.max;
+}
+
+/** Re-export for resolvers that need the bounds object (e.g. to build error messages). */
+export { GAMES_PER_MATCHUP_BY_SPORT as GAMES_PER_MATCHUP_RANGE_BY_SPORT } from '@legacy-sports/utils';
 
 /** Normalize an arbitrary input to a known SportKind, defaulting to baseball. */
 export function normalizeSport(value: string | null | undefined): SportKind {

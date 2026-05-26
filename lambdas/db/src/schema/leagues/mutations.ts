@@ -26,8 +26,10 @@ import {
 } from './types';
 import {
   DEFAULT_ROSTER_SIZE_BY_SPORT,
+  GAMES_PER_MATCHUP_RANGE_BY_SPORT,
   isEraFreeForSport,
   isEraValidForSport,
+  isGamesPerMatchupValidForSport,
   isPoolValidForSport,
   isRosterSizeValidForSport,
   normalizeSport,
@@ -91,6 +93,7 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       waiverType: t.string({ required: false }), // 'standard' | 'faab' (optional, defaults to 'standard')
       faabBudgetDefault: t.int({ required: false }), // Default FAAB budget per team (defaults to 100)
       startDate: t.string({ required: false }), // ISO date string
+      gamesPerMatchup: t.int({ required: false }), // per-sport max: baseball 162, football 17 (LS-4762)
       // ── Salary cap settings (LS-646) ─────────────────────────────────
       salaryCapEnabled: t.boolean({ required: false }),
       salaryCap: t.int({ required: false }),
@@ -227,6 +230,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         auctionBudget: inputAuctionBudget,
         auctionMinBid: inputAuctionMinBid,
         startDate: inputStartDate,
+        gamesPerMatchup: inputGamesPerMatchup,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -314,6 +318,16 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         const range = ROSTER_RANGE_BY_SPORT[resolvedSport];
         throw UserInputError(
           `Max roster size must be between ${range.min} and ${range.max} for ${resolvedSport} leagues.`,
+        );
+      }
+
+      if (
+        inputGamesPerMatchup != null &&
+        !isGamesPerMatchupValidForSport(resolvedSport, inputGamesPerMatchup)
+      ) {
+        const range = GAMES_PER_MATCHUP_RANGE_BY_SPORT[resolvedSport];
+        throw UserInputError(
+          `Games per matchup must be between ${range.min} and ${range.max} for ${resolvedSport} leagues.`,
         );
       }
 
@@ -450,6 +464,9 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           auctionBudget: inputAuctionBudget ?? 260,
           auctionMinBid: inputAuctionMinBid ?? 1,
           startDate: inputStartDate ?? undefined,
+          ...(inputGamesPerMatchup != null
+            ? { gamesPerMatchup: inputGamesPerMatchup }
+            : {}),
         });
 
         return result;
@@ -1438,13 +1455,32 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
       if (gamesPerMatchup !== null && gamesPerMatchup !== undefined) {
         if (gamesPerMatchup < 1) {
-          throw new Error('Games per matchup must be at least 1');
+          throw UserInputError('Games per matchup must be at least 1');
         }
 
-        // Validate pitcherStartsPerMatchup doesn't exceed new gamesPerMatchup
+        // Validate against per-sport max (football: 17, baseball: 162)
+        const [leagueForSport] = await context.db
+          .select({ sport: PublicSchema.leagues.sport })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+        if (!leagueForSport) {
+          throw UserInputError(`League ${leagueId} not found`);
+        }
+        const leagueSport = normalizeSport(leagueForSport.sport);
+        if (!isGamesPerMatchupValidForSport(leagueSport, gamesPerMatchup)) {
+          const range = GAMES_PER_MATCHUP_RANGE_BY_SPORT[leagueSport];
+          throw UserInputError(
+            `Games per matchup must be between ${range.min} and ${range.max} for ${leagueSport} leagues`,
+          );
+        }
+
+        // Validate spStartsPerMatchup doesn't exceed new gamesPerMatchup
         const effectiveSpStarts =
           pitcherStartsPerMatchup ?? leagueUpdate.pitcherStartsPerMatchup;
-        if (effectiveSpStarts === undefined) {
+        // Use == null to guard against both null and undefined so a null input
+        // does not silently skip the SP-starts cross-validation.
+        if (effectiveSpStarts == null) {
           // Need to fetch current pitcherStartsPerMatchup
           const current = await context.db
             .select({
@@ -1471,9 +1507,13 @@ builder.mutationField('updateLeagueSettings', (t) =>
             );
           }
         } else {
-          if (effectiveSpStarts > gamesPerMatchup) {
-            throw new Error(
-              `Games per matchup (${gamesPerMatchup}) cannot be less than SP starts per matchup (${effectiveSpStarts})`,
+          if (
+            effectiveSpStarts !== null &&
+            effectiveSpStarts !== undefined &&
+            effectiveSpStarts > gamesPerMatchup
+          ) {
+            throw UserInputError(
+              'Pitcher starts per matchup cannot exceed games per matchup',
             );
           }
 

@@ -6,13 +6,18 @@ import {
   updateMatchupScore,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { UserInputError } from '../errors';
 import {
   calculateMatchupScore,
   getDefaultScoringSettings,
   type PlayerGameStats,
   type ScoringSettings,
 } from '@legacy-sports/scoring';
-import { cryptoRandomFloat, cryptoRandomInt } from '@legacy-sports/utils';
+import {
+  cryptoRandomFloat,
+  cryptoRandomInt,
+  GAMES_PER_MATCHUP_BY_SPORT,
+} from '@legacy-sports/utils';
 import {
   and,
   eq,
@@ -700,6 +705,26 @@ export async function selectGamesForMatchup(
   const pitcherStartsPerMatchup = matchup.pitcherStartsPerMatchup ?? 1;
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 5;
   const gamesRemainingInMatchup = gamesPerMatchup - gameNumber + 1;
+
+  // AC4: validate gamesPerMatchup against per-sport cap (football: 17, baseball: 162).
+  // Treat an out-of-range value as a configuration error — never silently truncate.
+  const [leagueRow] = await db
+    .select({ sport: PublicSchema.leagues.sport })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, matchup.leagueId))
+    .limit(1);
+  if (!leagueRow) {
+    throw new UserInputError(
+      `League ${matchup.leagueId} not found for matchup ${matchupId}`,
+    );
+  }
+  const sport = leagueRow.sport ?? 'baseball';
+  const sportMaxGames = GAMES_PER_MATCHUP_BY_SPORT[sport]?.max ?? 162;
+  if (gamesPerMatchup > sportMaxGames) {
+    throw new UserInputError(
+      `gamesPerMatchup ${gamesPerMatchup} exceeds the ${sport} maximum of ${sportMaxGames} for matchup ${matchupId}`,
+    );
+  }
 
   LOGGER.info(
     `Selecting games for matchup ${matchupId}, game ${gameNumber} ` +
