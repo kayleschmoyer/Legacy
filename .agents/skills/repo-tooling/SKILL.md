@@ -32,7 +32,7 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 | Build (affected)    | `make build`                          | Build changed projects                                                                                   |
 | Codegen             | `make codegen`                        | GraphQL type generation                                                                                  |
 | DB migration status | `db_migration_status` (MCP)           | Check for pending migrations                                                                             |
-| DB migrate (MCP)    | `db_migrate` (MCP)                    | Apply pending migrations                                                                                 |
+| DB migrate (MCP)    | `db_migrate` (MCP)                    | Apply pending migrations — see `/database` skill for full procedure                                      |
 | DB migrate (shell)  | `make db-migrate`                     | Shell fallback / non-MCP envs                                                                            |
 | Full pre-commit     | `make pc`                             | typecheck + lint + test + build                                                                          |
 | Test all            | `make test-all`                       | All projects, not just affected                                                                          |

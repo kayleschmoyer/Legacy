@@ -1,9 +1,4 @@
----
-name: database
-description: 'Database operations: MCP tools (primary), migrations, queries, schema reference, dump/restore. Load when checking migration status, running SQL, writing migrations, dumping/restoring data, or verifying database health.'
----
-
-# Skill: Database Operations
+# Database Operations Reference
 
 ## Overview
 
