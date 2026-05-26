@@ -55,6 +55,12 @@ import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
 import { handleReportToJiraEpic } from './commands/reportToJiraEpic';
 import { handleSeedDisclosureFacts } from './commands/seedDisclosureFacts';
+import { handleLoadFootballCareer } from './commands/loadFootballCareer';
+import { handleGetPlayerFootballPassing } from './commands/getPlayerFootballPassing';
+import { handleGetPlayerFootballRushing } from './commands/getPlayerFootballRushing';
+import { handleGetPlayerFootballReceiving } from './commands/getPlayerFootballReceiving';
+import { handleGetPlayerFootballKicking } from './commands/getPlayerFootballKicking';
+import { handleGetPlayerFootballDefense } from './commands/getPlayerFootballDefense';
 
 // Initialize Rollbar for CLI
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -673,6 +679,93 @@ export function buildProgram(): Command {
         'The seed is idempotent — safe to re-run.',
     )
     .action(() => handleSeedDisclosureFacts());
+
+  program
+    .command('load-football-career')
+    .description(
+      'Load career stats from Pro Football Reference into career_football_* tables. ' +
+        'Accepts --player-id for a single player, --all for all football players, ' +
+        'or --batch <file> for a newline-delimited list of player IDs.',
+    )
+    .option(
+      '--player-id <id>',
+      'Load career stats for a single player ID',
+      parseInt,
+    )
+    .option('--all', 'Load career stats for all football players')
+    .option(
+      '--batch <file>',
+      'Load career stats for player IDs listed in a file (one per line)',
+    )
+    .option(
+      '--start-season <year>',
+      'Override start year for PFR season scan (default: 1970)',
+      parseInt,
+    )
+    .action(
+      (options: {
+        playerId?: number;
+        all?: boolean;
+        batch?: string;
+        startSeason?: number;
+      }) =>
+        handleLoadFootballCareer({
+          playerId: options.playerId,
+          all: options.all,
+          batch: options.batch,
+          startSeason: options.startSeason,
+        }),
+    );
+
+  program
+    .command('get-player-passing')
+    .description(
+      'Print career passing stats (career_football_passing) for a football player',
+    )
+    .option('--player-id <id>', 'Player ID', parseInt)
+    .action((options: { playerId?: number }) =>
+      handleGetPlayerFootballPassing(options),
+    );
+
+  program
+    .command('get-player-rushing')
+    .description(
+      'Print career rushing stats (career_football_rushing) for a football player',
+    )
+    .option('--player-id <id>', 'Player ID', parseInt)
+    .action((options: { playerId?: number }) =>
+      handleGetPlayerFootballRushing(options),
+    );
+
+  program
+    .command('get-player-receiving')
+    .description(
+      'Print career receiving stats (career_football_receiving) for a football player',
+    )
+    .option('--player-id <id>', 'Player ID', parseInt)
+    .action((options: { playerId?: number }) =>
+      handleGetPlayerFootballReceiving(options),
+    );
+
+  program
+    .command('get-player-kicking')
+    .description(
+      'Print career kicking stats (career_football_kicking) for a football player',
+    )
+    .option('--player-id <id>', 'Player ID', parseInt)
+    .action((options: { playerId?: number }) =>
+      handleGetPlayerFootballKicking(options),
+    );
+
+  program
+    .command('get-player-defense')
+    .description(
+      'Print career defense stats (career_football_defense or career_football_defense_idp) for a football player',
+    )
+    .option('--player-id <id>', 'Player ID', parseInt)
+    .action((options: { playerId?: number }) =>
+      handleGetPlayerFootballDefense(options),
+    );
 
   program
     .command('cleanup-test-leagues')

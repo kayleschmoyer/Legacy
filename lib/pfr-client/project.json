@@ -1,0 +1,12 @@
+{
+  "name": "pfr-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/pfr-client/src",
+  "projectType": "library",
+  "tags": ["platform:node", "scope:lib", "type:util"],
+  "targets": {
+    "typecheck": {},
+    "lint": {},
+    "test": {}
+  }
+}

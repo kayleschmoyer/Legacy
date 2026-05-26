@@ -17,8 +17,8 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { isNflSeason } from '@legacy-sports/utils';
 
-import { type Context } from '../builder';
 import { assertAuthorized } from './system-auth';
+import { type Context } from '../builder';
 import { builder } from '../builder';
 
 // ── Shared result type ────────────────────────────────────────────────────────

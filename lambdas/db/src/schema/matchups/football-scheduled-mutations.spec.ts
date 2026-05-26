@@ -49,11 +49,11 @@ jest.mock('@legacy-sports/db-client', () => ({
 
 import { isNflSeason } from '@legacy-sports/utils';
 
-import { type Context } from '../builder';
 import {
   resolveRefreshFootballCareerStats,
   resolveRefreshFootballWeeklySeasonStats,
 } from './football-scheduled-mutations';
+import { type Context } from '../builder';
 
 const mockIsNflSeason = isNflSeason as jest.MockedFunction<typeof isNflSeason>;
 
