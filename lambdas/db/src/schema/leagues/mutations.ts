@@ -471,17 +471,22 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
         return result;
       } catch (error) {
-        LOGGER.error('Error creating league and teams', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          userId: context.user?.id,
-          leagueName,
-          numberOfTeams,
-          playerPool,
-          draftMode,
-          selectionMethod,
-          draftOrder,
-        });
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        LOGGER.error(
+          'Error creating league and teams',
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            userId: context.user?.id,
+            leagueName,
+            numberOfTeams,
+            playerPool,
+            draftMode,
+            selectionMethod,
+            draftOrder,
+          },
+        );
 
         if (error instanceof Error) {
           throw new Error(

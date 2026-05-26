@@ -17,6 +17,7 @@ describe('League Mutations', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
@@ -376,10 +377,10 @@ describe('League Mutations', () => {
       // Non-admin users can delete their own leagues (where they are the owner)
       const mockLeagues = [{ id: 1 }, { id: 2 }];
 
-      // Select chain: .select().from() returns the query builder,
-      // then .where() resolves to the filtered list of owned leagues
+      // Select chain: .select().from().innerJoin().where() resolves to the filtered list
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockReturnValueOnce(mockDb);
+      mockDb.innerJoin.mockReturnValueOnce(mockDb);
       mockDb.where.mockResolvedValueOnce(mockLeagues);
 
       // Mock delete operations (these return mockDb for chaining)
@@ -413,12 +414,14 @@ describe('League Mutations', () => {
         db: mockDb,
       };
 
-      // Admins get all leagues without a WHERE filter — the select chain ends at
-      // .from() which resolves directly to the array
+      // Admins get all leagues without a WHERE filter on owner — the select chain
+      // goes through .innerJoin() and resolves at .where() (which receives undefined)
       const mockLeagues = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockResolvedValueOnce(mockLeagues);
+      mockDb.from.mockReturnValueOnce(mockDb);
+      mockDb.innerJoin.mockReturnValueOnce(mockDb);
+      mockDb.where.mockResolvedValueOnce(mockLeagues);
 
       // Mock delete operations (these return mockDb for chaining)
       mockDb.delete.mockReturnValue(mockDb);

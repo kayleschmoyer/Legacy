@@ -11,6 +11,7 @@ import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import type { SportKind } from '@legacy-sports/utils/positions';
 import {
   getDiscordWebhookUrls,
   notifyDiscordWaiverClaim,
@@ -28,7 +29,6 @@ import {
   validateFaabBudget,
 } from '../schema/waivers/helpers';
 import { assertSportCompatibility } from '../schema/sport-eligibility';
-import type { SportKind } from '@legacy-sports/utils/positions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
