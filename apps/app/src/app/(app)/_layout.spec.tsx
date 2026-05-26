@@ -361,6 +361,11 @@ jest.mock('./baseball/team/[teamId]', () => ({
   default: () => 'Team',
   TeamIdHeader: () => 'Team',
 }));
+jest.mock('./football/team/[teamId]', () => ({
+  __esModule: true,
+  default: () => 'FootballTeam',
+  FootballTeamHeader: () => 'FootballTeam',
+}));
 
 // ── Expected data ────────────────────────────────────────────────────────────
 

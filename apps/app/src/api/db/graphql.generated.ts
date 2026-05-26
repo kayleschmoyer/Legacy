@@ -4633,6 +4633,7 @@ export type LeagueFragment = {
   waiverEnabled?: boolean | null;
   waiverType?: string | null;
   sport?: Sport | null;
+  defensiveFormat?: DefensiveFormat | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -4682,6 +4683,7 @@ export type GetLeagueByIdQuery = {
     waiverEnabled?: boolean | null;
     waiverType?: string | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4719,6 +4721,7 @@ export type CreateLeagueMutation = {
       waiverEnabled?: boolean | null;
       waiverType?: string | null;
       sport?: Sport | null;
+      defensiveFormat?: DefensiveFormat | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -4764,6 +4767,7 @@ export type GetUserLeaguesQuery = {
     waiverEnabled?: boolean | null;
     waiverType?: string | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4804,6 +4808,7 @@ export type StartDraftMutation = {
     waiverEnabled?: boolean | null;
     waiverType?: string | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -6391,6 +6396,7 @@ export const LeagueFragmentDoc = gql`
     waiverEnabled
     waiverType
     sport
+    defensiveFormat
     userMembership {
       ...LeagueMember
     }

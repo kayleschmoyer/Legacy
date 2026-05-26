@@ -29,6 +29,7 @@ import JoinLeagueByCode from './baseball/league/join';
 import JoinFootballLeagueByCode from './football/league/join';
 import MatchupDetail from './baseball/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
+import FootballTeam, { FootballTeamHeader } from './football/team/[teamId]';
 import FreeAgents from './FreeAgents';
 import TradeCenterPage from './TradeCenterPage';
 import DirectMessagesScreen from './DirectMessages';
@@ -75,6 +76,7 @@ export type AppDrawerParamList = {
   PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
+  'football/team/[teamId]': { teamId: string };
   DirectMessages: undefined;
   management: undefined;
   about: undefined;
@@ -360,6 +362,15 @@ export default function Layout() {
               headerTitle: () => <TeamIdHeader />,
             }}
             component={Team}
+          />
+          <Screen
+            name="football/team/[teamId]"
+            options={{
+              drawerLabel: () => null,
+              headerShown: true,
+              headerTitle: () => <FootballTeamHeader />,
+            }}
+            component={FootballTeam}
           />
           <Screen
             name="DraftBoardPage"
