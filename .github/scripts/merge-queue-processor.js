@@ -76,24 +76,41 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     );
   }
 
-  // Get PRs with merge-when-ready label (or all if force_check is true)
-  // Use paginate to fetch ALL open PRs (default page size is 30)
-  const allPRs = await github.paginate(github.rest.pulls.list, {
-    owner,
-    repo,
-    state: 'open',
-    per_page: 100,
-  });
-
-  const mergeReadyPRs = forceCheck
-    ? allPRs
-    : allPRs.filter((pr) =>
-        pr.labels.some((label) => label.name === 'merge-when-ready'),
-      );
-
-  console.log(
-    `📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label (from ${allPRs.length} open)`,
-  );
+  // Get PRs with merge-when-ready label (or all if force_check is true).
+  // Normal path: label-filtered single-page fetch — avoids paginating all open PRs
+  // on every queue run, which was the top consumer of GitHub App rate-limit budget.
+  // forceCheck path: still paginates all open PRs so every PR is evaluated.
+  let mergeReadyPRs;
+  if (forceCheck) {
+    const allPRs = await github.paginate(github.rest.pulls.list, {
+      owner,
+      repo,
+      state: 'open',
+      per_page: 100,
+    });
+    mergeReadyPRs = allPRs;
+    console.log(
+      `📋 Force-check mode: evaluating all ${mergeReadyPRs.length} open PRs`,
+    );
+  } else {
+    // issues.listForRepo supports label filtering, so we only fetch labeled
+    // items instead of all open PRs. Paginate to handle edge cases where
+    // more than 100 PRs carry the label. It returns both Issues and PRs;
+    // filter to PRs only (PR entries carry a pull_request field with href/merged_at).
+    const labeledItems = await github.paginate(github.rest.issues.listForRepo, {
+      owner,
+      repo,
+      labels: 'merge-when-ready',
+      state: 'open',
+      per_page: 100,
+    });
+    mergeReadyPRs = labeledItems.filter(
+      (item) => item.pull_request !== undefined,
+    );
+    console.log(
+      `📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label`,
+    );
+  }
 
   let hasPendingPRs = false;
 

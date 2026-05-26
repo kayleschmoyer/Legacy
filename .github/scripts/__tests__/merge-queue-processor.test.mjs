@@ -40,6 +40,9 @@ function makePR(overrides = {}) {
     head: { sha: HEAD_SHA, ref: 'feature/test' },
     labels: [{ name: 'merge-when-ready' }],
     user: { login: 'test-author' },
+    // issues.listForRepo returns both issues and PRs; PRs carry a pull_request
+    // field (plain issues do not), which the processor uses to filter PR entries.
+    pull_request: { url: '', merged_at: null },
     ...overrides,
   };
 }
