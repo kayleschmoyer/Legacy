@@ -1,6 +1,6 @@
-# Common Copilot Review Patterns
+# Common Review Patterns
 
-These issues appear in 80%+ of Copilot reviews. Knowing them speeds up fixes.
+These issues appear repeatedly in reviewer bot CHANGES_REQUESTED cycles. Knowing them eliminates most review cycles. Patterns #1–28 were cataloged from earlier analysis; #29–43 from 100-PR analysis (May 2026, 47/100 PRs affected).
 
 ## Pattern Summary
 
@@ -34,7 +34,22 @@ These issues appear in 80%+ of Copilot reviews. Knowing them speeds up fixes.
 | 26  | `throw new Error()` in GraphQL resolver for input validation     | Use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`                                   | `lint-review-patterns` |
 | 27  | `localStorage`/`sessionStorage` write without try/catch          | Wrap in try/catch — storage throws in private mode and on quota exceeded                              | `lint-review-patterns` |
 | 28  | Unsafe `as 'literal-union'` cast on unvalidated external data    | Use type guard with allowed-values array instead of bare `as` assertion                               | Manual                 |
-| 29  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge | Manual                 |
+| 29  | ⭐ LOGGER.error/warn non-Error 2nd arg (13/100 PRs)              | Pass raw `Error` instance as 2nd arg; extra context goes in 3rd arg                                   | `lint-review-patterns` |
+| 30  | Missing/incomplete test coverage for new logic                   | Every new component/resolver/mutation/bug-fix needs a spec covering the changed behavior              | Manual                 |
+| 31  | PR description does not match diff                               | Read your diff before pushing; explain all generated-file changes                                     | Manual                 |
+| 32  | Missing range/null validation on GraphQL mutation arguments      | Guard numeric ranges, null/undefined, and enum values with `UserInputError`                           | Manual                 |
+| 33  | Loading state not reset after mutation failure                   | Use `finally { setLoading(false) }` — not only in success path                                        | Manual                 |
+| 34  | Missing authorization check (auth ≠ authz)                       | After auth check, also verify user membership/ownership of the requested resource                     | Manual                 |
+| 35  | Drizzle `integer` for BIGINT column (overflow)                   | Use `bigint('col', { mode: 'number' })` for DB BIGINT columns                                         | Manual                 |
+| 36  | Multi-column sort with single-column cursor                      | Cursor must encode all `orderBy` columns, not just `id`                                               | Manual                 |
+| 37  | Weak test assertions (`toBeDefined()` instead of value)          | Assert the concrete expected value, not just existence                                                | Manual                 |
+| 38  | Duplicate constant across packages (DRY violation)               | Define once in a shared lib; import everywhere                                                        | Manual                 |
+| 39  | ⚠️ Committed symlink / local absolute path                       | Check `file <new-file>` before staging; add to `.gitignore`                                           | Manual                 |
+| 40  | `console.*` / `process.stdout.write` in app code                 | Use `LOGGER` from `@legacy-sports/logging` (exceptions: CLI, migrations, build scripts)               | ESLint                 |
+| 41  | Error message leaked to UI                                       | Show generic string to user; log real error with `LOGGER.error`                                       | Manual                 |
+| 42  | Terraform resource rename without `moved {}` block               | Add `moved { from = old.name; to = new.name }` to avoid destroy+recreate                              | Manual                 |
+| 43  | Shell variable empty after `\|\| true` pattern                   | Provide explicit fallback: `cmd \| echo "default"`                                                    | Manual                 |
+| 44  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge | Manual                 |
 
 ## Pattern Details
 
@@ -307,3 +322,332 @@ const order: DraftOrder = args.draftOrder as DraftOrder; // safe after guard
 ```
 
 > Full coding standards catalog: [../../standards/references/standards-catalog.md](../../standards/references/standards-catalog.md)
+
+---
+
+## Patterns from 100-PR Analysis (May 2026)
+
+These patterns were identified by analyzing reviewer bot CHANGES_REQUESTED findings across 100 consecutive merged PRs. 47 of 100 PRs triggered at least one review cycle; these patterns account for 78% of all issues. They are ordered by frequency.
+
+### #29 — LOGGER.error/warn called with non-Error second argument ⭐ (most frequent: 13/100 PRs)
+
+The `RollbarOutputDestination` scans arguments for `instanceof Error` to capture stack traces. Any non-Error second argument causes Rollbar to synthesize a generic error with no stack. This includes wrapping the error in an object, passing `err.message` (string), or passing a named shorthand `{ err }`.
+
+```typescript
+// All wrong — Rollbar loses the stack trace
+LOGGER.error('Failed', { err }); // named shorthand wraps Error in object
+LOGGER.error('Failed', { error: err }); // named key wraps Error in object
+LOGGER.error('Failed', { error: err.message }); // string, not Error
+LOGGER.error('Failed', err.message); // string, not Error
+LOGGER.warn('Something odd', { err }); // same issue applies to LOGGER.warn
+
+// Correct — pass the Error instance directly as the second argument
+LOGGER.error('Failed', err as Error);
+LOGGER.error('Failed', err as Error, { userId }); // extra context as third arg is fine
+LOGGER.warn('Something odd', err as Error);
+```
+
+**Rule**: the second argument to `LOGGER.error` / `LOGGER.warn` must always be the raw `Error` instance (or omitted). Extra context goes in the _third_ argument as a plain object.
+
+### #30 — Missing or incomplete test coverage for new logic
+
+Shipping new mutations, resolvers, components, or bug fixes without tests — or with tests that only cover the happy path / input validation, not the behavior actually changed.
+
+Sub-patterns caught repeatedly:
+
+- **New component with filtering/search/pagination logic and no spec file** — every new component that has more than simple rendering needs a spec
+- **Bug fix where tests only cover input validation, not the fixed behavior** — if the fix is "wrap in a transaction", the test must assert transactional behavior, not just that bad input rejects
+- **New mutation with no unauthenticated (`user: null`) test** — see #4 above; applies to every new resolver/mutation, not just public ones
+- **New route component with data-fetching logic and no tests** — even if the route renders a child component, the routing/loading/error states need coverage
+
+### #31 — PR description does not match the diff
+
+The reviewer bot reads the PR description as a contract and flags discrepancies. Common triggers:
+
+- Description says `SomeComponent.spec.tsx` was updated; diff shows no change to that file
+- Description claims a dynamic `require()` was used; diff shows a static `import`
+- Generated `*.generated.ts` files changed but PR description has no explanation
+- PR touches multi-file functionality but description only mentions one file
+
+**Rule**: before pushing, read your own diff and verify each claim in the PR description is accurate. When generated files change (even unexpectedly from a rebase), note it in the description.
+
+### #32 — Missing range/null validation on GraphQL mutation arguments
+
+Mutation arguments used directly without range checks allow malformed inputs to reach business logic. The bot flags this as a security/contract violation.
+
+```typescript
+// Bad — negative numTeams, out-of-range pickPosition, null values all reach the DB
+async initializeMockDraft(_, args: { numTeams: number; userPickPosition: number; pickTimeLimit: number }) {
+  return initDraft(args.numTeams, args.userPickPosition, args.pickTimeLimit);
+}
+
+// Good — validate before use
+if (args.numTeams < 2 || args.numTeams > 20) {
+  throw new UserInputError('numTeams must be between 2 and 20');
+}
+if (args.userPickPosition < 1 || args.userPickPosition > args.numTeams) {
+  throw new UserInputError('userPickPosition out of range');
+}
+```
+
+Also applies to:
+
+- Optional fields that can be `null`/`undefined` — guard before use: `if (args.pitcherStarts == null)` not `if (!args.pitcherStarts)`
+- Enum-style string arguments — validate against the allowed set with `UserInputError` (see #26, #28)
+- CLI flags that accept file paths — guard against `../` traversal with `path.resolve` + prefix check
+
+### #33 — Loading state not reset after mutation failure
+
+When a mutation fails, UI loading state must be reset to `false` so the user can retry. The bot caught multiple cases where `setLoading(false)` was present only in the success path.
+
+```typescript
+// Bad — button stays disabled forever after a failure
+const handleSubmit = async () => {
+  setLoading(true);
+  try {
+    await myMutation();
+    setLoading(false); // only on success
+  } catch (err) {
+    LOGGER.error('Mutation failed', err as Error);
+    // loading stays true — user can never retry
+  }
+};
+
+// Good
+const handleSubmit = async () => {
+  setLoading(true);
+  try {
+    await myMutation();
+  } catch (err) {
+    LOGGER.error('Mutation failed', err as Error);
+    setError('Something went wrong. Please try again.');
+  } finally {
+    setLoading(false); // always reset
+  }
+};
+```
+
+### #34 — Missing authorization check (authentication ≠ authorization)
+
+Checking that a user is logged in is not sufficient — every resolver that accepts a `leagueId` or resource ID must also verify that the authenticated user has access to that specific resource.
+
+```typescript
+// Bad — any authenticated user can read any league's matchup data
+async matchupScores(_, { leagueId }, { user }) {
+  if (!user) throw new AuthenticationError('Not authenticated');
+  return getMatchupScores(leagueId); // no membership check
+}
+
+// Good
+async matchupScores(_, { leagueId }, { user }) {
+  if (!user) throw new AuthenticationError('Not authenticated');
+  const member = await getLeagueMember(leagueId, user.id);
+  if (!member) throw new ForbiddenError('Not a member of this league');
+  return getMatchupScores(leagueId);
+}
+```
+
+**When to check**: any resolver that takes a `leagueId`, `teamId`, `draftId`, or similar resource identifier.
+
+### #35 — Wrong numeric type in Drizzle schema (integer vs bigint)
+
+Using `integer` for columns that are `BIGINT` in the database silently overflows for large stat aggregates (career totals, etc.). Use the matching Drizzle type.
+
+```typescript
+// Bad — BIGINT column mapped as integer (silent overflow for values > 2^31)
+export const careerStats = pgTable('career_stats', {
+  totalTackles: integer('total_tackles'),
+  soloTackles: integer('solo_tackles'),
+});
+
+// Good
+export const careerStats = pgTable('career_stats', {
+  totalTackles: bigint('total_tackles', { mode: 'number' }),
+  soloTackles: bigint('solo_tackles', { mode: 'number' }),
+});
+```
+
+Also: when adding a `NOT NULL DEFAULT false` column, type it as `boolean` (not `Maybe<boolean>`) in the Drizzle model — the schema guarantees it is never null.
+
+### #36 — Multi-column sort with single-column cursor pagination
+
+When a query sorts by multiple columns, the `after` cursor must include all sort columns — not just `id`. A cursor filtering only on `id` skips or duplicates records across pages when rows share the same leading sort values.
+
+```typescript
+// Bad — sorts by (lastName, firstName, id) but cursor only filters by id
+const players = await db
+  .select()
+  .from(footballPlayers)
+  .orderBy(asc(lastName), asc(firstName), desc(id))
+  .where(after ? lt(id, after) : undefined); // cursor misses lastName/firstName tiebreaks
+
+// Good — cursor encodes all sort columns
+const players = await db
+  .select()
+  .from(footballPlayers)
+  .orderBy(asc(lastName), asc(firstName), desc(id))
+  .where(
+    after
+      ? or(
+          gt(lastName, after.lastName),
+          and(eq(lastName, after.lastName), gt(firstName, after.firstName)),
+          and(
+            eq(lastName, after.lastName),
+            eq(firstName, after.firstName),
+            lt(id, after.id),
+          ),
+        )
+      : undefined,
+  );
+```
+
+### #37 — Weak test assertions (`toBeDefined()` instead of checking the value)
+
+Tests that only assert a variable is defined pass even when the actual value is wrong. Always assert the concrete expected value.
+
+```typescript
+// Bad — passes even if scoringFormat is 'standard' or undefined
+expect(mutationInput).toBeDefined();
+expect(mutationInput.scoringFormat).toBeDefined();
+
+// Good — asserts the actual value being tested
+expect(mutationInput.scoringFormat).toBe('half_ppr');
+```
+
+Also: off-by-one in depth/truncation tests — if `maxDepth` means "truncate at this depth", assert truncation _at_ `maxDepth`, not `maxDepth - 1`.
+
+For E2E feature-flag fixtures: avoid unconditionally mocking flags to `true` — at minimum have one test exercising the flag-disabled path.
+
+### #38 — Duplicate constants across packages (DRY violation)
+
+Constants like sport defaults, position maps, and roster sizes that appear in more than one package create silent drift. The bot flags these as DRY violations requiring extraction to a shared lib.
+
+```typescript
+// Bad — same constant defined in three places
+// lambdas/db/src/schema/leagues/sport-validation.ts
+const DEFAULT_ROSTER_SIZE_BY_SPORT = { baseball: 25, football: 15 };
+
+// lib/db-client/src/lib/services/LeagueService.ts
+const DEFAULT_ROSTER_SIZE_BY_SPORT = { baseball: 25, football: 15 };
+
+// lib/shared-components/src/config/sports.ts
+const DEFAULT_ROSTER_SIZE_BY_SPORT = { baseball: 25, football: 15 };
+
+// Good — define once in lib/shared-components or lib/utils, import everywhere
+import { DEFAULT_ROSTER_SIZE_BY_SPORT } from '@legacy-sports/shared-components/config/sports';
+```
+
+**When to check**: any time you copy a constant from another file rather than importing it. If the receiving package can't import the source package, the constant belongs in a lower-level shared lib.
+
+### #39 — Committed local path / symlink artifact (**CRITICAL**)
+
+Committing a file that is a symlink pointing to an absolute local path (e.g. `D:/code/legacy-sports/certs`) or that embeds a hardcoded local path breaks CI and every other contributor's environment.
+
+```bash
+# Check before committing any new files:
+git status --short          # look for unexpectedly tracked files
+file <new-file>             # on Linux/Mac: reveals if it's a symlink
+ls -la <new-file>           # shows symlink target
+```
+
+If `git diff --staged` shows a new file entry that is a symlink or contains a Windows absolute path, **remove it from staging** (`git restore --staged <file>`) and add it to `.gitignore`.
+
+### #40 — `console.*` / `process.stdout.write` in application code
+
+All application code (lambdas, resolvers, services, React components, libraries) must use `LOGGER` from `@legacy-sports/logging`. The only exceptions are: `lib/logging/` itself, `apps/cli/`, `lib/db-client/src/cli/`, `lib/db-client/src/scripts/`, migration files, and build-time scripts.
+
+```typescript
+// Bad — in a lambda handler, resolver, or shared lib
+console.log('Processing event', event);
+console.error('Failed to load config', err);
+process.stdout.write(JSON.stringify(result) + '\n');
+
+// Good
+import { LOGGER } from '@legacy-sports/logging';
+LOGGER.info('Processing event', { event });
+LOGGER.error('Failed to load config', err as Error);
+```
+
+**When to check**: any new file in `lambdas/`, `lib/` (non-CLI), or `apps/web/`. `make pc` will catch `console.*` via ESLint but not `process.stdout.write` — check manually in new files.
+
+### #41 — Error message leaked directly to UI
+
+Internal error messages (from DB queries, GraphQL mutations, external APIs) contain stack traces, query details, or internal paths that must not be shown to users.
+
+```typescript
+// Bad — leaks internal mutation error detail to the UI
+const [doMutation] = useMutation(MY_MUTATION);
+const handleClick = async () => {
+  const result = await doMutation();
+  if (result.errors) {
+    setError(result.errors[0].message); // leaks "Could not find league with id=123 in table..."
+  }
+};
+
+// Good — show a safe generic message; log the real error
+if (result.errors) {
+  LOGGER.error('Mutation failed', new Error(result.errors[0].message));
+  setError('Something went wrong. Please try again.');
+}
+```
+
+### #42 — Terraform resource rename without `moved {}` block
+
+Renaming a Terraform resource (e.g. `aws_sqs_queue.old_name` → `aws_sqs_queue.new_name`) causes Terraform to destroy and recreate it, even if the underlying infrastructure is unchanged. Use a `moved {}` block to preserve state.
+
+```hcl
+# Bad — plan will show: -/+ aws_sqs_queue.old_name (destroy and recreate)
+resource "aws_sqs_queue" "new_name" { ... }
+
+# Good — state is preserved, no destroy
+moved {
+  from = aws_sqs_queue.old_name
+  to   = aws_sqs_queue.new_name
+}
+resource "aws_sqs_queue" "new_name" { ... }
+```
+
+**When to check**: any rename of a Terraform resource or module block address. See `.agents/skills/terraform-permission-planning/SKILL.md`.
+
+### #43 — Shell variable left empty on command failure (GHA scripts)
+
+Wrapping a command with `|| true` suppresses the exit code but leaves the variable as an empty string. Downstream string comparisons then silently misbehave.
+
+```bash
+# Bad — HAS_LABEL is "" on jq failure, not "0"
+HAS_LABEL=$(jq -r '...' <<< "$LABELS" 2>/dev/null || true)
+if [[ "$HAS_LABEL" == "0" ]]; then ...  # never true when jq fails
+
+# Good — provide an explicit fallback
+HAS_LABEL=$(jq -r '...' <<< "$LABELS" 2>/dev/null) || HAS_LABEL="0"
+# or
+HAS_LABEL=$(jq -r '...' <<< "$LABELS" 2>/dev/null || echo "0")
+```
+
+Also applies to unquoted variables in `for` loops — `for f in $pattern` expands globs and splits on spaces; quote: `for f in "$pattern"` or use an array.
+
+---
+
+## Quick Self-Review Checklist (all patterns)
+
+Before every push, scan your diff against this checklist:
+
+| Check                                                                                  | Patterns      |
+| -------------------------------------------------------------------------------------- | ------------- |
+| Every `LOGGER.error`/`.warn` call passes a raw `Error` as the 2nd arg                  | #29           |
+| Every new component/resolver/mutation/bug-fix has a spec covering the changed behavior | #30           |
+| PR description accurately describes the diff (no missing files, no wrong filenames)    | #31           |
+| Generated `*.generated.ts` changes are explained in the PR body                        | #16, #31      |
+| GraphQL mutation args have range/null/enum validation with `UserInputError`            | #26, #28, #32 |
+| `setLoading(false)` (and equivalent) resets in `finally`, not only in success path     | #33           |
+| Every resolver that takes a resource ID checks membership/ownership, not just auth     | #4, #34       |
+| Drizzle BIGINT columns use `bigint()`, not `integer()`                                 | #35           |
+| Multi-column `orderBy` cursors encode all sort columns                                 | #36           |
+| Test assertions check concrete values, not just `toBeDefined()`                        | #37           |
+| No constant duplicated across packages — import from shared lib                        | #38           |
+| No committed symlinks or files containing `D:/` / `C:/` local paths                    | #39           |
+| No `console.*` or `process.stdout.write` in non-CLI app code                           | #40           |
+| Error messages shown to users are generic strings, not `err.message`                   | #41           |
+| Terraform resource renames use `moved {}` blocks                                       | #42           |
+| Shell variables have explicit fallbacks after `\|\| true` patterns                     | #43           |
+| No `@ts-ignore` or `eslint-disable` (fix root cause instead)                           | standards     |
