@@ -30,7 +30,11 @@ beforeEach(() => mockedAxiosGet.mockReset());
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function makeAxiosError(status?: number, retryAfter?: string): AxiosError {
+function makeAxiosError(
+  status?: number,
+  retryAfter?: string,
+  code?: string,
+): AxiosError {
   const err = new AxiosError(
     status !== undefined ? `HTTP ${status}` : 'Network Error',
   );
@@ -45,7 +49,14 @@ function makeAxiosError(status?: number, retryAfter?: string): AxiosError {
       },
     });
   }
+  if (code !== undefined) {
+    Object.assign(err, { code });
+  }
   return err;
+}
+
+function makeTimeoutError(): AxiosError {
+  return makeAxiosError(undefined, undefined, 'ECONNABORTED');
 }
 
 const BDL_RESPONSE = {
@@ -89,6 +100,12 @@ const BDL_RESPONSE = {
 describe('isRetryableError', () => {
   it('returns true for a network error (no response)', () => {
     expect(isRetryableError(makeAxiosError())).toBe(true);
+  });
+
+  it('returns false for a timeout error (ECONNABORTED)', () => {
+    // Retrying immediately after a 10 s timeout will also timeout; three
+    // attempts back-to-back exceed Lambda's 30 s limit → 502 (LS-4856).
+    expect(isRetryableError(makeTimeoutError())).toBe(false);
   });
 
   it('returns true for status 429', () => {
@@ -265,5 +282,41 @@ describe('BallDontLieProvider.getScoreboard', () => {
       'HTTP 429',
     );
     expect(mockedAxiosGet).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry on timeout and serves stale cache when available', async () => {
+    const provider = makeProvider();
+
+    // Populate stale cache.
+    mockedAxiosGet.mockResolvedValueOnce(BDL_RESPONSE);
+    await provider.getScoreboard('2024-07-13');
+    const cacheMap = (
+      provider as unknown as {
+        cache: Map<string, { data: unknown; expiry: number }>;
+      }
+    ).cache;
+    const entry = cacheMap.get('scoreboard:2024-07-13');
+    if (entry) entry.expiry = Date.now() - 1;
+
+    // API times out (ECONNABORTED — not retried).
+    mockedAxiosGet.mockRejectedValue(makeTimeoutError());
+
+    const result = await provider.getScoreboard('2024-07-13');
+
+    expect(result.date).toBe('2024-07-13');
+    expect(result.games).toHaveLength(1);
+    // 1 initial populate + 1 timeout attempt (no retries)
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws on timeout when no stale cache is available', async () => {
+    const provider = makeProvider();
+    mockedAxiosGet.mockRejectedValue(makeTimeoutError());
+
+    await expect(provider.getScoreboard('2024-07-14')).rejects.toThrow(
+      'Network Error',
+    );
+    // No retries for timeout
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
   });
 });

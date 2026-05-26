@@ -104,12 +104,22 @@ const RETRY_BASE_DELAY_MS = 500;
 
 /**
  * Returns true for errors that are worth retrying: rate limits (429), server
- * errors (5xx), and network-level failures (no HTTP response at all).
+ * errors (5xx), and transient network-level failures (ECONNRESET, etc.).
+ *
+ * Timeout errors (ECONNABORTED) are excluded: an immediate retry after a
+ * 10 s timeout will almost certainly also timeout, and three 10 s attempts
+ * chained back-to-back exceed the Lambda's 30 s limit, causing API Gateway
+ * to return 502 to the client (LS-4856).
  * Exported for unit testing.
  */
 export function isRetryableError(err: unknown): boolean {
   if (!axios.isAxiosError(err)) return false;
-  if (!err.response) return true; // network error: ECONNRESET, timeout, etc.
+  if (!err.response) {
+    // Timeout (ECONNABORTED) — do not retry; fail fast so Lambda exits well
+    // within its 30 s limit and stale cache can be served.
+    if (err.code === 'ECONNABORTED') return false;
+    return true; // other network errors: ECONNRESET, ECONNREFUSED, etc.
+  }
   const { status } = err.response;
   return status === 429 || (status >= 500 && status <= 599);
 }
@@ -222,16 +232,17 @@ export class BallDontLieProvider implements MlbDataProvider {
       }
     }
 
-    // When rate-limited, serve stale cache rather than surfacing a 429 error.
-    if (axios.isAxiosError(lastErr) && lastErr.response?.status === 429) {
-      const stale = this.getStaleCached<Scoreboard>(cacheKey);
-      if (stale) {
-        LOGGER.warn('[balldontlie] rate-limited; serving stale cache', {
-          date,
-          cacheKey,
-        });
-        return stale;
-      }
+    // Serve stale cache for any error (timeout, network failure, rate limit).
+    // A slightly stale scoreboard is far better than crashing the Lambda and
+    // returning a 502 to the client (LS-4856).
+    const stale = this.getStaleCached<Scoreboard>(cacheKey);
+    if (stale) {
+      LOGGER.warn('[balldontlie] request failed; serving stale cache', {
+        date,
+        cacheKey,
+        error: axios.isAxiosError(lastErr) ? lastErr.message : String(lastErr),
+      });
+      return stale;
     }
     throw lastErr;
   }
