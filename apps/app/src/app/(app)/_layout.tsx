@@ -14,6 +14,7 @@ import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
 import FootballHome from './football';
+import FootballPlayers from './football/players';
 import LeagueDiscoveryScreen from './league-discovery';
 import SeasonDraftGamesScreen from './season-draft';
 import SeasonDraftGameScreen from './season-draft/[gameId]';
@@ -63,6 +64,7 @@ export type AppDrawerParamList = {
   'baseball/league/join': undefined;
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
+  'football/players': undefined;
   'football/league/create': undefined;
   'football/league/join': undefined;
   DraftBoardPage: { leagueId?: string } | undefined;
@@ -123,6 +125,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'football/index',
     title: 'Football',
+  },
+  {
+    route: 'football/players',
+    title: 'Football Players',
   },
   {
     route: 'DraftBoardPage',
@@ -201,7 +207,9 @@ function CustomDrawerContent(
   const footballEnabled = useFeatureIsOn('football_enabled');
   const visibleRoutes = footballEnabled
     ? ROUTES
-    : ROUTES.filter((r) => r.route !== 'football/index');
+    : ROUTES.filter(
+        (r) => r.route !== 'football/index' && r.route !== 'football/players',
+      );
 
   const doLogout = async () => {
     // Best-effort: deactivate push token before clearing credentials
@@ -325,6 +333,11 @@ export default function Layout() {
             name="football/index"
             options={{ title: 'Football Home' }}
             component={FootballHome}
+          />
+          <Screen
+            name="football/players"
+            options={{ title: 'Football Players' }}
+            component={FootballPlayers}
           />
           <Screen
             name="football/league/create"

@@ -136,6 +136,7 @@ jest.mock('@legacy-sports/shared-components', () => {
         <ActivityIndicator />
       </View>
     ),
+    NFL_TEAMS: {},
   };
 });
 

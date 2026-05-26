@@ -1,0 +1,60 @@
+query FootballPlayers(
+  $position: String
+  $nflTeam: String
+  $search: String
+  $after: String
+) {
+  footballPlayers(
+    position: $position
+    nflTeam: $nflTeam
+    search: $search
+    after: $after
+  ) {
+    nodes {
+      id
+      firstName
+      lastName
+      position
+      isDst
+      nflTeam
+      pfrId
+      careerStats {
+        passing {
+          yds
+          td
+          int
+          rating
+        }
+        rushing {
+          yds
+          td
+        }
+        receiving {
+          rec
+          yds
+          td
+        }
+        kicking {
+          fgm
+          fga
+        }
+        defense {
+          sacks
+          int
+          ptsAllowedPerG
+        }
+        idp {
+          soloTkl
+          astTkl
+          sacks
+          int
+          ff
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

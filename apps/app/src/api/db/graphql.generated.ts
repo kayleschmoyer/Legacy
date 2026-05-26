@@ -5483,6 +5483,75 @@ export type MarkAllNotificationsAsReadMutation = {
   markAllNotificationsAsRead?: boolean | null;
 };
 
+export type FootballPlayersQueryVariables = Exact<{
+  position?: InputMaybe<Scalars['String']['input']>;
+  nflTeam?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type FootballPlayersQuery = {
+  __typename?: 'Query';
+  footballPlayers?: {
+    __typename?: 'FootballPlayersConnection';
+    nodes: Array<{
+      __typename?: 'FootballPlayer';
+      id: number;
+      firstName: string;
+      lastName: string;
+      position?: string | null;
+      isDst: boolean;
+      nflTeam?: string | null;
+      pfrId?: string | null;
+      careerStats?: {
+        __typename?: 'FootballCareerStats';
+        passing?: {
+          __typename?: 'FootballCareerPassing';
+          yds?: number | null;
+          td?: number | null;
+          int?: number | null;
+          rating?: number | null;
+        } | null;
+        rushing?: {
+          __typename?: 'FootballCareerRushing';
+          yds?: number | null;
+          td?: number | null;
+        } | null;
+        receiving?: {
+          __typename?: 'FootballCareerReceiving';
+          rec?: number | null;
+          yds?: number | null;
+          td?: number | null;
+        } | null;
+        kicking?: {
+          __typename?: 'FootballCareerKicking';
+          fgm?: number | null;
+          fga?: number | null;
+        } | null;
+        defense?: {
+          __typename?: 'FootballCareerDefense';
+          sacks?: number | null;
+          int?: number | null;
+          ptsAllowedPerG?: number | null;
+        } | null;
+        idp?: {
+          __typename?: 'FootballCareerIdp';
+          soloTkl?: number | null;
+          astTkl?: number | null;
+          sacks?: number | null;
+          int?: number | null;
+          ff?: number | null;
+        } | null;
+      } | null;
+    }>;
+    pageInfo: {
+      __typename?: 'FootballPlayersPageInfo';
+      hasNextPage: boolean;
+      endCursor?: string | null;
+    };
+  } | null;
+};
+
 export type GetFreeAgentPlayersQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -9694,6 +9763,150 @@ export type MarkAllNotificationsAsReadMutationResult =
 export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
   MarkAllNotificationsAsReadMutation,
   MarkAllNotificationsAsReadMutationVariables
+>;
+export const FootballPlayers = gql`
+  query FootballPlayers(
+    $position: String
+    $nflTeam: String
+    $search: String
+    $after: String
+  ) {
+    footballPlayers(
+      position: $position
+      nflTeam: $nflTeam
+      search: $search
+      after: $after
+    ) {
+      nodes {
+        id
+        firstName
+        lastName
+        position
+        isDst
+        nflTeam
+        pfrId
+        careerStats {
+          passing {
+            yds
+            td
+            int
+            rating
+          }
+          rushing {
+            yds
+            td
+          }
+          receiving {
+            rec
+            yds
+            td
+          }
+          kicking {
+            fgm
+            fga
+          }
+          defense {
+            sacks
+            int
+            ptsAllowedPerG
+          }
+          idp {
+            soloTkl
+            astTkl
+            sacks
+            int
+            ff
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+/**
+ * __useFootballPlayersQuery__
+ *
+ * To run a query within a React component, call `useFootballPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useFootballPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useFootballPlayersQuery({
+ *   variables: {
+ *      position: // value for 'position'
+ *      nflTeam: // value for 'nflTeam'
+ *      search: // value for 'search'
+ *      after: // value for 'after'
+ *   },
+ * });
+ */
+export function useFootballPlayersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    FootballPlayersQuery,
+    FootballPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<FootballPlayersQuery, FootballPlayersQueryVariables>(
+    FootballPlayers,
+    options,
+  );
+}
+export function useFootballPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    FootballPlayersQuery,
+    FootballPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    FootballPlayersQuery,
+    FootballPlayersQueryVariables
+  >(FootballPlayers, options);
+}
+export function useFootballPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        FootballPlayersQuery,
+        FootballPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    FootballPlayersQuery,
+    FootballPlayersQueryVariables
+  >(
+    FootballPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          FootballPlayersQuery,
+          FootballPlayersQueryVariables
+        >,
+  );
+}
+export type FootballPlayersQueryHookResult = ReturnType<
+  typeof useFootballPlayersQuery
+>;
+export type FootballPlayersLazyQueryHookResult = ReturnType<
+  typeof useFootballPlayersLazyQuery
+>;
+export type FootballPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useFootballPlayersSuspenseQuery
+>;
+export type FootballPlayersQueryResult = Apollo.QueryResult<
+  FootballPlayersQuery,
+  FootballPlayersQueryVariables
 >;
 export const GetFreeAgentPlayers = gql`
   query GetFreeAgentPlayers($leagueId: Int!) {
