@@ -2957,6 +2957,7 @@ type Query {
   footballPlayers(
     after: String
     first: Int
+    nflTeam: String
     position: String
     search: String
   ): FootballPlayersConnection

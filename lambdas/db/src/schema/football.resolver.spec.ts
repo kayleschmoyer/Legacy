@@ -334,6 +334,28 @@ describe('football resolvers', () => {
 
       expect(mockDb.where).toHaveBeenCalled();
     });
+
+    it('throws BAD_USER_INPUT for invalid position value', async () => {
+      await expect(
+        getResolver()(
+          {},
+          { position: 'INVALID_POS', nflTeam: null, search: null, after: null },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
+
+    it('throws BAD_USER_INPUT for invalid nflTeam value', async () => {
+      await expect(
+        getResolver()(
+          {},
+          { position: null, nflTeam: 'BADTEAM', search: null, after: null },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
   });
 
   // ── footballPlayer ───────────────────────────────────────────────────────────

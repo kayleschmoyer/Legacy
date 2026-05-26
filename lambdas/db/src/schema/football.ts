@@ -1032,6 +1032,47 @@ function isValidPosition(p: string): p is PlayerPosition {
   return (VALID_FOOTBALL_POSITIONS as readonly string[]).includes(p);
 }
 
+const VALID_NFL_TEAMS = [
+  'ARI',
+  'ATL',
+  'BAL',
+  'BUF',
+  'CAR',
+  'CHI',
+  'CIN',
+  'CLE',
+  'DAL',
+  'DEN',
+  'DET',
+  'GB',
+  'HOU',
+  'IND',
+  'JAX',
+  'KC',
+  'LAC',
+  'LAR',
+  'LV',
+  'MIA',
+  'MIN',
+  'NE',
+  'NO',
+  'NYG',
+  'NYJ',
+  'PHI',
+  'PIT',
+  'SEA',
+  'SF',
+  'TB',
+  'TEN',
+  'WAS',
+] as const;
+
+type NflTeamAbbr = (typeof VALID_NFL_TEAMS)[number];
+
+function isValidNflTeam(t: string): t is NflTeamAbbr {
+  return (VALID_NFL_TEAMS as readonly string[]).includes(t);
+}
+
 builder.queryField('footballPlayers', (t) =>
   t.field({
     type: FootballPlayersConnectionRef,
@@ -1039,6 +1080,7 @@ builder.queryField('footballPlayers', (t) =>
       'Paginated list of football players, optionally filtered by position (LS-255)',
     args: {
       position: t.arg.string({ required: false }),
+      nflTeam: t.arg.string({ required: false }),
       search: t.arg.string({ required: false }),
       after: t.arg.string({ required: false }),
       first: t.arg.int({ required: false }),
@@ -1061,6 +1103,13 @@ builder.queryField('footballPlayers', (t) =>
           throw UserInputError(`Invalid position: ${args.position}`);
         }
         conditions.push(eq(PublicSchema.players.position, args.position));
+      }
+
+      if (args.nflTeam) {
+        if (!isValidNflTeam(args.nflTeam)) {
+          throw UserInputError(`Invalid NFL team: ${args.nflTeam}`);
+        }
+        conditions.push(eq(PublicSchema.players.nflTeam, args.nflTeam));
       }
 
       if (afterId != null && !isNaN(afterId)) {

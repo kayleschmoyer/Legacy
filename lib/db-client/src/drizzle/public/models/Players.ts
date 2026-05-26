@@ -44,7 +44,7 @@ export const players = pgTable(
     // migration 20260418_000000_add_twenty_questions_tables.
     batHand: text('bat_hand'),
     throwHand: text('throw_hand'),
-    // Football identity columns (LS-246)
+    // Football identity columns (LS-246 / LS-4150)
     sport: sportKind('sport').notNull().default('baseball'),
     pfrId: varchar('pfr_id', { length: 20 }),
     isDst: boolean('is_dst').notNull().default(false),

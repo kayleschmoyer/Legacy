@@ -132,6 +132,16 @@ const EliteDraftBoardScreen = lazyWithRetry(() =>
     default: m.EliteDraftBoardScreen,
   })),
 );
+const FootballPlayersPage = lazyWithRetry(() =>
+  import('../pages/football/FootballPlayersPage').then((m) => ({
+    default: m.FootballPlayersPage,
+  })),
+);
+const FootballPlayerDetailPage = lazyWithRetry(() =>
+  import('../pages/football/FootballPlayerDetailPage').then((m) => ({
+    default: m.FootballPlayerDetailPage,
+  })),
+);
 /** Route-level guard for admin pages — redirects non-admins to home.
  *  Defense-in-depth alongside the in-page accessLevel check in AdminPage. */
 function AdminGuard({
@@ -502,6 +512,22 @@ function App() {
               }
             />
             <Route path="/league/create" element={<CreateLeagueWizardPage />} />
+            <Route
+              path="/football/players"
+              element={
+                <FootballGate>
+                  <FootballPlayersPage />
+                </FootballGate>
+              }
+            />
+            <Route
+              path="/football/players/:id"
+              element={
+                <FootballGate>
+                  <FootballPlayerDetailPage />
+                </FootballGate>
+              }
+            />
             <Route
               path="/football/league/create"
               element={
