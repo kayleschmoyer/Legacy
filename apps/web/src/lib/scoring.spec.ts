@@ -109,6 +109,44 @@ describe('applyMultiplierGroups', () => {
   });
 });
 
+describe('useLeagueScoringSettings — poll interval (LS-4053)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('passes pollInterval of 5 minutes to the query', () => {
+    useGetLeagueScoringProfileQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({ data: undefined }),
+    });
+
+    renderHook(() => useLeagueScoringSettings(42));
+
+    expect(useGetLeagueScoringProfileQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ pollInterval: 5 * 60 * 1000 }),
+    );
+  });
+
+  it('still passes pollInterval when leagueId is provided', () => {
+    useGetLeagueScoringProfileQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({ data: undefined }),
+    });
+
+    renderHook(() => useLeagueScoringSettings(99));
+
+    const [options] = useGetLeagueScoringProfileQuery.mock.calls[0] as [
+      { pollInterval?: number; skip?: boolean },
+    ];
+    expect(options.pollInterval).toBe(5 * 60 * 1000);
+    expect(options.skip).toBe(false);
+  });
+});
+
 describe('useLeagueScoringSettings — visibility refetch (LS-4039)', () => {
   beforeEach(() => {
     jest.resetAllMocks();

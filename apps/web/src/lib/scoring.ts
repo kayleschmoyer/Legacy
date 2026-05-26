@@ -101,6 +101,9 @@ export function useLeagueScoringSettings(leagueId?: number) {
     variables: { leagueId: numericLeagueId || 0 },
     skip: shouldSkip,
     fetchPolicy: 'cache-and-network',
+    // Poll every 5 minutes so projections update when a commissioner changes
+    // multipliers mid-week without requiring a manual page refresh (LS-4053).
+    pollInterval: 5 * 60 * 1000,
   });
 
   // Refetch when the tab becomes visible again. `cache-and-network` only fetches
