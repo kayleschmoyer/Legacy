@@ -261,7 +261,7 @@ function AdminSection({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AdminPage(): React.JSX.Element {
+export function AdminPage(): React.JSX.Element | null {
   const navigate = useNavigate();
   const auth = useAuth();
   const [search, setSearch] = useState('');
@@ -292,7 +292,10 @@ export function AdminPage(): React.JSX.Element {
     skip: !auth.isAuthenticated,
   });
 
-  if (!auth.isLoading && auth.user?.accessLevel !== 'admin') {
+  if (auth.isLoading) {
+    return null;
+  }
+  if (auth.user?.accessLevel !== 'admin') {
     return <Navigate to="/" replace />;
   }
 
