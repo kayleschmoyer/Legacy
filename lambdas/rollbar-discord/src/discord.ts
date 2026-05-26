@@ -1,11 +1,11 @@
+import { LOGGER } from '@legacy-sports/logging';
+
 import type {
   BudgetNotification,
   CloudWatchAlarm,
   DiscordEmbed,
   RollbarEvent,
 } from './types';
-import { fetchWithTimeout } from './fetch-utils';
-
 // Discord embed color constants
 const COLOR_ERROR = 0xed4245; // Red
 const COLOR_WARNING = 0xfee75c; // Yellow
@@ -233,24 +233,77 @@ export function formatBudgetEmbed(
   };
 }
 
+const FETCH_TIMEOUT_MS = 5_000;
+const RATE_LIMIT_MAX_WAIT_MS = 30_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Post an embed to a Discord webhook URL.
+ *
+ * Handles Discord 429 rate-limit responses: reads retry_after from the JSON
+ * body (falling back to the Retry-After header), sleeps, then retries once.
+ * If the retry is also rate-limited, logs a warning and returns without
+ * throwing to avoid SNS retry storms. All requests are bounded by a 5 s
+ * AbortSignal timeout so the lambda cannot hang indefinitely on a slow Discord.
  */
 export async function postToDiscord(
   webhookUrl: string,
   embed: DiscordEmbed,
 ): Promise<void> {
   const body = JSON.stringify({ embeds: [embed] });
+  const headers = { 'Content-Type': 'application/json' };
 
-  const response = await fetchWithTimeout(
-    webhookUrl,
-    {
+  const doFetch = () =>
+    fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body,
-    },
-    5_000,
-  );
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
+  let response = await doFetch();
+
+  if (response.status === 429) {
+    let retryAfterMs = 1_000;
+    let retryAfterSet = false;
+    try {
+      const json = (await response.json()) as { retry_after?: number };
+      if (typeof json.retry_after === 'number') {
+        retryAfterMs = Math.min(
+          Math.max(0, json.retry_after * 1_000),
+          RATE_LIMIT_MAX_WAIT_MS,
+        );
+        retryAfterSet = true;
+      }
+    } catch {
+      // body not JSON; fall through to header check
+    }
+    if (!retryAfterSet) {
+      const header = response.headers?.get?.('Retry-After');
+      if (header) {
+        const parsed = parseFloat(header);
+        if (!isNaN(parsed)) {
+          retryAfterMs = Math.min(
+            Math.max(0, parsed * 1_000),
+            RATE_LIMIT_MAX_WAIT_MS,
+          );
+        }
+      }
+    }
+
+    await sleep(retryAfterMs);
+    response = await doFetch();
+
+    if (response.status === 429) {
+      LOGGER.warn('Discord webhook rate-limited on retry; dropping message', {
+        status: response.status,
+      });
+      return;
+    }
+  }
 
   if (!response.ok) {
     throw new Error(

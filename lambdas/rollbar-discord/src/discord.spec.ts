@@ -10,6 +10,15 @@ import type {
   RollbarEvent,
 } from './types';
 
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
 describe('formatRollbarEmbed', () => {
   it('formats a new_item event with item data', () => {
     const event: RollbarEvent = {
@@ -299,23 +308,22 @@ describe('formatBudgetEmbed', () => {
 
 describe('postToDiscord', () => {
   const originalFetch = globalThis.fetch;
+  const embed = { title: 'Test', description: 'Test embed', color: 0xed4245 };
+  const loggerMock = jest.requireMock<{ LOGGER: { warn: jest.Mock } }>(
+    '@legacy-sports/logging',
+  );
+
+  beforeEach(() => {
+    loggerMock.LOGGER.warn.mockClear();
+  });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
 
   it('sends embed to Discord webhook URL', async () => {
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 204,
-    });
+    const mockFetch = jest.fn().mockResolvedValue({ ok: true, status: 204 });
     globalThis.fetch = mockFetch;
-
-    const embed = {
-      title: 'Test',
-      description: 'Test embed',
-      color: 0xed4245,
-    };
 
     await postToDiscord('https://discord.com/api/webhooks/test', embed);
 
@@ -329,41 +337,82 @@ describe('postToDiscord', () => {
     );
   });
 
-  it('swallows 429 rate-limit responses without throwing', async () => {
+  it('retries on 429 using retry_after from body and succeeds', async () => {
+    const mockFetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: jest.fn().mockResolvedValue({ retry_after: 0 }),
+        headers: { get: jest.fn().mockReturnValue(null) },
+      })
+      .mockResolvedValueOnce({ ok: true, status: 204 });
+    globalThis.fetch = mockFetch;
+
+    await postToDiscord('https://discord.com/api/webhooks/test', embed);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(loggerMock.LOGGER.warn).not.toHaveBeenCalled();
+  });
+
+  it('retries on 429 using Retry-After header when body has no retry_after', async () => {
+    const mockFetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: jest.fn().mockResolvedValue({}),
+        headers: { get: jest.fn().mockReturnValue('0') },
+      })
+      .mockResolvedValueOnce({ ok: true, status: 204 });
+    globalThis.fetch = mockFetch;
+
+    await postToDiscord('https://discord.com/api/webhooks/test', embed);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops message without throwing when rate-limited twice', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 429,
       statusText: 'Too Many Requests',
-      text: jest.fn().mockResolvedValue('rate limited'),
+      json: jest.fn().mockResolvedValue({ retry_after: 0 }),
+      headers: { get: jest.fn().mockReturnValue(null) },
     });
-
-    const embed = {
-      title: 'Test',
-      description: 'Test embed',
-      color: 0xed4245,
-    };
 
     await expect(
       postToDiscord('https://discord.com/api/webhooks/test', embed),
-    ).rejects.toThrow('Discord webhook failed: 429 Too Many Requests');
+    ).resolves.toBeUndefined();
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(loggerMock.LOGGER.warn).toHaveBeenCalledWith(
+      expect.stringContaining('rate-limited'),
+      expect.objectContaining({ status: 429 }),
+    );
   });
 
-  it('throws on other non-ok responses', async () => {
+  it('throws on non-ok responses other than 429', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 500,
       statusText: 'Internal Server Error',
-      text: jest.fn().mockResolvedValue('server error'),
     });
-
-    const embed = {
-      title: 'Test',
-      description: 'Test embed',
-      color: 0xed4245,
-    };
 
     await expect(
       postToDiscord('https://discord.com/api/webhooks/test', embed),
     ).rejects.toThrow('Discord webhook failed: 500 Internal Server Error');
+  });
+
+  it('propagates AbortError when fetch times out', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockRejectedValue(new DOMException('signal timed out', 'TimeoutError'));
+
+    await expect(
+      postToDiscord('https://discord.com/api/webhooks/test', embed),
+    ).rejects.toThrow('signal timed out');
   });
 });
