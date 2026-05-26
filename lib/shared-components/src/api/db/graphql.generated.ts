@@ -437,6 +437,7 @@ export type CreateLeagueAndTeamsInput = {
   salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
+  scoringFormat?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
   startDate?: InputMaybe<Scalars['String']['input']>;

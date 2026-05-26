@@ -95,6 +95,10 @@ export interface CreateLeagueOptions {
   auctionMinBid?: number;
   /** ISO datetime string for the scheduled draft start time. */
   startDate?: string;
+  /** PPR scoring format for football leagues (LS-4158).
+   *  'standard' = 0 pts/rec, 'half_ppr' = 0.5 pts/rec, 'ppr' = 1 pt/rec (default).
+   *  Used to seed the default scoring profile's reception multiplier. */
+  scoringFormat?: 'standard' | 'half_ppr' | 'ppr';
 }
 
 export interface CreateLeagueResult {
@@ -187,6 +191,7 @@ export class LeagueService {
       auctionBudget = 260,
       auctionMinBid = 1,
       startDate,
+      scoringFormat = 'ppr',
     } = input;
 
     const maxRosterSize =
@@ -218,6 +223,7 @@ export class LeagueService {
             name,
             owner: ownerId,
             sport,
+            defensiveFormat,
             maxRosterSize,
             currentMatchup: null,
             inviteCode,
@@ -232,7 +238,6 @@ export class LeagueService {
             schedulingStrategy,
             numberOfDivisions,
             isPublic,
-            defensiveFormat,
             // Salary cap settings
             salaryCapEnabled,
             salaryCap,
@@ -340,10 +345,35 @@ export class LeagueService {
         //    getActiveScoringProfileForLeague queries isDefault=true; entries
         //    are populated on the first ScoringService.updateActiveProfile call
         //    via updateLeagueScoringProfileEntries (upsert).
-        await tx.insert(PublicSchema.leagueScoringProfiles).values({
-          leagueId: league.id,
-          isDefault: true,
-        });
+        const [scoringProfile] = await tx
+          .insert(PublicSchema.leagueScoringProfiles)
+          .values({
+            leagueId: league.id,
+            isDefault: true,
+          })
+          .returning({ id: PublicSchema.leagueScoringProfiles.id });
+
+        // 7. Seed reception multiplier from scoringFormat for football leagues (LS-4158).
+        //    'receiving_rec' default_multiplier is 1.0 (PPR); override for standard/half_ppr.
+        //    Only insert an entry when the chosen format differs from the DB default.
+        if (sport === 'football' && scoringFormat !== 'ppr' && scoringProfile) {
+          const recMultiplier =
+            scoringFormat === 'half_ppr' ? '0.500' : '0.000';
+          const [recStatDef] = await tx
+            .select({ id: PublicSchema.scoringStatDefinitions.id })
+            .from(PublicSchema.scoringStatDefinitions)
+            .where(
+              eq(PublicSchema.scoringStatDefinitions.statKey, 'receiving_rec'),
+            )
+            .limit(1);
+          if (recStatDef) {
+            await tx.insert(PublicSchema.leagueScoringProfileEntries).values({
+              profileId: scoringProfile.id,
+              statDefinitionId: recStatDef.id,
+              multiplier: recMultiplier,
+            });
+          }
+        }
 
         return {
           league,

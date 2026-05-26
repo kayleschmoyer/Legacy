@@ -67,6 +67,9 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       sport: t.field({ type: SportKindEnum, required: false }),
       // Defensive scoring format for football leagues (LS-246).
       defensiveFormat: t.field({ type: DefensiveFormatEnum, required: false }),
+      // PPR scoring format for football leagues (LS-4158).
+      // 'standard' = 0 pts/rec, 'half_ppr' = 0.5 pts/rec, 'ppr' = 1 pt/rec (default).
+      scoringFormat: t.string({ required: false }),
       numberOfTeams: t.int({ required: true }),
       numberOfDivisions: t.int({ required: false }), // default 2 (two divisions)
       schedulingStrategy: t.string({ required: false }), // 'round-robin' | 'divisional' | 'random' (optional, defaults to 'divisional')
@@ -196,6 +199,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         leagueName,
         sport: inputSport,
         defensiveFormat: inputDefensiveFormat,
+        scoringFormat: inputScoringFormat,
         numberOfTeams,
         numberOfDivisions,
         schedulingStrategy: inputSchedulingStrategy,
@@ -354,6 +358,27 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const validatedPlayerPool =
         playerPool as (typeof VALID_PLAYER_POOLS)[number];
 
+      // ── scoringFormat validation ─────────────────────────────────────────
+      const VALID_SCORING_FORMATS = ['standard', 'half_ppr', 'ppr'] as const;
+      if (
+        inputScoringFormat != null &&
+        !(VALID_SCORING_FORMATS as readonly string[]).includes(
+          inputScoringFormat,
+        )
+      ) {
+        throw UserInputError(
+          `Invalid scoringFormat: "${inputScoringFormat}". Allowed values: ${VALID_SCORING_FORMATS.join(', ')}.`,
+        );
+      }
+      const resolvedScoringFormat = (
+        inputScoringFormat != null &&
+        (VALID_SCORING_FORMATS as readonly string[]).includes(
+          inputScoringFormat,
+        )
+          ? inputScoringFormat
+          : 'ppr'
+      ) as (typeof VALID_SCORING_FORMATS)[number];
+
       // ── Custom era year-range validation ────────────────────────────────
       if (inputEraFilter === 'custom') {
         if (inputCustomEraStartYear == null || inputCustomEraEndYear == null) {
@@ -376,6 +401,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           sport: inputSport ?? 'baseball',
           defensiveFormat:
             inputDefensiveFormat === 'idp' ? 'idp' : ('dst' as const),
+          scoringFormat: resolvedScoringFormat,
           maxRosterSize:
             maxRosterSize ?? DEFAULT_ROSTER_SIZE_BY_SPORT[resolvedSport],
           numberOfTeams,

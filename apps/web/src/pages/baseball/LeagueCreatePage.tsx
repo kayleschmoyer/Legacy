@@ -38,6 +38,7 @@ import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
+  DefensiveFormat as GqlDefensiveFormat,
   Sport,
   useCreateLeagueAndTeamsMutation,
 } from '../../api/db/graphql.generated';
@@ -84,6 +85,38 @@ function sportFromPathname(pathname: string): SportId {
   return pathname.startsWith('/football') ? 'football' : 'baseball';
 }
 
+// ── Football scoring presets (LS-4158) ──────────────────────────────────────
+// Only `receiving_rec` differs across Standard / Half-PPR / PPR. All other
+// multipliers (passing yds, rush yds, TDs, etc.) are identical.
+type ScoringFormat = 'standard' | 'half_ppr' | 'ppr' | 'custom';
+type DefensiveFormat = 'dst' | 'idp';
+
+const SCORING_FORMAT_OPTIONS: ReadonlyArray<{
+  id: ScoringFormat;
+  label: string;
+  rec: number;
+  description: string;
+}> = [
+  {
+    id: 'standard',
+    label: 'Standard',
+    rec: 0,
+    description: 'No reception bonus',
+  },
+  {
+    id: 'half_ppr',
+    label: 'Half-PPR',
+    rec: 0.5,
+    description: '0.5 pts per reception',
+  },
+  {
+    id: 'ppr',
+    label: 'PPR',
+    rec: 1,
+    description: '1 pt per reception (default)',
+  },
+];
+
 interface CreateLeagueFormData {
   sport: SportId;
   leagueName: string;
@@ -107,6 +140,9 @@ interface CreateLeagueFormData {
   salaryCap?: number;
   auctionBudget: number;
   auctionMinBid: number;
+  // Football-only (LS-4158)
+  scoringFormat: ScoringFormat;
+  defensiveFormat: DefensiveFormat;
 }
 
 const TEAM_COUNT_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16];
@@ -305,6 +341,9 @@ function applySportSwitch(
     playerPool: 'all',
     customEraStartYear: undefined,
     customEraEndYear: undefined,
+    // Reset football-specific fields on sport switch
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
   };
 }
 
@@ -947,6 +986,11 @@ function SummaryRow({
 
 // ── SummarySidePanel ─────────────────────────────────────────────────────────
 
+function scoringFormatLabel(f: CreateLeagueFormData): string {
+  const opt = SCORING_FORMAT_OPTIONS.find((o) => o.id === f.scoringFormat);
+  return opt ? opt.label : 'Custom';
+}
+
 interface SummarySidePanelProps {
   f: CreateLeagueFormData;
   teams: number;
@@ -1040,6 +1084,15 @@ function SummarySidePanel({
             gold={f.baseballEraFilter !== 'all'}
           />
           {f.baseballHofOnly && <SummaryRow label="HOF Only" value="On" gold />}
+          {f.sport === 'football' && (
+            <>
+              <SummaryRow label="Scoring" value={scoringFormatLabel(f)} />
+              <SummaryRow
+                label="Defense"
+                value={f.defensiveFormat === 'idp' ? 'IDP' : 'D/ST'}
+              />
+            </>
+          )}
           <SummaryRow label="Draft" value={draftLabel} />
           <SummaryRow label="Waivers" value={waiversLabel} />
           {f.salaryCapEnabled && (
@@ -1157,6 +1210,8 @@ export function LeagueCreatePage(): React.JSX.Element {
       salaryCap: undefined,
       auctionBudget: 200,
       auctionMinBid: 1,
+      scoringFormat: 'ppr',
+      defensiveFormat: 'dst',
     };
   });
 
@@ -1190,6 +1245,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         'era-history',
         'draft',
         'waiver-budget',
+        'football-scoring',
       ]),
     );
   }, []);
@@ -1283,6 +1339,15 @@ export function LeagueCreatePage(): React.JSX.Element {
           input: {
             sport:
               formData.sport === 'football' ? Sport.Football : Sport.Baseball,
+            defensiveFormat:
+              formData.sport === 'football'
+                ? (formData.defensiveFormat as GqlDefensiveFormat)
+                : undefined,
+            scoringFormat:
+              formData.sport === 'football' &&
+              formData.scoringFormat !== 'custom'
+                ? formData.scoringFormat
+                : undefined,
             leagueName: trimmedLeagueName,
             numberOfTeams: formData.numberOfTeams,
             numberOfDivisions: formData.numberOfDivisions,
@@ -2276,6 +2341,169 @@ export function LeagueCreatePage(): React.JSX.Element {
                   </div>
                 </div>
               </CollapsibleSection>
+
+              {/* ── Section 6: Football Scoring Format (football only) ── */}
+              {selectedSport === 'football' && (
+                <CollapsibleSection
+                  id="football-scoring"
+                  num={6}
+                  title="Scoring Format"
+                  sub="Offensive preset and defensive lineup type for your football league."
+                  summary={
+                    <span>
+                      {SCORING_FORMAT_OPTIONS.find(
+                        (o) => o.id === formData.scoringFormat,
+                      )?.label ?? 'Custom'}{' '}
+                      · {formData.defensiveFormat === 'idp' ? 'IDP' : 'D/ST'}
+                    </span>
+                  }
+                  open={openSections.has('football-scoring')}
+                  onToggle={() => toggleSection('football-scoring')}
+                >
+                  {/* Offensive format */}
+                  <FieldRow
+                    label="Offensive Format"
+                    hint="Sets the receiving reception multiplier. All other stats are identical across formats."
+                  >
+                    <XStack gap="$2" flexWrap="wrap">
+                      {SCORING_FORMAT_OPTIONS.map((opt) => {
+                        const selected = formData.scoringFormat === opt.id;
+                        return (
+                          <Button
+                            key={opt.id}
+                            size="$3"
+                            flex={1}
+                            minWidth={100}
+                            onPress={() =>
+                              !isFormDisabled &&
+                              handleInputChange('scoringFormat', opt.id)
+                            }
+                            disabled={isFormDisabled}
+                            backgroundColor={
+                              selected ? withAlpha(EMERALD, 0.22) : '$color2'
+                            }
+                            borderColor={selected ? EMERALD : '$borderColor'}
+                            borderWidth={selected ? 2 : 1}
+                            hoverStyle={{
+                              backgroundColor: selected
+                                ? withAlpha(EMERALD, 0.3)
+                                : '$color3',
+                            }}
+                            pressStyle={{ scale: 0.97 }}
+                            data-testid={`scoring-format-${opt.id}`}
+                          >
+                            <YStack alignItems="center" gap={2}>
+                              <Text
+                                fontFamily="$display"
+                                fontWeight="800"
+                                fontSize={15}
+                                color={selected ? EMERALD : '$color'}
+                              >
+                                {opt.label}
+                              </Text>
+                              <Text
+                                fontFamily="$body"
+                                fontSize={11}
+                                color={selected ? '$color11' : '$gray9'}
+                              >
+                                {opt.description}
+                              </Text>
+                            </YStack>
+                          </Button>
+                        );
+                      })}
+                    </XStack>
+                  </FieldRow>
+
+                  {/* Defensive format */}
+                  <FieldRow
+                    label="Defensive Format"
+                    hint="D/ST uses team defense scoring with points-allowed bands. IDP uses individual defensive player stats."
+                  >
+                    <XStack gap="$2">
+                      {(
+                        [
+                          {
+                            id: 'dst' as const,
+                            label: 'D/ST',
+                            sub: 'Team Defense',
+                          },
+                          {
+                            id: 'idp' as const,
+                            label: 'IDP',
+                            sub: 'Individual Players',
+                          },
+                        ] as const
+                      ).map((opt) => {
+                        const selected = formData.defensiveFormat === opt.id;
+                        return (
+                          <Button
+                            key={opt.id}
+                            size="$3"
+                            flex={1}
+                            onPress={() =>
+                              !isFormDisabled &&
+                              handleInputChange('defensiveFormat', opt.id)
+                            }
+                            disabled={isFormDisabled}
+                            backgroundColor={
+                              selected ? withAlpha(AMBER, 0.18) : '$color2'
+                            }
+                            borderColor={selected ? AMBER : '$borderColor'}
+                            borderWidth={selected ? 2 : 1}
+                            hoverStyle={{
+                              backgroundColor: selected
+                                ? withAlpha(AMBER, 0.26)
+                                : '$color3',
+                            }}
+                            pressStyle={{ scale: 0.97 }}
+                            data-testid={`defensive-format-${opt.id}`}
+                          >
+                            <YStack alignItems="center" gap={2}>
+                              <Text
+                                fontFamily="$display"
+                                fontWeight="800"
+                                fontSize={15}
+                                color={selected ? AMBER : '$color'}
+                              >
+                                {opt.label}
+                              </Text>
+                              <Text
+                                fontFamily="$body"
+                                fontSize={11}
+                                color={selected ? '$color11' : '$gray9'}
+                              >
+                                {opt.sub}
+                              </Text>
+                            </YStack>
+                          </Button>
+                        );
+                      })}
+                    </XStack>
+                  </FieldRow>
+
+                  {/* Context note */}
+                  <XStack
+                    gap="$2"
+                    padding="$3"
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.08)}
+                    borderRadius="$3"
+                    borderWidth={1}
+                    borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.22)}
+                  >
+                    <Text
+                      fontFamily="$body"
+                      fontSize={12}
+                      color="$gray10"
+                      flex={1}
+                    >
+                      {formData.defensiveFormat === 'idp'
+                        ? 'IDP replaces the DST slot with DL×1, LB×2, DB×2, and a DP flex. Scoring uses flat multipliers per tackle, sack, INT, etc.'
+                        : 'D/ST uses a single team defense slot. Scoring combines sacks, turnovers, and points-allowed bands.'}
+                    </Text>
+                  </XStack>
+                </CollapsibleSection>
+              )}
 
               {/* ── Sticky action bar ── */}
               <XStack
