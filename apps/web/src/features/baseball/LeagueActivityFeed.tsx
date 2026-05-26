@@ -97,6 +97,7 @@ export function eventToActivityItem(event: {
   if (!event.eventType || !event.id) return null;
 
   let payload: Record<string, unknown> = {};
+  let payloadCorrupted = false;
   if (event.payload != null) {
     let parsed: unknown;
     try {
@@ -113,6 +114,7 @@ export function eventToActivityItem(event: {
       // Fall back to an empty payload so the activity item still renders
       // with its default copy instead of being dropped from the feed.
       parsed = {};
+      payloadCorrupted = true;
     }
     if (
       parsed === null ||
@@ -128,6 +130,7 @@ export function eventToActivityItem(event: {
       // Fall back to an empty payload so the activity item still renders
       // with its default copy instead of being dropped from the feed.
       payload = {};
+      payloadCorrupted = true;
     } else {
       payload = parsed as Record<string, unknown>;
     }
@@ -155,9 +158,10 @@ export function eventToActivityItem(event: {
         type: 'trade',
         icon: <ArrowLeftRight size={16} color="rgb(34, 197, 94)" />,
         title: 'Trade accepted',
-        detail:
-          typeof payload['teamAName'] === 'string' &&
-          typeof payload['teamBName'] === 'string'
+        detail: payloadCorrupted
+          ? 'A trade was accepted — team details are unavailable.'
+          : typeof payload['teamAName'] === 'string' &&
+              typeof payload['teamBName'] === 'string'
             ? `${payload['teamAName']} and ${payload['teamBName']} completed a trade.`
             : `${actor} accepted a trade offer.`,
         isoDate,

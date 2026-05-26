@@ -21,14 +21,16 @@ describe('eventToActivityItem', () => {
     warnSpy.mockRestore();
   });
 
-  it('does not throw and falls back to default copy for malformed JSON payload', () => {
+  it('does not throw and shows unavailable message for malformed JSON payload', () => {
     expect(() =>
       eventToActivityItem({ ...baseEvent, payload: 'not json' }),
     ).not.toThrow();
     const result = eventToActivityItem({ ...baseEvent, payload: 'not json' });
     expect(result).not.toBeNull();
     expect(result?.type).toBe('trade');
-    expect(result?.detail).toBe('alice accepted a trade offer.');
+    expect(result?.detail).toBe(
+      'A trade was accepted — team details are unavailable.',
+    );
     expect(warnSpy).toHaveBeenCalledWith(
       'Bad activity payload (parse error)',
       expect.objectContaining({
@@ -44,10 +46,13 @@ describe('eventToActivityItem', () => {
     expect(call?.[1]).not.toHaveProperty('payloadPreview');
   });
 
-  it('falls back to default copy when payload parses to JSON null', () => {
+  it('shows unavailable message when payload parses to JSON null', () => {
     const result = eventToActivityItem({ ...baseEvent, payload: 'null' });
     expect(result).not.toBeNull();
     expect(result?.type).toBe('trade');
+    expect(result?.detail).toBe(
+      'A trade was accepted — team details are unavailable.',
+    );
     expect(warnSpy).toHaveBeenCalledWith(
       'Bad activity payload (not a plain object)',
       expect.objectContaining({
@@ -61,10 +66,13 @@ describe('eventToActivityItem', () => {
     expect(call?.[1]).not.toHaveProperty('payloadPreview');
   });
 
-  it('falls back to default copy when payload parses to a JSON array', () => {
+  it('shows unavailable message when payload parses to a JSON array', () => {
     const result = eventToActivityItem({ ...baseEvent, payload: '[]' });
     expect(result).not.toBeNull();
     expect(result?.type).toBe('trade');
+    expect(result?.detail).toBe(
+      'A trade was accepted — team details are unavailable.',
+    );
     expect(warnSpy).toHaveBeenCalledWith(
       'Bad activity payload (not a plain object)',
       expect.objectContaining({
@@ -74,10 +82,13 @@ describe('eventToActivityItem', () => {
     );
   });
 
-  it('falls back to default copy when payload parses to a JSON primitive (number)', () => {
+  it('shows unavailable message when payload parses to a JSON primitive (number)', () => {
     const result = eventToActivityItem({ ...baseEvent, payload: '42' });
     expect(result).not.toBeNull();
     expect(result?.type).toBe('trade');
+    expect(result?.detail).toBe(
+      'A trade was accepted — team details are unavailable.',
+    );
     expect(warnSpy).toHaveBeenCalledWith(
       'Bad activity payload (not a plain object)',
       expect.objectContaining({ parsedType: 'number' }),
@@ -121,10 +132,11 @@ describe('eventToActivityItem', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('returns a valid ActivityItem when payload is missing entirely', () => {
+  it('returns a valid ActivityItem with generic fallback when payload is missing entirely', () => {
     const result = eventToActivityItem({ ...baseEvent, payload: null });
     expect(result).not.toBeNull();
     expect(result?.type).toBe('trade');
+    expect(result?.detail).toBe('alice accepted a trade offer.');
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
