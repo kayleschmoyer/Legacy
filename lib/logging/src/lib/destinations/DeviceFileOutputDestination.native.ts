@@ -2,9 +2,12 @@ import { type LogEntry, type LogLevel, type OutputDestination } from '../types';
 
 // Lazily require expo-file-system/legacy so that simply importing this module
 // (e.g. via the package barrel) does not pull the Expo module into Jest's
-// resolver for tests that have nothing to do with device logging — and so
-// esbuild cannot follow the dependency into server-side lambda bundles
-// (where it would try to bundle react-native and fail on Flow syntax).
+// resolver for tests that have nothing to do with device logging.
+//
+// esbuild isolation for lambda bundles is now handled by the platform-split
+// approach: index.ts imports DeviceFileOutputDestination (no .native suffix),
+// so esbuild sees the non-native stub (DeviceFileOutputDestination.ts) while
+// Metro resolves this .native.ts file for Android/iOS targets.
 //
 // We define only the subset of the expo-file-system/legacy API we actually
 // use rather than typing it as `typeof import('expo-file-system/legacy')`.
@@ -27,18 +30,8 @@ interface FileSystemModule {
 let cachedFs: FileSystemModule | null = null;
 function loadFileSystem(): FileSystemModule {
   if (!cachedFs) {
-    // Indirect module identifier defeats esbuild's static `require()`
-    // resolution; Metro (which has full dynamic-require support) still
-    // resolves this correctly at runtime on mobile, and `jest.mock(...)`
-    // still intercepts the runtime string at test time. The bare `require`
-    // call is the only shape that satisfies all three constraints — a sync
-    // constructor (so dynamic `import()` won't work), Metro/Jest module
-    // resolution (so `globalThis.require` is undefined in plain Node CJS),
-    // and esbuild dead-code elimination for non-mobile bundles. This is a
-    // narrowly-scoped, single-line approved-exception suppression.
-    const moduleId = ['expo-file-system', 'legacy'].join('/');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cachedFs = require(moduleId) as FileSystemModule;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- expo-file-system/legacy is CJS-only; dynamic import() is async and unusable in a sync loadFileSystem() call
+    cachedFs = require('expo-file-system/legacy') as FileSystemModule;
   }
   return cachedFs;
 }

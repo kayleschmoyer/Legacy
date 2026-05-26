@@ -7,13 +7,14 @@ export const LOGGER = createConsoleLogger();
 export { Logger } from './lib/Logger';
 export { createConsoleLogger, createCustomLogger } from './lib/factories';
 export { ConsoleOutputDestination } from './lib/destinations';
-// Mobile-only destination — safe to re-export from the web/node entry because
-// it lazy-requires `expo-file-system` only on construction (which never
-// happens outside the mobile bundle).
+// Mobile-only destination. This is the web/node entry — it intentionally
+// re-exports the non-native stub (DeviceFileOutputDestination.ts, always a
+// no-op). Mobile builds use index.native.ts which re-exports the real
+// DeviceFileOutputDestination.native.ts via Metro's platform extension priority.
 export {
   DeviceFileOutputDestination,
   type DeviceFileOutputDestinationOptions,
-} from './lib/destinations/DeviceFileOutputDestination.native';
+} from './lib/destinations/DeviceFileOutputDestination';
 export type {
   ILogger,
   LoggerConfig,
