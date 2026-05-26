@@ -107,6 +107,44 @@ test.describe('PremiumGate — free user @critical', () => {
       ).toBeVisible();
     },
   );
+
+  freeUserTest(
+    'clicking Get Premium in UpgradeModal navigates to /pricing @critical',
+    async ({ page }) => {
+      await routeGraphQL(page, {
+        getmysubscription: myFreeSubscriptionResponse(),
+        mysubscription: myFreeSubscriptionResponse(),
+        currentuser: { data: { currentUser: null } },
+        getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+        getstripeprices: {
+          data: {
+            stripePrices: {
+              monthlyPriceCents: 499,
+              annualTotalCents: 3999,
+              monthlyPriceId: 'price_monthly_test',
+              annualPriceId: 'price_annual_test',
+            },
+          },
+        },
+      });
+
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+
+      // Open the UpgradeModal via the PremiumGate overlay
+      await page
+        .getByRole('button', { name: /upgrade/i })
+        .first()
+        .click();
+      await expect(
+        page.getByRole('heading', { name: /upgrade to premium/i }),
+      ).toBeVisible();
+
+      // Clicking "Get Premium" should close the modal and navigate to /pricing
+      await page.getByRole('button', { name: /get premium/i }).click();
+      await expect(page).toHaveURL(/\/pricing/);
+    },
+  );
 });
 
 test.describe('PremiumGate — premium user @critical', () => {
@@ -361,19 +399,6 @@ test.describe('Subscription upgrade flow @critical', () => {
   test('upgrade button shows unavailable alert when GetStripePrices returns null', async ({
     page,
   }) => {
-    // Capture alert messages before page scripts run so the guard cannot block.
-    const alertMessages: string[] = [];
-    await page.addInitScript(() => {
-      window.alert = (msg: string) => {
-        (window as unknown as { __alertMessages: string[] }).__alertMessages =
-          (window as unknown as { __alertMessages: string[] })
-            .__alertMessages ?? [];
-        (
-          window as unknown as { __alertMessages: string[] }
-        ).__alertMessages.push(msg);
-      };
-    });
-
     await page.route(isGraphQLEndpoint, async (route) => {
       const op = route.request().postData()?.toLowerCase() ?? '';
       if (op.includes('mysubscription') || op.includes('getmysubscription')) {
@@ -414,38 +439,13 @@ test.describe('Subscription upgrade flow @critical', () => {
     await expect(upgradeBtn).toBeVisible();
     await upgradeBtn.click();
 
-    // Collect captured alert messages from the page context.
-    await expect
-      .poll(async () => {
-        const msgs = await page.evaluate(
-          () =>
-            (window as unknown as { __alertMessages?: string[] })
-              .__alertMessages ?? [],
-        );
-        alertMessages.push(...msgs);
-        return msgs.length;
-      })
-      .toBeGreaterThan(0);
-
-    // The guard message should mention unavailability or contact support.
-    expect(alertMessages[0]).toMatch(/unavailable|support/i);
+    // LS-4062 replaced window.alert() with an inline error banner — check the DOM.
+    await expect(page.getByText(/temporarily unavailable/i)).toBeVisible();
   });
 
   test('upgrade button shows error alert when createCheckoutSession fails', async ({
     page,
   }) => {
-    const alertMessages: string[] = [];
-    await page.addInitScript(() => {
-      window.alert = (msg: string) => {
-        (window as unknown as { __alertMessages: string[] }).__alertMessages =
-          (window as unknown as { __alertMessages: string[] })
-            .__alertMessages ?? [];
-        (
-          window as unknown as { __alertMessages: string[] }
-        ).__alertMessages.push(msg);
-      };
-    });
-
     await page.route(isGraphQLEndpoint, async (route) => {
       const op = route.request().postData()?.toLowerCase() ?? '';
       if (op.includes('mysubscription') || op.includes('getmysubscription')) {
@@ -495,19 +495,8 @@ test.describe('Subscription upgrade flow @critical', () => {
     await expect(upgradeBtn).toBeVisible();
     await upgradeBtn.click();
 
-    await expect
-      .poll(async () => {
-        const msgs = await page.evaluate(
-          () =>
-            (window as unknown as { __alertMessages?: string[] })
-              .__alertMessages ?? [],
-        );
-        alertMessages.push(...msgs);
-        return msgs.length;
-      })
-      .toBeGreaterThan(0);
-
-    expect(alertMessages[0]).toMatch(/checkout|try again|support/i);
+    // LS-4062 replaced window.alert() with an inline error banner — check the DOM.
+    await expect(page.getByText(/could not start checkout/i)).toBeVisible();
     // Button should be re-enabled after the error so the user can retry.
     await expect(upgradeBtn).toBeEnabled();
   });

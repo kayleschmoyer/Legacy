@@ -1,4 +1,4 @@
-import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, Check, Star } from '@tamagui/lucide-icons';
 import { BaseModal } from './BaseModal';
@@ -59,6 +59,7 @@ export function UpgradeModal({
   featureName,
   featureDescription,
 }: UpgradeModalProps) {
+  const navigate = useNavigate();
   const {
     monthlyPriceDisplay: MONTHLY_PRICE_DISPLAY,
     annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
@@ -149,7 +150,10 @@ export function UpgradeModal({
             pressStyle={{ opacity: 0.85, scale: 0.97 }}
             hoverStyle={{ opacity: 0.92 }}
             borderRadius="$4"
-            onPress={() => onOpenChange(false)}
+            onPress={() => {
+              onOpenChange(false);
+              void navigate('/pricing');
+            }}
           >
             Get Premium
           </Button>
