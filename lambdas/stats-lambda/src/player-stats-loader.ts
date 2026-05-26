@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
-import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import { Player, PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import {
   getAllGameBattingStats,
   getAllGameFieldingStats,
@@ -53,28 +53,7 @@ export async function loadPlayerGameStats(
     pfrId: string | null;
     isDst: boolean;
     nflTeam: string | null;
-    position:
-      | 'SP'
-      | 'RP'
-      | 'C'
-      | '1B'
-      | '2B'
-      | '3B'
-      | 'SS'
-      | 'RF'
-      | 'LF'
-      | 'CF'
-      | 'DH'
-      | 'QB'
-      | 'RB'
-      | 'WR'
-      | 'TE'
-      | 'K'
-      | 'DL'
-      | 'LB'
-      | 'DB'
-      | 'DST'
-      | null;
+    position: Player['position'];
   } = {
     id: playerId,
     firstName: '',

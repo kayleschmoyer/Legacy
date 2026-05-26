@@ -64,7 +64,7 @@ interface ScoringResultRow {
   mlb_player_id: number | null;
   bat_hand: string | null;
   throw_hand: string | null;
-  // Football identity columns (LS-246)
+  // Football identity columns (LS-246, LS-250)
   sport: 'baseball' | 'football';
   pfr_id: string | null;
   is_dst: boolean;

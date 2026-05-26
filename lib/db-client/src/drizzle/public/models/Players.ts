@@ -49,6 +49,8 @@ export const players = pgTable(
     pfrId: varchar('pfr_id', { length: 20 }),
     isDst: boolean('is_dst').notNull().default(false),
     nflTeam: varchar('nfl_team', { length: 10 }),
+    // PFR canonical position for football players (LS-250). Nullable — baseball players
+    // and football players without a PFR mapping have null.
     position: playerPosition('position'),
   },
   (table) => {

@@ -11,6 +11,7 @@ import {
   index,
   foreignKey,
   primaryKey,
+  text,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { players } from './Players';
@@ -700,4 +701,57 @@ export const careerFootballDefenseIdp = pgView('career_football_defense_idp', {
     SUM(safeties)  AS safeties
   FROM football_season_defense_idp
   GROUP BY player_id
+`);
+
+/**
+ * Derives eligible fantasy positions for each football player (LS-250).
+ * Requires: players.is_dst (LS-246) and players.position (LS-250) columns.
+ *
+ * Branches 1–3 use authoritative position data; branches 4–5 are stat-inferred
+ * fallbacks for players with no canonical position. QB takes priority over K —
+ * the K branch excludes any player who also has career passing attempts.
+ *   1. is_dst=true → 'DST' (synthetic team-defense player)
+ *   2. players.position IN ('DL','LB','DB') → IDP position (authoritative from PFR)
+ *   3. players.position IN ('QB','RB','WR','TE','K') → offensive position (authoritative from PFR)
+ *   4. career_football_passing.att > 0, position IS NULL → 'QB' (stat-inferred fallback)
+ *   5. career_football_kicking.fga > 0, position IS NULL, no passing att → 'K' (stat-inferred fallback)
+ */
+export const footballPlayerEligiblePositions = pgView(
+  'football_player_eligible_positions',
+  {
+    playerId: integer('player_id').notNull(),
+    position: text('position').notNull(),
+  },
+).as(sql`
+  SELECT p.id AS player_id, 'DST'::text AS position
+  FROM "public"."players" p
+  WHERE p.is_dst = true
+  UNION ALL
+  SELECT p.id AS player_id, p.position::text AS position
+  FROM "public"."players" p
+  WHERE p.position::text IN ('DL', 'LB', 'DB')
+    AND p.is_dst = false
+  UNION ALL
+  SELECT p.id AS player_id, p.position::text AS position
+  FROM "public"."players" p
+  WHERE p.position::text IN ('QB', 'RB', 'WR', 'TE', 'K')
+    AND p.is_dst = false
+  UNION ALL
+  SELECT cfp.player_id, 'QB'::text AS position
+  FROM "public"."career_football_passing" cfp
+  JOIN "public"."players" p ON p.id = cfp.player_id
+  WHERE cfp.att > 0
+    AND p.position IS NULL
+    AND p.is_dst = false
+  UNION ALL
+  SELECT cfk.player_id, 'K'::text AS position
+  FROM "public"."career_football_kicking" cfk
+  JOIN "public"."players" p ON p.id = cfk.player_id
+  WHERE cfk.fga > 0
+    AND p.position IS NULL
+    AND p.is_dst = false
+    AND NOT EXISTS (
+      SELECT 1 FROM "public"."career_football_passing" cfp
+      WHERE cfp.player_id = cfk.player_id AND cfp.att > 0
+    )
 `);
