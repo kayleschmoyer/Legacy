@@ -225,7 +225,7 @@ jobs:
           source /tmp/jira-api.sh
           echo "🔍 Fetching open PRs with LS-* branch pattern..."
 
-          PRS=$(gh pr list --state open --json number,headRefName,isDraft --limit 200)
+          PRS=$(gh pr list --state open --json number,headRefName,isDraft,labels --limit 200)
           TOTAL=$(echo "$PRS" | jq 'length')
           echo "Found $TOTAL open PRs"
 
@@ -254,28 +254,30 @@ jobs:
               EXPECTED="In Progress"
             fi
 
+            # Check label presence from already-fetched PR data (no extra API call needed).
+            HAS_LABEL=$(echo "$PR" | jq -r '[.labels[].name] | map(select(. == "jira-mismatch")) | length // 0')
+
             if [[ "$JIRA_STATUS" != "$EXPECTED" && "$JIRA_STATUS" != "In Progress" ]]; then
               echo "  ❌ PR #$NUMBER ($KEY): Jira='$JIRA_STATUS' but expected='$EXPECTED'"
               MISMATCHES=$((MISMATCHES + 1))
 
-              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -Fxc 'jira-mismatch' || true)
-
               if [[ "$HAS_LABEL" == "0" ]]; then
                 gh pr edit "$NUMBER" --add-label "jira-mismatch" 2>/dev/null || true
-                COMMENT_BODY=$(cat <<COMMENT_EOF
+                COMMENT_BODY_FILE=$(mktemp)
+                ESCAPED_KEY=$(printf '%s' "$KEY" | sed 's/[\\`"$]/\\&/g')
+                cat > "$COMMENT_BODY_FILE" <<COMMENT_EOF
           ⚠️ **Jira Status Mismatch**
 
-          **${KEY}** is \`${JIRA_STATUS}\` in Jira, but this PR is open (expected: \`${EXPECTED}\`).
+          **${ESCAPED_KEY}** is \`${JIRA_STATUS}\` in Jira, but this PR is open (expected: \`${EXPECTED}\`).
 
           This usually means someone manually changed the ticket status in Jira. Please verify the correct status.
 
           _Detected by the Jira Status Audit workflow._
           COMMENT_EOF
-                )
-                gh pr comment "$NUMBER" --body "$COMMENT_BODY" 2>/dev/null || true
+                gh pr comment "$NUMBER" --body-file "$COMMENT_BODY_FILE" 2>/dev/null || true
+                rm -f "$COMMENT_BODY_FILE"
               fi
             else
-              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -Fxc 'jira-mismatch' || true)
               if [[ "$HAS_LABEL" != "0" ]]; then
                 gh pr edit "$NUMBER" --remove-label "jira-mismatch" 2>/dev/null || true
                 FIXED=$((FIXED + 1))
