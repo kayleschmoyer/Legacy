@@ -10,9 +10,10 @@ export function StandingsRedirectPage() {
 
   const { data, loading } = useGetUserLeaguesQuery({
     skip: !isLoggedIn,
+    notifyOnNetworkStatusChange: true,
   });
 
-  if (authLoading || loading || (isLoggedIn && !data)) {
+  if (authLoading || loading || (isLoggedIn && !data?.userLeagues)) {
     return (
       <YStack
         flex={1}
