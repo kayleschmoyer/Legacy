@@ -68,13 +68,26 @@ export interface ScoringGroupCopy {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /**
- * Canonical order of scoring stat groups (Batting → Pitching → Fielding).
+ * Canonical order of scoring stat groups for baseball leagues.
  * Values must match the `ScoringStatGroup` GraphQL enum string values.
  */
 export const SCORING_GROUP_ORDER: readonly string[] = [
   'batting',
   'pitching',
   'fielding',
+];
+
+/**
+ * Canonical order of scoring stat groups for football leagues (Passing → Rushing →
+ * Receiving → Kicking → DST or IDP depending on defensiveFormat).
+ */
+export const FOOTBALL_SCORING_GROUP_ORDER: readonly string[] = [
+  'passing',
+  'rushing',
+  'receiving',
+  'kicking',
+  'defense',
+  'idp',
 ];
 
 /**
@@ -96,6 +109,36 @@ export const SCORING_GROUP_COPY: Record<string, ScoringGroupCopy> = {
     title: 'Fielding',
     description: 'Fielding bonuses and errors.',
     accent: '#F97316',
+  },
+  passing: {
+    title: 'Passing',
+    description: 'Passing yards, TDs, and interceptions.',
+    accent: '#8B5CF6',
+  },
+  rushing: {
+    title: 'Rushing',
+    description: 'Rushing yards, TDs, and fumbles.',
+    accent: '#14B8A6',
+  },
+  receiving: {
+    title: 'Receiving',
+    description: 'Receptions (PPR), receiving yards, and TDs.',
+    accent: '#F59E0B',
+  },
+  kicking: {
+    title: 'Kicking',
+    description: 'Field goals by distance, extra points, and misses.',
+    accent: '#EC4899',
+  },
+  defense: {
+    title: 'Defense / Special Teams (D/ST)',
+    description: 'Sacks, turnovers, TDs, and points-allowed bands.',
+    accent: '#EF4444',
+  },
+  idp: {
+    title: 'Individual Defensive Players (IDP)',
+    description: 'Tackles, sacks, interceptions, and defensive TDs.',
+    accent: '#EF4444',
   },
 };
 

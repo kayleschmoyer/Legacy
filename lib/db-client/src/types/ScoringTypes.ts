@@ -2,13 +2,27 @@ import { ScoringStatGroup } from './DatabaseTypes';
 
 export type ScoringMultiplierGroup = Extract<
   ScoringStatGroup,
-  'batting' | 'pitching' | 'fielding'
+  | 'batting'
+  | 'pitching'
+  | 'fielding'
+  | 'passing'
+  | 'rushing'
+  | 'receiving'
+  | 'kicking'
+  | 'defense'
+  | 'idp'
 >;
 
 export interface LeagueScoringMultipliers {
   batting: Record<string, number>;
   pitching: Record<string, number>;
   fielding: Record<string, number>;
+  passing?: Record<string, number>;
+  rushing?: Record<string, number>;
+  receiving?: Record<string, number>;
+  kicking?: Record<string, number>;
+  defense?: Record<string, number>;
+  idp?: Record<string, number>;
 }
 
 export interface LeagueScoringProfileSummary {

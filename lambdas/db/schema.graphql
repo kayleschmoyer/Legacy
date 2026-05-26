@@ -1355,7 +1355,7 @@ type League {
   customEraStartYear: Int
 
   """
-  Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). (LS-246)
+  Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). Null for baseball leagues. (LS-246/LS-257)
   """
   defensiveFormat: DefensiveFormat
   draftStatus: String
@@ -3573,8 +3573,14 @@ Grouping for fantasy scoring statistics
 """
 enum ScoringStatGroup {
   batting
+  defense
   fielding
+  idp
+  kicking
+  passing
   pitching
+  receiving
+  rushing
 }
 
 type SeasonBatting {

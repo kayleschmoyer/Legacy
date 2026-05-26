@@ -33,16 +33,7 @@ import {
 } from '../../constants/colors';
 
 /* ── Gradient accent per group ────────────────────────────────────────────── */
-const GROUP_COPY: Record<
-  ScoringStatGroup,
-  {
-    title: string;
-    description: string;
-    accent: string;
-    gradientFrom: string;
-    gradientTo: string;
-  }
-> = {
+const GROUP_COPY = {
   [ScoringStatGroup.Batting]: {
     title: 'Batting',
     description: 'Home runs, RBIs, steals, and more.',
@@ -282,10 +273,10 @@ export function LeagueScoringEditor(
 
   const stats = useMemo(() => collectProfileStats(profile), [profile]);
   const groupedStats = useMemo(() => {
-    const groups: Record<ScoringStatGroup, ProfileStat[]> = {
-      [ScoringStatGroup.Batting]: [],
-      [ScoringStatGroup.Pitching]: [],
-      [ScoringStatGroup.Fielding]: [],
+    const groups = {
+      [ScoringStatGroup.Batting]: [] as ProfileStat[],
+      [ScoringStatGroup.Pitching]: [] as ProfileStat[],
+      [ScoringStatGroup.Fielding]: [] as ProfileStat[],
     };
 
     for (const stat of stats) {
@@ -295,11 +286,13 @@ export function LeagueScoringEditor(
         continue;
       }
 
-      groups[groupKey].push(stat);
+      groups[groupKey as keyof typeof groups].push(stat);
     }
 
     for (const group of GROUP_ORDER) {
-      groups[group].sort((a, b) => a.displayName.localeCompare(b.displayName));
+      groups[group as keyof typeof groups].sort((a, b) =>
+        a.displayName.localeCompare(b.displayName),
+      );
     }
 
     return groups;
@@ -832,10 +825,11 @@ export function LeagueScoringEditor(
         {/* Group sections */}
         {!loading && stats.length > 0
           ? GROUP_ORDER.map((group) => {
-              const statsForGroup = groupedStats[group];
+              const statsForGroup =
+                groupedStats[group as keyof typeof groupedStats];
               if (!statsForGroup || statsForGroup.length === 0) return null;
 
-              const copy = GROUP_COPY[group];
+              const copy = GROUP_COPY[group as keyof typeof GROUP_COPY];
               const isExpanded = expandedGroups[group] !== false;
               const overrideCount = statsForGroup.filter(
                 (s) => Math.abs(s.multiplier - s.defaultMultiplier) > 0.0001,

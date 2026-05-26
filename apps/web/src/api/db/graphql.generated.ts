@@ -1213,7 +1213,7 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   customEraEndYear?: Maybe<Scalars['Int']['output']>;
   customEraStartYear?: Maybe<Scalars['Int']['output']>;
-  /** Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). (LS-246) */
+  /** Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). Null for baseball leagues. (LS-246/LS-257) */
   defensiveFormat?: Maybe<DefensiveFormat>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   eraFilter?: Maybe<Scalars['String']['output']>;
@@ -3632,8 +3632,14 @@ export type ScoringStatDefinition = {
 /** Grouping for fantasy scoring statistics */
 export enum ScoringStatGroup {
   Batting = 'batting',
+  Defense = 'defense',
   Fielding = 'fielding',
+  Idp = 'idp',
+  Kicking = 'kicking',
+  Passing = 'passing',
   Pitching = 'pitching',
+  Receiving = 'receiving',
+  Rushing = 'rushing',
 }
 
 export type SeasonBatting = {

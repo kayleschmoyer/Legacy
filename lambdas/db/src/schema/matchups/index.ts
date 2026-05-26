@@ -17,6 +17,9 @@ import './mutations';
 // Scheduled/system mutations (EventBridge cron triggers)
 import './scheduled-mutations';
 
+// Football-specific scheduled mutations (EventBridge cron triggers, LS-4769)
+import './football-scheduled-mutations';
+
 // Discord score alerts (EventBridge periodic trigger)
 import './discord-score-alerts';
 

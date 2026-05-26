@@ -39,7 +39,9 @@ export const League = builder.objectRef<{
    *  parent select did not include it — every league has a non-null value
    *  in the DB (LS-4628). */
   sport?: 'baseball' | 'football';
-  /** Defensive scoring format for football leagues (LS-246). Defaults to 'dst'. */
+  /** Defensive scoring format for football leagues (LS-246/LS-257).
+   *  'dst' = team D/ST, 'idp' = Individual Defensive Players.
+   *  Null for baseball leagues. */
   defensiveFormat?: 'dst' | 'idp' | null;
   maxRosterSize: number;
   currentMatchup: number | null;
@@ -124,8 +126,13 @@ League.implement({
       type: DefensiveFormatEnum,
       nullable: true,
       description:
-        'Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). (LS-246)',
-      resolve: (parent) => parent.defensiveFormat ?? null,
+        'Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players). Null for baseball leagues. (LS-246/LS-257)',
+      resolve: (parent) =>
+        parent.sport === 'football'
+          ? parent.defensiveFormat === 'idp'
+            ? 'idp'
+            : 'dst'
+          : null,
     }),
     maxRosterSize: t.exposeInt('maxRosterSize'),
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),

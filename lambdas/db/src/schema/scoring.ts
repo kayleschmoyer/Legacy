@@ -22,37 +22,39 @@ const SCORING_GROUPS: ScoringMultiplierGroup[] = [
   'batting',
   'pitching',
   'fielding',
+  'passing',
+  'rushing',
+  'receiving',
+  'kicking',
+  'defense',
+  'idp',
 ];
 
-// The DB scoring_stat_group enum was extended with football values in LS-245,
-// but the scoring-profile schema (definitions seed, GraphQL enum, league
-// multipliers) is still baseball-only — football scoring lands in LS-251 /
-// LS-254 / LS-255. Until then, narrow the wider DB type back to the baseball
-// subset before indexing into baseball-shaped structures.
-export function isBaseballScoringGroup(
+export function isScoringGroup(
   group: ScoringStatGroup,
 ): group is ScoringMultiplierGroup {
-  return group === 'batting' || group === 'pitching' || group === 'fielding';
+  return (SCORING_GROUPS as string[]).includes(group);
 }
 
-/**
- * Narrow a definition's `statGroup` to the baseball-only subset that the
- * current GraphQL `ScoringStatGroupEnum` exposes. Throws (and emits a
- * `LOGGER.error` for Rollbar) on any other value so we notice if a football
- * definition leaks in before the GraphQL surface widens (LS-255).
- */
-export function resolveBaseballScoringGroup(
+export function resolveScoringStatGroup(
   definition: Pick<ScoringStatDefinition, 'id' | 'statGroup'>,
 ): ScoringMultiplierGroup {
-  if (isBaseballScoringGroup(definition.statGroup)) {
+  if (isScoringGroup(definition.statGroup)) {
     return definition.statGroup;
   }
-  const message = `Unexpected non-baseball scoring stat group: ${definition.statGroup}`;
+  const message = `Unexpected scoring stat group: ${String(definition.statGroup)}`;
   LOGGER.error(message, new Error(message), {
     statGroup: definition.statGroup,
     statDefinitionId: definition.id,
   });
   throw new Error(message);
+}
+
+/** @deprecated Use isScoringGroup — now covers football groups too (LS-257). */
+export function isBaseballScoringGroup(
+  group: ScoringStatGroup,
+): group is ScoringMultiplierGroup {
+  return group === 'batting' || group === 'pitching' || group === 'fielding';
 }
 
 const ScoringStatGroupEnum = builder.enumType('ScoringStatGroup', {
@@ -61,6 +63,12 @@ const ScoringStatGroupEnum = builder.enumType('ScoringStatGroup', {
     batting: { value: 'batting' },
     pitching: { value: 'pitching' },
     fielding: { value: 'fielding' },
+    passing: { value: 'passing' },
+    rushing: { value: 'rushing' },
+    receiving: { value: 'receiving' },
+    kicking: { value: 'kicking' },
+    defense: { value: 'defense' },
+    idp: { value: 'idp' },
   },
 });
 
@@ -265,7 +273,7 @@ async function loadDefaultScoringConfig(): Promise<ScoringConfigGraph> {
 
   const stats = definitions.map((definition) => {
     const defaultMultiplier = parseNumeric(definition.defaultMultiplier) ?? 0;
-    const groupEntries = isBaseballScoringGroup(definition.statGroup)
+    const groupEntries = isScoringGroup(definition.statGroup)
       ? multipliers[definition.statGroup]
       : null;
     const override = groupEntries
@@ -304,7 +312,7 @@ ScoringStatDefinitionRef.implement({
     statKey: t.exposeString('statKey'),
     statGroup: t.field({
       type: ScoringStatGroupEnum,
-      resolve: resolveBaseballScoringGroup,
+      resolve: resolveScoringStatGroup,
     }),
     sourceTable: t.exposeString('sourceTable'),
     sourceColumn: t.exposeString('sourceColumn'),
