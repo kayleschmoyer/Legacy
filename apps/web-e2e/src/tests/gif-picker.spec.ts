@@ -412,6 +412,36 @@ test.describe('GIF Picker — empty state @regression', () => {
   });
 });
 
+test.describe('GIF Picker — broken thumbnail fallback @regression', () => {
+  test('shows "Image unavailable" placeholder when GIF thumbnail fails to load (LS-4106)', async ({
+    page,
+  }) => {
+    await mockGraphQL(page);
+    await mockGiphy(page);
+    // Make every Giphy media thumbnail fail (simulates CDN/CORS failure).
+    await page.route(
+      (url) => url.hostname === 'media.giphy.com',
+      async (route) => {
+        await route.fulfill({ status: 404, body: '' });
+      },
+    );
+    await goToLeagueChatTab(page);
+
+    await page.getByRole('button', { name: /open gif picker/i }).click();
+    await expect(page.getByText('GIF Search')).toBeVisible();
+
+    // Placeholder text replaces the broken thumbnail.
+    await expect(page.getByText('Image unavailable').first()).toBeVisible();
+
+    // The failed GIF button is disabled so it cannot be sent.
+    const failedButton = page
+      .getByRole('button', { name: /^Image unavailable:/i })
+      .first();
+    await expect(failedButton).toBeVisible();
+    await expect(failedButton).toBeDisabled();
+  });
+});
+
 test.describe('GIF Picker — "Powered by GIPHY" footer @regression', () => {
   test('shows GIPHY attribution text when open', async ({ page }) => {
     await mockGraphQL(page);

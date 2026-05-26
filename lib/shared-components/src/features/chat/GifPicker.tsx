@@ -16,7 +16,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Search, X } from '@tamagui/lucide-icons';
+import { ImageOff, Search, X } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 // ---------------------------------------------------------------------------
@@ -89,6 +89,7 @@ export function GifPicker({
   const [gifs, setGifs] = useState<GiphyGif[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedGifIds, setFailedGifIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
@@ -110,6 +111,7 @@ export function GifPicker({
       // Only apply result if this is still the latest request
       if (id === requestIdRef.current) {
         setGifs(json.data ?? []);
+        setFailedGifIds(new Set());
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -160,6 +162,10 @@ export function GifPicker({
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
+  }, []);
+
+  const handleImageError = useCallback((gifId: string) => {
+    setFailedGifIds((prev) => new Set([...prev, gifId]));
   }, []);
 
   return (
@@ -297,10 +303,12 @@ export function GifPicker({
           !error &&
           gifs.map((gif) => {
             const thumb = gif.images.fixed_height_small;
+            const failed = failedGifIds.has(gif.id);
             return (
               <button
                 type="button"
                 key={gif.id}
+                disabled={failed}
                 onClick={() => {
                   const url =
                     gif.images.downsized?.url ?? gif.images.original.url;
@@ -310,33 +318,67 @@ export function GifPicker({
                   border: '2px solid transparent',
                   borderRadius: 4,
                   padding: 0,
-                  cursor: 'pointer',
+                  cursor: failed ? 'not-allowed' : 'pointer',
                   background: withAlpha('#000000', 0.15),
                   overflow: 'hidden',
                   aspectRatio: `${thumb.width}/${thumb.height}`,
                   outline: 'none',
                   transition: 'border-color 0.1s',
+                  opacity: failed ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor =
-                    BRAND_NAVY_LIGHT;
+                  if (!failed)
+                    (e.currentTarget as HTMLButtonElement).style.borderColor =
+                      BRAND_NAVY_LIGHT;
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLButtonElement).style.borderColor =
                     'transparent';
                 }}
-                aria-label={`Send GIF: ${gif.title}`}
+                aria-label={
+                  failed
+                    ? `Image unavailable: ${gif.title}`
+                    : `Send GIF: ${gif.title}`
+                }
               >
-                <img
-                  src={thumb?.url ?? gif.images.original.url}
-                  alt={gif.title}
-                  loading="lazy"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                  }}
-                />
+                {failed ? (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      padding: 4,
+                    }}
+                  >
+                    <ImageOff size={20} color="$textMuted" />
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--textMuted, #888)',
+                        textAlign: 'center',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      Image unavailable
+                    </span>
+                  </div>
+                ) : (
+                  <img
+                    src={thumb?.url ?? gif.images.original.url}
+                    alt={gif.title}
+                    loading="lazy"
+                    onError={() => handleImageError(gif.id)}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                    }}
+                  />
+                )}
               </button>
             );
           })}
