@@ -224,7 +224,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       if (isCancelled) {
         LOGGER.debug('Google sign-in popup closed by user');
       } else {
-        LOGGER.error('Google login failed:', String(error));
+        LOGGER.error(
+          'Google login failed:',
+          error instanceof Error ? error : new Error(String(error)),
+        );
         const errorMsg =
           error instanceof Error ? error.message : 'Google login failed';
         setErrorMessage(errorMsg);

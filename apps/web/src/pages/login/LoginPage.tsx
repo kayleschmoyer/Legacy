@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import { OAuthProvider } from '@legacy-sports/shared-components/ui';
+import {
+  OAuthErrorCode,
+  OAuthProvider,
+} from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
@@ -295,7 +298,7 @@ export function LoginPage(): React.JSX.Element {
       } catch (error) {
         LOGGER.error(
           'One Tap authentication failed on login page:',
-          String(error),
+          error instanceof Error ? error : new Error(String(error)),
         );
         setErrorMessage(
           error instanceof Error
@@ -321,7 +324,19 @@ export function LoginPage(): React.JSX.Element {
       const oauthResponse = await OAuthProvider.signIn();
       await loginWithOAuth(oauthResponse);
     } catch (error) {
-      LOGGER.error('Sign-in failed on login page:', String(error));
+      // User closing the Google popup (or COOP policy closing it) is an expected
+      // UX action, not an error worth surfacing to Rollbar.
+      const isCancelled =
+        error instanceof Error &&
+        'code' in error &&
+        (error as { code: OAuthErrorCode }).code ===
+          OAuthErrorCode.SIGN_IN_CANCELLED;
+      if (!isCancelled) {
+        LOGGER.error(
+          'Sign-in failed on login page:',
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
       setErrorMessage(
         error instanceof Error
           ? error.message

@@ -37,3 +37,4 @@ export {
   Vibration,
   Animated,
 } from '../platform-components';
+export { OAuthErrorCode } from '../platform-components/types';
