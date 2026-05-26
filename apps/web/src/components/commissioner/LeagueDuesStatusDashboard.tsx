@@ -10,12 +10,12 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  AlertTriangle,
   Check,
   CircleDollarSign,
   DollarSign,
   X as XIcon,
 } from '@tamagui/lucide-icons';
-import { AlertTriangle } from '@tamagui/lucide-icons';
 import {
   useGetLeagueDuesStatusQuery,
   useMarkMemberPaidMutation,
@@ -53,7 +53,7 @@ export function LeagueDuesStatusDashboard({
   onSuccess,
   onError,
 }: LeagueDuesStatusDashboardProps) {
-  const { data, loading, error } = useGetLeagueDuesStatusQuery({
+  const { data, loading, error, refetch } = useGetLeagueDuesStatusQuery({
     variables: { leagueId },
     fetchPolicy: 'cache-and-network',
   });
@@ -62,6 +62,7 @@ export function LeagueDuesStatusDashboard({
   const [markUnpaid, { loading: markingUnpaid }] =
     useMarkMemberUnpaidMutation();
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+  const [refetchFailed, setRefetchFailed] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey>('username');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -131,21 +132,19 @@ export function LeagueDuesStatusDashboard({
   const handleTogglePaid = useCallback(
     async (userId: number, currentlyPaid: boolean) => {
       setTogglingUserId(userId);
+      setRefetchFailed(false);
       try {
         if (currentlyPaid) {
-          await markUnpaid({
-            variables: { leagueId, userId },
-            refetchQueries: ['GetLeagueDuesStatus'],
-            awaitRefetchQueries: true,
-          });
+          await markUnpaid({ variables: { leagueId, userId } });
           onSuccess?.('Member marked as unpaid');
         } else {
-          await markPaid({
-            variables: { leagueId, userId },
-            refetchQueries: ['GetLeagueDuesStatus'],
-            awaitRefetchQueries: true,
-          });
+          await markPaid({ variables: { leagueId, userId } });
           onSuccess?.('Member marked as paid');
+        }
+        try {
+          await refetch();
+        } catch {
+          setRefetchFailed(true);
         }
       } catch (err) {
         const msg =
@@ -155,7 +154,7 @@ export function LeagueDuesStatusDashboard({
         setTogglingUserId(null);
       }
     },
-    [leagueId, markPaid, markUnpaid, onSuccess, onError],
+    [leagueId, markPaid, markUnpaid, onSuccess, onError, refetch],
   );
 
   const mutating = markingPaid || markingUnpaid;
@@ -286,6 +285,35 @@ export function LeagueDuesStatusDashboard({
         </XStack>
 
         <Separator />
+
+        {/* Refetch-failure notice */}
+        {refetchFailed && (
+          <XStack
+            alignItems="center"
+            justifyContent="space-between"
+            padding="$3"
+            borderRadius="$4"
+            backgroundColor={withAlpha(RED, 0.1)}
+            borderColor={withAlpha(RED, 0.3)}
+            borderWidth={1}
+          >
+            <XStack alignItems="center" gap="$2">
+              <AlertTriangle size={16} color="$red10" />
+              <Text fontSize="$2" color="$red10">
+                Data may be stale — could not refresh
+              </Text>
+            </XStack>
+            <Button
+              size="$2"
+              onPress={() => {
+                setRefetchFailed(false);
+                refetch().catch(() => setRefetchFailed(true));
+              }}
+            >
+              <Text fontSize="$2">Refresh</Text>
+            </Button>
+          </XStack>
+        )}
 
         {/* Filter Buttons */}
         <XStack gap="$2" flexWrap="wrap">
