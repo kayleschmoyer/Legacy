@@ -347,13 +347,16 @@ Automatically keeps Jira ticket statuses in sync with branch/PR activity.
 
 ### Transition Table
 
-| Event                               | Action | Jira Transition |
-| ----------------------------------- | ------ | --------------- |
-| `push` to `LS-*/...` branch         | --     | In Progress     |
-| `pull_request` opened               | --     | In Review       |
-| `pull_request` reopened             | --     | In Review       |
-| `pull_request` closed + merged      | --     | Done            |
-| `pull_request` closed without merge | --     | In Progress     |
+| Event                               | Action                                                                   | Jira Transition |
+| ----------------------------------- | ------------------------------------------------------------------------ | --------------- |
+| `push` to `LS-*/...` branch         | --                                                                       | In Progress     |
+| `push` to `claude/**` branch        | ticket key extracted from commit messages (branch name has no `LS-####`) | In Progress     |
+| `pull_request` opened               | ticket key extracted from PR title + body                                | In Review       |
+| `pull_request` reopened             | --                                                                       | In Review       |
+| `pull_request` closed + merged      | --                                                                       | Done            |
+| `pull_request` closed without merge | --                                                                       | In Progress     |
+
+> **Ticket key extraction priority (push events on `claude/**`):** commit messages in the push payload are scanned for `LS-####`keys. Agents must include the ticket key in every commit message (enforced by AGENTS.md). PR title/body extraction applies only to`pull_request` events.
 
 ### Epic Sync
 

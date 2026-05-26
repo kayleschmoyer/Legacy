@@ -88,6 +88,9 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          # Commit messages from the push payload (newline-separated).
+          # Only populated on push events; empty string on pull_request events.
+          COMMIT_MESSAGES: ${{ join(github.event.commits.*.message, '\n') }}
         run: |
           BRANCH="${{ steps.branch.outputs.name }}"
 
@@ -110,12 +113,23 @@ jobs:
             PR_KEYS=$(printf '%s\n%s' "$TITLE_KEYS" "$BODY_KEYS")
           fi
 
+          # For push events on agent branches (claude/*) where the branch name
+          # contains no ticket key, fall back to scanning commit messages.
+          # Agents always include LS-#### in commit messages per AGENTS.md.
+          COMMIT_KEYS=""
+          if [[ "${{ github.event_name }}" == "push" && -z "$BRANCH_KEYS" && -n "$COMMIT_MESSAGES" ]]; then
+            COMMIT_KEYS=$(echo "$COMMIT_MESSAGES" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
+            if [[ -n "$COMMIT_KEYS" ]]; then
+              echo "Extracted keys from commit messages: $(echo "$COMMIT_KEYS" | tr '\n' ' ')"
+            fi
+          fi
+
           # Combine and deduplicate all keys
-          ALL_KEYS=$(printf '%s\n%s' "$BRANCH_KEYS" "$PR_KEYS" \
+          ALL_KEYS=$(printf '%s\n%s\n%s' "$BRANCH_KEYS" "$PR_KEYS" "$COMMIT_KEYS" \
             | grep -E '^LS-[0-9]+$' | sort -u | tr '\n' ' ' | xargs)
 
           if [[ -z "$ALL_KEYS" ]]; then
-            echo "⏭️  No Jira ticket keys found in branch '$BRANCH' or PR metadata — skipping."
+            echo "⏭️  No Jira ticket keys found in branch '$BRANCH', PR metadata, or commit messages — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "keys=$ALL_KEYS" >> "$GITHUB_OUTPUT"

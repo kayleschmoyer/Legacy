@@ -204,23 +204,84 @@ $branches = git branch -a | ForEach-Object { $_.Trim() -replace '^\*\s*', '' -re
 
 Write-Info "Found $($branches.Count) unique branches"
 
-# Extract Jira ticket keys from branch names
+# Extract Jira ticket keys from branch names, falling back to PR title/body for
+# agent branches (claude/*) that embed no ticket key in the branch name.
 $ticketPattern = 'LS-\d+'
 $branchTickets = @{}
 
+# Collect agent branches that need PR-based ticket discovery
+$agentBranches = @()
+
 foreach ($branch in $branches) {
     if ($branch -match $ticketPattern) {
-        $ticketKey = $matches[0]
+        $ticketKey = $matches[0].ToUpper()
         if (-not $branchTickets.ContainsKey($ticketKey)) {
             $branchTickets[$ticketKey] = @()
         }
         $branchTickets[$ticketKey] += $branch
+    } elseif ($branch -match '^claude/') {
+        $agentBranches += $branch
     } elseif ($ShowAll) {
         Write-Info "Branch without ticket: $branch"
     }
 }
 
-Write-Success "Found $($branchTickets.Count) branches with Jira tickets"
+# For agent branches, do one targeted PR lookup per branch to extract the
+# ticket key from the PR title/body. This is O(# agent branches), not O(# PRs).
+if ($agentBranches.Count -gt 0 -and $ghAvailable) {
+    Write-Info "Resolving ticket keys for $($agentBranches.Count) agent branch(es) via PR lookup..."
+
+    foreach ($branch in $agentBranches) {
+        try {
+            $ghArgs = @("pr", "list", "--head", $branch, "--state", "all", "--json", "title,body,number,state,mergedAt", "--limit", "1")
+            $ghOutput = & gh $ghArgs 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Verbose "gh command failed for ${branch}: $($ghOutput)"
+                continue
+            }
+            $prJson = $ghOutput
+            if (-not $prJson) { continue }
+
+            $pr = $prJson | ConvertFrom-Json
+            if (-not $pr -or $pr.Count -eq 0) {
+                if ($ShowAll) { Write-Info "Agent branch without PR: $branch" }
+                continue
+            }
+
+            $pr = $pr[0]
+
+            # Extract all LS-#### keys from PR title (all matches) and body
+            # (only matches preceded by a closing keyword, matching GHA logic).
+            $titleKeys = [regex]::Matches($pr.title, 'LS-\d+', 'IgnoreCase') |
+                         ForEach-Object { $_.Value.ToUpper() }
+
+            $bodyKeys = @()
+            if ($pr.body) {
+                $bodyKeys = [regex]::Matches(
+                    $pr.body,
+                    '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?)\s+(LS-\d+)',
+                    'IgnoreCase'
+                ) | ForEach-Object { $_.Groups[1].Value.ToUpper() }
+            }
+
+            $keys = @($titleKeys) + @($bodyKeys) | Select-Object -Unique
+
+            foreach ($ticketKey in $keys) {
+                if (-not $branchTickets.ContainsKey($ticketKey)) {
+                    $branchTickets[$ticketKey] = @()
+                }
+                if ($branchTickets[$ticketKey] -notcontains $branch) {
+                    $branchTickets[$ticketKey] += $branch
+                }
+                Write-Info "Agent branch $branch → $ticketKey (PR #$($pr.number))"
+            }
+        } catch {
+            Write-Verbose "PR lookup failed for ${branch}: $($_.Exception.Message)"
+        }
+    }
+}
+
+Write-Success "Found $($branchTickets.Count) Jira ticket(s) across branches"
 
 # Check each ticket status
 Write-Header "Checking Jira ticket statuses..."
