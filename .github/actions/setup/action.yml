@@ -150,7 +150,15 @@ runs:
           echo "📦 pnpm store cache miss - packages will be downloaded"
         fi
 
-        pnpm install "${INSTALL_FLAGS[@]}"
+        # Retry once on failure: pnpm can fail with ERR_PNPM_EEXIST when two packages
+        # share a nested dep (e.g. drizzle-kit + @tamagui/static both nest esbuild@0.25.12)
+        # and pnpm "Recreates" node_modules while both already exist as separate inodes.
+        # Clearing node_modules before the retry lets pnpm hard-link cleanly from the store.
+        if ! pnpm install "${INSTALL_FLAGS[@]}"; then
+          echo "⚠️ pnpm install failed — clearing node_modules and retrying once from pnpm store cache"
+          rm -rf node_modules
+          pnpm install "${INSTALL_FLAGS[@]}" || exit 1
+        fi
 
         echo "✅ pnpm installation complete"
 
