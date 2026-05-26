@@ -36,6 +36,29 @@ export interface LeagueStandingsProps {
   onTeamClick?: (teamId: number) => void;
 }
 
+/** Exported for unit testing. */
+export function buildDivisionGroups<T extends { divisionId: number | null }>(
+  teams: readonly T[],
+): [number | null, T[]][] | null {
+  const uniqueDivisions = new Set(
+    teams.map((t) => t.divisionId).filter((d): d is number => d != null),
+  );
+  if (uniqueDivisions.size <= 1) return null;
+
+  const groups = new Map<number | null, T[]>();
+  for (const team of teams) {
+    const divId = team.divisionId ?? null;
+    const group = groups.get(divId) ?? [];
+    group.push(team);
+    groups.set(divId, group);
+  }
+  return [...groups.entries()].sort(([a], [b]) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
+}
+
 const RankBadge = styled(YStack, {
   width: 32,
   height: 32,
@@ -150,25 +173,10 @@ export function LeagueStandings({
   }, [teams, standings, leagueId]);
 
   // Group teams by division when multiple divisions exist
-  const divisionGroups = useMemo(() => {
-    const uniqueDivisions = new Set(
-      rankedTeams
-        .map((t) => t.divisionId)
-        .filter((d): d is number => d != null),
-    );
-    // If 0 or 1 division, no grouping needed
-    if (uniqueDivisions.size <= 1) return null;
-
-    const groups = new Map<number, typeof rankedTeams>();
-    for (const team of rankedTeams) {
-      const divId = team.divisionId ?? 0;
-      const group = groups.get(divId) ?? [];
-      group.push(team);
-      groups.set(divId, group);
-    }
-    // Return sorted by division ID
-    return [...groups.entries()].sort(([a], [b]) => a - b);
-  }, [rankedTeams]);
+  const divisionGroups = useMemo(
+    () => buildDivisionGroups(rankedTeams),
+    [rankedTeams],
+  );
 
   const isLoading = loading || standingsLoading;
 
@@ -542,7 +550,7 @@ export function LeagueStandings({
         <XStack alignItems="flex-start" overflow="hidden" width="100%">
           {divisionGroups.map(([divId, divTeams], groupIdx) => (
             <YStack
-              key={divId}
+              key={divId ?? 'unassigned'}
               flex={1}
               flexBasis={0}
               minWidth={0}
@@ -565,7 +573,7 @@ export function LeagueStandings({
                   textTransform="uppercase"
                   letterSpacing={0.8}
                 >
-                  Division {divId}
+                  {divId === null ? 'Unassigned' : `Division ${divId}`}
                 </Text>
                 <Text fontSize="$2" color="$textMuted" marginLeft="$2">
                   ({divTeams.length} {divTeams.length === 1 ? 'team' : 'teams'})
