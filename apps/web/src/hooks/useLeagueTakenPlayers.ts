@@ -24,11 +24,18 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
   });
   const [takenPlayerIds, setTakenPlayerIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
+  // Track the refreshKey that was in effect when the last fetch completed.
+  // If resolvedKey !== refreshKey the data is stale — report loading:true
+  // synchronously on the very render where refreshKey changes, before the
+  // effect fires, so displayPlayers never shows already-claimed players during
+  // the async re-fetch window (LS-4044).
+  const [resolvedKey, setResolvedKey] = useState<unknown>(refreshKey);
 
   useEffect(() => {
     if (teamsLoading) return;
     if (!teamsData?.leagueTeams) {
       setLoading(false);
+      setResolvedKey(refreshKey);
       return;
     }
 
@@ -66,8 +73,13 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
         });
 
         setTakenPlayerIds(ids);
+        setResolvedKey(refreshKey);
       } catch (err) {
-        LOGGER.error('Failed to fetch league rosters', String(err));
+        LOGGER.error(
+          'Failed to fetch league rosters',
+          err instanceof Error ? err : String(err),
+        );
+        setResolvedKey(refreshKey);
       } finally {
         setLoading(false);
       }
@@ -81,5 +93,8 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
     });
   }, [teamsData, teamsLoading, client, refreshKey]);
 
-  return { takenPlayerIds, loading: loading || teamsLoading };
+  return {
+    takenPlayerIds,
+    loading: loading || teamsLoading || resolvedKey !== refreshKey,
+  };
 }

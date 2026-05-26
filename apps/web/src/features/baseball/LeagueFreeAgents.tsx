@@ -1283,6 +1283,11 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                       disabled={player.id == null}
                       onPress={() => {
                         if (player.id == null) return;
+                        // Defense: takenPlayerIds may have been updated since
+                        // this row was rendered; skip the modal if the player
+                        // is no longer available to prevent a mutation failure
+                        // with no user-visible explanation (LS-4044).
+                        if (takenPlayerIds.has(player.id)) return;
                         setClaimPlayer({
                           id: player.id,
                           firstName: player.firstName,

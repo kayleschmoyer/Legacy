@@ -58,6 +58,39 @@ describe('useLeagueTakenPlayers — refreshKey re-fetches roster (LS-4032)', () 
     expect(query.mock.calls.length).toBe(callsAfterFirst + 2);
   });
 
+  it('reports loading:true immediately when refreshKey changes before fetch completes (LS-4044)', async () => {
+    // Initial fetch resolves immediately
+    const query = jest
+      .fn()
+      .mockResolvedValue({ data: { teamMembers: [{ player: { id: 42 } }] } });
+    useApolloClient.mockReturnValue({ query });
+
+    const { result, rerender } = renderHook(
+      ({ key }: { key: number }) => useLeagueTakenPlayers(1, key),
+      { initialProps: { key: 0 } },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.takenPlayerIds.has(42)).toBe(true);
+
+    // Next fetch never resolves — simulates a slow network on page navigation.
+    // Collect resolvers so the body is non-empty (avoids no-empty-function lint).
+    const pending: ((v: unknown) => void)[] = [];
+    query.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+
+    rerender({ key: 1 });
+
+    // loading must be true immediately — no stale-display window
+    await waitFor(() => expect(result.current.loading).toBe(true));
+    // takenPlayerIds still holds the old set until the fetch resolves
+    expect(result.current.takenPlayerIds.has(42)).toBe(true);
+  });
+
   it('does not re-fetch when refreshKey is stable across renders', async () => {
     const query = jest
       .fn()
