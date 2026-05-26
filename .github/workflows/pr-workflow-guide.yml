@@ -1,0 +1,89 @@
+name: PR Workflow Guide (W8)
+
+# Posts a one-time comment on newly-opened PRs authored by a bot identity
+# explaining how to drive the PR through the review lifecycle. This is a
+# belt-and-suspenders prompt for agents that open a PR without AGENTS.md in
+# context — it surfaces the exact steps without requiring them to rediscover
+# the protocol.
+#
+# Only fires for bot-authored PRs (user.type == "Bot") to avoid cluttering
+# human-opened PRs.
+#
+# Skipped when:
+#   - PR is from a fork (no write permission to post comments).
+#   - PR author is not a bot.
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-workflow-guide-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  post-guide:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.sender.type == 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Generate reviewer app token
+        id: reviewer-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Post PR workflow guide comment
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api -X POST "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            -f body="$(cat <<'COMMENT'
+          ## PR Workflow Guide
+
+          This PR was opened by an automated agent. Here is the required protocol to drive it to merge.
+
+          ### Steps
+
+          1. **Work in draft** — push commits freely; the Reviewer Bot does not fire while the PR is in draft.
+
+          2. **Run pre-commit checks** before marking ready:
+             ```
+             make pc
+             ```
+
+          3. **Self-review** — read every changed file in full against `.agents/skills/pr-lifecycle/references/common-review-patterns.md` and fix issues before pushing.
+
+          4. **Mark ready for review**:
+             ```
+             github_mark_pr_ready(number: <PR#>)
+             ```
+
+          5. **Apply labels** (in this order — `bot:ready-for-review` must be last):
+             ```
+             github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
+             github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])
+             ```
+             The `bot:ready-for-review` label fires **Cycle 1** of the Reviewer Bot.
+
+          6. **Respond to every review thread** with one of:
+             - `FIX: <sha>` — fix is committed at `<sha>`; then resolve the thread
+             - `JUSTIFY: <rationale>` — finding is incorrect or out of scope (Cycle 1 only)
+
+          7. **After replying**, resolve all `FIX:` threads in a single batch call, push fix commits, then re-apply `bot:ready-for-review` to fire the next cycle.
+
+          8. **Repeat** until the bot posts an APPROVED verdict. CI runs automatically after approval. The Merge Queue handles the final merge when all checks are green.
+
+          > Full protocol: `AGENTS.md` → [Author Agent Contract](https://github.com/bkrupa/legacy-sports/blob/main/AGENTS.md#author-agent-contract-bot-pr-flow)
+          > and `.agents/skills/pr-lifecycle/SKILL.md`
+          COMMENT
+          )"
