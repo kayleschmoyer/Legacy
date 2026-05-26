@@ -460,15 +460,25 @@ export const handleSecureGoogleAuth = async (
           'Email verified from authorization code flow successfully',
         );
       } catch (error) {
-        LOGGER.error(
-          'Failed to exchange authorization code for email:',
-          error instanceof Error ? error : new Error(String(error)),
-          {
-            handler: 'handleSecureGoogleAuth',
-            context: 'code_exchange',
-            redirectUri,
-          },
-        );
+        const isInvalidGrant =
+          error instanceof Error && error.message.includes('invalid_grant');
+        if (isInvalidGrant) {
+          LOGGER.warn(
+            'Authorization code rejected by Google (invalid_grant) — code expired or already used',
+            error instanceof Error ? error : new Error(String(error)),
+            { handler: 'handleSecureGoogleAuth', context: 'code_exchange' },
+          );
+        } else {
+          LOGGER.error(
+            'Failed to exchange authorization code for email:',
+            error instanceof Error ? error : new Error(String(error)),
+            {
+              handler: 'handleSecureGoogleAuth',
+              context: 'code_exchange',
+              redirectUri,
+            },
+          );
+        }
         return {
           statusCode: 400,
           body: JSON.stringify({

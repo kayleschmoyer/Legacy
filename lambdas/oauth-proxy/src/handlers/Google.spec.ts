@@ -335,8 +335,32 @@ describe('handleSecureGoogleAuth — error logging', () => {
     jest.clearAllMocks();
   });
 
-  it('passes the full Error to LOGGER.error when code exchange fails', async () => {
+  it('logs LOGGER.warn (not LOGGER.error) when code exchange fails with invalid_grant', async () => {
     const cause = new Error('invalid_grant');
+    googleMock.OAuth2Client.mockImplementationOnce(() => ({
+      verifyIdToken: jest.fn(),
+      getToken: jest.fn().mockRejectedValue(cause),
+    }));
+
+    const result = await handleSecureGoogleAuth(
+      makeEvent({ code: 'auth-code-123' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(loggerMock.LOGGER.warn).toHaveBeenCalledWith(
+      expect.stringContaining('invalid_grant'),
+      cause,
+      expect.objectContaining({ context: 'code_exchange' }),
+    );
+    expect(loggerMock.LOGGER.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Failed to exchange authorization code'),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('passes the full Error to LOGGER.error when code exchange fails with a non-grant error', async () => {
+    const cause = new Error('Connection reset by peer');
     googleMock.OAuth2Client.mockImplementationOnce(() => ({
       verifyIdToken: jest.fn(),
       getToken: jest.fn().mockRejectedValue(cause),
@@ -351,6 +375,11 @@ describe('handleSecureGoogleAuth — error logging', () => {
       expect.stringContaining('Failed to exchange authorization code'),
       cause,
       expect.objectContaining({ context: 'code_exchange' }),
+    );
+    expect(loggerMock.LOGGER.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('invalid_grant'),
+      expect.anything(),
+      expect.anything(),
     );
   });
 
