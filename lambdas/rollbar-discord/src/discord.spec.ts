@@ -4,6 +4,7 @@ import {
   formatRollbarEmbed,
   postToDiscord,
 } from './discord';
+import { scrubPii, scrubUrl } from './scrub-pii';
 import type {
   BudgetNotification,
   CloudWatchAlarm,
@@ -303,6 +304,181 @@ describe('formatBudgetEmbed', () => {
 
     const fieldNames = embed.fields?.map((f) => f.name) ?? [];
     expect(fieldNames).not.toContain('Period');
+  });
+});
+
+describe('scrubUrl', () => {
+  it('strips query string from an absolute URL', () => {
+    expect(
+      scrubUrl('https://api.example.com/v1/users?token=abc123&user=42'),
+    ).toBe('https://api.example.com/v1/users');
+  });
+
+  it('strips query string from a relative URL', () => {
+    expect(scrubUrl('/api/v1/leagues?auth=eyJsomething&page=1')).toBe(
+      '/api/v1/leagues',
+    );
+  });
+
+  it('preserves a URL with no query string', () => {
+    expect(scrubUrl('/api/test')).toBe('/api/test');
+  });
+
+  it('strips fragment from a relative URL', () => {
+    expect(scrubUrl('/page#section')).toBe('/page');
+  });
+});
+
+describe('scrubPii', () => {
+  it('redacts email addresses', () => {
+    expect(scrubPii('Error for user john.doe@example.com in prod')).toBe(
+      'Error for user [REDACTED] in prod',
+    );
+  });
+
+  it('redacts JWT tokens', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    expect(scrubPii(`Auth failed for token ${jwt}`)).toBe(
+      'Auth failed for token [REDACTED]',
+    );
+  });
+
+  it('redacts Bearer token header values', () => {
+    expect(scrubPii('Authorization: Bearer abc123token')).toBe(
+      'Authorization: Bearer [REDACTED]',
+    );
+  });
+
+  it('redacts long hex blobs', () => {
+    const hex = 'a3f9c1e2b4d6f8a09b2c4e1d3f5a7b9c';
+    expect(scrubPii(`Session token: ${hex}`)).toBe('Session token: [REDACTED]');
+  });
+
+  it('redacts JSON-like sensitive key string values', () => {
+    expect(
+      scrubPii('payload: {"token": "super-secret-value", "user": "alice"}'),
+    ).toBe('payload: {"token": "[REDACTED]", "user": "alice"}');
+  });
+
+  it('redacts JSON-like sensitive key numeric values', () => {
+    expect(scrubPii('payload: {"api_key": 123456, "user": "alice"}')).toBe(
+      'payload: {"api_key": "[REDACTED]", "user": "alice"}',
+    );
+  });
+
+  it('redacts JSON-like sensitive key boolean values', () => {
+    expect(scrubPii('payload: {"session": true, "active": false}')).toBe(
+      'payload: {"session": "[REDACTED]", "active": false}',
+    );
+  });
+
+  it('redacts JSON-like sensitive key null values', () => {
+    expect(scrubPii('payload: {"password": null}')).toBe(
+      'payload: {"password": "[REDACTED]"}',
+    );
+  });
+
+  it('leaves clean text unchanged', () => {
+    const clean = 'TypeError: Cannot read property "foo" of undefined';
+    expect(scrubPii(clean)).toBe(clean);
+  });
+});
+
+describe('formatRollbarEmbed PII scrubbing', () => {
+  it('strips query string from request URL', () => {
+    const event: RollbarEvent = {
+      event_name: 'occurrence',
+      data: {
+        occurrence: {
+          level: 'error',
+          environment: 'production',
+          body: { message: { body: 'something broke' } },
+          request: {
+            url: 'https://api.example.com/v1/leagues?token=supersecret&user=42',
+            method: 'GET',
+          },
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    const requestField = embed?.fields?.find((f) => f.name === 'Request');
+    expect(requestField?.value).toBe('GET https://api.example.com/v1/leagues');
+    expect(requestField?.value).not.toContain('token=');
+    expect(requestField?.value).not.toContain('user=');
+  });
+
+  it('redacts email address in item.title', () => {
+    const event: RollbarEvent = {
+      event_name: 'new_item',
+      data: {
+        item: {
+          title: 'Login failed for user@example.com',
+          level: 'error',
+          environment: 'production',
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.title).toBe('Login failed for [REDACTED]');
+    expect(embed?.title).not.toContain('@');
+  });
+
+  it('redacts JWT token in exception message', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const event: RollbarEvent = {
+      event_name: 'occurrence',
+      data: {
+        occurrence: {
+          level: 'error',
+          environment: 'production',
+          body: {
+            trace: {
+              exception: {
+                class: 'AuthError',
+                message: `Invalid token: ${jwt}`,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.description).toContain('AuthError');
+    expect(embed?.description).toContain('[REDACTED]');
+    expect(embed?.description).not.toContain('eyJ');
+  });
+
+  it('redacts email in message.body', () => {
+    const event: RollbarEvent = {
+      event_name: 'occurrence',
+      data: {
+        occurrence: {
+          level: 'warning',
+          environment: 'staging',
+          body: {
+            message: {
+              body: 'User admin@company.com exceeded rate limit',
+            },
+          },
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.description).toBe('User [REDACTED] exceeded rate limit');
   });
 });
 

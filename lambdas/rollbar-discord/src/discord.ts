@@ -6,6 +6,7 @@ import type {
   DiscordEmbed,
   RollbarEvent,
 } from './types';
+import { scrubPii, scrubUrl } from './scrub-pii';
 // Discord embed color constants
 const COLOR_ERROR = 0xed4245; // Red
 const COLOR_WARNING = 0xfee75c; // Yellow
@@ -69,10 +70,11 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   const level = normalizeLevel(item?.level ?? occurrence?.level);
   const environment = item?.environment ?? occurrence?.environment ?? 'unknown';
 
-  const title =
+  const rawTitle =
     item?.title ??
     occurrence?.body?.trace?.exception?.message ??
     'Rollbar Event';
+  const title = scrubPii(rawTitle);
   const truncatedTitle =
     title.length > 256 ? title.slice(0, 253) + '...' : title;
 
@@ -97,7 +99,7 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   if (occurrence?.request?.url) {
     fields.push({
       name: 'Request',
-      value: `${occurrence.request.method ?? 'GET'} ${occurrence.request.url}`,
+      value: `${occurrence.request.method ?? 'GET'} ${scrubUrl(occurrence.request.url)}`,
       inline: false,
     });
   }
@@ -106,9 +108,9 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   let description = '';
   const exception = occurrence?.body?.trace?.exception;
   if (exception) {
-    description = `**${exception.class ?? 'Error'}**: ${exception.message ?? ''}`;
+    description = `**${exception.class ?? 'Error'}**: ${scrubPii(exception.message ?? '')}`;
   } else if (occurrence?.body?.message?.body) {
-    description = occurrence.body.message.body;
+    description = scrubPii(occurrence.body.message.body);
   }
 
   if (description.length > 2048) {
