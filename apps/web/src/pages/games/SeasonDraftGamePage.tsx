@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { SeasonDraftGame } from '@legacy-sports/shared-components/season-draft';
-import { Text, YStack } from 'tamagui';
+import { Button, Text, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 
 /**
@@ -21,15 +21,22 @@ export const SeasonDraftGamePage: React.FC = () => {
   if (isNaN(numericGameId)) {
     return (
       <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
-        <Text color="$brandSeamRedLight">Invalid game link.</Text>
+        <Text color="$brandSeamRedLight">Game not found.</Text>
       </YStack>
     );
   }
 
   if (!user) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
+      <YStack
+        flex={1}
+        justifyContent="center"
+        alignItems="center"
+        padding="$6"
+        gap="$4"
+      >
         <Text>Please sign in to view this Season Draft Game.</Text>
+        <Button onPress={() => navigate('/')}>Sign In</Button>
       </YStack>
     );
   }
