@@ -22,9 +22,11 @@ export async function getOrCreateUser(
   const maskedEmail = `${maskedLocal}@${domain}`;
   LOGGER.debug(`Getting or creating user: ${maskedEmail}`);
 
+  let isNewUser = false;
+  let user: InternalUser;
+
   try {
-    let isNewUser = false;
-    const user = await withDbClient(async (db) => {
+    user = await withDbClient(async (db) => {
       let u = await getUserByEmail(db, email);
 
       if (!u) {
@@ -44,13 +46,6 @@ export async function getOrCreateUser(
 
       return u;
     });
-
-    // Best-effort Discord notification — sent after DB connection is released
-    if (isNewUser) {
-      await notifyNewUserSignup(email, user.id, 'google');
-    }
-
-    return user;
   } catch (error) {
     LOGGER.error(
       'Error getting or creating user:',
@@ -58,6 +53,14 @@ export async function getOrCreateUser(
     );
     throw error;
   }
+
+  // Best-effort Discord notification — outside the DB try/catch so a
+  // notification failure cannot re-throw and fail user signup.
+  if (isNewUser) {
+    await notifyNewUserSignup(email, user.id, 'google');
+  }
+
+  return user;
 }
 
 /**

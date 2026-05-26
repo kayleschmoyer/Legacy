@@ -94,12 +94,14 @@ export async function notifyNewUserSignup(
   try {
     webhookUrl = await getWebhookUrl();
   } catch (err) {
-    LOGGER.error('Failed to retrieve Discord new-user signup webhook URL', {
-      error:
-        err instanceof Error
-          ? { name: err.name, message: err.message, stack: err.stack }
-          : String(err),
-    });
+    // Warn rather than error — the webhook is optional/best-effort and the
+    // secret may simply have no value set yet (e.g. feature not yet configured
+    // in this environment). A warn keeps it out of Rollbar while still
+    // surfacing the issue in CloudWatch.
+    LOGGER.warn(
+      'Discord new-user signup webhook URL unavailable — skipping notification',
+      err instanceof Error ? err : String(err),
+    );
     return;
   }
   if (!webhookUrl) return;

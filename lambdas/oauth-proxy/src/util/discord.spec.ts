@@ -168,4 +168,32 @@ describe('notifyNewUserSignup', () => {
     const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://discord.com/api/webhooks/test/secret-name-wins');
   });
+
+  it('does not throw and skips fetch when secret name is set but retrieval fails', async () => {
+    delete process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'];
+    // Secret name env var is set (guard passes) but retrieval will fail —
+    // simulates the case where the Secrets Manager secret exists as a
+    // placeholder but has no value populated yet.
+    process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME'] =
+      'prod/discord-user-signup-webhook-url';
+
+    jest.resetModules();
+    jest.doMock('@legacy-sports/aws-utils', () => ({
+      readSecret: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('ResourceNotFoundException: Secret has no value'),
+        ),
+    }));
+
+    const { notifyNewUserSignup: fresh } = (await import('./discord')) as {
+      notifyNewUserSignup: typeof notifyNewUserSignup;
+    };
+
+    await expect(
+      fresh('user@example.com', 1, 'google'),
+    ).resolves.toBeUndefined();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
