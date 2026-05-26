@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Dialog } from '@legacy-sports/shared-components';
 import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
@@ -265,6 +266,10 @@ export function AdminPage(): React.JSX.Element {
   const auth = useAuth();
   const [search, setSearch] = useState('');
   const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
+  const [pendingImpersonation, setPendingImpersonation] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
 
   // JWT decoder state
   const [jwtInput, setJwtInput] = useState('');
@@ -291,20 +296,23 @@ export function AdminPage(): React.JSX.Element {
     return <Navigate to="/" replace />;
   }
 
-  const handleImpersonate = async (userId: number, label: string) => {
-    if (
-      !window.confirm(
-        `Impersonate ${label}? You will be signed in as this user until you sign out.`,
-      )
-    ) {
-      return;
-    }
-    setImpersonatingId(userId);
+  const handleImpersonate = (userId: number, label: string) => {
+    setPendingImpersonation({ id: userId, label });
+  };
+
+  const handleImpersonateConfirm = async () => {
+    if (!pendingImpersonation) return;
+    const { id } = pendingImpersonation;
+    setPendingImpersonation(null);
+    setImpersonatingId(id);
     try {
-      await auth.impersonateUser(userId);
+      await auth.impersonateUser(id);
       void navigate('/');
     } catch (err) {
-      LOGGER.error('Impersonation failed:', String(err));
+      LOGGER.error(
+        'Impersonation failed:',
+        err instanceof Error ? err : String(err),
+      );
     } finally {
       setImpersonatingId(null);
     }
@@ -788,7 +796,7 @@ export function AdminPage(): React.JSX.Element {
                         type="button"
                         onClick={() => {
                           if (u.id == null) return;
-                          void handleImpersonate(
+                          handleImpersonate(
                             u.id,
                             u.username ?? u.email ?? `user #${u.id}`,
                           );
@@ -969,6 +977,22 @@ export function AdminPage(): React.JSX.Element {
           )}
         </AdminSection>
       </YStack>
+
+      <Dialog
+        open={pendingImpersonation !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingImpersonation(null);
+        }}
+        eyebrow="Admin action"
+        title="Impersonate user"
+        description={`You are about to impersonate ${pendingImpersonation?.label ?? ''}. You will be signed in as this user until you sign out.`}
+        confirmLabel="Impersonate"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          void handleImpersonateConfirm();
+        }}
+        onCancel={() => setPendingImpersonation(null)}
+      />
 
       {/* Keyframes for spinner — injected once at component scope. */}
       <style>{`@keyframes admin-spin { to { transform: rotate(360deg); } }
