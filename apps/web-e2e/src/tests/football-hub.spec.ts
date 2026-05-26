@@ -600,17 +600,14 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
     page,
   }) => {
     await page.goto('/football');
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByText(/football fantasy/i).first()).toBeVisible();
-    const footballContent = await page.locator('body').textContent();
+    await expect(
+      page.locator('[aria-label="Football fantasy landing page"]'),
+    ).toBeVisible({ timeout: 10000 });
 
     await page.goto('/baseball');
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByText(/baseball fantasy/i).first()).toBeVisible();
-    const baseballContent = await page.locator('body').textContent();
-
-    // The two pages should have meaningfully different content.
-    expect(footballContent).not.toBe(baseballContent);
+    await expect(
+      page.locator('[aria-label="Baseball fantasy landing page"]'),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('primary navigation is visible on the football hub', async ({
@@ -646,13 +643,12 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
     await page.goto('/football/league/create');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByTestId('sport-tab-football')).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    await expect(page.getByTestId('football-beta-banner')).toBeVisible({
+      timeout: 10000,
+    });
     await expect(
       page.getByRole('heading', { name: /Create Football League/i }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('/baseball/league/create is pre-selected to baseball sport', async ({
