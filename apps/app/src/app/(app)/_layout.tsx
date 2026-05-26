@@ -24,6 +24,7 @@ import ViewCareerStats from './view_career_stats';
 import ViewGameLogs from './view_game_logs';
 import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
 import LeagueCreatePage from './baseball/league/create';
+import FootballLeagueCreatePage from './football/league/create';
 import JoinLeagueByCode from './baseball/league/join';
 import MatchupDetail from './baseball/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
@@ -60,6 +61,7 @@ export type AppDrawerParamList = {
   'baseball/league/join': undefined;
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
+  'football/league/create': undefined;
   DraftBoardPage: { leagueId?: string } | undefined;
   'league-discovery': undefined;
   'season-draft/index': undefined;
@@ -315,6 +317,15 @@ export default function Layout() {
             name="football/index"
             options={{ title: 'Football Home' }}
             component={FootballHome}
+          />
+          <Screen
+            name="football/league/create"
+            options={{
+              drawerLabel: () => null,
+              headerShown: true,
+              headerTitle: 'Create Football League',
+            }}
+            component={FootballLeagueCreatePage}
           />
           <Screen
             name="baseball/index"
