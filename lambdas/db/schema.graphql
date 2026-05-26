@@ -240,6 +240,20 @@ type BadgeProgress {
   userId: Int
 }
 
+type BaseballMatchupPlayer {
+  playerId: Int!
+  playerName: String!
+  position: String!
+  totalPoints: Float!
+}
+
+type BaseballMatchupStats {
+  players: [BaseballMatchupPlayer!]!
+  teamId: Int!
+  teamName: String!
+  totalPoints: Float!
+}
+
 type BillingPortalSessionResult {
   url: String
 }
@@ -986,13 +1000,13 @@ type FootballGameRushingStats {
 A player on a football fantasy team in a matchup
 """
 type FootballMatchupPlayer {
-  games: [FootballMatchupPlayerGame!]
-  isDst: Boolean
+  games: [FootballMatchupPlayerGame!]!
+  isDst: Boolean!
   nflTeam: String
-  playerId: Int
-  playerName: String
-  position: String
-  totalPoints: Float
+  playerId: Int!
+  playerName: String!
+  position: String!
+  totalPoints: Float!
 }
 
 """
@@ -1000,10 +1014,10 @@ A single NFL game played by a football matchup player
 """
 type FootballMatchupPlayerGame {
   defense: FootballGameDefenseStats
-  fantasyPoints: Float
+  fantasyPoints: Float!
   gameDate: String
-  gameIdentifier: String
-  gameNum: Int
+  gameIdentifier: String!
+  gameNum: Int!
   idp: FootballGameIDPStats
   kicking: FootballGameKickingStats
   opponent: String
@@ -1016,10 +1030,10 @@ type FootballMatchupPlayerGame {
 Stats for one team in a football matchup
 """
 type FootballMatchupStats {
-  players: [FootballMatchupPlayer!]
-  teamId: Int
-  teamName: String
-  totalPoints: Float
+  players: [FootballMatchupPlayer!]!
+  teamId: Int!
+  teamName: String!
+  totalPoints: Float!
 }
 
 """
@@ -1786,6 +1800,8 @@ type MatchupRecap {
   """
   winnerId: Int
 }
+
+union MatchupStats = BaseballMatchupStats | FootballMatchupStats
 
 enum MatchupStatus {
   cancelled
@@ -3103,6 +3119,7 @@ type Query {
   """
   leagueTradeBlock(leagueId: Int!): [TeamMember!]
   leagueTradeOffers(leagueId: Int!, status: String): [TradeOffer!]
+  matchupScores(leagueId: Int!, weekNum: Int!): [MatchupStats!]!
 
   """
   Aggregate statistics about the baseball database powering the minigames hub

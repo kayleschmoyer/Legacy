@@ -1377,8 +1377,8 @@ export const FootballMatchupPlayerGameRef =
 FootballMatchupPlayerGameRef.implement({
   description: 'A single NFL game played by a football matchup player',
   fields: (t) => ({
-    gameNum: t.exposeInt('gameNum'),
-    gameIdentifier: t.exposeString('gameIdentifier'),
+    gameNum: t.exposeInt('gameNum', { nullable: false }),
+    gameIdentifier: t.exposeString('gameIdentifier', { nullable: false }),
     opponent: t.exposeString('opponent', { nullable: true }),
     gameDate: t.exposeString('gameDate', { nullable: true }),
     passing: t.field({
@@ -1411,7 +1411,7 @@ FootballMatchupPlayerGameRef.implement({
       nullable: true,
       resolve: (parent) => parent.idp ?? null,
     }),
-    fantasyPoints: t.exposeFloat('fantasyPoints'),
+    fantasyPoints: t.exposeFloat('fantasyPoints', { nullable: false }),
   }),
 });
 
@@ -1433,16 +1433,17 @@ export const FootballMatchupPlayerRef =
 FootballMatchupPlayerRef.implement({
   description: 'A player on a football fantasy team in a matchup',
   fields: (t) => ({
-    playerId: t.exposeInt('playerId'),
-    playerName: t.exposeString('playerName'),
-    position: t.exposeString('position'),
+    playerId: t.exposeInt('playerId', { nullable: false }),
+    playerName: t.exposeString('playerName', { nullable: false }),
+    position: t.exposeString('position', { nullable: false }),
     nflTeam: t.exposeString('nflTeam', { nullable: true }),
-    isDst: t.exposeBoolean('isDst'),
+    isDst: t.exposeBoolean('isDst', { nullable: false }),
     games: t.field({
       type: [FootballMatchupPlayerGameRef],
+      nullable: false,
       resolve: (parent) => parent.games,
     }),
-    totalPoints: t.exposeFloat('totalPoints'),
+    totalPoints: t.exposeFloat('totalPoints', { nullable: false }),
   }),
 });
 
@@ -1461,11 +1462,12 @@ export const FootballMatchupStatsRef =
 FootballMatchupStatsRef.implement({
   description: 'Stats for one team in a football matchup',
   fields: (t) => ({
-    teamId: t.exposeInt('teamId'),
-    teamName: t.exposeString('teamName'),
-    totalPoints: t.exposeFloat('totalPoints'),
+    teamId: t.exposeInt('teamId', { nullable: false }),
+    teamName: t.exposeString('teamName', { nullable: false }),
+    totalPoints: t.exposeFloat('totalPoints', { nullable: false }),
     players: t.field({
       type: [FootballMatchupPlayerRef],
+      nullable: false,
       resolve: (parent) => parent.players,
     }),
   }),

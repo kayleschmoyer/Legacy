@@ -229,6 +229,22 @@ export type BadgeProgress = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type BaseballMatchupPlayer = {
+  __typename?: 'BaseballMatchupPlayer';
+  playerId: Scalars['Int']['output'];
+  playerName: Scalars['String']['output'];
+  position: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
+};
+
+export type BaseballMatchupStats = {
+  __typename?: 'BaseballMatchupStats';
+  players: Array<BaseballMatchupPlayer>;
+  teamId: Scalars['Int']['output'];
+  teamName: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
+};
+
 export type BillingPortalSessionResult = {
   __typename?: 'BillingPortalSessionResult';
   url?: Maybe<Scalars['String']['output']>;
@@ -868,23 +884,23 @@ export type FootballGameRushingStats = {
 /** A player on a football fantasy team in a matchup */
 export type FootballMatchupPlayer = {
   __typename?: 'FootballMatchupPlayer';
-  games?: Maybe<Array<FootballMatchupPlayerGame>>;
-  isDst?: Maybe<Scalars['Boolean']['output']>;
+  games: Array<FootballMatchupPlayerGame>;
+  isDst: Scalars['Boolean']['output'];
   nflTeam?: Maybe<Scalars['String']['output']>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  playerName?: Maybe<Scalars['String']['output']>;
-  position?: Maybe<Scalars['String']['output']>;
-  totalPoints?: Maybe<Scalars['Float']['output']>;
+  playerId: Scalars['Int']['output'];
+  playerName: Scalars['String']['output'];
+  position: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
 };
 
 /** A single NFL game played by a football matchup player */
 export type FootballMatchupPlayerGame = {
   __typename?: 'FootballMatchupPlayerGame';
   defense?: Maybe<FootballGameDefenseStats>;
-  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  fantasyPoints: Scalars['Float']['output'];
   gameDate?: Maybe<Scalars['String']['output']>;
-  gameIdentifier?: Maybe<Scalars['String']['output']>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
+  gameIdentifier: Scalars['String']['output'];
+  gameNum: Scalars['Int']['output'];
   idp?: Maybe<FootballGameIdpStats>;
   kicking?: Maybe<FootballGameKickingStats>;
   opponent?: Maybe<Scalars['String']['output']>;
@@ -896,10 +912,10 @@ export type FootballMatchupPlayerGame = {
 /** Stats for one team in a football matchup */
 export type FootballMatchupStats = {
   __typename?: 'FootballMatchupStats';
-  players?: Maybe<Array<FootballMatchupPlayer>>;
-  teamId?: Maybe<Scalars['Int']['output']>;
-  teamName?: Maybe<Scalars['String']['output']>;
-  totalPoints?: Maybe<Scalars['Float']['output']>;
+  players: Array<FootballMatchupPlayer>;
+  teamId: Scalars['Int']['output'];
+  teamName: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
 };
 
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
@@ -1584,6 +1600,8 @@ export type MatchupRecap = {
   /** ID of the winning team, or null on a tie */
   winnerId?: Maybe<Scalars['Int']['output']>;
 };
+
+export type MatchupStats = BaseballMatchupStats | FootballMatchupStats;
 
 export enum MatchupStatus {
   Cancelled = 'cancelled',
@@ -2839,6 +2857,7 @@ export type Query = {
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
+  matchupScores: Array<MatchupStats>;
   /** Aggregate statistics about the baseball database powering the minigames hub */
   minigamesStats?: Maybe<MinigamesStats>;
   /** Get the current user's votes for a league season */
@@ -3255,6 +3274,11 @@ export type QueryLeagueTradeBlockArgs = {
 export type QueryLeagueTradeOffersArgs = {
   leagueId: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryMatchupScoresArgs = {
+  leagueId: Scalars['Int']['input'];
+  weekNum: Scalars['Int']['input'];
 };
 
 export type QueryMyAwardVotesArgs = {
@@ -5075,11 +5099,11 @@ export type FootballGameIdpStatsFragment = {
 
 export type FootballMatchupPlayerGameFragment = {
   __typename?: 'FootballMatchupPlayerGame';
-  gameNum?: number | null;
-  gameIdentifier?: string | null;
+  gameNum: number;
+  gameIdentifier: string;
   gameDate?: string | null;
   opponent?: string | null;
-  fantasyPoints?: number | null;
+  fantasyPoints: number;
   passing?: {
     __typename?: 'FootballGamePassingStats';
     att?: number | null;
@@ -5134,19 +5158,19 @@ export type FootballMatchupPlayerGameFragment = {
 
 export type FootballMatchupPlayerFragment = {
   __typename?: 'FootballMatchupPlayer';
-  playerId?: number | null;
-  playerName?: string | null;
-  position?: string | null;
-  isDst?: boolean | null;
+  playerId: number;
+  playerName: string;
+  position: string;
+  isDst: boolean;
   nflTeam?: string | null;
-  totalPoints?: number | null;
-  games?: Array<{
+  totalPoints: number;
+  games: Array<{
     __typename?: 'FootballMatchupPlayerGame';
-    gameNum?: number | null;
-    gameIdentifier?: string | null;
+    gameNum: number;
+    gameIdentifier: string;
     gameDate?: string | null;
     opponent?: string | null;
-    fantasyPoints?: number | null;
+    fantasyPoints: number;
     passing?: {
       __typename?: 'FootballGamePassingStats';
       att?: number | null;
@@ -5197,29 +5221,29 @@ export type FootballMatchupPlayerFragment = {
       defTd?: number | null;
       safeties?: number | null;
     } | null;
-  }> | null;
+  }>;
 };
 
 export type FootballMatchupStatsFragment = {
   __typename?: 'FootballMatchupStats';
-  teamId?: number | null;
-  teamName?: string | null;
-  totalPoints?: number | null;
-  players?: Array<{
+  teamId: number;
+  teamName: string;
+  totalPoints: number;
+  players: Array<{
     __typename?: 'FootballMatchupPlayer';
-    playerId?: number | null;
-    playerName?: string | null;
-    position?: string | null;
-    isDst?: boolean | null;
+    playerId: number;
+    playerName: string;
+    position: string;
+    isDst: boolean;
     nflTeam?: string | null;
-    totalPoints?: number | null;
-    games?: Array<{
+    totalPoints: number;
+    games: Array<{
       __typename?: 'FootballMatchupPlayerGame';
-      gameNum?: number | null;
-      gameIdentifier?: string | null;
+      gameNum: number;
+      gameIdentifier: string;
       gameDate?: string | null;
       opponent?: string | null;
-      fantasyPoints?: number | null;
+      fantasyPoints: number;
       passing?: {
         __typename?: 'FootballGamePassingStats';
         att?: number | null;
@@ -5270,8 +5294,8 @@ export type FootballMatchupStatsFragment = {
         defTd?: number | null;
         safeties?: number | null;
       } | null;
-    }> | null;
-  }> | null;
+    }>;
+  }>;
 };
 
 export type FootballPlayerFragment = {

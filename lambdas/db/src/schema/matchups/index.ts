@@ -32,5 +32,8 @@ import './discord-weekly-recaps';
 // Football-specific scheduled mutations (EventBridge seasonal triggers)
 import './football-scheduled-mutations';
 
+// matchupScores query (baseball + football union)
+import './matchupScores';
+
 // Re-export types that other schema modules may need
 export { MatchupPlayerGameRef } from './types';
