@@ -28,7 +28,7 @@ import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { verifyCommissionerAccess } from './authorization';
 import { CommissionerAuditLog } from './leagues';
-import { AuthenticationError } from './graphql-errors';
+import { AuthenticationError, UserInputError } from './graphql-errors';
 import { addPlayerToRoster } from '../services/roster-service';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -453,6 +453,10 @@ builder.mutationField('swapMatchupTeams', (t) =>
           success: false,
           message: 'Both matchups must belong to the same league.',
         };
+      }
+
+      if (m1.weekNumber !== m2.weekNumber) {
+        throw UserInputError('Both matchups must be from the same week.');
       }
 
       if (!context.user.isAdmin) {

@@ -8,27 +8,18 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
-import { EditMatchupScoresSection } from './CommissionerToolsControl';
+import {
+  EditMatchupScoresSection,
+  SwapMatchupTeamsSection,
+} from './CommissionerToolsControl';
 
 const mockEditScore = jest.fn();
+const mockSwap = jest.fn();
+const mockGetMatchupsQuery = jest.fn();
 
 jest.mock('../../api/db/graphql.generated', () => ({
-  useGetMatchupsForLeagueQuery: () => ({
-    data: {
-      getMatchupsForLeague: [
-        {
-          id: '101',
-          weekNumber: 1,
-          team1Id: 1,
-          team2Id: 2,
-          team1Score: 0,
-          team2Score: 0,
-          status: 'completed',
-        },
-      ],
-    },
-    loading: false,
-  }),
+  useGetMatchupsForLeagueQuery: (...args: unknown[]): unknown =>
+    mockGetMatchupsQuery(...args),
   useEditMatchupScoreMutation: () => [mockEditScore, { loading: false }],
   // Stubs for the other hooks pulled in by the parent module's top-level imports.
   useBulkDropTeamPlayersMutation: () => [jest.fn(), { loading: false }],
@@ -42,7 +33,7 @@ jest.mock('../../api/db/graphql.generated', () => ({
     { loading: false },
   ],
   useSetTeamLockMutation: () => [jest.fn(), { loading: false }],
-  useSwapMatchupTeamsMutation: () => [jest.fn(), { loading: false }],
+  useSwapMatchupTeamsMutation: () => [mockSwap, { loading: false }],
   useUpdateCommissionerNoteMutation: () => [jest.fn(), { loading: false }],
 }));
 
@@ -104,6 +95,22 @@ jest.mock('tamagui', () => {
 describe('EditMatchupScoresSection — LS-4040 double-submit guard', () => {
   beforeEach(() => {
     mockEditScore.mockReset();
+    mockGetMatchupsQuery.mockReturnValue({
+      data: {
+        getMatchupsForLeague: [
+          {
+            id: '101',
+            weekNumber: 1,
+            team1Id: 1,
+            team2Id: 2,
+            team1Score: 0,
+            team2Score: 0,
+            status: 'completed',
+          },
+        ],
+      },
+      loading: false,
+    });
   });
 
   it('fires editMatchupScore only once when Save Scores is clicked twice in rapid succession', async () => {
@@ -157,5 +164,112 @@ describe('EditMatchupScoresSection — LS-4040 double-submit guard', () => {
       });
       return Promise.resolve();
     });
+  });
+});
+
+describe('SwapMatchupTeamsSection — LS-4055 same-week validation', () => {
+  const matchups = [
+    {
+      id: '201',
+      weekNumber: 3,
+      team1Id: 1,
+      team2Id: 2,
+      team1Score: 0,
+      team2Score: 0,
+      status: 'scheduled',
+    },
+    {
+      id: '202',
+      weekNumber: 3,
+      team1Id: 3,
+      team2Id: 4,
+      team1Score: 0,
+      team2Score: 0,
+      status: 'scheduled',
+    },
+    {
+      id: '301',
+      weekNumber: 8,
+      team1Id: 5,
+      team2Id: 6,
+      team1Score: 0,
+      team2Score: 0,
+      status: 'scheduled',
+    },
+  ];
+
+  type Teams = React.ComponentProps<typeof SwapMatchupTeamsSection>['teams'];
+  const teams: Teams = [
+    { id: 1, name: 'Team A' },
+    { id: 2, name: 'Team B' },
+    { id: 3, name: 'Team C' },
+    { id: 4, name: 'Team D' },
+    { id: 5, name: 'Team E' },
+    { id: 6, name: 'Team F' },
+  ] as unknown as Teams;
+
+  beforeEach(() => {
+    mockSwap.mockReset();
+    mockGetMatchupsQuery.mockReturnValue({
+      data: { getMatchupsForLeague: matchups },
+      loading: false,
+    });
+  });
+
+  it('rejects swap when matchups are from different weeks', () => {
+    const onError = jest.fn();
+    render(
+      <SwapMatchupTeamsSection leagueId={1} teams={teams} onError={onError} />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Matchup A'), {
+      target: { value: '201' },
+    });
+    fireEvent.change(screen.getByLabelText('Matchup B'), {
+      target: { value: '301' },
+    });
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /swap teams/i }));
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      new Error('Both matchups must be from the same week'),
+    );
+    expect(mockSwap).not.toHaveBeenCalled();
+  });
+
+  it('allows swap when matchups are from the same week', async () => {
+    mockSwap.mockResolvedValue({
+      data: { swapMatchupTeams: { message: 'Teams swapped' } },
+    });
+    const onSuccess = jest.fn();
+    render(
+      <SwapMatchupTeamsSection
+        leagueId={1}
+        teams={teams}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Matchup A'), {
+      target: { value: '201' },
+    });
+    fireEvent.change(screen.getByLabelText('Matchup B'), {
+      target: { value: '202' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /swap teams/i }));
+    await act(() => Promise.resolve());
+
+    expect(mockSwap).toHaveBeenCalledTimes(1);
+    expect(mockSwap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          input: { matchupId1: 201, matchupId2: 202, reason: undefined },
+        },
+      }),
+    );
+    expect(onSuccess).toHaveBeenCalledWith('Teams swapped');
   });
 });

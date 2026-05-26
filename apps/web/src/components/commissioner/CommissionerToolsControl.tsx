@@ -573,7 +573,7 @@ export function EditMatchupScoresSection({
 
 // ── Sub-section: Swap Matchup Teams ────────────────────────────────────────
 
-function SwapMatchupTeamsSection({
+export function SwapMatchupTeamsSection({
   leagueId,
   teams,
   onSuccess,
@@ -604,6 +604,16 @@ function SwapMatchupTeamsSection({
     const m2 = parseInt(matchupId2, 10);
     if (!m1 || !m2 || m1 === m2) {
       onError?.(new Error('Please select two different matchups'));
+      return;
+    }
+    const matchup1 = matchups.find((m) => String(m.id) === matchupId1);
+    const matchup2 = matchups.find((m) => String(m.id) === matchupId2);
+    if (!matchup1 || !matchup2) {
+      onError?.(new Error('One or both selected matchups are invalid.'));
+      return;
+    }
+    if (matchup1.weekNumber !== matchup2.weekNumber) {
+      onError?.(new Error('Both matchups must be from the same week'));
       return;
     }
     try {
