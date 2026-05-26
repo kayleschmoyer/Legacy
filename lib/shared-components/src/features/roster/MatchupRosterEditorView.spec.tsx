@@ -334,6 +334,97 @@ describe('MatchupRosterEditorView', () => {
     });
   });
 
+  describe('swap-target eligibility feedback (LS-4050)', () => {
+    // Occupied swap-target rows previously showed "Tap to swap" regardless of
+    // eligibility, misleading users into thinking the swap was possible before
+    // blocking it at click time.  These tests pin the visual feedback contract
+    // for occupied ineligible swap targets (the functional block in
+    // handlePlayerClick was already in place via LS-4036).
+
+    const selectPlayer = (container: HTMLElement, playerId: string): void => {
+      const wrapper = container.querySelector(
+        `[data-testid="matchup-player-row-${playerId}"]`,
+      );
+      const inner = wrapper?.firstElementChild as HTMLElement | null;
+      if (!inner) throw new Error(`row ${playerId} not rendered`);
+      fireEvent.click(inner);
+    };
+
+    it('shows "Not eligible" on an occupied slot when the selected player cannot move there', () => {
+      // sp1 (SP-only) selected; c1 (C-only) is in the C slot.
+      // sp1 cannot fill the C slot, so c1's row must surface "Not eligible".
+      const players = [
+        makePlayer('sp1', 101, ['SP']),
+        makePlayer('c1', 102, ['C']),
+      ];
+      const positionMap = new Map<number, string>([
+        [101, 'SP'],
+        [102, 'C'],
+      ]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT, C_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      selectPlayer(container, 'sp1');
+      expect(screen.getByText('Not eligible')).toBeTruthy();
+      expect(screen.queryByText('Tap to swap')).toBeNull();
+    });
+
+    it('shows "Tap to swap" on an occupied slot when both players are eligible for the exchanged slots', () => {
+      const players = [
+        makePlayer('p1', 101, ['SP', 'C']),
+        makePlayer('p2', 102, ['SP', 'C']),
+      ];
+      const positionMap = new Map<number, string>([
+        [101, 'SP'],
+        [102, 'C'],
+      ]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT, C_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      selectPlayer(container, 'p1');
+      expect(screen.getByText('Tap to swap')).toBeTruthy();
+      expect(screen.queryByText('Not eligible')).toBeNull();
+    });
+
+    it('does not call onSwapPositions when tapping an ineligible occupied swap target', () => {
+      const onSwapPositions = jest.fn().mockResolvedValue(undefined);
+      const players = [
+        makePlayer('sp1', 101, ['SP']),
+        makePlayer('c1', 102, ['C']),
+      ];
+      const positionMap = new Map<number, string>([
+        [101, 'SP'],
+        [102, 'C'],
+      ]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT, C_SLOT]}
+          onSwapPositions={onSwapPositions}
+          onMoveToPosition={noop}
+        />,
+      );
+      selectPlayer(container, 'sp1');
+      selectPlayer(container, 'c1');
+      expect(onSwapPositions).not.toHaveBeenCalled();
+      // The error banner should name the ineligible player.
+      expect(screen.getByText(/is not eligible for/)).toBeTruthy();
+    });
+  });
+
   describe('mutation failure handling (LS-2664)', () => {
     // Before LS-2664, the four mutation handlers called `setSelectedPlayerId(null)`
     // unconditionally after `await onMutation(...)`. If the promise rejected, the

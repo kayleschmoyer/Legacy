@@ -376,6 +376,26 @@ export function MatchupRosterEditorView({
     const isSelected = selectedPlayerId === player.id;
     const isSwapTarget =
       selectedPlayerId !== null && selectedPlayerId !== player.id;
+    // When this card is a potential swap target, check whether the swap would
+    // be legal for both players before showing any "Tap to swap" affordance.
+    let isIneligibleSwapTarget = false;
+    if (isSwapTarget && selectedPlayer !== null) {
+      const selectedNewSlotType = player.positionId
+        ? (positionMap.get(player.positionId) ?? null)
+        : null;
+      const targetNewSlotType = selectedPlayer.positionId
+        ? (positionMap.get(selectedPlayer.positionId) ?? null)
+        : null;
+      isIneligibleSwapTarget =
+        !isEligibleForSlot(
+          selectedPlayer.player?.eligiblePositions ?? null,
+          selectedNewSlotType,
+        ) ||
+        !isEligibleForSlot(
+          player.player?.eligiblePositions ?? null,
+          targetNewSlotType,
+        );
+    }
     const playerName =
       `${player.player?.firstName ?? ''} ${player.player?.lastName ?? ''}`.trim();
 
@@ -393,22 +413,25 @@ export function MatchupRosterEditorView({
           backgroundColor={
             !locked && isSelected
               ? '$blue3'
-              : !locked && isSwapTarget
+              : !locked && isSwapTarget && !isIneligibleSwapTarget
                 ? '$blue2'
                 : undefined
           }
           borderWidth={!locked && isSelected ? 2 : 0}
           borderColor={!locked && isSelected ? '$blue8' : undefined}
           borderRadius="$3"
+          opacity={isIneligibleSwapTarget ? 0.45 : undefined}
           hoverStyle={
-            locked
+            locked || isIneligibleSwapTarget
               ? undefined
               : {
                   backgroundColor: isSwapTarget ? '$blue2' : '$gray3',
                   cursor: 'pointer',
                 }
           }
-          pressStyle={locked ? undefined : { scale: 0.99 }}
+          pressStyle={
+            locked || isIneligibleSwapTarget ? undefined : { scale: 0.99 }
+          }
           animation="quick"
           onPress={locked ? undefined : () => handlePlayerClick(player)}
           alignItems="center"
@@ -498,9 +521,14 @@ export function MatchupRosterEditorView({
               </XStack>
             )}
 
-          {!locked && isSwapTarget && (
+          {!locked && isSwapTarget && !isIneligibleSwapTarget && (
             <Text fontSize="$1" color="$yellow10" fontWeight="600">
               Tap to swap
+            </Text>
+          )}
+          {!locked && isIneligibleSwapTarget && (
+            <Text fontSize="$1" color="$red10" fontWeight="600">
+              Not eligible
             </Text>
           )}
         </XStack>
