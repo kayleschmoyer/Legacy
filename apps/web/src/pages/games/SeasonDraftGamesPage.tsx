@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { SeasonDraftGameLobby } from '@legacy-sports/shared-components/season-draft';
-import { Text, YStack } from 'tamagui';
+import { Button, Text, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 
 /**
@@ -17,8 +17,27 @@ export const SeasonDraftGamesPage: React.FC = () => {
 
   if (!user) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
+      <YStack
+        flex={1}
+        justifyContent="center"
+        alignItems="center"
+        padding="$6"
+        gap="$4"
+      >
         <Text>Please sign in to view your Season Draft Games.</Text>
+        <Button
+          onPress={() => navigate('/login')}
+          backgroundColor="$brandNavy"
+          borderWidth={1}
+          borderColor="$brandNavyLight"
+          borderRadius="$4"
+          hoverStyle={{ backgroundColor: '$brandNavyLight' }}
+          pressStyle={{ scale: 0.97 }}
+        >
+          <Text color="white" fontWeight="700">
+            Sign In
+          </Text>
+        </Button>
       </YStack>
     );
   }
