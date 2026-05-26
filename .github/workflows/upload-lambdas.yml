@@ -409,7 +409,18 @@ jobs:
             if [ -z "$EFFECTIVE_BASE" ] || [ -z "$RESOLVED_BASE" ] || [ "$RESOLVED_BASE" = "$HEAD_SHA" ]; then
               EFFECTIVE_BASE="HEAD~1"
               echo "⚠️ NX_BASE unset, unresolvable, or same as HEAD — falling back to HEAD~1"
+            elif ! git merge-base --is-ancestor "$EFFECTIVE_BASE" "$HEAD_SHA" 2>/dev/null; then
+              # NX_BASE resolved but is not an ancestor of HEAD — this happens
+              # when two pushes merge quickly and nx-set-shas picks up the SHA
+              # of a concurrent/newer successful run as the "last success."
+              # Using a future commit as BASE causes `nx affected` to fail with
+              # "fatal: bad object", silently blocking all Lambda deploys.
+              echo "⚠️ NX_BASE ($EFFECTIVE_BASE) is not an ancestor of HEAD ($HEAD_SHA) — concurrent deploy race detected, falling back to HEAD~1"
+              EFFECTIVE_BASE="HEAD~1"
             fi
+            # Export so the nx CLI reads the resolved value rather than the
+            # original NX_BASE env var set by nrwl/nx-set-shas.
+            export NX_BASE="$EFFECTIVE_BASE"
             echo "Using NX_BASE=$EFFECTIVE_BASE for affected detection"
 
             if ! AFFECTED_RAW=$(pnpm exec nx show projects --affected --base="$EFFECTIVE_BASE" --head=HEAD --type app 2>&1); then

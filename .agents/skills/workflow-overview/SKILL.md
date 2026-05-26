@@ -438,6 +438,8 @@ When multiple CI runs complete within seconds, multiple `workflow_run` triggers 
 
 **Lambda upload CI guard:** `upload-lambdas.yml` verifies CI passed before uploading. On push events it resolves the merged PR's head SHA and searches for a completed CI Orchestrator run on that SHA. The orchestrator emits two runs per PR SHA — one from the `pull_request` event (conclusion: `skipped`) and one from `pull_request_review` (the real run). The guard prefers runs with `conclusion: success`; if none exists it falls back to the first matching run and rejects non-success conclusions. This means a deploy blocked by the guard with `conclusion: skipped` indicates the real CI run is missing, not that CI failed.
 
+**NX_BASE concurrent-deploy race:** When two squash-merges land on `main` close together, `nrwl/nx-set-shas` can set `NX_BASE` to a SHA from a concurrent/newer successful run — a commit that is not an ancestor of the current HEAD. `nx affected --base=<future-sha>` then fails with `fatal: bad object`, producing zero affected lambdas and silently skipping all deploys. The detect step in `upload-lambdas.yml` guards against this with `git merge-base --is-ancestor "$EFFECTIVE_BASE" "$HEAD_SHA"` and falls back to `HEAD~1` when the race is detected; it also exports the resolved value as `NX_BASE` so the `nx` CLI reads the corrected SHA rather than the original bad value. If all Lambda deploys appear to have stopped (check `gh run list --workflow=upload-lambdas.yml`), a concurrent-push race is the first thing to suspect.
+
 ### PR Preview Deployments
 
 `deploy-pr-preview.yml` deploys web builds for open PRs to the `gh-pages` branch of `bkrupa/legacy-sports-deploys`. Previews live at **subdirectory paths**, not separate branches:
