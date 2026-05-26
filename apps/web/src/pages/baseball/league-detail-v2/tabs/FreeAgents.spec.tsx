@@ -19,6 +19,7 @@ import { FreeAgentsTab } from './FreeAgents';
 let mockPlayers: ReadonlyArray<Record<string, unknown>> = [];
 
 jest.mock('../../../../api/db/graphql.generated', () => ({
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useGetPlayersWithStatsQuery: jest.fn(() => ({
     data: { players: mockPlayers },
     loading: false,
@@ -151,5 +152,32 @@ describe('FreeAgentsTab', () => {
     expect(screen.getByTestId('waiver-claim-modal')).toHaveTextContent(
       'claim 77',
     );
+  });
+
+  it('renders the football player pool placeholder for football leagues', () => {
+    render(
+      <FreeAgentsTab
+        league={{ ...league, sport: 'football' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    expect(screen.getByText('Football Player Pool')).toBeInTheDocument();
+  });
+
+  it('does not render hitter/pitcher toggles for football leagues', () => {
+    render(
+      <FreeAgentsTab
+        league={{ ...league, sport: 'football' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Pitchers' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Hitters' }),
+    ).not.toBeInTheDocument();
   });
 });

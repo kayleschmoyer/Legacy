@@ -30,6 +30,13 @@ function isValidPlayerPool(v: string): v is ValidPlayerPool {
   return (VALID_PLAYER_POOLS as readonly string[]).includes(v);
 }
 
+function parseDefensiveFormat(
+  v: string | null | undefined,
+): 'dst' | 'idp' | null {
+  if (v === 'dst' || v === 'idp') return v;
+  return null;
+}
+
 // Query fields
 builder.queryField('league', (t) =>
   t.field({
@@ -155,7 +162,7 @@ builder.queryField('league', (t) =>
           name: league.name,
           owner: league.owner,
           sport: league.sport,
-          defensiveFormat: league.defensiveFormat as 'dst' | 'idp' | null,
+          defensiveFormat: parseDefensiveFormat(league.defensiveFormat),
           maxRosterSize: league.maxRosterSize,
           currentMatchup: league.currentMatchup,
           currentWeek: league.currentWeek,
@@ -289,7 +296,7 @@ builder.queryField('userLeagues', (t) =>
           name: league.name,
           owner: league.owner,
           sport: league.sport,
-          defensiveFormat: league.defensiveFormat as 'dst' | 'idp' | null,
+          defensiveFormat: parseDefensiveFormat(league.defensiveFormat),
           maxRosterSize: league.maxRosterSize,
           currentMatchup: league.currentMatchup,
           currentWeek: league.currentWeek,

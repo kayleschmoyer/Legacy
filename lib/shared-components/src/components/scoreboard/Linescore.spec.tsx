@@ -52,4 +52,39 @@ describe('Linescore', () => {
     expect(getByText('H')).toBeTruthy();
     expect(getByText('E')).toBeTruthy();
   });
+
+  describe('football mode (sport="football")', () => {
+    const footballProps = {
+      awayAbbr: 'KC',
+      homeAbbr: 'SF',
+      awayInnings: [7, 14, 0, 3],
+      homeInnings: [3, 0, 10, 7],
+      sport: 'football' as const,
+    };
+
+    it('renders Q1/Q2/Q3/Q4 period headers instead of inning numbers', () => {
+      const { getByText } = render(<Linescore {...footballProps} />);
+      expect(getByText('Q1')).toBeTruthy();
+      expect(getByText('Q2')).toBeTruthy();
+      expect(getByText('Q3')).toBeTruthy();
+      expect(getByText('Q4')).toBeTruthy();
+    });
+
+    it('renders "PTS" total column instead of R / H / E', () => {
+      const { getByText, queryByText } = render(
+        <Linescore {...footballProps} />,
+      );
+      expect(getByText('PTS')).toBeTruthy();
+      expect(queryByText('R')).toBeNull();
+      expect(queryByText('H')).toBeNull();
+      expect(queryByText('E')).toBeNull();
+    });
+
+    it('does not render inning numbers in football mode', () => {
+      const { queryByText } = render(<Linescore {...footballProps} />);
+      // Inning numbers 1–9 should not appear as column headers in football mode
+      expect(queryByText('1')).toBeNull();
+      expect(queryByText('9')).toBeNull();
+    });
+  });
 });

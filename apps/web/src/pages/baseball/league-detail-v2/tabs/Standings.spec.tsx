@@ -19,6 +19,7 @@ let mockStandings: ReadonlyArray<Record<string, unknown>> = [];
 
 jest.mock('../../../../api/db/graphql.generated', () => ({
   PlayoffMatchupStatus: { Completed: 'completed' },
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useGetLeagueStandingsQuery: jest.fn(() => ({
     data: { getLeagueStandings: mockStandings },
     loading: false,
@@ -195,5 +196,31 @@ describe('StandingsTab', () => {
     expect(
       screen.getByText('No teams have joined this league yet.'),
     ).toBeInTheDocument();
+  });
+
+  it('shows football subtitle "Sorted by W, then PF" for football leagues', () => {
+    mockStandings = [makeRow()];
+    render(
+      <StandingsTab
+        league={{ ...league, sport: 'football' }}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(screen.getByText(/Sorted by W, then PF/)).toBeInTheDocument();
+  });
+
+  it('shows baseball subtitle "Sorted by win percentage" for baseball leagues', () => {
+    mockStandings = [makeRow()];
+    render(
+      <StandingsTab
+        league={{ ...league, sport: 'baseball' }}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(screen.getByText(/Sorted by win percentage/)).toBeInTheDocument();
   });
 });

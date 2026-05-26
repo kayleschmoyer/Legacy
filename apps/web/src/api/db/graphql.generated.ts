@@ -5556,6 +5556,7 @@ export type LeagueFragment = {
   name?: string | null;
   owner?: number | null;
   sport?: Sport | null;
+  defensiveFormat?: DefensiveFormat | null;
   maxRosterSize?: number | null;
   currentMatchup?: number | null;
   currentWeekNumber?: number | null;
@@ -9990,6 +9991,7 @@ export const LeagueFragmentDoc = gql`
     name
     owner
     sport
+    defensiveFormat
     maxRosterSize
     currentMatchup
     currentWeekNumber

@@ -4,6 +4,7 @@ import {
   type LeagueFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
+  Sport,
   useGetMatchupPlayersQuery,
 } from '../../../../api/db/graphql.generated';
 import {
@@ -200,6 +201,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   initialMatchupId,
   onTeam,
 }) => {
+  const isFootball = league.sport === Sport.Football;
   const { currentWeek } = useCurrentWeek(league.id ?? null);
   const [week, setWeek] = useState<number>(
     league.currentWeekNumber ?? currentWeek ?? 1,
@@ -326,9 +328,11 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
           </button>
         </div>
         <span className="meta">
-          {totalGames > 0
-            ? `${gamesPlayed} of ${totalGames} games complete`
-            : 'No games scheduled'}
+          {isFootball
+            ? `Matchup ${week}${league.totalMatchups ? `/${league.totalMatchups}` : ''} · Head-to-Head`
+            : totalGames > 0
+              ? `${gamesPlayed} of ${totalGames} games complete`
+              : 'No games scheduled'}
         </span>
       </div>
 
@@ -343,7 +347,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         onTeam={onTeam}
       />
 
-      {totalGames > 0 ? (
+      {!isFootball && totalGames > 0 ? (
         <div className="ls-games-remaining">
           <div className="ls-games-row">
             <div>

@@ -1,16 +1,21 @@
 /**
- * Tests for the DuesCompact subcomponent of OverviewTab (LS-4632).
+ * Tests for the DuesCompact and Snapshot subcomponents of OverviewTab (LS-4152, LS-4632).
  *
- * Covers the redesign acceptance criteria for the dues summary:
+ * DuesCompact covers:
  *   1. Renders null when dues are not enabled.
  *   2. Renders null when no member rows are returned.
  *   3. Renders the paid / total headline and collected dollar amount.
  *   4. Renders the Outstanding list only when unpaid members exist.
+ *
+ * Snapshot covers:
+ *   5. Football-specific labels ("Weeks / Season", "Weekly Format") appear
+ *      when isFootball is true.
+ *   6. Baseball-specific label ("Games / Matchup") appears when isFootball is false.
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
-import { DuesCompact } from './Overview';
+import { DuesCompact, Snapshot } from './Overview';
 import type { GetLeagueDuesStatusQuery } from '../../../../api/db/graphql.generated';
 
 let mockData: GetLeagueDuesStatusQuery | null = null;
@@ -140,5 +145,31 @@ describe('DuesCompact', () => {
     render(<DuesCompact leagueId={1} />);
     expect(screen.queryByText('Outstanding')).not.toBeInTheDocument();
     expect(screen.queryByText('Pending')).not.toBeInTheDocument();
+  });
+});
+
+const snapshotBase = {
+  teamCount: 10,
+  rosterSize: 25,
+  gamesPerMatchup: 7,
+  matchupDays: 7,
+  startersCount: 9,
+};
+
+describe('Snapshot', () => {
+  it('renders football-specific labels when isFootball is true', () => {
+    render(<Snapshot {...snapshotBase} isFootball={true} />);
+    expect(screen.getByText('Weeks / Season')).toBeInTheDocument();
+    expect(screen.getByText('Weekly Format')).toBeInTheDocument();
+    expect(screen.queryByText('Games / Matchup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Matchup Length')).not.toBeInTheDocument();
+  });
+
+  it('renders baseball-specific label when isFootball is false', () => {
+    render(<Snapshot {...snapshotBase} isFootball={false} />);
+    expect(screen.getByText('Games / Matchup')).toBeInTheDocument();
+    expect(screen.getByText('Matchup Length')).toBeInTheDocument();
+    expect(screen.queryByText('Weeks / Season')).not.toBeInTheDocument();
+    expect(screen.queryByText('Weekly Format')).not.toBeInTheDocument();
   });
 });

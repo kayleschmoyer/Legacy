@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues';
 import {
   type LeagueFragment,
+  Sport,
   type TeamFragment,
   type TeamMemberFragment,
   useGetLeagueDuesStatusQuery,
@@ -33,32 +34,44 @@ interface RankedTeam {
   isMine: boolean;
 }
 
-const Snapshot: React.FC<{
+export const Snapshot: React.FC<{
   teamCount: number;
   rosterSize: number;
   gamesPerMatchup: number;
   matchupDays: number;
   startersCount: number;
+  isFootball: boolean;
 }> = ({
   teamCount,
   rosterSize,
   gamesPerMatchup,
   matchupDays,
   startersCount,
+  isFootball,
 }) => (
   <div className="ls-snapshot">
     {[
       { label: 'Teams', value: String(teamCount) },
       { label: 'Roster Size', value: String(rosterSize) },
-      { label: 'Games / Matchup', value: String(gamesPerMatchup) },
-      { label: 'Matchup Length', value: String(matchupDays), unit: 'days' },
+      isFootball
+        ? { label: 'Weeks / Season', value: String(gamesPerMatchup) }
+        : { label: 'Games / Matchup', value: String(gamesPerMatchup) },
+      isFootball
+        ? { label: 'Weekly Format', value: 'Head-to-Head' }
+        : {
+            label: 'Matchup Length',
+            value: String(matchupDays),
+            unit: 'days',
+          },
       { label: 'My Starters', value: String(startersCount) },
     ].map((s) => (
       <div key={s.label} className="ls-snap-stat">
         <div className="label">{s.label}</div>
         <div className="value">
           {s.value}
-          {s.unit ? <span className="unit">{s.unit}</span> : null}
+          {'unit' in s && s.unit ? (
+            <span className="unit">{s.unit}</span>
+          ) : null}
         </div>
       </div>
     ))}
@@ -420,6 +433,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const isDrafting =
     draftStatus === 'in-progress' || draftStatus === 'drafting';
 
+  const isFootball = league.sport === Sport.Football;
   const startersCount = myRoster.filter((p) => p.positionId != null).length;
 
   const mentionableTeams = useMemo(
@@ -477,6 +491,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         gamesPerMatchup={league.gamesPerMatchup ?? 0}
         matchupDays={7}
         startersCount={startersCount}
+        isFootball={isFootball}
       />
 
       <div className="ls-overview-grid">

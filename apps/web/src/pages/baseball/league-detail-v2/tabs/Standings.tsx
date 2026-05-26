@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   type LeagueFragment,
   PlayoffMatchupStatus,
+  Sport,
   type TeamFragment,
   useGetLeagueStandingsQuery,
   useGetPlayoffBracketQuery,
@@ -120,6 +121,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
   myTeamId,
   onTeam,
 }) => {
+  const isFootball = league.sport === Sport.Football;
   const { data: standingsData, loading: standingsLoading } =
     useGetLeagueStandingsQuery({
       variables: { leagueId: league.id ?? 0 },
@@ -250,7 +252,9 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         sub={
           standingsLoading
             ? 'Loading…'
-            : `${rows.length} teams · Sorted by win percentage`
+            : isFootball
+              ? `${rows.length} teams · Sorted by W, then PF`
+              : `${rows.length} teams · Sorted by win percentage`
         }
       >
         <div className="ls-table-wrap">

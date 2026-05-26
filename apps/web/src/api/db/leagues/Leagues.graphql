@@ -2,7 +2,9 @@ fragment League on League {
   id
   name
   owner
+  # Sport and defensive format for football-aware UI (LS-4152)
   sport
+  defensiveFormat
   maxRosterSize
   currentMatchup
   currentWeekNumber

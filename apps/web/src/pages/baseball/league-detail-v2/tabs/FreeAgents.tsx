@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   type LeagueFragment,
+  Sport,
   useGetPlayersWithStatsQuery,
 } from '../../../../api/db/graphql.generated';
 import { useLeagueTakenPlayers } from '../../../../hooks/useLeagueTakenPlayers';
@@ -76,6 +77,7 @@ export const FreeAgentsTab: React.FC<FreeAgentsTabProps> = ({
   isMember,
   myTeamId,
 }) => {
+  const isFootball = league.sport === Sport.Football;
   const [group, setGroup] = useState<Group>('hitters');
   const [pos, setPos] = useState<string>('ALL');
   const [search, setSearch] = useState('');
@@ -151,6 +153,36 @@ export const FreeAgentsTab: React.FC<FreeAgentsTabProps> = ({
   const positions = group === 'pitchers' ? PITCHER_POSITIONS : HITTER_POSITIONS;
   const isLoading = loading || takenLoading;
   const hasNextPage = (data?.players ?? []).length >= PAGE_SIZE;
+
+  if (isFootball) {
+    return (
+      <Section title="Free Agents" sub="Available players in the league pool">
+        <div
+          style={{
+            padding: '32px 16px',
+            textAlign: 'center',
+            color: 'var(--fg3)',
+            fontSize: 13,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: 14,
+              color: 'var(--fg2)',
+              marginBottom: 6,
+              letterSpacing: '.04em',
+            }}
+          >
+            Football Player Pool
+          </div>
+          Football free-agent search and waiver claims for NFL players will be
+          available here once the football player pool ships.
+        </div>
+      </Section>
+    );
+  }
 
   const renderCell = (
     p: NonNullable<(typeof players)[number]>,

@@ -46,7 +46,7 @@ DraftPick.implement({
       type: 'Player',
       nullable: true,
       description:
-        'The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup.',
+        'The drafted player. Enables the draft board to render pick names without a secondary lookup.',
       resolve: (parent, _args, context) => {
         return context.loaders.players.load(parent.playerId);
       },

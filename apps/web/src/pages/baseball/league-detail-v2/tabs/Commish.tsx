@@ -1,7 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  DefensiveFormat,
   type LeagueFragment,
+  Sport,
   type TeamFragment,
 } from '../../../../api/db/graphql.generated';
 import {
@@ -77,6 +79,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   onSettingsError,
 }) => {
   const navigate = useNavigate();
+  const isFootball = league.sport === Sport.Football;
   const [openId, setOpenId] = useState<string>('next-step');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
   const [waiverSuccess, setWaiverSuccess] = useState<string | null>(null);
@@ -191,23 +194,27 @@ export const CommishTab: React.FC<CommishTabProps> = ({
         />
       ) : null,
     },
-    {
-      id: 'draft-settings',
-      label: 'Draft Settings',
-      iconClass: 'gold',
-      icon: <I.Settings size={16} />,
-      content: leagueId ? (
-        <DraftSettingsControl
-          leagueId={leagueId}
-          draftStatus={league.draftStatus}
-          playerPool={league.playerPool}
-          eraFilter={league.eraFilter}
-          baseballHofOnly={league.baseballHofOnly}
-          customEraStartYear={league.customEraStartYear ?? undefined}
-          customEraEndYear={league.customEraEndYear ?? undefined}
-        />
-      ) : null,
-    },
+    ...(!isFootball
+      ? [
+          {
+            id: 'draft-settings',
+            label: 'Draft Settings',
+            iconClass: 'gold' as const,
+            icon: <I.Settings size={16} />,
+            content: leagueId ? (
+              <DraftSettingsControl
+                leagueId={leagueId}
+                draftStatus={league.draftStatus}
+                playerPool={league.playerPool}
+                eraFilter={league.eraFilter}
+                baseballHofOnly={league.baseballHofOnly}
+                customEraStartYear={league.customEraStartYear ?? undefined}
+                customEraEndYear={league.customEraEndYear ?? undefined}
+              />
+            ) : null,
+          },
+        ]
+      : []),
     {
       id: 'dues',
       label: 'League Dues',
@@ -237,16 +244,43 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       label: 'Scoring Rules',
       icon: <I.List size={16} />,
       content: leagueId ? (
-        <LeagueScoringEditor
-          leagueId={leagueId}
-          profile={scoringProfile}
-          loading={scoringLoading}
-          error={scoringError ?? null}
-          onRefetch={async () => {
-            await refetchScoring();
-          }}
-          draftStatus={league.draftStatus}
-        />
+        isFootball ? (
+          <div
+            style={{
+              padding: '24px 16px',
+              textAlign: 'center',
+              color: 'var(--fg3)',
+              fontSize: 13,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: 14,
+                color: 'var(--fg2)',
+                marginBottom: 6,
+                letterSpacing: '.04em',
+              }}
+            >
+              Football Scoring Editor
+            </div>
+            Football scoring settings (passing, rushing, receiving, kicking
+            {league.defensiveFormat === DefensiveFormat.Idp ? ', IDP' : ', DST'}
+            ) will be configurable here once the football scoring editor ships.
+          </div>
+        ) : (
+          <LeagueScoringEditor
+            leagueId={leagueId}
+            profile={scoringProfile}
+            loading={scoringLoading}
+            error={scoringError ?? null}
+            onRefetch={async () => {
+              await refetchScoring();
+            }}
+            draftStatus={league.draftStatus}
+          />
+        )
       ) : null,
     },
     {

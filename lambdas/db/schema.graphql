@@ -723,7 +723,7 @@ type DraftPick {
   pickedAt: String
 
   """
-  The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup.
+  The drafted player. Enables the draft board to render pick names without a secondary lookup.
   """
   player: Player
   playerId: Int
