@@ -438,4 +438,54 @@ describe('errorLink', () => {
       expect.objectContaining({ context: 'apollo:TestOp' }),
     );
   });
+
+  it.each([
+    'BAD_USER_INPUT',
+    'FORBIDDEN',
+    'PREMIUM_REQUIRED',
+    'GAME_UNAVAILABLE',
+  ])(
+    'does NOT call captureError for expected GraphQL error code %s',
+    async (code) => {
+      jest.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+
+      const expectedError = new CombinedGraphQLErrors(
+        { errors: [{ message: 'Expected error', extensions: { code } }] },
+        [{ message: 'Expected error', extensions: { code } }],
+      );
+
+      await runWithError(expectedError, {});
+
+      expect(captureError).not.toHaveBeenCalled();
+    },
+  );
+
+  it('DOES call captureError for unexpected GraphQL error codes', async () => {
+    jest.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+
+    const unexpectedError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          {
+            message: 'Internal error',
+            extensions: { code: 'INTERNAL_SERVER_ERROR' },
+          },
+        ],
+      },
+      [
+        {
+          message: 'Internal error',
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        },
+      ],
+    );
+
+    await runWithError(unexpectedError, {});
+
+    expect(captureError).toHaveBeenCalledTimes(1);
+    expect(captureError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'apollo:TestOp' }),
+    );
+  });
 });

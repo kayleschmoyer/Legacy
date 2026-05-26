@@ -440,6 +440,9 @@ export function useDraftQueries({
     variables: { draftId: draftId ?? 0 },
     skip: !draftId || isAuctionDraft,
     fetchPolicy: 'cache-and-network',
+    // Non-GM users receive FORBIDDEN — suppress global toast/Rollbar; the
+    // queue panel itself handles the FORBIDDEN case by rendering nothing.
+    context: { suppressGlobalError: true },
   });
   const queueEntries = useMemo(
     () => queueData?.getMyDraftQueue ?? [],

@@ -286,6 +286,7 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
       // both layers agree on what is a bug vs. an expected condition.
       const EXPECTED_CODES = new Set([
         'BAD_USER_INPUT',
+        'FORBIDDEN',
         'PREMIUM_REQUIRED',
         'GAME_UNAVAILABLE',
       ]);

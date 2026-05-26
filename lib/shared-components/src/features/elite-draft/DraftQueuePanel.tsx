@@ -28,6 +28,7 @@ export function DraftQueuePanel({
   const {
     data,
     loading,
+    error,
     refetch: refetchQueue,
   } = useQuery<GetMyDraftQueueQuery, GetMyDraftQueueQueryVariables>(
     GET_MY_DRAFT_QUEUE,
@@ -35,6 +36,9 @@ export function DraftQueuePanel({
       variables: { draftId },
       skip: !draftId,
       fetchPolicy: 'cache-and-network',
+      // Suppress global error toast — FORBIDDEN is handled below by returning
+      // null; other errors are surfaced via onError instead.
+      context: { suppressGlobalError: true },
     },
   );
 
@@ -107,6 +111,17 @@ export function DraftQueuePanel({
     },
     [draftId, entries, reorderQueue, refetchQueue, onError],
   );
+
+  // Non-GM users receive FORBIDDEN — hide the panel silently rather than
+  // surfacing a confusing error toast (LS-4804).
+  const gqlErrors =
+    error != null && 'graphQLErrors' in error
+      ? (error.graphQLErrors as ReadonlyArray<{
+          extensions?: Record<string, unknown>;
+        }>)
+      : [];
+  if (gqlErrors.some((e) => e.extensions?.['code'] === 'FORBIDDEN'))
+    return null;
 
   const busy = removing || reordering;
 
