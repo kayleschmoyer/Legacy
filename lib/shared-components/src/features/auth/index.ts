@@ -11,5 +11,6 @@ export type {
   OAuthResponse,
   OAuthError,
 } from '../../platform-components/types';
+export { OAuthErrorCode } from '../../platform-components/types';
 
 // Legacy infrastructure completely removed - now using modern AuthProvider pattern

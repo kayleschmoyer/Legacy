@@ -7,6 +7,7 @@ import {
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
+import { env } from '../../config/environment';
 import {
   useGetOnThisDayQuery,
   useGetPlayerCountQuery,
@@ -248,9 +249,12 @@ export function LoginPage(): React.JSX.Element {
           );
         }
 
-        window.location.replace(import.meta.env.BASE_URL || '/');
+        window.location.replace(env.baseUrl);
       } catch (err) {
-        LOGGER.error('Discord callback exchange failed:', String(err));
+        LOGGER.error(
+          'Discord callback exchange failed:',
+          err instanceof Error ? err : String(err),
+        );
         setErrorMessage(
           err instanceof Error
             ? err.message
@@ -324,24 +328,24 @@ export function LoginPage(): React.JSX.Element {
       const oauthResponse = await OAuthProvider.signIn();
       await loginWithOAuth(oauthResponse);
     } catch (error) {
-      // User closing the Google popup (or COOP policy closing it) is an expected
-      // UX action, not an error worth surfacing to Rollbar.
       const isCancelled =
         error instanceof Error &&
         'code' in error &&
         (error as { code: OAuthErrorCode }).code ===
           OAuthErrorCode.SIGN_IN_CANCELLED;
-      if (!isCancelled) {
+      if (isCancelled) {
+        LOGGER.debug('Google sign-in popup closed by user');
+      } else {
         LOGGER.error(
           'Sign-in failed on login page:',
-          error instanceof Error ? error : new Error(String(error)),
+          error instanceof Error ? error : String(error),
+        );
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Sign-in failed. Please try again.',
         );
       }
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Sign-in failed. Please try again.',
-      );
     } finally {
       setIsLoading(false);
     }
@@ -371,10 +375,7 @@ export function LoginPage(): React.JSX.Element {
         <header className="ll-nav">
           <nav aria-label="Landing" className="ll-nav-inner">
             <a className="ll-brand" href="/">
-              <img
-                src={`${import.meta.env.BASE_URL}logo.png`}
-                alt="Legacy Sports"
-              />
+              <img src={`${env.baseUrl}logo.png`} alt="Legacy Sports" />
               <div className="ll-wordmark">
                 LEGACY SPORTS
                 <br />

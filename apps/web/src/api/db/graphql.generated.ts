@@ -629,7 +629,7 @@ export type DraftPick = {
   overallPick?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   pickedAt?: Maybe<Scalars['String']['output']>;
-  /** The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup. */
+  /** The drafted player. Enables the draft board to render pick names without a secondary lookup. */
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
@@ -5638,6 +5638,7 @@ export type GetLeagueByIdQuery = {
     name?: string | null;
     owner?: number | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -5706,6 +5707,7 @@ export type CreateLeagueAndTeamsMutation = {
       name?: string | null;
       owner?: number | null;
       sport?: Sport | null;
+      defensiveFormat?: DefensiveFormat | null;
       maxRosterSize?: number | null;
       currentMatchup?: number | null;
       currentWeekNumber?: number | null;
@@ -5771,6 +5773,7 @@ export type GetUserLeaguesQuery = {
     name?: string | null;
     owner?: number | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -5868,6 +5871,7 @@ export type StartDraftMutation = {
     name?: string | null;
     owner?: number | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6072,6 +6076,7 @@ export type UpdateLeagueSettingsMutation = {
     name?: string | null;
     owner?: number | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6181,6 +6186,7 @@ export type RenewLeagueMutation = {
     name?: string | null;
     owner?: number | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6247,6 +6253,7 @@ export type StartSeasonMutation = {
     name?: string | null;
     owner?: number | null;
     sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
