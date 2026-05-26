@@ -217,11 +217,19 @@ jobs:
       # LS-1652: Only allow self-hosted runners for PR authors with write permission.
       # External contributors (read-only) are routed to GitHub-hosted runners to prevent
       # untrusted code from executing on our infrastructure.
+      - name: "Generate App Token"
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
       - name: "🔒 Resolve Runner Label"
         id: runner-access
         uses: ./.github/actions/resolve-runner-label
         with:
           runner-label: ${{ vars.CI_RUNNER_LABEL }}
+          github-token: ${{ steps.app-token.outputs.token || github.token }}
 
       # LS-4182: Idempotency guard — if all 5 required CI checks already
       # succeeded for this exact SHA, skip the CI Pipeline re-run. A second

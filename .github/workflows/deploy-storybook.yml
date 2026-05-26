@@ -50,11 +50,19 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: .github/actions/resolve-runner-label
+      - name: "Generate App Token"
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
       - name: "Resolve Runner Label"
         id: resolve
         uses: ./.github/actions/resolve-runner-label
         with:
           runner-label: ${{ vars.CI_RUNNER_LABEL }}
+          github-token: ${{ steps.app-token.outputs.token || github.token }}
 
   # LS-1962: Merged build + deploy into a single job to eliminate GitHub
   # artifact upload/download, which was hitting storage quota limits.

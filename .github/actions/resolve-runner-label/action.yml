@@ -9,6 +9,10 @@ inputs:
     description: "Self-hosted runner label (pass vars.CI_RUNNER_LABEL from the calling workflow). Empty string falls back to ubuntu-latest."
     required: false
     default: ""
+  github-token:
+    description: "GitHub token for the collaborator permission API call. Pass a dedicated app token (e.g. code-bot) to avoid installation rate limits under concurrent CI load."
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   runner-label:
@@ -25,6 +29,7 @@ runs:
       id: resolve
       uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
       with:
+        github-token: ${{ inputs.github-token }}
         script: |
           const label = ${{ toJSON(inputs.runner-label) }} || '';
           if (!label) {
