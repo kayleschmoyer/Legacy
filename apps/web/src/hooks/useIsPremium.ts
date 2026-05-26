@@ -74,7 +74,13 @@ export function useIsPremiumStatus(): {
     return () => window.removeEventListener('focus', onFocus);
   }, [wsClient, userId, refetchSafely]);
 
-  const isLoading = authLoading || userLoading;
+  // Guard against stale Apollo cache data during a logout/login cycle.
+  // When user.id changes, Apollo may still return the previous user's record
+  // while the new query is in-flight. Only trust data that belongs to the
+  // currently-authenticated user; treat a mismatch as still-loading.
+  const dataIsForCurrentUser =
+    data?.user?.id == null || data.user.id === user?.id;
+  const isLoading = authLoading || userLoading || !dataIsForCurrentUser;
 
   if (isLoading) return { isPremium: false, isLoading };
   if (user?.accessLevel === 'admin') return { isPremium: true, isLoading };

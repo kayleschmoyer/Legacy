@@ -109,6 +109,40 @@ describe('useIsPremiumStatus', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it('returns isPremium: false when Apollo data belongs to a previous user (stale cache)', () => {
+    // Simulates logout-then-login: auth now shows user 2, but Apollo still
+    // holds user 1's premium record while the new query is in-flight.
+    useAuth.mockReturnValue({
+      user: { id: 2, accessLevel: 'user' },
+      isLoading: false,
+    });
+    useGetUserByIdQuery.mockReturnValue({
+      data: { user: { id: 1, subscriptionTier: 'premium' } },
+      loading: false,
+    });
+
+    const { result } = renderHook(() => useIsPremiumStatus());
+
+    expect(result.current.isPremium).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('returns correct premium status once fresh data arrives for new user', () => {
+    useAuth.mockReturnValue({
+      user: { id: 2, accessLevel: 'user' },
+      isLoading: false,
+    });
+    useGetUserByIdQuery.mockReturnValue({
+      data: { user: { id: 2, subscriptionTier: 'free' } },
+      loading: false,
+    });
+
+    const { result } = renderHook(() => useIsPremiumStatus());
+
+    expect(result.current.isPremium).toBe(false);
+    expect(result.current.isLoading).toBe(false);
+  });
+
   it('does not poll the user query (push notifications keep it fresh)', () => {
     useAuth.mockReturnValue({
       user: { id: 42, accessLevel: 'user' },
