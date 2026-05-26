@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { useLeagueChat } from './useLeagueChat';
 
 jest.mock('@apollo/client/react', () => ({
@@ -31,6 +31,148 @@ const makeRawMessages = (leagueId: number, count: number) =>
     metadata: null,
     sender: { username: 'user1', avatarUrl: null },
   }));
+
+describe('useLeagueChat — message ordering (LS-4059)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    useLeagueWebSocket.mockReturnValue(undefined);
+    useSendLeagueChatMessageMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+  });
+
+  it('sorts messages by createdAt timestamp when history arrives out of order', () => {
+    const outOfOrderMessages = [
+      {
+        id: '3',
+        userId: '1',
+        messageText: 'third',
+        gifUrl: null,
+        timestamp: '2024-01-01T00:00:03Z',
+        messageType: 'text',
+        metadata: null,
+        sender: { username: 'user1', avatarUrl: null },
+      },
+      {
+        id: '1',
+        userId: '1',
+        messageText: 'first',
+        gifUrl: null,
+        timestamp: '2024-01-01T00:00:01Z',
+        messageType: 'text',
+        metadata: null,
+        sender: { username: 'user1', avatarUrl: null },
+      },
+      {
+        id: '2',
+        userId: '1',
+        messageText: 'second',
+        gifUrl: null,
+        timestamp: '2024-01-01T00:00:02Z',
+        messageType: 'text',
+        metadata: null,
+        sender: { username: 'user1', avatarUrl: null },
+      },
+    ];
+
+    useQuery.mockReturnValue({
+      loading: true,
+      data: undefined,
+      refetch: jest.fn(),
+    });
+
+    const { result, rerender } = renderHook(() => useLeagueChat(1));
+    expect(result.current.messages).toHaveLength(0);
+
+    useQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: outOfOrderMessages },
+      refetch: jest.fn(),
+    });
+
+    rerender();
+
+    expect(result.current.messages.map((m) => m.messageText)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('sorts new WS messages into correct position among existing messages', () => {
+    type WsChatMessage = {
+      messageId: string;
+      senderId: string | null;
+      senderUsername: string;
+      messageText: string;
+      gifUrl: string | null;
+      timestamp: string;
+      messageType: string | null;
+      metadata: Record<string, unknown> | null;
+    };
+    let wsCallback: ((n: WsChatMessage) => void) | null = null;
+
+    useLeagueWebSocket.mockImplementation(
+      ({
+        onLeagueChatMessage,
+      }: {
+        onLeagueChatMessage: (n: WsChatMessage) => void;
+      }) => {
+        wsCallback = onLeagueChatMessage;
+      },
+    );
+
+    useQuery.mockReturnValue({
+      loading: true,
+      data: undefined,
+      refetch: jest.fn(),
+    });
+
+    const { result, rerender } = renderHook(() => useLeagueChat(1));
+
+    useQuery.mockReturnValue({
+      loading: false,
+      data: {
+        getLeagueMessages: [
+          {
+            id: '2',
+            userId: '1',
+            messageText: 'second',
+            gifUrl: null,
+            timestamp: '2024-01-01T00:00:02Z',
+            messageType: 'text',
+            metadata: null,
+            sender: { username: 'user1', avatarUrl: null },
+          },
+        ],
+      },
+      refetch: jest.fn(),
+    });
+
+    rerender();
+    expect(result.current.messages).toHaveLength(1);
+
+    // WS delivers "first" out of order after "second" is already in state
+    act(() => {
+      wsCallback?.({
+        messageId: '1',
+        senderId: '1',
+        senderUsername: 'user1',
+        messageText: 'first',
+        gifUrl: null,
+        timestamp: '2024-01-01T00:00:01Z',
+        messageType: 'text',
+        metadata: null,
+      });
+    });
+
+    expect(result.current.messages.map((m) => m.messageText)).toEqual([
+      'first',
+      'second',
+    ]);
+  });
+});
 
 describe('useLeagueChat — stale-data guard (LS-2461)', () => {
   beforeEach(() => {

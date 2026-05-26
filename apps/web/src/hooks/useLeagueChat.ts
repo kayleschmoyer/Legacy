@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
@@ -185,5 +185,27 @@ export function useLeagueChat(leagueId: number): {
     },
   });
 
-  return { messages, loading, sending, sendError, sendMessage };
+  // Sort by server-assigned timestamp so rapid back-to-back messages always
+  // display in chronological order regardless of WS/mutation arrival order.
+  const sortedMessages = useMemo(() => {
+    // Postgres timestamps arrive as "YYYY-MM-DD HH:MM:SS" (no tz suffix) — the
+    // server stores them as UTC. Strings that already carry Z or + are left as-is.
+    // This normalization mirrors normalizeTimestamp in LeagueChatTab.tsx.
+    const toMs = (s: string) => {
+      const ms = new Date(
+        s.includes('Z') || s.includes('+') ? s : s.replace(' ', 'T') + 'Z',
+      ).getTime();
+      if (isNaN(ms)) {
+        LOGGER.error(
+          'useLeagueChat: malformed createdAt timestamp',
+          new Error(`Malformed timestamp: ${s}`),
+        );
+        return 0;
+      }
+      return ms;
+    };
+    return [...messages].sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
+  }, [messages]);
+
+  return { messages: sortedMessages, loading, sending, sendError, sendMessage };
 }
