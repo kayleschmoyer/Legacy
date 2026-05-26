@@ -473,7 +473,7 @@ export function LeagueHistory({
                     >
                       {s.championTeamName}
                     </Text>
-                    {s.championScore != null && s.runnerUpTeamName && (
+                    {s.championScore != null && (
                       <Text
                         style={{
                           fontFamily: "'Roboto Mono', 'Courier New', monospace",
