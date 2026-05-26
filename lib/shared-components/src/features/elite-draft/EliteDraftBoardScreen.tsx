@@ -28,6 +28,7 @@ import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import { useAuth } from '../../features/auth';
+import { useGetUserByIdQuery } from '../../api/db/graphql.generated';
 import type { SportKind } from '../../config/sports';
 
 export interface EliteDraftBoardScreenProps {
@@ -62,8 +63,13 @@ export function EliteDraftBoardScreen({
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
-  const isPremium = user?.accessLevel === 'admin';
   const isAuthenticated = !!user;
+
+  const { data: userSubscriptionData } = useGetUserByIdQuery({
+    variables: { id: userId },
+    skip: !user?.id,
+  });
+  const isPremium = userSubscriptionData?.user?.subscriptionTier === 'premium';
 
   const ui = useDraftUIState();
 

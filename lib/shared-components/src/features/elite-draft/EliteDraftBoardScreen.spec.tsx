@@ -27,6 +27,10 @@ jest.mock('../../features/auth', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../../api/db/graphql.generated', () => ({
+  useGetUserByIdQuery: jest.fn(() => ({ data: undefined })),
+}));
+
 jest.mock('./auction/AuctionDraftRoom', () => ({
   AuctionDraftRoom: () => <div data-testid="auction-draft-room" />,
 }));
