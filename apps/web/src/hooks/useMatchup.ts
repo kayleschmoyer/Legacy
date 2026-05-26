@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import {
   type MatchupStatus,
   useGetCurrentWeekForLeagueQuery,
@@ -98,7 +99,9 @@ export function useMatchupsByWeek(
 }
 
 /**
- * Hook for fetching matchup history with optional filters
+ * Hook for fetching matchup history with optional filters.
+ * Automatically refetches when the league's current week changes so callers
+ * never see stale history after a week rollover.
  */
 export function useMatchupHistory(
   leagueId: number | null | undefined,
@@ -109,6 +112,7 @@ export function useMatchupHistory(
     limit?: number;
   },
 ) {
+  const { currentWeek } = useCurrentWeek(leagueId);
   const { data, loading, error, refetch } = useGetMatchupHistoryQuery({
     variables: {
       leagueId: leagueId ?? 0,
@@ -119,6 +123,20 @@ export function useMatchupHistory(
     },
     skip: !leagueId,
   });
+
+  // Refetch when the current week advances so stale history is never shown
+  // across a week rollover. The ref sentinel (undefined) prevents a refetch on
+  // the initial render before the week query has resolved.
+  const prevWeekRef = useRef<number | null | undefined>(undefined);
+  useEffect(() => {
+    if (
+      prevWeekRef.current !== undefined &&
+      prevWeekRef.current !== currentWeek
+    ) {
+      void refetch();
+    }
+    prevWeekRef.current = currentWeek;
+  }, [currentWeek, refetch]);
 
   return {
     matchups: data?.getMatchupHistory ?? [],
