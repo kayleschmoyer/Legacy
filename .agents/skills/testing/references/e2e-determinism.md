@@ -364,6 +364,7 @@ Cross-referenced from [`integration-commands.md` — `expect.poll()` passes but 
 
 ## Related
 
+- [ci-failure-prevention.md](ci-failure-prevention.md) — proactive catalog of the top CI failure patterns (GrowthBook flag seeding, Suspense body-text comparison, migration check) with write-time checklists
 - [playwright-best-practices.md](playwright-best-practices.md) — the broader Playwright reference
 - [test-tagging-guide.md](test-tagging-guide.md) — `@flaky`, `@critical`, etc.
 - [ui-serial-phases.md](ui-serial-phases.md) — patterns for multi-phase UI flows
