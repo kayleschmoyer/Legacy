@@ -1048,6 +1048,16 @@ export type FootballSeasonRushing = {
   ydsPerAtt?: Maybe<Scalars['Float']['output']>;
 };
 
+/** Result of a football stats refresh job triggered by EventBridge */
+export type FootballStatsRefreshResult = {
+  __typename?: 'FootballStatsRefreshResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  /** Human-readable explanation of the outcome */
+  reason?: Maybe<Scalars['String']['output']>;
+  /** Whether the stats refresh was actually triggered (false when out of season or handler not yet available) */
+  triggered?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type ForceAddPlayerInput = {
   leagueId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
@@ -1724,6 +1734,10 @@ export type Mutation = {
   recalculateLeagueMatchupScores?: Maybe<RecalculateMatchupScoresResult>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
+  /** Refresh PFR career stats for all football players after the NFL season ends. Triggered once per year on March 1 by EventBridge; system-only. */
+  refreshFootballCareerStats?: Maybe<FootballStatsRefreshResult>;
+  /** Refresh PFR season-totals for players on active football leagues. No-ops outside the NFL season window (Sept 1 – Feb 15). Triggered weekly by EventBridge; system-only. */
+  refreshFootballWeeklySeasonStats?: Maybe<FootballStatsRefreshResult>;
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;

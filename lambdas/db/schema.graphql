@@ -1177,6 +1177,23 @@ type FootballSeasonRushing {
   ydsPerAtt: Float
 }
 
+"""
+Result of a football stats refresh job triggered by EventBridge
+"""
+type FootballStatsRefreshResult {
+  errors: [String!]
+
+  """
+  Human-readable explanation of the outcome
+  """
+  reason: String
+
+  """
+  Whether the stats refresh was actually triggered (false when out of season or handler not yet available)
+  """
+  triggered: Boolean
+}
+
 input ForceAddPlayerInput {
   leagueId: Int!
   playerId: Int!
@@ -2167,6 +2184,16 @@ type Mutation {
   Record user consent for a specific data processing type
   """
   recordConsent(input: RecordConsentInput!): UserConsent
+
+  """
+  Refresh PFR career stats for all football players after the NFL season ends. Triggered once per year on March 1 by EventBridge; system-only.
+  """
+  refreshFootballCareerStats: FootballStatsRefreshResult
+
+  """
+  Refresh PFR season-totals for players on active football leagues. No-ops outside the NFL season window (Sept 1 – Feb 15). Triggered weekly by EventBridge; system-only.
+  """
+  refreshFootballWeeklySeasonStats: FootballStatsRefreshResult
   registerDeviceToken(input: DeviceTokenInput!): DeviceToken
 
   """

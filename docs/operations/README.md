@@ -6,6 +6,7 @@ Each runbook documents: when to use it, prerequisites, exact steps, how to verif
 
 ## Runbooks
 
-| Runbook                                           | Summary                                                   |
-| ------------------------------------------------- | --------------------------------------------------------- |
-| [Promote user to admin](promote-user-to-admin.md) | Grant a user `admin` access level in `app_internal.users` |
+| Runbook                                               | Summary                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| [Promote user to admin](promote-user-to-admin.md)     | Grant a user `admin` access level in `app_internal.users`                 |
+| [Football cron landscape](football-cron-landscape.md) | Season-aware EventBridge jobs for football stats refresh and their guards |

@@ -434,3 +434,95 @@ resource "aws_lambda_permission" "expire_subscription_grace_periods_eventbridge"
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.expire_subscription_grace_periods.arn
 }
+
+# ── Football: Weekly Season Stats Refresh ──────────────────────────────
+# Pulls the latest PFR season-totals for players on active football leagues.
+# Fires every Tuesday at 07:00 UTC (2am EST) — the day after Monday Night Football
+# so all week's box scores are final.
+#
+# The NFL season runs Sept 1 – Feb 15; the lambda-side no-op guard in
+# refreshFootballWeeklySeasonStats returns triggered:false outside that window
+# so this rule can stay enabled year-round without wasting work.
+# Season-window dates are documented in lib/utils/src/lib/season-constants.ts.
+
+resource "aws_cloudwatch_event_rule" "football_weekly_season_refresh" {
+  name                = "${local.name_prefix}-football-weekly-season-refresh"
+  description         = "Refresh PFR season-totals for active football leagues every Tuesday at 2am EST (07:00 UTC); no-ops outside NFL season"
+  schedule_expression = "cron(0 7 ? * TUE *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "football_weekly_season_refresh" {
+  rule      = aws_cloudwatch_event_rule.football_weekly_season_refresh.name
+  target_id = "football-weekly-season-refresh"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { refreshFootballWeeklySeasonStats { triggered reason errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "football_weekly_season_refresh_eventbridge" {
+  statement_id  = "AllowEventBridgeFootballWeeklySeasonRefresh"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.football_weekly_season_refresh.arn
+}
+
+# ── Football: Annual Career Stats Refresh ──────────────────────────────
+# Refreshes PFR career stats for all football players after the NFL season ends.
+# Fires once per year on March 1 at 06:00 UTC — always post-Super Bowl,
+# so no season-window guard is needed at the lambda level.
+# Season-window dates are documented in lib/utils/src/lib/season-constants.ts.
+
+resource "aws_cloudwatch_event_rule" "football_career_refresh" {
+  name                = "${local.name_prefix}-football-career-refresh"
+  description         = "Refresh PFR career stats for all football players once per year on March 1 at 06:00 UTC (post-Super Bowl)"
+  schedule_expression = "cron(0 6 1 3 ? *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "football_career_refresh" {
+  rule      = aws_cloudwatch_event_rule.football_career_refresh.name
+  target_id = "football-career-refresh"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { refreshFootballCareerStats { triggered reason errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "football_career_refresh_eventbridge" {
+  statement_id  = "AllowEventBridgeFootballCareerRefresh"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.football_career_refresh.arn
+}
