@@ -1,5 +1,5 @@
 /**
- * Football strategy tests (LS-4665).
+ * Football strategy tests (LS-4665, LS-4763).
  *
  * Acceptance: a football league with a mock player pool auto-picks a complete,
  * sensible roster. We simulate the per-pick loop the way scheduled-mutations
@@ -8,6 +8,7 @@
  * up filled by a position-eligible player.
  */
 
+import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils/positions';
 import {
   ALLOWED_POSITIONS_FOOTBALL,
   effectiveFootballFpg,
@@ -171,5 +172,31 @@ describe('footballStrategy.scoreForUnfilledPositions', () => {
   test('mock fpg is deterministic per player id', () => {
     const info: PlayerDraftInfo = { fpg: 0, positions: ['QB'] };
     expect(effectiveFootballFpg(info, 42)).toBe(effectiveFootballFpg(info, 42));
+  });
+});
+
+describe('ALLOWED_POSITIONS_FOOTBALL derives from shared map (LS-4763)', () => {
+  const shared = ALLOWED_POSITIONS_BY_SPORT['football'];
+
+  it('all slots except DEF match the shared ALLOWED_POSITIONS_BY_SPORT.football', () => {
+    for (const slot of Object.keys(shared)) {
+      if (slot === 'DEF') continue;
+      expect(ALLOWED_POSITIONS_FOOTBALL[slot]).toEqual(shared[slot]);
+    }
+  });
+
+  it('DEF slot retains DST alias for data-feed compatibility', () => {
+    expect(ALLOWED_POSITIONS_FOOTBALL['DEF']).toContain('DEF');
+    expect(ALLOWED_POSITIONS_FOOTBALL['DEF']).toContain('DST');
+  });
+
+  it('FLEX slot accepts RB, WR, TE only (LS-4763 acceptance criteria)', () => {
+    const flex = ALLOWED_POSITIONS_FOOTBALL['FLEX'] ?? [];
+    expect(flex).toContain('RB');
+    expect(flex).toContain('WR');
+    expect(flex).toContain('TE');
+    expect(flex).not.toContain('QB');
+    expect(flex).not.toContain('K');
+    expect(flex).not.toContain('DEF');
   });
 });

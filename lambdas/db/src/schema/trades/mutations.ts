@@ -22,6 +22,7 @@ import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
 import { notifyDiscordTradeEvent } from '../../services/discord-league';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import { assertSportCompatibility } from '../sport-eligibility';
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
 
@@ -376,7 +377,10 @@ builder.mutationField('proposeTrade', (t) =>
 
       // 0. Check league phase — trades are only allowed during the active season
       const [leagueCheck] = await db
-        .select({ leaguePhase: PublicSchema.leagues.leaguePhase })
+        .select({
+          leaguePhase: PublicSchema.leagues.leaguePhase,
+          sport: PublicSchema.leagues.sport,
+        })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, leagueId))
         .limit(1);
@@ -447,6 +451,17 @@ builder.mutationField('proposeTrade', (t) =>
           "One or more players you are requesting are not on the other team's roster",
         );
       }
+
+      // 4b. Sport-compatibility guard: all players must match the league's sport
+      const allTradePlayerIds = [...offeringPlayerIds, ...requestingPlayerIds];
+      const tradePlayerSports = await db
+        .select({
+          playerId: PublicSchema.players.id,
+          sport: PublicSchema.players.sport,
+        })
+        .from(PublicSchema.players)
+        .where(inArray(PublicSchema.players.id, allTradePlayerIds));
+      assertSportCompatibility(tradePlayerSports, leagueCheck.sport);
 
       // 5. Create the trade offer
       const expiresAt = expiresInDays
@@ -675,16 +690,30 @@ builder.mutationField('acceptTrade', (t) =>
         .filter((leg) => leg.fromTeamId !== proposingTeamId)
         .map((leg) => leg.playerId);
 
-      // Salary cap enforcement — validate post-trade payroll for both teams.
+      // Salary cap enforcement + sport compatibility — fetch league settings.
       const [leagueCapRow] = await db
         .select({
           salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
           salaryCap: PublicSchema.leagues.salaryCap,
           minSalary: PublicSchema.leagues.minSalary,
+          sport: PublicSchema.leagues.sport,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, trade.leagueId))
         .limit(1);
+
+      // Sport-compatibility guard: all traded players must match the league's sport.
+      if (leagueCapRow) {
+        const allPlayerIds = playerLegs.map((leg) => leg.playerId);
+        const tradedPlayerSports = await db
+          .select({
+            playerId: PublicSchema.players.id,
+            sport: PublicSchema.players.sport,
+          })
+          .from(PublicSchema.players)
+          .where(inArray(PublicSchema.players.id, allPlayerIds));
+        assertSportCompatibility(tradedPlayerSports, leagueCapRow.sport);
+      }
 
       if (leagueCapRow?.salaryCapEnabled && leagueCapRow.salaryCap != null) {
         const allPlayerIds = playerLegs.map((leg) => leg.playerId);

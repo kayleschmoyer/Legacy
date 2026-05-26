@@ -27,6 +27,8 @@ import {
   addClaimedPlayerToCurrentMatchup,
   validateFaabBudget,
 } from '../schema/waivers/helpers';
+import { assertSportCompatibility } from '../schema/sport-eligibility';
+import type { SportKind } from '@legacy-sports/utils/positions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,7 @@ interface LeagueSalarySettings {
   minSalary: number;
   seasonNumber: number;
   salaryCap: number | null;
+  sport: SportKind;
 }
 
 // ── Sort helper (exported for direct unit testing) ─────────────────────────
@@ -175,6 +178,7 @@ export class WaiverClaimProcessor {
               minSalary: settings.minSalary,
               seasonNumber: settings.seasonNumber,
               salaryCap: settings.salaryCap ?? null,
+              sport: settings.sport,
             }
           : null;
 
@@ -383,6 +387,7 @@ export class WaiverClaimProcessor {
         minSalary: PublicSchema.leagues.minSalary,
         seasonNumber: PublicSchema.leagues.seasonNumber,
         salaryCap: PublicSchema.leagues.salaryCap,
+        sport: PublicSchema.leagues.sport,
       })
       .from(PublicSchema.leagues)
       .where(inArray(PublicSchema.leagues.id, leagueIds));
@@ -506,6 +511,34 @@ export class WaiverClaimProcessor {
           capErr instanceof Error ? capErr.message : 'Salary cap exceeded';
         await this.failClaim(claim.id, capReason);
         return { outcome: 'failed', reason: capReason };
+      }
+    }
+
+    // Sport-compatibility guard: player must belong to the same sport as the league.
+    // Run before handleRosterAndDrop so a rejected claim never executes a drop.
+    if (leagueSalarySettings) {
+      const [playerSportRow] = await db
+        .select({
+          playerId: PublicSchema.players.id,
+          sport: PublicSchema.players.sport,
+        })
+        .from(PublicSchema.players)
+        .where(eq(PublicSchema.players.id, claim.playerId))
+        .limit(1);
+      if (playerSportRow) {
+        try {
+          assertSportCompatibility(
+            [playerSportRow],
+            leagueSalarySettings.sport,
+          );
+        } catch (sportErr) {
+          const sportReason =
+            sportErr instanceof Error
+              ? sportErr.message
+              : 'Sport mismatch: player does not belong to this league sport';
+          await this.failClaim(claim.id, sportReason);
+          return { outcome: 'failed', reason: sportReason };
+        }
       }
     }
 

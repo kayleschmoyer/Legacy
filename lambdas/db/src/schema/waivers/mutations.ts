@@ -23,6 +23,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../graphql-errors';
+import { assertSportCompatibility } from '../sport-eligibility';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ builder.mutationField('claimFreeAgent', (t) =>
           salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
           minSalary: PublicSchema.leagues.minSalary,
           salaryCap: PublicSchema.leagues.salaryCap,
+          sport: PublicSchema.leagues.sport,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, leagueId))
@@ -184,6 +186,19 @@ builder.mutationField('claimFreeAgent', (t) =>
         throw UserInputError(
           'This player is already on a roster in this league',
         );
+      }
+
+      // 3b. Sport-compatibility guard: claimed player must match league sport
+      const [claimedPlayerRow] = await db
+        .select({
+          playerId: PublicSchema.players.id,
+          sport: PublicSchema.players.sport,
+        })
+        .from(PublicSchema.players)
+        .where(eq(PublicSchema.players.id, playerId))
+        .limit(1);
+      if (claimedPlayerRow) {
+        assertSportCompatibility([claimedPlayerRow], leagueRow[0].sport);
       }
 
       // 4. Check for existing pending claim for this player in this league

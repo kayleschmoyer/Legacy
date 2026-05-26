@@ -7,6 +7,8 @@ module.exports = {
       'identity-obj-proxy',
     '^__PLATFORM_COMPONENTS__$': '<rootDir>/src/platform-components/web',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
+    '^@legacy-sports/utils/positions$':
+      '<rootDir>/../../lib/utils/src/lib/allowed-positions',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
   },
   setupFilesAfterEnv: ['<rootDir>/jest-setup-web.js'],
