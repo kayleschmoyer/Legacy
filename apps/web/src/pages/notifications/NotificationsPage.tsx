@@ -604,6 +604,12 @@ const NotificationsPage: React.FC = () => {
   const isEmpty =
     !isLoading && !isError && notifications.length === 0 && page === 0;
 
+  useEffect(() => {
+    if (!loading && !error && notifications.length === 0 && page > 0) {
+      setPage(0);
+    }
+  }, [loading, error, notifications.length, page]);
+
   const handleMarkAsRead = useCallback(
     (notificationId: number) => {
       void markAsRead({
