@@ -14,10 +14,11 @@ import { DateTimePicker } from '../../components/DateTimePicker';
 import {
   DRAFT_MODES,
   DRAFT_ORDERS,
-  ERA_FILTERS,
+  ERA_FILTERS_BY_SPORT,
   PICK_TIME_OPTIONS,
-  PLAYER_POOLS,
+  PLAYER_POOLS_BY_SPORT,
   SELECTION_METHODS,
+  type SportKind,
 } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import {
@@ -29,6 +30,8 @@ export interface DraftSettingsControlProps {
   leagueId: number;
   draftStatus: string | null | undefined;
   playerPool: string | null | undefined;
+  /** Sport kind — determines which player pool and era filter options are shown. Defaults to 'baseball'. */
+  sport?: SportKind;
   /** Current era filter for the league (editable before draft starts). */
   eraFilter?: string | null | undefined;
   baseballHofOnly?: boolean | null | undefined;
@@ -128,6 +131,7 @@ export function DraftSettingsControl({
   leagueId,
   draftStatus,
   playerPool: leaguePlayerPool,
+  sport = 'baseball',
   eraFilter,
   baseballHofOnly,
   customEraStartYear,
@@ -136,6 +140,8 @@ export function DraftSettingsControl({
   onError,
   onDirtyChange,
 }: DraftSettingsControlProps) {
+  const sportPlayerPools = PLAYER_POOLS_BY_SPORT[sport];
+  const sportEraFilters = ERA_FILTERS_BY_SPORT[sport];
   const isDraftLocked = draftStatus !== 'not-started';
 
   // Fetch the current draft record (if any)
@@ -607,8 +613,8 @@ export function DraftSettingsControl({
             {/* Player Pool */}
             <OptionSelector
               label="Player Pool"
-              description="Choose which players are available to draft. All MLB includes every player; or limit to one league."
-              options={PLAYER_POOLS}
+              description="Choose which players are available to draft, or limit to one conference."
+              options={sportPlayerPools}
               value={playerPool}
               onChange={handlePlayerPoolChange}
               disabled={isDraftLocked || saving}
@@ -617,8 +623,8 @@ export function DraftSettingsControl({
             {/* Era Filter */}
             <OptionSelector
               label="Historical Era Filter"
-              description="Restrict the draft pool to players from a specific baseball era. Change before the draft starts."
-              options={ERA_FILTERS}
+              description="Restrict the draft pool to players from a specific era. Change before the draft starts."
+              options={sportEraFilters}
               value={eraFilterLocal}
               onChange={handleEraFilterChange}
               disabled={isDraftLocked || saving}

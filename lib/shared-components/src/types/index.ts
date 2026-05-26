@@ -165,18 +165,39 @@ export enum DraftOrder {
   LINEAR = 'linear',
 }
 
+/**
+ * Player pool — restricts the draft pool to players from a specific league or
+ * conference. Values are shared across sports; use `PLAYER_POOLS_BY_SPORT` from
+ * `config/sports.ts` to get the appropriate subset for a given sport.
+ *
+ * ⚠️ This enum is intentionally extensible: new sports will add new members.
+ * Any `switch` statement over `PlayerPool` **must** include a `default` case to
+ * remain correct as the enum grows.
+ */
 export enum PlayerPool {
+  // Baseball
   ALL = 'all',
   NL = 'nl',
   AL = 'al',
+  // Football (LS-4760)
+  NFL = 'nfl',
+  AFC = 'afc',
+  NFC = 'nfc',
 }
 
 /**
  * Era filter enum — matches the `era_filter` PostgreSQL enum.
- * Controls which historical baseball era the player pool is restricted to.
+ * Baseball and football eras are both represented here; use
+ * `ERA_FILTERS_BY_SPORT` from `config/sports.ts` to get the appropriate
+ * subset for a given sport.
+ *
+ * ⚠️ This enum is intentionally extensible: new sports will add new era
+ * members. Any `switch` statement over `EraFilter` **must** include a
+ * `default` case to remain correct as the enum grows.
  */
 export enum EraFilter {
   ALL = 'all',
+  // Baseball
   DEAD_BALL = 'dead_ball',
   GOLDEN_AGE = 'golden_age',
   EXPANSION = 'expansion',
@@ -184,6 +205,13 @@ export enum EraFilter {
   STEROID_ERA = 'steroid_era',
   MODERN = 'modern',
   CUSTOM = 'custom',
+  // Football (LS-4760)
+  PIONEER = 'pioneer',
+  SINGLE_PLATOON = 'single_platoon',
+  SUPER_BOWL_ERA = 'super_bowl_era',
+  WEST_COAST = 'west_coast',
+  SALARY_CAP_ERA = 'salary_cap_era',
+  SPREAD_OFFENSE = 'spread_offense',
 }
 
 export interface DropdownItem {

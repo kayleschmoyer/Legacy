@@ -26,7 +26,7 @@ import { Platform } from '../../platform-components';
 import {
   DRAFT_MODES,
   DRAFT_ORDERS,
-  PLAYER_POOLS,
+  PLAYER_POOLS_BY_SPORT,
   SCHEDULING_STRATEGIES,
   SELECTION_METHODS,
 } from '../../config/sports';
@@ -200,7 +200,9 @@ const DEFAULT_FORM: Omit<CreateLeagueFormData, 'sport'> = {
 function makeDefaultForm(
   sport: CreateLeagueFormData['sport'],
 ): CreateLeagueFormData {
-  return { ...DEFAULT_FORM, sport };
+  const defaultPlayerPool: PlayerPool =
+    sport === 'football' ? PlayerPool.NFL : PlayerPool.ALL;
+  return { ...DEFAULT_FORM, sport, playerPool: defaultPlayerPool };
 }
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
@@ -651,6 +653,13 @@ function RosterStep({
   set: (patch: Partial<CreateLeagueFormData>) => void;
   disabled: boolean;
 }) {
+  // Resolve sport-appropriate pool options without a type cast: sports beyond
+  // the current SportKind coverage fall back to baseball pools.
+  const activePools =
+    f.sport === 'football'
+      ? PLAYER_POOLS_BY_SPORT.football
+      : PLAYER_POOLS_BY_SPORT.baseball;
+
   return (
     <YStack gap="$4">
       <YStack gap="$1">
@@ -684,7 +693,7 @@ function RosterStep({
         <FieldLabel>Player Pool</FieldLabel>
         <BtnGroup
           value={f.playerPool}
-          options={PLAYER_POOLS.map((p) => ({
+          options={activePools.map((p) => ({
             label: p.label,
             value: p.value as PlayerPool,
           }))}
@@ -692,7 +701,7 @@ function RosterStep({
           disabled={disabled}
         />
         <FieldHint>
-          Narrow the league to a single league's talent, or open it up.
+          Narrow the league to a single conference's talent, or open it up.
         </FieldHint>
       </YStack>
     </YStack>

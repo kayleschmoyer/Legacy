@@ -2,6 +2,7 @@ import {
   DEFAULT_BASEBALL_ROSTER_POSITIONS,
   DEFAULT_FOOTBALL_ROSTER_POSITIONS,
 } from '@legacy-sports/utils';
+import type { SportKind } from '@legacy-sports/utils';
 import { SportConfig } from '../types';
 
 /**
@@ -149,17 +150,30 @@ export const SCHEDULING_STRATEGIES = Object.freeze([
   { label: 'Random', value: 'random' },
 ]);
 
-export const PLAYER_POOLS = Object.freeze([
-  { label: 'All MLB', value: 'all' },
-  { label: 'National League', value: 'nl' },
-  { label: 'American League', value: 'al' },
-]);
+export const PLAYER_POOLS_BY_SPORT: Record<
+  SportKind,
+  ReadonlyArray<{ label: string; value: string }>
+> = {
+  baseball: Object.freeze([
+    { label: 'All MLB', value: 'all' },
+    { label: 'National League', value: 'nl' },
+    { label: 'American League', value: 'al' },
+  ]),
+  football: Object.freeze([
+    { label: 'All NFL', value: 'nfl' },
+    { label: 'AFC', value: 'afc' },
+    { label: 'NFC', value: 'nfc' },
+  ]),
+};
+
+/** Backwards-compatible alias — returns baseball player pools. */
+export const PLAYER_POOLS = PLAYER_POOLS_BY_SPORT.baseball;
 
 /**
- * Era filter options for league creation.
+ * Era filter options per sport, for league creation.
  * Maps to the `era_filter` database enum.
  *
- * Year ranges:
+ * Baseball year ranges:
  *   Dead Ball   : 1871-1919
  *   Golden Age  : 1920-1960
  *   Expansion   : 1961-1976
@@ -168,40 +182,79 @@ export const PLAYER_POOLS = Object.freeze([
  *   Modern      : 2006+
  *   Custom      : commissioner-defined
  *   All         : no restriction (default)
+ *
+ * Football year ranges:
+ *   Pioneer         : 1920-1945
+ *   Single-Platoon  : 1946-1959
+ *   Super Bowl Era  : 1960-1977
+ *   West Coast      : 1978-1993
+ *   Salary Cap      : 1994-2010
+ *   Spread Offense  : 2011+
  */
-export const ERA_FILTERS = Object.freeze([
-  { label: 'All Eras', value: 'all' },
-  { label: 'Dead Ball Era (pre-1920)', value: 'dead_ball' },
-  { label: 'Golden Age (1920-1960)', value: 'golden_age' },
-  { label: 'Expansion Era (1961-1976)', value: 'expansion' },
-  { label: 'Free Agency Era (1977-1993)', value: 'free_agency' },
-  { label: 'Steroid Era (1994-2005)', value: 'steroid_era' },
-  { label: 'Modern Era (2006+)', value: 'modern' },
-  { label: 'Custom Era', value: 'custom' },
-]);
-
-/** Year boundaries for each pre-defined era */
-export const ERA_YEAR_RANGES: Record<
-  string,
-  { start: number; end: number; label: string }
+export const ERA_FILTERS_BY_SPORT: Record<
+  SportKind,
+  ReadonlyArray<{ label: string; value: string }>
 > = {
-  dead_ball: { start: 1871, end: 1919, label: 'Dead Ball Era' },
-  golden_age: { start: 1920, end: 1960, label: 'Golden Age' },
-  expansion: { start: 1961, end: 1976, label: 'Expansion Era' },
-  free_agency: { start: 1977, end: 1993, label: 'Free Agency Era' },
-  steroid_era: { start: 1994, end: 2005, label: 'Steroid Era' },
-  modern: { start: 2006, end: 9999, label: 'Modern Era' },
+  baseball: Object.freeze([
+    { label: 'All Eras', value: 'all' },
+    { label: 'Dead Ball Era (pre-1920)', value: 'dead_ball' },
+    { label: 'Golden Age (1920-1960)', value: 'golden_age' },
+    { label: 'Expansion Era (1961-1976)', value: 'expansion' },
+    { label: 'Free Agency Era (1977-1993)', value: 'free_agency' },
+    { label: 'Steroid Era (1994-2005)', value: 'steroid_era' },
+    { label: 'Modern Era (2006+)', value: 'modern' },
+    { label: 'Custom Era', value: 'custom' },
+  ]),
+  football: Object.freeze([
+    { label: 'All Eras', value: 'all' },
+    { label: 'Pioneer Era (1920-1945)', value: 'pioneer' },
+    { label: 'Single-Platoon Era (1946-1959)', value: 'single_platoon' },
+    { label: 'Super Bowl Era (1960-1977)', value: 'super_bowl_era' },
+    { label: 'West Coast Era (1978-1993)', value: 'west_coast' },
+    { label: 'Salary Cap Era (1994-2010)', value: 'salary_cap_era' },
+    { label: 'Spread Offense Era (2011+)', value: 'spread_offense' },
+  ]),
 };
 
+/** Backwards-compatible alias — returns baseball era filters. */
+export const ERA_FILTERS = ERA_FILTERS_BY_SPORT.baseball;
+
+/** Year boundaries for pre-defined eras, keyed by sport. */
+export const ERA_YEAR_RANGES_BY_SPORT: Record<
+  SportKind,
+  Record<string, { start: number; end: number; label: string }>
+> = {
+  baseball: {
+    dead_ball: { start: 1871, end: 1919, label: 'Dead Ball Era' },
+    golden_age: { start: 1920, end: 1960, label: 'Golden Age' },
+    expansion: { start: 1961, end: 1976, label: 'Expansion Era' },
+    free_agency: { start: 1977, end: 1993, label: 'Free Agency Era' },
+    steroid_era: { start: 1994, end: 2005, label: 'Steroid Era' },
+    modern: { start: 2006, end: 9999, label: 'Modern Era' },
+  },
+  football: {
+    pioneer: { start: 1920, end: 1945, label: 'Pioneer Era' },
+    single_platoon: { start: 1946, end: 1959, label: 'Single-Platoon Era' },
+    super_bowl_era: { start: 1960, end: 1977, label: 'Super Bowl Era' },
+    west_coast: { start: 1978, end: 1993, label: 'West Coast Era' },
+    salary_cap_era: { start: 1994, end: 2010, label: 'Salary Cap Era' },
+    spread_offense: { start: 2011, end: 9999, label: 'Spread Offense Era' },
+  },
+};
+
+/** Backwards-compatible alias — returns baseball era year ranges. */
+export const ERA_YEAR_RANGES = ERA_YEAR_RANGES_BY_SPORT.baseball;
+
 /**
- * Derive the primary baseball era name from a career midpoint year.
- *
- * @param midpointYear - The year at the midpoint of a player's career
- *   (or any representative year, e.g. peak year)
- * @returns Human-readable era label, e.g. "Golden Age"
+ * Derive the era name from a career midpoint year for the given sport.
+ * Defaults to baseball when sport is not specified.
  */
-export function getEraFromYear(midpointYear: number): string {
-  for (const [, range] of Object.entries(ERA_YEAR_RANGES)) {
+export function getEraFromYear(
+  midpointYear: number,
+  sport: SportKind = 'baseball',
+): string {
+  const ranges = ERA_YEAR_RANGES_BY_SPORT[sport];
+  for (const [, range] of Object.entries(ranges)) {
     if (midpointYear >= range.start && midpointYear <= range.end) {
       return range.label;
     }
@@ -210,10 +263,15 @@ export function getEraFromYear(midpointYear: number): string {
 }
 
 /**
- * Derive the primary era value (DB enum string) from a career midpoint year.
+ * Derive the era value (DB enum string) from a career midpoint year for the given sport.
+ * Defaults to baseball when sport is not specified.
  */
-export function getEraValueFromYear(midpointYear: number): string {
-  for (const [key, range] of Object.entries(ERA_YEAR_RANGES)) {
+export function getEraValueFromYear(
+  midpointYear: number,
+  sport: SportKind = 'baseball',
+): string {
+  const ranges = ERA_YEAR_RANGES_BY_SPORT[sport];
+  for (const [key, range] of Object.entries(ranges)) {
     if (midpointYear >= range.start && midpointYear <= range.end) {
       return key;
     }
