@@ -26,6 +26,7 @@ import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
 import LeagueCreatePage from './baseball/league/create';
 import FootballLeagueCreatePage from './football/league/create';
 import JoinLeagueByCode from './baseball/league/join';
+import JoinFootballLeagueByCode from './football/league/join';
 import MatchupDetail from './baseball/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
@@ -62,6 +63,7 @@ export type AppDrawerParamList = {
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
   'football/league/create': undefined;
+  'football/league/join': undefined;
   DraftBoardPage: { leagueId?: string } | undefined;
   'league-discovery': undefined;
   'season-draft/index': undefined;
@@ -147,6 +149,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'baseball/league/join',
     title: 'Join League',
+  },
+  {
+    route: 'football/league/join',
+    title: 'Join Football League',
   },
   {
     route: 'league-discovery',
@@ -415,6 +421,11 @@ export default function Layout() {
             name="baseball/league/join"
             options={{ title: 'Join League' }}
             component={JoinLeagueByCode}
+          />
+          <Screen
+            name="football/league/join"
+            options={{ title: 'Join Football League' }}
+            component={JoinFootballLeagueByCode}
           />
           <Screen
             name="league-discovery"

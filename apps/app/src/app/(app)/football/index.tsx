@@ -84,6 +84,13 @@ export default function FootballHome() {
               </Text>
             </Button>
           </Link>
+          <Link href="/football/league/join" asChild>
+            <Button flex={1} backgroundColor="$orange9" borderRadius="$3">
+              <Text color="$white" fontSize="$4" fontWeight="bold">
+                Join League
+              </Text>
+            </Button>
+          </Link>
           <Link href="/football/leagues" asChild>
             <Button flex={1} backgroundColor="$orange9" borderRadius="$3">
               <Text color="$white" fontSize="$4" fontWeight="bold">
