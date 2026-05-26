@@ -53,12 +53,13 @@ export function DeleteLeagueControl({
         awaitRefetchQueries: true,
       });
 
-      setLoading(false);
-
       if (result.data?.deleteLeague) {
         setShowConfirmDialog(false);
         onDeleted?.();
+        // loading stays true — onDeleted navigates away and unmounts this
+        // component before the next render, preventing a second tap.
       } else {
+        setLoading(false);
         onError?.(new Error('Failed to delete league'));
       }
     } catch (err) {
