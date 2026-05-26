@@ -265,6 +265,7 @@ export function CommissionerAnnouncementsPanel({
             onPress={() => {
               setShowCompose(true);
             }}
+            disabled={posting}
             backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.15)}
             borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.4)}
             borderWidth={1}
@@ -294,6 +295,7 @@ export function CommissionerAnnouncementsPanel({
               setInputText(e.target.value);
             }}
             onKeyDown={handleKeyDown}
+            disabled={posting}
             placeholder="Write an announcement for all league members… (Ctrl+Enter to post)"
             maxLength={2000}
             rows={3}
