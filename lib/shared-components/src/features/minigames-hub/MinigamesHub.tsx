@@ -23,6 +23,23 @@ export interface MinigamesHubProps {
   onNavigate: (gameId: MinigameId) => void;
 }
 
+// Narrow-viewport breakpoint: at <=720px the hero stacks and cards become
+// single-column so copy and CTAs remain readable/tappable on phones.
+const NARROW_QUERY = '(max-width: 720px)';
+
+function useIsNarrow(): boolean {
+  const [narrow, setNarrow] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia(NARROW_QUERY);
+    setNarrow(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return narrow;
+}
+
 const EYEBROW_STYLE: React.CSSProperties = {
   fontFamily: 'var(--font-display, "Big Shoulders Display", sans-serif)',
   fontWeight: 700,
@@ -277,10 +294,11 @@ const GAME_TEMPLATES: Omit<GameDef, 'stat'>[] = [
   },
 ];
 
-const GameCard: React.FC<{ game: GameDef; onPress: () => void }> = ({
-  game,
-  onPress,
-}) => {
+const GameCard: React.FC<{
+  game: GameDef;
+  onPress: () => void;
+  isNarrow: boolean;
+}> = ({ game, onPress, isNarrow }) => {
   const iconBg =
     game.accent === 'navy'
       ? withAlpha(BRAND_NAVY, 0.55)
@@ -302,7 +320,7 @@ const GameCard: React.FC<{ game: GameDef; onPress: () => void }> = ({
         background: SURFACE_CARD,
         border: `1px solid ${withAlpha('#ffffff', 0.08)}`,
         borderRadius: 16,
-        padding: 28,
+        padding: isNarrow ? 20 : 28,
         display: 'flex',
         flexDirection: 'column',
         gap: 14,
@@ -310,10 +328,11 @@ const GameCard: React.FC<{ game: GameDef; onPress: () => void }> = ({
         transition: 'all 240ms ease',
         position: 'relative',
         overflow: 'hidden',
-        minHeight: 360,
+        minHeight: isNarrow ? 0 : 360,
         color: '#F5F7FA',
         fontFamily: 'inherit',
-        flex: 1,
+        flex: isNarrow ? '1 1 100%' : '1 1 280px',
+        width: isNarrow ? '100%' : undefined,
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget;
@@ -398,7 +417,7 @@ const GameCard: React.FC<{ game: GameDef; onPress: () => void }> = ({
             fontFamily:
               'var(--font-display, "Big Shoulders Display", sans-serif)',
             fontWeight: 800,
-            fontSize: 44,
+            fontSize: isNarrow ? 34 : 44,
             lineHeight: 1,
             letterSpacing: '-0.02em',
             color: '#F8FAFC',
@@ -529,6 +548,7 @@ const GameCard: React.FC<{ game: GameDef; onPress: () => void }> = ({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
+  const isNarrow = useIsNarrow();
   const {
     data: sdGamesData,
     loading: sdLoading,
@@ -603,7 +623,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
         maxWidth: 1280,
         width: '100%',
         alignSelf: 'center',
-        padding: '32px 20px 80px',
+        padding: isNarrow ? '20px 16px 64px' : '32px 20px 80px',
         margin: '0 auto',
       }}
     >
@@ -611,10 +631,10 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 260px',
-          gap: 40,
+          gridTemplateColumns: isNarrow ? '1fr' : '1fr 260px',
+          gap: isNarrow ? 24 : 40,
           alignItems: 'center',
-          padding: '48px 44px',
+          padding: isNarrow ? '28px 22px' : '48px 44px',
           marginBottom: 28,
           background: [
             `radial-gradient(ellipse at 85% 30%, ${withAlpha(BRAND_GOLD, 0.12)} 0%, transparent 55%)`,
@@ -759,18 +779,21 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Baseball artwork */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            width: '100%',
-            maxWidth: 220,
-            justifySelf: 'end',
-          }}
-        >
-          <BaseballMark />
-        </div>
+        {/* Baseball artwork — hidden on narrow viewports to keep the hero
+            compact and avoid pushing the mode cards below the fold. */}
+        {!isNarrow && (
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              width: '100%',
+              maxWidth: 220,
+              justifySelf: 'end',
+            }}
+          >
+            <BaseballMark />
+          </div>
+        )}
       </div>
 
       {/* ── Game cards ── */}
@@ -778,7 +801,12 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
         style={{ display: 'flex', gap: 18, marginBottom: 32, flexWrap: 'wrap' }}
       >
         {games.map((g) => (
-          <GameCard key={g.id} game={g} onPress={() => onNavigate(g.id)} />
+          <GameCard
+            key={g.id}
+            game={g}
+            onPress={() => onNavigate(g.id)}
+            isNarrow={isNarrow}
+          />
         ))}
       </div>
 
