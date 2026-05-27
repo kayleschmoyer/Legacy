@@ -343,6 +343,12 @@ export const CSS = `
 }
 .d-rail::-webkit-scrollbar { width: 3px; }
 .d-rail::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+.d-rail-content {
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 0; flex: 1;
+}
+/* Mobile-only collapse toggle — hidden on desktop (LS-4824). */
+.d-rail-mobile-toggle { display: none; }
 
 /* ===== View Tabs (4-tab system) ===== */
 .d-view-tabs {
@@ -1069,7 +1075,33 @@ export const CSS = `
     grid-template-rows: auto auto 1fr;
     grid-template-areas: "topband" "rail" "main";
   }
-  .d-rail { border-left: none; border-top: 1px solid rgba(255,255,255,0.06); max-height: 280px; }
+  .d-rail {
+    border-left: none;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    max-height: 280px;
+    padding: 8px 14px;
+  }
+  /* LS-4824: collapse the rail to just the toggle on mobile so the player
+     pool isn't pushed below the fold. Desktop layout is unaffected. */
+  .d-rail-mobile-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    color: var(--d-text);
+    font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .d-rail-mobile-toggle:hover { background: rgba(255,255,255,0.08); }
+  .d-rail.collapsed { max-height: none; overflow: visible; }
+  .d-rail.collapsed .d-rail-content { display: none; }
   .d-depth-grid { grid-template-columns: repeat(2, 1fr); }
   .d-topband { grid-template-columns: 1fr auto; grid-template-rows: auto auto; }
 }

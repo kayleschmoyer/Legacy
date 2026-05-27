@@ -104,175 +104,197 @@ export function DraftRail({
   const totalDrafted = myTeam.length;
   const totalSlots = positionSlots.reduce((sum, s) => sum + s.slots, 0);
 
+  // LS-4824: on mobile the rail sits above the player pool and consumes the
+  // top of the viewport. Default to collapsed so mobile users can see the
+  // draft board first, and provide a toggle. Desktop ignores this via CSS.
+  const [mobileCollapsed, setMobileCollapsed] = React.useState(true);
+
   return (
-    <aside className="d-rail" aria-label="Draft panel">
-      {/* Draft Intelligence — only on user's pick */}
-      {isMyPick && (
-        <div className="d-intel-panel">
-          <div className="d-intel-title">
-            Draft Intelligence
-            {isPremium && (
-              <span
-                style={{
-                  marginLeft: 6,
-                  fontSize: 9,
-                  letterSpacing: '0.14em',
-                  color: 'var(--d-accent)',
-                  fontWeight: 700,
-                }}
-              >
-                ✦ PREMIUM
-              </span>
-            )}
-          </div>
-          <DraftIntelligence
-            draftId={draftId}
-            teamId={myTeamId}
-            currentOverallPick={currentOverallPick}
-            onDraft={
-              commPickMode && isOwner ? onCommissionerPick : onDraftPlayer
-            }
-          />
-        </div>
-      )}
-
-      {/* Auto-pick Queue */}
-      {draftId && myTeamId !== null && (
-        <div className="d-rail-panel d-queue-panel">
-          <div className="d-rail-panel-head">
-            <h4 className="d-rail-panel-title">Auto-pick Queue</h4>
-          </div>
-          <DraftQueuePanel
-            draftId={draftId}
-            autoPickDisabled={autoPickDisabled}
-            onError={onShowToast}
-          />
-        </div>
-      )}
-
-      {/* My Roster — progress bars */}
-      <div className="d-rail-panel">
-        <div className="d-rail-panel-head">
-          <h4 className="d-rail-panel-title">My Roster</h4>
-          <span className="d-rail-panel-count num">
-            {totalDrafted} / {totalSlots}
-          </span>
-        </div>
-        <div className="d-pos-progress-list" role="list">
-          {positionSlots.map(({ pos, label, slots }) => {
-            const count = positionCounts[pos] ?? 0;
-            const fill = slots > 0 ? Math.min(1, count / slots) : 0;
-            const barColor = getPositionColor(sport ?? 'baseball', pos);
-            const isFilled = count > 0;
-            const isComplete = count >= slots;
-            return (
-              <div
-                key={pos}
-                className={`d-pos-progress-row${isFilled ? ' filled' : ''}${isComplete ? ' complete' : ''}`}
-                role="listitem"
-                aria-label={`${label}: ${count} of ${slots}`}
-              >
-                <span className="d-pos-progress-label">{label}</span>
-                <div className="d-pos-progress-bar" aria-hidden="true">
-                  <div
-                    className="d-pos-progress-fill"
-                    style={{ width: `${fill * 100}%`, background: barColor }}
-                  />
-                </div>
-                <span className="d-pos-progress-count num">
-                  {count}/{slots}
+    <aside
+      className={`d-rail${mobileCollapsed ? ' collapsed' : ''}`}
+      aria-label="Draft panel"
+    >
+      <button
+        type="button"
+        className="d-rail-mobile-toggle"
+        aria-expanded={!mobileCollapsed}
+        aria-controls="d-rail-content"
+        onClick={() => setMobileCollapsed((c) => !c)}
+      >
+        <span>Draft panel</span>
+        <span aria-hidden="true">{mobileCollapsed ? '▾ Show' : '▴ Hide'}</span>
+      </button>
+      <div id="d-rail-content" className="d-rail-content">
+        {/* Draft Intelligence — only on user's pick */}
+        {isMyPick && (
+          <div className="d-intel-panel">
+            <div className="d-intel-title">
+              Draft Intelligence
+              {isPremium && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 9,
+                    letterSpacing: '0.14em',
+                    color: 'var(--d-accent)',
+                    fontWeight: 700,
+                  }}
+                >
+                  ✦ PREMIUM
                 </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+              )}
+            </div>
+            <DraftIntelligence
+              draftId={draftId}
+              teamId={myTeamId}
+              currentOverallPick={currentOverallPick}
+              onDraft={
+                commPickMode && isOwner ? onCommissionerPick : onDraftPlayer
+              }
+            />
+          </div>
+        )}
 
-      {/* Pick History */}
-      {pickHistory.length > 0 && (
-        <div
-          className="d-rail-panel"
-          style={{
-            flex: 1,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div className="d-rail-panel-head">
-            <h4 className="d-rail-panel-title">Pick History</h4>
-            <span className="d-rail-panel-count num">{pickHistory.length}</span>
+        {/* Auto-pick Queue */}
+        {draftId && myTeamId !== null && (
+          <div className="d-rail-panel d-queue-panel">
+            <div className="d-rail-panel-head">
+              <h4 className="d-rail-panel-title">Auto-pick Queue</h4>
+            </div>
+            <DraftQueuePanel
+              draftId={draftId}
+              autoPickDisabled={autoPickDisabled}
+              onError={onShowToast}
+            />
           </div>
-          <div
-            style={{ overflowY: 'auto', flex: 1 }}
-            role="list"
-            aria-label="Recent draft picks"
-          >
-            {pickHistory
-              .slice()
-              .reverse()
-              .slice(0, 40)
-              .map((pick) => {
-                const name = playerName(pick, statsLookup);
-                const pos =
-                  statsLookup.get(pick.playerId)?.position ??
-                  pick.player?.eligiblePositions?.[0] ??
-                  '?';
-                const isMine = pick.teamId === myTeamId;
-                const pill = getPositionPill(pos);
-                return (
-                  <div
-                    key={pick.id}
-                    className={`d-pick-row${isMine ? ' mine' : ''}`}
-                    role="listitem"
-                  >
-                    <span className="d-pick-num num">
-                      {pickRoundLabel(pick)}
-                    </span>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '1px 5px',
-                        borderRadius: 3,
-                        fontSize: 9,
-                        fontWeight: 700,
-                        color: pill.color,
-                        background: pill.bg,
-                        whiteSpace: 'nowrap',
-                        fontFamily: "'Big Shoulders Display', sans-serif",
-                        letterSpacing: '0.06em',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {pos}
-                    </span>
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontSize: 12,
-                        color: isMine ? 'var(--d-accent)' : 'var(--d-text)',
-                      }}
-                    >
-                      {name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: 'var(--d-text-muted)',
-                        textAlign: 'right',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {teamNameById(pick.teamId)}
-                    </span>
+        )}
+
+        {/* My Roster — progress bars */}
+        <div className="d-rail-panel">
+          <div className="d-rail-panel-head">
+            <h4 className="d-rail-panel-title">My Roster</h4>
+            <span className="d-rail-panel-count num">
+              {totalDrafted} / {totalSlots}
+            </span>
+          </div>
+          <div className="d-pos-progress-list" role="list">
+            {positionSlots.map(({ pos, label, slots }) => {
+              const count = positionCounts[pos] ?? 0;
+              const fill = slots > 0 ? Math.min(1, count / slots) : 0;
+              const barColor = getPositionColor(sport ?? 'baseball', pos);
+              const isFilled = count > 0;
+              const isComplete = count >= slots;
+              return (
+                <div
+                  key={pos}
+                  className={`d-pos-progress-row${isFilled ? ' filled' : ''}${isComplete ? ' complete' : ''}`}
+                  role="listitem"
+                  aria-label={`${label}: ${count} of ${slots}`}
+                >
+                  <span className="d-pos-progress-label">{label}</span>
+                  <div className="d-pos-progress-bar" aria-hidden="true">
+                    <div
+                      className="d-pos-progress-fill"
+                      style={{ width: `${fill * 100}%`, background: barColor }}
+                    />
                   </div>
-                );
-              })}
+                  <span className="d-pos-progress-count num">
+                    {count}/{slots}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
-      )}
+
+        {/* Pick History */}
+        {pickHistory.length > 0 && (
+          <div
+            className="d-rail-panel"
+            style={{
+              flex: 1,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div className="d-rail-panel-head">
+              <h4 className="d-rail-panel-title">Pick History</h4>
+              <span className="d-rail-panel-count num">
+                {pickHistory.length}
+              </span>
+            </div>
+            <div
+              style={{ overflowY: 'auto', flex: 1 }}
+              role="list"
+              aria-label="Recent draft picks"
+            >
+              {pickHistory
+                .slice()
+                .reverse()
+                .slice(0, 40)
+                .map((pick) => {
+                  const name = playerName(pick, statsLookup);
+                  const pos =
+                    statsLookup.get(pick.playerId)?.position ??
+                    pick.player?.eligiblePositions?.[0] ??
+                    '?';
+                  const isMine = pick.teamId === myTeamId;
+                  const pill = getPositionPill(pos);
+                  return (
+                    <div
+                      key={pick.id}
+                      className={`d-pick-row${isMine ? ' mine' : ''}`}
+                      role="listitem"
+                    >
+                      <span className="d-pick-num num">
+                        {pickRoundLabel(pick)}
+                      </span>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '1px 5px',
+                          borderRadius: 3,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: pill.color,
+                          background: pill.bg,
+                          whiteSpace: 'nowrap',
+                          fontFamily: "'Big Shoulders Display', sans-serif",
+                          letterSpacing: '0.06em',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {pos}
+                      </span>
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontSize: 12,
+                          color: isMine ? 'var(--d-accent)' : 'var(--d-text)',
+                        }}
+                      >
+                        {name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: 'var(--d-text-muted)',
+                          textAlign: 'right',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {teamNameById(pick.teamId)}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }

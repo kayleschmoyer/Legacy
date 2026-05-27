@@ -9,7 +9,7 @@
 import React from 'react';
 import { DraftRail } from './DraftRail';
 import { POSITION_COLORS } from './constants';
-import { render } from '../../test-utils';
+import { fireEvent, render } from '../../test-utils';
 
 jest.mock('./DraftIntelligence', () => ({
   DraftIntelligence: () => <div data-testid="intel" />,
@@ -59,6 +59,42 @@ describe('DraftRail roster depth chart', () => {
     expect(queryByLabelText('DEF: 0 of 1')).toBeTruthy();
     expect(queryByLabelText('FLEX: 0 of 1')).toBeTruthy();
     expect(queryByLabelText('C: 0 of 1')).toBeNull();
+  });
+
+  // LS-4824: mobile-only collapse toggle. Default collapsed so the player
+  // pool isn't pushed below the fold on mobile.
+  describe('mobile collapse toggle (LS-4824)', () => {
+    it('renders collapsed by default with aria-expanded=false', () => {
+      const { getByRole, container } = render(<DraftRail {...baseProps} />);
+      const toggle = getByRole('button', { name: /draft panel/i });
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle.getAttribute('aria-controls')).toBe('d-rail-content');
+      const aside = container.querySelector('.d-rail');
+      expect(aside?.classList.contains('collapsed')).toBe(true);
+    });
+
+    it('toggles collapsed/expanded state on click', () => {
+      const { getByRole, container } = render(<DraftRail {...baseProps} />);
+      const toggle = getByRole('button', { name: /draft panel/i });
+      const aside = container.querySelector('.d-rail');
+
+      fireEvent.click(toggle);
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(aside?.classList.contains('collapsed')).toBe(false);
+
+      fireEvent.click(toggle);
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(aside?.classList.contains('collapsed')).toBe(true);
+    });
+
+    it('keeps roster content in the DOM when collapsed (CSS-only hide)', () => {
+      // Content stays mounted so React state and accessibility tree are
+      // preserved; visibility is controlled by the .collapsed class scoped
+      // to the mobile media query in styles.ts.
+      const { queryByLabelText } = render(<DraftRail {...baseProps} />);
+      expect(queryByLabelText('C: 0 of 1')).toBeTruthy();
+      expect(queryByLabelText('P: 0 of 9')).toBeTruthy();
+    });
   });
 
   it('paints roster-bar fills with sport-scoped position colors', () => {
