@@ -1462,7 +1462,7 @@ export function LeagueCreatePage(): React.JSX.Element {
           gap="$4"
           flexWrap="wrap"
         >
-          <YStack gap="$1">
+          <YStack flex={1} minWidth={0} gap="$1">
             <Text
               fontFamily="$display"
               fontWeight="700"

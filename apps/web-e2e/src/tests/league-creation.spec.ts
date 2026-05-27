@@ -49,6 +49,28 @@ test.describe('League Creation @critical', () => {
     await expect(page).toHaveURL('/baseball/league/create');
   });
 
+  test('intro paragraph is fully visible at mobile viewport without horizontal overflow (LS-4847)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/baseball/league/create');
+    await page.waitForLoadState('domcontentloaded');
+
+    const heading = page.getByTestId('create-league-heading');
+    await expect(heading).toBeVisible();
+    const intro = page.getByText(
+      /Configure your league settings and draft rules\. You can adjust everything except team count after the draft\./,
+    );
+    await expect(intro).toBeVisible();
+
+    // The paragraph's bounding box must fit within the viewport — otherwise
+    // text overflows horizontally and wraps off-screen (LS-4847 repro).
+    const box = await intro.boundingBox();
+    if (!box) throw new Error('intro paragraph has no bounding box');
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+  });
+
   test('Create League button is always enabled; submitting with short name shows a validation error', async ({
     page,
   }) => {
