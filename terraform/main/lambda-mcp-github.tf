@@ -86,7 +86,12 @@ resource "aws_lambda_function" "mcp_github" {
 
   environment {
     variables = {
-      GITHUB_TOKEN_SECRET_NAME            = aws_secretsmanager_secret.mcp_github_token.name
+      GITHUB_TOKEN_SECRET_NAME = aws_secretsmanager_secret.mcp_github_token.name
+      # Lambda has no .git/ and no git binary, so getRepoOwnerName() can't
+      # auto-detect owner/repo via readGitRemoteUrl or `git remote get-url`.
+      # Setting GITHUB_REPOSITORY makes the env-var short-circuit in auth.ts
+      # the authoritative source (LS-4873).
+      GITHUB_REPOSITORY                   = "bkrupa/legacy-sports"
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
