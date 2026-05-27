@@ -123,6 +123,35 @@ jobs:
         with:
           packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
 
+      # Self-hosted runners bake the Android SDK into the AMI at /opt/android-sdk
+      # and rely on /opt/actions-runner/.env to surface ANDROID_HOME to job steps
+      # (LS-4936). When that mechanism doesn't take effect (stale AMI, runner
+      # agent not reading .env), Gradle fails with "SDK location not found".
+      # Belt-and-suspenders: if ANDROID_HOME is empty but the SDK exists on disk,
+      # export it explicitly so the build doesn't depend solely on the AMI .env.
+      - name: Ensure ANDROID_HOME (self-hosted fallback)
+        if: ${{ vars.CI_RUNNER_LABEL != '' }}
+        shell: bash
+        run: |
+          if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
+            echo "✅ ANDROID_HOME already set: $ANDROID_HOME"
+            exit 0
+          fi
+          SDK_DIR="/opt/android-sdk"
+          if [ ! -d "$SDK_DIR" ]; then
+            echo "❌ ANDROID_HOME is unset and $SDK_DIR does not exist on this runner."
+            echo "   Expected the AMI to bake the SDK there (terraform/runners/packer/runner-ami.pkr.hcl)."
+            exit 1
+          fi
+          echo "⚠️ ANDROID_HOME was not inherited from /opt/actions-runner/.env — exporting from workflow."
+          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "$SDK_DIR/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK_DIR/platform-tools" >> "$GITHUB_PATH"
+          if [ -d "$SDK_DIR/build-tools/${{ env.ANDROID_API_LEVEL }}.0.0" ]; then
+            echo "$SDK_DIR/build-tools/${{ env.ANDROID_API_LEVEL }}.0.0" >> "$GITHUB_PATH"
+          fi
+
       - name: Build Android APK
         id: build
         uses: ./.github/actions/build-android
