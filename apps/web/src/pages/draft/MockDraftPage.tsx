@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Text } from 'tamagui';
 import {
   Button,
@@ -154,6 +154,17 @@ interface SetupScreenProps {
   error?: string | null;
   /** When true, the Sport selector exposes a Football option (LS-4666). */
   footballMockEnabled?: boolean;
+  /** Prefill values from URL query params (e.g. when launched from a real league row). */
+  initialNumTeams?: number;
+  initialDraftOrder?: MockDraftSettings['draftOrder'];
+}
+
+// Snap to the closest supported team count to keep the option buttons in sync.
+const TEAM_OPTIONS = [4, 6, 8, 10, 12] as const;
+function clampToTeamOption(n: number): number {
+  return TEAM_OPTIONS.reduce((best, opt) =>
+    Math.abs(opt - n) < Math.abs(best - n) ? opt : best,
+  );
 }
 
 function SetupScreen({
@@ -161,13 +172,18 @@ function SetupScreen({
   loading = false,
   error = null,
   footballMockEnabled = false,
+  initialNumTeams,
+  initialDraftOrder,
 }: SetupScreenProps): React.JSX.Element {
   const navigate = useNavigate();
-  const [numTeams, setNumTeams] = React.useState(8);
+  const [numTeams, setNumTeams] = React.useState(
+    initialNumTeams != null ? clampToTeamOption(initialNumTeams) : 8,
+  );
   const [rosterSize, setRosterSize] = React.useState(10);
   const [userPickPosition, setUserPickPosition] = React.useState(1);
-  const [draftOrder, setDraftOrder] =
-    React.useState<MockDraftSettings['draftOrder']>('snake');
+  const [draftOrder, setDraftOrder] = React.useState<
+    MockDraftSettings['draftOrder']
+  >(initialDraftOrder ?? 'snake');
   const [playerPool, setPlayerPool] =
     React.useState<MockDraftSettings['playerPool']>('all');
   const [sport, setSport] = React.useState<SportKind>('baseball');
@@ -489,6 +505,16 @@ export function MockDraftPage(): React.JSX.Element {
     string | null
   >(null);
 
+  // Prefill setup from query params when launched from a pre-draft league row
+  // on the homepage. Only the first render matters — these are seed values.
+  const [searchParams] = useSearchParams();
+  const teamsParam = Number(searchParams.get('teams'));
+  const initialNumTeams =
+    Number.isFinite(teamsParam) && teamsParam > 0 ? teamsParam : undefined;
+  const orderParam = searchParams.get('draftOrder');
+  const initialDraftOrder: MockDraftSettings['draftOrder'] | undefined =
+    orderParam === 'linear' || orderParam === 'snake' ? orderParam : undefined;
+
   const handleStart = async (s: MockDraftSettings) => {
     // Football mock draft is preview-only until the sport-aware engine ships.
     if (s.sport === 'football') return;
@@ -528,6 +554,8 @@ export function MockDraftPage(): React.JSX.Element {
         loading={loading}
         error={error?.message ?? missingLeagueIdError}
         footballMockEnabled={footballMockEnabled}
+        initialNumTeams={initialNumTeams}
+        initialDraftOrder={initialDraftOrder}
       />
     </PremiumGate>
   );

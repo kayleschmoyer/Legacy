@@ -60,6 +60,28 @@ function leagueDetailRoute(
   return `/${sportPrefix}/league/${summary.leagueId}`;
 }
 
+const MOCK_DRAFT_ROUTE = '/baseball/mock-draft';
+
+function leagueMockDraftRoute(
+  summary: Pick<
+    UserLeagueSummaryFragment,
+    'leagueId' | 'teamCount' | 'draftMode'
+  >,
+): string {
+  const params = new URLSearchParams();
+  if (summary.leagueId != null) {
+    params.set('fromLeague', String(summary.leagueId));
+  }
+  if (summary.teamCount != null) {
+    params.set('teams', String(summary.teamCount));
+  }
+  // Mock setup currently supports snake / linear; anything else falls back to snake.
+  const order = summary.draftMode === 'linear' ? 'linear' : 'snake';
+  params.set('draftOrder', order);
+  const qs = params.toString();
+  return qs ? `${MOCK_DRAFT_ROUTE}?${qs}` : MOCK_DRAFT_ROUTE;
+}
+
 /* ─── Urgency sort ─── */
 
 function urgencyKey(s: UserLeagueSummaryFragment): number {
@@ -814,9 +836,11 @@ function LeagueHeroCard({
 function LeagueListRow({
   summary,
   onPress,
+  onMockDraft,
 }: {
   summary: UserLeagueSummaryFragment;
   onPress: () => void;
+  onMockDraft?: () => void;
 }) {
   const isDraftLive = summary.draftStatus === 'in-progress';
   const hasMatchup =
@@ -916,13 +940,82 @@ function LeagueListRow({
         )}
       </div>
 
-      {/* Phase chip */}
-      <div>
+      {/* Phase chip + row action */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}
+      >
         <PhaseChip
           phase={summary.leaguePhase}
           draftStatus={summary.draftStatus}
           hasMatchup={hasMatchup}
         />
+        {isPreDraft && onMockDraft && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMockDraft();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+              }
+            }}
+            aria-label={`Run a mock draft for ${summary.leagueName ?? 'this league'}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              minHeight: 44,
+              minWidth: 44,
+              padding: '8px 12px',
+              background: 'transparent',
+              border: `1px solid ${BORDER_STRONG}`,
+              color: TEXT_SECONDARY,
+              borderRadius: 9999,
+              cursor: 'pointer',
+              fontFamily: 'Big Shoulders Display, system-ui, sans-serif',
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              transition:
+                'color 150ms ease, border-color 150ms ease, background 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = TEXT_INTERFACE;
+              e.currentTarget.style.borderColor = BORDER_INTERACTIVE;
+              e.currentTarget.style.background = withAlpha(WHITE, 0.03);
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = TEXT_SECONDARY;
+              e.currentTarget.style.borderColor = BORDER_STRONG;
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 3v18h18" />
+              <path d="M7 14l3-3 3 3 5-5" />
+            </svg>
+            Mock Draft
+          </button>
+        )}
       </div>
 
       {/* Score / record */}
@@ -1190,6 +1283,129 @@ function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
       >
         {title}
       </h2>
+    </div>
+  );
+}
+
+/* ─── Mock Draft CTA (new-user view) ─── */
+
+function MockDraftCta({ onPress }: { onPress: () => void }) {
+  return (
+    <div
+      className="ls-mock-cta"
+      style={{
+        background: `radial-gradient(ellipse at 0% 50%, ${withAlpha(BRAND_NAVY, 0.32)} 0%, transparent 55%), ${SURFACE_PANEL}`,
+        border: `1px solid ${PANEL_BORDER}`,
+        borderRadius: 24,
+        padding: '28px 32px',
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr auto',
+        gap: 24,
+        alignItems: 'center',
+      }}
+    >
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 12,
+          background: withAlpha(BRAND_NAVY, 0.35),
+          border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.45)}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <BrandIcon
+          name="draft"
+          size={36}
+          title="Mock draft"
+          decorative={false}
+        />
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          minWidth: 0,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'Big Shoulders Display, system-ui',
+            fontWeight: 700,
+            fontSize: 18,
+            letterSpacing: '0.01em',
+            color: TEXT_INTERFACE,
+          }}
+        >
+          See who falls to your pick.
+        </div>
+        <p
+          style={{
+            fontFamily: 'Literata, Georgia, serif',
+            fontSize: 14,
+            color: TEXT_SECONDARY,
+            margin: 0,
+            maxWidth: '60ch',
+          }}
+        >
+          Run a 12-team snake against bots in under ten minutes. Once you join a
+          real league, mocks pull from that league&apos;s exact era and ruleset
+          — so the names you see are the names you&apos;ll see.
+        </p>
+        <div
+          style={{
+            fontFamily: 'Big Shoulders Display, system-ui',
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: TEXT_TERTIARY,
+            display: 'flex',
+            gap: 12,
+            marginTop: 4,
+            fontVariantNumeric: 'tabular-nums',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>All-time pool</span>
+          <span style={{ color: TEXT_SEPARATOR }}>·</span>
+          <span>Snake or auction</span>
+          <span style={{ color: TEXT_SEPARATOR }}>·</span>
+          <span>~8 min</span>
+        </div>
+      </div>
+      <button
+        onClick={onPress}
+        style={{
+          fontFamily: 'Big Shoulders Display, system-ui',
+          fontWeight: 700,
+          fontSize: 13,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          padding: '11px 20px',
+          borderRadius: 12,
+          background: BRAND_NAVY,
+          color: WHITE,
+          border: `1px solid ${BRAND_NAVY_LIGHT}`,
+          cursor: 'pointer',
+          flexShrink: 0,
+          transition: 'background 150ms ease, transform 150ms ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = BRAND_NAVY_LIGHT;
+          e.currentTarget.style.transform = 'translateY(-1px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = BRAND_NAVY;
+          e.currentTarget.style.transform = '';
+        }}
+      >
+        Start Mock Draft
+      </button>
     </div>
   );
 }
@@ -1535,6 +1751,7 @@ export function HomePage(): React.JSX.Element {
         @media (max-width: 640px) { .ls-sport-grid { grid-template-columns: 1fr; } }
         .ls-otd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 640px) { .ls-otd-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .ls-mock-cta { grid-template-columns: 1fr !important; padding: 22px !important; gap: 16px !important; } }
         .ls-rail { position: sticky; top: 88px; }
       `;
       document.head.appendChild(style);
@@ -1945,6 +2162,7 @@ export function HomePage(): React.JSX.Element {
                           key={s.leagueId}
                           summary={s}
                           onPress={() => navigate(leagueDetailRoute(s))}
+                          onMockDraft={() => navigate(leagueMockDraftRoute(s))}
                         />
                       ))}
                     </div>
@@ -2034,6 +2252,9 @@ export function HomePage(): React.JSX.Element {
                             key={s.leagueId}
                             summary={s}
                             onPress={() => navigate(leagueDetailRoute(s))}
+                            onMockDraft={() =>
+                              navigate(leagueMockDraftRoute(s))
+                            }
                           />
                         ))}
                       </div>
@@ -2625,6 +2846,14 @@ export function HomePage(): React.JSX.Element {
               />
             </section>
           )}
+
+          {/* Try a mock draft */}
+          <section style={{ marginTop: 56 }}>
+            <div style={{ marginBottom: 20 }}>
+              <SectionHead eyebrow="Scout the room" title="Try a mock draft" />
+            </div>
+            <MockDraftCta onPress={() => navigate(MOCK_DRAFT_ROUTE)} />
+          </section>
 
           {/* Stats CTA */}
           <section style={{ marginTop: 56 }}>
