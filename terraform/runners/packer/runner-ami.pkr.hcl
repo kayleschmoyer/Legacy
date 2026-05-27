@@ -409,7 +409,7 @@ build {
     ]
   }
 
-  # Gradle wrapper distribution pre-bake
+  # Gradle wrapper distribution pre-bake (LS-4933 added; LS-4934 verified the AMI rebuild + Android job confirms no Gradle download)
   #
   # Android builds use the wrapper pinned in apps/app/android/gradle/wrapper/gradle-wrapper.properties
   # (currently gradle-${var.gradle_version}-bin.zip, ~150MB). On a fresh runner the wrapper
