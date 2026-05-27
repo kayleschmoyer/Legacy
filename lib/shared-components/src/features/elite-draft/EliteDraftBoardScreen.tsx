@@ -569,7 +569,12 @@ export function EliteDraftBoardScreen({
         </div>
       )}
       {ui.urgentMessage && !ui.toastMessage && (
-        <div className="d-toast error" role="alert" aria-live="assertive">
+        <div
+          className="d-toast error"
+          role="alert"
+          aria-live="assertive"
+          onClick={() => ui.setUrgentMessage('')}
+        >
           {ui.urgentMessage}
         </div>
       )}

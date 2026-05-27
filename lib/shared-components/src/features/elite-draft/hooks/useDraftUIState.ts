@@ -98,6 +98,21 @@ export function useDraftUIState() {
   const [liveMessage, setLiveMessage] = useState('');
   const [urgentMessage, setUrgentMessage] = useState('');
 
+  // Auto-dismiss the visible urgent-error toast so a transient failure
+  // (e.g. "Draft pick failed: …") doesn't leave a permanent banner — on
+  // mobile the toast was unreachable behind the bottom nav bar (LS-4827).
+  const urgentTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    if (!urgentMessage) return undefined;
+    if (urgentTimerRef.current) clearTimeout(urgentTimerRef.current);
+    urgentTimerRef.current = setTimeout(() => setUrgentMessage(''), 6000);
+    return () => {
+      if (urgentTimerRef.current) clearTimeout(urgentTimerRef.current);
+    };
+  }, [urgentMessage]);
+
   // Toast auto-dismiss
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
