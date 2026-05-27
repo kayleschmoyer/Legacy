@@ -339,6 +339,14 @@ build {
       "tar xzf runner.tar.gz",
       "sudo ./bin/installdependencies.sh",
       "rm -rf /tmp/runner-install",
+      # Pre-create the runner install dir so subsequent provisioners can seed
+      # /opt/actions-runner/.env with system-wide env vars (JAVA_HOME, ANDROID_HOME, …).
+      # The terraform-aws-github-runner module installs the runner agent into this
+      # directory at boot via user-data; the runner release tarball does NOT ship a
+      # .env file, so our pre-baked .env is preserved and read by the runner on
+      # startup (it is the canonical mechanism for injecting env into job steps).
+      # Without this, the .env writes below get silently skipped (LS-4936).
+      "sudo mkdir -p /opt/actions-runner",
     ]
   }
 
@@ -380,7 +388,8 @@ build {
       "echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' | sudo tee /etc/profile.d/java.sh",
       "echo 'export PATH=$JAVA_HOME/bin:$PATH' | sudo tee -a /etc/profile.d/java.sh",
       # Also export to the runner process env so non-login GitHub Actions shells get JAVA_HOME.
-      "if [ -d /opt/actions-runner ]; then echo 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' | sudo tee -a /opt/actions-runner/.env; fi",
+      # /opt/actions-runner is pre-created in the runner-deps provisioner above.
+      "echo 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' | sudo tee -a /opt/actions-runner/.env",
     ]
   }
 
@@ -402,9 +411,10 @@ build {
       # Set ANDROID_HOME globally so login shells and Gradle pick it up
       "echo 'export ANDROID_HOME=/opt/android-sdk' | sudo tee /etc/profile.d/android-sdk.sh",
       "echo 'export PATH=$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/build-tools/${var.android_build_tools_version}' | sudo tee -a /etc/profile.d/android-sdk.sh",
-      # Also export to the runner process env so non-login GitHub Actions shells get ANDROID_HOME
-      "if [ -d /opt/actions-runner ]; then echo 'ANDROID_HOME=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
-      "if [ -d /opt/actions-runner ]; then echo 'ANDROID_SDK_ROOT=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
+      # Also export to the runner process env so non-login GitHub Actions shells get ANDROID_HOME.
+      # /opt/actions-runner is pre-created in the runner-deps provisioner above.
+      "echo 'ANDROID_HOME=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env",
+      "echo 'ANDROID_SDK_ROOT=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env",
       "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list_installed",
     ]
   }
