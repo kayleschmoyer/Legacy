@@ -7,6 +7,11 @@ import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
 import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import {
+  GetNotificationHistory,
+  type GetNotificationHistoryQuery,
+  type GetNotificationHistoryQueryVariables,
+  GetUnreadNotificationCount,
+  type GetUnreadNotificationCountQuery,
   useGetNotificationHistoryQuery,
   useGetUnreadNotificationCountQuery,
   useMarkAllNotificationsAsReadMutation,
@@ -173,7 +178,36 @@ export const NotificationDropdown: React.FC = () => {
   );
 
   const handleMarkAllAsRead = useCallback(() => {
+    const now = new Date().toISOString();
     void markAllAsRead({
+      optimisticResponse: { markAllNotificationsAsRead: true },
+      update(cache) {
+        cache.writeQuery<GetUnreadNotificationCountQuery>({
+          query: GetUnreadNotificationCount,
+          data: { getUnreadNotificationCount: 0 },
+        });
+        const history = cache.readQuery<
+          GetNotificationHistoryQuery,
+          GetNotificationHistoryQueryVariables
+        >({
+          query: GetNotificationHistory,
+          variables: { limit: 10, offset: 0 },
+        });
+        if (history?.getNotificationHistory) {
+          cache.writeQuery<
+            GetNotificationHistoryQuery,
+            GetNotificationHistoryQueryVariables
+          >({
+            query: GetNotificationHistory,
+            variables: { limit: 10, offset: 0 },
+            data: {
+              getNotificationHistory: history.getNotificationHistory.map((n) =>
+                n?.read ? n : { ...n, read: true, readAt: now },
+              ),
+            },
+          });
+        }
+      },
       refetchQueries: ['GetNotificationHistory', 'GetUnreadNotificationCount'],
     });
   }, [markAllAsRead]);
