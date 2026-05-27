@@ -24,6 +24,9 @@ import PlayerStats from './PlayerStats';
 import ViewCareerStats from './view_career_stats';
 import ViewGameLogs from './view_game_logs';
 import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
+import FootballLeagueId, {
+  FootballLeagueIdHeader,
+} from './football/league/[leagueId]';
 import LeagueCreatePage from './baseball/league/create';
 import FootballLeagueCreatePage from './football/league/create';
 import JoinLeagueByCode from './baseball/league/join';
@@ -77,6 +80,7 @@ export type AppDrawerParamList = {
   PlayerStats: undefined;
   PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
+  'football/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
   'football/team/[teamId]': { teamId: string };
   DirectMessages: undefined;
@@ -366,6 +370,11 @@ export default function Layout() {
             name="baseball/league/[leagueId]"
             options={{ headerTitle: LeagueIdHeader }}
             component={LeagueId}
+          />
+          <Screen
+            name="football/league/[leagueId]"
+            options={{ headerTitle: FootballLeagueIdHeader }}
+            component={FootballLeagueId}
           />
           <Screen
             name="baseball/team/[teamId]"

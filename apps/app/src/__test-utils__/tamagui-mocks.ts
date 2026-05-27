@@ -188,4 +188,9 @@ export const tamaguiMocks = {
     const { View } = getRN();
     return React.createElement(View, null, children);
   },
+
+  Separator: () => {
+    const { View } = getRN();
+    return React.createElement(View, null);
+  },
 };

@@ -357,6 +357,11 @@ jest.mock('./baseball/league/[leagueId]', () => ({
   default: () => 'LeagueId',
   LeagueIdHeader: () => 'League',
 }));
+jest.mock('./football/league/[leagueId]', () => ({
+  __esModule: true,
+  default: () => 'FootballLeagueId',
+  FootballLeagueIdHeader: () => 'FootballLeague',
+}));
 jest.mock('./baseball/team/[teamId]', () => ({
   __esModule: true,
   default: () => 'Team',
@@ -615,6 +620,7 @@ describe('App Drawer Layout', () => {
         'baseball/index',
         'baseball/league/create',
         'baseball/league/[leagueId]',
+        'football/league/[leagueId]',
         'baseball/team/[teamId]',
         'DraftBoardPage',
         'season-draft/index',
