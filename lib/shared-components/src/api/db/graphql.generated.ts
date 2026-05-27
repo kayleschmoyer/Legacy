@@ -2902,6 +2902,7 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
@@ -3320,6 +3321,10 @@ export type QueryMatchupScoresArgs = {
 export type QueryMyAwardVotesArgs = {
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
+};
+
+export type QueryMyLeaguesArgs = {
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryOnThisDayArgs = {

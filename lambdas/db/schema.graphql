@@ -3182,6 +3182,7 @@ type Query {
   Get all data export/deletion requests for the authenticated user
   """
   myDataRequests: [DataRequest!]
+  myLeagues(sport: Sport): [League!]!
 
   """
   Get the current subscription for the authenticated user.

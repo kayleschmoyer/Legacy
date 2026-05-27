@@ -1,7 +1,7 @@
 /**
  * League domain — Query resolvers
  *
- * Queries: league, userLeagues, leaguePositions, leagueTeams,
+ * Queries: league, userLeagues, myLeagues, leaguePositions, leagueTeams,
  *          userTeamId, validateInviteCode, teamLeagueMembers,
  *          publicLeagues
  */
@@ -13,6 +13,7 @@ import {
   League,
   LeagueMember,
   LeaguePosition,
+  SportKindEnum,
   Team,
   TeamMember,
 } from './types';
@@ -328,6 +329,96 @@ builder.queryField('userLeagues', (t) =>
           error: error instanceof Error ? error.message : String(error),
         });
         throw new Error('Failed to fetch user leagues');
+      }
+    },
+  }),
+);
+
+// myLeagues — sport-filtered variant of userLeagues for multi-sport hubs.
+// LS-255 AC12: myLeagues(sport: FOOTBALL) returns only football leagues;
+// myLeagues() returns all sports.
+builder.queryField('myLeagues', (t) =>
+  t.field({
+    type: [League],
+    nullable: false,
+    args: {
+      sport: t.arg({ type: SportKindEnum, required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch user leagues',
+        );
+      }
+
+      const userId = context.user.id;
+      const sportFilter = args.sport ?? null;
+
+      try {
+        const conditions: SQL[] = [
+          eq(PublicSchema.leagueMembers.userId, userId),
+          eq(PublicSchema.leagues.isMockDraft, false),
+        ];
+        if (sportFilter != null) {
+          conditions.push(eq(PublicSchema.leagues.sport, sportFilter));
+        }
+
+        const results = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            sport: PublicSchema.leagues.sport,
+            defensiveFormat: PublicSchema.leagues.defensiveFormat,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            currentWeek: PublicSchema.leagues.currentWeek,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            leaguePhase: PublicSchema.leagues.leaguePhase,
+            inviteCode: PublicSchema.leagues.inviteCode,
+            playerPool: PublicSchema.leagues.playerPool,
+            weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
+            waiverType: PublicSchema.leagues.waiverType,
+            waiverEnabled: PublicSchema.leagues.waiverEnabled,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+            isPublic: PublicSchema.leagues.isPublic,
+            tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
+          })
+          .from(PublicSchema.leagues)
+          .innerJoin(
+            PublicSchema.leagueMembers,
+            eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+          )
+          .where(and(...conditions))
+          .orderBy(PublicSchema.leagues.id);
+
+        return results.map((league) => ({
+          id: league.id,
+          name: league.name,
+          owner: league.owner,
+          sport: league.sport,
+          defensiveFormat: parseDefensiveFormat(league.defensiveFormat),
+          maxRosterSize: league.maxRosterSize,
+          currentMatchup: league.currentMatchup,
+          currentWeek: league.currentWeek,
+          draftStatus: league.draftStatus,
+          leaguePhase: league.leaguePhase,
+          inviteCode: league.inviteCode,
+          playerPool: league.playerPool,
+          weekAdvanceStatus: league.weekAdvanceStatus,
+          waiverType: league.waiverType,
+          waiverEnabled: league.waiverEnabled,
+          faabBudgetDefault: league.faabBudgetDefault,
+          isPublic: league.isPublic,
+          tierFrozenAt: league.tierFrozenAt?.toISOString() ?? null,
+        }));
+      } catch (error) {
+        LOGGER.error(
+          'Failed to fetch my leagues',
+          error instanceof Error ? error : new Error(String(error)),
+          { userId, sport: sportFilter },
+        );
+        throw new Error('Failed to fetch my leagues');
       }
     },
   }),
