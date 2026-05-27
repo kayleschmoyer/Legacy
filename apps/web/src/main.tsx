@@ -36,7 +36,11 @@ import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
 import { store } from './store/store';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
-import { ThemeProvider, useThemeContext } from './context/ThemeContext';
+import {
+  ThemeProvider,
+  ThemeServerSync,
+  useThemeContext,
+} from './context/ThemeContext';
 import { GrowthBookProvider } from './context/GrowthBookProvider';
 import { LoginPage } from './pages/login/LoginPage';
 
@@ -142,6 +146,7 @@ function ThemeAwareApp() {
           colorScheme={resolvedTheme}
           tamaguiConfig={tamaguiConfig}
         >
+          <ThemeServerSync />
           <App />
         </AppProvider>
       </BrowserRouter>

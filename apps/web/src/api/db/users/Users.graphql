@@ -7,6 +7,7 @@ fragment User on User {
   subscriptionTier
   discordId
   discordUsername
+  themePreference
 }
 
 fragment AdminUser on User {
@@ -61,6 +62,13 @@ query AdminGetUsers($limit: Int, $offset: Int) {
 mutation UpdateUsername($username: String!) {
   updateUsername(username: $username) {
     ...User
+  }
+}
+
+mutation UpdateUserTheme($themePreference: String!) {
+  updateUserTheme(themePreference: $themePreference) {
+    id
+    themePreference
   }
 }
 

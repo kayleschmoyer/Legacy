@@ -14,10 +14,30 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
+import { useAuth } from '@legacy-sports/shared-components/auth';
+import {
+  useGetUserByIdQuery,
+  useUpdateUserThemeMutation,
+} from '../api/db/graphql.generated';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
+
+const VALID_THEME_PREFERENCES: readonly ThemePreference[] = [
+  'system',
+  'light',
+  'dark',
+];
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return (
+    typeof value === 'string' &&
+    (VALID_THEME_PREFERENCES as readonly string[]).includes(value)
+  );
+}
 export type ResolvedTheme = 'light' | 'dark';
 
 const PREFS_KEY = 'ls_user_preferences';
@@ -124,4 +144,78 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useThemeContext(): ThemeContextValue {
   return useContext(ThemeContext);
+}
+
+/* ── Server sync (LS-4913) ─────────────────────────────── */
+
+/**
+ * Non-rendering bridge that syncs the user's theme preference with the
+ * backend so the choice follows them across devices. Must be mounted
+ * inside both ApolloProvider and AuthProvider (i.e. somewhere under
+ * `AppProvider` in main.tsx).
+ *
+ * On first hydration:
+ * - If the server has a value, adopt it locally (clobbering localStorage
+ *   so a freshly-opened mobile browser inherits the desktop choice).
+ * - If the server has no value but local does (and it is not the
+ *   default "system"), push the local value up.
+ *
+ * After hydration, any user-driven `setThemePreference` change is
+ * persisted to the server best-effort.
+ */
+export function ThemeServerSync(): null {
+  const { themePreference, setThemePreference } = useThemeContext();
+  const auth = useAuth();
+  const userId = auth?.user?.id;
+
+  // cache-and-network so a freshly-opened browser still picks up a theme
+  // that was set on another device after this user's cache was warmed.
+  const { data } = useGetUserByIdQuery({
+    variables: { id: userId ?? 0 },
+    skip: !userId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [updateUserTheme] = useUpdateUserThemeMutation();
+
+  const hydratedRef = useRef(false);
+  const lastSyncedRef = useRef<ThemePreference | null>(null);
+
+  // Hydrate from server once per session.
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    if (!userId || !data?.user) return;
+
+    const serverTheme = data.user.themePreference;
+    if (isThemePreference(serverTheme)) {
+      if (serverTheme !== themePreference) {
+        setThemePreference(serverTheme);
+      }
+      lastSyncedRef.current = serverTheme;
+    } else {
+      // Server has no preference yet. If the user had previously picked
+      // a non-default locally, push it up so the next device inherits it.
+      lastSyncedRef.current = null;
+    }
+    hydratedRef.current = true;
+  }, [data, userId, themePreference, setThemePreference]);
+
+  // Push subsequent local changes up.
+  useEffect(() => {
+    if (!hydratedRef.current || !userId) return;
+    if (themePreference === lastSyncedRef.current) return;
+    lastSyncedRef.current = themePreference;
+    void updateUserTheme({
+      variables: { themePreference },
+    }).catch((error: unknown) => {
+      // Best-effort sync: the local preference is already persisted to
+      // localStorage and will retry on the next change. Log so backend or
+      // network failures are observable instead of silently swallowed.
+      LOGGER.error(
+        'Failed to sync user theme preference to server',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    });
+  }, [themePreference, userId, updateUserTheme]);
+
+  return null;
 }

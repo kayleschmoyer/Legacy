@@ -67,6 +67,7 @@ export const usersInAppInternal = appInternal.table(
     discordId: varchar('discord_id', { length: 32 }),
     discordUsername: varchar('discord_username', { length: 100 }),
     discordAvatar: varchar('discord_avatar', { length: 255 }),
+    themePreference: varchar('theme_preference', { length: 10 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

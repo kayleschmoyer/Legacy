@@ -30,6 +30,7 @@ export const users = pgView('users', {
   discordId: varchar('discord_id', { length: 32 }),
   discordUsername: varchar('discord_username', { length: 100 }),
   discordAvatar: varchar('discord_avatar', { length: 255 }),
+  themePreference: varchar('theme_preference', { length: 10 }),
 }).as(sql`SELECT id,
        email,
        username,
@@ -38,5 +39,6 @@ export const users = pgView('users', {
        subscription_tier::text AS subscription_tier,
        discord_id,
        discord_username,
-       discord_avatar
+       discord_avatar,
+       theme_preference
 FROM app_internal.users`);

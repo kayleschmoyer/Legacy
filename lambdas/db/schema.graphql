@@ -2503,6 +2503,11 @@ type Mutation {
   updateUserRole(accessLevel: String!, userId: Int!): User
 
   """
+  Update the theme preference ("system" | "light" | "dark") for the currently authenticated user. Syncs the choice across devices (LS-4913).
+  """
+  updateUserTheme(themePreference: String!): User
+
+  """
   Update the username for the currently authenticated user.
   """
   updateUsername(username: String!): User
@@ -4362,6 +4367,7 @@ type User {
   email: String
   id: Int
   subscriptionTier: String
+  themePreference: String
   username: String
 }
 

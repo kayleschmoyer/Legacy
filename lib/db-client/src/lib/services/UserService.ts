@@ -250,6 +250,25 @@ export class UserService {
   }
 
   /**
+   * Update a user's theme preference in the internal schema.
+   * Accepts 'system' | 'light' | 'dark'. Returns the updated user record from
+   * the public view, or null if not found.
+   */
+  async updateUserTheme(
+    userId: number,
+    themePreference: string,
+  ): Promise<User | null> {
+    await runWithInternalClient(this.options, async (db) => {
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({ themePreference })
+        .where(eq(InternalSchema.usersInAppInternal.id, userId));
+    });
+
+    return this.getUserById(userId);
+  }
+
+  /**
    * Find users whose email matches a SQL LIKE pattern and that were created
    * before a cut-off date, and delete them. Used to sweep up orphaned test
    * fixtures (e.g. the `int-commissioner-*@test.legacysports.dev` users left

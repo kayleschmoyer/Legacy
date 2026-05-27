@@ -627,3 +627,239 @@ describe('cleanupLeakedTestUsers mutation', () => {
     expect(payload).not.toHaveProperty('sampleEmails');
   });
 });
+
+describe('updateUserTheme mutation', () => {
+  let schema: GraphQLSchema;
+  let mockContext: {
+    user: {
+      id: number;
+      email: string;
+      username: string;
+      isAdmin: boolean;
+    } | null;
+  };
+  let mockUpdateUserTheme: jest.Mock;
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockUpdateUserTheme = jest.fn();
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/logging', () => ({
+      LOGGER: {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      },
+    }));
+
+    jest.doMock('jsonwebtoken', () => ({
+      sign: jest.fn(),
+      verify: jest.fn(),
+      decode: jest.fn(),
+    }));
+
+    jest.doMock('../server/context', () => ({
+      getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(() => ({
+        users: {
+          getUserById: jest.fn(),
+          updateUserTheme: mockUpdateUserTheme,
+        },
+        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
+      })),
+      runWithPublicClient: jest.fn(),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+      PublicSchema: {
+        leagues: {
+          id: 'id',
+          name: 'name',
+          currentWeek: 'cw',
+          currentMatchup: 'cm',
+        },
+        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'l',
+          userId: 'u',
+          teamId: 't',
+          permissionLevel: 'p',
+        },
+        teamMembers: {
+          id: 'id',
+          teamId: 't',
+          leagueId: 'l',
+          playerId: 'p',
+          positionId: 'pos',
+        },
+        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+        matchups: {
+          id: 'id',
+          leagueId: 'l',
+          weekNumber: 'w',
+          status: 's',
+          team1Id: 't1',
+          team2Id: 't2',
+        },
+        matchupPlayers: {
+          id: 'id',
+          matchupId: 'm',
+          playerId: 'p',
+          teamId: 't',
+        },
+        leagueWeekPlayerSeasons: {
+          playerId: 'p',
+          season: 's',
+          leagueId: 'l',
+          weekNumber: 'w',
+        },
+        leagueSeasonAwards: {
+          id: 'id',
+          leagueId: 'l',
+          season: 's',
+          playerId: 'p',
+          awardType: 'a',
+          notes: 'n',
+          createdAt: 'c',
+          updatedAt: 'u',
+        },
+        leagueActivityLog: {
+          id: 'id',
+          leagueId: 'l',
+          eventType: 'e',
+          occurredAt: 'o',
+        },
+        leagueActivityEventType: { enumValues: [] },
+      },
+      InternalSchema: {
+        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
+      },
+      PublicDb: {},
+    }));
+
+    jest.doMock('../services/standings-service', () => ({
+      StandingsService: {
+        getHeadToHead: jest.fn(),
+        getSeasonSummary: jest.fn(),
+        getStandings: jest.fn(),
+        getMatchupStats: jest.fn(),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+    const schemaModule = require('../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: {
+        id: 42,
+        email: 'user@example.com',
+        username: 'user42',
+        isAdmin: false,
+      },
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver() {
+    const mutationType = schema.getMutationType();
+    const field = mutationType?.getFields().updateUserTheme;
+    if (!field?.resolve) {
+      throw new Error('updateUserTheme resolver not found');
+    }
+    return field.resolve;
+  }
+
+  it('rejects unauthenticated requests', async () => {
+    const resolve = getResolver();
+    await expect(
+      resolve(
+        {},
+        { themePreference: 'dark' },
+        { user: null },
+        undefined as never,
+      ),
+    ).rejects.toThrow(/Authentication required|UNAUTHENTICATED/i);
+    expect(mockUpdateUserTheme).not.toHaveBeenCalled();
+  });
+
+  it.each(['system', 'light', 'dark'] as const)(
+    'updates and returns the user for valid theme %s',
+    async (theme) => {
+      mockUpdateUserTheme.mockResolvedValue({
+        id: 42,
+        email: 'user@example.com',
+        username: 'user42',
+        accessLevel: 'none',
+        avatarUrl: null,
+        discordId: null,
+        discordUsername: null,
+        discordAvatar: null,
+        themePreference: theme,
+      });
+      const resolve = getResolver();
+
+      const result = (await resolve(
+        {},
+        { themePreference: theme },
+        mockContext,
+        undefined as never,
+      )) as { id: number; themePreference: string };
+
+      expect(mockUpdateUserTheme).toHaveBeenCalledWith(42, theme);
+      expect(result).toMatchObject({ id: 42, themePreference: theme });
+    },
+  );
+
+  it('rejects invalid theme values', async () => {
+    const resolve = getResolver();
+    await expect(
+      resolve(
+        {},
+        { themePreference: 'sepia' },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow(/themePreference must be one of/i);
+    expect(mockUpdateUserTheme).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the underlying user lookup fails', async () => {
+    mockUpdateUserTheme.mockResolvedValue(null);
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { themePreference: 'dark' },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toBeNull();
+  });
+});

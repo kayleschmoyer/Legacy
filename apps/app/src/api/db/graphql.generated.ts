@@ -1857,6 +1857,8 @@ export type Mutation = {
   updateUserAvatar?: Maybe<User>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
+  /** Update the theme preference ("system" | "light" | "dark") for the currently authenticated user. Syncs the choice across devices (LS-4913). */
+  updateUserTheme?: Maybe<User>;
   /** Update the username for the currently authenticated user. */
   updateUsername?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
@@ -2459,6 +2461,10 @@ export type MutationUpdateUserAvatarArgs = {
 export type MutationUpdateUserRoleArgs = {
   accessLevel: Scalars['String']['input'];
   userId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserThemeArgs = {
+  themePreference: Scalars['String']['input'];
 };
 
 export type MutationUpdateUsernameArgs = {
@@ -4363,6 +4369,7 @@ export type User = {
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   subscriptionTier?: Maybe<Scalars['String']['output']>;
+  themePreference?: Maybe<Scalars['String']['output']>;
   username?: Maybe<Scalars['String']['output']>;
 };
 

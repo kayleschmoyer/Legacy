@@ -26,6 +26,7 @@ export const UserRef = builder.objectRef<{
   discordId?: string | null;
   discordUsername?: string | null;
   discordAvatar?: string | null;
+  themePreference?: string | null;
 }>('User');
 
 UserRef.implement({
@@ -39,6 +40,7 @@ UserRef.implement({
     discordId: t.exposeString('discordId', { nullable: true }),
     discordUsername: t.exposeString('discordUsername', { nullable: true }),
     discordAvatar: t.exposeString('discordAvatar', { nullable: true }),
+    themePreference: t.exposeString('themePreference', { nullable: true }),
   }),
 });
 
@@ -88,6 +90,7 @@ builder.queryField('users', (t) =>
         discordId: u.discordId ?? null,
         discordUsername: u.discordUsername ?? null,
         discordAvatar: u.discordAvatar ?? null,
+        themePreference: u.themePreference ?? null,
       }));
     },
   }),
@@ -145,6 +148,7 @@ builder.queryField('user', (t) =>
         discordId: user.discordId ?? null,
         discordUsername: user.discordUsername ?? null,
         discordAvatar: user.discordAvatar ?? null,
+        themePreference: user.themePreference ?? null,
       };
     },
   }),
@@ -179,6 +183,7 @@ builder.queryField('userByEmail', (t) =>
         discordId: foundUser.discordId ?? null,
         discordUsername: foundUser.discordUsername ?? null,
         discordAvatar: foundUser.discordAvatar ?? null,
+        themePreference: foundUser.themePreference ?? null,
       };
     },
   }),
@@ -211,6 +216,7 @@ builder.queryField('searchUsers', (t) =>
         discordId: user.discordId ?? null,
         discordUsername: user.discordUsername ?? null,
         discordAvatar: user.discordAvatar ?? null,
+        themePreference: user.themePreference ?? null,
       }));
     },
   }),
@@ -250,6 +256,7 @@ builder.mutationField('updateUserRole', (t) =>
         discordId: updated.discordId ?? null,
         discordUsername: updated.discordUsername ?? null,
         discordAvatar: updated.discordAvatar ?? null,
+        themePreference: updated.themePreference ?? null,
       };
     },
   }),
@@ -295,6 +302,7 @@ builder.mutationField('updateUsername', (t) =>
           discordId: updated.discordId ?? null,
           discordUsername: updated.discordUsername ?? null,
           discordAvatar: updated.discordAvatar ?? null,
+          themePreference: updated.themePreference ?? null,
         };
       } catch (error: unknown) {
         // Check for Postgres unique constraint violation (code 23505)
@@ -345,6 +353,55 @@ builder.mutationField('updateUserAvatar', (t) =>
         discordId: updated.discordId ?? null,
         discordUsername: updated.discordUsername ?? null,
         discordAvatar: updated.discordAvatar ?? null,
+        themePreference: updated.themePreference ?? null,
+      };
+    },
+  }),
+);
+
+const ALLOWED_THEME_PREFERENCES: readonly string[] = [
+  'system',
+  'light',
+  'dark',
+];
+
+builder.mutationField('updateUserTheme', (t) =>
+  t.field({
+    type: UserRef,
+    nullable: true,
+    description:
+      'Update the theme preference ("system" | "light" | "dark") for the currently authenticated user. Syncs the choice across devices (LS-4913).',
+    args: {
+      themePreference: t.arg.string({ required: true }),
+    },
+    resolve: async (parent, { themePreference }, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      if (!ALLOWED_THEME_PREFERENCES.includes(themePreference)) {
+        throw UserInputError(
+          'themePreference must be one of: system, light, dark',
+        );
+      }
+
+      const updated = await dbService.users.updateUserTheme(
+        context.user.id,
+        themePreference,
+      );
+
+      if (!updated) return null;
+
+      return {
+        id: Number(updated.id),
+        email: updated.email,
+        username: updated.username,
+        accessLevel: updated.accessLevel,
+        avatarUrl: updated.avatarUrl ?? null,
+        discordId: updated.discordId ?? null,
+        discordUsername: updated.discordUsername ?? null,
+        discordAvatar: updated.discordAvatar ?? null,
+        themePreference: updated.themePreference ?? null,
       };
     },
   }),

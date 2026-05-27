@@ -1857,6 +1857,8 @@ export type Mutation = {
   updateUserAvatar?: Maybe<User>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
+  /** Update the theme preference ("system" | "light" | "dark") for the currently authenticated user. Syncs the choice across devices (LS-4913). */
+  updateUserTheme?: Maybe<User>;
   /** Update the username for the currently authenticated user. */
   updateUsername?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
@@ -2459,6 +2461,10 @@ export type MutationUpdateUserAvatarArgs = {
 export type MutationUpdateUserRoleArgs = {
   accessLevel: Scalars['String']['input'];
   userId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserThemeArgs = {
+  themePreference: Scalars['String']['input'];
 };
 
 export type MutationUpdateUsernameArgs = {
@@ -4363,6 +4369,7 @@ export type User = {
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   subscriptionTier?: Maybe<Scalars['String']['output']>;
+  themePreference?: Maybe<Scalars['String']['output']>;
   username?: Maybe<Scalars['String']['output']>;
 };
 
@@ -9749,6 +9756,7 @@ export type UserFragment = {
   subscriptionTier?: string | null;
   discordId?: string | null;
   discordUsername?: string | null;
+  themePreference?: string | null;
 };
 
 export type AdminUserFragment = {
@@ -9775,6 +9783,7 @@ export type GetUserByIdQuery = {
     subscriptionTier?: string | null;
     discordId?: string | null;
     discordUsername?: string | null;
+    themePreference?: string | null;
   } | null;
 };
 
@@ -9799,6 +9808,7 @@ export type GetAllUsersQuery = {
     subscriptionTier?: string | null;
     discordId?: string | null;
     discordUsername?: string | null;
+    themePreference?: string | null;
   }> | null;
 };
 
@@ -9829,6 +9839,7 @@ export type UpdateUserRoleMutation = {
     subscriptionTier?: string | null;
     discordId?: string | null;
     discordUsername?: string | null;
+    themePreference?: string | null;
   } | null;
 };
 
@@ -9864,6 +9875,20 @@ export type UpdateUsernameMutation = {
     subscriptionTier?: string | null;
     discordId?: string | null;
     discordUsername?: string | null;
+    themePreference?: string | null;
+  } | null;
+};
+
+export type UpdateUserThemeMutationVariables = Exact<{
+  themePreference: Scalars['String']['input'];
+}>;
+
+export type UpdateUserThemeMutation = {
+  __typename?: 'Mutation';
+  updateUserTheme?: {
+    __typename?: 'User';
+    id?: number | null;
+    themePreference?: string | null;
   } | null;
 };
 
@@ -10497,6 +10522,7 @@ export const UserFragmentDoc = gql`
     subscriptionTier
     discordId
     discordUsername
+    themePreference
   }
 `;
 export const AdminUserFragmentDoc = gql`
@@ -23258,6 +23284,57 @@ export type UpdateUsernameMutationResult =
 export type UpdateUsernameMutationOptions = BaseMutationOptions<
   UpdateUsernameMutation,
   UpdateUsernameMutationVariables
+>;
+export const UpdateUserTheme = gql`
+  mutation UpdateUserTheme($themePreference: String!) {
+    updateUserTheme(themePreference: $themePreference) {
+      id
+      themePreference
+    }
+  }
+`;
+export type UpdateUserThemeMutationFn = MutationFunction<
+  UpdateUserThemeMutation,
+  UpdateUserThemeMutationVariables
+>;
+
+/**
+ * __useUpdateUserThemeMutation__
+ *
+ * To run a mutation, you first call `useUpdateUserThemeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUserThemeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUserThemeMutation, { data, loading, error }] = useUpdateUserThemeMutation({
+ *   variables: {
+ *      themePreference: // value for 'themePreference'
+ *   },
+ * });
+ */
+export function useUpdateUserThemeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUserThemeMutation,
+    UpdateUserThemeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUserThemeMutation,
+    UpdateUserThemeMutationVariables
+  >(UpdateUserTheme, options);
+}
+export type UpdateUserThemeMutationHookResult = ReturnType<
+  typeof useUpdateUserThemeMutation
+>;
+export type UpdateUserThemeMutationResult =
+  Apollo.MutationResult<UpdateUserThemeMutation>;
+export type UpdateUserThemeMutationOptions = BaseMutationOptions<
+  UpdateUserThemeMutation,
+  UpdateUserThemeMutationVariables
 >;
 export const ImpersonateUser = gql`
   mutation ImpersonateUser($userId: Int!) {
