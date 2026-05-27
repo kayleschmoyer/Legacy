@@ -110,7 +110,7 @@ test.describe
             leagueName: `Season Lifecycle Integration Test ${Date.now()}`,
             numberOfTeams: 3,
             numberOfDivisions: 1,
-            maxRosterSize: 4,
+            maxRosterSize: 15,
             playerPool: 'all',
           },
         },
