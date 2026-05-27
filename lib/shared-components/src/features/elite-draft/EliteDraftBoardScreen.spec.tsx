@@ -422,6 +422,56 @@ describe('EliteDraftBoardScreen — draft completion paths (LS-4268 regression g
   });
 });
 
+// Regression gate: LS-4085 — draftId exists (scheduled draft) but draftStatus is not
+// 'in-progress'. Before the fix the guard checked !draftId, so a queued draft with an
+// assigned draftId would fall through to the live board and render an empty/broken UI.
+describe('EliteDraftBoardScreen — pre-draft lobby guard (LS-4085)', () => {
+  it('shows PreDraftLobby when draftId is assigned but draftStatus is queued (scheduled draft)', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'queued',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueDraft: null,
+        draftId: 42,
+      }),
+    );
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('pre-draft-lobby')).toBeTruthy();
+    expect(queryByTestId('draft-player-board')).toBeNull();
+  });
+
+  it('shows live draft board when draftStatus is paused (paused draft has a draftId)', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'paused',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        draftId: 42,
+      }),
+    );
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-player-board')).toBeTruthy();
+    expect(queryByTestId('pre-draft-lobby')).toBeNull();
+  });
+});
+
 describe('EliteDraftBoardScreen — paused overlay', () => {
   it('does not show paused overlay when draft is not paused', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: false }));

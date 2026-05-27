@@ -738,7 +738,11 @@ export function EliteDraftBoardScreen({
     );
   }
 
-  if (!queries.draftId && queries.league?.draftStatus !== 'in-progress') {
+  // Only render the live draft board when the draft is actively running or paused (LS-4085).
+  if (
+    queries.league?.draftStatus !== 'in-progress' &&
+    queries.league?.draftStatus !== 'paused'
+  ) {
     return (
       <NativePreDraftLobby
         league={queries.league}

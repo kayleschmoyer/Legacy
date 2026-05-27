@@ -378,14 +378,20 @@ export function EliteDraftBoardScreen({
 
   // Guard against a race where GetLeagueById resolves first with draftStatus='completed'
   // but GetLiveDraftLeagueDraft is still loading (leagueDraft=null, draftId=null).
-  // Without this, the !draftId && draftStatus!=='in-progress' condition below would fire
-  // and show PreDraftLobby instead of DraftCompleteView. Hold at LoadingScreen until
-  // leagueDraft arrives — its draftCompletedAt will trigger DraftCompleteView above (LS-4263).
+  // Without this, the draftStatus-based condition below would fire and show PreDraftLobby
+  // instead of DraftCompleteView. Hold at LoadingScreen until leagueDraft arrives —
+  // its draftCompletedAt will trigger DraftCompleteView above (LS-4263).
   if (queries.league?.draftStatus === 'completed' && !queries.leagueDraft) {
     return <LoadingScreen />;
   }
 
-  if (!queries.draftId && queries.league?.draftStatus !== 'in-progress') {
+  // Only render the live draft board when the draft is actively running or paused.
+  // A draftId can exist for scheduled ('queued') drafts that haven't started yet;
+  // relying on draftId absence would render the empty live board for those cases (LS-4085).
+  if (
+    queries.league?.draftStatus !== 'in-progress' &&
+    queries.league?.draftStatus !== 'paused'
+  ) {
     return (
       <PreDraftLobby
         league={queries.league}
