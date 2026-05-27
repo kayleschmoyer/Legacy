@@ -4411,6 +4411,7 @@ export type UserLeagueSummary = {
   rank?: Maybe<Scalars['Int']['output']>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
+  sport?: Maybe<Scalars['String']['output']>;
   teamCount?: Maybe<Scalars['Int']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
@@ -5462,6 +5463,7 @@ export type UserLeagueSummaryFragment = {
   __typename?: 'UserLeagueSummary';
   leagueId?: number | null;
   leagueName?: string | null;
+  sport?: string | null;
   leaguePhase?: string | null;
   seasonNumber?: number | null;
   draftStatus?: string | null;
@@ -5494,6 +5496,7 @@ export type GetUserLeagueSummariesQuery = {
     __typename?: 'UserLeagueSummary';
     leagueId?: number | null;
     leagueName?: string | null;
+    sport?: string | null;
     leaguePhase?: string | null;
     seasonNumber?: number | null;
     draftStatus?: string | null;
@@ -5527,6 +5530,7 @@ export type GetArchivedUserLeagueSummariesQuery = {
     __typename?: 'UserLeagueSummary';
     leagueId?: number | null;
     leagueName?: string | null;
+    sport?: string | null;
     leaguePhase?: string | null;
     seasonNumber?: number | null;
     draftStatus?: string | null;
@@ -9961,6 +9965,7 @@ export const UserLeagueSummaryFragmentDoc = gql`
   fragment UserLeagueSummary on UserLeagueSummary {
     leagueId
     leagueName
+    sport
     leaguePhase
     seasonNumber
     draftStatus

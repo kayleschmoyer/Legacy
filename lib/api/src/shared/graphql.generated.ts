@@ -223,6 +223,22 @@ export type BadgeProgress = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type BaseballMatchupPlayer = {
+  __typename?: 'BaseballMatchupPlayer';
+  playerId: Scalars['Int']['output'];
+  playerName: Scalars['String']['output'];
+  position: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
+};
+
+export type BaseballMatchupStats = {
+  __typename?: 'BaseballMatchupStats';
+  players: Array<BaseballMatchupPlayer>;
+  teamId: Scalars['Int']['output'];
+  teamName: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
+};
+
 export type BillingPortalSessionResult = {
   __typename?: 'BillingPortalSessionResult';
   url?: Maybe<Scalars['String']['output']>;
@@ -432,6 +448,7 @@ export type CreateLeagueAndTeamsInput = {
   salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
+  scoringFormat?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
   startDate?: InputMaybe<Scalars['String']['input']>;
@@ -612,7 +629,7 @@ export type DraftPick = {
   overallPick?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   pickedAt?: Maybe<Scalars['String']['output']>;
-  /** The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup. */
+  /** The drafted player. Enables the draft board to render pick names without a secondary lookup. */
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
@@ -861,23 +878,23 @@ export type FootballGameRushingStats = {
 /** A player on a football fantasy team in a matchup */
 export type FootballMatchupPlayer = {
   __typename?: 'FootballMatchupPlayer';
-  games?: Maybe<Array<FootballMatchupPlayerGame>>;
-  isDst?: Maybe<Scalars['Boolean']['output']>;
+  games: Array<FootballMatchupPlayerGame>;
+  isDst: Scalars['Boolean']['output'];
   nflTeam?: Maybe<Scalars['String']['output']>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  playerName?: Maybe<Scalars['String']['output']>;
-  position?: Maybe<Scalars['String']['output']>;
-  totalPoints?: Maybe<Scalars['Float']['output']>;
+  playerId: Scalars['Int']['output'];
+  playerName: Scalars['String']['output'];
+  position: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
 };
 
 /** A single NFL game played by a football matchup player */
 export type FootballMatchupPlayerGame = {
   __typename?: 'FootballMatchupPlayerGame';
   defense?: Maybe<FootballGameDefenseStats>;
-  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  fantasyPoints: Scalars['Float']['output'];
   gameDate?: Maybe<Scalars['String']['output']>;
-  gameIdentifier?: Maybe<Scalars['String']['output']>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
+  gameIdentifier: Scalars['String']['output'];
+  gameNum: Scalars['Int']['output'];
   idp?: Maybe<FootballGameIdpStats>;
   kicking?: Maybe<FootballGameKickingStats>;
   opponent?: Maybe<Scalars['String']['output']>;
@@ -889,10 +906,10 @@ export type FootballMatchupPlayerGame = {
 /** Stats for one team in a football matchup */
 export type FootballMatchupStats = {
   __typename?: 'FootballMatchupStats';
-  players?: Maybe<Array<FootballMatchupPlayer>>;
-  teamId?: Maybe<Scalars['Int']['output']>;
-  teamName?: Maybe<Scalars['String']['output']>;
-  totalPoints?: Maybe<Scalars['Float']['output']>;
+  players: Array<FootballMatchupPlayer>;
+  teamId: Scalars['Int']['output'];
+  teamName: Scalars['String']['output'];
+  totalPoints: Scalars['Float']['output'];
 };
 
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
@@ -1577,6 +1594,8 @@ export type MatchupRecap = {
   /** ID of the winning team, or null on a tie */
   winnerId?: Maybe<Scalars['Int']['output']>;
 };
+
+export type MatchupStats = BaseballMatchupStats | FootballMatchupStats;
 
 export enum MatchupStatus {
   Cancelled = 'cancelled',
@@ -2340,6 +2359,7 @@ export type MutationTwentyQuestionsGuessArgs = {
 
 export type MutationTwentyQuestionsStartArgs = {
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type MutationUndoLastDraftPickArgs = {
@@ -2831,6 +2851,7 @@ export type Query = {
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
+  matchupScores: Array<MatchupStats>;
   /** Aggregate statistics about the baseball database powering the minigames hub */
   minigamesStats?: Maybe<MinigamesStats>;
   /** Get the current user's votes for a league season */
@@ -2998,6 +3019,7 @@ export type QueryFootballPlayerArgs = {
 export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  nflTeam?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3248,6 +3270,11 @@ export type QueryLeagueTradeOffersArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryMatchupScoresArgs = {
+  leagueId: Scalars['Int']['input'];
+  weekNum: Scalars['Int']['input'];
+};
+
 export type QueryMyAwardVotesArgs = {
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
@@ -3318,6 +3345,7 @@ export type QueryPlayersArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryPublicLeaguesArgs = {
@@ -3335,6 +3363,7 @@ export type QueryScoreboardArgs = {
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
+  sport?: InputMaybe<Sport>;
 };
 
 export type QuerySearchUsersArgs = {
@@ -4188,6 +4217,8 @@ export type TwentyQuestionsGame = {
   maxQuestions?: Maybe<Scalars['Int']['output']>;
   questions?: Maybe<Array<TwentyQuestionsQuestion>>;
   questionsUsed?: Maybe<Scalars['Int']['output']>;
+  /** Sport the player pool was drawn from */
+  sport?: Maybe<Sport>;
   startedAt?: Maybe<Scalars['String']['output']>;
   status?: Maybe<TwentyQuestionsStatus>;
   /** Revealed only when status is won or lost */
@@ -4380,6 +4411,7 @@ export type UserLeagueSummary = {
   rank?: Maybe<Scalars['Int']['output']>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
+  sport?: Maybe<Scalars['String']['output']>;
   teamCount?: Maybe<Scalars['Int']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;

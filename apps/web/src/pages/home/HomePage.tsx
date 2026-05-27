@@ -53,12 +53,11 @@ import { useThemeContext } from '../../context/ThemeContext';
 const CREATE_BASEBALL_LEAGUE_ROUTE = '/baseball/league/create';
 const JOIN_BASEBALL_LEAGUE_ROUTE = '/baseball/league/join';
 
-// Centralized so the sport prefix can be derived from the summary
-// once non-baseball leagues exist.
 function leagueDetailRoute(
-  summary: Pick<UserLeagueSummaryFragment, 'leagueId'>,
+  summary: Pick<UserLeagueSummaryFragment, 'leagueId' | 'sport'>,
 ): string {
-  return `/baseball/league/${summary.leagueId}`;
+  const sportPrefix = summary.sport === 'football' ? 'football' : 'baseball';
+  return `/${sportPrefix}/league/${summary.leagueId}`;
 }
 
 /* ─── Urgency sort ─── */

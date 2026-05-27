@@ -4424,6 +4424,7 @@ type UserLeagueSummary {
   rank: Int
   seasonNumber: Int
   selectionMethod: String
+  sport: String
   teamCount: Int
   ties: Int
   totalMatchups: Int

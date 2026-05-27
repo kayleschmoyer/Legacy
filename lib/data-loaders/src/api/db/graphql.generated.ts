@@ -4411,6 +4411,7 @@ export type UserLeagueSummary = {
   rank?: Maybe<Scalars['Int']['output']>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
+  sport?: Maybe<Scalars['String']['output']>;
   teamCount?: Maybe<Scalars['Int']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;

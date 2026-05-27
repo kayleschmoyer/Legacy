@@ -1,6 +1,7 @@
 fragment UserLeagueSummary on UserLeagueSummary {
   leagueId
   leagueName
+  sport
   leaguePhase
   seasonNumber
   draftStatus

@@ -1146,6 +1146,7 @@ builder.queryField('leagueTradeBlock', (t) =>
 type UserLeagueSummaryShape = {
   leagueId: number;
   leagueName: string;
+  sport: string | null;
   leaguePhase: string | null;
   seasonNumber: number | null;
   draftStatus: string | null;
@@ -1177,6 +1178,7 @@ builder.objectType(UserLeagueSummary, {
   fields: (t) => ({
     leagueId: t.exposeInt('leagueId'),
     leagueName: t.exposeString('leagueName'),
+    sport: t.exposeString('sport', { nullable: true }),
     leaguePhase: t.exposeString('leaguePhase', { nullable: true }),
     seasonNumber: t.exposeInt('seasonNumber', { nullable: true }),
     draftStatus: t.exposeString('draftStatus', { nullable: true }),
@@ -1220,6 +1222,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
         .select({
           id: PublicSchema.leagues.id,
           name: PublicSchema.leagues.name,
+          sport: PublicSchema.leagues.sport,
           leaguePhase: PublicSchema.leagues.leaguePhase,
           draftStatus: PublicSchema.leagues.draftStatus,
           currentMatchup: PublicSchema.leagues.currentMatchup,
@@ -1399,6 +1402,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
         return {
           leagueId: league.id,
           leagueName: league.name,
+          sport: league.sport,
           leaguePhase: league.leaguePhase,
           seasonNumber: league.seasonNumber,
           draftStatus: league.draftStatus,
@@ -1447,6 +1451,7 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
         .select({
           id: PublicSchema.leagues.id,
           name: PublicSchema.leagues.name,
+          sport: PublicSchema.leagues.sport,
           leaguePhase: PublicSchema.leagues.leaguePhase,
           draftStatus: PublicSchema.leagues.draftStatus,
           currentMatchup: PublicSchema.leagues.currentMatchup,
@@ -1499,6 +1504,7 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
           return {
             leagueId: league.id,
             leagueName: league.name,
+            sport: league.sport,
             leaguePhase: league.leaguePhase,
             seasonNumber: league.seasonNumber,
             draftStatus: league.draftStatus,
