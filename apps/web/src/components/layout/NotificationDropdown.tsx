@@ -1,13 +1,14 @@
 import type { GestureResponderEvent } from 'react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
 import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
+import { categorize } from '../../utils/notificationUtils';
 import {
   GetNotificationHistory,
   type GetNotificationHistoryQuery,
@@ -95,9 +96,50 @@ const DropdownFooter = styled(XStack, {
   borderTopColor: '$borderColor',
 });
 
+/**
+ * Notification types that route to the user's profile subscription page.
+ * Kept as an explicit allow-list (rather than a broad `includes('subscription')`
+ * substring match) so future unrelated types like
+ * `commissioner_subscription_to_league_updates` don't accidentally route
+ * users to the billing page.
+ */
+const SUBSCRIPTION_NOTIFICATION_TYPES: ReadonlySet<string> = new Set([
+  'subscription_updated',
+  'subscription_canceled',
+  'subscription_renewed',
+  'trial_will_end',
+  'trial_started',
+  'trial_ended',
+]);
+
+export function getNotificationLink(notification: {
+  notificationType?: string | null;
+  matchupId?: number | null;
+  leagueId?: number | null;
+}): string {
+  const category = categorize(notification.notificationType);
+  const { matchupId, leagueId } = notification;
+
+  if ((category === 'matchup' || category === 'result') && matchupId != null) {
+    return `/matchup/${matchupId}`;
+  }
+  if (category === 'trade' && leagueId != null) {
+    return `/baseball/league/${leagueId}/trades`;
+  }
+  if (category === 'draft' && leagueId != null) {
+    return `/baseball/league/${leagueId}`;
+  }
+  const normalizedType = (notification.notificationType ?? '').toLowerCase();
+  if (SUBSCRIPTION_NOTIFICATION_TYPES.has(normalizedType)) {
+    return '/profile/subscription';
+  }
+  return '/notifications';
+}
+
 export const NotificationDropdown: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const client = useApolloClient();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonId = 'notification-menu-button';
@@ -334,6 +376,8 @@ export const NotificationDropdown: React.FC = () => {
                     if (!notification.read && notification.id != null) {
                       handleMarkAsRead(notification.id);
                     }
+                    setIsOpen(false);
+                    navigate(getNotificationLink(notification));
                   }}
                 >
                   <XStack flex={1} gap="$3" alignItems="flex-start">

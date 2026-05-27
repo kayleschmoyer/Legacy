@@ -10,7 +10,10 @@ import React from 'react';
 import { act, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-import { NotificationDropdown } from './NotificationDropdown';
+import {
+  getNotificationLink,
+  NotificationDropdown,
+} from './NotificationDropdown';
 
 type UnreadCountResult = { data: { getUnreadNotificationCount: number } };
 type HistoryResult = { data: undefined; loading: boolean };
@@ -166,5 +169,128 @@ describe('NotificationDropdown — LS-4094 stale-history invalidation', () => {
     });
 
     expect(mockEvict).not.toHaveBeenCalled();
+  });
+});
+
+describe('getNotificationLink — LS-4086 dropdown navigation routing', () => {
+  it('routes matchup notifications with a matchupId to /matchup/:id', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'matchup_started',
+        matchupId: 42,
+        leagueId: 7,
+      }),
+    ).toBe('/matchup/42');
+    expect(
+      getNotificationLink({
+        notificationType: 'MATCHUP_CLOSE_GAME',
+        matchupId: 99,
+        leagueId: null,
+      }),
+    ).toBe('/matchup/99');
+    expect(
+      getNotificationLink({
+        notificationType: 'reminder_lineup',
+        matchupId: 5,
+      }),
+    ).toBe('/matchup/5');
+  });
+
+  it('routes result notifications with a matchupId to /matchup/:id', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'matchup_ended',
+        matchupId: 17,
+      }),
+    ).toBe('/matchup/17');
+    expect(
+      getNotificationLink({
+        notificationType: 'game_lost',
+        matchupId: 21,
+      }),
+    ).toBe('/matchup/21');
+  });
+
+  it('falls back to /notifications when a matchup-category notification has no matchupId', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'matchup_started',
+        matchupId: null,
+        leagueId: 7,
+      }),
+    ).toBe('/notifications');
+  });
+
+  it('routes trade notifications with a leagueId to the trades tab', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'trade_proposed',
+        leagueId: 12,
+      }),
+    ).toBe('/baseball/league/12/trades');
+  });
+
+  it('falls back to /notifications when a trade notification has no leagueId', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'trade_proposed',
+        leagueId: null,
+      }),
+    ).toBe('/notifications');
+  });
+
+  it('routes draft notifications with a leagueId to the league page', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'draft_completed',
+        leagueId: 33,
+      }),
+    ).toBe('/baseball/league/33');
+    expect(
+      getNotificationLink({
+        notificationType: 'DRAFT_STARTED',
+        leagueId: 8,
+      }),
+    ).toBe('/baseball/league/8');
+  });
+
+  it('routes subscription/trial system notifications to /profile/subscription', () => {
+    expect(
+      getNotificationLink({ notificationType: 'subscription_updated' }),
+    ).toBe('/profile/subscription');
+    expect(getNotificationLink({ notificationType: 'trial_will_end' })).toBe(
+      '/profile/subscription',
+    );
+  });
+
+  it('does not route unrelated types that merely contain "subscription" or "trial"', () => {
+    // Guard against the previous broad substring match — an unrelated type
+    // that happens to contain "subscription" should fall back to /notifications.
+    expect(
+      getNotificationLink({
+        notificationType: 'commissioner_subscription_to_league_updates',
+      }),
+    ).toBe('/notifications');
+    expect(
+      getNotificationLink({ notificationType: 'free_trial_recommendation' }),
+    ).toBe('/notifications');
+  });
+
+  it('falls back to /notifications for unknown or missing notification types', () => {
+    expect(getNotificationLink({ notificationType: null })).toBe(
+      '/notifications',
+    );
+    expect(getNotificationLink({ notificationType: undefined })).toBe(
+      '/notifications',
+    );
+    expect(getNotificationLink({ notificationType: '' })).toBe(
+      '/notifications',
+    );
+    expect(
+      getNotificationLink({
+        notificationType: 'commissioner_announcement',
+        leagueId: 4,
+      }),
+    ).toBe('/notifications');
   });
 });

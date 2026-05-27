@@ -18,6 +18,13 @@ import {
 } from '../../api/db/graphql.generated';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
+/* ─── Notification-type taxonomy ─── */
+
+import {
+  categorize,
+  type NotificationTypeCategory as TypeCategory,
+} from '../../utils/notificationUtils';
+
 const PAGE_SIZE = 20;
 
 /* ─── Editorial palette (mirrors the design bundle) ─── */
@@ -45,9 +52,7 @@ const PAGE_BACKGROUND: React.CSSProperties = {
   color: TEXT_PRIMARY,
 };
 
-/* ─── Notification-type taxonomy ─── */
-
-type TypeCategory = 'matchup' | 'result' | 'trade' | 'draft' | 'system';
+export { categorize };
 
 const TYPE_STRIPE: Record<TypeCategory, string> = {
   matchup: BRAND_GOLD,
@@ -72,19 +77,6 @@ const TYPE_LABEL: Record<TypeCategory, string> = {
   draft: 'Draft',
   system: 'League',
 };
-
-export function categorize(
-  notificationType: string | null | undefined,
-): TypeCategory {
-  const t = (notificationType ?? '').toLowerCase();
-  if (t.includes('draft')) return 'draft';
-  if (t.includes('trade')) return 'trade';
-  if (t.includes('ended') || t.includes('result') || t.includes('lost'))
-    return 'result';
-  if (t.includes('matchup') || t.includes('reminder') || t.includes('close'))
-    return 'matchup';
-  return 'system';
-}
 
 /* ─── Day-grouping helpers ─── */
 
