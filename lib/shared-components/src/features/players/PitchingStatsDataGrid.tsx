@@ -702,235 +702,249 @@ export function PitchingStatsDataGrid({
         boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
       }}
     >
-      <XStack
-        style={{
-          background: BRAND_NAVY_DARK,
-          borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
-        }}
-        paddingVertical="$2"
-        paddingHorizontal="$3"
-      >
-        {visibleColumns.map((column) => {
-          const sortField = COLUMN_TO_SORT_FIELD_MAP[column.key] || column.key;
-          const isActiveSortColumn = queryParams.orderBy === sortField;
-          const isDescending = queryParams.orderDirection === 'desc';
-
-          return (
-            <XStack
-              key={column.key}
-              width={column.width || 'auto'}
-              minWidth={column.minWidth}
-              flexGrow={1}
-              justifyContent={
-                column.align === 'center'
-                  ? 'center'
-                  : column.align === 'right'
-                    ? 'flex-end'
-                    : 'flex-start'
-              }
-              alignItems="center"
-              paddingHorizontal="$1"
-              paddingVertical="$1"
-              borderRadius="$2"
-              style={{
-                background: isActiveSortColumn
-                  ? 'rgba(196,165,90,0.18)'
-                  : 'transparent',
-                transition: 'background 0.15s ease',
-              }}
-              hoverStyle={
-                column.sortable
-                  ? {
-                      backgroundColor: isActiveSortColumn
-                        ? ('rgba(196,165,90,0.25)' as never)
-                        : ('rgba(255,255,255,0.07)' as never),
-                    }
-                  : undefined
-              }
-              pressStyle={column.sortable ? { scale: 0.97 } : undefined}
-              cursor={column.sortable ? 'pointer' : 'default'}
-              onPress={
-                column.sortable
-                  ? () => {
-                      const currentDirection =
-                        isActiveSortColumn && isDescending ? 'asc' : 'desc';
-                      handleSort(column.key, currentDirection);
-                    }
-                  : undefined
-              }
-            >
-              <XStack gap="$1" alignItems="center">
-                <Text
-                  numberOfLines={1}
-                  userSelect="none"
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: '700',
-                    fontSize: 11,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                    transition: 'color 0.15s ease',
-                  }}
-                >
-                  {column.label}
-                </Text>
-                {column.sortable && isActiveSortColumn && (
-                  <Text style={{ fontSize: 10, color: BRAND_GOLD }}>
-                    {isDescending ? '▼' : '▲'}
-                  </Text>
-                )}
-              </XStack>
-            </XStack>
-          );
-        })}
-      </XStack>
-
+      {/* Horizontal scroll wrapper — keeps the header aligned with body rows
+          when columns overflow the viewport (mobile). Without this wrapper the
+          body scrolls independently and the column labels appear unmoored. */}
       <YStack flex={1} style={{ overflowX: 'auto' }}>
-        {loading ? (
-          <XStack
-            testID="loading-indicator"
-            justifyContent="center"
-            alignItems="center"
-            padding="$6"
-            gap="$3"
-          >
-            <Spinner size="large" color={BRAND_NAVY_LIGHT as never} />
-            <Text style={{ color: TEXT_MUTED }}>
-              Loading pitching statistics...
-            </Text>
-          </XStack>
-        ) : pitchingData.length === 0 ? (
-          <YStack
-            justifyContent="center"
-            alignItems="center"
-            padding="$6"
-            gap="$3"
-          >
-            <Text
-              fontSize="$5"
-              fontWeight="600"
-              style={{ color: TEXT_HIGH_CONTRAST }}
-            >
-              No pitchers found
-            </Text>
-            <Text
-              fontSize="$3"
-              textAlign="center"
-              style={{ color: TEXT_MUTED }}
-            >
-              Try adjusting your filters to find more pitchers.
-            </Text>
-            <Button
-              onPress={() => {
-                setLocalFilters({ minGames: 0, minWins: 0, minStrikeouts: 0 });
-                setPositionFilter('');
-                updateQueryParams({
-                  minGames: 0,
-                  minWins: 0,
-                  minStrikeouts: 0,
-                  position: undefined,
-                  offset: 0,
-                });
-              }}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                border: `1px solid rgba(196,165,90,0.3)`,
-                borderRadius: 10,
-                color: BRAND_GOLD_LIGHT,
-              }}
-            >
-              Clear Filters
-            </Button>
-          </YStack>
-        ) : (
-          pitchingData.map(
-            (player: CareerPitchingFragment | null, index: number) => (
+        <XStack
+          style={{
+            background: BRAND_NAVY_DARK,
+            borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
+            minWidth: 'max-content',
+          }}
+          paddingVertical="$2"
+          paddingHorizontal="$3"
+        >
+          {visibleColumns.map((column) => {
+            const sortField =
+              COLUMN_TO_SORT_FIELD_MAP[column.key] || column.key;
+            const isActiveSortColumn = queryParams.orderBy === sortField;
+            const isDescending = queryParams.orderDirection === 'desc';
+
+            return (
               <XStack
-                key={player?.playerId || index}
+                key={column.key}
+                width={column.width || 'auto'}
+                minWidth={column.minWidth}
+                flexGrow={1}
+                justifyContent={
+                  column.align === 'center'
+                    ? 'center'
+                    : column.align === 'right'
+                      ? 'flex-end'
+                      : 'flex-start'
+                }
+                alignItems="center"
+                paddingHorizontal="$1"
+                paddingVertical="$1"
+                borderRadius="$2"
                 style={{
-                  background: index % 2 === 0 ? BG_PAGE : 'rgba(17,27,47,0.8)',
-                  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-                  transition: 'background 0.12s ease',
-                  cursor: 'pointer',
+                  background: isActiveSortColumn
+                    ? 'rgba(196,165,90,0.18)'
+                    : 'transparent',
+                  transition: 'background 0.15s ease',
                 }}
-                hoverStyle={{
-                  backgroundColor: `rgba(27,58,92,0.3)` as never,
-                }}
-                pressStyle={{ scale: 0.998 }}
-                paddingVertical="$2"
-                paddingHorizontal="$3"
-                onPress={() => player && handleRowClick(player)}
-                cursor="pointer"
-              >
-                {visibleColumns.map((column) => {
-                  const isNameCol = column.key === 'playerName';
-                  const cellValue =
-                    column.key === 'playerName'
-                      ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
-                        `Player ${player?.playerId ?? '-'}`
-                      : column.key === 'formattedPositions'
-                        ? formatPositionsPlayed(player?.positionsPlayed) ||
-                          player?.primaryPosition ||
-                          '-'
-                        : column.key === 'fantasyPoints'
-                          ? Math.round(
-                              computePitchingFantasyPoints(player),
-                            ).toString()
-                          : column.key === 'fantasyPointsPerGame'
-                            ? (() => {
-                                const games = player?.games ?? 0;
-                                const fpts =
-                                  computePitchingFantasyPoints(player);
-                                return games > 0
-                                  ? (fpts / games).toFixed(1)
-                                  : '0.0';
-                              })()
-                            : column.formatter
-                              ? column.formatter(
-                                  player?.[column.key as keyof typeof player],
-                                )
-                              : (() => {
-                                  const rawVal =
-                                    player?.[column.key as keyof typeof player];
-                                  return typeof rawVal === 'object'
-                                    ? '—'
-                                    : String(rawVal ?? '—');
-                                })();
-                  return (
-                    <XStack
-                      key={column.key}
-                      width={column.width || 'auto'}
-                      minWidth={column.minWidth}
-                      flexGrow={1}
-                      justifyContent={
-                        column.align === 'center'
-                          ? 'center'
-                          : column.align === 'right'
-                            ? 'flex-end'
-                            : 'flex-start'
+                hoverStyle={
+                  column.sortable
+                    ? {
+                        backgroundColor: isActiveSortColumn
+                          ? ('rgba(196,165,90,0.25)' as never)
+                          : ('rgba(255,255,255,0.07)' as never),
                       }
-                      alignItems="center"
-                    >
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
-                          fontWeight: isNameCol ? '600' : '400',
-                          fontSize: isNameCol ? 14 : 13,
-                          color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {cellValue}
-                      </Text>
-                    </XStack>
-                  );
-                })}
+                    : undefined
+                }
+                pressStyle={column.sortable ? { scale: 0.97 } : undefined}
+                cursor={column.sortable ? 'pointer' : 'default'}
+                onPress={
+                  column.sortable
+                    ? () => {
+                        const currentDirection =
+                          isActiveSortColumn && isDescending ? 'asc' : 'desc';
+                        handleSort(column.key, currentDirection);
+                      }
+                    : undefined
+                }
+              >
+                <XStack gap="$1" alignItems="center">
+                  <Text
+                    numberOfLines={1}
+                    userSelect="none"
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '700',
+                      fontSize: 11,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
+                      transition: 'color 0.15s ease',
+                    }}
+                  >
+                    {column.label}
+                  </Text>
+                  {column.sortable && isActiveSortColumn && (
+                    <Text style={{ fontSize: 10, color: BRAND_GOLD }}>
+                      {isDescending ? '▼' : '▲'}
+                    </Text>
+                  )}
+                </XStack>
               </XStack>
-            ),
-          )
-        )}
+            );
+          })}
+        </XStack>
+
+        <YStack flex={1} style={{ minWidth: 'max-content' }}>
+          {loading ? (
+            <XStack
+              testID="loading-indicator"
+              justifyContent="center"
+              alignItems="center"
+              padding="$6"
+              gap="$3"
+            >
+              <Spinner size="large" color={BRAND_NAVY_LIGHT as never} />
+              <Text style={{ color: TEXT_MUTED }}>
+                Loading pitching statistics...
+              </Text>
+            </XStack>
+          ) : pitchingData.length === 0 ? (
+            <YStack
+              justifyContent="center"
+              alignItems="center"
+              padding="$6"
+              gap="$3"
+            >
+              <Text
+                fontSize="$5"
+                fontWeight="600"
+                style={{ color: TEXT_HIGH_CONTRAST }}
+              >
+                No pitchers found
+              </Text>
+              <Text
+                fontSize="$3"
+                textAlign="center"
+                style={{ color: TEXT_MUTED }}
+              >
+                Try adjusting your filters to find more pitchers.
+              </Text>
+              <Button
+                onPress={() => {
+                  setLocalFilters({
+                    minGames: 0,
+                    minWins: 0,
+                    minStrikeouts: 0,
+                  });
+                  setPositionFilter('');
+                  updateQueryParams({
+                    minGames: 0,
+                    minWins: 0,
+                    minStrikeouts: 0,
+                    position: undefined,
+                    offset: 0,
+                  });
+                }}
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+                  border: `1px solid rgba(196,165,90,0.3)`,
+                  borderRadius: 10,
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                Clear Filters
+              </Button>
+            </YStack>
+          ) : (
+            pitchingData.map(
+              (player: CareerPitchingFragment | null, index: number) => (
+                <XStack
+                  key={player?.playerId || index}
+                  style={{
+                    background:
+                      index % 2 === 0 ? BG_PAGE : 'rgba(17,27,47,0.8)',
+                    borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+                    transition: 'background 0.12s ease',
+                    cursor: 'pointer',
+                  }}
+                  hoverStyle={{
+                    backgroundColor: `rgba(27,58,92,0.3)` as never,
+                  }}
+                  pressStyle={{ scale: 0.998 }}
+                  paddingVertical="$2"
+                  paddingHorizontal="$3"
+                  onPress={() => player && handleRowClick(player)}
+                  cursor="pointer"
+                >
+                  {visibleColumns.map((column) => {
+                    const isNameCol = column.key === 'playerName';
+                    const cellValue =
+                      column.key === 'playerName'
+                        ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
+                          `Player ${player?.playerId ?? '-'}`
+                        : column.key === 'formattedPositions'
+                          ? formatPositionsPlayed(player?.positionsPlayed) ||
+                            player?.primaryPosition ||
+                            '-'
+                          : column.key === 'fantasyPoints'
+                            ? Math.round(
+                                computePitchingFantasyPoints(player),
+                              ).toString()
+                            : column.key === 'fantasyPointsPerGame'
+                              ? (() => {
+                                  const games = player?.games ?? 0;
+                                  const fpts =
+                                    computePitchingFantasyPoints(player);
+                                  return games > 0
+                                    ? (fpts / games).toFixed(1)
+                                    : '0.0';
+                                })()
+                              : column.formatter
+                                ? column.formatter(
+                                    player?.[column.key as keyof typeof player],
+                                  )
+                                : (() => {
+                                    const rawVal =
+                                      player?.[
+                                        column.key as keyof typeof player
+                                      ];
+                                    return typeof rawVal === 'object'
+                                      ? '—'
+                                      : String(rawVal ?? '—');
+                                  })();
+                    return (
+                      <XStack
+                        key={column.key}
+                        width={column.width || 'auto'}
+                        minWidth={column.minWidth}
+                        flexGrow={1}
+                        justifyContent={
+                          column.align === 'center'
+                            ? 'center'
+                            : column.align === 'right'
+                              ? 'flex-end'
+                              : 'flex-start'
+                        }
+                        alignItems="center"
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
+                            fontWeight: isNameCol ? '600' : '400',
+                            fontSize: isNameCol ? 14 : 13,
+                            color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {cellValue}
+                        </Text>
+                      </XStack>
+                    );
+                  })}
+                </XStack>
+              ),
+            )
+          )}
+        </YStack>
       </YStack>
     </YStack>
   );

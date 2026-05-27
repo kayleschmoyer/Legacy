@@ -824,128 +824,295 @@ export function PlayerStatsDataGrid({
         boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
       }}
     >
-      {/* Table Header */}
-      <XStack
-        style={{
-          background: BRAND_NAVY_DARK,
-          borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
-        }}
-        paddingVertical="$2"
-      >
-        {visibleColumns.map((column) => {
-          const sortField =
-            COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
-          const isActiveSortColumn = queryParams.orderBy === sortField;
-          const isDescending = queryParams.orderDirection === 'desc';
-          const isPlayerCol = column.key === 'displayName';
+      {/* Horizontal scroll wrapper — keeps the header aligned with body rows
+          when columns overflow the viewport (mobile). Without this wrapper the
+          body scrolls independently and the column labels appear unmoored. */}
+      <YStack flex={1} style={{ overflowX: 'auto' }}>
+        {/* Table Header */}
+        <XStack
+          style={{
+            background: BRAND_NAVY_DARK,
+            borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
+            minWidth: 'max-content',
+          }}
+          paddingVertical="$2"
+        >
+          {visibleColumns.map((column) => {
+            const sortField =
+              COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
+            const isActiveSortColumn = queryParams.orderBy === sortField;
+            const isDescending = queryParams.orderDirection === 'desc';
+            const isPlayerCol = column.key === 'displayName';
 
-          return (
-            <XStack
-              key={column.key}
-              width={column.width || 'auto'}
-              minWidth={column.minWidth}
-              flexGrow={isPlayerCol ? 0 : 1}
-              flexShrink={0}
-              justifyContent={
-                column.align === 'center'
-                  ? 'center'
-                  : column.align === 'right'
-                    ? 'flex-end'
-                    : 'flex-start'
-              }
-              alignItems="center"
-              paddingHorizontal="$2"
-              paddingVertical="$1"
-              borderRadius="$2"
-              style={{
-                background: isActiveSortColumn
-                  ? 'rgba(196,165,90,0.18)'
-                  : isPlayerCol
-                    ? BRAND_NAVY_DARK
-                    : 'transparent',
-                transition: 'background 0.15s ease',
-                ...(isPlayerCol
-                  ? {
-                      position: 'sticky',
-                      left: 0,
-                      zIndex: 2,
-                    }
-                  : {}),
-              }}
-              hoverStyle={
-                column.sortable
-                  ? {
-                      backgroundColor: isActiveSortColumn
-                        ? ('rgba(196,165,90,0.25)' as never)
-                        : ('rgba(255,255,255,0.07)' as never),
-                    }
-                  : undefined
-              }
-              pressStyle={column.sortable ? { scale: 0.97 } : undefined}
-              cursor={column.sortable ? 'pointer' : 'default'}
-              onPress={
-                column.sortable
-                  ? () => {
-                      const currentDirection =
-                        isActiveSortColumn && isDescending ? 'asc' : 'desc';
-                      handleSort(column.key as string, currentDirection);
-                    }
-                  : undefined
-              }
-            >
-              <XStack gap="$1" alignItems="center">
-                <Text
-                  numberOfLines={1}
-                  userSelect="none"
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: '700',
-                    fontSize: 11,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                    transition: 'color 0.15s ease',
-                  }}
-                >
-                  {column.label}
-                </Text>
-                {column.sortable && isActiveSortColumn && (
+            return (
+              <XStack
+                key={column.key}
+                width={column.width || 'auto'}
+                minWidth={column.minWidth}
+                flexGrow={isPlayerCol ? 0 : 1}
+                flexShrink={0}
+                justifyContent={
+                  column.align === 'center'
+                    ? 'center'
+                    : column.align === 'right'
+                      ? 'flex-end'
+                      : 'flex-start'
+                }
+                alignItems="center"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                borderRadius="$2"
+                style={{
+                  background: isActiveSortColumn
+                    ? 'rgba(196,165,90,0.18)'
+                    : isPlayerCol
+                      ? BRAND_NAVY_DARK
+                      : 'transparent',
+                  transition: 'background 0.15s ease',
+                  ...(isPlayerCol
+                    ? {
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 2,
+                      }
+                    : {}),
+                }}
+                hoverStyle={
+                  column.sortable
+                    ? {
+                        backgroundColor: isActiveSortColumn
+                          ? ('rgba(196,165,90,0.25)' as never)
+                          : ('rgba(255,255,255,0.07)' as never),
+                      }
+                    : undefined
+                }
+                pressStyle={column.sortable ? { scale: 0.97 } : undefined}
+                cursor={column.sortable ? 'pointer' : 'default'}
+                onPress={
+                  column.sortable
+                    ? () => {
+                        const currentDirection =
+                          isActiveSortColumn && isDescending ? 'asc' : 'desc';
+                        handleSort(column.key as string, currentDirection);
+                      }
+                    : undefined
+                }
+              >
+                <XStack gap="$1" alignItems="center">
                   <Text
+                    numberOfLines={1}
+                    userSelect="none"
                     style={{
-                      fontSize: 10,
-                      color: BRAND_GOLD,
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '700',
+                      fontSize: 11,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
+                      transition: 'color 0.15s ease',
                     }}
                   >
-                    {isDescending ? '▼' : '▲'}
+                    {column.label}
                   </Text>
-                )}
+                  {column.sortable && isActiveSortColumn && (
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        color: BRAND_GOLD,
+                      }}
+                    >
+                      {isDescending ? '▼' : '▲'}
+                    </Text>
+                  )}
+                </XStack>
               </XStack>
-            </XStack>
-          );
-        })}
-      </XStack>
+            );
+          })}
+        </XStack>
 
-      {/* Table Body */}
-      <YStack flex={1} style={{ overflowX: 'auto' }}>
-        {loading ? (
-          <YStack
-            testID="loading-indicator"
-            aria-busy
-            aria-label="Loading player statistics..."
-            style={{ background: 'transparent' }}
-          >
-            {/* Skeleton rows that mirror populated row geometry */}
-            {Array.from({ length: 8 }).map((_, rowIdx) => (
+        {/* Table Body */}
+        <YStack flex={1} style={{ minWidth: 'max-content' }}>
+          {loading ? (
+            <YStack
+              testID="loading-indicator"
+              aria-busy
+              aria-label="Loading player statistics..."
+              style={{ background: 'transparent' }}
+            >
+              {/* Skeleton rows that mirror populated row geometry */}
+              {Array.from({ length: 8 }).map((_, rowIdx) => (
+                <XStack
+                  key={`skel-${rowIdx}`}
+                  style={{
+                    background: rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
+                    borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+                  }}
+                  paddingVertical="$2"
+                >
+                  {visibleColumns.map((column) => {
+                    const isNameCol = column.key === 'displayName';
+                    return (
+                      <XStack
+                        key={column.key}
+                        width={column.width || 'auto'}
+                        minWidth={column.minWidth}
+                        flexGrow={isNameCol ? 0 : 1}
+                        flexShrink={0}
+                        alignItems="center"
+                        gap="$2"
+                        paddingHorizontal="$2"
+                        justifyContent={
+                          column.align === 'center'
+                            ? 'center'
+                            : column.align === 'right'
+                              ? 'flex-end'
+                              : 'flex-start'
+                        }
+                        style={
+                          isNameCol
+                            ? {
+                                position: 'sticky',
+                                left: 0,
+                                zIndex: 1,
+                                background:
+                                  rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
+                                borderLeft: `1px solid ${OUTLINE_SUBTLE}`,
+                              }
+                            : undefined
+                        }
+                      >
+                        {isNameCol ? (
+                          <>
+                            <YStack
+                              style={{
+                                width: 32,
+                                height: 18,
+                                borderRadius: 4,
+                                background: 'rgba(255,255,255,0.08)',
+                              }}
+                            />
+                            <YStack
+                              style={{
+                                flex: 1,
+                                height: 12,
+                                borderRadius: 3,
+                                background: 'rgba(255,255,255,0.08)',
+                              }}
+                            />
+                          </>
+                        ) : (
+                          <YStack
+                            style={{
+                              width: '70%',
+                              height: 10,
+                              borderRadius: 3,
+                              background: 'rgba(255,255,255,0.08)',
+                            }}
+                          />
+                        )}
+                      </XStack>
+                    );
+                  })}
+                </XStack>
+              ))}
               <XStack
-                key={`skel-${rowIdx}`}
-                style={{
-                  background: rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
-                  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+                justifyContent="center"
+                alignItems="center"
+                padding="$3"
+                gap="$2"
+              >
+                <Spinner size="small" color={BRAND_NAVY_LIGHT} />
+                <Text style={{ color: TEXT_MUTED, fontSize: 12 }}>
+                  Loading player statistics...
+                </Text>
+              </XStack>
+            </YStack>
+          ) : data.length === 0 ? (
+            <YStack
+              justifyContent="center"
+              alignItems="center"
+              padding="$6"
+              gap="$3"
+            >
+              <Text
+                fontSize="$5"
+                fontWeight="600"
+                style={{ color: TEXT_HIGH_CONTRAST }}
+              >
+                No players found
+              </Text>
+              <Text
+                fontSize="$3"
+                textAlign="center"
+                style={{ color: TEXT_MUTED }}
+              >
+                Try adjusting your search terms or filters to find more players.
+              </Text>
+              <Button
+                onPress={() => {
+                  if (searchDebounceRef.current) {
+                    clearTimeout(searchDebounceRef.current);
+                  }
+                  const cleared = {
+                    minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
+                    minHomeRuns: 0,
+                    minRBI: 0,
+                  };
+                  setSearchTerm('');
+                  setPositionFilter('');
+                  setLocalFilters(cleared);
+                  updateQueryParams({
+                    ...cleared,
+                    searchTerm: undefined,
+                    position: undefined,
+                    after: undefined,
+                  });
                 }}
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+                  border: `1px solid rgba(196,165,90,0.3)`,
+                  borderRadius: 10,
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                Clear Filters
+              </Button>
+            </YStack>
+          ) : (
+            data.map((player: PlayerCareerStats, index: number) => (
+              <XStack
+                key={player.id}
+                data-testid={`player-row-${player.playerId}`}
+                style={{
+                  background: index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
+                  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+                  transition: 'background 0.12s ease',
+                }}
+                hoverStyle={{
+                  backgroundColor: BG_ELEVATED as never,
+                }}
+                pressStyle={{ scale: 0.998 }}
                 paddingVertical="$2"
+                onPress={() => handleRowClick(player)}
+                cursor="pointer"
               >
                 {visibleColumns.map((column) => {
                   const isNameCol = column.key === 'displayName';
+                  const raw = player[column.key];
+                  const cellValue = column.formatter
+                    ? column.formatter(raw)
+                    : raw == null
+                      ? '—'
+                      : typeof raw === 'string' ||
+                          typeof raw === 'number' ||
+                          typeof raw === 'boolean'
+                        ? String(raw)
+                        : '—';
+                  const rowBg = index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW;
+                  const posKey = player.primaryPosition;
+                  const posColor = posKey
+                    ? getPositionColor('baseball', posKey)
+                    : POS_UTILITY;
                   return (
                     <XStack
                       key={column.key}
@@ -953,9 +1120,6 @@ export function PlayerStatsDataGrid({
                       minWidth={column.minWidth}
                       flexGrow={isNameCol ? 0 : 1}
                       flexShrink={0}
-                      alignItems="center"
-                      gap="$2"
-                      paddingHorizontal="$2"
                       justifyContent={
                         column.align === 'center'
                           ? 'center'
@@ -963,223 +1127,65 @@ export function PlayerStatsDataGrid({
                             ? 'flex-end'
                             : 'flex-start'
                       }
+                      alignItems="center"
+                      paddingHorizontal="$2"
+                      gap="$2"
                       style={
                         isNameCol
                           ? {
                               position: 'sticky',
                               left: 0,
                               zIndex: 1,
-                              background:
-                                rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
-                              borderLeft: `1px solid ${OUTLINE_SUBTLE}`,
+                              background: rowBg,
+                              borderLeft: `1px solid ${posColor}`,
                             }
                           : undefined
                       }
                     >
-                      {isNameCol ? (
-                        <>
-                          <YStack
-                            style={{
-                              width: 32,
-                              height: 18,
-                              borderRadius: 4,
-                              background: 'rgba(255,255,255,0.08)',
-                            }}
-                          />
-                          <YStack
-                            style={{
-                              flex: 1,
-                              height: 12,
-                              borderRadius: 3,
-                              background: 'rgba(255,255,255,0.08)',
-                            }}
-                          />
-                        </>
-                      ) : (
-                        <YStack
+                      {isNameCol && posKey ? (
+                        <XStack
+                          alignItems="center"
+                          justifyContent="center"
+                          paddingHorizontal={7}
+                          paddingVertical={3}
                           style={{
-                            width: '70%',
-                            height: 10,
-                            borderRadius: 3,
-                            background: 'rgba(255,255,255,0.08)',
+                            minWidth: 32,
+                            borderRadius: 4,
+                            background: posColor,
                           }}
-                        />
-                      )}
+                        >
+                          <Text
+                            style={{
+                              fontFamily: FONT_DISPLAY,
+                              fontWeight: '800',
+                              fontSize: 10,
+                              letterSpacing: '0.08em',
+                              color: '#fff',
+                            }}
+                          >
+                            {posKey}
+                          </Text>
+                        </XStack>
+                      ) : null}
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
+                          fontWeight: isNameCol ? '600' : '400',
+                          fontSize: isNameCol ? 14 : 13,
+                          color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {cellValue}
+                      </Text>
                     </XStack>
                   );
                 })}
               </XStack>
-            ))}
-            <XStack
-              justifyContent="center"
-              alignItems="center"
-              padding="$3"
-              gap="$2"
-            >
-              <Spinner size="small" color={BRAND_NAVY_LIGHT} />
-              <Text style={{ color: TEXT_MUTED, fontSize: 12 }}>
-                Loading player statistics...
-              </Text>
-            </XStack>
-          </YStack>
-        ) : data.length === 0 ? (
-          <YStack
-            justifyContent="center"
-            alignItems="center"
-            padding="$6"
-            gap="$3"
-          >
-            <Text
-              fontSize="$5"
-              fontWeight="600"
-              style={{ color: TEXT_HIGH_CONTRAST }}
-            >
-              No players found
-            </Text>
-            <Text
-              fontSize="$3"
-              textAlign="center"
-              style={{ color: TEXT_MUTED }}
-            >
-              Try adjusting your search terms or filters to find more players.
-            </Text>
-            <Button
-              onPress={() => {
-                if (searchDebounceRef.current) {
-                  clearTimeout(searchDebounceRef.current);
-                }
-                const cleared = {
-                  minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
-                  minHomeRuns: 0,
-                  minRBI: 0,
-                };
-                setSearchTerm('');
-                setPositionFilter('');
-                setLocalFilters(cleared);
-                updateQueryParams({
-                  ...cleared,
-                  searchTerm: undefined,
-                  position: undefined,
-                  after: undefined,
-                });
-              }}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                border: `1px solid rgba(196,165,90,0.3)`,
-                borderRadius: 10,
-                color: BRAND_GOLD_LIGHT,
-              }}
-            >
-              Clear Filters
-            </Button>
-          </YStack>
-        ) : (
-          data.map((player: PlayerCareerStats, index: number) => (
-            <XStack
-              key={player.id}
-              data-testid={`player-row-${player.playerId}`}
-              style={{
-                background: index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
-                borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-                transition: 'background 0.12s ease',
-              }}
-              hoverStyle={{
-                backgroundColor: BG_ELEVATED as never,
-              }}
-              pressStyle={{ scale: 0.998 }}
-              paddingVertical="$2"
-              onPress={() => handleRowClick(player)}
-              cursor="pointer"
-            >
-              {visibleColumns.map((column) => {
-                const isNameCol = column.key === 'displayName';
-                const raw = player[column.key];
-                const cellValue = column.formatter
-                  ? column.formatter(raw)
-                  : raw == null
-                    ? '—'
-                    : typeof raw === 'string' ||
-                        typeof raw === 'number' ||
-                        typeof raw === 'boolean'
-                      ? String(raw)
-                      : '—';
-                const rowBg = index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW;
-                const posKey = player.primaryPosition;
-                const posColor = posKey
-                  ? getPositionColor('baseball', posKey)
-                  : POS_UTILITY;
-                return (
-                  <XStack
-                    key={column.key}
-                    width={column.width || 'auto'}
-                    minWidth={column.minWidth}
-                    flexGrow={isNameCol ? 0 : 1}
-                    flexShrink={0}
-                    justifyContent={
-                      column.align === 'center'
-                        ? 'center'
-                        : column.align === 'right'
-                          ? 'flex-end'
-                          : 'flex-start'
-                    }
-                    alignItems="center"
-                    paddingHorizontal="$2"
-                    gap="$2"
-                    style={
-                      isNameCol
-                        ? {
-                            position: 'sticky',
-                            left: 0,
-                            zIndex: 1,
-                            background: rowBg,
-                            borderLeft: `1px solid ${posColor}`,
-                          }
-                        : undefined
-                    }
-                  >
-                    {isNameCol && posKey ? (
-                      <XStack
-                        alignItems="center"
-                        justifyContent="center"
-                        paddingHorizontal={7}
-                        paddingVertical={3}
-                        style={{
-                          minWidth: 32,
-                          borderRadius: 4,
-                          background: posColor,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: FONT_DISPLAY,
-                            fontWeight: '800',
-                            fontSize: 10,
-                            letterSpacing: '0.08em',
-                            color: '#fff',
-                          }}
-                        >
-                          {posKey}
-                        </Text>
-                      </XStack>
-                    ) : null}
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
-                        fontWeight: isNameCol ? '600' : '400',
-                        fontSize: isNameCol ? 14 : 13,
-                        color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      {cellValue}
-                    </Text>
-                  </XStack>
-                );
-              })}
-            </XStack>
-          ))
-        )}
+            ))
+          )}
+        </YStack>
       </YStack>
     </YStack>
   );
