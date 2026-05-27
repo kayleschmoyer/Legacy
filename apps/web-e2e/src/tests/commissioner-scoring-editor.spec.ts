@@ -763,3 +763,80 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     ).not.toBeVisible();
   });
 });
+
+test.describe('Commissioner Scoring Editor — Unsaved Changes Guard @critical', () => {
+  test('blocks in-app tab navigation when there are unsaved changes (LS-4104)', async ({
+    page,
+  }) => {
+    await setupGraphQL(page);
+    await page.goto('/baseball/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const scoringRegion = page.getByTestId('scoring-editor');
+
+    // Make a change to trigger the unsaved state.
+    const hrInput = scoringRegion.getByRole('textbox', {
+      name: 'Home Runs multiplier',
+    });
+    await hrInput.fill('3');
+    await hrInput.blur();
+    await expect(scoringRegion.getByText(/unsaved/i)).toBeVisible();
+
+    // Register dialog handler BEFORE clicking — Playwright dispatches the
+    // dialog synchronously and an unhandled `window.confirm` auto-dismisses.
+    let dialogMessage = '';
+    page.once('dialog', async (dialog) => {
+      dialogMessage = dialog.message();
+      await dialog.dismiss();
+    });
+
+    // Click the Overview tab to trigger React Router navigation.
+    const tablist = page.getByRole('tablist', { name: 'League sections' });
+    await tablist.getByRole('tab', { name: 'Overview' }).click();
+
+    // The window.confirm prompt fired with the AC message.
+    await expect
+      .poll(() => dialogMessage, { timeout: 5_000 })
+      .toContain('unsaved scoring changes');
+    expect(dialogMessage).toContain('Leave without saving?');
+
+    // Navigation was cancelled — still on the commissioner page with the
+    // scoring editor and pending-changes badge intact.
+    await expect(scoringRegion).toBeVisible();
+    await expect(scoringRegion.getByText(/unsaved/i)).toBeVisible();
+  });
+
+  test('allows tab navigation when there are no unsaved changes', async ({
+    page,
+  }) => {
+    await setupGraphQL(page);
+    await page.goto('/baseball/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const scoringRegion = page.getByTestId('scoring-editor');
+    await expect(scoringRegion).toBeVisible();
+
+    // No edits made → no badge.
+    await expect(scoringRegion.getByText(/unsaved/i)).not.toBeVisible();
+
+    // Treat any dialog as a test failure — none should appear.
+    let unexpectedDialog = false;
+    const dialogListener = (dialog: import('@playwright/test').Dialog) => {
+      unexpectedDialog = true;
+      void dialog.dismiss();
+    };
+    page.on('dialog', dialogListener);
+
+    try {
+      const tablist = page.getByRole('tablist', { name: 'League sections' });
+      await tablist.getByRole('tab', { name: 'Overview' }).click();
+
+      // Wait for tab swap to complete; scoring editor unmounts on the
+      // Overview tab.
+      await expect(scoringRegion).not.toBeVisible({ timeout: 5_000 });
+      expect(unexpectedDialog).toBe(false);
+    } finally {
+      page.off('dialog', dialogListener);
+    }
+  });
+});

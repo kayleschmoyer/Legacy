@@ -402,6 +402,96 @@ export function LeagueScoringEditor(
     !hasValidationErrors &&
     pendingUpdates.length > 0;
 
+  // Unsaved-changes navigation guard (LS-4104). The "unsaved" badge alone is
+  // easy to miss; without these guards a stray tab click silently discards the
+  // commissioner's scoring edits.
+  //
+  // Implementation note: react-router-dom v6's `useBlocker` only works under a
+  // Data Router (`createBrowserRouter` + `RouterProvider`). This app mounts a
+  // classic `<BrowserRouter>` (see apps/web/src/main.tsx), so `useBlocker`
+  // would throw "must be used within a data router". We therefore guard
+  // navigation with two listeners scoped to the window/document instead.
+  const hasUnsavedChanges = pendingUpdates.length > 0;
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const promptMessage =
+      'You have unsaved scoring changes. Leave without saving?';
+
+    // 1. Browser-level: refresh, tab close, typed-URL navigation. The browser
+    //    supplies its own dialog text in modern Chrome/Firefox/Safari;
+    //    `event.returnValue` is required for the prompt to appear at all but
+    //    its value is ignored.
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 2. SPA-level: in-app clicks that would trigger a route change (tab
+    //    buttons, <Link> anchors, sidebar items). Capture-phase so we run
+    //    before any onClick handlers that call `navigate()`. We deliberately
+    //    do NOT intercept clicks inside the editor itself — Save, Reset, and
+    //    input typing must remain unblocked.
+    const editorRoot = document.querySelector('[data-testid="scoring-editor"]');
+
+    const handleNavClick = (event: MouseEvent) => {
+      // Only respond to primary clicks without modifier keys; cmd/ctrl-click
+      // opens a new tab, which doesn't lose the current page's state.
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      // event.target on a click can be a Text node (e.g., a click landing on
+      // selected text inside a `<p>`). `.closest()` only exists on Element,
+      // so narrow with `instanceof Element` rather than a blind cast.
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      // Clicks inside the editor (Save, Reset, inputs, group headers) are
+      // never navigations — let them through.
+      if (editorRoot?.contains(target)) return;
+
+      const navTarget = target.closest('[role="tab"], a[href]');
+      if (!navTarget) return;
+
+      // Re-clicking the currently selected tab is a no-op route-wise.
+      if (navTarget.getAttribute('aria-selected') === 'true') return;
+
+      // External / new-window links bypass our SPA — beforeunload will fire
+      // for those, so we can let them through here.
+      if (navTarget instanceof HTMLAnchorElement) {
+        if (navTarget.target === '_blank') return;
+        const href = navTarget.getAttribute('href');
+        if (!href) return;
+        // Skip hash-only and pure query-string changes — they don't unmount
+        // the editor.
+        if (href.startsWith('#') || href.startsWith('?')) return;
+      }
+
+      if (!window.confirm(promptMessage)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener('click', handleNavClick, { capture: true });
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleNavClick, {
+        capture: true,
+      });
+    };
+  }, [hasUnsavedChanges]);
+
   const handleValueChange = (statId: number, nextValue: string) => {
     setFormValues((prev) => ({ ...prev, [statId]: nextValue }));
 
