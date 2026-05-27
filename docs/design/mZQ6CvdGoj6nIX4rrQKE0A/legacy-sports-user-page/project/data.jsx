@@ -1,0 +1,215 @@
+// data.jsx — sample personas + default settings
+const PERSONAS = {
+  champion: {
+    name: 'Marcus Whitfield',
+    handle: 'whitfield',
+    initials: 'MW',
+    pronouns: 'he/him',
+    location: 'Brooklyn, NY',
+    joined: 'March 2018',
+    tagline: 'Built for October. Plays every month.',
+    bio: [
+      'Eight years in, four active leagues, and one rule: respect the box score. I came up running redraft and never looked back — these days I keep one dynasty alive in the Lower East and commish the Dugout Society on the side.',
+      'Favorite draft slot: 7. Favorite metric: WAR. Favorite manager move: the August buy-low on a slumping ace.',
+    ],
+    favTeam: 'New York Yankees',
+    favTeamSub: 'Since 1996 · World Series · 27 rings',
+    favEra: 'Modern Era',
+    favEraSub: '2000 – Present · Power, parity, peak Pujols',
+    headlineStat: { label: 'Championships', value: '3' },
+    altStats: [
+      { label: 'All-time record', value: '412–308', sub: 'W–L across all leagues' },
+      { label: 'Win %', value: '.572', sub: 'Active manager rate' },
+      { label: 'Global rank', value: '#247', sub: 'Out of 184k managers' },
+    ],
+    inlineStats: [
+      { k: 'Titles', v: '3' },
+      { k: 'Years', v: '8' },
+      { k: 'Win %', v: '.572' },
+      { k: 'Leagues', v: '4' },
+    ],
+    trophies: [
+      { year: 2024, league: 'The Dugout Society', finish: 'Champion · 14-2 record', size: 'lg' },
+      { year: 2022, league: 'Crosstown Classic', finish: 'Champion · vs. @torres', size: 'md' },
+      { year: 2020, league: 'Diamond Kings', finish: 'Champion · 12-team H2H', size: 'md' },
+    ],
+    leagues: [
+      { name: 'The Dugout Society', sub: 'Keeper · 12 teams · Year 4', record: '14-2-0', rank: '1st', points: '1,884.5', status: 'champ' },
+      { name: 'Lower East All-Time', sub: 'Dynasty · 16 teams · Year 8', record: '9-5-0', rank: '4th', points: '1,623.5', status: 'active' },
+      { name: 'Diamond Kings', sub: 'Redraft · 10 teams · Year 6', record: '8-4-1', rank: '3rd', points: '1,512.0', status: 'active' },
+      { name: 'Crosstown Classic', sub: 'Redraft · 12 teams · Year 5', record: '6-7-0', rank: '8th', points: '1,201.0', status: 'active' },
+    ],
+    badges: [
+      { name: 'Triple Crown', desc: 'Led AVG, HR & RBI in one season', kind: 'gold', rare: 'RARE', glyph: '♔' },
+      { name: 'Perfect Season', desc: 'Won every matchup in a season', kind: 'gold', rare: 'MYTHIC', glyph: '★' },
+      { name: 'Walk-Off Era', desc: 'Won 5 matchups by under 5 pts', kind: 'seam', glyph: '◆' },
+      { name: 'Time Traveler', desc: 'Drafted players from 5+ eras', kind: 'green', glyph: '↻' },
+      { name: 'Comeback Kid', desc: 'Won the title after an 0–4 start', kind: 'green', glyph: '↑' },
+      { name: 'Hot Stove', desc: '10+ trades in a single season', kind: 'seam', glyph: '⇄' },
+      { name: 'Commissioner', desc: 'Ran a league 3+ consecutive years', kind: 'default', glyph: 'C' },
+      { name: 'Sweep', desc: 'Locked — win a 4-week playoff sweep', kind: 'default', locked: true, glyph: '⊘' },
+    ],
+  },
+
+  veteran: {
+    name: 'Jordan Vega',
+    handle: 'vega',
+    initials: 'JV',
+    pronouns: 'she/her',
+    location: 'Oakland, CA',
+    joined: 'April 2019',
+    tagline: 'Trust the projections. Trust the gut more.',
+    bio: [
+      'Six seasons in, still finishing top-3 most years and still chasing my first ring. I treat the deadline like a holiday and the waiver wire like a part-time job.',
+      'I draft pitching early because the math says so. I will fight you about WHIP.',
+    ],
+    favTeam: 'Oakland Athletics',
+    favTeamSub: 'Moneyball era forever · 1972, 73, 74, 89',
+    favEra: 'Live Ball Era',
+    favEraSub: '1920 – 1941 · Ruth, Gehrig, Foxx',
+    headlineStat: { label: 'Championships', value: '0' },
+    altStats: [
+      { label: 'All-time record', value: '298–254', sub: 'W–L across all leagues' },
+      { label: 'Win %', value: '.540', sub: 'Active manager rate' },
+      { label: 'Global rank', value: '#1,402', sub: 'Out of 184k managers' },
+    ],
+    inlineStats: [
+      { k: 'Titles', v: '0' },
+      { k: 'Years', v: '6' },
+      { k: 'Win %', v: '.540' },
+      { k: 'Leagues', v: '3' },
+    ],
+    trophies: [
+      { year: 2023, league: 'Diamond Kings', finish: 'Runner-up · lost by 3.5 pts', size: 'md', silver: true },
+      { year: 2021, league: 'East Bay Dynasty', finish: '3rd place · 9-4 record', size: 'sm', bronze: true },
+    ],
+    leagues: [
+      { name: 'Diamond Kings', sub: 'Redraft · 10 teams · Year 6', record: '11-3-0', rank: '2nd', points: '1,712.0', status: 'active' },
+      { name: 'East Bay Dynasty', sub: 'Dynasty · 14 teams · Year 5', record: '8-6-0', rank: '5th', points: '1,498.5', status: 'active' },
+      { name: 'Westside H2H', sub: 'Keeper · 12 teams · Year 3', record: '7-7-0', rank: '6th', points: '1,402.5', status: 'active' },
+    ],
+    badges: [
+      { name: 'Almost', desc: 'Two finals appearances, zero rings', kind: 'seam', rare: 'COMMON', glyph: '◯' },
+      { name: 'Pitcher Whisperer', desc: 'Top-5 ERA & WHIP in same year', kind: 'default', glyph: 'P' },
+      { name: 'Deadline Hawk', desc: '20+ trades over your career', kind: 'green', glyph: '⇄' },
+      { name: 'Streamer', desc: '300+ waiver claims in a season', kind: 'default', glyph: '∿' },
+      { name: 'Commissioner', desc: 'Ran a league 3+ years', kind: 'default', glyph: 'C' },
+      { name: 'Time Traveler', desc: 'Drafted from 5+ eras', kind: 'green', glyph: '↻' },
+      { name: 'Triple Crown', desc: 'Locked — lead AVG/HR/RBI', kind: 'default', locked: true, glyph: '♔' },
+      { name: 'Champion', desc: 'Locked — win it all', kind: 'default', locked: true, glyph: '★' },
+    ],
+  },
+
+  rookie: {
+    name: 'Alex Park',
+    handle: 'apark',
+    initials: 'AP',
+    pronouns: 'they/them',
+    location: 'Austin, TX',
+    joined: 'February 2026',
+    tagline: 'Year one. Learning the game.',
+    bio: [
+      'New to fantasy this season. Joined a friend\'s redraft league and somehow ended up on a four-game streak in May. Big fan of Cal Raleigh, Jose Ramirez, and any pitcher with a slider.',
+    ],
+    favTeam: 'Seattle Mariners',
+    favTeamSub: 'Adopted in 2022 · still waiting',
+    favEra: 'Modern Era',
+    favEraSub: '2000 – Present',
+    headlineStat: { label: 'Championships', value: '0' },
+    altStats: [
+      { label: 'All-time record', value: '8–4', sub: 'First season' },
+      { label: 'Win %', value: '.667', sub: 'Hot start' },
+      { label: 'Current rank', value: '2nd', sub: 'Of 10 in your league' },
+    ],
+    inlineStats: [
+      { k: 'Titles', v: '0' },
+      { k: 'Years', v: '1' },
+      { k: 'Win %', v: '.667' },
+      { k: 'Leagues', v: '1' },
+    ],
+    trophies: [],
+    leagues: [
+      { name: 'Austin Slow Pitch', sub: 'Redraft · 10 teams · Year 1', record: '8-4-0', rank: '2nd', points: '986.5', status: 'active' },
+    ],
+    badges: [
+      { name: 'First Draft', desc: 'Completed your first live draft', kind: 'green', glyph: '✓' },
+      { name: 'First Win', desc: 'Won your first weekly matchup', kind: 'green', glyph: '1' },
+      { name: 'Five in a Row', desc: 'Won 5 matchups in a row', kind: 'gold', rare: 'NICE', glyph: '5' },
+      { name: 'Rookie of the Year', desc: 'Locked — top-3 rookie finish', kind: 'default', locked: true, glyph: 'R' },
+      { name: 'Champion', desc: 'Locked — win the title', kind: 'default', locked: true, glyph: '★' },
+      { name: 'Triple Crown', desc: 'Locked — lead AVG/HR/RBI', kind: 'default', locked: true, glyph: '♔' },
+      { name: 'Commissioner', desc: 'Locked — run a league', kind: 'default', locked: true, glyph: 'C' },
+      { name: 'Time Traveler', desc: 'Locked — draft from 5 eras', kind: 'default', locked: true, glyph: '↻' },
+    ],
+  },
+
+  commissioner: {
+    name: 'Sam Reyes',
+    handle: 'commish',
+    initials: 'SR',
+    pronouns: 'he/him',
+    location: 'Chicago, IL',
+    joined: 'September 2016',
+    tagline: 'Keeps the league running. Sometimes wins it too.',
+    bio: [
+      'Ten years of commissioning, five different leagues. I write the bylaws, settle the trades, and run the keeper auctions. I also play — not always well, but always on time.',
+      'If you\'re looking for someone to run your league: I\'ve done it. If you want to know which veto rule is fairest: ask me, I have opinions.',
+    ],
+    favTeam: 'Chicago Cubs',
+    favTeamSub: '108 years of waiting · then 2016',
+    favEra: 'All Eras',
+    favEraSub: 'Dead Ball through Modern · the whole story',
+    headlineStat: { label: 'Championships', value: '2' },
+    altStats: [
+      { label: 'All-time record', value: '498–402', sub: 'Across 10 seasons' },
+      { label: 'Leagues run', value: '5', sub: 'As commissioner' },
+      { label: 'Seasons run', value: '23', sub: 'Across all leagues' },
+    ],
+    inlineStats: [
+      { k: 'Titles', v: '2' },
+      { k: 'Years', v: '10' },
+      { k: 'Leagues run', v: '5' },
+      { k: 'Trades approved', v: '614' },
+    ],
+    trophies: [
+      { year: 2019, league: 'Wrigley H2H', finish: 'Champion · player-commish', size: 'lg' },
+      { year: 2017, league: 'Lincoln Park Dynasty', finish: 'Champion · founding season', size: 'md' },
+    ],
+    leagues: [
+      { name: 'Wrigley H2H', sub: 'Redraft · 12 teams · Year 10 · Commish', record: '9-5-0', rank: '4th', points: '1,544.0', status: 'active', commish: true },
+      { name: 'Lincoln Park Dynasty', sub: 'Dynasty · 14 teams · Year 9 · Commish', record: '7-7-0', rank: '7th', points: '1,388.5', status: 'active', commish: true },
+      { name: 'North Side Keeper', sub: 'Keeper · 10 teams · Year 4 · Commish', record: '10-4-0', rank: '2nd', points: '1,602.5', status: 'active', commish: true },
+      { name: 'The Wednesday Beer League', sub: 'Redraft · 8 teams · Year 6 · Commish', record: '5-3-0', rank: '3rd', points: '988.5', status: 'active', commish: true },
+    ],
+    badges: [
+      { name: 'Commissioner', desc: 'Ran a league 3+ consecutive years', kind: 'gold', glyph: 'C' },
+      { name: 'Founder', desc: 'Started a league from scratch', kind: 'gold', glyph: 'F' },
+      { name: 'Decade', desc: '10 consecutive seasons as commish', kind: 'gold', rare: 'RARE', glyph: 'X' },
+      { name: 'Fair Trade', desc: 'Approved 500+ trades cleanly', kind: 'green', glyph: '⇄' },
+      { name: 'Champion', desc: 'Won the title twice', kind: 'gold', glyph: '★' },
+      { name: 'Time Traveler', desc: 'Drafted from 5+ eras', kind: 'green', glyph: '↻' },
+      { name: 'Walk-Off Era', desc: '5 matchups won by under 5 pts', kind: 'seam', glyph: '◆' },
+      { name: 'Mentor', desc: 'Onboarded 10+ rookie managers', kind: 'default', glyph: 'M' },
+    ],
+  },
+};
+
+// Per-section visibility defaults (owner's settings — what the public sees)
+const DEFAULT_VISIBILITY = {
+  bio: true,
+  stats: true,
+  trophies: true,
+  leagues: true,
+  badges: true,
+  favorites: true,
+  // also part of profile-fields:
+  location: true,
+  pronouns: true,
+  joinedDate: true,
+  tagline: true,
+  globalRank: true,
+};
+
+const DEFAULT_PROFILE_PUBLIC = true;
+
+Object.assign(window, { PERSONAS, DEFAULT_VISIBILITY, DEFAULT_PROFILE_PUBLIC });

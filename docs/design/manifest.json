@@ -198,6 +198,17 @@
       "lastSyncedHash": "9a61976a288210f38325b96318d58dfee52b2b53e75938fc034f179e4c4a11d1",
       "lastSyncedAt": "2026-05-20T16:35:55.380Z",
       "jiraKey": "LS-4580"
+    },
+    {
+      "id": "mZQ6CvdGoj6nIX4rrQKE0A",
+      "url": null,
+      "title": "User Page",
+      "slug": "legacy-sports-user-page",
+      "status": "active",
+      "lastSyncedHash": "231d89bd13de59fc8d739c540a6f7085dbf2fde413297962eb2832abef7cbbe2",
+      "lastSyncedAt": "2026-05-26T00:00:00.000Z",
+      "jiraKey": "LS-4922",
+      "source": "manual-zip-upload"
     }
   ]
 }
