@@ -73,6 +73,10 @@
           },
           {
             "type": "command",
+            "command": ".claude/hooks/check-open-pr.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/cleanup-worktree-junction.sh"
           },
           {
