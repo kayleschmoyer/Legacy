@@ -9,6 +9,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Edit3, Megaphone, Plus, Send, Trash2, X } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   GetLeagueAnnouncements,
   type GetLeagueAnnouncementsQuery,
@@ -82,11 +83,18 @@ export function CommissionerAnnouncementsPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
+  const [editRefetchWarning, setEditRefetchWarning] = useState<string | null>(
+    null,
+  );
 
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data, loading } = useGetLeagueAnnouncementsQuery({
+  const {
+    data,
+    loading,
+    refetch: refetchAnnouncements,
+  } = useGetLeagueAnnouncementsQuery({
     variables: { leagueId },
     skip: isNaN(leagueId),
     fetchPolicy: 'cache-and-network',
@@ -155,6 +163,7 @@ export function CommissionerAnnouncementsPanel({
     setEditingId(id);
     setEditText(currentText);
     setEditError(null);
+    setEditRefetchWarning(null);
   }, []);
 
   const handleEditCancel = useCallback(() => {
@@ -171,20 +180,28 @@ export function CommissionerAnnouncementsPanel({
       try {
         await updateAnnouncement({
           variables: { id: Number(id), leagueId, messageText: text },
-          awaitRefetchQueries: true,
-          refetchQueries: [
-            { query: GetLeagueAnnouncements, variables: { leagueId } },
-          ],
         });
         setEditingId(null);
         setEditText('');
+        try {
+          await refetchAnnouncements({ leagueId });
+        } catch (err: unknown) {
+          LOGGER.error(
+            'Failed to refetch announcements after edit',
+            err instanceof Error ? err : String(err),
+            { leagueId, announcementId: id },
+          );
+          setEditRefetchWarning(
+            'Edit saved but could not refresh — reload the page to see changes.',
+          );
+        }
       } catch (err: unknown) {
         setEditError(
           err instanceof Error ? err.message : 'Failed to update announcement',
         );
       }
     },
-    [editText, updating, updateAnnouncement, leagueId],
+    [editText, updating, updateAnnouncement, refetchAnnouncements, leagueId],
   );
 
   const handleDelete = useCallback(
@@ -278,6 +295,24 @@ export function CommissionerAnnouncementsPanel({
           </Button>
         )}
       </XStack>
+
+      {/* Refetch warning after a successful edit */}
+      {editRefetchWarning && (
+        <XStack
+          paddingHorizontal="$5"
+          paddingVertical="$3"
+          gap="$2"
+          alignItems="center"
+          style={{
+            borderBottom: `1px solid ${withAlpha(BRAND_GOLD_LIGHT, 0.2)}`,
+            backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.08),
+          }}
+        >
+          <Text fontSize="$2" color={BRAND_GOLD_LIGHT}>
+            {editRefetchWarning}
+          </Text>
+        </XStack>
+      )}
 
       {/* Compose area */}
       {isCommissioner && showCompose && (
