@@ -210,16 +210,11 @@ const DonatePage: React.FC = () => {
                   >
                     <Paragraph
                       size="$3"
-                      fontWeight="600"
                       style={
                         { color: BRAND_SEAM_RED_LIGHT } as React.CSSProperties
                       }
                     >
-                      Donations are temporarily unavailable
-                    </Paragraph>
-                    <Paragraph size="$2" color="$colorPress">
-                      We couldn't load the secure Stripe checkout link. Please
-                      try again in a few minutes.
+                      Could not load donation link — please try again later.
                     </Paragraph>
                   </YStack>
                 )}
