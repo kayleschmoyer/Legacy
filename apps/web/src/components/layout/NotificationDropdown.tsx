@@ -1,5 +1,6 @@
 import type { GestureResponderEvent } from 'react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useApolloClient } from '@apollo/client/react';
 import { Link } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
@@ -95,6 +96,7 @@ const DropdownFooter = styled(XStack, {
 
 export const NotificationDropdown: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const client = useApolloClient();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonId = 'notification-menu-button';
@@ -114,6 +116,15 @@ export const NotificationDropdown: React.FC = () => {
 
   const unreadCount = countData?.getUnreadNotificationCount ?? 0;
   const notifications = historyData?.getNotificationHistory ?? [];
+
+  const prevUnreadCountRef = useRef(unreadCount);
+  useEffect(() => {
+    if (prevUnreadCountRef.current !== unreadCount && !isOpen) {
+      client.cache.evict({ fieldName: 'getNotificationHistory' });
+      client.cache.gc();
+    }
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount, isOpen, client]);
 
   // Click outside handler
   useEffect(() => {
