@@ -77,9 +77,7 @@ export function useLeagueWebSocketLifecycle({
         );
       }
     });
-    void Promise.resolve().then(() => {
-      if (active) wsClient.connect();
-    });
+    wsClient.connect();
     return () => {
       active = false;
       wsClient.dispose();

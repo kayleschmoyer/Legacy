@@ -52,15 +52,10 @@ describe('useLeagueWebSocketLifecycle', () => {
     authToken: 'test-token',
   };
 
-  it('creates and connects a WebSocket client on mount', async () => {
+  it('creates and connects a WebSocket client on mount', () => {
     const { result } = renderHook(() =>
       useLeagueWebSocketLifecycle(defaultOptions),
     );
-
-    // Flush effects and the microtask that calls connect()
-    await act(async () => {
-      await Promise.resolve();
-    });
 
     expect(WebSocketClient).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -74,14 +69,10 @@ describe('useLeagueWebSocketLifecycle', () => {
     expect(mockClient.connect).toHaveBeenCalledTimes(1);
   });
 
-  it('disposes the client on unmount', async () => {
+  it('disposes the client on unmount', () => {
     const { unmount } = renderHook(() =>
       useLeagueWebSocketLifecycle(defaultOptions),
     );
-
-    await act(async () => {
-      await Promise.resolve();
-    });
 
     unmount();
 
