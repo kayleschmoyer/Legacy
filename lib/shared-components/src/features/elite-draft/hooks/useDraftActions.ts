@@ -245,11 +245,16 @@ export function useDraftActions({
 
   const handlePauseDraft = useCallback(async () => {
     if (!leagueId || pauseLoading) return;
+    // Optimistic update: freeze the timer immediately so the UI matches the
+    // user's intent. Without this, the countdown keeps ticking visibly for the
+    // full mutation roundtrip (500ms-2s+ on slow networks), making it look
+    // like the pause button did nothing (LS-4834).
+    _setDraftPaused(true);
     try {
       await pauseDraftMutation({ variables: { leagueId } });
-      _setDraftPaused(true);
       void refetchLeague();
     } catch (err) {
+      _setDraftPaused(false);
       const msg = err instanceof Error ? err.message : 'Failed to pause draft';
       showToast(msg, 'error');
     }
@@ -264,12 +269,14 @@ export function useDraftActions({
 
   const handleResumeDraft = useCallback(async () => {
     if (!leagueId || resumeLoading) return;
+    // Optimistic update — mirror of handlePauseDraft (LS-4834).
+    _setDraftPaused(false);
     try {
       await resumeDraftMutation({ variables: { leagueId } });
-      _setDraftPaused(false);
       void refetchLeague();
       if (draftId) void refetchCurrentPick({ draftId });
     } catch (err) {
+      _setDraftPaused(true);
       const msg = err instanceof Error ? err.message : 'Failed to resume draft';
       showToast(msg, 'error');
     }

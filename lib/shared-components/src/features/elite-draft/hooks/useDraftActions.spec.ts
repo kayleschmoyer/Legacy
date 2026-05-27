@@ -12,6 +12,8 @@ import { act, renderHook } from '@testing-library/react';
 // Jest hoists jest.mock above imports; references inside the factory must
 // be allow-listed (prefixed with `mock`) so they can be safely captured.
 const mockMakeDraftPick = jest.fn();
+const mockPauseDraft = jest.fn();
+const mockResumeDraft = jest.fn();
 const mockCommissionerPick = jest.fn();
 const mockNoop = jest.fn();
 const mockCallCounter = { current: 0 };
@@ -32,6 +34,8 @@ jest.mock('@apollo/client/react', () => ({
     //   9: REMOVE_FROM_DRAFT_QUEUE
     //  10: TOGGLE_DRAFT_AUTO_PICK
     if (idx === 1) return [mockMakeDraftPick, { loading: false }];
+    if (idx === 2) return [mockPauseDraft, { loading: false }];
+    if (idx === 3) return [mockResumeDraft, { loading: false }];
     if (idx === 4) return [mockCommissionerPick, { loading: false }];
     return [mockNoop, { loading: false }];
   },
@@ -90,6 +94,8 @@ describe('useDraftActions re-entry guards (LS-2681)', () => {
   beforeEach(() => {
     mockCallCounter.current = 0;
     mockMakeDraftPick.mockReset();
+    mockPauseDraft.mockReset();
+    mockResumeDraft.mockReset();
     mockCommissionerPick.mockReset();
     mockNoop.mockReset();
   });
@@ -186,5 +192,117 @@ describe('useDraftActions re-entry guards (LS-2681)', () => {
       await firstPromise;
       await secondPromise;
     });
+  });
+});
+
+describe('useDraftActions pause/resume optimistic update (LS-4834)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockMakeDraftPick.mockReset();
+    mockPauseDraft.mockReset();
+    mockResumeDraft.mockReset();
+    mockCommissionerPick.mockReset();
+    mockNoop.mockReset();
+  });
+
+  it('handlePauseDraft sets draftPaused=true synchronously before awaiting the mutation', async () => {
+    let resolvePause: (v: unknown) => void = () => undefined;
+    mockPauseDraft.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePause = resolve;
+        }),
+    );
+    const setDraftPaused = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ setDraftPaused })),
+    );
+
+    let pausePromise: Promise<void> = Promise.resolve();
+    act(() => {
+      pausePromise = result.current.handlePauseDraft();
+    });
+
+    // Before the mutation resolves, draftPaused must already be true so the
+    // timer freezes immediately — this is the regression gate for LS-4834.
+    expect(setDraftPaused).toHaveBeenCalledWith(true);
+    expect(mockPauseDraft).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolvePause({ data: {} });
+      await pausePromise;
+    });
+
+    // No revert on success.
+    expect(setDraftPaused).not.toHaveBeenCalledWith(false);
+  });
+
+  it('handlePauseDraft reverts draftPaused to false when the mutation fails', async () => {
+    mockPauseDraft.mockRejectedValueOnce(new Error('network error'));
+    const setDraftPaused = jest.fn();
+    const showToast = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ setDraftPaused, showToast })),
+    );
+
+    await act(async () => {
+      await result.current.handlePauseDraft();
+    });
+
+    expect(setDraftPaused).toHaveBeenNthCalledWith(1, true);
+    expect(setDraftPaused).toHaveBeenNthCalledWith(2, false);
+    expect(showToast).toHaveBeenCalledWith('network error', 'error');
+  });
+
+  it('handleResumeDraft sets draftPaused=false synchronously before awaiting the mutation', async () => {
+    let resolveResume: (v: unknown) => void = () => undefined;
+    mockResumeDraft.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveResume = resolve;
+        }),
+    );
+    const setDraftPaused = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ draftPaused: true, setDraftPaused })),
+    );
+
+    let resumePromise: Promise<void> = Promise.resolve();
+    act(() => {
+      resumePromise = result.current.handleResumeDraft();
+    });
+
+    expect(setDraftPaused).toHaveBeenCalledWith(false);
+    expect(mockResumeDraft).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveResume({ data: {} });
+      await resumePromise;
+    });
+
+    expect(setDraftPaused).not.toHaveBeenCalledWith(true);
+  });
+
+  it('handleResumeDraft reverts draftPaused to true when the mutation fails', async () => {
+    mockResumeDraft.mockRejectedValueOnce(new Error('boom'));
+    const setDraftPaused = jest.fn();
+    const showToast = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(
+        makeParams({ draftPaused: true, setDraftPaused, showToast }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.handleResumeDraft();
+    });
+
+    expect(setDraftPaused).toHaveBeenNthCalledWith(1, false);
+    expect(setDraftPaused).toHaveBeenNthCalledWith(2, true);
+    expect(showToast).toHaveBeenCalledWith('boom', 'error');
   });
 });
