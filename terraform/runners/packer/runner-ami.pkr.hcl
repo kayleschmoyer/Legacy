@@ -329,11 +329,19 @@ build {
     ]
   }
 
-  # Java 17 (required by sdkmanager — Android SDK command-line tools are JVM-based)
+  # Java 17 (required by sdkmanager — Android SDK command-line tools are JVM-based).
+  # The JDK (not JRE) is required so Gradle's Android build can locate javac/aapt2
+  # toolchain bits; baking JAVA_HOME into the runner env lets us skip
+  # actions/setup-java on self-hosted runners and saves ~60s per Android build.
   provisioner "shell" {
     inline = [
-      "sudo apt-get install -y -qq openjdk-17-jre-headless",
+      "sudo apt-get install -y -qq openjdk-17-jdk-headless",
       "java -version",
+      # JAVA_HOME lives at a stable path on Ubuntu 22.04 for the openjdk-17 package.
+      "echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' | sudo tee /etc/profile.d/java.sh",
+      "echo 'export PATH=$JAVA_HOME/bin:$PATH' | sudo tee -a /etc/profile.d/java.sh",
+      # Also export to the runner process env so non-login GitHub Actions shells get JAVA_HOME.
+      "if [ -d /opt/actions-runner ]; then echo 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' | sudo tee -a /opt/actions-runner/.env; fi",
     ]
   }
 
@@ -354,7 +362,7 @@ build {
       "sudo chmod -R a+rX $ANDROID_HOME",
       # Set ANDROID_HOME globally so login shells and Gradle pick it up
       "echo 'export ANDROID_HOME=/opt/android-sdk' | sudo tee /etc/profile.d/android-sdk.sh",
-      "echo 'export PATH=$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools' | sudo tee -a /etc/profile.d/android-sdk.sh",
+      "echo 'export PATH=$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/build-tools/${var.android_build_tools_version}' | sudo tee -a /etc/profile.d/android-sdk.sh",
       # Also export to the runner process env so non-login GitHub Actions shells get ANDROID_HOME
       "if [ -d /opt/actions-runner ]; then echo 'ANDROID_HOME=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
       "if [ -d /opt/actions-runner ]; then echo 'ANDROID_SDK_ROOT=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",

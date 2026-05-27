@@ -99,8 +99,12 @@ jobs:
           set-nx-shas: false
           skip-system-deps: true
 
-      # setup-java with built-in Gradle caching — replaces manual cache step
+      # setup-java with built-in Gradle caching — replaces manual cache step.
+      # Self-hosted runners already have JDK 17 + JAVA_HOME baked in via the
+      # runner AMI (terraform/runners/packer/runner-ami.pkr.hcl), so skip the
+      # download there.
       - name: Setup Java
+        if: ${{ !contains(runner.labels, 'self-hosted') }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           distribution: "temurin"
