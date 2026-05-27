@@ -7,7 +7,10 @@ import { resolve } from 'path';
 import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 import { execSync } from 'child_process';
-import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
+import {
+  rollbarSourcemapPlugin,
+  spaRouteFallbackPlugin,
+} from '../../tools/vite-configs';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(({ mode }) => {
@@ -136,6 +139,15 @@ export default defineConfig(({ mode }) => {
       }),
       react(),
       nxCopyAssetsPlugin(['*.md']),
+      // SPA route fallback: emit per-route index.html copies so GitHub Pages
+      // returns 200 for deep-linked routes instead of 404. LS-4841.
+      ...(isProduction
+        ? [
+            spaRouteFallbackPlugin({
+              routesFile: 'src/app/app.tsx',
+            }),
+          ]
+        : []),
       ...(isDeployBuild && process.env.ROLLBAR_ACCESS_TOKEN
         ? [
             rollbarSourcemapPlugin({
