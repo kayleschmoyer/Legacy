@@ -11,6 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,
@@ -18,15 +19,19 @@ import {
   withAlpha,
 } from '../../constants/colors';
 
+const DELETION_TIMEOUT_MS = 30_000;
+
 export const LeagueManagement: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const [liveMsg, setLiveMsg] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [deleteAllLeagues, { loading, error }] = useDeleteAllLeaguesMutation();
 
   const handleDeleteAllLeagues = () => {
+    setLocalError(null);
     setShowDialog(true);
     setLiveMsg('Delete all leagues dialog opened.');
   };
@@ -39,11 +44,23 @@ export const LeagueManagement: React.FC = () => {
 
   const handleFinalConfirm = () => {
     setIsDeleting(true);
+    setLocalError(null);
     setLiveMsg('Deleting all leagues has started.');
-    void deleteAllLeagues({
-      refetchQueries: ['GetUserLeagues'],
-      awaitRefetchQueries: true,
-    })
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('Deletion timed out — please try again.')),
+        DELETION_TIMEOUT_MS,
+      ),
+    );
+
+    void Promise.race([
+      deleteAllLeagues({
+        refetchQueries: ['GetUserLeagues'],
+        awaitRefetchQueries: true,
+      }),
+      timeoutPromise,
+    ])
       .then((result) => {
         setIsDeleting(false);
         setShowFinalConfirm(false);
@@ -52,11 +69,12 @@ export const LeagueManagement: React.FC = () => {
           `Success: ${result.data?.deleteAllLeagues || 'All leagues have been deleted successfully'}`,
         );
       })
-      .catch((error: Error) => {
+      .catch((err: Error) => {
         setIsDeleting(false);
         setShowFinalConfirm(false);
-        setLiveMsg(`Error deleting leagues: ${error.message}`);
-        alert(`Error: Failed to delete leagues: ${error.message}`);
+        setLiveMsg(`Error deleting leagues: ${err.message}`);
+        setLocalError(err.message);
+        LOGGER.error('Failed to delete leagues', err);
       });
   };
 
@@ -117,10 +135,10 @@ export const LeagueManagement: React.FC = () => {
               </XStack>
             </YStack>
 
-            {error && (
+            {(error || localError) && (
               <Card padding="$3" backgroundColor="$red3" borderColor="$red7">
                 <Text color="$red11" fontSize="$2">
-                  Error: {error.message}
+                  Error: {localError ?? error?.message}
                 </Text>
               </Card>
             )}
