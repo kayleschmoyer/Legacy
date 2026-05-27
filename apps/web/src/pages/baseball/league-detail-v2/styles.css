@@ -2467,4 +2467,60 @@
     grid-column: 2 / -1;
     justify-content: flex-end;
   }
+
+  /* Role bar: wrap brand and role switch onto separate rows so the
+     Spectator button cannot clip on a 375-390px viewport. */
+  .ls-role-bar-inner {
+    flex-wrap: wrap;
+    padding: 8px 14px;
+    gap: 8px;
+  }
+  .ls-role-bar .brand .sub {
+    display: none;
+  }
+  .ls-role-bar .spacer {
+    display: none;
+  }
+  .ls-role-switch {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ls-role-switch::-webkit-scrollbar {
+    display: none;
+  }
+  .ls-role-switch button {
+    flex: 1 1 auto;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  /* Tab bar: surface a right-edge fade so the user can see that more
+     tabs (Standings, Trades, History, My Team, Commissioner) exist
+     beyond the visible scroll area. */
+  .ls-tabbar {
+    mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+  }
+  .ls-tabbar button {
+    padding: 12px 12px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .ls-tabbar button.on::after {
+    left: 10px;
+    right: 10px;
+  }
 }
