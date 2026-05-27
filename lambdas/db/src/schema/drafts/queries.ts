@@ -214,6 +214,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
+          baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
@@ -290,6 +291,14 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const minCareerSeasons = league?.minCareerSeasons ?? 3;
       if (minCareerSeasons > 0) {
         sqlConditions.push(careerSeasonsCondition(minCareerSeasons));
+      }
+
+      // Apply Hall of Fame restriction when the league is configured HoF-only
+      // (LS-4826). makeDraftPick already rejects non-HoF picks server-side via
+      // the same flag; aligning the available-players query keeps the draft
+      // board from showing players the user can't actually draft.
+      if (league?.baseballHofOnly) {
+        sqlConditions.push(sql`p.hall_of_fame = true`);
       }
 
       const whereClause =
