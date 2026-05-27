@@ -3643,6 +3643,8 @@ export function LeagueDetailPage(): React.JSX.Element {
           <DeleteLeagueControl
             leagueId={leagueId}
             leagueName={league.name ?? 'Unknown League'}
+            teamCount={leagueTeams.length}
+            seasonNumber={league.seasonNumber ?? undefined}
             onSuccess={() => {
               // Handled by DeleteLeagueControl
             }}

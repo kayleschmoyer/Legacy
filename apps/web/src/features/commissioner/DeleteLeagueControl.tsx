@@ -15,6 +15,8 @@ import { useDeleteLeagueMutation } from '../../api/db/graphql.generated';
 export interface DeleteLeagueControlProps {
   leagueId: number;
   leagueName: string;
+  teamCount?: number;
+  seasonNumber?: number;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
 }
@@ -31,6 +33,8 @@ export interface DeleteLeagueControlProps {
 export function DeleteLeagueControl({
   leagueId,
   leagueName,
+  teamCount,
+  seasonNumber,
   onSuccess,
   onError,
 }: DeleteLeagueControlProps) {
@@ -192,6 +196,33 @@ export function DeleteLeagueControl({
               This action is permanent and cannot be undone. All teams,
               matchups, drafts, and member data will be deleted.
             </Dialog.Description>
+
+            {(teamCount !== undefined || seasonNumber !== undefined) && (
+              <YStack
+                space="$2"
+                backgroundColor="$red3"
+                borderColor="$red6"
+                borderWidth={1}
+                borderRadius="$3"
+                padding="$3"
+                data-testid="delete-league-summary"
+              >
+                <Text fontSize="$2" color="$red11" fontWeight="bold">
+                  This will permanently delete:
+                </Text>
+                {teamCount !== undefined && (
+                  <Text fontSize="$2" color="$red11">
+                    • {teamCount} {teamCount === 1 ? 'team' : 'teams'}
+                  </Text>
+                )}
+                {seasonNumber !== undefined && seasonNumber > 0 && (
+                  <Text fontSize="$2" color="$red11">
+                    • {seasonNumber} {seasonNumber === 1 ? 'season' : 'seasons'}{' '}
+                    of league history
+                  </Text>
+                )}
+              </YStack>
+            )}
 
             <YStack space="$3">
               <Text fontSize="$3" fontWeight="bold">

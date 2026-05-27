@@ -76,6 +76,7 @@ export interface CommishTabProps {
 
 export const CommishTab: React.FC<CommishTabProps> = ({
   league,
+  teams,
   onSettingsSuccess,
   onSettingsError,
 }) => {
@@ -318,6 +319,8 @@ export const CommishTab: React.FC<CommishTabProps> = ({
         <DeleteLeagueControl
           leagueId={leagueId}
           leagueName={league.name ?? 'this league'}
+          teamCount={teams.length}
+          seasonNumber={league.seasonNumber ?? undefined}
         />
       ) : null,
     },

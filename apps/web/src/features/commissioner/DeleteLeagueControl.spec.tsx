@@ -120,6 +120,90 @@ const resolveMutation = async () => {
   });
 };
 
+describe('DeleteLeagueControl — LS-4074 data summary in delete dialog', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockDeleteLeague.mockClear();
+    mockResolveMutation = null;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const openDialog = () => {
+    const outerBtn = screen
+      .getAllByRole('button')
+      .find((el) =>
+        /^(Delete League|Deleting\.\.\.)$/.test(el.textContent ?? ''),
+      );
+    if (!outerBtn) throw new Error('outer Delete League button not found');
+    fireEvent.click(outerBtn);
+  };
+
+  it('shows team and season summary when both props provided', () => {
+    render(
+      <DeleteLeagueControl
+        leagueId={1}
+        leagueName="Test League"
+        teamCount={8}
+        seasonNumber={4}
+      />,
+    );
+    openDialog();
+    expect(screen.getByText('This will permanently delete:')).toBeTruthy();
+    expect(screen.getByText('• 8 teams')).toBeTruthy();
+    expect(screen.getByText(/• 4 seasons of league history/)).toBeTruthy();
+  });
+
+  it('uses singular form for 1 team and 1 season', () => {
+    render(
+      <DeleteLeagueControl
+        leagueId={1}
+        leagueName="Test League"
+        teamCount={1}
+        seasonNumber={1}
+      />,
+    );
+    openDialog();
+    expect(screen.getByText('• 1 team')).toBeTruthy();
+    expect(screen.getByText(/• 1 season of league history/)).toBeTruthy();
+  });
+
+  it('shows only team count when seasonNumber is omitted', () => {
+    render(
+      <DeleteLeagueControl
+        leagueId={1}
+        leagueName="Test League"
+        teamCount={6}
+      />,
+    );
+    openDialog();
+    expect(screen.getByText('• 6 teams')).toBeTruthy();
+    expect(screen.queryByText(/season/)).toBeNull();
+  });
+
+  it('omits season line when seasonNumber is 0', () => {
+    render(
+      <DeleteLeagueControl
+        leagueId={1}
+        leagueName="Test League"
+        teamCount={4}
+        seasonNumber={0}
+      />,
+    );
+    openDialog();
+    expect(screen.getByText('• 4 teams')).toBeTruthy();
+    expect(screen.queryByText(/season/)).toBeNull();
+  });
+
+  it('shows no summary when neither teamCount nor seasonNumber provided', () => {
+    render(<DeleteLeagueControl leagueId={1} leagueName="Test League" />);
+    openDialog();
+    expect(screen.queryByText('This will permanently delete:')).toBeNull();
+  });
+});
+
 describe('DeleteLeagueControl — LS-4030 double-delete guard', () => {
   beforeEach(() => {
     jest.useFakeTimers();
