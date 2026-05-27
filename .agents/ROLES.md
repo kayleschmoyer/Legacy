@@ -36,9 +36,10 @@ Defines the role archetypes used by slash command skills. Each skill dispatches 
 **Creativity**: Medium-high. Exercises judgment on triage priority and when to escalate.
 **When uncertain**: Comment the blocker on the PR and move on — don't block the sweep. Only label `requires-human-review` when the blocker is outside any agent's reach (missing credentials, product decisions, external dependencies).
 
-| Skill        | Description               |
-| ------------ | ------------------------- |
-| `/sweep-prs` | Scan and fix all open PRs |
+| Skill               | Description                    |
+| ------------------- | ------------------------------ |
+| `/sweep-prs`        | Scan and fix all open PRs      |
+| `/sweep-dependabot` | Triage all open Dependabot PRs |
 
 ## Frontmatter Schema
 
