@@ -41,3 +41,8 @@ export type { PlayerRowData, PlayerRowProps } from './PlayerRow';
 export type { PlayersGridProps } from './PlayersGrid';
 export type { PlayersTableProps } from './PlayersTable';
 export type { PlayerCardProps } from './PlayerCard';
+export type {
+  PlayersScreenProps,
+  PlayersShellState,
+  PlayersViewMode,
+} from './PlayersScreen';

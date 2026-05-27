@@ -1,4 +1,4 @@
-import { fullName, initialsOf } from './PlayersScreen';
+import { deriveShellState, fullName, initialsOf } from './PlayersScreen';
 import type { PlayerFragment } from './PlayersApi';
 
 // Unit tests for the pure helpers powering the Players Page editorial header
@@ -58,5 +58,86 @@ describe('fullName (LS-4646)', () => {
     expect(fullName(makePlayer({ firstName: null, lastName: 'Suzuki' }))).toBe(
       'Suzuki',
     );
+  });
+});
+
+describe('deriveShellState (LS-4656)', () => {
+  it('returns loading while the peek query is in flight with no data', () => {
+    expect(
+      deriveShellState({
+        loading: true,
+        error: false,
+        playerCount: 0,
+        hasActiveFilters: false,
+      }),
+    ).toBe('loading');
+  });
+
+  it('returns error when the peek query failed with no usable data', () => {
+    expect(
+      deriveShellState({
+        loading: false,
+        error: true,
+        playerCount: 0,
+        hasActiveFilters: false,
+      }),
+    ).toBe('error');
+  });
+
+  it('returns empty when the archive came back clean but filters narrowed it to zero', () => {
+    expect(
+      deriveShellState({
+        loading: false,
+        error: false,
+        playerCount: 0,
+        hasActiveFilters: true,
+      }),
+    ).toBe('empty');
+  });
+
+  it('does NOT return empty when no filters are active — defers to the populated layout', () => {
+    expect(
+      deriveShellState({
+        loading: false,
+        error: false,
+        playerCount: 0,
+        hasActiveFilters: false,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('returns undefined (populated) when data has arrived', () => {
+    expect(
+      deriveShellState({
+        loading: false,
+        error: false,
+        playerCount: 50,
+        hasActiveFilters: false,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('prefers populated state over loading when partial data is already available', () => {
+    // Avoids flashing a skeleton during background refetches when the user
+    // already has a populated grid in front of them.
+    expect(
+      deriveShellState({
+        loading: true,
+        error: false,
+        playerCount: 12,
+        hasActiveFilters: false,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('prefers populated state over error when partial data is usable', () => {
+    expect(
+      deriveShellState({
+        loading: false,
+        error: true,
+        playerCount: 12,
+        hasActiveFilters: false,
+      }),
+    ).toBeUndefined();
   });
 });

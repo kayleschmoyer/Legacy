@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
+import { Pressable } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { PlayersGrid } from './PlayersGrid';
@@ -6,19 +7,27 @@ import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 import { Platform } from '../../platform-components';
 import {
   BG_DARK,
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_SEAM_RED,
+  OUTLINE_SUBTLE,
+  OVERLAY_WHITE_05,
   POS_UTILITY,
+  STATS_PAGE_TOKENS,
   SURFACE_CARD,
   TEXT_MUTED,
   TEXT_NEUTRAL_FG3,
   TEXT_PRIMARY,
+  WHITE,
   withAlpha,
 } from '../../utils/colors';
 
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
+
+// LS-4613 token — same BG_ELEVATED used by the Stats Page state cards.
+const BG_ELEVATED = STATS_PAGE_TOKENS.BG_ELEVATED;
 
 // `as unknown as number` is the project's documented workaround for passing
 // raw CSS strings (clamp(), unitless line-height) through Tamagui's numeric
@@ -27,13 +36,76 @@ const FONT_BODY = "'Literata', serif";
 // pattern in PlayerStatsPage.tsx (LS-4613). Native branches always supply
 // real numbers, so the cast only takes effect under Platform.OS === 'web'.
 
+/**
+ * Shell-level conditional state for the Players Page. When omitted, the page
+ * derives state from the peek Apollo query (loading / error / empty) — see
+ * {@link deriveShellState}. Setting this prop forces the corresponding state
+ * card and replaces the populated content (Featured + grid).
+ */
+export type PlayersShellState = 'loading' | 'error' | 'empty';
+
+/** Skeleton geometry to render when state === 'loading'. Mirrors design's view modes. */
+export type PlayersViewMode = 'cards' | 'list' | 'stats';
+
 export interface PlayersScreenProps {
   onPlayerSelect?: (player: PlayerFragment) => void;
   pageSize?: number;
   title?: string;
   /** Render the Featured player spotlight above the grid. Default: true. */
   showFeatured?: boolean;
+  /**
+   * Force a shell-level state card (loading / error / empty) instead of the
+   * Featured + grid layout. When omitted, the page derives state from the
+   * peek Apollo query result.
+   */
+  state?: PlayersShellState;
+  /** Active view mode — controls loading-skeleton geometry. Default: 'cards'. */
+  viewMode?: PlayersViewMode;
+  /** Whether any filters are currently active. Used by the derived empty state. */
+  hasActiveFilters?: boolean;
+  /** Retry handler invoked from the ErrorState card. Defaults to Apollo refetch. */
+  onRetry?: () => void;
+  /** Clear-all-filters handler invoked from the EmptyState card. */
+  onClearFilters?: () => void;
 }
+
+/**
+ * Derive the shell state from peek-query flags + filter activity.
+ *
+ * - `loading` while the peek query is in flight and no data has arrived yet
+ * - `error` when the peek query failed with no usable partial data
+ * - `empty` when the query returned successfully but the player set is empty
+ *   AND filters are active (so the host can clear them); without filters, an
+ *   empty archive is a populated-but-empty state, not an action-needed empty
+ *   card — defer to the grid's own messaging.
+ * - otherwise `undefined`, meaning render the populated Featured + grid.
+ *
+ * Exported for direct unit testing — see PlayersScreen.spec.tsx.
+ */
+export function deriveShellState({
+  loading,
+  error,
+  playerCount,
+  hasActiveFilters,
+}: {
+  loading: boolean;
+  error: boolean;
+  playerCount: number;
+  hasActiveFilters: boolean;
+}): PlayersShellState | undefined {
+  if (loading && playerCount === 0) return 'loading';
+  if (error && playerCount === 0) return 'error';
+  if (!loading && !error && playerCount === 0 && hasActiveFilters) {
+    return 'empty';
+  }
+  return undefined;
+}
+
+const STATE_ANNOUNCEMENTS: Record<PlayersShellState, string> = {
+  loading: 'Loading players.',
+  error: 'Unable to load players.',
+  empty: 'No players match the current filters.',
+};
 
 /** Exported for direct unit testing — see PlayersScreen.spec.tsx. */
 export function initialsOf(player: PlayerFragment): string {
@@ -52,6 +124,11 @@ function PlayersScreen({
   pageSize = 50,
   title = 'All Players',
   showFeatured = true,
+  state,
+  viewMode = 'cards',
+  hasActiveFilters = false,
+  onRetry,
+  onClearFilters,
 }: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
     (player: PlayerFragment) => {
@@ -64,7 +141,7 @@ function PlayersScreen({
   // Lightweight peek query for the Featured spotlight + count chip. The main
   // grid runs its own paginated query inside PlayersGrid; this one stays at
   // limit:1 so the shell doesn't double-fetch a full page.
-  const { data, error } = useGetAllPlayersQuery({
+  const { data, error, loading, refetch } = useGetAllPlayersQuery({
     variables: {
       limit: 1,
       offset: 0,
@@ -86,6 +163,33 @@ function PlayersScreen({
     return players.find((p): p is PlayerFragment => p !== null) ?? null;
   }, [data?.players]);
 
+  // Derive state from peek query when host did not force one explicitly.
+  const peekPlayerCount = data?.players?.length ?? 0;
+  const derivedState = useMemo(
+    () =>
+      deriveShellState({
+        loading,
+        error: !!error,
+        playerCount: peekPlayerCount,
+        hasActiveFilters,
+      }),
+    [loading, error, peekPlayerCount, hasActiveFilters],
+  );
+  const activeState: PlayersShellState | undefined = state ?? derivedState;
+
+  const handleRetry = useCallback(() => {
+    if (onRetry) {
+      onRetry();
+      return;
+    }
+    refetch().catch((err: unknown) => {
+      LOGGER.error(
+        'PlayersScreen refetch failed',
+        err instanceof Error ? err : String(err),
+      );
+    });
+  }, [onRetry, refetch]);
+
   // Static placeholder until Slice 2 wires filter-aware counts.
   const totalPlayers = pageSize;
   const matchedPlayers = pageSize;
@@ -98,6 +202,22 @@ function PlayersScreen({
       {Platform.OS === 'web' && (
         <style>{`
           .pp-screen-inner { padding: 32px 24px 80px; gap: 28px; }
+          @keyframes pp-shimmer { 0% { background-position: -480px 0; } 100% { background-position: 480px 0; } }
+          .pp-sk-bar {
+            display: inline-block;
+            background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.04) 100%);
+            background-size: 480px 100%;
+            animation: pp-shimmer 1.4s linear infinite;
+            border-radius: 4px;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .pp-sk-bar { animation: none; background: rgba(255,255,255,0.08); }
+          }
+          .pp-sk-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+          }
           @media (max-width: 640px) {
             .pp-screen-inner { padding: 20px 16px 56px; gap: 20px; }
             .pp-head { gap: 12px; }
@@ -248,23 +368,57 @@ function PlayersScreen({
           </XStack>
         </XStack>
 
-        {/* Featured spotlight — mirrors .pp-featured */}
-        {showFeatured && featuredPlayer && (
-          <FeaturedSpotlight player={featuredPlayer} />
+        {/* ARIA live region — announces shell state transitions to screen
+            readers. Mirrors PlayerStatsPage.tsx (LS-4613). Off-screen via
+            standard sr-only clip pattern. */}
+        {Platform.OS === 'web' && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: 'hidden',
+              clip: 'rect(0,0,0,0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {activeState ? STATE_ANNOUNCEMENTS[activeState] : ''}
+          </div>
         )}
 
-        {/* Grid (filter rail / view toggle / state cards delivered in Slices 2-5).
-            The editorial header above is the single h1 — pass an inner title
-            distinct from `title` so PlayersGrid's H2 doesn't shadow the page
-            heading and trip Playwright strict-mode `name: /all players/i`
-            lookups (LS-3497 / auth-flows.spec.ts:575). */}
-        <PlayersGrid
-          onPlayerSelect={handlePlayerSelect}
-          pageSize={pageSize}
-          showSearch={true}
-          showSorting={true}
-          title="Roster"
-        />
+        {/* Body — state card or populated Featured + grid. */}
+        {activeState === 'loading' ? (
+          <LoadingSkeleton viewMode={viewMode} />
+        ) : activeState === 'error' ? (
+          <ErrorState onRetry={handleRetry} />
+        ) : activeState === 'empty' ? (
+          <EmptyState onClear={onClearFilters} />
+        ) : (
+          <>
+            {/* Featured spotlight — mirrors .pp-featured */}
+            {showFeatured && featuredPlayer && (
+              <FeaturedSpotlight player={featuredPlayer} />
+            )}
+
+            {/* Grid (filter rail / view toggle delivered in Slices 2-4).
+                The editorial header above is the single h1 — pass an inner
+                title distinct from `title` so PlayersGrid's H2 doesn't shadow
+                the page heading and trip Playwright strict-mode lookups
+                (LS-3497 / auth-flows.spec.ts:575). */}
+            <PlayersGrid
+              onPlayerSelect={handlePlayerSelect}
+              pageSize={pageSize}
+              showSearch={true}
+              showSorting={true}
+              title="Roster"
+            />
+          </>
+        )}
       </YStack>
     </YStack>
   );
@@ -440,6 +594,366 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
         ))}
       </XStack>
     </XStack>
+  );
+}
+
+// ── Conditional state primitives ───────────────────────────────────────────────
+
+interface SkeletonBarProps {
+  width: number | string;
+  height?: number;
+  radius?: number | string;
+}
+
+/** Shimmer bar (web) or static dim fill (native). Honors prefers-reduced-motion via CSS. */
+function SkeletonBar({ width, height = 12, radius = 4 }: SkeletonBarProps) {
+  if (Platform.OS === 'web') {
+    return (
+      <span
+        className="pp-sk-bar"
+        style={
+          {
+            width,
+            height,
+            borderRadius: radius,
+            flex: '0 0 auto',
+          } as React.CSSProperties
+        }
+      />
+    );
+  }
+  return (
+    <YStack
+      style={{
+        width: typeof width === 'string' ? undefined : width,
+        height,
+        borderRadius: typeof radius === 'string' ? 4 : radius,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+      }}
+    />
+  );
+}
+
+/** Card-shaped skeleton matching the populated PlayerCard footprint. */
+function CardSkeleton() {
+  return (
+    <YStack
+      style={{
+        padding: 18,
+        background: SURFACE_CARD,
+        border: `1px solid ${OVERLAY_WHITE_05}`,
+        borderRadius: 14,
+        gap: 12,
+        minHeight: 198,
+      }}
+    >
+      <XStack alignItems="center" style={{ gap: 12 }}>
+        <SkeletonBar width={48} height={48} radius="50%" />
+        <YStack style={{ flex: 1, gap: 6 }}>
+          <SkeletonBar width="70%" height={18} />
+          <SkeletonBar width="45%" height={12} />
+        </YStack>
+        <SkeletonBar width={30} height={18} />
+      </XStack>
+      <SkeletonBar width="100%" height={54} radius={6} />
+      <XStack justifyContent="space-between" alignItems="center">
+        <SkeletonBar width="40%" height={12} />
+        <SkeletonBar width={80} height={18} radius={9999} />
+      </XStack>
+    </YStack>
+  );
+}
+
+interface LoadingSkeletonProps {
+  viewMode: PlayersViewMode;
+}
+
+/** Geometry-matching skeleton for the active view mode. */
+function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
+  if (viewMode === 'list') {
+    return (
+      <YStack
+        testID="players-loading-skeleton"
+        role="presentation"
+        aria-hidden={true}
+        style={{ gap: 8 }}
+      >
+        {Array.from({ length: 6 }).map((_, i) => (
+          <XStack
+            key={i}
+            alignItems="center"
+            style={{
+              gap: 12,
+              padding: 12,
+              background: SURFACE_CARD,
+              border: `1px solid ${OUTLINE_SUBTLE}`,
+              borderRadius: 8,
+            }}
+          >
+            <SkeletonBar width={36} height={36} radius="50%" />
+            <YStack style={{ flex: 1, gap: 6 }}>
+              <SkeletonBar width={160} height={16} />
+              <SkeletonBar width={220} height={12} />
+            </YStack>
+            <SkeletonBar width={50} height={24} />
+            <SkeletonBar width={50} height={24} />
+            <SkeletonBar width={50} height={24} />
+          </XStack>
+        ))}
+      </YStack>
+    );
+  }
+
+  if (viewMode === 'stats') {
+    return (
+      <YStack
+        testID="players-loading-skeleton"
+        role="presentation"
+        aria-hidden={true}
+        style={{
+          background: BG_ELEVATED,
+          border: `1px solid ${OUTLINE_SUBTLE}`,
+          borderRadius: 12,
+          padding: 18,
+          gap: 10,
+        }}
+      >
+        {Array.from({ length: 8 }).map((_, r) => (
+          <XStack
+            key={r}
+            alignItems="center"
+            style={{
+              gap: 12,
+              padding: '10px 8px',
+              borderBottom: `1px solid ${withAlpha(BRAND_GOLD, 0.06)}`,
+            }}
+          >
+            <SkeletonBar width={180} height={14} />
+            {Array.from({ length: 8 }).map((__, c) => (
+              <SkeletonBar key={c} width={42} height={12} />
+            ))}
+          </XStack>
+        ))}
+      </YStack>
+    );
+  }
+
+  // cards (default)
+  return (
+    <YStack
+      testID="players-loading-skeleton"
+      role="presentation"
+      aria-hidden={true}
+      className={Platform.OS === 'web' ? 'pp-sk-grid' : undefined}
+      style={
+        Platform.OS === 'web' ? undefined : { gap: 16, flexDirection: 'column' }
+      }
+    >
+      {Array.from({ length: 8 }).map((_, i) => (
+        <CardSkeleton key={i} />
+      ))}
+    </YStack>
+  );
+}
+
+interface ErrorStateProps {
+  onRetry?: () => void;
+}
+
+function ErrorState({ onRetry }: ErrorStateProps) {
+  return (
+    <YStack
+      testID="players-error-state"
+      role="alert"
+      aria-live="assertive"
+      style={{
+        alignSelf: 'center',
+        maxWidth: 520,
+        width: '100%',
+        margin: '32px auto',
+        padding: '40px 28px',
+        background: BG_ELEVATED,
+        // BRAND_SEAM_RED border per AC1 — same treatment as the Stats Page
+        // ErrorCard so the two pages read as a single design system.
+        border: `1px solid ${BRAND_SEAM_RED}`,
+        borderRadius: 14,
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      {Platform.OS === 'web' && (
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={BRAND_SEAM_RED}
+          strokeWidth="1.8"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      )}
+      <Text
+        tag="h3"
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '800',
+          fontSize: 24,
+          color: TEXT_PRIMARY,
+          margin: 0,
+          textAlign: 'center',
+        }}
+      >
+        Connection lost
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 14,
+          color: TEXT_MUTED,
+          textAlign: 'center',
+          maxWidth: '60ch',
+          lineHeight:
+            Platform.OS === 'web' ? ('1.55' as unknown as number) : 22,
+          margin: 0,
+        }}
+      >
+        The archive didn't respond. Check your connection or try again — most
+        roster queries take only a moment.
+      </Text>
+      {onRetry && (
+        <Pressable
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading players"
+          style={{
+            marginTop: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 22,
+            borderRadius: 9999,
+            backgroundColor: BRAND_NAVY,
+            minHeight: 44,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 12,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: WHITE,
+            }}
+          >
+            Retry
+          </Text>
+        </Pressable>
+      )}
+    </YStack>
+  );
+}
+
+interface EmptyStateProps {
+  onClear?: () => void;
+}
+
+function EmptyState({ onClear }: EmptyStateProps) {
+  return (
+    <YStack
+      testID="players-empty-state"
+      role="status"
+      style={{
+        alignSelf: 'center',
+        maxWidth: 520,
+        width: '100%',
+        margin: '32px auto',
+        padding: '40px 28px',
+        background: BG_ELEVATED,
+        border: `1px solid ${OUTLINE_SUBTLE}`,
+        borderRadius: 14,
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      {Platform.OS === 'web' && (
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={TEXT_MUTED}
+          strokeWidth="1.4"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          <line x1="8" y1="11" x2="14" y2="11" />
+        </svg>
+      )}
+      <Text
+        tag="h3"
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '800',
+          fontSize: 24,
+          color: TEXT_PRIMARY,
+          margin: 0,
+          textAlign: 'center',
+        }}
+      >
+        Nothing to show with those filters
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 14,
+          color: TEXT_MUTED,
+          textAlign: 'center',
+          maxWidth: '60ch',
+          lineHeight:
+            Platform.OS === 'web' ? ('1.55' as unknown as number) : 22,
+          margin: 0,
+        }}
+      >
+        No players match the current filters. Try widening your search, relaxing
+        a range, or clearing filters entirely.
+      </Text>
+      {onClear && (
+        <Pressable
+          onPress={onClear}
+          accessibilityRole="button"
+          accessibilityLabel="Clear all filters"
+          style={{
+            marginTop: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 22,
+            borderRadius: 9999,
+            backgroundColor: BRAND_NAVY,
+            minHeight: 44,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 12,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: WHITE,
+            }}
+          >
+            Clear all filters
+          </Text>
+        </Pressable>
+      )}
+    </YStack>
   );
 }
 
