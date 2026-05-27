@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Legacy Sports — Profile Settings</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="assets/colors_and_type.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+    <style>
+      html,
+      body {
+        background: #f0eee9;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="text/babel" src="design-canvas.jsx"></script>
+    <script type="text/babel" src="Icons.jsx"></script>
+    <script type="text/babel" src="ProfileSettings.jsx"></script>
+    <script type="text/babel" src="PublicProfileHero.jsx"></script>
+    <script type="text/babel" src="BreakpointFrame.jsx"></script>
+
+    <script type="text/babel" data-presets="react">
+      // Mixed state — most common real Public-Profile state (some sections off)
+      const MIXED = {
+        isPublic: true,
+        bio: true,
+        stats: true,
+        trophies: false,
+        favorites: true,
+        leagues: true,
+        badges: false,
+        location: true,
+        pronouns: false,
+        joinedDate: true,
+        tagline: true,
+        globalRank: true,
+      };
+
+      // Everything off (master ON, all sections off)
+      const ALL_OFF = {
+        isPublic: true,
+        bio: false,
+        stats: false,
+        trophies: false,
+        favorites: false,
+        leagues: false,
+        badges: false,
+        location: false,
+        pronouns: false,
+        joinedDate: false,
+        tagline: false,
+        globalRank: false,
+      };
+
+      // Master OFF (preserve choices)
+      const MASTER_OFF = {
+        isPublic: false,
+        bio: true,
+        stats: true,
+        trophies: false,
+        favorites: true,
+        leagues: true,
+        badges: false,
+        location: true,
+        pronouns: false,
+        joinedDate: true,
+        tagline: true,
+        globalRank: true,
+      };
+
+      const App = () => (
+        <DesignCanvas
+          title="Profile Settings · /profile/settings"
+          subtitle="Legacy Sports · interactive prototype across every documented breakpoint"
+        >
+          {/* ── Section 1: Live breakpoint inspector ─────────────────── */}
+          <DCSection
+            id="breakpoints"
+            title="Breakpoints · interactive viewport"
+            subtitle="One canvas, every documented size. Click a pill in the toolbar to swap viewport width — the page reflows live via container queries. The toolbar is canvas chrome, not part of the product UI."
+          >
+            <DCArtboard
+              id="bp-frame"
+              label="Viewport inspector · 7 breakpoints"
+              sublabel="$xxs · $xs · $sm · $md · $lg · $xl · $xxl — click a pill to swap width"
+              width={1520}
+              height={3500}
+            >
+              <BreakpointFrame
+                initial="xl"
+                render={() => (
+                  <ProfileSettings
+                    initialPublic={MIXED}
+                    initialStickyBar="default"
+                  />
+                )}
+              />
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── Section 2: Public Profile states ────────────────────── */}
+          <DCSection
+            id="public-states"
+            title="Public Profile · Section 6 states"
+            subtitle="Three states of the new visibility card. Auto-save sticky bar updates with each toggle."
+          >
+            <DCArtboard
+              id="pub-default"
+              label="Default · all sections public"
+              sublabel="Master ON · 6/6 sections · status chip Live"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings
+                initialPublic={{
+                  isPublic: true,
+                  bio: true,
+                  stats: true,
+                  trophies: true,
+                  favorites: true,
+                  leagues: true,
+                  badges: true,
+                  location: true,
+                  pronouns: true,
+                  joinedDate: true,
+                  tagline: true,
+                  globalRank: true,
+                }}
+                initialStickyBar="hidden"
+              />
+            </DCArtboard>
+
+            <DCArtboard
+              id="pub-mixed"
+              label="Mixed · most common real state"
+              sublabel="Master ON · 4/6 sections · 2 details hidden · sticky bar reflects the change"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings initialPublic={MIXED} initialStickyBar="saved" />
+            </DCArtboard>
+
+            <DCArtboard
+              id="pub-off"
+              label="Master OFF · everything dimmed"
+              sublabel="Locked screen for visitors · prior choices preserved · status chip Private (gold)"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings
+                initialPublic={MASTER_OFF}
+                initialStickyBar="default"
+              />
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── Section 3: Edit & flow states ───────────────────────── */}
+          <DCSection
+            id="states"
+            title="Edit & flow states"
+            subtitle="States the brief calls out explicitly — username editing, Discord linking, avatar saving, errors."
+          >
+            <DCArtboard
+              id="state-uname-edit"
+              label="Username · editing + validation error"
+              sublabel="Input + Save/Cancel, validation error in red below"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings
+                initialUsernameMode="edit"
+                initialPublic={MIXED}
+              />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-discord-connected"
+              label="Discord · connected"
+              sublabel="Disconnect (red) · confirms via inline state"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings
+                initialDiscord={{
+                  state: 'connected',
+                  username: 'marcusj#4271',
+                }}
+                initialPublic={MIXED}
+              />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-discord-err"
+              label="Discord · error"
+              sublabel="Inline error text below the row · primary action stays available"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings
+                initialDiscord={{ state: 'error', username: 'marcusj#4271' }}
+                initialPublic={MIXED}
+              />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-all-off"
+              label="Sticky bar · zero sections public"
+              sublabel="Master ON but everything off · bar copy reflects 0/6"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettings
+                initialPublic={ALL_OFF}
+                initialStickyBar="default"
+              />
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── Section 4: /u/:handle page (owner + visitor) ────────── */}
+          <DCSection
+            id="public-profile"
+            title="Public profile · /u/marcus-j"
+            subtitle="What the visibility toggles actually control. Owner sees Hidden chips; visitor sees a locked screen when master is OFF."
+          >
+            <DCArtboard
+              id="owner-mixed"
+              label="Owner view · with Hidden chips"
+              sublabel="Trophy Case + Achievements hidden, Pronouns hidden — owner still sees the slot with a Hidden chip"
+              width={1100}
+              height={950}
+            >
+              <PublicProfileHero
+                visibility={{
+                  isPublic: true,
+                  bio: true,
+                  stats: true,
+                  trophies: false,
+                  favorites: true,
+                  leagues: true,
+                  badges: false,
+                  location: true,
+                  pronouns: false,
+                  joinedDate: true,
+                  tagline: true,
+                  globalRank: true,
+                }}
+              />
+            </DCArtboard>
+
+            <DCArtboard
+              id="owner-mobile"
+              label="Owner view · mobile · Hidden chips"
+              sublabel="$xxs · hero stacks, chips stay inline with metadata"
+              width={420}
+              height={1450}
+            >
+              <PublicProfileHero
+                visibility={{
+                  isPublic: true,
+                  bio: true,
+                  stats: true,
+                  trophies: false,
+                  favorites: true,
+                  leagues: true,
+                  badges: false,
+                  location: true,
+                  pronouns: false,
+                  joinedDate: true,
+                  tagline: true,
+                  globalRank: true,
+                }}
+              />
+            </DCArtboard>
+
+            <DCArtboard
+              id="visitor-locked"
+              label="Visitor · locked screen"
+              sublabel="What a logged-out (or other-manager) visitor sees when master is OFF"
+              width={1100}
+              height={700}
+            >
+              <VisitorLocked handle="marcus-j" />
+            </DCArtboard>
+
+            <DCArtboard
+              id="visitor-locked-mobile"
+              label="Visitor · locked screen · mobile"
+              sublabel="$xxs"
+              width={420}
+              height={750}
+            >
+              <VisitorLocked handle="marcus-j" />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+
+      ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    </script>
+  </body>
+</html>

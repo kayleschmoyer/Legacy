@@ -160,6 +160,16 @@
       "jiraKey": "LS-4584"
     },
     {
+      "id": "profile-settings-2026-05-26",
+      "title": "Profile Settings",
+      "slug": "legacy-sports-profile-settings",
+      "status": "active",
+      "source": "manual-local-sync",
+      "lastSyncedHash": "f9ed551882e3ef4ad53254241adc51ba725ff3f1941f8ecefeae883185be3502",
+      "lastSyncedAt": "2026-05-26T00:00:00.000Z",
+      "jiraKey": "LS-4931"
+    },
+    {
       "id": "nxFiEGqu3yPCDKpoNDmQWA",
       "url": "https://api.anthropic.com/v1/design/h/nxFiEGqu3yPCDKpoNDmQWA",
       "title": "Homepage",
