@@ -77,7 +77,12 @@ const TickerLabel = styled(Text, {
   fontWeight: '700',
   color: '$brandGold',
   letterSpacing: 2,
-});
+  // Mobile: bump up so the heritage-gold "MLB" label is legible against the
+  // dark ticker strip at small viewport widths.
+  $sm: {
+    fontSize: '$3',
+  },
+} as never);
 
 const ScrollOuter = styled(XStack, {
   flex: 1,
@@ -164,6 +169,14 @@ function GameChip({ game }: { game: TickerGame }) {
          * double-announce scores and abbreviations.
          */}
 
+        {/*
+         * Mobile font-size bumps: the default Tamagui scale renders `$1` at
+         * 11 px and `$4` at 14 px, which is barely legible on a scrolling
+         * ticker at mobile widths. The `$sm` overrides bump each piece of
+         * text up one to two steps for viewports ≤800 px while preserving
+         * the tighter desktop layout.
+         */}
+
         {/* Away team abbreviation */}
         <Text
           aria-hidden="true"
@@ -171,6 +184,7 @@ function GameChip({ game }: { game: TickerGame }) {
           fontWeight="500"
           color="$color11"
           letterSpacing={0.5}
+          $sm={{ fontSize: '$3' }}
         >
           {game.awayTeam.abbreviation}
         </Text>
@@ -183,6 +197,7 @@ function GameChip({ game }: { game: TickerGame }) {
             fontWeight="800"
             color={awayScoreColor}
             style={{ fontVariantNumeric: 'tabular-nums' }}
+            $sm={{ fontSize: '$5' }}
           >
             {game.awayTeam.runs}
           </Text>
@@ -194,6 +209,7 @@ function GameChip({ game }: { game: TickerGame }) {
           fontSize="$1"
           color="$color8"
           paddingHorizontal="$1"
+          $sm={{ fontSize: '$2' }}
         >
           {isPreview ? 'vs' : '–'}
         </Text>
@@ -206,6 +222,7 @@ function GameChip({ game }: { game: TickerGame }) {
             fontWeight="800"
             color={homeScoreColor}
             style={{ fontVariantNumeric: 'tabular-nums' }}
+            $sm={{ fontSize: '$5' }}
           >
             {game.homeTeam.runs}
           </Text>
@@ -218,6 +235,7 @@ function GameChip({ game }: { game: TickerGame }) {
           fontWeight="500"
           color="$color11"
           letterSpacing={0.5}
+          $sm={{ fontSize: '$3' }}
         >
           {game.homeTeam.abbreviation}
         </Text>
@@ -229,6 +247,7 @@ function GameChip({ game }: { game: TickerGame }) {
               className="scoreboard-ticker-live-dot"
               fontSize="$1"
               color="$green8"
+              $sm={{ fontSize: '$2' }}
             >
               ●
             </Text>
@@ -239,6 +258,7 @@ function GameChip({ game }: { game: TickerGame }) {
             fontWeight={isLive ? '700' : '400'}
             letterSpacing={isLive ? 0.5 : 0}
             fontFamily={isLive ? BIG_SHOULDERS : undefined}
+            $sm={{ fontSize: '$2' }}
           >
             {statusText}
           </Text>
@@ -256,6 +276,7 @@ function Separator() {
       fontWeight="500"
       flexShrink={0}
       paddingHorizontal="$1"
+      $sm={{ fontSize: '$3' }}
     >
       ·
     </Text>
