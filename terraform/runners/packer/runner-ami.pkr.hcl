@@ -82,6 +82,13 @@ variable "android_cmdline_tools_sha256" {
   default = "04453066b540409d975c676d781da1477479dde3761310f1a7eb92a1dfb15af7"
 }
 
+variable "pnpm_sha256" {
+  type        = string
+  description = "SHA-256 of pnpm-linux-x64 release binary for the matching pnpm_version. The pnpm project does NOT ship per-asset .sha256 companion files on GitHub releases (LS-4958), so we have to pin the hash here and bump it together with pnpm_version. Recompute with: curl -sL https://github.com/pnpm/pnpm/releases/download/v<version>/pnpm-linux-x64 | sha256sum"
+  # SHA-256 for pnpm-linux-x64 at v9.12.1
+  default = "9be00ae5ae8fad0e0b6f49cf0a09795ddcc3c202e7313a7bdd1273f360902304"
+}
+
 variable "docker_version" {
   type    = string
   default = "28.1.1"
@@ -238,14 +245,15 @@ build {
       "sudo apt-get install -y -qq nodejs",
       "node --version",
       "curl -fsSL https://github.com/pnpm/pnpm/releases/download/v${var.pnpm_version}/pnpm-linux-x64 -o /tmp/pnpm",
-      "curl -fsSL https://github.com/pnpm/pnpm/releases/download/v${var.pnpm_version}/pnpm-linux-x64.sha256 -o /tmp/pnpm.sha256",
-      # The pnpm release .sha256 file may contain either just the hex digest
-      # or the standard `<hash>  <filename>` format. Extract the hash with
-      # awk so this works either way, then verify against the downloaded
-      # binary with sha256sum -c.
-      "PNPM_HASH=$(awk '{print $1}' /tmp/pnpm.sha256) && echo \"$PNPM_HASH  /tmp/pnpm\" | sha256sum -c -",
+      # Verify the downloaded binary against a hash pinned in var.pnpm_sha256.
+      # The pnpm project does NOT ship per-asset .sha256 companion files on
+      # GitHub releases (this was the LS-4958 root cause — the previous code
+      # tried to curl pnpm-linux-x64.sha256 and got 404, breaking every AMI
+      # build). Bump var.pnpm_sha256 together with var.pnpm_version on any
+      # future pnpm update.
+      "echo '${var.pnpm_sha256}  /tmp/pnpm' | sha256sum -c -",
       "sudo install -m 0755 -o root -g root /tmp/pnpm /usr/local/bin/pnpm",
-      "rm /tmp/pnpm /tmp/pnpm.sha256",
+      "rm /tmp/pnpm",
       "command -v pnpm",
       "pnpm --version",
     ]
