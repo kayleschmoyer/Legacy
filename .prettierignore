@@ -6,6 +6,8 @@
 # Static bundles are checked in but should not be reformatted automatically
 static/environment.js
 static/main.js
+# Design mockups synced from Claude Design — hand-authored snapshots, not source
+docs/design/**/scratch/
 pnpm-lock.yaml
 # Env files have no prettier parser
 .env*
