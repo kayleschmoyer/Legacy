@@ -28,8 +28,8 @@ The design medium is **HTML/CSS/JS** — these are prototypes, not production co
 
 The bundle covers two views and maps onto these routes in `apps/web`:
 
-| Design view (in bundle)          | Target route                                                                                             |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Design view (in bundle)                | Target route                                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `project/settings.jsx` (Settings tab)  | **`/profile/settings`** — existing route at `apps/web/src/pages/profile/ProfileSettingsPage.tsx`  |
 | `project/profile.jsx` (Public profile) | **New route** (suggested `/u/:handle` or `/profile/:handle`), under `apps/web/src/pages/profile/` |
 

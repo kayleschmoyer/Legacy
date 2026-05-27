@@ -276,18 +276,17 @@ jobs:
           path = Path("terraform/runners/packer/runner-ami.pkr.hcl")
           text = path.read_text()
 
-          new_text = re.sub(
-              r'(variable "playwright_version"\s*\{[^}]*?default\s*=\s*)"[^"]+"',
-              lambda m: m.group(1) + f'"{version}"',
-              text,
-              count=1,
-              flags=re.DOTALL,
-          )
+          pattern = r'(variable "playwright_version"\s*\{[^}]*?default\s*=\s*)"([^"]+)"'
+          m = re.search(pattern, text, flags=re.DOTALL)
+          if not m:
+              raise SystemExit("Failed to find playwright_version default in Packer HCL")
 
-          if new_text == text:
-              raise SystemExit("Failed to update playwright_version default in Packer HCL")
-          path.write_text(new_text)
-          print(f"Updated Packer default to {version}")
+          if m.group(2) == version:
+              print(f"Packer default already at {version}, skipping update")
+          else:
+              new_text = text[:m.start()] + m.group(1) + f'"{version}"' + text[m.end():]
+              path.write_text(new_text)
+              print(f"Updated Packer default to {version}")
           PYEOF
 
           # Terraform tfvars: update runner_ami_playwright_version.
@@ -300,17 +299,17 @@ jobs:
           path = Path("terraform/runners/runner-ami.auto.tfvars")
           text = path.read_text()
 
-          new_text = re.sub(
-              r'(runner_ami_playwright_version\s*=\s*)"[^"]+"',
-              lambda m: m.group(1) + f'"{version}"',
-              text,
-              count=1,
-          )
+          pattern = r'(runner_ami_playwright_version\s*=\s*)"([^"]+)"'
+          m = re.search(pattern, text)
+          if not m:
+              raise SystemExit("Failed to find runner_ami_playwright_version in tfvars")
 
-          if new_text == text:
-              raise SystemExit("Failed to update runner_ami_playwright_version in tfvars")
-          path.write_text(new_text)
-          print(f"Updated tfvars to {version}")
+          if m.group(2) == version:
+              print(f"tfvars already at {version}, skipping update")
+          else:
+              new_text = text[:m.start()] + m.group(1) + f'"{version}"' + text[m.end():]
+              path.write_text(new_text)
+              print(f"Updated tfvars to {version}")
           PYEOF
 
       - name: Commit and push updates

@@ -2,14 +2,14 @@
 
 const { useState, useEffect, useMemo, useRef } = React;
 
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "persona": "champion",
-  "heroVariant": "centered",
-  "density": "cozy",
-  "trophyStyle": "mantle",
-  "accent": "gold",
-  "previewAsOwner": false
-}/*EDITMODE-END*/;
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
+  persona: 'champion',
+  heroVariant: 'centered',
+  density: 'cozy',
+  trophyStyle: 'mantle',
+  accent: 'gold',
+  previewAsOwner: false,
+}; /*EDITMODE-END*/
 
 const parseHash = () => {
   const h = (window.location.hash || '').replace(/^#\/?/, '');
@@ -24,15 +24,23 @@ const App = () => {
 
   // Profile + visibility state — driven by Settings page
   const persona = PERSONAS[tweaks.persona] || PERSONAS.champion;
-  const [person, setPerson] = useState(() => JSON.parse(JSON.stringify(persona)));
-  const [visibility, setVisibility] = useState(() => ({ ...DEFAULT_VISIBILITY }));
+  const [person, setPerson] = useState(() =>
+    JSON.parse(JSON.stringify(persona)),
+  );
+  const [visibility, setVisibility] = useState(() => ({
+    ...DEFAULT_VISIBILITY,
+  }));
   const [isPublic, setIsPublic] = useState(DEFAULT_PROFILE_PUBLIC);
 
   // When persona tweak changes, reset profile state to that persona
   const lastPersona = useRef(tweaks.persona);
   useEffect(() => {
     if (lastPersona.current !== tweaks.persona) {
-      setPerson(JSON.parse(JSON.stringify(PERSONAS[tweaks.persona] || PERSONAS.champion)));
+      setPerson(
+        JSON.parse(
+          JSON.stringify(PERSONAS[tweaks.persona] || PERSONAS.champion),
+        ),
+      );
       setVisibility({ ...DEFAULT_VISIBILITY });
       setIsPublic(true);
       lastPersona.current = tweaks.persona;
@@ -56,7 +64,9 @@ const App = () => {
     return () => window.removeEventListener('hashchange', onHash);
   }, [route]);
 
-  const nav = (next) => { window.location.hash = `#/${next}`; };
+  const nav = (next) => {
+    window.location.hash = `#/${next}`;
+  };
 
   const bodyClass = [
     `density-${tweaks.density}`,
@@ -65,11 +75,7 @@ const App = () => {
 
   return (
     <div className={bodyClass}>
-      <Nav
-        route={route}
-        onNav={nav}
-        person={person}
-      />
+      <Nav route={route} onNav={nav} person={person} />
 
       <div className={transitioning ? 'view exit' : ''}>
         {route === 'profile' && (
@@ -102,7 +108,7 @@ const App = () => {
           <TweakSelect
             label="Persona"
             value={tweaks.persona}
-            onChange={v => setTweak('persona', v)}
+            onChange={(v) => setTweak('persona', v)}
             options={[
               { value: 'champion', label: 'Veteran champion · Marcus' },
               { value: 'veteran', label: 'Veteran no-rings · Jordan' },
@@ -116,7 +122,7 @@ const App = () => {
           <TweakRadio
             label="Hero variant"
             value={tweaks.heroVariant}
-            onChange={v => setTweak('heroVariant', v)}
+            onChange={(v) => setTweak('heroVariant', v)}
             options={[
               { value: 'centered', label: 'Centered' },
               { value: 'side', label: 'Side-by-side' },
@@ -126,7 +132,7 @@ const App = () => {
           <TweakRadio
             label="Trophy style"
             value={tweaks.trophyStyle}
-            onChange={v => setTweak('trophyStyle', v)}
+            onChange={(v) => setTweak('trophyStyle', v)}
             options={[
               { value: 'mantle', label: 'Mantle' },
               { value: 'grid', label: 'Grid' },
@@ -136,7 +142,7 @@ const App = () => {
           <TweakRadio
             label="Density"
             value={tweaks.density}
-            onChange={v => setTweak('density', v)}
+            onChange={(v) => setTweak('density', v)}
             options={[
               { value: 'cozy', label: 'Cozy' },
               { value: 'compact', label: 'Compact' },
@@ -148,7 +154,7 @@ const App = () => {
           <TweakRadio
             label="Hero color"
             value={tweaks.accent}
-            onChange={v => setTweak('accent', v)}
+            onChange={(v) => setTweak('accent', v)}
             options={[
               { value: 'gold', label: 'Gold' },
               { value: 'seam', label: 'Seam red' },
@@ -160,7 +166,7 @@ const App = () => {
           <TweakToggle
             label="Preview as owner"
             value={tweaks.previewAsOwner}
-            onChange={v => setTweak('previewAsOwner', v)}
+            onChange={(v) => setTweak('previewAsOwner', v)}
           />
         </TweakSection>
       </TweaksPanel>
@@ -174,14 +180,24 @@ const Nav = ({ route, onNav, person }) => (
     <div className="ls-nav-inner">
       <a className="ls-brand" onClick={() => onNav('profile')}>
         <img src="design-system/assets/logo.png" alt="" />
-        <div className="ls-wordmark">LEGACY<br /><span>SPORTS</span></div>
+        <div className="ls-wordmark">
+          LEGACY
+          <br />
+          <span>SPORTS</span>
+        </div>
       </a>
 
       <nav className="ls-tabs" style={{ marginLeft: 'auto' }}>
-        <a className={route === 'profile' ? 'on' : ''} onClick={() => onNav('profile')}>
+        <a
+          className={route === 'profile' ? 'on' : ''}
+          onClick={() => onNav('profile')}
+        >
           <BrandIcon name="scoreboard" size={14} opacity={0.85} /> Profile
         </a>
-        <a className={route === 'settings' ? 'on' : ''} onClick={() => onNav('settings')}>
+        <a
+          className={route === 'settings' ? 'on' : ''}
+          onClick={() => onNav('settings')}
+        >
           <BrandIcon name="commissioner" size={14} opacity={0.85} /> Settings
         </a>
       </nav>
@@ -190,7 +206,9 @@ const Nav = ({ route, onNav, person }) => (
         <button className="ls-icon-btn" title="Notifications">
           <BrandIcon name="bell" size={18} opacity={0.85} />
         </button>
-        <div className="ls-avatar" title={person.name}>{person.initials}</div>
+        <div className="ls-avatar" title={person.name}>
+          {person.initials}
+        </div>
       </div>
     </div>
   </header>
