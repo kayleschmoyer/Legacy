@@ -397,10 +397,10 @@ const GameCard: React.FC<{
               fontFamily:
                 'var(--font-display, "Big Shoulders Display", sans-serif)',
               fontWeight: 700,
-              fontSize: 10.5,
+              fontSize: isNarrow ? 11.5 : 10.5,
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              color: '#9CAAC5',
+              color: isNarrow ? '#B8C5DC' : '#9CAAC5',
               padding: '6px 11px',
               borderRadius: 9999,
               background: withAlpha('#ffffff', 0.04),
@@ -429,9 +429,9 @@ const GameCard: React.FC<{
         {/* Description */}
         <p
           style={{
-            fontSize: 15,
-            lineHeight: 1.55,
-            color: '#9CAAC5',
+            fontSize: isNarrow ? 15.5 : 15,
+            lineHeight: 1.6,
+            color: isNarrow ? '#C5D0E3' : '#9CAAC5',
             margin: 0,
             maxWidth: '48ch',
           }}
@@ -447,7 +447,7 @@ const GameCard: React.FC<{
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: 6,
+            gap: isNarrow ? 8 : 6,
           }}
         >
           {game.meta.map((m) => (
@@ -455,8 +455,8 @@ const GameCard: React.FC<{
               key={m}
               style={{
                 fontFamily: 'inherit',
-                fontSize: 13,
-                color: '#7A8BAA',
+                fontSize: isNarrow ? 14 : 13,
+                color: isNarrow ? '#A2B3D0' : '#7A8BAA',
                 paddingLeft: 18,
                 position: 'relative',
               }}
@@ -508,10 +508,10 @@ const GameCard: React.FC<{
                 fontFamily:
                   'var(--font-display, "Big Shoulders Display", sans-serif)',
                 fontWeight: 700,
-                fontSize: 10,
+                fontSize: isNarrow ? 11 : 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: '#7A8BAA',
+                color: isNarrow ? '#9AABCB' : '#7A8BAA',
                 marginTop: 4,
               }}
             >
@@ -526,11 +526,11 @@ const GameCard: React.FC<{
               fontFamily:
                 'var(--font-display, "Big Shoulders Display", sans-serif)',
               fontWeight: 800,
-              fontSize: 13,
+              fontSize: isNarrow ? 14 : 13,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: BRAND_GOLD_LIGHT,
-              padding: '10px 16px',
+              padding: isNarrow ? '12px 18px' : '10px 16px',
               borderRadius: 9999,
               background: withAlpha(BRAND_GOLD, 0.08),
               border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
@@ -685,7 +685,9 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
               fontFamily:
                 'var(--font-display, "Big Shoulders Display", sans-serif)',
               fontWeight: 800,
-              fontSize: 'clamp(38px, 6vw, 64px)',
+              fontSize: isNarrow
+                ? 'clamp(30px, 8vw, 38px)'
+                : 'clamp(38px, 6vw, 64px)',
               lineHeight: 0.98,
               letterSpacing: '-0.025em',
               color: '#F8FAFC',
@@ -712,9 +714,9 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
           <p
             style={{
               fontFamily: 'inherit',
-              fontSize: 17,
+              fontSize: isNarrow ? 15 : 17,
               lineHeight: 1.55,
-              color: '#9CAAC5',
+              color: isNarrow ? '#B8C5DC' : '#9CAAC5',
               maxWidth: '52ch',
               margin: '0 0 24px',
             }}
@@ -728,7 +730,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 22,
+              gap: isNarrow ? 16 : 22,
               flexWrap: 'wrap',
               paddingTop: 20,
               borderTop: `1px solid ${withAlpha('#ffffff', 0.08)}`,
@@ -742,6 +744,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
                     width: 1,
                     height: 34,
                     background: withAlpha('#ffffff', 0.1),
+                    display: isNarrow ? 'none' : 'block',
                   }}
                 />
               ) : (
@@ -751,7 +754,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
                       fontFamily:
                         'var(--font-display, "Big Shoulders Display", sans-serif)',
                       fontWeight: 800,
-                      fontSize: 24,
+                      fontSize: isNarrow ? 22 : 24,
                       color: '#F8FAFC',
                       lineHeight: 1,
                       fontVariantNumeric: 'tabular-nums',
@@ -764,10 +767,10 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
                       fontFamily:
                         'var(--font-display, "Big Shoulders Display", sans-serif)',
                       fontWeight: 700,
-                      fontSize: 10.5,
+                      fontSize: isNarrow ? 11 : 10.5,
                       letterSpacing: '0.14em',
                       textTransform: 'uppercase',
-                      color: '#7A8BAA',
+                      color: isNarrow ? '#9AABCB' : '#7A8BAA',
                       marginTop: 6,
                     }}
                   >
