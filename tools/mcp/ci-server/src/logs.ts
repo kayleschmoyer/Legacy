@@ -204,6 +204,25 @@ export async function fetchRunLogs(
 }
 
 /**
+ * Append one line to a fixed-size ring buffer, dropping the oldest line when full.
+ * Trims in batches to keep amortized cost O(1) per line — calling `shift()` per
+ * push would be O(n) per call and quadratic across a multi-million-line stream.
+ */
+function pushLine(buffer: string[], line: string, maxLines: number): void {
+  buffer.push(line);
+  if (buffer.length > maxLines * 2) {
+    buffer.splice(0, buffer.length - maxLines);
+  }
+}
+
+/** Final trim after streaming completes — leaves exactly the last `maxLines`. */
+function trimRingBuffer(buffer: string[], maxLines: number): void {
+  if (buffer.length > maxLines) {
+    buffer.splice(0, buffer.length - maxLines);
+  }
+}
+
+/**
  * Fetch logs and collect the last `maxLines` lines (ring buffer).
  * Processes logs per-job incrementally to avoid buffering the entire run in memory.
  */
@@ -266,16 +285,21 @@ export async function fetchRunLogsRing(
     );
 
     for (const { name, text } of batchResults) {
-      const jobLines = [`${name}`, ...text.split(/\r?\n/)];
-      totalLines += jobLines.length;
+      // Iterate lines without spread: `[...arr]` and `push(...arr)` pass each
+      // element as a function argument, which trips the engine's argument-count
+      // limit (surfaces as "Maximum call stack size exceeded") for logs with
+      // hundreds of thousands of lines.
+      pushLine(ringBuffer, name, maxLines);
+      totalLines += 1;
 
-      // Add to ring buffer, trimming if it exceeds maxLines
-      ringBuffer.push(...jobLines);
-      if (ringBuffer.length > maxLines) {
-        ringBuffer.splice(0, ringBuffer.length - maxLines);
+      const textLines = text.split(/\r?\n/);
+      totalLines += textLines.length;
+      for (const line of textLines) {
+        pushLine(ringBuffer, line, maxLines);
       }
     }
   }
 
+  trimRingBuffer(ringBuffer, maxLines);
   return { lines: ringBuffer, totalLines };
 }
