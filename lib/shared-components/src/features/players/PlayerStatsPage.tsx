@@ -471,6 +471,15 @@ export function PlayerStatsPage({
             .ps-tabContent { animation: none; }
             .ps-sk-bar { animation: none; background: rgba(255,255,255,0.08); }
           }
+          .ps-toolbar { grid-template-columns: minmax(240px, 1.5fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto; }
+          @media (max-width: 640px) {
+            .ps-toolbar { grid-template-columns: 1fr; }
+            .ps-toolbar > * { width: 100%; }
+          }
+          .ps-adv-grid { grid-template-columns: repeat(3, 1fr); }
+          @media (max-width: 640px) {
+            .ps-adv-grid { grid-template-columns: 1fr; }
+          }
         `}</style>
       )}
 
@@ -720,10 +729,9 @@ export function PlayerStatsPage({
         {/* ── Toolbar: search, position, page size, advanced ─────────── */}
         <XStack
           testID="filter-controls"
+          className={Platform.OS === 'web' ? 'ps-toolbar' : undefined}
           style={{
             display: Platform.OS === 'web' ? 'grid' : 'flex',
-            gridTemplateColumns:
-              'minmax(240px, 1.5fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto',
             flexDirection: 'column',
             gap: 10,
             padding: 14,
@@ -1087,9 +1095,9 @@ export function PlayerStatsPage({
               </Pressable>
             </XStack>
             <XStack
+              className={Platform.OS === 'web' ? 'ps-adv-grid' : undefined}
               style={{
                 display: Platform.OS === 'web' ? 'grid' : 'flex',
-                gridTemplateColumns: 'repeat(3, 1fr)',
                 flexDirection: 'column',
                 gap: 20,
               }}
