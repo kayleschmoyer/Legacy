@@ -91,18 +91,50 @@ function PlayersScreen({
   const matchedPlayers = pageSize;
 
   return (
-    <YStack flex={1} style={{ backgroundColor: BG_DARK }}>
+    <YStack flex={1} className="pp-screen" style={{ backgroundColor: BG_DARK }}>
+      {/* Mobile readability tweaks (LS-4809): tighten outer padding, stack the
+          featured spotlight, scale typography. Mirrors the inline-<style>
+          responsive pattern used by PlayerStatsPage.tsx. */}
+      {Platform.OS === 'web' && (
+        <style>{`
+          .pp-screen-inner { padding: 32px 24px 80px; gap: 28px; }
+          @media (max-width: 640px) {
+            .pp-screen-inner { padding: 20px 16px 56px; gap: 20px; }
+            .pp-head { gap: 12px; }
+            .pp-head-eyebrow { font-size: 10px; letter-spacing: 0.14em; }
+            .pp-head-title { font-size: 34px !important; line-height: 1 !important; }
+            .pp-head-lede { font-size: 15px; }
+            .pp-head-sub { font-size: 13px; }
+            .pp-head-count { align-self: flex-start; }
+            .pp-featured { padding: 18px 18px !important; gap: 16px !important; }
+            .pp-featured-mug { width: 64px !important; height: 64px !important; border-radius: 32px !important; }
+            .pp-featured-mug-text { font-size: 22px !important; }
+            .pp-featured-name { font-size: 26px !important; }
+            .pp-featured-stats {
+              padding-left: 0 !important;
+              border-left-width: 0 !important;
+              border-top-width: 1px;
+              border-top-style: solid;
+              border-top-color: rgba(255,255,255,0.08);
+              padding-top: 14px;
+              gap: 20px !important;
+              width: 100%;
+            }
+            .pp-featured-stat-value { font-size: 24px !important; }
+          }
+        `}</style>
+      )}
       <YStack
+        className="pp-screen-inner"
         style={{
           maxWidth: 1280,
           width: '100%',
           margin: '0 auto',
-          padding: '32px 24px 80px',
-          gap: 28,
         }}
       >
         {/* Editorial header — mirrors .pp-head from design players.css */}
         <XStack
+          className="pp-head"
           justifyContent="space-between"
           alignItems="flex-end"
           gap="$6"
@@ -110,6 +142,7 @@ function PlayersScreen({
         >
           <YStack gap="$2" style={{ flex: 1, minWidth: 240 }}>
             <Text
+              className="pp-head-eyebrow"
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
@@ -123,6 +156,7 @@ function PlayersScreen({
             </Text>
             <Text
               tag="h1"
+              className="pp-head-title"
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '800',
@@ -140,6 +174,7 @@ function PlayersScreen({
               {title}
             </Text>
             <Text
+              className="pp-head-lede"
               style={{
                 fontFamily: FONT_BODY,
                 fontStyle: 'italic',
@@ -155,6 +190,7 @@ function PlayersScreen({
               waiver-wire dart throws that decide a season.
             </Text>
             <Text
+              className="pp-head-sub"
               style={{
                 fontFamily: FONT_BODY,
                 fontSize: 14,
@@ -171,7 +207,7 @@ function PlayersScreen({
           </YStack>
 
           {/* Count chip — right-aligned "N of M matched" indicator */}
-          <XStack alignItems="center" gap="$2">
+          <XStack className="pp-head-count" alignItems="center" gap="$2">
             <Text
               style={{
                 fontFamily: FONT_DISPLAY,
@@ -247,6 +283,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
     <XStack
       role="region"
       aria-label="Player spotlight"
+      className="pp-featured"
       style={{
         position: 'relative',
         overflow: 'hidden',
@@ -286,6 +323,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
 
       {/* Initials mug */}
       <YStack
+        className="pp-featured-mug"
         style={{
           width: 96,
           height: 96,
@@ -300,6 +338,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
         }}
       >
         <Text
+          className="pp-featured-mug-text"
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: '800',
@@ -328,6 +367,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
         </Text>
         <Text
           tag="h2"
+          className="pp-featured-name"
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: '800',
@@ -358,6 +398,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
           stats flow through the Featured fragment, render the design's
           slot scaffold with em-dashes so spacing + typography still match. */}
       <XStack
+        className="pp-featured-stats"
         style={{
           paddingLeft: 24,
           gap: 28,
@@ -382,6 +423,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
               {label}
             </Text>
             <Text
+              className="pp-featured-stat-value"
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '800',

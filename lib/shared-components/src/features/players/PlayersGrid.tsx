@@ -136,18 +136,44 @@ function PlayersGrid({
   }
 
   return (
-    <YStack flex={1} p="$4" bg="$background">
+    <YStack flex={1} className="pg-root" p="$4" bg="$background">
+      {/* Mobile readability tweaks (LS-4809): full-width cards, wrappable
+          header and controls, smaller refresh control. Matches the inline
+          <style> responsive pattern used elsewhere in this feature. */}
+      <style>{`
+        .pg-card-cell { width: 280px; min-width: 280px; max-width: 400px; }
+        @media (max-width: 640px) {
+          .pg-root { padding: 12px !important; }
+          .pg-head { flex-wrap: wrap; gap: 8px; }
+          .pg-head-title { font-size: 24px !important; }
+          .pg-card-cell { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+          .pg-controls > * { flex: 1 1 100% !important; min-width: 0 !important; }
+        }
+      `}</style>
       {/* Header */}
       <YStack mb="$4">
-        <XStack jc="space-between" ai="center" mb="$3">
-          <H2 color="$color">{title}</H2>
+        <XStack
+          className="pg-head"
+          jc="space-between"
+          ai="center"
+          mb="$3"
+          flexWrap="wrap"
+        >
+          <H2 color="$color" className="pg-head-title">
+            {title}
+          </H2>
           <XStack gap="$2" ai="center">
             <Text color="$gray10">
               {filteredPlayers.length} player
               {filteredPlayers.length !== 1 ? 's' : ''}
               {!searchTerm && hasMore ? ' (more available)' : ''}
             </Text>
-            <Button size="$3" onPress={handleRefresh} variant="outlined">
+            <Button
+              size="$3"
+              onPress={handleRefresh}
+              variant="outlined"
+              aria-label="Refresh players"
+            >
               <RefreshCw size={16} />
             </Button>
           </XStack>
@@ -155,7 +181,7 @@ function PlayersGrid({
 
         {/* Controls */}
         {(showSearch || showSorting) && (
-          <XStack gap="$3" ai="center" flexWrap="wrap">
+          <XStack className="pg-controls" gap="$3" ai="center" flexWrap="wrap">
             {showSearch && (
               <XStack
                 flex={1}
@@ -235,7 +261,7 @@ function PlayersGrid({
                 : undefined;
 
               return (
-                <YStack key={player.id} width={200} minW={280} maxW={400}>
+                <YStack key={player.id} className="pg-card-cell">
                   <PlayerCard
                     player={player}
                     onPlayerClick={onPlayerSelect}
