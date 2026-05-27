@@ -171,6 +171,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
           backgroundColor="$green2"
           borderColor="$green6"
           padding="$3"
+          width="100%"
           role="status"
           aria-live="polite"
         >
@@ -191,6 +192,8 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
         borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
         padding="$5"
+        $sm={{ padding: '$3' }}
+        width="100%"
       >
         <form
           onSubmit={handleFormSubmit}
@@ -509,7 +512,12 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
       </Card>
 
       {/* Info Card */}
-      <Card backgroundColor="$purple2" borderColor="$purple6" padding="$4">
+      <Card
+        backgroundColor="$purple2"
+        borderColor="$purple6"
+        padding="$4"
+        width="100%"
+      >
         <YStack space="$2">
           <H2 size="$5" color="$purple11">
             <span role="img" aria-label="lightbulb">
