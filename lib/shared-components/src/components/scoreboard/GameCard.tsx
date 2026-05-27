@@ -179,6 +179,7 @@ export function GameCard({
     <Card
       bordered
       padded={false}
+      overflow="hidden"
       backgroundColor="$surfaceCard"
       borderColor={isLive ? '$brandSeamRed' : '$borderColor'}
       pressStyle={togglable ? { scale: 0.99 } : undefined}
