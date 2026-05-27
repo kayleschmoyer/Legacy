@@ -7,7 +7,7 @@
  *
  * cycle = count(formal reviews authored by the reviewer bot) + 1
  *
- * Three review types are excluded from the count:
+ * Four review types are excluded from the count:
  *  1. Infrastructure-error reviews (posted by postInfraErrorReview when the LLM
  *     API fails). They carry no LLM findings, so treating them as a completed
  *     cycle would cause the C2 validator on the subsequent retry to strip all
@@ -23,6 +23,12 @@
  *     postRealReview. Counting them caused false cycle-limit arbitrations
  *     (LS-4474): a single Cycle 1 review followed by two in-thread replies
  *     to malformed author FIX comments produced cycle=4 → escalation.
+ *  4. APPROVED reviews — an approval is a terminal verdict, not an unresolved
+ *     feedback loop, so it must not consume a cycle slot. Without this
+ *     exclusion a sequence like CHANGES_REQUESTED → APPROVED → APPROVED could
+ *     fire `needs-human-arbitration` on an already-approved PR if a follow-up
+ *     reviewer run computed the cycle before the latest approval was dismissed
+ *     (observed on PR #4362).
  *
  * In shadow mode (T9) the bot posts plain PR comments, not formal reviews, so
  * the counter always returns 1 — correct for the first pass. Once the reviewer
@@ -113,6 +119,7 @@ export function isThreadReplyArtifactReview(review) {
  *  - DISMISSED reviews (dismissed by stale-approval policy on push)
  *  - Empty-body COMMENTED reviews (GitHub-materialized reply artifacts from
  *    in-thread replies — see isThreadReplyArtifactReview)
+ *  - APPROVED reviews (terminal verdict, not an unresolved feedback loop — see PR #4362)
  *
  * @param {Array<{ userLogin: string | null, state?: string | null, body?: string | null }>} reviews  All formal reviews on the PR
  * @param {Set<string>} [botLogins]               Override the bot login set (testing)
@@ -123,6 +130,7 @@ export function computeCycle(reviews, botLogins = REVIEWER_BOT_LOGINS) {
     (r) =>
       botLogins.has(r.userLogin) &&
       r.state !== 'DISMISSED' &&
+      r.state !== 'APPROVED' &&
       !isInfraErrorReview(r) &&
       !isThreadReplyArtifactReview(r),
   ).length;

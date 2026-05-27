@@ -341,6 +341,7 @@ async function main() {
         .findLast(
           (r) =>
             r.state !== 'DISMISSED' &&
+            r.state !== 'APPROVED' &&
             !isInfraErrorReview(r) &&
             !isThreadReplyArtifactReview(r),
         ) ?? null;

@@ -214,7 +214,7 @@ describe('computeCycle', () => {
     assert.strictEqual(computeCycle(reviews), 1);
   });
 
-  it('counts non-dismissed bot reviews regardless of state value', () => {
+  it('excludes APPROVED reviews from the cycle count', () => {
     const body = '## Changes Required\n\nFinding.';
     const reviews = [
       {
@@ -224,7 +224,63 @@ describe('computeCycle', () => {
       },
       { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
     ];
-    assert.strictEqual(computeCycle(reviews), 3);
+    // Only the CHANGES_REQUESTED review counts → cycle 2 (was 3 before PR #4362 fix)
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  // LS-4904: prior to this fix, a sequence of CHANGES_REQUESTED → APPROVED →
+  // APPROVED on PR #4362 produced cycle=4 and false-triggered
+  // needs-human-arbitration on an already-approved PR. APPROVED is a terminal
+  // verdict, not an unresolved feedback loop, so it must not consume a cycle slot.
+  it('does not escalate on the PR #4362 sequence (CHANGES_REQUESTED + 2 APPROVED)', () => {
+    const body = '## Changes Required\n\nFinding.';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body,
+      },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
+    ];
+    const cycle = computeCycle(reviews);
+    assert.strictEqual(cycle, 2);
+    assert.strictEqual(isEscalationRequired(cycle), false);
+  });
+
+  it('returns cycle 1 for a single APPROVED review', () => {
+    const body = '## LGTM\n\nApproved.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  it('escalates once real findings accumulate even with interleaved approvals', () => {
+    const body = '## Changes Required\n\nFinding.';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body,
+      },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body,
+      },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body,
+      },
+    ];
+    // Only the 3 CHANGES_REQUESTED count → cycle 4 → escalation required.
+    const cycle = computeCycle(reviews);
+    assert.strictEqual(cycle, 4);
+    assert.strictEqual(isEscalationRequired(cycle), true);
   });
 
   it('excludes both DISMISSED and infra-error reviews together', () => {

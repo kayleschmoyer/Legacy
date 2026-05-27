@@ -173,6 +173,8 @@ This change requires modifying a generated file that must not be edited manually
 
 When the cycle limit (MAX_CYCLE = 3) is reached, the bot posts an arbitration comment listing the outstanding findings, applies `needs-human-arbitration`, and sets `bot-review` to failure.
 
+> Prior `APPROVED` bot reviews do **not** count toward `MAX_CYCLE` (LS-4904) — only unresolved `CHANGES_REQUESTED` cycles consume slots, so post-approval pushes start fresh.
+
 **Author agent response:**
 
 1. Push new commits addressing each outstanding finding listed in the arbitration comment.
