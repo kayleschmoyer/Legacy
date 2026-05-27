@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   H1,
@@ -10,6 +16,7 @@ import {
 import { AuthService, useAuth } from '@legacy-sports/shared-components/auth';
 import { BrandIcon } from '@legacy-sports/shared-components/icons';
 import { Input, ScrollView, Spinner, styled, Theme } from 'tamagui';
+import { Monitor, Moon, Sun } from '@tamagui/lucide-icons';
 import { PageMeta } from '../../components/PageMeta';
 import {
   useGetUserByIdQuery,
@@ -17,6 +24,10 @@ import {
   useUpdateUsernameMutation,
 } from '../../api/db/graphql.generated';
 import { AvatarPicker } from '../../components/common';
+import {
+  type ThemePreference,
+  useThemeContext,
+} from '../../context/ThemeContext';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -156,6 +167,42 @@ const AccessLevelBadge = styled(XStack, {
   },
 });
 
+const ThemeOptionButton = styled(YStack, {
+  flex: 1,
+  cursor: 'pointer',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '$1',
+  paddingVertical: '$3',
+  paddingHorizontal: '$2',
+  borderRadius: '$4',
+  borderWidth: 1,
+  borderColor: '$glassBorder',
+  backgroundColor: '$color2',
+  hoverStyle: { backgroundColor: '$color3' },
+  pressStyle: { scale: 0.97 },
+  animation: 'quick',
+  variants: {
+    active: {
+      true: {
+        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.2),
+        borderColor: BRAND_NAVY_LIGHT,
+        hoverStyle: { backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25) },
+      },
+    },
+  } as const,
+});
+
+const THEME_OPTIONS: Array<{
+  value: ThemePreference;
+  label: string;
+  Icon: typeof Sun;
+}> = [
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'system', label: 'System', Icon: Monitor },
+  { value: 'dark', label: 'Dark', Icon: Moon },
+];
+
 const InfoBanner = styled(XStack, {
   alignItems: 'flex-start',
   gap: '$3',
@@ -212,6 +259,8 @@ const ProfileSettingsPage: React.FC = () => {
     [auth.config],
   );
   const [imageError, setImageError] = useState(false);
+  const { themePreference, setThemePreference } = useThemeContext();
+  const themeOptionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const userName = user?.username ?? '';
   const userEmail = user?.email ?? '';
   const userImage = user?.picture ?? null;
@@ -608,6 +657,116 @@ const ProfileSettingsPage: React.FC = () => {
                   onSelect={handleAvatarSelect}
                   loading={avatarLoading}
                 />
+              </SectionBody>
+            </SectionCard>
+
+            {/* ── Appearance ── */}
+            <SectionCard
+              data-testid="profile-appearance-section"
+              style={{
+                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
+              }}
+            >
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={16} lineHeight={18}>
+                    <span role="img" aria-label="appearance">
+                      🎨
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    Appearance
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Choose how Legacy Sports looks on this device
+                  </Paragraph>
+                </YStack>
+              </SectionHeader>
+
+              <SectionBody>
+                <YStack gap="$3" role="radiogroup" aria-label="Theme">
+                  <Paragraph size="$3" color="$colorPress" fontWeight="500">
+                    Theme
+                  </Paragraph>
+                  <XStack gap="$3" $sm={{ gap: '$2' }}>
+                    {THEME_OPTIONS.map(({ value, label, Icon }, index) => {
+                      const isActive = themePreference === value;
+                      // ARIA radiogroup roving tabindex: only the checked radio
+                      // is in the tab order; arrow keys move between options
+                      // and update selection. If no option is checked
+                      // (unlikely — theme always has a value), the first
+                      // option is the tab stop so the group is reachable.
+                      const activeIndex = THEME_OPTIONS.findIndex(
+                        (o) => o.value === themePreference,
+                      );
+                      const isTabStop =
+                        activeIndex === -1 ? index === 0 : isActive;
+                      return (
+                        <ThemeOptionButton
+                          key={value}
+                          ref={(el: HTMLDivElement | null) => {
+                            themeOptionRefs.current[index] = el;
+                          }}
+                          active={isActive}
+                          role="radio"
+                          tabIndex={isTabStop ? 0 : -1}
+                          aria-checked={isActive}
+                          aria-label={`${label} theme`}
+                          data-testid={`profile-theme-${value}`}
+                          onPress={() => setThemePreference(value)}
+                          onKeyDown={(
+                            e: React.KeyboardEvent<HTMLDivElement>,
+                          ) => {
+                            if (e.repeat) return;
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setThemePreference(value);
+                              return;
+                            }
+                            let nextIndex: number | null = null;
+                            if (
+                              e.key === 'ArrowRight' ||
+                              e.key === 'ArrowDown'
+                            ) {
+                              nextIndex = (index + 1) % THEME_OPTIONS.length;
+                            } else if (
+                              e.key === 'ArrowLeft' ||
+                              e.key === 'ArrowUp'
+                            ) {
+                              nextIndex =
+                                (index - 1 + THEME_OPTIONS.length) %
+                                THEME_OPTIONS.length;
+                            } else if (e.key === 'Home') {
+                              nextIndex = 0;
+                            } else if (e.key === 'End') {
+                              nextIndex = THEME_OPTIONS.length - 1;
+                            }
+                            if (nextIndex !== null) {
+                              e.preventDefault();
+                              const nextOption = THEME_OPTIONS[nextIndex];
+                              setThemePreference(nextOption.value);
+                              themeOptionRefs.current[nextIndex]?.focus();
+                            }
+                          }}
+                        >
+                          <Icon
+                            size={20}
+                            color={isActive ? '$brandNavy' : '$colorPress'}
+                          />
+                          <Paragraph
+                            size="$2"
+                            color={isActive ? '$brandNavy' : '$colorPress'}
+                            fontWeight={isActive ? '600' : '400'}
+                          >
+                            {label}
+                          </Paragraph>
+                        </ThemeOptionButton>
+                      );
+                    })}
+                  </XStack>
+                </YStack>
               </SectionBody>
             </SectionCard>
 

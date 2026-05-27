@@ -209,6 +209,86 @@ test.describe('Profile Settings Page @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-4912: Appearance / theme switcher must be reachable from
+// /profile/settings — including on mobile, where the desktop user-profile
+// dropdown (which carries its own theme picker) is not rendered. Users on
+// mobile reach this page via the bottom-bar "You" tab and had no way to
+// change theme before this fix.
+// ---------------------------------------------------------------------------
+
+test.describe('Profile Settings Page — appearance @regression', () => {
+  test('renders Appearance section with all three theme options', async ({
+    page,
+  }) => {
+    await setupProfileGraphQL(page);
+    await page.goto('/profile/settings');
+
+    await expect(page.getByText('Appearance')).toBeVisible();
+    await expect(page.getByTestId('profile-theme-light')).toBeVisible();
+    await expect(page.getByTestId('profile-theme-system')).toBeVisible();
+    await expect(page.getByTestId('profile-theme-dark')).toBeVisible();
+  });
+
+  test('theme can be changed on mobile (412x784 viewport)', async ({
+    page,
+  }) => {
+    // Match the reporter's viewport from LS-4912 exactly.
+    await page.setViewportSize({ width: 412, height: 784 });
+    await setupProfileGraphQL(page);
+    await page.goto('/profile/settings');
+
+    const light = page.getByTestId('profile-theme-light');
+    const dark = page.getByTestId('profile-theme-dark');
+
+    await expect(light).toBeVisible();
+    await light.click();
+    await expect(light).toHaveAttribute('aria-checked', 'true');
+
+    await dark.click();
+    await expect(dark).toHaveAttribute('aria-checked', 'true');
+    await expect(light).toHaveAttribute('aria-checked', 'false');
+  });
+
+  test('theme radio group follows ARIA roving-tabindex model', async ({
+    page,
+  }) => {
+    await setupProfileGraphQL(page);
+    await page.goto('/profile/settings');
+
+    const light = page.getByTestId('profile-theme-light');
+    const system = page.getByTestId('profile-theme-system');
+    const dark = page.getByTestId('profile-theme-dark');
+
+    // Select Light so we have a known starting point.
+    await light.click();
+    await expect(light).toHaveAttribute('aria-checked', 'true');
+
+    // Only the checked option is in the tab order.
+    await expect(light).toHaveAttribute('tabindex', '0');
+    await expect(system).toHaveAttribute('tabindex', '-1');
+    await expect(dark).toHaveAttribute('tabindex', '-1');
+
+    // ArrowRight moves selection (and focus) to System.
+    await light.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(system).toHaveAttribute('aria-checked', 'true');
+    await expect(system).toHaveAttribute('tabindex', '0');
+    await expect(light).toHaveAttribute('tabindex', '-1');
+    await expect(system).toBeFocused();
+
+    // ArrowLeft wraps back to Light from System.
+    await page.keyboard.press('ArrowLeft');
+    await expect(light).toHaveAttribute('aria-checked', 'true');
+    await expect(light).toBeFocused();
+
+    // End jumps to the last option (Dark).
+    await page.keyboard.press('End');
+    await expect(dark).toHaveAttribute('aria-checked', 'true');
+    await expect(dark).toBeFocused();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-3507: Accessibility regression — /profile/settings
 //
 // An automated scan flagged an empty alt attribute on the logo image and
