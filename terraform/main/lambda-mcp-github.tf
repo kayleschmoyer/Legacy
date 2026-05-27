@@ -96,6 +96,8 @@ resource "aws_lambda_function" "mcp_github" {
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME    = aws_secretsmanager_secret.rollbar_access_token.name
+      MCP_COGNITO_ISSUER                  = local.mcp_cognito_issuer
+      MCP_COGNITO_AUDIENCE                = aws_cognito_user_pool_client.mcp_cli.id
     }
   }
 

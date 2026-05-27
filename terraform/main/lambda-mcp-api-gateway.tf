@@ -273,23 +273,18 @@ resource "aws_apigatewayv2_api" "mcp" {
   tags          = local.common_tags
 }
 
-# ── JWT authoriser — Cognito-issued OIDC tokens ───────────────────────────────
-# API Gateway fetches <issuer>/.well-known/jwks.json automatically to validate
-# incoming ID tokens. The audience is the Cognito user-pool client ID, which
-# matches the `aud` claim Cognito puts in id tokens.
-
-resource "aws_apigatewayv2_authorizer" "mcp_oidc" {
-  for_each         = local.mcp_servers_map
-  api_id           = aws_apigatewayv2_api.mcp[each.key].id
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-  name             = "cognito-oidc"
-
-  jwt_configuration {
-    audience = [aws_cognito_user_pool_client.mcp_cli.id]
-    issuer   = local.mcp_cognito_issuer
-  }
-}
+# ── Auth note ─────────────────────────────────────────────────────────────────
+# Each Lambda validates the Cognito-issued bearer token itself (see
+# tools/mcp/<server>/src/mcp-bearer-auth.ts). API Gateway used to enforce auth
+# via a JWT authorizer here, but its 401 response body
+# (`{"message":"Unauthorized"}`) is not a JSON-RPC envelope; Claude Code's MCP
+# transport surfaces it as `ZodError: expected string, received undefined`
+# instead of an actionable token-expired hint (LS-4941, follow-up to LS-4874).
+# Moving validation into the Lambda lets us return a JSON-RPC error the
+# client surfaces verbatim — at the cost of one extra invoke per unauth call,
+# which we accept since unauth requests are rare and short-circuit before
+# any tool runs. The Cognito issuer + audience are passed to each Lambda via
+# MCP_COGNITO_ISSUER / MCP_COGNITO_AUDIENCE env vars.
 
 # ── Lambda integrations ───────────────────────────────────────────────────────
 
@@ -310,8 +305,8 @@ resource "aws_apigatewayv2_route" "mcp_default" {
   route_key = "$default"
   target    = "integrations/${aws_apigatewayv2_integration.mcp[each.key].id}"
 
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.mcp_oidc[each.key].id
+  # Auth happens inside the Lambda (see the "Auth note" comment above).
+  authorization_type = "NONE"
 }
 
 # ── Stage (auto-deploy) ───────────────────────────────────────────────────────

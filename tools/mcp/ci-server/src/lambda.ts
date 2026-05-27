@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-secrets-manager';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createServer } from './index.js';
+import { authenticateMcpRequest } from './mcp-bearer-auth.js';
 
 const sm = new SecretsManagerClient({});
 let tokenInitialized = false;
@@ -32,6 +33,9 @@ async function ensureToken(): Promise<void> {
 export const handler = async (
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
+  const authError = await authenticateMcpRequest(event);
+  if (authError) return authError;
+
   await ensureToken();
 
   const domainName = event.requestContext.domainName ?? 'localhost';
