@@ -100,6 +100,7 @@ resource "aws_iam_role_policy" "runner_ami_builder" {
           "ec2:DescribeInstances",
           "ec2:DescribeInstanceStatus",
           "ec2:DescribeRegions",
+          "ec2:DescribeRouteTables",
           "ec2:DescribeSecurityGroups",
           "ec2:DescribeSnapshots",
           "ec2:DescribeSubnets",
