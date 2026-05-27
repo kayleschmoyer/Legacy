@@ -181,7 +181,7 @@ function SectionHead({
 }: {
   label: string;
   count: number;
-  kind: 'live' | 'upcoming' | 'final';
+  kind: 'live' | 'upcoming' | 'final' | 'postponed';
 }) {
   const lampColor =
     kind === 'live'
@@ -297,6 +297,40 @@ function SkeletonBar({
   );
 }
 
+// ─── Game bucketing ────────────────────────────────────────────────────────
+
+/**
+ * Bucket scoreboard games by status. Postponed games are split out so they
+ * never appear under "Upcoming" — they will not be played that day.
+ */
+export function partitionScoreboardGames(games: ScoreboardGame[]): {
+  liveGames: ScoreboardGame[];
+  upcomingGames: ScoreboardGame[];
+  finalGames: ScoreboardGame[];
+  postponedGames: ScoreboardGame[];
+} {
+  const liveGames: ScoreboardGame[] = [];
+  const upcomingGames: ScoreboardGame[] = [];
+  const finalGames: ScoreboardGame[] = [];
+  const postponedGames: ScoreboardGame[] = [];
+  for (const game of games) {
+    switch (game.status) {
+      case 'Live':
+        liveGames.push(game);
+        break;
+      case 'Final':
+        finalGames.push(game);
+        break;
+      case 'Postponed':
+        postponedGames.push(game);
+        break;
+      default:
+        upcomingGames.push(game);
+    }
+  }
+  return { liveGames, upcomingGames, finalGames, postponedGames };
+}
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function Scoreboard() {
@@ -319,11 +353,8 @@ export function Scoreboard() {
   const games: ScoreboardGame[] = data?.scoreboard?.games ?? [];
   const lastUpdated = data?.scoreboard?.lastUpdated;
 
-  const liveGames = games.filter((g) => g.status === 'Live');
-  const finalGames = games.filter((g) => g.status === 'Final');
-  const upcomingGames = games.filter(
-    (g) => g.status !== 'Live' && g.status !== 'Final',
-  );
+  const { liveGames, upcomingGames, finalGames, postponedGames } =
+    partitionScoreboardGames(games);
   const isAnyGameLive = liveGames.length > 0;
   // Also poll while upcoming games exist for today — games can transition
   // from Upcoming → Live without triggering a re-fetch otherwise.
@@ -389,6 +420,13 @@ export function Scoreboard() {
               )}
               {finalGames.length > 0 && (
                 <SectionGrid kind="final" label="Final" games={finalGames} />
+              )}
+              {postponedGames.length > 0 && (
+                <SectionGrid
+                  kind="postponed"
+                  label="Postponed"
+                  games={postponedGames}
+                />
               )}
             </YStack>
           )}
@@ -555,7 +593,7 @@ function SectionGrid({
   label,
   games,
 }: {
-  kind: 'live' | 'upcoming' | 'final';
+  kind: 'live' | 'upcoming' | 'final' | 'postponed';
   label: string;
   games: ScoreboardGame[];
 }) {
