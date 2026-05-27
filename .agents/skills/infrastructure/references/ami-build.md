@@ -25,6 +25,29 @@ The self-hosted GitHub Actions runners use a pre-baked Ubuntu 22.04 AMI built wi
 >
 > `Amazon CloudWatch Agent` is **not** baked into the AMI by the Packer template. When `enable_cloudwatch_agent = true` is set in `github-runners.tf`, the agent is installed during instance boot by the runner module's userdata. Do not list it as a baked-in tool.
 
+## Citing the AMI in Tickets and Docs
+
+AMI IDs are **point-in-time** — every Packer rebuild produces a new `ami-xxxxxxxx`, and the runner ASG picks up the new one automatically via name-based filtering. A hardcoded AMI ID in a ticket description is stale the moment the next AMI is built.
+
+When writing a ticket or doc that references "the current runner AMI", cite the **launch-template filter** rather than the AMI ID:
+
+```
+The runner launch template selects whatever AMI matches the filter
+`legacy-sports-runner-pw${runner_ami_playwright_version}-*` (see
+terraform/runners/github-runners.tf — module.github_runners ami.filter).
+```
+
+To look up the live AMI ID at implementation time:
+
+```bash
+aws ec2 describe-images --owners self \
+  --filters "Name=name,Values=legacy-sports-runner-pw*" \
+  --query "Images | sort_by(@, &CreationDate) | [-1].{Name:Name,ImageId:ImageId}" \
+  --output table
+```
+
+This is also captured in the `/define` skill — see `.agents/skills/define/SKILL.md` ("Citing Infrastructure Version Refs").
+
 ## When to Rebuild
 
 Rebuild the AMI when:

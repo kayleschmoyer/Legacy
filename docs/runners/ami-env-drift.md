@@ -266,7 +266,13 @@ Follow-up tickets to file from this inventory:
   via `corepack`.
 - **D-5 AMI ID drift in ticket**: process-only — ensure ticket descriptions
   capture the live AMI at the moment of writing, or link to the launch
-  template rather than a hardcoded AMI ID.
+  template rather than a hardcoded AMI ID. **Landed in
+  [LS-4950](https://bkrupa.atlassian.net/browse/LS-4950)**: see the "Citing
+  Infrastructure Version Refs" section in
+  [`.agents/skills/define/SKILL.md`](../../.agents/skills/define/SKILL.md)
+  and the "Citing the AMI in Tickets and Docs" section in
+  [`.agents/skills/infrastructure/references/ami-build.md`](../../.agents/skills/infrastructure/references/ami-build.md)
+  for the canonical guidance and lookup snippet.
 - **D-6 `ec2:DescribeImages` on runner role**: add the permission, OR embed
   AMI-tag values into a `/etc/legacy-sports-runner-version` file so the
   runner doesn't need IAM to read its own contract.

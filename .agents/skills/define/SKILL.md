@@ -165,6 +165,30 @@ After writing to Jira, print the ticket URL and suggest next steps:
 - **If the Technical Approach has multiple distinct phases**: suggest `/slice LS-####` to decompose into child tasks before implementing
 - **If Open Questions remain**: recommend resolving them before running `/work-ticket`
 
+## Citing Infrastructure Version Refs
+
+When a ticket needs to cite a piece of mutable infrastructure (AMIs, container images, Lambda versions, launch templates), **cite the selector — not the point-in-time ID**. IDs captured at ticket-write time go stale fast: the runner AMI alone rolls forward on every Packer rebuild, so a hardcoded `ami-xxxxxxxx` in a ticket description is usually wrong by the time anyone implements the ticket (see [LS-4947](https://bkrupa.atlassian.net/browse/LS-4947) drift instance D-5 for the worked example that motivated this rule).
+
+Instead, cite the launch-template / module / filter that resolves to "whatever is current", and include a one-line lookup snippet so the implementer can fetch the live ID at implementation time.
+
+Worked example — runner AMI:
+
+```
+❌ The current runner AMI is ami-09604782c3c411107.
+
+✅ The runner launch template selects whatever AMI matches the filter
+   `legacy-sports-runner-pw${runner_ami_playwright_version}-*` (see
+   terraform/runners/github-runners.tf — module.github_runners ami.filter).
+   Look up the live AMI ID at implementation time with:
+
+     aws ec2 describe-images --owners self \
+       --filters "Name=name,Values=legacy-sports-runner-pw*" \
+       --query "Images | sort_by(@, &CreationDate) | [-1].ImageId" \
+       --output text
+```
+
+Same shape applies to anything else with a name-based or tag-based selector (Lambda aliases, ECR `:latest`, ASG launch template versions).
+
 ## Gotchas
 
 - **Precondition for writing a new ticket to Jira in interactive mode: the user has confirmed the draft.** Show the draft and wait — a hallucinated scope in Jira is worse than no ticket. This precondition does not apply to autonomous invocations (e.g. when `work-ticket` calls this skill to enrich an underspecified ticket); proceeding without confirmation is expected there.
