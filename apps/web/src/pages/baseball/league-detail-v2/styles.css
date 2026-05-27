@@ -2531,4 +2531,20 @@
     left: 10px;
     right: 10px;
   }
+
+  /* Section card head: wrap the right-aligned sub-tabs (e.g. the Overview
+     Activity / Chat / Scoring pills) onto their own row so they cannot get
+     pushed past the right edge of the card on narrow viewports. Without
+     this, the title block + sub-tabs strip overflow the .ls-card content
+     box at ~443px and the rightmost pill (Chat / Scoring) is clipped. */
+  .ls-card-head {
+    flex-wrap: wrap;
+  }
+  .ls-card-head > div {
+    min-width: 0;
+  }
+  .ls-card-head .ls-subtabs {
+    flex: 1 1 100%;
+    margin-bottom: 0;
+  }
 }
