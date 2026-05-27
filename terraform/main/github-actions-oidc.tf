@@ -368,7 +368,24 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:RevokeSecurityGroupEgress",
           "ec2:ModifyVpcEndpoint",
           "ec2:CreateVpcEndpoint",
-          "ec2:DeleteVpcEndpoints"
+          "ec2:DeleteVpcEndpoints",
+          # Launch-template permissions — required by the runner-terraform-apply
+          # workflow, which manages the github-aws-runners module's
+          # aws_launch_template.runner resource. Scoped to versioning + the
+          # one-time create; deletion-of-the-LT itself is deliberately
+          # excluded (would only be needed for `terraform destroy`, which
+          # this CI role never runs — least-privilege per Reviewer Bot review
+          # on PR #4474). Per-version delete IS needed because terraform
+          # routinely deletes old LT versions when applying changes that
+          # force a new version.
+          # Discovered on LS-4948 (PR #4473) — the LS-4948 user-data change
+          # failed at apply time because CreateLaunchTemplateVersion wasn't
+          # in this block. See LS-4952 for the diagnostic.
+          # ec2:Describe*LaunchTemplate* is already covered by the Describe* allow above.
+          "ec2:CreateLaunchTemplate",
+          "ec2:CreateLaunchTemplateVersion",
+          "ec2:DeleteLaunchTemplateVersions",
+          "ec2:ModifyLaunchTemplate"
         ]
         Resource = [
           "arn:aws:ec2:${local.region}:${local.account_id}:*",
