@@ -118,12 +118,16 @@ resource "aws_iam_role_policy" "runner_ami_builder" {
         Resource = "*"
       },
       # Instance termination is scoped strictly to Packer-tagged build instances.
-      # Packer's amazon-ebs builder tags the temporary build instance with
-      # `Name = Packer Builder` (literal string) during RunInstances. The condition
-      # below uses ONLY that prefix — the runner fleet's instances are tagged
-      # `legacy-sports-dev-runner-...` and must NOT be terminable by this role,
-      # so the previous wildcard that included `legacy-sports-runner*` was removed
-      # per Copilot review on PR #2281.
+      # The amazon-ebs builder does NOT apply a default Name tag — we set
+      # `Name = "Packer Builder - legacy-sports-runner"` explicitly via the
+      # `run_tags` block in terraform/runners/packer/runner-ami.pkr.hcl so this
+      # condition matches. Before LS-4921, run_tags was unset and the condition
+      # never matched, so failed builds leaked the build instance (and its temp
+      # security group, since SG delete cascades on instance termination).
+      # The condition uses ONLY the "Packer Builder*" prefix — the runner fleet's
+      # instances are tagged `legacy-sports-dev-runner-...` and must NOT be
+      # terminable by this role, so the previous wildcard that included
+      # `legacy-sports-runner*` was removed per Copilot review on PR #2281.
       {
         Sid    = "PackerBuilderTerminateTagged"
         Effect = "Allow"

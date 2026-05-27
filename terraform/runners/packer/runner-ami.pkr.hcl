@@ -121,6 +121,24 @@ source "amazon-ebs" "runner" {
   subnet_id                   = var.subnet_id
   associate_public_ip_address = true
 
+  # Tag the temporary EC2 build instance and its volumes with a deterministic
+  # Name prefix so the runner-ami-builder IAM role's tag-scoped
+  # ec2:TerminateInstances condition (Name LIKE "Packer Builder*") matches.
+  # The amazon-ebs builder does NOT apply a default Name tag when run_tags is
+  # unset, which previously caused failed builds to leak EC2 instances and
+  # security groups (LS-4921) because cleanup TerminateInstances was denied.
+  # See terraform/runners/runner-ami-builder-iam.tf for the matching policy.
+  run_tags = {
+    Name      = "Packer Builder - legacy-sports-runner"
+    Project   = "legacy-sports"
+    ManagedBy = "packer"
+  }
+  run_volume_tags = {
+    Name      = "Packer Builder - legacy-sports-runner"
+    Project   = "legacy-sports"
+    ManagedBy = "packer"
+  }
+
   # The Ubuntu 22.04 source AMI ships with an 8 GB root volume — too small for
   # the Android NDK (~8 GB uncompressed) plus Node.js, Playwright, Docker, etc.
   # This resizes the Packer build instance disk only; the runner AMI inherits
