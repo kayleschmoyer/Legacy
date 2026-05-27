@@ -28,7 +28,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 2. **Inspect ticket** — `jira_view(key: "LS-####")` / `jira_list_children(key: "LS-####")` for parents.
 3. **Blocker check** — `jira_check_blockers(key: "LS-####")`. Stop if blockers are not In Review/Done.
 4. **Jira → In Progress** — `jira_transition(key: "LS-####", status: "In Progress")`.
-5. **Do NOT rename the branch** — Claude Code caches the branch name at session start and never refreshes it. Renaming permanently disables PR detection and "Create PR" (anthropics/claude-code#18690). Leave the branch as `claude/<random>`. Jira linking works via PR title and commit messages containing `LS-####` — branch name is not required. See `.agents/skills/branch-naming/SKILL.md`.
+5. **Precondition for any branch operation: leave the auto-generated branch name (`claude/<random>`) as-is.** Claude Code caches the branch name at session start and never refreshes it, so a rename permanently disables PR detection and "Create PR" (anthropics/claude-code#18690). Jira linking flows through PR title and commit messages containing `LS-####`, not the branch name. See `.agents/skills/branch-naming/SKILL.md`.
 6. **Register the active worktree** — so MCP tools target the right tree:
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
@@ -39,7 +39,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    node scripts/setup-worktree-node-modules.mjs
    ```
 
-   Run from the worktree root. Uses Node.js `fs` APIs internally — no shell escaping needed. Idempotent (safe to call if symlinks already exist). Requires Windows Developer Mode for symlinks. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures.
+   Run from the worktree root. Uses Node.js `fs` APIs internally — no shell escaping needed. Idempotent (safe to call if symlinks already exist). Requires Windows Developer Mode for symlinks. **Precondition for any manual symlink creation in a worktree: the setup script and `make install` have both failed.** Manual `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, and `mklink /J` bypass `.modules.yaml` path consistency checks and cause Nx graph failures, so they are not a supported fallback.
 
    In addition to `node_modules`, the script also links the main repo's gitignored secret files (`.env`, `.env.local`) into the worktree as file symlinks. This is what lets agents run integration tests locally — `playwright.integration.config.ts` loads `<repo>/.env` for `E2E_COMMISSIONER_*`, `E2E_MANAGER_*`, `VITE_OAUTH_PROXY_URL`, etc. — without manual per-worktree credential copying. Symlinks (not copies) ensure secret rotations in main propagate automatically. If a real file is already present in the worktree (not a symlink), the script leaves it alone — delete it manually if you want to switch to the linked copy.
 
@@ -58,19 +58,19 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > Never attempt to re-point the junction/symlink manually.
 
-   > **Installing new packages in a worktree**: while `node_modules` is symlinked to the main repo, you must never run `pnpm add` or `make install` from the worktree. Those commands are unsafe in this setup: the repo's guardrails are meant to stop them, but attempting to run them with the symlink still in place risks corrupting the shared `node_modules` used by every worktree. If your implementation requires adding/removing/updating dependencies, you **must** break the symlink first and install independently:
+   > **Installing new packages in a worktree** — **Precondition for `pnpm add` or `make install`: the symlink has been removed first.** While `node_modules` is symlinked to the main repo, running either command in place risks corrupting the shared `node_modules` used by every worktree (the `preinstall-guard` exists as a safety net, but even partial execution before it fires can damage sibling worktrees). To add/remove/update dependencies:
    >
    > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the symlink only, not the main repo's `node_modules`
    > 2. `pnpm add -w <package>` — adds the package to root `package.json`
    > 3. `make install` — creates independent `node_modules` in the worktree
    >
-   > See [install-packages.md](../repo-tooling/references/install-packages.md) for the full procedure. **Never run `pnpm add` or `make install` while the symlink is still in place** — the `preinstall-guard` is there to catch this unsafe path, but you must not rely on it because even partial execution can damage every other worktree's shared `node_modules`.
+   > See [install-packages.md](../repo-tooling/references/install-packages.md) for the full procedure.
 
    > **Broken, empty, or missing `node_modules` recovery**: if the symlink is broken, missing, pointing to the wrong location, **or the target resolved but contains 0 packages** (empty main-repo `node_modules`):
    >
    > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`. If `node_modules` is already missing, skip this step.
    > 2. Run `node scripts/setup-worktree-node-modules.mjs` to recreate the symlink, **or** run `make install` for an independent `node_modules`
-   > 3. **Never** recreate the symlink with `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, or any other manual command — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures.
+   > 3. **Precondition for manual symlink recreation: the setup script and `make install` have both failed.** `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, and `New-Item -ItemType SymbolicLink` bypass `.modules.yaml` path consistency checks and cause Nx graph failures, so they are not a supported fallback.
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
@@ -79,7 +79,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.
 11. **Self-review (mandatory gate)** — run `/review` and produce a Self-Review Summary before pushing. See `skills/pr-lifecycle/references/self-review.md`.
 12. **Ship** — `worktree_commit` → `worktree_push` → `github_create_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → `github_mark_pr_ready` → `github_request_review` → subscribe to PR activity → `jira_transition("In Review")`.
-    - **Never use raw `git` for commit or push**: `git add <files> && git commit -m "..."` → `worktree_commit({ files: ["<file>"], message: "..." })`; `git push -u origin <branch>` (or `HEAD`) → `worktree_push({ setUpstream: true })`. The MCP tools enforce secret-file guards and worktree safety checks that raw git bypasses. See the MCP-first substitution table in `.agents/skills/mcp-first/SKILL.md`.
+    - **Precondition for any commit/push: use the worktree MCP tool.** `git add <files> && git commit -m "..."` → `worktree_commit({ files: ["<file>"], message: "..." })`; `git push -u origin <branch>` (or `HEAD`) → `worktree_push({ setUpstream: true })`. The MCP tools enforce secret-file guards and worktree safety checks that raw git bypasses. Raw `git` is a fallback only after the MCP tool returns an explicit error. See the MCP-first substitution table in `.agents/skills/mcp-first/SKILL.md`.
     - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`. Do not attempt `make install` from the worktree while symlinks exist — ask the user to repair the main repo instead.
 13. **Watch to merge** — monitor CI, fix failures, respond to review comments, rebase as needed.
 14. **After merge** — MCP gap audit, mark tracking tasks complete, cleanup.
@@ -208,10 +208,9 @@ These are loaded by `references/sibling/sibling-worktree-flow.md` and are not re
 
 ## Key Rules (both flows)
 
-| Rule                                                                  | Detail                                                                                                                                    |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Never commit to the `main` branch**                                 | Always work on a feature branch, in either `.claude/worktrees/<name>/` (native) or `D:\code\legacy-sports-worktrees\<ticket>\` (sibling). |
-| **Never edit `D:\code\legacy-sports` with HEAD on `main`**            | The `.claude/hooks/guard-main-repo.sh` hook enforces this.                                                                                |
-| **MCP-first**                                                         | Prefer worktree MCP tools (`worktree_commit`, `worktree_push`, `worktree_rebase`) over raw `git` commands.                                |
-| **Never manually remove a sibling worktree**                          | Always `twig worktree clean`. `git worktree remove` destroys symlinks.                                                                    |
-| **Never `make clean`/`make install`/`pnpm install` in the main repo** | Breaks all symlinks.                                                                                                                      |
+| Precondition                                                                                                                               | Detail                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Before any commit: HEAD is on a feature branch, not `main`.**                                                                            | Work in either `.claude/worktrees/<name>/` (native) or `D:\code\legacy-sports-worktrees\<ticket>\` (sibling). `.claude/hooks/guard-main-repo.sh` blocks edits in main on `main`. |
+| **Before any git operation: prefer the worktree MCP tool over raw `git`.**                                                                 | `worktree_commit`, `worktree_push`, `worktree_rebase` apply worktree-path resolution and safety guards that raw `git` bypasses.                                                  |
+| **Before removing a sibling worktree: use `twig worktree clean`.**                                                                         | `git worktree remove` and manual deletion destroy the symlinks that other worktrees depend on.                                                                                   |
+| **Before `make clean` / `make install` / `pnpm install` in the main repo: confirm no worktree symlinks point into `<main>/node_modules`.** | These commands rebuild or wipe the directory every worktree's symlink targets — running them while any worktree is symlinked breaks them all simultaneously.                     |

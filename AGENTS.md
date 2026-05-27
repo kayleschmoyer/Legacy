@@ -319,6 +319,8 @@ Fantasy sports players (25–45) who are league commissioners and active partici
 
 Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description` frontmatter field enables skill auto-discovery; agents can also browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
 
+**Writing or editing a skill**: load **`skill-authoring`** (`.agents/skills/skill-authoring/SKILL.md`) before drafting or restructuring any `SKILL.md`. It encodes the **precondition + TaskCreate pattern** that replaces prevention-style "never X" prohibitions — positive imperatives ("Before X, do Y") and explicit TaskCreate checklist items survive context compaction and are mechanically checkable, while bare "never X" bullets are read as background warnings.
+
 **Process framework**: `.agents/skills/dev-process/SKILL.md` is the canonical map of how work flows through this codebase. Load it at the start of any task that doesn't fit the dominant new-feature path — it covers incidents, bugs, security, refactors, migrations, spikes, experiments, reverts, inherited PRs, and documentation-only changes.
 
 **E2E/integration determinism**: `.agents/skills/testing/references/e2e-determinism.md` is the 12-lever checklist that gates every PR touching E2E or integration tests. Flake is a P1 bug.

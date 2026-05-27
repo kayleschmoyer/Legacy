@@ -110,7 +110,7 @@ Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` vi
 
 ## GitHub PR Operations
 
-> **⛔ `gh pr create` is an anti-pattern** — always use `github_create_pr` MCP tool. `gh pr create` silently targets the shell's working directory and ignores `worktreePath`, causing PRs to be created from the wrong branch in multi-worktree sessions. It is also flagged by the MCP gap auditor as a missing-awareness gap. The CLI is a fallback only for when the MCP server is confirmed unavailable.
+> **Precondition for opening a PR**: call `github_create_pr` (MCP tool). It resolves `worktreePath` correctly, so the PR opens from the worktree's branch rather than the shell's CWD. `gh pr create` ignores `worktreePath` and silently targets the shell's working directory — use it only after confirming the MCP server is unavailable, and add a follow-up MCP gap ticket when you do.
 
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
 
@@ -178,7 +178,7 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, `ci_rerun`, 
 | `sleep N && gh run view RUN_ID` (loop)      | `ScheduleWakeup(delaySeconds: N, ...)` then `ci_view_run(runId: RUN_ID)` — works in all environments                                                                                                                                                                 |
 | `WebFetch(url: ".../test-results.json")`    | `ci_get_playwright_report({ reportName: "pr-N" })` — returns stats, `failedTests`, `flakyTests`, and `skippedTests: [{ name, file, reason }]`; handles large ZIPs without truncation. Report name patterns: `"pr-{number}"`, `"manual-{number}"`, or numeric run ID. |
 
-**CI status and PR events are surfaced natively by Claude Code** — no wait tool needed in local/web sessions. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `sleep N && gh pr checks <pr>`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips. **In Copilot CLI or any environment** where you need to wait for CI, use the built-in `ScheduleWakeup` tool to sleep for an interval (e.g. 270s to stay within the prompt-cache window), then call `ci_view_run({ runId: <id> })` to check status — repeat until terminal.
+**Precondition for waiting on CI or PR events**: in local/web Claude Code sessions, continue to the next workflow step after pushing — CI failures, review events, and merge status arrive as push notifications, so no wait tool is needed. Treat `ci_view_run` and `github_view_pr` as one-shot lookups (e.g. to fetch a `runId` after a failure event), not as poll targets. **In Copilot CLI or any environment without push notifications**, use `ScheduleWakeup(delaySeconds: 270)` (stays within the prompt-cache window) then call `ci_view_run({ runId: <id> })` once; repeat until terminal. Polling loops (`sleep N && gh run view`, repeated `ci_view_run` calls) never deliver earlier signal than the native notification and have been observed burning 1–2M tokens per session — the precondition above prevents this.
 
 ## Jira Operations
 

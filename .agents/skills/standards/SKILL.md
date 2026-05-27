@@ -13,13 +13,13 @@ These standards inform the risk assessment in the [planning skill](../planning/S
 
 ### No lint suppression -- fix root causes
 
-**Never** add `eslint-disable`, `eslint-disable-next-line`, `@ts-ignore`, or `@ts-expect-error` as a first resort. Fix the underlying issue instead. If a disable is truly unavoidable, it must: (1) target a single line, (2) name the exact rule, and (3) include a `-- description` explaining why.
+**Precondition for any `eslint-disable` / `eslint-disable-next-line` / `@ts-ignore` / `@ts-expect-error`: the root cause cannot be fixed in this PR and a follow-up ticket explains why.** When a disable is unavoidable, it must (1) target a single line, (2) name the exact rule, and (3) include a `-- description` explaining the constraint.
 
 > Details, approved exceptions, and ESLint config reference: [references/lint-discipline.md](references/lint-discipline.md)
 
-### Never edit generated files -- run codegen
+### Precondition for changes to generated files: edit the source and re-run codegen
 
-Files matching `*.generated.ts` and `schema.graphql` are auto-generated. Manual edits get overwritten and fail CI. Fix the source (`.graphql` files, Pothos types, codegen config) and run `make codegen`.
+Files matching `*.generated.ts` and `schema.graphql` are auto-generated; manual edits are overwritten by the next codegen run and fail CI. Fix the source (`.graphql` files, Pothos types, codegen config) and run `make codegen` to produce the change.
 
 > Regeneration steps, CI checks, and conflict resolution: [references/codegen-policy.md](references/codegen-policy.md)
 

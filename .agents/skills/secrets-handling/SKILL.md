@@ -5,17 +5,17 @@ description: 'How agents should handle secrets without exposing values in conver
 
 # Skill: Secrets Handling
 
-## The Core Rule
+## The Core Precondition
 
-**Never embed raw secret values in tool calls.** Every tool call — `Edit`, `Write`, `Bash`, `github_secret_set` — is recorded in the session transcript and visible to anyone with access to the session. Secret values in tool call arguments are permanently exposed.
+**Precondition for any tool call that touches a secret: the secret value lives in a file on disk, never inline in the call arguments.** Every tool call — `Edit`, `Write`, `Bash`, `github_secret_set` — is recorded in the session transcript and visible to anyone with access to the session. A value inline in arguments is permanently exposed.
 
-This means:
+Concrete examples (the unsafe forms violate the precondition above; the safe forms satisfy it):
 
-- **DO NOT**: `Edit(file: "secrets.auto.tfvars", new_string: 'my_api_key = "sk-abc123..."')`
-- **DO NOT**: `Bash(command: 'echo "sk-abc123..." >> secrets.auto.tfvars')`
-- **DO NOT**: Ask the user to paste a secret value into chat (it ends up in conversation history)
-- **SAFE**: Reading from a file the user placed on disk and copying it to the target
-- **SAFE**: Asking the user to write the value to a file path, then referencing that path
+- ❌ Unsafe inline: `Edit(file: "secrets.auto.tfvars", new_string: 'my_api_key = "sk-abc123..."')`
+- ❌ Unsafe inline: `Bash(command: 'echo "sk-abc123..." >> secrets.auto.tfvars')`
+- ❌ Unsafe inline: asking the user to paste the secret into chat (ends up in conversation history)
+- ✅ Safe: read from a file the user placed on disk and copy to the target
+- ✅ Safe: ask the user to write the value to a file path, then reference that path
 
 ---
 

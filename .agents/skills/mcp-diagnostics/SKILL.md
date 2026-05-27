@@ -15,7 +15,7 @@ An MCP server has silently failed to load when **any** of the following is true:
 - The `<system-reminder>` deferred tools list is empty or missing `mcp__legacy-sports-github__*`, `mcp__worktree__*`, `mcp__legacy-sports-make__*`, `mcp__legacy-sports-nx__*`
 - The session's `[MCP WARNING]` output from `check-mcp-servers.sh` reports a failure
 
-**Do not silently fall back to `gh`, `git`, or `make` Bash commands.** That masks the failure and produces MCP gap audit entries. Diagnose and report first.
+**Precondition for any `gh` / `git` / `make` shell fallback: the MCP failure is diagnosed and reported.** Silent fallback masks the failure, produces MCP gap audit entries, and prevents the user from fixing the underlying connectivity. Run the diagnostic checklist below first; only then decide whether a shell fallback is appropriate for the immediate operation.
 
 ## Diagnostic Checklist
 

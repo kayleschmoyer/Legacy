@@ -142,7 +142,7 @@ Follow the [work-ticket](../work-ticket/SKILL.md) leaf mode workflow from Step 2
 
 2. **Reproduce before fixing** — follow the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type). Capture before-state evidence (screenshot, failing test, query result). This is not optional — you cannot prove a fix works without showing the broken state first.
 
-3. **Write the fix** — address the root cause identified in Phase 2. Never patch symptoms. Never use `@ts-ignore` or `eslint-disable`. Use `LOGGER` instead of `console.*`.
+3. **Write the fix** — address the root cause identified in Phase 2. **Precondition for committing the fix: the change targets the root cause, not a symptom**; a symptom patch leaves the defect free to recur in adjacent flows. **Precondition for any `@ts-ignore` / `eslint-disable`: a separate ticket documents why the types or code cannot be fixed.** Use `LOGGER` instead of `console.*`.
 
 4. **Write a regression test** — every bug fix must include a test that would have caught the defect. The test must fail against the old code and pass against the fix.
 

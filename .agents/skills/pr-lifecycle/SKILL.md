@@ -34,7 +34,7 @@ You must produce a **structured Self-Review Summary** (see the template in the r
 
 ### Phase 2: Create PR with Jira Linkage
 
-> **⛔ Never use `gh pr create` directly** — always use `github_create_pr` MCP tool. The MCP tool handles `worktreePath` routing (ensures the PR targets the correct branch in multi-worktree sessions), structured body encoding, and is audited by the MCP gap checker. `gh pr create` silently uses the shell working directory, bypasses `worktreePath`, and produces audit flags. Fall back to `gh pr create` **only** after confirming `github_auth_status()` returns `configured: false` and the user explicitly authorizes the CLI fallback.
+> **Precondition for opening a PR**: call `github_create_pr` (MCP tool). It routes via `worktreePath`, handles structured body encoding, and is audited by the MCP gap checker. `gh pr create` silently uses the shell's working directory instead of `worktreePath`, which targets the wrong branch in multi-worktree sessions. **Precondition for `gh pr create` fallback**: `github_auth_status()` returns `configured: false` and the user has explicitly authorized the CLI fallback.
 
 Before creating a PR, verify GitHub auth is working:
 
@@ -62,7 +62,7 @@ After creating the PR and transitioning Jira, shepherd the PR through CI and rev
 
 Claude Code surfaces CI results and review events **as push notifications**. After marking the PR ready, Claude Code will automatically receive and surface CI failures, new review threads, and other agent-actionable events. Handle each event as it arrives (fixing code, resolving threads, re-running CI) and continue until merged or closed.
 
-> **⛔ Do NOT poll for CI results.** Never run `sleep N && gh pr view --json statusCheckRollup`, `sleep N && gh run view`, or repeated `ci_view_run` / `github_view_pr` calls in a loop. Claude Code delivers CI events automatically — polling only wastes context (1–2M tokens observed in a single session). After marking the PR ready, simply wait for the next event.
+> **Precondition for any CI status read**: a push event has arrived (CI failure/pass, review, merge). Treat `ci_view_run`, `github_view_pr`, and `gh pr view --json statusCheckRollup` as one-shot lookups triggered by an event — not as poll targets. Repeated calls in a `sleep` loop have been observed burning 1–2M tokens per session for zero earlier signal than the native push notification.
 
 See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table.
 
@@ -119,7 +119,7 @@ Before the next push, also check whether any other blockers are already known on
 
 ## Enabling Auto-Merge from Worktrees
 
-> **⛔ Never use `gh pr merge --auto` from a worktree session.** The `gh` CLI shells out to `git` to check out the base branch locally before enabling auto-merge. When the parent repo already has `main` checked out (always the case in our worktree workflow), this fails with:
+> **Precondition for enabling auto-merge**: use `github_pr_enable_auto_merge` (GraphQL — no local git ops). `gh pr merge --auto` shells out to `git` to check out the base branch locally, which fails in worktree sessions because the parent repo already has `main` checked out:
 >
 > ```
 > fatal: 'main' is already used by worktree at 'D:/code/legacy-sports'
@@ -172,23 +172,23 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 6.  **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
 7.  **Always create PRs as drafts, then mark ready before handoff** -- use `draft: true` in `github_create_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then call `github_mark_pr_ready(number: <PR#>)`. **Draft is a working state, not an ending state.** It is fine to keep a PR in draft while you are still actively pushing commits, iterating on CI, or waiting on a user question. It is NOT fine to end a turn or hand off with a PR still in draft. **Stopping at `draft: true` is a Tier 2 failure** — draft PRs are skipped by `Reviewer (W1)` (which checks `draft == false`), skipped by the bot-review-gated CI orchestration path, and skipped by sweep agents. A forgotten draft sits forever and nobody picks it up. Before ending a turn, handing off, or requesting review, verify `github_view_pr({ number: N })` returns `isDraft: false`. If you genuinely cannot mark it ready (real blocker), surface that blocker explicitly to the user — do not silently leave the PR in draft. See [create-pr.md](references/create-pr.md) for the canonical step order.
 8.  **Check Runs ≠ Commit Statuses** -- `github_retrigger_check` only works on **Check Runs** (Checks API). `bot-review` and other bot-set statuses use the **Statuses API** and will NOT be found by `github_retrigger_check`. If you get "No check run named 'X' found", use `github_list_commit_statuses({ number: <PR#> })` to see commit statuses instead. To clear a stale commit status: push a new commit (re-triggers the workflow) or dispatch via `ci_dispatch_workflow`. Note: `github_merge_pr(strategy: "direct")` does NOT bypass required commit statuses — it uses the standard merge API which still enforces branch protection rules.
-9.  **Claude Code surfaces PR events natively — never use polling loops** -- after marking a PR ready, Claude Code automatically surfaces CI results, review threads, and other agent-actionable events. No wait tool needed. React to each event as it arrives and handle it.
-    - **Never use `sleep` + polling loops** — no `sleep N && gh run view`, no `sleep N && gh pr view --json statusCheckRollup`, no `sleep N && gh pr checks <pr>`, no `ci_view_run every ~60s` loops. These waste context and shell round-trips. `sleep N && gh pr checks` is a common fallback when agents believe the CI server is not loaded — but Claude Code's native event streaming works regardless of which MCP servers are connected.
+9.  **Precondition for PR event handling**: react to each push notification as it arrives. After marking a PR ready, Claude Code surfaces CI results, review threads, and other agent-actionable events automatically — no wait tool is needed.
+    - **Precondition for any status-read call**: a push event has arrived. `sleep N && gh run view`, `sleep N && gh pr view --json statusCheckRollup`, `sleep N && gh pr checks <pr>`, and `ci_view_run every ~60s` loops never deliver earlier signal than the native notification. Native event streaming works regardless of which MCP servers are connected, so the "CI server not loaded" rationalization does not justify polling.
 10. **Batch known PR fixes into one push** -- when a PR simultaneously has unresolved review threads and failing checks, gather both the thread set and CI evidence before editing. The default remediation unit is one review/CI round -> one validation -> one push. Multiple pushes for already-known issues create avoidable Copilot re-reviews and CI cycles.
 11. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup.
 12. **Re-dispatch `bot-review` via MCP — never `gh workflow run`** -- if `bot-review` remains stuck after resolving threads, use `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })`. Never use `gh workflow run copilot-auto-approve.yml` via Bash — always use the `ci_dispatch_workflow` MCP tool. See [cloud-agent-mode/SKILL.md](../cloud-agent-mode/SKILL.md#quirk-3-ci_dispatch_workflow-returns-403-in-cloud--agent_author_app-lacks-actionswrite) for the 403 fallback in cloud sessions.
-13. **Never `sleep`-poll waiting for a Copilot review submission** -- after calling `github_request_review({ prs: [PR#] })`, use `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` (Claude Code built-in, local sessions only) to receive the review event rather than polling with `sleep N && gh api repos/{owner}/{repo}/pulls/{pr}/reviews`. The sleep-polling pattern wastes 4–5 minutes per review cycle, may miss the event if the sleep is too short, and burns context tokens on repeated API calls — the same anti-pattern as CI polling (see Rule 9). If `subscribe_pr_activity` is unavailable (cloud/headless sessions or MCP servers not loaded), fall back to a **capped** retry: poll at most 5 times with 30-second gaps. Note the degraded mode explicitly in session output.
-14. **⛔ COMMON FAILURE: Apply `bot:ready-for-review` after every fix-push** — pushing fix commits without this label leaves the PR stuck. `Reviewer (W1)` fires on `opened`, `ready_for_review`, `labeled` (with `bot:ready-for-review`/`review-bot-degraded`/`bot:reset-cycle-counter`), and `synchronize` **only when `bot:ready-for-review` is already present**. A plain push without the label starts no new reviewer cycle and no orchestrated CI. After resolving review threads and pushing fix commits, you MUST call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — otherwise the PR sits with stale CI failure labels, no new review fires, and the CI Orchestrator never runs. Not needed at PR creation — `github_mark_pr_ready` fires `ready_for_review` for Cycle 1. The label is auto-removed by the reviewer workflow; if still present (rate-limited prior cycle), remove and re-add it. Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`.
+13. **Precondition for waiting on a Copilot review**: after `github_request_review({ prs: [PR#] })`, subscribe to the review event via `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` (Claude Code built-in, local sessions only). The subscription delivers the review event as a push notification — no polling needed. **Fallback precondition** (cloud/headless or MCP not loaded): cap retries at 5 with 30-second gaps and note the degraded mode in session output. `sleep N && gh api repos/{owner}/{repo}/pulls/{pr}/reviews` loops waste 4–5 minutes per cycle and miss the event when the sleep window misaligns — the same anti-pattern as CI polling (see Rule 9).
+14. **Precondition after every fix-push: apply `bot:ready-for-review`.** `Reviewer (W1)` fires on `opened`, `ready_for_review`, `labeled` (with `bot:ready-for-review`/`review-bot-degraded`/`bot:reset-cycle-counter`), and `synchronize` **only when `bot:ready-for-review` is already present**. A plain push without the label starts no reviewer cycle and no orchestrated CI. After resolving threads and pushing, call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this is the most common workflow stall. Not needed at PR creation (`github_mark_pr_ready` fires `ready_for_review` for Cycle 1). The reviewer workflow auto-removes the label; if still present (rate-limited prior cycle), remove and re-add it. Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`.
 
 **CI tool reference — instant snapshots:**
 
-| Tool              | Correct usage                                                      |
-| ----------------- | ------------------------------------------------------------------ |
-| `ci_list_runs`    | ONE-SHOT: get the runId for a failing CI run — never loop          |
-| `ci_get_logs`     | ONE-SHOT: read failed-step output after getting runId — never loop |
-| `ci_view_run`     | ONE-SHOT: inspect a specific run — never loop                      |
-| `github_view_pr`  | ONE-SHOT: verify merge state or read PR metadata — never loop      |
-| `github_list_prs` | ONE-SHOT: find an existing PR — never loop                         |
+| Tool              | Correct usage                                                       |
+| ----------------- | ------------------------------------------------------------------- |
+| `ci_list_runs`    | ONE-SHOT: get the runId for a failing CI run — do not loop          |
+| `ci_get_logs`     | ONE-SHOT: read failed-step output after getting runId — do not loop |
+| `ci_view_run`     | ONE-SHOT: inspect a specific run — do not loop                      |
+| `github_view_pr`  | ONE-SHOT: verify merge state or read PR metadata — do not loop      |
+| `github_list_prs` | ONE-SHOT: find an existing PR — do not loop                         |
 
 ## Quick Commands
 

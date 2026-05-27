@@ -14,22 +14,15 @@ Load this skill at the start of any workflow that requires external service acce
 - Querying AWS resources (logs, SSM, secrets, Lambda)
 - Triggering or inspecting CI runs
 
-## The Rule: Check First, Never Generate
+## Preconditions
 
-**Always call `auth_check_all` before the first operation that requires auth.**
+**Before any external-service operation: call `auth_check_all`.**
 
 ```
 auth_check_all()
 ```
 
-If `allAuthenticated: false`, read the `hint` for each failing service, surface it to the user, and **stop**. Do not attempt the operation. Do not try to authenticate on the user's behalf.
-
-## What Agents Must Never Do
-
-- Run `gh auth login`, `aws sso login`, or any token-generation shell command unattended
-- Trigger OAuth device flows from within the agent session
-- Fall back to `acli` or raw `curl` with auth headers as a workaround for missing tokens
-- Proceed with a workflow after `auth_check_all` reports a failing service
+**Before proceeding past `auth_check_all`: `allAuthenticated: true`.** If `false`, surface the `hint` for each failing service verbatim to the user and wait for them to authenticate. Token generation, OAuth device flows, `gh auth login`, `aws sso login`, and similar credential-creating commands are user actions — running them from the agent session bypasses the user's terminal context and produces tokens scoped to the wrong identity. Falling back to `acli` or raw `curl` with auth headers does not work around a missing token; it produces an unauthenticated request that fails differently.
 
 ## Mid-Session Token Expiry (URL MCP Servers)
 
@@ -38,7 +31,7 @@ The 3 URL-based MCP servers (`legacy-sports-github`, `legacy-sports-jira`, `lega
 When you recognise the symptom:
 
 1. Surface the recovery prompt verbatim to the user — run `node scripts/mcp-auth.mjs` to refresh, then **restart the Claude Code session**.
-2. Do not retry. Do not fall back to `gh` / `acli` / `curl`. Stop and wait for the user.
+2. **Precondition for resuming MCP calls: the session has been restarted with a fresh token.** Retrying the failing tool in the current session re-uses the same expired transport headers and fails identically. `gh` / `acli` / `curl` fallbacks bypass the MCP server entirely and so do not exercise the broken auth path the user needs to fix — wait for the restart.
 
 Full diagnosis and the exact prompt to send are in `.agents/skills/mcp-diagnostics/SKILL.md` (Mid-Session 401 / Token Expiry section).
 

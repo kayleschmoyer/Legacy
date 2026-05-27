@@ -208,7 +208,7 @@ worktree_push()
 
 After fixing all known issues, Claude Code will surface PR events natively — no wait tool needed.
 
-> ⛔ **Never use `Start-Sleep`, `sleep`, or any polling loop.** Claude Code surfaces PR events (CI fail/pass, review threads, conflicts, merged) automatically. See the [mcp-first CI Operations section](../mcp-first/SKILL.md#ci-operations).
+> **Precondition for waiting on PR events**: continue to the next workflow step after pushing — Claude Code surfaces CI fail/pass, review threads, conflicts, and merge events as push notifications. Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal than the native notification. See the [mcp-first CI Operations section](../mcp-first/SKILL.md#ci-operations).
 
 React to each event as it arrives. Handle each event:
 
@@ -229,7 +229,7 @@ React to each event as it arrives. Handle each event:
 - No unresolved review threads
 - `bot:ready-for-review` has been (re-)applied since the last fix-push so the Reviewer Bot fires
 
-When the Reviewer Bot APPROVEs, it labels and the merge queue (`.github/workflows/merge-queue.yml`) picks the PR up automatically. **Do not apply `merge-when-ready` manually** — see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership). Do **not** call `github_merge_pr` directly either — it may bypass branch protection and merge-queue enforcement.
+When the Reviewer Bot APPROVEs, it labels the PR with `merge-when-ready` itself and the merge queue (`.github/workflows/merge-queue.yml`) picks it up automatically. **Precondition for the merge step**: wait for the Bot's label rather than applying `merge-when-ready` yourself; manual application bypasses the gate that holds back PRs the Bot has rejected. Use `github_merge_pr` only when the workflow explicitly calls for an admin merge (`strategy: "direct"`) — the default path is the merge queue. See [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership).
 
 If a clean PR sits without `merge-when-ready` for more than one Reviewer Bot cycle, the upstream cause is either (a) `bot:ready-for-review` was not (re-)applied after the last push, (b) the Reviewer Bot is rate-limited (`review-bot-degraded` label present), or (c) the Reviewer Bot's verdict is still CHANGES_REQUESTED. Fix the upstream cause — do not paper over with the label.
 

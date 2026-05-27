@@ -68,7 +68,7 @@ Build a triage list:
 4. **Validate**: `make pc` (minimum: `make format && make lint-fix && make typecheck`)
 5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `skills/pr-lifecycle/references/common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
 6. **Commit + push once**: single commit covering all review fixes and any already-identified CI/root-cause fixes you intentionally batched into the same round.
-7. **Resolve threads immediately after push**: call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does NOT auto-resolve threads. **Always invoke this MCP tool directly — do not reach for raw GraphQL mutations or shell commands (`Invoke-RestMethod`, `curl`) without first attempting the tool and receiving a connection error or explicit tool-not-found response.** Assuming the tool is unavailable without trying it is not acceptable.
+7. **Resolve threads immediately after push**: call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does not auto-resolve threads. **Precondition for any GraphQL / `Invoke-RestMethod` / `curl` fallback**: first call `github_resolve_threads` and receive a connection error or explicit tool-not-found response. The MCP tool handles thread-ID batching and worktree-path resolution; shell fallbacks bypass both.
 8. **Re-request Copilot review**: `github_request_review({ prs: [<PR#>] })`
 
 **Two-round cap**: Round 1 fixes security/bugs/type safety. Round 2 fixes remaining actionable comments. After round 2, resolve remaining threads as "acknowledged" and proceed.
@@ -86,7 +86,7 @@ Build a triage list:
 7. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
 8. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
 9. **Commit + push once for the round**.
-10. **Wait for CI**: Claude Code surfaces CI results natively — confirm CI passes before declaring done. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop; see [mcp-first CI Operations](../mcp-first/SKILL.md#ci-operations).
+10. **Wait for CI**: continue to the next workflow step after pushing — Claude Code surfaces CI pass/fail as push notifications, so `github_view_pr` / `ci_view_run` are one-shot lookups (e.g. after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal. See [mcp-first CI Operations](../mcp-first/SKILL.md#ci-operations).
 
 ### Step 4: Final Verification
 

@@ -167,7 +167,7 @@ After writing to Jira, print the ticket URL and suggest next steps:
 
 ## Gotchas
 
-- **In interactive new-ticket mode, never create a ticket without user confirmation** — the draft step is mandatory before writing to Jira. This does not apply to autonomous invocations (e.g. when `work-ticket` calls this skill to enrich an underspecified ticket) where proceeding without confirmation is expected. A hallucinated scope in Jira is worse than no ticket.
+- **Precondition for writing a new ticket to Jira in interactive mode: the user has confirmed the draft.** Show the draft and wait — a hallucinated scope in Jira is worse than no ticket. This precondition does not apply to autonomous invocations (e.g. when `work-ticket` calls this skill to enrich an underspecified ticket); proceeding without confirmation is expected there.
 - **Acceptance Criteria must be testable** — "The feature works correctly" is not a criterion. "Users can complete checkout without error when cart has >10 items" is.
 - **Enrich, don't overwrite** — in Enrich mode, always preserve `## Implementation Notes` if it exists. That section is written by the implementer and contains context that is not in the diff.
 - **Out of Scope is not optional** — even one item prevents costly misunderstandings mid-implementation.

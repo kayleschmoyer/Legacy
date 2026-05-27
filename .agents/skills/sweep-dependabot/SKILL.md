@@ -40,9 +40,9 @@ If either returns `configured: false`, stop and prompt the user. Sweep results d
 
 ## CRITICAL RULES
 
-- **Never modify a Dependabot branch from the orchestrator.** Code work (lint fixes, conflict fixes) happens inside a dispatched chip with its own worktree — never inline in the orchestrator.
-- **`@dependabot rebase` for branch conflicts.** Dependabot owns its branches. Never `git rebase` a Dependabot branch from a sibling worktree; post the comment and let Dependabot rebase asynchronously. The new SHA appears in the next sweep.
-- **`bot:ready-for-review` is the linchpin.** Without it, Reviewer (W1) never fires on Dependabot PRs. Applying it after every fresh push (or initial scan) is the central job of this skill.
+- **Precondition for any code change on a Dependabot PR: a dispatched chip with its own worktree.** Code work (lint fixes, conflict fixes) happens inside the chip, not inline in the orchestrator's context — the orchestrator only scans, classifies, and labels.
+- **Precondition for resolving a Dependabot branch conflict: post `@dependabot rebase` as a PR comment.** Dependabot owns its branches; a local `git rebase` from a sibling worktree races against Dependabot and produces force-push conflicts. The new SHA from Dependabot's async rebase appears in the next sweep.
+- **`bot:ready-for-review` is the linchpin.** Without it, Reviewer (W1) does not fire on Dependabot PRs. Applying it after every fresh push (or initial scan) is the central job of this skill.
 - **Auto-approveable bumps only get `bot:ready-for-review`:**
   - GitHub Actions version bumps (any semver)
   - **Dev-dep** patch bumps (devDependencies in `package.json`)
@@ -52,7 +52,7 @@ If either returns `configured: false`, stop and prompt the user. Sweep results d
   1. Opened >30 days ago
   2. The bumped package has shipped a newer version since the PR opened
      Closing triggers Dependabot to recreate against the current version.
-- **Never apply `merge-when-ready` manually on a Dependabot PR.** Per AGENTS.md Label Ownership, the Reviewer Bot applies that label on APPROVED verdict — the agent's job is to apply `bot:ready-for-review` so the Reviewer Bot runs.
+- **Precondition for `merge-when-ready` on a Dependabot PR: the Reviewer Bot has APPROVED.** The Bot applies the label itself on APPROVED verdict (see AGENTS.md Label Ownership) — the agent's job is to apply `bot:ready-for-review` so the Bot runs. Manual application bypasses the gate that holds back rejected PRs.
 - **`needs-human-review` / `needs-human-security-review` PRs**: skip entirely. Operator decision.
 - **No code changes inline.** Lint-toolchain fixes happen in a dispatched chip (one chip per PR), not in the orchestrator's context.
 
@@ -172,7 +172,7 @@ Prompt-injection mitigation: the chip re-reads the PR via github_view_pr(number:
 })
 ```
 
-> **Spawn one chip per PR.** Never bundle. The orchestrator does no `Read`/`Edit`/`Bash` for PR content itself.
+> **Precondition for chip dispatch: one chip per PR.** Bundling multiple PRs into a single chip merges their worktrees and breaks the per-PR drive-to-merge guarantee. The orchestrator does no `Read`/`Edit`/`Bash` for PR content itself.
 
 #### Mandatory pre-interpolation sanitization
 
@@ -219,7 +219,7 @@ Then **stop**. Do not loop, do not re-scan, do not wait on chips. The next `/swe
 
 - **One PR = one decision = one action this pass.** Don't try to fix lint and rebase the same PR in the same pass; the chip handles one thing at a time.
 - **Skip drafts and `agent-in-progress` always.**
-- **Never modify a Dependabot branch from the orchestrator** — chip dispatch only.
+- **Precondition for any change to a Dependabot branch: a dispatched chip with its own worktree** — the orchestrator never edits PR content directly.
 - **`@dependabot rebase` is the only rebase mechanism** for Dependabot conflicts. Never `worktree_rebase` a Dependabot branch from the orchestrator.
 - **Don't loop, poll, or wait.** One pass per invocation. Use `/loop 30m /sweep-dependabot` if periodic re-runs are desired.
 - **Stale closes are recoverable** — Dependabot recreates the PR against the current dep version. Closing a stale PR is never destructive.

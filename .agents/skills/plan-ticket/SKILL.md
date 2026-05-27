@@ -156,7 +156,7 @@ The `jira-branch-sync` workflow will automatically transition the Jira ticket to
 
 ## Gotchas
 
-- **Always confirm before writing in interactive runs** — never create a ticket without the user seeing the draft, except in workflow-triggered Automated Mode where Step 5 explicitly skips interactive confirmation. A hallucinated scope in Jira is worse than no ticket.
+- **Precondition for writing a new ticket to Jira in interactive runs: the user has seen and confirmed the draft.** Show the draft and wait — a hallucinated scope in Jira is worse than no ticket. Exception: workflow-triggered Automated Mode skips interactive confirmation per Step 5.
 - **Acceptance Criteria must be testable** — "Works correctly" is not a criterion. "Users can add an item with a name > 100 chars without error" is.
 - **Out of Scope is mandatory** — at least one item. Prevents costly mid-sprint disputes.
 - **Technical Approach must reference real files** — if reconnaissance found nothing, write "To be determined" rather than inventing paths.

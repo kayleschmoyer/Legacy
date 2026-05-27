@@ -88,7 +88,7 @@ See [`e2e-determinism.md` antipatterns from past regressions](../testing/referen
 
 ### Phase 1: Reproduce Locally — MANDATORY GATE
 
-> **⛔ Do not write or change any code until you have reproduced the failure locally.**
+> **Precondition for editing any code in this skill: the failure has reproduced locally on your machine.** A CI failure log is the symptom report, not the reproduction — without a local run, you cannot tell whether your fix actually changes the behavior or just changes adjacent code.
 
 Run only the failing test using the `--grep` filter:
 
@@ -196,7 +196,7 @@ Triggers that require the class-of-bug check (current ticket refs):
 
 ### Phase 4: Verify — TWO-TIER GATE
 
-> **⛔ Do not push until both Phase 4a and Phase 4b are green.**
+> **Precondition for `worktree_push()` in this skill: Phase 4a and Phase 4b are both green.** A green single-spec run alone does not prove the fix holds under nightly's cumulative load — see Phase 4b for the full-suite gate.
 
 A green single-spec local run confirms the _targeted_ fix but cannot prove the fix holds under nightly's cumulative load, shared-user contention, and cross-shard lag (see [Nightly Execution Profile](#nightly-execution-profile--why-local-single-spec-runs-mislead) above). Both gates are mandatory.
 

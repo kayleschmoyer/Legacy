@@ -41,11 +41,11 @@ Every bug fix requires verification that matches the bug's category. Choose the 
 
 ## Critical Rules
 
-- **Never patch database state as the fix.** Always find and fix the code path that produced the bad state. DB corrections are a temporary recovery step, not a resolution. **Why**: the defect will produce more bad state, and the patch has to be repeated — often at 2 AM.
-- **Never silence error reporting to fix a bug.** Removing `LOGGER.error()`, swallowing exceptions in bare `catch` blocks, or filtering errors from Sentry hides the symptom — the defect still runs. **Why**: the next occurrence will be invisible, making the eventual fix harder to find.
+- **Precondition for closing a bug: the code path that produced the bad state is fixed.** Direct DB corrections are a recovery step that runs _alongside_ the fix; on their own they leave the defect free to produce the same bad state again, repeating the patch — often at 2 AM.
+- **Precondition for any fix that touches error reporting: the LOGGER.error / Sentry / catch-block path still surfaces future occurrences.** Removing the log, swallowing the exception in a bare `catch`, or filtering it from Sentry hides the symptom while leaving the defect running, so the next occurrence is invisible and the eventual fix takes longer to find.
 - **Every `catch` must re-throw, log, or return a meaningful error.** Empty catch blocks and demoted log levels make future debugging impossible.
-- **Never use `@ts-ignore` or `eslint-disable`** to work around a bug — fix the types or the code.
-- **Evidence before action.** If you cannot cite the specific error message, file path, and line number — go back and get more logs.
+- **Precondition for `@ts-ignore` / `eslint-disable`: a separate ticket documents why the types or code cannot be fixed.** Suppression as a debugging shortcut converts a typed bug into an untyped one and removes the lint signal that catches the next regression.
+- **Precondition for writing a fix: cite the specific error message, file path, and line number.** If you cannot, return to evidence-gathering before editing code.
 
 ## Decision Tree
 
