@@ -1723,7 +1723,7 @@ export function HomePage(): React.JSX.Element {
                   margin: 0,
                 }}
               >
-                Welcome, {userName}
+                {userName}
               </h1>
             </div>
             <ErrorCard
@@ -1818,7 +1818,7 @@ export function HomePage(): React.JSX.Element {
                     margin: '0 0 10px',
                   }}
                 >
-                  Welcome, {userName}
+                  {userName}
                 </h1>
                 {/* Record line */}
                 <div
