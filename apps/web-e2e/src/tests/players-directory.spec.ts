@@ -95,6 +95,10 @@ test.describe('Players Directory – static elements @smoke', () => {
     ).toBeVisible();
   });
 
+  test('sets a page-specific browser title (LS-4842)', async ({ page }) => {
+    await expect(page).toHaveTitle('All Players | Legacy Sports');
+  });
+
   test('shows a search input', async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search/i).first();
     await expect(searchInput).toBeVisible();

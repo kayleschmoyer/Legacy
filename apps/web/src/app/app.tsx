@@ -20,6 +20,7 @@ import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
 import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { PageMeta } from '../components/PageMeta';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { NAV_Z_INDEX } from '../constants/dimensions';
@@ -601,7 +602,18 @@ function App() {
               element={<MatchupRedirectPage />}
             />
             <Route path="/management" element={<ManagementPage />} />
-            <Route path="/players" element={<PlayersScreen />} />
+            <Route
+              path="/players"
+              element={
+                <>
+                  <PageMeta
+                    title="All Players"
+                    description="Browse every player available across your Legacy Sports fantasy leagues."
+                  />
+                  <PlayersScreen />
+                </>
+              }
+            />
             <Route path="/players/stats" element={<PlayerStatsPage />} />
             <Route path="/players/compare" element={<PlayerComparisonPage />} />
             <Route path="/players/:id" element={<PlayerDetailPage />} />
