@@ -414,10 +414,12 @@ export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  // EnhancedAuthGuard sits above BrowserRouter and only re-checks the path on
-  // a fresh page load, not on client-side navigation.  Unauthenticated users
-  // need a full navigation so the guard intercepts at "/" and shows the sign-in
-  // page.  Authenticated users keep the SPA transition (no reload, no state loss).
+  // EnhancedAuthGuard sits outside BrowserRouter and only re-checks
+  // window.location.pathname when it re-renders — it does not subscribe
+  // to React Router navigation events.  Unauthenticated users therefore
+  // need a full-page navigation so the guard fires on the new path and
+  // shows the login page.  Authenticated users use navigate() to stay
+  // in the SPA without losing in-memory state.
   const navigateToHome = () => {
     if (isAuthenticated) {
       navigate('/');
