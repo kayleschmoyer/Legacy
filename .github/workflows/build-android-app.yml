@@ -99,12 +99,15 @@ jobs:
           set-nx-shas: false
           skip-system-deps: true
 
-      # setup-java with built-in Gradle caching — replaces manual cache step.
       # Self-hosted runners already have JDK 17 + JAVA_HOME baked in via the
       # runner AMI (terraform/runners/packer/runner-ami.pkr.hcl), so skip the
-      # download there.
+      # download there. The gate uses `vars.CI_RUNNER_LABEL == ''` (matching
+      # the `runs-on` expression above) because `runner.labels` is NOT a valid
+      # GitHub Actions context — the older `!contains(runner.labels, ...)` form
+      # always evaluated to true and silently re-downloaded the JDK/SDK on every
+      # self-hosted run (LS-4933).
       - name: Setup Java
-        if: ${{ !contains(runner.labels, 'self-hosted') }}
+        if: ${{ vars.CI_RUNNER_LABEL == '' }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           distribution: "temurin"
@@ -115,7 +118,7 @@ jobs:
             pnpm-lock.yaml
 
       - name: Setup Android SDK
-        if: ${{ !contains(runner.labels, 'self-hosted') }}
+        if: ${{ vars.CI_RUNNER_LABEL == '' }}
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"

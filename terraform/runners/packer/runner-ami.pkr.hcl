@@ -69,6 +69,12 @@ variable "android_cmdline_tools_build" {
   default     = "14742923"
 }
 
+variable "gradle_version" {
+  type        = string
+  description = "Gradle distribution version pre-baked into ~/.gradle/wrapper/dists/. MUST match the version pinned in apps/app/android/gradle/wrapper/gradle-wrapper.properties — if it drifts, the wrapper will redownload at build time (cache miss, ~150MB). Bump together with the gradle-wrapper.properties pin."
+  default     = "8.14.3"
+}
+
 variable "android_cmdline_tools_sha256" {
   type        = string
   description = "SHA-256 of commandlinetools-linux-<build>_latest.zip. Verify at https://developer.android.com/studio#command-tools"
@@ -175,6 +181,7 @@ source "amazon-ebs" "runner" {
     TerraformVersion  = var.terraform_version
     AndroidApiLevel   = var.android_api_level
     AndroidNdkVersion = var.android_ndk_version
+    GradleVersion     = var.gradle_version
     DockerInstalled   = "true"
   }
 }
@@ -399,6 +406,56 @@ build {
       "if [ -d /opt/actions-runner ]; then echo 'ANDROID_HOME=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
       "if [ -d /opt/actions-runner ]; then echo 'ANDROID_SDK_ROOT=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
       "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list_installed",
+    ]
+  }
+
+  # Gradle wrapper distribution pre-bake
+  #
+  # Android builds use the wrapper pinned in apps/app/android/gradle/wrapper/gradle-wrapper.properties
+  # (currently gradle-${var.gradle_version}-bin.zip, ~150MB). On a fresh runner the wrapper
+  # downloads it on first build — pre-extracting it here saves that round-trip.
+  #
+  # Layout the wrapper expects (PathAssembler.getHash in the gradle wrapper sources):
+  #   $GRADLE_USER_HOME/wrapper/dists/gradle-<version>-bin/<hash>/
+  #     gradle-<version>-bin.zip
+  #     gradle-<version>-bin.zip.ok      (marker — wrapper trusts the extracted dir when present)
+  #     gradle-<version>/                (extracted distribution)
+  # where <hash> = BigInteger(1, MD5(distributionUrl)).toString(36).
+  #
+  # The GitHub Actions runner runs as the `ubuntu` user (HOME=/home/ubuntu),
+  # which makes $GRADLE_USER_HOME default to /home/ubuntu/.gradle. We write
+  # there directly so `gradlew` finds the dist without a download.
+  provisioner "shell" {
+    environment_vars = [
+      "GRADLE_VERSION=${var.gradle_version}",
+    ]
+    inline = [
+      <<-EOT
+        set -e
+        GRADLE_URL="https://services.gradle.org/distributions/gradle-$${GRADLE_VERSION}-bin.zip"
+        HASH=$(python3 - <<'PY'
+        import hashlib, os
+        url = "https://services.gradle.org/distributions/gradle-" + os.environ["GRADLE_VERSION"] + "-bin.zip"
+        n = int(hashlib.md5(url.encode()).hexdigest(), 16)
+        s = ""
+        digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+        while n:
+            s = digits[n % 36] + s
+            n //= 36
+        print(s or "0")
+        PY
+        )
+        DIST_DIR="/home/ubuntu/.gradle/wrapper/dists/gradle-$${GRADLE_VERSION}-bin/$${HASH}"
+        echo "Pre-baking Gradle $${GRADLE_VERSION} wrapper dist at $${DIST_DIR}"
+        sudo install -d -o ubuntu -g ubuntu -m 0755 "/home/ubuntu/.gradle"
+        sudo install -d -o ubuntu -g ubuntu -m 0755 "/home/ubuntu/.gradle/wrapper"
+        sudo install -d -o ubuntu -g ubuntu -m 0755 "/home/ubuntu/.gradle/wrapper/dists"
+        sudo -u ubuntu mkdir -p "$${DIST_DIR}"
+        sudo -u ubuntu curl -fSL "$${GRADLE_URL}" -o "$${DIST_DIR}/gradle-$${GRADLE_VERSION}-bin.zip"
+        sudo -u ubuntu unzip -q "$${DIST_DIR}/gradle-$${GRADLE_VERSION}-bin.zip" -d "$${DIST_DIR}"
+        sudo -u ubuntu touch "$${DIST_DIR}/gradle-$${GRADLE_VERSION}-bin.zip.ok"
+        ls -la "$${DIST_DIR}"
+      EOT
     ]
   }
 

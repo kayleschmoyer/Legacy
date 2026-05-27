@@ -54,13 +54,71 @@ runs:
         chmod +x android/gradlew
         echo "✅ Expo prebuild completed"
 
+    - name: "📦 Cache Gradle (deps + build cache + wrapper)"
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        # The bulk of cold-cache time is dependency download and Kotlin compile
+        # of the Gradle plugins. Persist:
+        # - modules-2 / jars-* / transforms-*: resolved deps (AGP, Kotlin stdlib,
+        #   RN Gradle plugin, Expo plugins, androidx/com.facebook.react JARs)
+        # - build-cache-1: Gradle's task-output cache. With --build-cache enabled
+        #   (see GRADLE_FLAGS below), unchanged native CMake tasks go FROM-CACHE.
+        # - wrapper/dists: the gradle-<version>-bin.zip download (~150MB).
+        # Note: GRADLE_USER_HOME defaults to $HOME/.gradle = /home/ubuntu/.gradle
+        # on self-hosted runners, which the AMI pre-warms with the wrapper dist.
+        path: |
+          ~/.gradle/caches/modules-2
+          ~/.gradle/caches/jars-9
+          ~/.gradle/caches/transforms-3
+          ~/.gradle/caches/transforms-4
+          ~/.gradle/caches/build-cache-1
+          ~/.gradle/wrapper/dists
+          ~/.gradle/notifications
+        key: >-
+          ${{ runner.os }}-gradle-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-${{
+          hashFiles('pnpm-lock.yaml', 'apps/app/android/**/*.gradle*',
+          'apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-
+          ${{ runner.os }}-gradle-${{ inputs.build-type }}-
+          ${{ runner.os }}-gradle-
+
+    - name: "📦 Cache Project .gradle (configuration cache + project state)"
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        # Holds the Gradle configuration cache (--configuration-cache),
+        # daemon registry, and project-local Gradle metadata. Keyed off the
+        # same inputs as the configuration cache itself would hash internally.
+        path: |
+          apps/app/android/.gradle
+        key: >-
+          ${{ runner.os }}-gradle-project-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-${{
+          hashFiles('pnpm-lock.yaml', 'apps/app/android/**/*.gradle*',
+          'apps/app/android/app/build.gradle') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-project-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-
+          ${{ runner.os }}-gradle-project-${{ inputs.build-type }}-
+          ${{ runner.os }}-gradle-project-
+
     - name: "📦 Cache Native C++ Build Outputs"
       if: inputs.cache-native-builds == 'true'
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
+        # Belt-and-suspenders alongside Gradle's --build-cache: capture the
+        # raw C++ build outputs for the three modules that dominate native
+        # compile time (Reanimated worklets, Worklets runtime, Nitro modules).
+        # The pnpm glob covers the resolved package paths; the top-level glob
+        # covers the hoisted symlink case. node_modules churn on lockfile
+        # change so we key off pnpm-lock.yaml.
         path: |
           apps/app/android/app/.cxx
           apps/app/android/build
+          node_modules/.pnpm/react-native-reanimated@*/node_modules/react-native-reanimated/android/build
+          node_modules/.pnpm/react-native-worklets@*/node_modules/react-native-worklets/android/build
+          node_modules/.pnpm/react-native-nitro-modules@*/node_modules/react-native-nitro-modules/android/build
+          node_modules/react-native-reanimated/android/build
+          node_modules/react-native-worklets/android/build
+          node_modules/react-native-nitro-modules/android/build
         key: ${{ runner.os }}-android-native-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           ${{ runner.os }}-android-native-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-
@@ -81,21 +139,25 @@ runs:
     - name: "🏗️ Build Android APK"
       id: build
       shell: bash
-      env:
-        # Isolate Gradle user home to runner temp so gradle.properties is fresh
-        # each run and never accumulates duplicate entries across jobs.
-        GRADLE_USER_HOME: ${{ runner.temp }}/gradle
       run: |
         cd apps/app/android
         chmod +x gradlew
 
         BUILD_TYPE="${{ inputs.build-type }}"
 
+        # GRADLE_USER_HOME defaults to $HOME/.gradle so the AMI pre-baked
+        # wrapper dist (terraform/runners/packer/runner-ami.pkr.hcl) and the
+        # actions/cache layers above are actually used. A previous version of
+        # this action pinned GRADLE_USER_HOME to $RUNNER_TEMP/gradle to avoid
+        # gradle.properties duplication, but RUNNER_TEMP is ephemeral and the
+        # override silently defeated every cross-job Gradle cache (LS-4933).
+        # The gradle.properties writes below use `>` (truncate) so a shared
+        # GRADLE_USER_HOME does not accumulate duplicate entries.
+
         # --- Memory hardening ---
         # 1. Override org.gradle.jvmargs in the project gradle.properties directly.
         #    Expo prebuild regenerates android/ each run so this never persists to repo.
-        #    Belt-and-suspenders: also write GRADLE_USER_HOME/gradle.properties (set
-        #    to $RUNNER_TEMP/gradle by the step env above).
+        #    Belt-and-suspenders: also write $HOME/.gradle/gradle.properties (truncate).
         if grep -q '^org\.gradle\.jvmargs=' gradle.properties; then
           sed -i 's|^org\.gradle\.jvmargs=.*|org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m|' gradle.properties
         else
@@ -107,8 +169,8 @@ runs:
           exit 1
         fi
         echo "ℹ️  Effective jvmargs: $EFFECTIVE_JVMARGS"
-        mkdir -p "$GRADLE_USER_HOME"
-        printf 'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' > "$GRADLE_USER_HOME/gradle.properties"
+        mkdir -p "$HOME/.gradle"
+        printf 'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' > "$HOME/.gradle/gradle.properties"
 
         # 2. Limit parallel C++ jobs per CMake invocation.
         #    Ninja defaults to nCPU parallel clang++ processes.
