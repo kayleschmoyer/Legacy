@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { getPositionColor } from './utils';
 import {
@@ -48,7 +48,19 @@ export function DraftIntelligence({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when pick number changes
   }, [currentOverallPick]);
 
-  const recommendations = data?.getDraftRecommendations ?? [];
+  // Sort by score descending so the panel renders BEST-to-worst even if the
+  // server response or Apollo cache write surfaces the items in a different
+  // order (LS-4825 — mobile users observed alphabetical ordering when the
+  // upstream sort was lost). The rank labels (`#1`, `#2`, …) below derive
+  // from this array index, so any drift here directly corrupts the visible
+  // ranking.
+  const recommendations = useMemo(
+    () =>
+      (data?.getDraftRecommendations ?? [])
+        .slice()
+        .sort((a, b) => (b?.score ?? 0) - (a?.score ?? 0)),
+    [data?.getDraftRecommendations],
+  );
 
   // Track which player ID is staged for confirmation (null = none pending)
   const [pendingConfirm, setPendingConfirm] = useState<number | null>(null);
