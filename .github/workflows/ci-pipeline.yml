@@ -362,6 +362,11 @@ jobs:
           set -o pipefail
           node scripts/check-migration-immutability.js --branch 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
+      - name: "Workflow working-directory existence (LS-4910)"
+        run: |
+          set -o pipefail
+          node scripts/validate-workflows.js 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
+
       - name: "Touch-Map Documentation Freshness"
         continue-on-error: true
         env:

@@ -67,6 +67,137 @@ const KNOWN_VALID_EVENTS_NOT_IN_SCHEMA = new Set([
   // GitHub Actions workflow trigger (GitHub returns "Unexpected value" at parse time).
 ]);
 
+// Extract every working-directory value declared in a workflow or composite
+// action file, along with enough context to point a developer at the offending
+// step. Returns an array of { file, location, value }.
+//
+// Sources scanned:
+//   - workflow: jobs.<id>.defaults.run.working-directory
+//   - workflow: jobs.<id>.steps[N].working-directory
+//   - composite action: runs.steps[N].working-directory
+function collectWorkingDirectories(filePath, data) {
+  const found = [];
+  if (!data || typeof data !== 'object') return found;
+
+  const pushStep = (location, step) => {
+    if (!step || typeof step !== 'object') return;
+    if (typeof step['working-directory'] === 'string') {
+      found.push({
+        file: filePath,
+        location,
+        value: step['working-directory'],
+      });
+    }
+  };
+
+  // Workflow file: jobs.<id>.{defaults.run.working-directory, steps[].working-directory}
+  if (data.jobs && typeof data.jobs === 'object') {
+    for (const [jobId, job] of Object.entries(data.jobs)) {
+      if (!job || typeof job !== 'object') continue;
+      const defaultWd = job.defaults?.run?.['working-directory'];
+      if (typeof defaultWd === 'string') {
+        found.push({
+          file: filePath,
+          location: `jobs.${jobId}.defaults.run`,
+          value: defaultWd,
+        });
+      }
+      if (Array.isArray(job.steps)) {
+        job.steps.forEach((step, i) => {
+          const label = step?.name ? `"${step.name}"` : `index ${i}`;
+          pushStep(`jobs.${jobId}.steps[${i}] (${label})`, step);
+        });
+      }
+    }
+  }
+
+  // Composite action: runs.steps[].working-directory
+  if (data.runs?.using === 'composite' && Array.isArray(data.runs.steps)) {
+    data.runs.steps.forEach((step, i) => {
+      const label = step?.name ? `"${step.name}"` : `index ${i}`;
+      pushStep(`runs.steps[${i}] (${label})`, step);
+    });
+  }
+
+  return found;
+}
+
+// Check that every working-directory value resolves to a real path in the repo.
+// Skips values containing GitHub expression interpolation (${{ ... }}) and any
+// absolute paths (which are valid on the runner but cannot be verified against
+// the repo tree). Returns an array of { file, location, value, reason }.
+function checkWorkingDirectoryPaths(entries, repoRoot) {
+  const failures = [];
+  for (const entry of entries) {
+    const { value } = entry;
+    if (value.includes('${{')) continue; // Dynamic — cannot verify statically.
+    if (path.isAbsolute(value)) continue; // Resolved on runner, not in repo.
+
+    const absolute = path.resolve(repoRoot, value);
+    // Ensure the path stays inside the repo. A working-directory that escapes
+    // the checkout (e.g. ../../etc) is almost certainly a bug, so flag it.
+    const relative = path.relative(repoRoot, absolute);
+    if (relative.startsWith('..')) {
+      failures.push({
+        ...entry,
+        reason: `escapes repository root (resolves to ${absolute})`,
+      });
+      continue;
+    }
+
+    if (!fs.existsSync(absolute)) {
+      failures.push({
+        ...entry,
+        reason: `directory does not exist (resolved to ${path.relative(repoRoot, absolute) || '.'})`,
+      });
+      continue;
+    }
+
+    const stat = fs.statSync(absolute);
+    if (!stat.isDirectory()) {
+      failures.push({
+        ...entry,
+        reason: `path exists but is not a directory`,
+      });
+    }
+  }
+  return failures;
+}
+
+// Run the working-directory existence check across every workflow and action
+// file. Returns true if all paths resolve, false otherwise (and prints errors).
+function runWorkingDirectoryCheck({ workflowFiles, actionFiles, repoRoot }) {
+  log('\n🔍 Checking working-directory paths exist...', 'cyan');
+
+  const entries = [];
+  for (const file of [...workflowFiles, ...actionFiles]) {
+    try {
+      const data = yaml.load(fs.readFileSync(file, 'utf8'));
+      entries.push(...collectWorkingDirectories(file, data));
+    } catch {
+      // YAML parse errors are surfaced by the schema validator; skip here.
+    }
+  }
+
+  const failures = checkWorkingDirectoryPaths(entries, repoRoot);
+  if (failures.length === 0) {
+    log(
+      `✓ All ${entries.length} working-directory value(s) point to existing paths`,
+      'green',
+    );
+    return true;
+  }
+
+  log(`\n❌ ${failures.length} working-directory path(s) failed:`, 'red');
+  for (const f of failures) {
+    log(`\n  ${path.relative(repoRoot, f.file)}`, 'red');
+    log(`    at ${f.location}`, 'yellow');
+    log(`    working-directory: ${f.value}`, 'yellow');
+    log(`    ${f.reason}`, 'red');
+  }
+  return false;
+}
+
 // Validate a single YAML file
 async function validateFile(filePath, schema, ajv) {
   try {
@@ -131,8 +262,28 @@ async function main() {
   log('🔍 Validating GitHub Actions workflows...', 'cyan');
 
   try {
+    // Find files first so the working-directory check can run even when the
+    // SchemaStore host is unreachable.
+    const workflowFiles = glob.sync('.github/workflows/*.{yml,yaml}', {
+      nodir: true,
+    });
+    const actionFiles = glob.sync('.github/actions/**/action.{yml,yaml}', {
+      nodir: true,
+    });
+    const repoRoot = process.cwd();
+
+    // working-directory existence check (LS-4910): catches references to
+    // directories that don't exist in the repo (e.g. renamed without updating
+    // the workflow). Runs independently of the schema validation so it still
+    // gates `make pc` when offline.
+    const wdOk = runWorkingDirectoryCheck({
+      workflowFiles,
+      actionFiles,
+      repoRoot,
+    });
+
     // Fetch schemas
-    log('📥 Fetching JSON schemas...', 'cyan');
+    log('\n📥 Fetching JSON schemas...', 'cyan');
     const [workflowSchema, actionSchema] = await Promise.all([
       fetchSchema(WORKFLOW_SCHEMA_URL),
       fetchSchema(ACTION_SCHEMA_URL),
@@ -143,7 +294,8 @@ async function main() {
         '\n⚠️  Schema fetch failed (network or server error) — skipping workflow validation',
         'yellow',
       );
-      process.exit(0);
+      // Still honour the working-directory check result.
+      process.exit(wdOk ? 0 : 1);
     }
 
     const ajv = new Ajv({
@@ -152,14 +304,6 @@ async function main() {
       allowUnionTypes: true,
     });
     addFormats(ajv);
-
-    // Find files
-    const workflowFiles = glob.sync('.github/workflows/*.{yml,yaml}', {
-      nodir: true,
-    });
-    const actionFiles = glob.sync('.github/actions/**/action.{yml,yaml}', {
-      nodir: true,
-    });
 
     log(
       `\n📝 Found ${workflowFiles.length} workflows and ${actionFiles.length} actions\n`,
@@ -187,6 +331,9 @@ async function main() {
       formatErrors(failures);
       log(`\n❌ ${failures.length} file(s) failed validation`, 'red');
       process.exit(1);
+    } else if (!wdOk) {
+      // Schema validation passed but working-directory check failed.
+      process.exit(1);
     } else {
       log(`\n✅ All workflow files are valid!`, 'green');
       process.exit(0);
@@ -200,4 +347,12 @@ async function main() {
   }
 }
 
-main();
+// Allow the helpers to be required from unit tests without executing main().
+module.exports = {
+  collectWorkingDirectories,
+  checkWorkingDirectoryPaths,
+};
+
+if (require.main === module) {
+  main();
+}
