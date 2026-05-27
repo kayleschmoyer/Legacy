@@ -14,7 +14,11 @@ import {
 } from 'tamagui';
 import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
 import { PlayerCard } from './PlayerCard';
+import { PlayerListRow } from './PlayerListRow';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
+// `PlayersViewMode` lives in PlayersScreen (LS-4656). Type-only import keeps
+// this leaf component free of the runtime cycle PlayersScreen → PlayersGrid.
+import type { PlayersViewMode } from './PlayersScreen';
 
 export interface PlayersGridResultStats {
   matched: number;
@@ -52,6 +56,12 @@ export interface PlayersGridProps {
    * summary header without duplicating the query.
    */
   onResultStats?: (stats: PlayersGridResultStats) => void;
+  /**
+   * Render mode for the player collection. `'cards'` (default) keeps the
+   * existing card grid; `'list'` renders the dense `.pp-list-row` layout
+   * from the Players Page redesign (LS-4650).
+   */
+  viewMode?: PlayersViewMode;
 }
 
 const SORT_OPTIONS = [
@@ -85,6 +95,7 @@ function PlayersGrid({
   searchTerm: searchTermProp,
   sortBy: sortByProp,
   onResultStats,
+  viewMode = 'cards',
 }: PlayersGridProps) {
   const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [internalSortBy, setInternalSortBy] = useState<string>(DEFAULT_SORT);
@@ -203,12 +214,21 @@ function PlayersGrid({
           <style> responsive pattern used elsewhere in this feature. */}
       <style>{`
         .pg-card-cell { width: 280px; min-width: 280px; max-width: 400px; }
+        /* List view rounded ends + collapsed inner borders (LS-4650).
+           Mirrors the design's .pp-list-row first/last-child rules so
+           consecutive rows share a single hair-line edge. */
+        .pg-list-stack > .pp-list-row { border-radius: 0; border-bottom-width: 0; }
+        .pg-list-stack > .pp-list-row:first-child { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+        .pg-list-stack > .pp-list-row:last-child { border-bottom-width: 1px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
         @media (max-width: 640px) {
           .pg-root { padding: 12px !important; }
           .pg-head { flex-wrap: wrap; gap: 8px; }
           .pg-head-title { font-size: 24px !important; }
           .pg-card-cell { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
           .pg-controls > * { flex: 1 1 100% !important; min-width: 0 !important; }
+          /* Drop the trailing stat cells on phone widths — matches the
+             design's hide-sm rule at the small-tablet breakpoint. */
+          .pp-list-stat-md { display: none !important; }
         }
       `}</style>
       {/* Header */}
@@ -315,24 +335,42 @@ function PlayersGrid({
         </YStack>
       ) : (
         <ScrollView>
-          <YStack flexDirection="row" flexWrap="wrap" gap="$3" jc="flex-start">
-            {filteredPlayers.map((player) => {
-              const projection = player.id
-                ? projectedPoints?.get(player.id)
-                : undefined;
+          {viewMode === 'list' ? (
+            <YStack className="pg-list-stack" flexDirection="column">
+              {filteredPlayers.map((player, idx) => (
+                <PlayerListRow
+                  key={player.id}
+                  player={player}
+                  index={idx}
+                  onPlayerClick={onPlayerSelect}
+                />
+              ))}
+            </YStack>
+          ) : (
+            <YStack
+              flexDirection="row"
+              flexWrap="wrap"
+              gap="$3"
+              jc="flex-start"
+            >
+              {filteredPlayers.map((player) => {
+                const projection = player.id
+                  ? projectedPoints?.get(player.id)
+                  : undefined;
 
-              return (
-                <YStack key={player.id} className="pg-card-cell">
-                  <PlayerCard
-                    player={player}
-                    onPlayerClick={onPlayerSelect}
-                    projectedPoints={projection}
-                    showProjection={showProjections}
-                  />
-                </YStack>
-              );
-            })}
-          </YStack>
+                return (
+                  <YStack key={player.id} className="pg-card-cell">
+                    <PlayerCard
+                      player={player}
+                      onPlayerClick={onPlayerSelect}
+                      projectedPoints={projection}
+                      showProjection={showProjections}
+                    />
+                  </YStack>
+                );
+              })}
+            </YStack>
+          )}
 
           {!searchTerm && hasMore && (
             <YStack ai="center" marginTop="$4" marginBottom="$2">

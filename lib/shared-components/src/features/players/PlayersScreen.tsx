@@ -4,6 +4,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { PlayersGrid, type PlayersGridResultStats } from './PlayersGrid';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
+import { fullName, initialsOf } from './playerNameUtils';
 import { Platform } from '../../platform-components';
 import {
   BG_DARK,
@@ -40,6 +41,12 @@ const BG_ELEVATED = STATS_PAGE_TOKENS.BG_ELEVATED;
 // .agents/skills/standards/references/tamagui-web-pitfalls.md and the same
 // pattern in PlayerStatsPage.tsx (LS-4613). Native branches always supply
 // real numbers, so the cast only takes effect under Platform.OS === 'web'.
+
+// Re-export the editorial-shell pure helpers from their leaf module so
+// existing callers and tests can keep their `from './PlayersScreen'` imports
+// (LS-4650 — helpers moved to playerNameUtils.ts to break a PlayerListRow
+// import cycle).
+export { fullName, initialsOf };
 
 // ── Filter rail option sets (LS-4649) ────────────────────────────────
 // Mirrors docs/design/F89Q4j6WFCFqqsZpQ4VhlQ/legacy-sports-players-page/
@@ -92,8 +99,11 @@ const SORT_OPTIONS = [
  */
 export type PlayersShellState = 'loading' | 'error' | 'empty';
 
-/** Skeleton geometry to render when state === 'loading'. Mirrors design's view modes. */
+/** Players Page view modes (LS-4650). Drives both the populated render
+ *  (PlayersGrid cards vs list) and the loading-skeleton geometry. */
 export type PlayersViewMode = 'cards' | 'list' | 'stats';
+
+const VIEW_MODES: ReadonlyArray<PlayersViewMode> = ['cards', 'list', 'stats'];
 
 export interface PlayersScreenProps {
   onPlayerSelect?: (player: PlayerFragment) => void;
@@ -107,7 +117,8 @@ export interface PlayersScreenProps {
    * peek Apollo query result.
    */
   state?: PlayersShellState;
-  /** Active view mode — controls loading-skeleton geometry. Default: 'cards'. */
+  /** Initial view mode when the URL does not carry a `?view=` parameter and
+   *  on non-web platforms (which don't read the URL). Default: 'cards'. */
   viewMode?: PlayersViewMode;
   /** Retry handler invoked from the ErrorState card. Defaults to Apollo refetch. */
   onRetry?: () => void;
@@ -151,18 +162,6 @@ const STATE_ANNOUNCEMENTS: Record<PlayersShellState, string> = {
   empty: 'No players match the current filters.',
 };
 
-/** Exported for direct unit testing — see PlayersScreen.spec.tsx. */
-export function initialsOf(player: PlayerFragment): string {
-  const first = player.firstName?.trim()?.[0] ?? '';
-  const last = player.lastName?.trim()?.[0] ?? '';
-  return (first + last).toUpperCase() || '—';
-}
-
-/** Exported for direct unit testing — see PlayersScreen.spec.tsx. */
-export function fullName(player: PlayerFragment): string {
-  return [player.firstName, player.lastName].filter(Boolean).join(' ').trim();
-}
-
 /**
  * Active-summary chip descriptor — exported for direct unit testing.
  * The shape mirrors the design's `ActiveSummary` in players-app.jsx so
@@ -204,13 +203,65 @@ export function activeFilterChips(args: {
   return chips;
 }
 
+/**
+ * Pure parser for the Players Page `?view=` URL search parameter (LS-4650).
+ * Falls back to the supplied default for missing or unrecognised values so
+ * refresh / back-navigation always lands on a renderable view. Exported for
+ * unit tests.
+ */
+export function parseViewParam(
+  search: string | null | undefined,
+  fallback: PlayersViewMode = 'cards',
+): PlayersViewMode {
+  if (!search) return fallback;
+  try {
+    const params = new URLSearchParams(
+      search.startsWith('?') ? search.slice(1) : search,
+    );
+    const raw = params.get('view');
+    if (raw && (VIEW_MODES as readonly string[]).includes(raw)) {
+      return raw as PlayersViewMode;
+    }
+  } catch {
+    /* malformed query strings fall through to the fallback below */
+  }
+  return fallback;
+}
+
+/**
+ * Pure builder for the URL search string after a view change (LS-4650).
+ * Returns the new `?...` string (including leading `?`, or empty string if no
+ * other params remain) so callers can pump it through `history.replaceState`
+ * without depending on `window` at module scope. The default `'cards'` is
+ * elided from the URL so a clean `/players` link stays clean.
+ */
+export function buildViewSearch(
+  currentSearch: string | null | undefined,
+  view: PlayersViewMode,
+): string {
+  const params = new URLSearchParams(
+    currentSearch
+      ? currentSearch.startsWith('?')
+        ? currentSearch.slice(1)
+        : currentSearch
+      : '',
+  );
+  if (view === 'cards') {
+    params.delete('view');
+  } else {
+    params.set('view', view);
+  }
+  const next = params.toString();
+  return next ? `?${next}` : '';
+}
+
 function PlayersScreen({
   onPlayerSelect,
   pageSize = 50,
   title = 'All Players',
   showFeatured = true,
   state,
-  viewMode = 'cards',
+  viewMode: viewModeProp = 'cards',
   onRetry,
 }: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
@@ -220,6 +271,41 @@ function PlayersScreen({
     },
     [onPlayerSelect],
   );
+
+  // View mode (Cards / List). Stats Table is reserved for the upcoming slice;
+  // the toggle exposes it as disabled with a "Coming soon" hint per AC1.
+  // Persistence: hydrate from `?view=` on mount, push view changes back via
+  // history.replaceState so refresh + back-navigation keep the choice (AC3).
+  // The `viewMode` prop seeds the initial value when no URL parameter is set
+  // (or on native, which doesn't read the URL).
+  const [view, setView] = useState<PlayersViewMode>(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return viewModeProp;
+    }
+    return parseViewParam(window.location.search, viewModeProp);
+  });
+
+  const handleViewChange = useCallback((next: PlayersViewMode) => {
+    setView(next);
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      url.search = buildViewSearch(url.search, next);
+      window.history.replaceState(
+        null,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    } catch (err) {
+      // history.replaceState can throw under sandbox/iframe policies; the
+      // in-memory state is the source of truth for the current session, so
+      // log and continue rather than blocking the toggle.
+      LOGGER.warn(
+        'PlayersScreen view URL sync failed',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }, []);
 
   // Filter / sort state owned by the screen so the grid, the count chip,
   // the active-summary row, and the derived empty state all read from one
@@ -671,7 +757,7 @@ function PlayersScreen({
 
         {/* Body — state card (LS-4656) or populated Featured + grid (LS-4649). */}
         {activeState === 'loading' ? (
-          <LoadingSkeleton viewMode={viewMode} />
+          <LoadingSkeleton viewMode={view} />
         ) : activeState === 'error' ? (
           <ErrorState onRetry={handleRetry} />
         ) : activeState === 'empty' ? (
@@ -683,7 +769,11 @@ function PlayersScreen({
               <FeaturedSpotlight player={featuredPlayer} />
             )}
 
-            {/* Grid (view toggle / stats table delivered in Slices 3-4).
+            {/* View toggle — Cards / List / Stats. Stats is locked until the
+                Stats Table slice lands (LS-4650 AC1). */}
+            <ViewToggle view={view} onChange={handleViewChange} />
+
+            {/* Grid (stats table delivered in Slice 4).
                 The editorial header above is the single h1 — pass an inner
                 title distinct from `title` so PlayersGrid's H2 doesn't shadow
                 the page heading and trip Playwright strict-mode lookups
@@ -700,6 +790,7 @@ function PlayersScreen({
               searchTerm={Platform.OS === 'web' ? searchTerm : undefined}
               sortBy={Platform.OS === 'web' ? sortBy : undefined}
               onResultStats={handleResultStats}
+              viewMode={view}
             />
           </>
         )}
@@ -931,6 +1022,126 @@ function ActiveSummary({ chips, onClear }: ActiveSummaryProps) {
       >
         Clear all
       </button>
+    </XStack>
+  );
+}
+
+// ── View toggle (LS-4650) ──────────────────────────────────────────────────
+
+interface ViewToggleProps {
+  view: PlayersViewMode;
+  onChange: (next: PlayersViewMode) => void;
+}
+
+interface ViewToggleOption {
+  id: PlayersViewMode;
+  label: string;
+  disabled?: boolean;
+  disabledHint?: string;
+}
+
+const VIEW_TOGGLE_OPTIONS: ReadonlyArray<ViewToggleOption> = [
+  { id: 'cards', label: 'Cards' },
+  { id: 'list', label: 'List' },
+  { id: 'stats', label: 'Stats', disabled: true, disabledHint: 'Coming soon' },
+];
+
+/**
+ * Pill cluster matching `.pp-viewtoggle` / `.pp-view` rules from
+ * docs/design/F89Q4j6WFCFqqsZpQ4VhlQ/legacy-sports-players-page/project/players.css
+ * (LS-4650 AC1). Selected option fills BRAND_NAVY with WHITE text; Stats is
+ * gated as disabled until the Stats Table slice lands and exposes its tooltip
+ * via `title` so users know the option is coming rather than broken.
+ */
+function ViewToggle({ view, onChange }: ViewToggleProps) {
+  return (
+    <XStack
+      role="tablist"
+      aria-label="Players view"
+      className="pp-viewtoggle"
+      style={{
+        alignSelf: 'flex-start',
+        backgroundColor: SURFACE_PANEL,
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor: OUTLINE_SUBTLE,
+        borderRadius: 8,
+        padding: 4,
+        gap: 2,
+      }}
+    >
+      {VIEW_TOGGLE_OPTIONS.map((option) => {
+        const selected = option.id === view;
+        return (
+          <ViewToggleButton
+            key={option.id}
+            option={option}
+            selected={selected}
+            onPress={() => {
+              if (!option.disabled && !selected) onChange(option.id);
+            }}
+          />
+        );
+      })}
+    </XStack>
+  );
+}
+
+interface ViewToggleButtonProps {
+  option: ViewToggleOption;
+  selected: boolean;
+  onPress: () => void;
+}
+
+function ViewToggleButton({
+  option,
+  selected,
+  onPress,
+}: ViewToggleButtonProps) {
+  const { id, label, disabled, disabledHint } = option;
+
+  const labelColor = disabled
+    ? TEXT_MUTED
+    : selected
+      ? WHITE
+      : TEXT_NEUTRAL_FG3;
+
+  return (
+    <XStack
+      role="tab"
+      aria-selected={selected}
+      aria-disabled={disabled}
+      tabIndex={disabled ? -1 : 0}
+      // `title` becomes the native browser tooltip on hover — surfaces the
+      // "Coming soon" hint for the gated Stats option per AC1.
+      {...(disabled && disabledHint ? { title: disabledHint } : {})}
+      onPress={disabled ? undefined : onPress}
+      cursor={disabled ? 'not-allowed' : 'pointer'}
+      opacity={disabled ? 0.55 : 1}
+      style={{
+        paddingTop: 8,
+        paddingBottom: 8,
+        paddingLeft: 12,
+        paddingRight: 12,
+        borderRadius: 4,
+        backgroundColor: selected ? BRAND_NAVY : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text
+        data-testid={`players-view-${id}`}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '700',
+          fontSize: 11,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: labelColor,
+        }}
+      >
+        {label}
+      </Text>
     </XStack>
   );
 }
