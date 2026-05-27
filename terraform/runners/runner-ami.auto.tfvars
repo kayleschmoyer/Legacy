@@ -22,4 +22,10 @@
 #
 # Rollback: revert the PR. Terraform re-selects the previous AMI (still present
 # in the account until prune-runner-amis removes it).
+#
+# LS-4905 roll-out note: when the Playwright version is unchanged, the AMI name
+# filter (legacy-sports-runner-pw<version>-*) still selects the *most recent*
+# match, so a freshly-baked AMI built off the current packer config (e.g. after
+# LS-4902 added JDK 17 + Android build-tools to PATH) is picked up by
+# runner-terraform-apply.yml on the next merge that touches terraform/runners/**.
 runner_ami_playwright_version = "1.59.1"

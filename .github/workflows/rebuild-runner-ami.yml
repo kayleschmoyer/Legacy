@@ -71,21 +71,21 @@ jobs:
     env:
       AWS_REGION: us-east-1
     steps:
-      - name: Validate required secrets
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Per Copilot review on PR #2281: fail fast with a clear message if
-          # the bot token is missing rather than dying obscurely at checkout.
-          if [ -z "${BOT_TOKEN:-}" ]; then
-            echo "::error::secrets.BOT_GITHUB_TOKEN is not configured."
-            echo "::error::This workflow needs a token that can push back to PR branches AND retrigger required checks."
-            echo "::error::The default GITHUB_TOKEN cannot retrigger required checks, so a legacy-sports-code-bot PAT or GitHub App installation token is required."
-            echo "::error::Add it under repo Settings -> Secrets and variables -> Actions -> New repository secret."
-            exit 1
-          fi
-          echo "✅ BOT_GITHUB_TOKEN is configured."
+      # Mint a short-lived GitHub App installation token for the Agent Author app
+      # (App ID 3158619, legacy-sports-code-bot). This is the same pattern used by
+      # dependabot-lockfile-fix.yml and pr-workflow-guide.yml — it gives us a token
+      # that can push back to the PR branch AND retrigger required checks, which
+      # the default GITHUB_TOKEN cannot. Avoids the operational burden of rotating
+      # a hand-managed PAT (LS-4905; previously this workflow required a separate
+      # BOT_GITHUB_TOKEN secret that drifted out of existence).
+      - name: Generate bot token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        id: bot-token
+        with:
+          app-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
 
       - name: Validate required inputs
         run: |
@@ -130,10 +130,10 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0
-          # Use a bot token so the push back to the PR branch triggers downstream CI.
-          # The default GITHUB_TOKEN cannot push back to a branch in a way that
-          # re-runs required checks.
-          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          # Use the App installation token so the push back to the PR branch
+          # triggers downstream CI. The default GITHUB_TOKEN cannot push back to a
+          # branch in a way that re-runs required checks.
+          token: ${{ steps.bot-token.outputs.token }}
 
       - name: Extract target Playwright version from lockfile
         id: lockfile
