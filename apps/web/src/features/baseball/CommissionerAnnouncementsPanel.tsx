@@ -428,7 +428,7 @@ export function CommissionerAnnouncementsPanel({
                 </YStack>
 
                 {/* Content */}
-                <YStack flex={1} gap="$1">
+                <YStack flex={1} minWidth={0} gap="$1">
                   <XStack
                     justifyContent="space-between"
                     alignItems="center"
@@ -568,7 +568,12 @@ export function CommissionerAnnouncementsPanel({
                       fontSize="$4"
                       color="$color"
                       lineHeight="$5"
-                      style={{ wordBreak: 'break-word' } as React.CSSProperties}
+                      style={
+                        {
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere',
+                        } as React.CSSProperties
+                      }
                     >
                       {announcement.messageText}
                     </Text>
