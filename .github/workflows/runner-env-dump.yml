@@ -1,0 +1,238 @@
+# runner-env-dump.yml — One-off diagnostic dump of the runner AMI's env surface.
+#
+# LS-4947 Phase 1. workflow_dispatch only — this is the runtime side of the
+# drift inventory: it runs on a real self-hosted runner backed by the current
+# AMI and emits the actual env / PATH / tool versions that GitHub Actions jobs
+# observe at job time. The Packer HCL is the source-of-truth side; this is the
+# ground-truth side. Diff the two to find drift.
+#
+# What it captures:
+#   - The full process env (`env`) the runner exposes to job steps (non-login
+#     shell — this is what most actions actually see).
+#   - The env after sourcing /etc/profile (login-shell view — what `bash -l`
+#     and humans SSH'ing in see). Comparing the two surfaces drift between
+#     /etc/environment (non-login) and /etc/profile.d/*.sh (login).
+#   - `which` + `--version` for every tool the Packer provisioner installs.
+#   - The verbatim contents of /etc/environment, /etc/profile.d/*.sh, and the
+#     runner's own /opt/actions-runner/.env.
+#   - File-system landmarks the AMI bakes in (Android SDK, Playwright browser
+#     cache, Gradle wrapper dist, actions-runner dir).
+#
+# How to use:
+#   1. Trigger via `gh workflow run runner-env-dump.yml --ref <branch>` or the
+#      GH UI. Make sure the workflow file exists on the ref you're dispatching.
+#   2. Wait for completion (~30s — it's all pure shell, no network).
+#   3. The job summary + raw log link goes into docs/runners/ami-env-drift.md
+#      as evidence for the inventory.
+#
+# This workflow MUST stay workflow_dispatch only — it is a diagnostic, not a
+# gate. Adding a `pull_request` or `schedule` trigger would burn runner minutes
+# on every PR for no signal. If we ever want a recurring drift detector, that
+# is a separate workflow that fails on assertion violations, not a dump.
+
+name: Runner Env Dump (Diagnostic)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    name: Dump runner env surface
+    # Pin to the self-hosted fleet — `ubuntu-latest` would defeat the purpose.
+    # If CI_RUNNER_LABEL is unset, fall back to a label that does not exist so
+    # the job fails loudly rather than silently running on GitHub-hosted.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'self-hosted-not-configured' }}
+    steps:
+      - name: Runner identity
+        run: |
+          echo "## Runner identity" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "hostname        : $(hostname)"        | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "whoami          : $(whoami)"          | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "uname -a        : $(uname -a)"        | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "lsb_release     : $(lsb_release -ds 2>/dev/null || cat /etc/os-release | head -2 | tr '\n' ' ')" | tee -a "$GITHUB_STEP_SUMMARY"
+          # AMI ID via IMDSv2 (the runner instance can reach IMDS).
+          TOKEN=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+            -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+          AMI_ID=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" \
+            http://169.254.169.254/latest/meta-data/ami-id 2>/dev/null || echo "unavailable")
+          echo "ami-id          : $AMI_ID" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Non-login shell env (what job steps see)
+        run: |
+          echo "## env (non-login, default GH Actions shell)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          env | sort | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Login shell env (what `bash -l` sees)
+        shell: bash -l {0}
+        run: |
+          echo "## env (login shell — sources /etc/profile + /etc/profile.d/*.sh)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          env | sort | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: PATH comparison
+        run: |
+          echo "## PATH (non-login)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$PATH" | tr ':' '\n' | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: PATH (login shell)
+        shell: bash -l {0}
+        run: |
+          echo "## PATH (login shell)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$PATH" | tr ':' '\n' | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Static env files
+        run: |
+          dump_file() {
+            local path="$1"
+            echo "### $path"
+            if [[ -e "$path" ]]; then
+              echo '```'
+              sudo cat "$path" 2>/dev/null || cat "$path"
+              echo '```'
+            else
+              echo "_(not present)_"
+            fi
+          }
+          {
+            echo "## Static env files"
+            dump_file /etc/environment
+            for f in /etc/profile.d/*.sh; do
+              dump_file "$f"
+            done
+            dump_file /opt/actions-runner/.env
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Tool versions (which + --version)
+        run: |
+          # Each entry: "<binary>|<version flag>". `--version` is the default;
+          # entries that need something different override it explicitly. We
+          # never let a single failure abort the dump — every tool gets probed,
+          # missing ones print "MISSING" so the inventory can mark them.
+          declare -a tools=(
+            "node|--version"
+            "npm|--version"
+            "corepack|--version"
+            "pnpm|--version"
+            "npx|--version"
+            "playwright|--version"
+            "serve|--version"
+            "terraform|--version"
+            "uv|--version"
+            "uvx|--version"
+            "snyk|--version"
+            "docker|--version"
+            "docker compose version|"
+            "gh|--version"
+            "aws|--version"
+            "amazon-cloudwatch-agent-ctl|-a status"
+            "java|-version"
+            "javac|-version"
+            "sdkmanager|--version"
+            "adb|--version"
+            "gradle|--version"
+            "git|--version"
+            "jq|--version"
+            "curl|--version"
+            "unzip|-v"
+            "zip|--version"
+            "python3|--version"
+          )
+          {
+            echo "## Tool versions"
+            echo
+            printf "| Tool | Path | Version (first line) |\n"
+            printf "| --- | --- | --- |\n"
+            for entry in "${tools[@]}"; do
+              bin="${entry%%|*}"
+              flag="${entry##*|}"
+              # Split "docker compose version" handling: take the first word for
+              # `which`, but invoke the whole left-hand side for the version
+              # call so multi-word probes work.
+              first_word="${bin%% *}"
+              path=$(command -v "$first_word" 2>/dev/null || echo "MISSING")
+              if [[ "$path" == "MISSING" ]]; then
+                version="MISSING"
+              else
+                if [[ -n "$flag" ]]; then
+                  version=$($bin $flag 2>&1 | head -n 1 || echo "ERROR")
+                else
+                  version=$($bin 2>&1 | head -n 1 || echo "ERROR")
+                fi
+                # Sanitize | in version output so the markdown table doesn't break.
+                version="${version//|/\\|}"
+              fi
+              printf "| %s | %s | %s |\n" "$bin" "$path" "$version"
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: File-system landmarks
+        run: |
+          check() {
+            local path="$1"
+            if [[ -e "$path" ]]; then
+              echo "✅ $path ($(stat -c '%U:%G %a' "$path" 2>/dev/null))"
+              if [[ -d "$path" ]]; then
+                ls -la "$path" 2>&1 | head -n 10 | sed 's/^/    /'
+              fi
+            else
+              echo "❌ $path (missing)"
+            fi
+          }
+          {
+            echo "## File-system landmarks (Packer-baked paths)"
+            echo '```'
+            check /opt/playwright-browsers
+            check /opt/android-sdk
+            check /opt/android-sdk/cmdline-tools/latest/bin
+            check /opt/android-sdk/platform-tools
+            check /opt/actions-runner
+            check /opt/actions-runner/.env
+            check /home/ubuntu/.gradle/wrapper/dists
+            check /usr/lib/jvm/java-17-openjdk-amd64
+            check /usr/local/bin/terraform
+            check /usr/local/bin/snyk
+            check /usr/local/bin/aws
+            check /usr/local/bin/uv
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: AMI tag advertised versions
+        run: |
+          # The AMI tags are the contract: any tag value that doesn't match the
+          # corresponding tool version above is a drift instance. We pull the
+          # tags via the EC2 metadata + describe-images so we don't need IAM to
+          # describe-tags on the instance.
+          TOKEN=$(curl -s -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+            -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+          AMI_ID=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" \
+            http://169.254.169.254/latest/meta-data/ami-id 2>/dev/null || echo "")
+          REGION=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" \
+            http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || echo "us-east-1")
+          {
+            echo "## AMI tags (advertised contract)"
+            echo '```'
+            if [[ -n "$AMI_ID" ]]; then
+              if command -v aws >/dev/null 2>&1; then
+                aws ec2 describe-images --region "$REGION" --image-ids "$AMI_ID" \
+                  --query 'Images[0].Tags[?starts_with(Key, `Name`) == `false`]' \
+                  --output table 2>&1 || echo "(describe-images failed — instance role may lack ec2:DescribeImages)"
+              else
+                echo "(aws CLI missing — see Tool versions table)"
+              fi
+            else
+              echo "(IMDS unavailable)"
+            fi
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
