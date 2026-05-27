@@ -223,20 +223,26 @@ test.describe
       await page.waitForLoadState('load');
 
       // V2 Team tab: name input is always editable — no edit-toggle button.
-      // Wait for "Save Name" to be enabled (team data loaded) before filling,
-      // then wait again to ensure no concurrent mutation holds the button.
+      // "Save Name" is dirty-gated (disabled until the input differs from the
+      // current team name), and clicking opens a confirmation dialog before
+      // the rename mutation fires.
       const nameInput = page.locator('#team-name-input');
       await expect(nameInput).toBeVisible({ timeout: 10_000 });
-      const saveNameBtn = page.getByRole('button', { name: /Save Name/i });
-      await expect(saveNameBtn).toBeEnabled({ timeout: 10_000 });
+      // Wait for team data to seed the input (non-empty value) so the
+      // subsequent fill replaces a known starting state.
+      await expect
+        .poll(() => nameInput.inputValue(), { timeout: 10_000 })
+        .not.toBe('');
       await nameInput.fill('The Commissioners');
+      const saveNameBtn = page.getByRole('button', { name: /Save Name/i });
       await expect(saveNameBtn).toBeEnabled({ timeout: 5_000 });
       await saveNameBtn.click();
-      // Mutation completes when the button returns from its loading state
-      // to enabled. The next step does a full goto/load anyway, but waiting
-      // for the button gives us deterministic local mutation completion
-      // (LS-4457).
-      await expect(saveNameBtn).toBeEnabled({ timeout: 10_000 });
+      // Confirm the rename in the dialog.
+      const confirmDialog = page.getByTestId('rename-team-confirm');
+      await expect(confirmDialog).toBeVisible({ timeout: 5_000 });
+      await confirmDialog.getByRole('button', { name: /^Rename$/ }).click();
+      // Dialog closing signals the mutation completed (LS-4457, LS-4938).
+      await expect(confirmDialog).toBeHidden({ timeout: 10_000 });
     });
 
     await test.step('Verify updated team name on overview', async () => {
