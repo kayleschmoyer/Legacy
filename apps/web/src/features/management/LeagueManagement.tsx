@@ -27,6 +27,8 @@ const EASE_STANDARD = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 const FG_STRONG = '#FFFFFF';
 const FG2 = '#DEE6FF';
 
+const DELETION_TIMEOUT_MS = 30_000;
+
 type DialogStep = 'none' | 'confirm1' | 'confirm2' | 'deleting';
 
 export const LeagueManagement: React.FC = () => {
@@ -36,11 +38,13 @@ export const LeagueManagement: React.FC = () => {
   const [liveMsg, setLiveMsg] = useState('');
   const [showError, setShowError] = useState(true);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [deleteAllLeagues, { loading, error }] = useDeleteAllLeaguesMutation();
   const isBusy = loading || dialog === 'deleting';
 
   const openConfirm1 = () => {
+    setLocalError(null);
     setDialog('confirm1');
     setLiveMsg('Delete all leagues dialog opened.');
   };
@@ -55,11 +59,23 @@ export const LeagueManagement: React.FC = () => {
 
   const handleFinalConfirm = () => {
     setDialog('deleting');
+    setLocalError(null);
     setLiveMsg('Deleting all leagues has started.');
-    void deleteAllLeagues({
-      refetchQueries: ['GetUserLeagues'],
-      awaitRefetchQueries: true,
-    })
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('Deletion timed out — please try again.')),
+        DELETION_TIMEOUT_MS,
+      ),
+    );
+
+    void Promise.race([
+      deleteAllLeagues({
+        refetchQueries: ['GetUserLeagues'],
+        awaitRefetchQueries: true,
+      }),
+      timeoutPromise,
+    ])
       .then(() => {
         setDialog('none');
         setShowError(false);
@@ -70,6 +86,7 @@ export const LeagueManagement: React.FC = () => {
       .catch((err: Error) => {
         setDialog('none');
         setShowError(true);
+        setLocalError(err.message);
         setLiveMsg('Unable to delete leagues. See the error card for details.');
         LOGGER.error('deleteAllLeagues mutation failed', err);
       });
@@ -291,7 +308,7 @@ export const LeagueManagement: React.FC = () => {
               </div>
             )}
             {/* Error inline card */}
-            {error && showError && (
+            {(error || localError) && showError && (
               <div
                 role="alert"
                 aria-live="assertive"
@@ -346,7 +363,8 @@ export const LeagueManagement: React.FC = () => {
                       maxWidth: '70ch',
                     }}
                   >
-                    {error.message ||
+                    {localError ??
+                      error?.message ??
                       'The server returned an error while processing your request. Your leagues are still intact. Try again, or contact your commissioner if the problem persists.'}
                   </p>
                   <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>

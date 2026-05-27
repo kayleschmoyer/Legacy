@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- jest mock factories use any for simplicity */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { LeagueManagement } from './LeagueManagement';
 
 // ── Auth mock — exercises both unauthenticated and authenticated paths ────────
@@ -88,5 +88,73 @@ describe('LeagueManagement', () => {
     );
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByText(/Are you sure\?/i)).toBeInTheDocument();
+  });
+
+  describe('deletion timeout', () => {
+    const neverResolves = <T = never,>(): Promise<T> =>
+      new Promise<T>(() => undefined);
+    const flushMicrotasks = () => Promise.resolve();
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows the timeout error after 30s when the mutation hangs', async () => {
+      mockMutation.mockImplementation(() => neverResolves());
+
+      render(<LeagueManagement />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /Delete All Leagues/i }),
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+      fireEvent.click(
+        screen.getByRole('button', { name: /Yes, Delete Everything/i }),
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(30_001);
+        await flushMicrotasks();
+      });
+
+      expect(
+        screen.getAllByText(/Deletion timed out — please try again\./i).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it('clears the timeout error when the user reopens the dialog', async () => {
+      mockMutation.mockImplementation(() => neverResolves());
+
+      render(<LeagueManagement />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /Delete All Leagues/i }),
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+      fireEvent.click(
+        screen.getByRole('button', { name: /Yes, Delete Everything/i }),
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(30_001);
+        await flushMicrotasks();
+      });
+
+      expect(
+        screen.getAllByText(/Deletion timed out — please try again\./i).length,
+      ).toBeGreaterThan(0);
+
+      // Re-opening the flow clears the timeout error message.
+      fireEvent.click(
+        screen.getByRole('button', { name: /Delete All Leagues/i }),
+      );
+      expect(
+        screen.queryAllByText(/Deletion timed out — please try again\./i),
+      ).toHaveLength(0);
+    });
   });
 });
