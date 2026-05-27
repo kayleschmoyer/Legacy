@@ -496,6 +496,110 @@ describe('merge-queue-processor — 405 required-checks-expected handling (LS-41
     );
   });
 
+  it('logs verbatim 405 response body (message + documentation_url) before interpretation (LS-4926)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw Object.assign(new Error('Repository rule violations found'), {
+        status: 405,
+        response: {
+          data: {
+            message:
+              'Repository rule violations found\n\n' +
+              '5 of 7 required status checks are expected.',
+            documentation_url:
+              'https://docs.github.com/rest/pulls/pulls#merge-a-pull-request',
+          },
+        },
+      });
+    };
+
+    const captured = [];
+    const originalLog = console.log;
+    console.log = (...args) => {
+      captured.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    const all = captured.join('\n');
+    assert.match(
+      all,
+      /GitHub merge API 405 — Repository rule violations found/,
+      'should log the verbatim GitHub-supplied message',
+    );
+    assert.match(
+      all,
+      /5 of 7 required status checks are expected/,
+      'should include the full message body',
+    );
+    assert.match(
+      all,
+      /docs\.github\.com\/rest\/pulls\/pulls#merge-a-pull-request/,
+      'should include documentation_url when present',
+    );
+    assert.match(
+      all,
+      /CI still registering or in-progress/,
+      'existing interpretive line should remain (retry behavior unchanged)',
+    );
+  });
+
+  it('logs verbatim 405 body even for non-pending 405 causes (ruleset misconfig case, LS-4926)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw Object.assign(new Error('Method Not Allowed'), {
+        status: 405,
+        response: {
+          data: { message: 'Pull Request is not mergeable' },
+        },
+      });
+    };
+
+    const captured = [];
+    const originalLog = console.log;
+    console.log = (...args) => {
+      captured.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    assert.match(
+      captured.join('\n'),
+      /GitHub merge API 405 — Pull Request is not mergeable/,
+      'verbatim body should be logged even when no documentation_url is present',
+    );
+  });
+
   it('still surfaces other 405 causes as real errors with a comment', async () => {
     const { github, calls } = makeGithub({
       reviews: [

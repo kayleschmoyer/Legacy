@@ -4,6 +4,12 @@
  *
  * Called from the "Process Enhanced Merge Queue" step via:
  *   await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry });
+ *
+ * Logging: uses console.log / console.error throughout — this script runs in
+ * the GitHub Actions runner's Node sandbox via actions/github-script and
+ * cannot import workspace packages like `@legacy-sports/logging`. Build-time
+ * scripts are an explicit exception to the no-console rule (see AGENTS.md,
+ * Code Quality → No console.*).
  */
 
 // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
@@ -713,6 +719,21 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
             `branch advanced during merge window. Will re-evaluate on next trigger.`,
         );
         return;
+      }
+
+      // Surface GitHub's actual 405 body verbatim before any processor
+      // interpretation. The interpretive branches below are educated guesses;
+      // when the real cause is a ruleset/required-checks misconfig (e.g. an
+      // evaluator bug), the guess sends debuggers down the wrong path (LS-4926).
+      if (error.status === 405) {
+        const apiMessage = error.response?.data?.message;
+        const docUrl = error.response?.data?.documentation_url;
+        if (apiMessage) {
+          console.log(
+            `❌ PR #${pr.number}: GitHub merge API 405 — ${sanitizeLog(apiMessage)}` +
+              (docUrl ? ` (see ${docUrl})` : ''),
+          );
+        }
       }
 
       // 405 with either "N of M required status checks are expected" or
