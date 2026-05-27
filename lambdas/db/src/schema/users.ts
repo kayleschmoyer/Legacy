@@ -350,6 +350,102 @@ builder.mutationField('updateUserAvatar', (t) =>
   }),
 );
 
+// ─── Leaked test-user cleanup (LS-4917) ───────────────────────────────────────
+
+/**
+ * Sweep target: per-run test users left over by the short-lived
+ * `int-${role}-${Date.now().toString(36)}@test.legacysports.dev` producer
+ * introduced in commit 4a9121732 (March 2026) and reverted by LS-2314.
+ * The producer is gone; these orphan rows are a one-time backfill, but the
+ * mutation is exposed so any future drift can be cleaned up the same way.
+ *
+ * The pattern is hardcoded (not caller-supplied) to keep this admin-only path
+ * from being usable to wipe arbitrary user cohorts.
+ */
+const LEAKED_TEST_USER_EMAIL_PATTERN = 'int-%@test.legacysports.dev';
+
+/**
+ * Minimum age required before a matching user is eligible for deletion.
+ * Mirrors the rationale of `MIN_LEAGUE_AGE_FOR_CLEANUP_MS` in the integration
+ * league cleanup — protects against any future producer that briefly resurfaces
+ * the same naming pattern from having its fixtures yanked mid-run.
+ */
+const DEFAULT_LEAKED_USER_MIN_AGE_DAYS = 7;
+
+const CleanupLeakedTestUsersResultRef = builder.objectRef<{
+  matched: number;
+  deleted: number;
+  dryRun: boolean;
+  minAgeDays: number;
+  sampleEmails: string[];
+  errors: string[];
+}>('CleanupLeakedTestUsersResult');
+
+CleanupLeakedTestUsersResultRef.implement({
+  fields: (t) => ({
+    matched: t.exposeInt('matched'),
+    deleted: t.exposeInt('deleted'),
+    dryRun: t.exposeBoolean('dryRun'),
+    minAgeDays: t.exposeInt('minAgeDays'),
+    sampleEmails: t.exposeStringList('sampleEmails'),
+    errors: t.exposeStringList('errors'),
+  }),
+});
+
+builder.mutationField('cleanupLeakedTestUsers', (t) =>
+  t.field({
+    type: CleanupLeakedTestUsersResultRef,
+    description:
+      'Admin only: delete leaked `int-*@test.legacysports.dev` test users older than `minAgeDays` (default 7). Pass `dryRun: true` to preview the match set.',
+    args: {
+      dryRun: t.arg.boolean({ required: true }),
+      minAgeDays: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, { dryRun, minAgeDays }, context) => {
+      if (!context.user?.isAdmin) {
+        throw ForbiddenError(
+          'Admin access required to cleanup leaked test users',
+        );
+      }
+
+      const ageDays = minAgeDays ?? DEFAULT_LEAKED_USER_MIN_AGE_DAYS;
+      if (ageDays < 1) {
+        throw UserInputError('minAgeDays must be >= 1');
+      }
+
+      const result = await dbService.users.deleteLeakedTestUsers({
+        emailLikePattern: LEAKED_TEST_USER_EMAIL_PATTERN,
+        minAgeMs: ageDays * 24 * 60 * 60 * 1000,
+        dryRun,
+      });
+
+      // Audit log: every sweep is recorded at error level with actor ID and
+      // counts only — no emails or other PII. Sample emails for operator
+      // spot-checking are returned in the GraphQL response, not logged.
+      LOGGER.error('Leaked test-user cleanup sweep', {
+        audit: true,
+        actor: { id: Number(context.user.id) },
+        dryRun,
+        minAgeDays: ageDays,
+        matched: result.matched.length,
+        deleted: result.deleted,
+        errorCount: result.errors.length,
+      });
+
+      return {
+        matched: result.matched.length,
+        deleted: result.deleted,
+        dryRun,
+        minAgeDays: ageDays,
+        sampleEmails: result.matched.slice(0, 10).map((u) => u.email),
+        errors: result.errors.map(
+          (e) => `user ${e.id} (${e.email}): ${e.message}`,
+        ),
+      };
+    },
+  }),
+);
+
 // ─── Impersonation ────────────────────────────────────────────────────────────
 
 const ImpersonateUserResultRef = builder.objectRef<{

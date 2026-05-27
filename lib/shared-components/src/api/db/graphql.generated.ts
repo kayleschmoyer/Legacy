@@ -399,6 +399,16 @@ export type CheckoutSessionResult = {
   url?: Maybe<Scalars['String']['output']>;
 };
 
+export type CleanupLeakedTestUsersResult = {
+  __typename?: 'CleanupLeakedTestUsersResult';
+  deleted?: Maybe<Scalars['Int']['output']>;
+  dryRun?: Maybe<Scalars['Boolean']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  matched?: Maybe<Scalars['Int']['output']>;
+  minAgeDays?: Maybe<Scalars['Int']['output']>;
+  sampleEmails?: Maybe<Array<Scalars['String']['output']>>;
+};
+
 /** Result of a commissioner action */
 export type CommissionerActionResult = {
   __typename?: 'CommissionerActionResult';
@@ -1683,6 +1693,8 @@ export type Mutation = {
   /** Cast or update a vote for a season award. League membership required. Voting must be open. */
   castAwardVote?: Maybe<Scalars['Boolean']['output']>;
   claimFreeAgent?: Maybe<WaiverClaim>;
+  /** Admin only: delete leaked `int-*@test.legacysports.dev` test users older than `minAgeDays` (default 7). Pass `dryRun: true` to preview the match set. */
+  cleanupLeakedTestUsers?: Maybe<CleanupLeakedTestUsersResult>;
   /** Close voting and tally results. Winners are stored in league_season_awards. Commissioner access required. */
   closeAwardVoting?: Maybe<AwardVotingPeriod>;
   commissionerPick?: Maybe<DraftPick>;
@@ -1941,6 +1953,11 @@ export type MutationClaimFreeAgentArgs = {
   faabBid?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCleanupLeakedTestUsersArgs = {
+  dryRun: Scalars['Boolean']['input'];
+  minAgeDays?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationCloseAwardVotingArgs = {

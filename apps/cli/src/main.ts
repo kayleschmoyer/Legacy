@@ -53,6 +53,7 @@ import { handleLoadBrParkFactors } from './commands/loadBrParkFactors';
 import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjustments';
 import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
+import { handleCleanupTestUsers } from './commands/cleanupTestUsers';
 import { handleReportToJiraEpic } from './commands/reportToJiraEpic';
 import { handleSeedDisclosureFacts } from './commands/seedDisclosureFacts';
 import { handleLoadFootballCareer } from './commands/loadFootballCareer';
@@ -786,6 +787,23 @@ export function buildProgram(): Command {
         pattern?: string;
         yes?: boolean;
       }) => handleCleanupTestLeagues(options),
+    );
+
+  program
+    .command('cleanup-test-users')
+    .description(
+      'Admin only: delete leaked int-*@test.legacysports.dev test users (LS-4917)',
+    )
+    .option('--dry-run', 'List matching users without deleting them')
+    .option(
+      '--min-age-days <n>',
+      'Only target users older than N days (default 7)',
+      parseInt,
+    )
+    .option('--yes', 'Skip confirmation prompt and proceed with deletion')
+    .action(
+      (options: { dryRun?: boolean; minAgeDays?: number; yes?: boolean }) =>
+        handleCleanupTestUsers(options),
     );
 
   return program;

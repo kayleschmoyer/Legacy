@@ -8,6 +8,8 @@ import {
   inArray,
   isNotNull,
   isNull,
+  like,
+  lt,
   or,
   SQL,
 } from 'drizzle-orm';
@@ -245,6 +247,75 @@ export class UserService {
     });
 
     return this.getUserById(userId);
+  }
+
+  /**
+   * Find users whose email matches a SQL LIKE pattern and that were created
+   * before a cut-off date, and delete them. Used to sweep up orphaned test
+   * fixtures (e.g. the `int-commissioner-*@test.legacysports.dev` users left
+   * over from the short-lived per-run-email producer in LS-4917).
+   *
+   * The age guard is mandatory — callers cannot opt out — so concurrent test
+   * runs that recently created the same kind of user cannot have their
+   * fixtures yanked out from under them.
+   *
+   * Returns the set of matched users (always) and, when `dryRun` is false, the
+   * per-user delete outcome. Errors surface from FK constraints that don't
+   * CASCADE — those rows are skipped rather than aborting the whole sweep.
+   */
+  async deleteLeakedTestUsers(opts: {
+    emailLikePattern: string;
+    minAgeMs: number;
+    dryRun: boolean;
+    now?: Date;
+  }): Promise<{
+    matched: Array<{ id: number; email: string; createdAt: Date }>;
+    deleted: number;
+    errors: Array<{ id: number; email: string; message: string }>;
+  }> {
+    const now = opts.now ?? new Date();
+    const cutoff = new Date(now.getTime() - opts.minAgeMs);
+
+    return runWithInternalClient(this.options, async (db) => {
+      const matched = await db
+        .select({
+          id: InternalSchema.usersInAppInternal.id,
+          email: InternalSchema.usersInAppInternal.email,
+          createdAt: InternalSchema.usersInAppInternal.createdAt,
+        })
+        .from(InternalSchema.usersInAppInternal)
+        .where(
+          and(
+            like(
+              InternalSchema.usersInAppInternal.email,
+              opts.emailLikePattern,
+            ),
+            lt(InternalSchema.usersInAppInternal.createdAt, cutoff),
+          ),
+        );
+
+      if (opts.dryRun || matched.length === 0) {
+        return { matched, deleted: 0, errors: [] };
+      }
+
+      const errors: Array<{ id: number; email: string; message: string }> = [];
+      let deleted = 0;
+      for (const row of matched) {
+        try {
+          await db
+            .delete(InternalSchema.usersInAppInternal)
+            .where(eq(InternalSchema.usersInAppInternal.id, row.id));
+          deleted++;
+        } catch (err) {
+          errors.push({
+            id: row.id,
+            email: row.email,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      return { matched, deleted, errors };
+    });
   }
 
   /**

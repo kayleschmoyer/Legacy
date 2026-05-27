@@ -435,6 +435,15 @@ type CheckoutSessionResult {
   url: String
 }
 
+type CleanupLeakedTestUsersResult {
+  deleted: Int
+  dryRun: Boolean
+  errors: [String!]
+  matched: Int
+  minAgeDays: Int
+  sampleEmails: [String!]
+}
+
 """
 Result of a commissioner action
 """
@@ -1958,6 +1967,14 @@ type Mutation {
     leagueId: Int!
     playerId: Int!
   ): WaiverClaim
+
+  """
+  Admin only: delete leaked `int-*@test.legacysports.dev` test users older than `minAgeDays` (default 7). Pass `dryRun: true` to preview the match set.
+  """
+  cleanupLeakedTestUsers(
+    dryRun: Boolean!
+    minAgeDays: Int
+  ): CleanupLeakedTestUsersResult
 
   """
   Close voting and tally results. Winners are stored in league_season_awards. Commissioner access required.
