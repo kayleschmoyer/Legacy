@@ -755,6 +755,9 @@ export function PlayerStatsPage({
             }}
           >
             {Platform.OS === 'web' && (
+              // pointerEvents: none — without it, mobile taps that land on the
+              // icon are absorbed by the SVG instead of focusing the input,
+              // which manifests as "can't type in the search field" (LS-4813).
               <svg
                 width="16"
                 height="16"
@@ -767,6 +770,7 @@ export function PlayerStatsPage({
                   left: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
                 }}
               >
                 <circle cx="11" cy="11" r="8" />
