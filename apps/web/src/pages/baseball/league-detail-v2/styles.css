@@ -134,7 +134,15 @@
 /* Role switch bar */
 .ls-role-bar {
   position: sticky;
-  top: 0;
+  /* Must clear the app nav (NAV_HEIGHT_PX = 65) and the scoreboard ticker
+     (TICKER_HEIGHT_PX = 40) — matches SECONDARY_STICKY_TOP in
+     apps/web/src/constants/dimensions.ts. Without this offset the role bar
+     would stick at viewport top:0 and be hidden behind the app nav
+     (z-index 200) and the ticker (z-index 150), since this bar's z-index of
+     60 is lower than both. On days with no MLB games the ticker is not
+     rendered and there is a small extra gap below the nav — an acceptable
+     trade-off over dynamic detection. */
+  top: 105px;
   z-index: 60;
   background: rgba(10, 15, 26, 0.86);
   backdrop-filter: blur(14px);
