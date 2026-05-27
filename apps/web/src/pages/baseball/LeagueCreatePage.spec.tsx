@@ -14,7 +14,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return -- mock factories return untyped JSX */
 /* eslint-disable react/jsx-no-useless-fragment -- single-child fragments are intentional in mocks */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
@@ -225,6 +225,74 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
     renderPage('/baseball/league/create');
     expect(
       screen.queryByTestId('football-beta-banner'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+  });
+
+  it('shows the reset notice when switching from Auction to Automated draft', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    // Select Auction before switching draft mode
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+
+    // Switch to Automated Draft
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+
+    expect(screen.getByTestId('selection-reset-notice')).toBeInTheDocument();
+  });
+
+  it('does not show the reset notice when the selection method is already Random', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    // Switch to Automated (resets to Random, notice appears)
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    const notice = screen.getByTestId('selection-reset-notice');
+    fireEvent.click(within(notice).getByRole('button', { name: /^Dismiss$/i }));
+
+    // Switch back to Live, then to Automated again — already Random, no notice
+    fireEvent.click(screen.getByRole('button', { name: /^Live Draft$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+
+    expect(
+      screen.queryByTestId('selection-reset-notice'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('dismisses the reset notice when the Dismiss button is clicked', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+
+    const notice = screen.getByTestId('selection-reset-notice');
+    expect(notice).toBeInTheDocument();
+
+    fireEvent.click(within(notice).getByRole('button', { name: /^Dismiss$/i }));
+    expect(
+      screen.queryByTestId('selection-reset-notice'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('auto-dismisses the reset notice when switching back to Live Draft', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    expect(screen.getByTestId('selection-reset-notice')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Live Draft$/i }));
+    expect(
+      screen.queryByTestId('selection-reset-notice'),
     ).not.toBeInTheDocument();
   });
 });

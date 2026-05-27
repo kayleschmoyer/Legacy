@@ -1301,8 +1301,15 @@ export function LeagueCreatePage(): React.JSX.Element {
   ) => {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
-      if (field === 'draftMode' && value === 'automated') {
-        next.selectionMethod = 'random';
+      if (field === 'draftMode') {
+        if (value === 'automated') {
+          if (prev.selectionMethod !== 'random') {
+            setSelectionResetNotice(true);
+          }
+          next.selectionMethod = 'random';
+        } else {
+          setSelectionResetNotice(false);
+        }
       }
       if (
         field === 'numberOfTeams' &&
@@ -1324,6 +1331,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const firstError = errorCount > 0 ? Object.values(validationErrors)[0] : null;
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selectionResetNotice, setSelectionResetNotice] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2144,6 +2152,42 @@ export function LeagueCreatePage(): React.JSX.Element {
                       }
                     />
                   </FieldRow>
+
+                  {/* Selection method reset notice */}
+                  {selectionResetNotice && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <XStack
+                        role="status"
+                        aria-live="polite"
+                        gap="$3"
+                        alignItems="center"
+                        backgroundColor={withAlpha(AMBER, 0.1)}
+                        borderWidth={1}
+                        borderColor={withAlpha(AMBER, 0.4)}
+                        borderRadius="$4"
+                        padding="$3"
+                        data-testid="selection-reset-notice"
+                      >
+                        <AlertCircle size={16} color={AMBER} flexShrink={0} />
+                        <Text
+                          fontFamily="$body"
+                          fontSize={13}
+                          color="$color11"
+                          flex={1}
+                        >
+                          Switching to automated draft reset your selection
+                          method to Random.
+                        </Text>
+                        <Button
+                          size="$2"
+                          variant="outlined"
+                          onPress={() => setSelectionResetNotice(false)}
+                        >
+                          Dismiss
+                        </Button>
+                      </XStack>
+                    </div>
+                  )}
 
                   {/* Draft Order */}
                   <FieldRow
