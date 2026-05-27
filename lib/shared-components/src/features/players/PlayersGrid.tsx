@@ -16,6 +16,12 @@ import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
 import { PlayerCard } from './PlayerCard';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 
+export interface PlayersGridResultStats {
+  matched: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export interface PlayersGridProps {
   onPlayerSelect?: (player: PlayerFragment) => void;
   pageSize?: number;
@@ -26,12 +32,47 @@ export interface PlayersGridProps {
   projectedPoints?: Map<number, number>;
   /** Whether to show projections on player cards */
   showProjections?: boolean;
+  /**
+   * Controlled search term. When provided, replaces the grid's internal
+   * search input value — used by PlayersScreen (LS-4649) to drive the
+   * editorial search bar above the rail. Pair with `showSearch={false}`
+   * to hide the built-in input.
+   */
+  searchTerm?: string;
+  /**
+   * Controlled sort key (e.g. `NAME_ASC`, `NAME_DESC`). When provided,
+   * replaces the grid's internal Select value — used by PlayersScreen
+   * (LS-4649) so the editorial sort selector above the rail drives the
+   * query. Pair with `showSorting={false}` to hide the built-in select.
+   */
+  sortBy?: string;
+  /**
+   * Notified whenever the grid's matched/total/hasMore counts change.
+   * Used by PlayersScreen (LS-4649) to drive the count chip + active-
+   * summary header without duplicating the query.
+   */
+  onResultStats?: (stats: PlayersGridResultStats) => void;
 }
 
 const SORT_OPTIONS = [
   { label: 'Name (A-Z)', value: 'NAME_ASC' },
   { label: 'Name (Z-A)', value: 'NAME_DESC' },
 ] as const;
+
+// Strict allow-list of sort values that may reach the GraphQL resolver
+// (LS-4649 reviewer feedback). `sortBy` is decomposed into `orderBy` +
+// `orderDirection` and sent as query variables; clamping the input to
+// known values up front prevents an unexpected `sortByProp` (now that
+// the prop is externally controllable) from passing arbitrary strings
+// to the backend.
+const ALLOWED_SORT_VALUES = new Set(SORT_OPTIONS.map((o) => o.value));
+const DEFAULT_SORT = 'NAME_ASC';
+function normalizeSortBy(raw: string | undefined): string {
+  return raw &&
+    ALLOWED_SORT_VALUES.has(raw as (typeof SORT_OPTIONS)[number]['value'])
+    ? raw
+    : DEFAULT_SORT;
+}
 
 function PlayersGrid({
   onPlayerSelect,
@@ -41,9 +82,17 @@ function PlayersGrid({
   title = 'Players',
   projectedPoints,
   showProjections = false,
+  searchTerm: searchTermProp,
+  sortBy: sortByProp,
+  onResultStats,
 }: PlayersGridProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<string>('NAME_ASC');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const [internalSortBy, setInternalSortBy] = useState<string>(DEFAULT_SORT);
+  const searchTerm = searchTermProp ?? internalSearchTerm;
+  // Clamp the effective sort to the allow-list so an unexpected external
+  // value (controlled `sortByProp`) never reaches the resolver verbatim.
+  const sortBy = normalizeSortBy(sortByProp ?? internalSortBy);
+  const setSearchTerm = setInternalSearchTerm;
   const [allPlayers, setAllPlayers] = useState<PlayerFragment[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -72,7 +121,7 @@ function PlayersGrid({
   }, [data?.players, pageSize]);
 
   const handleSortChange = useCallback((newSort: string) => {
-    setSortBy(newSort);
+    setInternalSortBy(newSort);
     // useEffect above resets allPlayers when data updates for the new sort
   }, []);
 
@@ -105,6 +154,18 @@ function PlayersGrid({
         .includes(searchTerm.toLowerCase()),
     );
   }, [allPlayers, searchTerm]);
+
+  // Surface matched/total/hasMore so a parent (PlayersScreen, LS-4649)
+  // can drive its own count chip and active-summary meta without
+  // re-issuing the same query.
+  useEffect(() => {
+    if (!onResultStats) return;
+    onResultStats({
+      matched: filteredPlayers.length,
+      total: allPlayers.length,
+      hasMore,
+    });
+  }, [filteredPlayers.length, allPlayers.length, hasMore, onResultStats]);
 
   if (loading && !data) {
     return (

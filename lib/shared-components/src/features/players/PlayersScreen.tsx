@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
-import { PlayersGrid } from './PlayersGrid';
+import { PlayersGrid, type PlayersGridResultStats } from './PlayersGrid';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 import { Platform } from '../../platform-components';
 import {
@@ -13,9 +13,14 @@ import {
   BRAND_SEAM_RED,
   OUTLINE_SUBTLE,
   OVERLAY_WHITE_05,
+  POS_CATCHER,
+  POS_INFIELD,
+  POS_OUTFIELD,
+  POS_PITCHER,
   POS_UTILITY,
   STATS_PAGE_TOKENS,
   SURFACE_CARD,
+  SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_NEUTRAL_FG3,
   TEXT_PRIMARY,
@@ -35,6 +40,49 @@ const BG_ELEVATED = STATS_PAGE_TOKENS.BG_ELEVATED;
 // .agents/skills/standards/references/tamagui-web-pitfalls.md and the same
 // pattern in PlayerStatsPage.tsx (LS-4613). Native branches always supply
 // real numbers, so the cast only takes effect under Platform.OS === 'web'.
+
+// ── Filter rail option sets (LS-4649) ────────────────────────────────
+// Mirrors docs/design/F89Q4j6WFCFqqsZpQ4VhlQ/legacy-sports-players-page/
+// project/players-data.jsx. Era and Position filters are scaffold-only in
+// this slice — the PlayerFragment doesn't yet select `primaryEra` /
+// `eligiblePositions`, so the rail captures user intent (active summary,
+// clear-all) without short-circuiting the server query. A follow-up slice
+// can extend the fragment and the GraphQL `players` resolver to filter on
+// these fields without changing the rail UI.
+const ERAS = [
+  { id: 'all', label: 'All Eras' },
+  { id: 'dead', label: 'Dead Ball', range: '1901–19' },
+  { id: 'live', label: 'Live Ball', range: '1920–45' },
+  { id: 'integration', label: 'Integration', range: '1946–68' },
+  { id: 'expansion', label: 'Expansion', range: '1969–93' },
+  { id: 'steroid', label: 'Steroid', range: '1994–04' },
+  { id: 'modern', label: 'Modern', range: '2005–' },
+] as const;
+
+const POSITIONS = [
+  { id: 'all', label: 'All', dot: 'transparent' },
+  { id: 'pitcher', label: 'P', dot: POS_PITCHER },
+  { id: 'catcher', label: 'C', dot: POS_CATCHER },
+  { id: 'infield', label: 'IF', dot: POS_INFIELD },
+  { id: 'outfield', label: 'OF', dot: POS_OUTFIELD },
+  { id: 'utility', label: 'DH', dot: POS_UTILITY },
+] as const;
+
+const AVAILABILITY = [
+  { id: 'all', label: 'Any' },
+  { id: 'free', label: 'Free Agents' },
+  { id: 'rost', label: 'Rostered' },
+  { id: 'wait', label: 'Waivers' },
+] as const;
+
+type EraId = (typeof ERAS)[number]['id'];
+type PositionId = (typeof POSITIONS)[number]['id'];
+type AvailabilityId = (typeof AVAILABILITY)[number]['id'];
+
+const SORT_OPTIONS = [
+  { value: 'NAME_ASC', label: 'Sort: Name (A → Z)' },
+  { value: 'NAME_DESC', label: 'Sort: Name (Z → A)' },
+] as const;
 
 /**
  * Shell-level conditional state for the Players Page. When omitted, the page
@@ -61,12 +109,8 @@ export interface PlayersScreenProps {
   state?: PlayersShellState;
   /** Active view mode — controls loading-skeleton geometry. Default: 'cards'. */
   viewMode?: PlayersViewMode;
-  /** Whether any filters are currently active. Used by the derived empty state. */
-  hasActiveFilters?: boolean;
   /** Retry handler invoked from the ErrorState card. Defaults to Apollo refetch. */
   onRetry?: () => void;
-  /** Clear-all-filters handler invoked from the EmptyState card. */
-  onClearFilters?: () => void;
 }
 
 /**
@@ -119,6 +163,47 @@ export function fullName(player: PlayerFragment): string {
   return [player.firstName, player.lastName].filter(Boolean).join(' ').trim();
 }
 
+/**
+ * Active-summary chip descriptor — exported for direct unit testing.
+ * The shape mirrors the design's `ActiveSummary` in players-app.jsx so
+ * future slices can add new filter dimensions without rewriting the chip
+ * list rendering. (LS-4649)
+ */
+export interface ActiveFilterChip {
+  key: 'q' | 'era' | 'pos' | 'avail';
+  label: string;
+}
+
+/**
+ * Compute the active-filter chip list. Exported so PlayersScreen.spec.tsx
+ * can verify the mapping (search query → quoted chip, era → era label,
+ * etc.) without mounting the whole shell. (LS-4649)
+ */
+export function activeFilterChips(args: {
+  searchTerm: string;
+  era: EraId;
+  pos: PositionId;
+  avail: AvailabilityId;
+}): ActiveFilterChip[] {
+  const chips: ActiveFilterChip[] = [];
+  if (args.searchTerm.trim()) {
+    chips.push({ key: 'q', label: `"${args.searchTerm.trim()}"` });
+  }
+  if (args.era !== 'all') {
+    const era = ERAS.find((e) => e.id === args.era);
+    if (era) chips.push({ key: 'era', label: era.label });
+  }
+  if (args.pos !== 'all') {
+    const pos = POSITIONS.find((p) => p.id === args.pos);
+    if (pos) chips.push({ key: 'pos', label: pos.label });
+  }
+  if (args.avail !== 'all') {
+    const avail = AVAILABILITY.find((a) => a.id === args.avail);
+    if (avail) chips.push({ key: 'avail', label: avail.label });
+  }
+  return chips;
+}
+
 function PlayersScreen({
   onPlayerSelect,
   pageSize = 50,
@@ -126,9 +211,7 @@ function PlayersScreen({
   showFeatured = true,
   state,
   viewMode = 'cards',
-  hasActiveFilters = false,
   onRetry,
-  onClearFilters,
 }: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
     (player: PlayerFragment) => {
@@ -138,9 +221,47 @@ function PlayersScreen({
     [onPlayerSelect],
   );
 
-  // Lightweight peek query for the Featured spotlight + count chip. The main
-  // grid runs its own paginated query inside PlayersGrid; this one stays at
-  // limit:1 so the shell doesn't double-fetch a full page.
+  // Filter / sort state owned by the screen so the grid, the count chip,
+  // the active-summary row, and the derived empty state all read from one
+  // source of truth (LS-4649).
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<string>('NAME_ASC');
+  const [era, setEra] = useState<EraId>('all');
+  const [pos, setPos] = useState<PositionId>('all');
+  const [avail, setAvail] = useState<AvailabilityId>('all');
+  const [resultStats, setResultStats] = useState<PlayersGridResultStats>({
+    matched: 0,
+    total: 0,
+    hasMore: false,
+  });
+  const handleResultStats = useCallback((stats: PlayersGridResultStats) => {
+    setResultStats(stats);
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setSearchTerm('');
+    setEra('all');
+    setPos('all');
+    setAvail('all');
+  }, []);
+
+  const clearChip = useCallback(
+    (key: 'all' | ActiveFilterChip['key']) => {
+      if (key === 'all') {
+        clearAllFilters();
+        return;
+      }
+      if (key === 'q') setSearchTerm('');
+      if (key === 'era') setEra('all');
+      if (key === 'pos') setPos('all');
+      if (key === 'avail') setAvail('all');
+    },
+    [clearAllFilters],
+  );
+
+  // Lightweight peek query for the Featured spotlight + derived shell state.
+  // The main grid runs its own paginated query inside PlayersGrid; this one
+  // stays at limit:1 so the shell doesn't double-fetch a full page.
   const { data, error, loading, refetch } = useGetAllPlayersQuery({
     variables: {
       limit: 1,
@@ -162,6 +283,12 @@ function PlayersScreen({
     const players = data?.players ?? [];
     return players.find((p): p is PlayerFragment => p !== null) ?? null;
   }, [data?.players]);
+
+  const chips = useMemo(
+    () => activeFilterChips({ searchTerm, era, pos, avail }),
+    [searchTerm, era, pos, avail],
+  );
+  const hasActiveFilters = chips.length > 0;
 
   // Derive state from peek query when host did not force one explicitly.
   const peekPlayerCount = data?.players?.length ?? 0;
@@ -190,10 +317,6 @@ function PlayersScreen({
     });
   }, [onRetry, refetch]);
 
-  // Static placeholder until Slice 2 wires filter-aware counts.
-  const totalPlayers = pageSize;
-  const matchedPlayers = pageSize;
-
   return (
     <YStack flex={1} className="pp-screen" style={{ backgroundColor: BG_DARK }}>
       {/* Mobile readability tweaks (LS-4809): tighten outer padding, stack the
@@ -218,6 +341,118 @@ function PlayersScreen({
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
             gap: 16px;
           }
+          .pp-filters { display: flex; flex-direction: column; gap: 14px; }
+          .pp-search-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+          .pp-search-box { flex: 1 1 320px; min-width: 220px; position: relative; }
+          .pp-search-box input {
+            width: 100%;
+            padding: 14px 16px 14px 44px;
+            background: ${SURFACE_PANEL};
+            border: 1px solid ${OUTLINE_SUBTLE};
+            border-radius: 10px;
+            color: ${TEXT_PRIMARY};
+            font-family: ${FONT_BODY};
+            font-size: 15px;
+            transition: border-color 150ms ease, box-shadow 150ms ease;
+            box-sizing: border-box;
+          }
+          .pp-search-box input:focus {
+            outline: 0;
+            border-color: ${BRAND_GOLD_LIGHT};
+            box-shadow: 0 0 0 3px rgba(197, 165, 90, 0.18);
+          }
+          .pp-search-box input::placeholder { color: ${TEXT_MUTED}; font-style: italic; }
+          .pp-search-icon {
+            position: absolute; left: 14px; top: 50%;
+            transform: translateY(-50%);
+            color: ${TEXT_MUTED}; pointer-events: none;
+            display: inline-flex;
+          }
+          .pp-sort {
+            background: ${SURFACE_PANEL};
+            border: 1px solid ${OUTLINE_SUBTLE};
+            border-radius: 10px;
+            color: ${TEXT_PRIMARY};
+            font-family: ${FONT_DISPLAY};
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 12px 36px 12px 14px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CAAC5' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+          }
+          .pp-sort:focus {
+            outline: 0;
+            border-color: ${BRAND_GOLD_LIGHT};
+            box-shadow: 0 0 0 3px rgba(197, 165, 90, 0.18);
+          }
+          .pp-rail { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+          .pp-rail-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+          .pp-rail-divider { width: 1px; align-self: stretch; background: ${OUTLINE_SUBTLE}; }
+          .pp-pill {
+            font-family: ${FONT_DISPLAY};
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 7px 13px;
+            border-radius: 9999px;
+            background: transparent;
+            border: 1px solid ${OUTLINE_SUBTLE};
+            color: ${TEXT_NEUTRAL_FG3};
+            cursor: pointer;
+            transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+            display: inline-flex;
+            align-items: center;
+          }
+          .pp-pill:hover { color: ${TEXT_PRIMARY}; border-color: ${withAlpha(BRAND_NAVY, 0.7)}; }
+          .pp-pill.on {
+            background: ${withAlpha(BRAND_NAVY, 0.55)};
+            border-color: ${withAlpha(BRAND_GOLD_LIGHT, 0.45)};
+            color: ${TEXT_PRIMARY};
+          }
+          .pp-pill-dot {
+            display: inline-block;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+          }
+          .pp-active { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 10px 0 0; }
+          .pp-tag {
+            font-family: ${FONT_DISPLAY};
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 4px 8px 4px 10px;
+            background: ${withAlpha(BRAND_GOLD_LIGHT, 0.1)};
+            border: 1px solid ${withAlpha(BRAND_GOLD_LIGHT, 0.25)};
+            border-radius: 9999px;
+            color: ${BRAND_GOLD_LIGHT};
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+          }
+          .pp-tag-close {
+            background: transparent; border: 0; color: inherit;
+            cursor: pointer; padding: 0; line-height: 1; font-size: 14px; opacity: 0.7;
+          }
+          .pp-tag-close:hover { opacity: 1; }
+          .pp-clear-all {
+            font-family: ${FONT_BODY};
+            font-style: italic;
+            font-size: 13px;
+            color: ${TEXT_NEUTRAL_FG3};
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+          }
+          .pp-clear-all:hover { color: ${BRAND_GOLD_LIGHT}; }
           @media (max-width: 640px) {
             .pp-screen-inner { padding: 20px 16px 56px; gap: 20px; }
             .pp-head { gap: 12px; }
@@ -241,6 +476,21 @@ function PlayersScreen({
               width: 100%;
             }
             .pp-featured-stat-value { font-size: 24px !important; }
+            .pp-search-row { flex-direction: column; align-items: stretch; gap: 10px; }
+            .pp-search-box { flex: 1 1 auto; min-width: 0; }
+            .pp-sort { width: 100%; }
+            .pp-rail { flex-direction: column; align-items: stretch; gap: 10px; }
+            .pp-rail-divider { display: none; }
+            .pp-rail-group {
+              flex-wrap: nowrap;
+              overflow-x: auto;
+              margin: 0 -12px;
+              padding: 0 12px 4px;
+              scrollbar-width: none;
+            }
+            .pp-rail-group::-webkit-scrollbar { display: none; }
+            .pp-rail-label { flex-shrink: 0; align-self: center; font-size: 9px; }
+            .pp-pill { flex-shrink: 0; padding: 6px 11px; font-size: 10px; }
           }
         `}</style>
       )}
@@ -326,7 +576,8 @@ function PlayersScreen({
             </Text>
           </YStack>
 
-          {/* Count chip — right-aligned "N of M matched" indicator */}
+          {/* Count chip — right-aligned "N of M matched" indicator. Now
+              filter-aware (LS-4649): reads from PlayersGrid's onResultStats. */}
           <XStack className="pp-head-count" alignItems="center" gap="$2">
             <Text
               style={{
@@ -348,7 +599,7 @@ function PlayersScreen({
                   fontSize: 16,
                 }}
               >
-                {matchedPlayers}
+                {resultStats.matched}
               </Text>{' '}
               of{' '}
               <Text
@@ -361,7 +612,7 @@ function PlayersScreen({
                   fontSize: 16,
                 }}
               >
-                {totalPlayers}
+                {resultStats.total}
               </Text>{' '}
               matched
             </Text>
@@ -391,13 +642,40 @@ function PlayersScreen({
           </div>
         )}
 
-        {/* Body — state card or populated Featured + grid. */}
+        {/* Filter block — mirrors `.pp-filters` from players-app.jsx.
+            Search + sort row on top, filter rail in the middle, active
+            summary chips below (LS-4649). Always rendered so users can
+            adjust filters even when an empty/error state card is showing.
+            Era/Position/Status pills are scaffold-only for this slice;
+            a follow-up will wire them to the query once the Player
+            fragment exposes `primaryEra` + `eligiblePositions`. */}
+        {Platform.OS === 'web' && (
+          <YStack className="pp-filters">
+            <FilterControls
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+            />
+            <FilterRail
+              era={era}
+              setEra={setEra}
+              pos={pos}
+              setPos={setPos}
+              avail={avail}
+              setAvail={setAvail}
+            />
+            <ActiveSummary chips={chips} onClear={clearChip} />
+          </YStack>
+        )}
+
+        {/* Body — state card (LS-4656) or populated Featured + grid (LS-4649). */}
         {activeState === 'loading' ? (
           <LoadingSkeleton viewMode={viewMode} />
         ) : activeState === 'error' ? (
           <ErrorState onRetry={handleRetry} />
         ) : activeState === 'empty' ? (
-          <EmptyState onClear={onClearFilters} />
+          <EmptyState onClear={clearAllFilters} />
         ) : (
           <>
             {/* Featured spotlight — mirrors .pp-featured */}
@@ -405,22 +683,255 @@ function PlayersScreen({
               <FeaturedSpotlight player={featuredPlayer} />
             )}
 
-            {/* Grid (filter rail / view toggle delivered in Slices 2-4).
+            {/* Grid (view toggle / stats table delivered in Slices 3-4).
                 The editorial header above is the single h1 — pass an inner
                 title distinct from `title` so PlayersGrid's H2 doesn't shadow
                 the page heading and trip Playwright strict-mode lookups
-                (LS-3497 / auth-flows.spec.ts:575). */}
+                (LS-3497 / auth-flows.spec.ts:575). On web, the screen's own
+                editorial controls drive the grid via the controlled
+                `searchTerm`/`sortBy` props (LS-4649); native still uses the
+                grid's built-in controls until a native-styled rail lands. */}
             <PlayersGrid
               onPlayerSelect={handlePlayerSelect}
               pageSize={pageSize}
-              showSearch={true}
-              showSorting={true}
+              showSearch={Platform.OS !== 'web'}
+              showSorting={Platform.OS !== 'web'}
               title="Roster"
+              searchTerm={Platform.OS === 'web' ? searchTerm : undefined}
+              sortBy={Platform.OS === 'web' ? sortBy : undefined}
+              onResultStats={handleResultStats}
             />
           </>
         )}
       </YStack>
     </YStack>
+  );
+}
+
+interface FilterControlsProps {
+  searchTerm: string;
+  setSearchTerm: (v: string) => void;
+  sortBy: string;
+  setSortBy: (v: string) => void;
+}
+
+function FilterControls({
+  searchTerm,
+  setSearchTerm,
+  sortBy,
+  setSortBy,
+}: FilterControlsProps) {
+  return (
+    <XStack className="pp-search-row">
+      <YStack className="pp-search-box">
+        <span className="pp-search-icon" aria-hidden={true}>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </span>
+        <input
+          type="text"
+          placeholder="Search by name…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          aria-label="Search players"
+        />
+      </YStack>
+      <select
+        className="pp-sort"
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value)}
+        aria-label="Sort players"
+      >
+        {SORT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </XStack>
+  );
+}
+
+interface FilterRailProps {
+  era: EraId;
+  setEra: (v: EraId) => void;
+  pos: PositionId;
+  setPos: (v: PositionId) => void;
+  avail: AvailabilityId;
+  setAvail: (v: AvailabilityId) => void;
+}
+
+function FilterRail({
+  era,
+  setEra,
+  pos,
+  setPos,
+  avail,
+  setAvail,
+}: FilterRailProps) {
+  return (
+    <XStack
+      className="pp-rail"
+      role="group"
+      aria-label="Filter players by era, position, or status"
+    >
+      <RailGroup label="Era">
+        {ERAS.map((e) => (
+          <RailPill
+            key={e.id}
+            label={e.label}
+            range={'range' in e ? e.range : undefined}
+            active={era === e.id}
+            onPress={() => setEra(e.id)}
+          />
+        ))}
+      </RailGroup>
+      <YStack className="pp-rail-divider" aria-hidden={true} />
+      <RailGroup label="Position">
+        {POSITIONS.map((o) => (
+          <RailPill
+            key={o.id}
+            label={o.label}
+            dot={o.id === 'all' ? undefined : o.dot}
+            active={pos === o.id}
+            onPress={() => setPos(o.id)}
+          />
+        ))}
+      </RailGroup>
+      <YStack className="pp-rail-divider" aria-hidden={true} />
+      <RailGroup label="Status">
+        {AVAILABILITY.map((a) => (
+          <RailPill
+            key={a.id}
+            label={a.label}
+            active={avail === a.id}
+            onPress={() => setAvail(a.id)}
+          />
+        ))}
+      </RailGroup>
+    </XStack>
+  );
+}
+
+interface RailGroupProps {
+  label: string;
+  children: React.ReactNode;
+}
+
+function RailGroup({ label, children }: RailGroupProps) {
+  return (
+    <XStack className="pp-rail-group">
+      <Text
+        className="pp-rail-label"
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '700',
+          fontSize: 10,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: TEXT_MUTED,
+          marginRight: 4,
+        }}
+      >
+        {label}
+      </Text>
+      {children}
+    </XStack>
+  );
+}
+
+interface RailPillProps {
+  label: string;
+  range?: string;
+  dot?: string;
+  active: boolean;
+  onPress: () => void;
+}
+
+function RailPill({ label, range, dot, active, onPress }: RailPillProps) {
+  return (
+    <button
+      type="button"
+      className={'pp-pill' + (active ? ' on' : '')}
+      onClick={onPress}
+      aria-pressed={active}
+    >
+      {dot && (
+        <span
+          className="pp-pill-dot"
+          style={{ backgroundColor: dot }}
+          aria-hidden={true}
+        />
+      )}
+      {label}
+      {range && (
+        <span
+          style={{ opacity: 0.55, marginLeft: 6, fontWeight: 400 }}
+          aria-hidden={true}
+        >
+          {range}
+        </span>
+      )}
+    </button>
+  );
+}
+
+interface ActiveSummaryProps {
+  chips: ActiveFilterChip[];
+  onClear: (key: 'all' | ActiveFilterChip['key']) => void;
+}
+
+function ActiveSummary({ chips, onClear }: ActiveSummaryProps) {
+  if (chips.length === 0) return null;
+  return (
+    <XStack
+      className="pp-active"
+      role="status"
+      aria-label="Active filters"
+      aria-live="polite"
+    >
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontStyle: 'italic',
+          fontSize: 13,
+          color: TEXT_NEUTRAL_FG3,
+        }}
+      >
+        Showing
+      </Text>
+      {chips.map((chip) => (
+        <span key={`${chip.key}:${chip.label}`} className="pp-tag">
+          {chip.label}
+          <button
+            type="button"
+            className="pp-tag-close"
+            aria-label={`Clear ${chip.label} filter`}
+            onClick={() => onClear(chip.key)}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        className="pp-clear-all"
+        onClick={() => onClear('all')}
+      >
+        Clear all
+      </button>
+    </XStack>
   );
 }
 
@@ -597,7 +1108,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
   );
 }
 
-// ── Conditional state primitives ───────────────────────────────────────────────
+// ── Conditional state primitives (LS-4656) ─────────────────────────────────────
 
 interface SkeletonBarProps {
   width: number | string;

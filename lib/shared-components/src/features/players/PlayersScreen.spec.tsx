@@ -1,4 +1,9 @@
-import { deriveShellState, fullName, initialsOf } from './PlayersScreen';
+import {
+  activeFilterChips,
+  deriveShellState,
+  fullName,
+  initialsOf,
+} from './PlayersScreen';
 import type { PlayerFragment } from './PlayersApi';
 
 // Unit tests for the pure helpers powering the Players Page editorial header
@@ -139,5 +144,54 @@ describe('deriveShellState (LS-4656)', () => {
         hasActiveFilters: false,
       }),
     ).toBeUndefined();
+  });
+});
+
+describe('activeFilterChips (LS-4649)', () => {
+  it('returns an empty list when nothing is filtered', () => {
+    expect(
+      activeFilterChips({
+        searchTerm: '',
+        era: 'all',
+        pos: 'all',
+        avail: 'all',
+      }),
+    ).toEqual([]);
+  });
+
+  it('treats a whitespace-only search term as empty', () => {
+    expect(
+      activeFilterChips({
+        searchTerm: '   ',
+        era: 'all',
+        pos: 'all',
+        avail: 'all',
+      }),
+    ).toEqual([]);
+  });
+
+  it('emits a quoted chip for an active search term, trimmed', () => {
+    const chips = activeFilterChips({
+      searchTerm: '  Ruth  ',
+      era: 'all',
+      pos: 'all',
+      avail: 'all',
+    });
+    expect(chips).toEqual([{ key: 'q', label: '"Ruth"' }]);
+  });
+
+  it('maps each filter to its human-readable label', () => {
+    const chips = activeFilterChips({
+      searchTerm: 'Ichiro',
+      era: 'live',
+      pos: 'outfield',
+      avail: 'free',
+    });
+    expect(chips).toEqual([
+      { key: 'q', label: '"Ichiro"' },
+      { key: 'era', label: 'Live Ball' },
+      { key: 'pos', label: 'OF' },
+      { key: 'avail', label: 'Free Agents' },
+    ]);
   });
 });
