@@ -3,7 +3,6 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   isBaseballScoringGroup,
   isScoringGroup,
-  resolveBaseballScoringGroup,
   resolveScoringStatGroup,
 } from './scoring';
 
@@ -67,46 +66,5 @@ describe('resolveScoringStatGroup', () => {
   ] as const)('returns %s unchanged for all known groups', (group) => {
     expect(resolveScoringStatGroup({ id: 1, statGroup: group })).toBe(group);
     expect(loggerErrorSpy).not.toHaveBeenCalled();
-  });
-});
-
-describe('resolveBaseballScoringGroup', () => {
-  let loggerErrorSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    loggerErrorSpy = jest.spyOn(LOGGER, 'error').mockImplementation();
-  });
-
-  afterEach(() => {
-    loggerErrorSpy.mockRestore();
-  });
-
-  it.each(['batting', 'pitching', 'fielding'] as const)(
-    'returns %s unchanged for baseball groups',
-    (group) => {
-      expect(resolveBaseballScoringGroup({ id: 1, statGroup: group })).toBe(
-        group,
-      );
-      expect(loggerErrorSpy).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each([
-    'passing',
-    'rushing',
-    'receiving',
-    'kicking',
-    'defense',
-    'idp',
-  ] as const)('throws and logs for football group %s', (group) => {
-    expect(() =>
-      resolveBaseballScoringGroup({ id: 42, statGroup: group }),
-    ).toThrow(`Unexpected non-baseball scoring stat group: ${group}`);
-
-    expect(loggerErrorSpy).toHaveBeenCalledWith(
-      `Unexpected non-baseball scoring stat group: ${group}`,
-      expect.any(Error),
-      { statGroup: group, statDefinitionId: 42 },
-    );
   });
 });

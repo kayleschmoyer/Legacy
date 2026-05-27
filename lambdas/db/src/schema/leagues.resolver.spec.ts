@@ -16,6 +16,7 @@ describe('League Mutations', () => {
     mockDb = {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
