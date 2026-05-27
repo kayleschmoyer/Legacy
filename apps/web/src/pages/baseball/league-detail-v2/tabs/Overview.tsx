@@ -363,6 +363,7 @@ export interface OverviewTabProps {
   isCommissioner: boolean;
   onTab: (t: TabId) => void;
   onTeam: (teamId: number) => void;
+  onJoinDraft: () => void;
   currentUserId: number | null;
   myRoster: readonly TeamMemberFragment[];
 }
@@ -374,6 +375,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   isCommissioner,
   onTab,
   onTeam,
+  onJoinDraft,
   currentUserId,
   myRoster,
 }) => {
@@ -458,7 +460,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <button
               className="ls-btn ls-btn-seam sm"
               type="button"
-              onClick={() => onTab('overview')}
+              aria-label="Join draft room"
+              onClick={onJoinDraft}
             >
               <I.PlayCircle size={12} /> Join Draft Room
             </button>

@@ -362,6 +362,9 @@ export function LeagueDetailPageV2(): React.JSX.Element {
                 isCommissioner={effIsCommish}
                 onTab={setTab}
                 onTeam={onTeamNav}
+                onJoinDraft={() =>
+                  navigate(`/baseball/league/${leagueId}/draft`)
+                }
                 currentUserId={user?.id ?? null}
                 myRoster={myRoster}
               />

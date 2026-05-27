@@ -13,16 +13,21 @@
  *   6. Baseball-specific label ("Games / Matchup") appears when isFootball is false.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-import { DuesCompact, Snapshot } from './Overview';
-import type { GetLeagueDuesStatusQuery } from '../../../../api/db/graphql.generated';
+import { DuesCompact, OverviewTab, Snapshot } from './Overview';
+import {
+  type GetLeagueDuesStatusQuery,
+  type LeagueFragment,
+  Sport,
+} from '../../../../api/db/graphql.generated';
 
 let mockData: GetLeagueDuesStatusQuery | null = null;
 
 jest.mock('../../../../api/db/graphql.generated', () => ({
   useGetLeagueDuesStatusQuery: jest.fn(() => ({ data: mockData })),
   useGetLeagueStandingsQuery: jest.fn(() => ({ data: null })),
+  Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
 // Overview.tsx pulls in heavy feature trees (LeagueChatTab -> GifPicker uses
@@ -155,6 +160,63 @@ const snapshotBase = {
   matchupDays: 7,
   startersCount: 9,
 };
+
+describe('OverviewTab — Join Draft Room (LS-4916)', () => {
+  const baseLeague = {
+    __typename: 'League',
+    id: 3924,
+    sport: Sport.Baseball,
+    draftStatus: 'in-progress',
+    maxRosterSize: 25,
+    gamesPerMatchup: 7,
+    inviteCode: 'ABC123',
+    lmNotes: null,
+    currentWeekNumber: null,
+    currentMatchup: null,
+  } as unknown as LeagueFragment;
+
+  it('calls onJoinDraft when the Join Draft Room button is clicked', () => {
+    const onJoinDraft = jest.fn();
+    render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={onJoinDraft}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /join draft room/i }));
+    expect(onJoinDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render the Join Draft Room banner when no draft is in progress', () => {
+    const league = {
+      ...baseLeague,
+      draftStatus: 'pre-draft',
+    } as LeagueFragment;
+    render(
+      <OverviewTab
+        league={league}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: /join draft room/i }),
+    ).not.toBeInTheDocument();
+  });
+});
 
 describe('Snapshot', () => {
   it('renders football-specific labels when isFootball is true', () => {
