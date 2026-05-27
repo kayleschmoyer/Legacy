@@ -112,6 +112,14 @@ variable "ssh_source_cidr" {
 # because terraform/github-runners.tf filters by this exact prefix to select the AMI
 # without an explicit AMI ID. Changing this prefix requires a coordinated update to
 # the filter block in github-runners.tf and the drift-check workflow.
+#
+# Rebuild history (most recent first):
+# - LS-4957 — carry the LS-4949 pnpm fix (standalone binary, no corepack)
+#   into a freshly baked AMI. LS-4949 itself only changed this Packer file;
+#   without a rebuild, runners kept booting from the pre-LS-4949 AMI with
+#   pnpm 11.3.0 (corepack drift). See `.agents/skills/infrastructure/
+#   references/ami-build.md` for the carrier-PR + rebuild-runner-ami label
+#   process this PR exercises.
 source "amazon-ebs" "runner" {
   ami_name      = "legacy-sports-runner-pw${var.playwright_version}-{{timestamp}}"
   instance_type = var.instance_type

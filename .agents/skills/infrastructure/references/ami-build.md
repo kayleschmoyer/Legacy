@@ -62,6 +62,43 @@ You do **not** need to rebuild when:
 - Terraform infrastructure changes (applied separately via `make runner-apply`)
 - GitHub Actions workflow changes
 
+## How to Trigger a Rebuild (CI path — preferred)
+
+The `.github/workflows/rebuild-runner-ami.yml` workflow is the canonical, audited path for producing a new AMI. It runs Packer inside CI using the `runner-ami-builder` IAM role (so no local AWS access is needed) and commits any version-pin updates back to the triggering PR. It is **PR-anchored**: triggers fire only via `pull_request: types: [labeled]` or `workflow_dispatch` with a `pr-number` input.
+
+### When the rebuild is part of an in-flight PR
+
+If your PR mutates `terraform/runners/packer/runner-ami.pkr.hcl` (or anything else that changes the AMI's contents), apply the **`rebuild-runner-ami`** label to the PR **before merge**. The workflow:
+
+1. Builds an AMI from your branch's Packer config.
+2. Pushes any required `playwright_version` / `runner_ami_playwright_version` updates back to the branch.
+3. Lets the `runner-ami-drift-check` workflow gate confirm all three version sources agree.
+
+Merging then completes the rollout cleanly in one cycle.
+
+### When the Packer-touching PR already merged (carrier PR)
+
+If a PR merged without the label and you only realize the rebuild is needed afterwards (LS-4949 shape — Packer-only change, no AMI baked), open a small **carrier PR**:
+
+1. Make a one-line meaningful change to a Packer-adjacent file — e.g. a comment in `terraform/runners/packer/runner-ami.pkr.hcl` recording the rebuild reason, or an entry in this runbook's rebuild history.
+2. Apply the `rebuild-runner-ami` label.
+3. The workflow builds the AMI against the carrier branch (which is just `main` + your one-line comment) and commits the version-pin updates back.
+4. Merge the carrier PR. `runner-terraform-apply.yml` fires on `terraform/runners/` changes and rolls the launch template forward via the `most_recent` name-prefix filter.
+
+### Workflow-dispatch (manual, no PR open)
+
+Only useful for `prune-only` runs (cleanup of old AMIs without a build) or to retry a build against an existing PR. For actual rebuilds, always go through the label trigger so the version-pin commit-back path runs.
+
+### What if no AMI gets built? (LS-4949 failure mode)
+
+If a Packer config change ships to `main` without the `rebuild-runner-ami` label applied beforehand, the runner fleet keeps booting from the **previous** AMI — the merged Packer code never gets exercised. Symptoms:
+
+- Recent runner-env-dump diagnostic still shows pre-fix behavior.
+- `lambda-terraform-apply` / `runner-terraform-apply` post-merge runs succeed (correctly — they apply terraform, not Packer).
+- The `verify-env-contract` post-provisioner added in LS-4947 doesn't catch this because it only runs when a build actually happens.
+
+Recovery: open a carrier PR per the section above.
+
 ## Prerequisites
 
 1. **AWS SSO authenticated**: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if credentials are expired
