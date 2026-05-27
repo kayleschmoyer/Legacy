@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { ScrollView, Spinner, styled, Text } from 'tamagui';
+import { Spinner, styled, Text } from 'tamagui';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import { formatDraftDate } from '@legacy-sports/utils';
 import { formatDisplayName } from '../../lib/formatDisplayName';
@@ -1654,7 +1654,7 @@ export function HomePage(): React.JSX.Element {
     (!!auth.user && (summariesLoading || (!summaryData && !summariesError)))
   ) {
     return (
-      <ScrollView>
+      <>
         <PageMeta
           title="Dashboard"
           description="Your personalized fantasy sports dashboard."
@@ -1668,7 +1668,7 @@ export function HomePage(): React.JSX.Element {
             )}
           </ContentContainer>
         </PageContainer>
-      </ScrollView>
+      </>
     );
   }
 
@@ -1683,7 +1683,7 @@ export function HomePage(): React.JSX.Element {
     const errorOccurredAt =
       errorMeta?.message === errorMessage ? errorMeta.occurredAt : new Date();
     return (
-      <ScrollView>
+      <>
         <PageMeta
           title="Dashboard"
           description="Your personalized fantasy sports dashboard."
@@ -1745,7 +1745,7 @@ export function HomePage(): React.JSX.Element {
             </div>
           </ContentContainer>
         </PageContainer>
-      </ScrollView>
+      </>
     );
   }
 
@@ -1773,7 +1773,7 @@ export function HomePage(): React.JSX.Element {
       : null;
 
     return (
-      <ScrollView>
+      <>
         <PageMeta
           title="Dashboard"
           description="Your personalized fantasy sports dashboard."
@@ -2200,7 +2200,7 @@ export function HomePage(): React.JSX.Element {
             </div>
           </ContentContainer>
         </PageContainer>
-      </ScrollView>
+      </>
     );
   }
 
@@ -2208,435 +2208,430 @@ export function HomePage(): React.JSX.Element {
   return (
     <>
       {tutorialOpen && <OnboardingTutorial onClose={handleTutorialClose} />}
-      <ScrollView>
-        <PageMeta
-          title="Fantasy Baseball League Manager"
-          description="Manage your fantasy baseball leagues, draft players, track live stats, and compete with friends on Legacy Sports."
-        />
-        <PageContainer style={pageBackgroundStyle}>
-          <ContentContainer>
-            {/* Editorial hero */}
-            <div
+      <PageMeta
+        title="Fantasy Baseball League Manager"
+        description="Manage your fantasy baseball leagues, draft players, track live stats, and compete with friends on Legacy Sports."
+      />
+      <PageContainer style={pageBackgroundStyle}>
+        <ContentContainer>
+          {/* Editorial hero */}
+          <div
+            style={{
+              paddingBottom: 32,
+              marginBottom: 40,
+              borderBottom: `1px solid ${PANEL_BORDER}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 18,
+            }}
+          >
+            <span
               style={{
-                paddingBottom: 32,
-                marginBottom: 40,
-                borderBottom: `1px solid ${PANEL_BORDER}`,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 18,
+                fontFamily: 'Big Shoulders Display, system-ui',
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: BRAND_GOLD_LIGHT,
               }}
             >
-              <span
+              Welcome, {userName}
+            </span>
+            <h1
+              style={{
+                fontFamily: 'Big Shoulders Display, system-ui',
+                fontWeight: 800,
+                fontSize: 'clamp(44px, 5.2vw, 68px)',
+                lineHeight: 0.98,
+                letterSpacing: '-0.025em',
+                color: WHITE,
+                margin: 0,
+              }}
+            >
+              Start your dynasty.
+              <br />
+              <span style={{ color: BRAND_GOLD_LIGHT }}>
+                Draft legends across every era.
+              </span>
+            </h1>
+            <p
+              style={{
+                fontFamily: 'Literata, Georgia, serif',
+                fontSize: 18,
+                lineHeight: 1.55,
+                color: TEXT_SECONDARY,
+                margin: 0,
+                maxWidth: '60ch',
+              }}
+            >
+              Create a league in sixty seconds. Invite ten friends, pick an era,
+              and compete on real archived statistics — from Deadball to today.
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                marginTop: 14,
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                onClick={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
                 style={{
                   fontFamily: 'Big Shoulders Display, system-ui',
                   fontWeight: 700,
-                  fontSize: 12,
-                  letterSpacing: '0.14em',
+                  fontSize: 13,
+                  letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: BRAND_GOLD_LIGHT,
+                  padding: '11px 20px',
+                  borderRadius: 12,
+                  background: BRAND_GOLD,
+                  color: BG_DARK,
+                  border: 'none',
+                  cursor: 'pointer',
                 }}
               >
-                Welcome, {userName}
-              </span>
-              <h1
+                Create League
+              </button>
+              <button
+                onClick={() => navigate(JOIN_BASEBALL_LEAGUE_ROUTE)}
                 style={{
                   fontFamily: 'Big Shoulders Display, system-ui',
-                  fontWeight: 800,
-                  fontSize: 'clamp(44px, 5.2vw, 68px)',
-                  lineHeight: 0.98,
-                  letterSpacing: '-0.025em',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '11px 20px',
+                  borderRadius: 12,
+                  background: BRAND_NAVY,
                   color: WHITE,
-                  margin: 0,
+                  border: `1px solid ${BRAND_NAVY_LIGHT}`,
+                  cursor: 'pointer',
                 }}
               >
-                Start your dynasty.
-                <br />
-                <span style={{ color: BRAND_GOLD_LIGHT }}>
-                  Draft legends across every era.
-                </span>
-              </h1>
-              <p
+                Join League
+              </button>
+              <button
+                onClick={() => setTutorialOpen(true)}
                 style={{
-                  fontFamily: 'Literata, Georgia, serif',
-                  fontSize: 18,
-                  lineHeight: 1.55,
-                  color: TEXT_SECONDARY,
-                  margin: 0,
-                  maxWidth: '60ch',
+                  fontFamily: 'Big Shoulders Display, system-ui',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '11px 20px',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: TEXT_INTERFACE,
+                  border: `1px solid ${BORDER_STRONG}`,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                Create a league in sixty seconds. Invite ten friends, pick an
-                era, and compete on real archived statistics — from Deadball to
-                today.
-              </p>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 3-3 3" />
+                  <path d="M12 17h.01" />
+                </svg>
+                How It Works
+              </button>
+            </div>
+          </div>
+
+          {/* Choose Your Sport */}
+          <section>
+            <div style={{ marginBottom: 20 }}>
+              <SectionHead eyebrow="Step one" title="Choose your sport" />
+            </div>
+            <div className="ls-sport-grid">
+              {orderedSports.map((sport) => (
+                <div
+                  key={sport.key}
+                  aria-disabled={!sport.available}
+                  style={{
+                    ...sportCardBg(sport.accentBase, sport.accentAlpha),
+                    position: 'relative',
+                    padding: 32,
+                    borderRadius: 20,
+                    border: `1px solid rgba(255,255,255,0.08)`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                    opacity: sport.available ? 1 : 0.6,
+                    cursor: sport.available ? 'default' : 'default',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: 12,
+                        background: withAlpha(BG_DARK, 0.55),
+                        border: `1px solid ${PANEL_BORDER}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BrandIcon
+                        name={sport.icon}
+                        size={40}
+                        title={sport.title}
+                        decorative={false}
+                      />
+                    </div>
+                    {sport.available ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '5px 11px',
+                          borderRadius: 9999,
+                          background: withAlpha(GREEN, 0.12),
+                          border: `1px solid ${withAlpha(GREEN, 0.4)}`,
+                          fontFamily: 'Big Shoulders Display, system-ui',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          letterSpacing: '0.12em',
+                          textTransform: 'uppercase',
+                          color: GREEN_LIGHTER,
+                        }}
+                      >
+                        <span
+                          className="ls-dot-pulse"
+                          style={{
+                            display: 'inline-block',
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            background: GREEN_LIGHTER,
+                          }}
+                        />
+                        Live Season
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '5px 11px',
+                          borderRadius: 9999,
+                          background: 'rgba(200,148,82,.10)',
+                          border: `1px solid rgba(200,148,82,.35)`,
+                          fontFamily: 'Big Shoulders Display, system-ui',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          letterSpacing: '0.12em',
+                          textTransform: 'uppercase',
+                          color: AMBER_WARM,
+                        }}
+                      >
+                        Coming Soon
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <div
+                      data-testid={`sport-card-title-${sport.key}`}
+                      style={{
+                        fontFamily: 'Big Shoulders Display, system-ui',
+                        fontWeight: 800,
+                        fontSize: 32,
+                        letterSpacing: '-0.005em',
+                        color: WHITE,
+                      }}
+                    >
+                      {sport.title}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'Literata, Georgia, serif',
+                        fontSize: 15,
+                        color: TEXT_SECONDARY,
+                        maxWidth: '48ch',
+                        marginTop: 4,
+                      }}
+                    >
+                      {sport.description}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      marginTop: 'auto',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {sport.available ? (
+                      <>
+                        <button
+                          onClick={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
+                          style={{
+                            fontFamily: 'Big Shoulders Display, system-ui',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            padding: '11px 20px',
+                            borderRadius: 12,
+                            background: BRAND_GOLD,
+                            color: BG_DARK,
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Create League
+                        </button>
+                        <button
+                          onClick={() => navigate(sport.route)}
+                          style={{
+                            fontFamily: 'Big Shoulders Display, system-ui',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            padding: '11px 20px',
+                            borderRadius: 12,
+                            background: 'transparent',
+                            color: TEXT_INTERFACE,
+                            border: `1px solid ${BORDER_STRONG}`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          View Public Leagues
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          disabled
+                          style={{
+                            fontFamily: 'Big Shoulders Display, system-ui',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            padding: '11px 20px',
+                            borderRadius: 12,
+                            background: 'transparent',
+                            color: TEXT_INTERFACE,
+                            border: `1px solid ${BORDER_STRONG}`,
+                            cursor: 'not-allowed',
+                            opacity: 0.45,
+                          }}
+                        >
+                          View Leagues
+                        </button>
+                        <button
+                          disabled
+                          style={{
+                            fontFamily: 'Big Shoulders Display, system-ui',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            padding: '11px 20px',
+                            borderRadius: 12,
+                            background: 'transparent',
+                            color: TEXT_INTERFACE,
+                            border: `1px solid ${BORDER_STRONG}`,
+                            cursor: 'not-allowed',
+                            opacity: 0.45,
+                          }}
+                        >
+                          Create League
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* On This Day — baseball only */}
+          {defaultSport === 'baseball' && (
+            <section style={{ marginTop: 56 }}>
               <div
                 style={{
                   display: 'flex',
-                  gap: 12,
-                  marginTop: 14,
-                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-end',
+                  gap: 16,
+                  marginBottom: 20,
                 }}
               >
+                <SectionHead
+                  eyebrow="Try the archive"
+                  title="On This Day in Baseball"
+                />
                 <button
-                  onClick={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
+                  onClick={() => navigate('/players/stats')}
                   style={{
-                    fontFamily: 'Big Shoulders Display, system-ui',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    padding: '11px 20px',
-                    borderRadius: 12,
-                    background: BRAND_GOLD,
-                    color: BG_DARK,
+                    background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                  }}
-                >
-                  Create League
-                </button>
-                <button
-                  onClick={() => navigate(JOIN_BASEBALL_LEAGUE_ROUTE)}
-                  style={{
                     fontFamily: 'Big Shoulders Display, system-ui',
                     fontWeight: 700,
-                    fontSize: 13,
-                    letterSpacing: '0.08em',
+                    fontSize: 12,
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
-                    padding: '11px 20px',
-                    borderRadius: 12,
-                    background: BRAND_NAVY,
-                    color: WHITE,
-                    border: `1px solid ${BRAND_NAVY_LIGHT}`,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Join League
-                </button>
-                <button
-                  onClick={() => setTutorialOpen(true)}
-                  style={{
-                    fontFamily: 'Big Shoulders Display, system-ui',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    padding: '11px 20px',
-                    borderRadius: 12,
-                    background: 'transparent',
-                    color: TEXT_INTERFACE,
-                    border: `1px solid ${BORDER_STRONG}`,
-                    cursor: 'pointer',
+                    color: BRAND_GOLD_LIGHT,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 6,
+                    padding: 0,
+                    flexShrink: 0,
                   }}
                 >
+                  Full archive
                   <svg
-                    width="14"
-                    height="14"
+                    width="12"
+                    height="12"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                     strokeLinecap="round"
-                    strokeLinejoin="round"
                   >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 3-3 3" />
-                    <path d="M12 17h.01" />
+                    <path d="M5 12h14M13 5l7 7-7 7" />
                   </svg>
-                  How It Works
                 </button>
               </div>
-            </div>
-
-            {/* Choose Your Sport */}
-            <section>
-              <div style={{ marginBottom: 20 }}>
-                <SectionHead eyebrow="Step one" title="Choose your sport" />
-              </div>
-              <div className="ls-sport-grid">
-                {orderedSports.map((sport) => (
-                  <div
-                    key={sport.key}
-                    aria-disabled={!sport.available}
-                    style={{
-                      ...sportCardBg(sport.accentBase, sport.accentAlpha),
-                      position: 'relative',
-                      padding: 32,
-                      borderRadius: 20,
-                      border: `1px solid rgba(255,255,255,0.08)`,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 16,
-                      opacity: sport.available ? 1 : 0.6,
-                      cursor: sport.available ? 'default' : 'default',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 72,
-                          height: 72,
-                          borderRadius: 12,
-                          background: withAlpha(BG_DARK, 0.55),
-                          border: `1px solid ${PANEL_BORDER}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BrandIcon
-                          name={sport.icon}
-                          size={40}
-                          title={sport.title}
-                          decorative={false}
-                        />
-                      </div>
-                      {sport.available ? (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '5px 11px',
-                            borderRadius: 9999,
-                            background: withAlpha(GREEN, 0.12),
-                            border: `1px solid ${withAlpha(GREEN, 0.4)}`,
-                            fontFamily: 'Big Shoulders Display, system-ui',
-                            fontWeight: 700,
-                            fontSize: 11,
-                            letterSpacing: '0.12em',
-                            textTransform: 'uppercase',
-                            color: GREEN_LIGHTER,
-                          }}
-                        >
-                          <span
-                            className="ls-dot-pulse"
-                            style={{
-                              display: 'inline-block',
-                              width: 7,
-                              height: 7,
-                              borderRadius: '50%',
-                              background: GREEN_LIGHTER,
-                            }}
-                          />
-                          Live Season
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '5px 11px',
-                            borderRadius: 9999,
-                            background: 'rgba(200,148,82,.10)',
-                            border: `1px solid rgba(200,148,82,.35)`,
-                            fontFamily: 'Big Shoulders Display, system-ui',
-                            fontWeight: 700,
-                            fontSize: 11,
-                            letterSpacing: '0.12em',
-                            textTransform: 'uppercase',
-                            color: AMBER_WARM,
-                          }}
-                        >
-                          Coming Soon
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <div
-                        data-testid={`sport-card-title-${sport.key}`}
-                        style={{
-                          fontFamily: 'Big Shoulders Display, system-ui',
-                          fontWeight: 800,
-                          fontSize: 32,
-                          letterSpacing: '-0.005em',
-                          color: WHITE,
-                        }}
-                      >
-                        {sport.title}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: 'Literata, Georgia, serif',
-                          fontSize: 15,
-                          color: TEXT_SECONDARY,
-                          maxWidth: '48ch',
-                          marginTop: 4,
-                        }}
-                      >
-                        {sport.description}
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 10,
-                        marginTop: 'auto',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      {sport.available ? (
-                        <>
-                          <button
-                            onClick={() =>
-                              navigate(CREATE_BASEBALL_LEAGUE_ROUTE)
-                            }
-                            style={{
-                              fontFamily: 'Big Shoulders Display, system-ui',
-                              fontWeight: 700,
-                              fontSize: 13,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              padding: '11px 20px',
-                              borderRadius: 12,
-                              background: BRAND_GOLD,
-                              color: BG_DARK,
-                              border: 'none',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Create League
-                          </button>
-                          <button
-                            onClick={() => navigate(sport.route)}
-                            style={{
-                              fontFamily: 'Big Shoulders Display, system-ui',
-                              fontWeight: 700,
-                              fontSize: 13,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              padding: '11px 20px',
-                              borderRadius: 12,
-                              background: 'transparent',
-                              color: TEXT_INTERFACE,
-                              border: `1px solid ${BORDER_STRONG}`,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            View Public Leagues
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            disabled
-                            style={{
-                              fontFamily: 'Big Shoulders Display, system-ui',
-                              fontWeight: 700,
-                              fontSize: 13,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              padding: '11px 20px',
-                              borderRadius: 12,
-                              background: 'transparent',
-                              color: TEXT_INTERFACE,
-                              border: `1px solid ${BORDER_STRONG}`,
-                              cursor: 'not-allowed',
-                              opacity: 0.45,
-                            }}
-                          >
-                            View Leagues
-                          </button>
-                          <button
-                            disabled
-                            style={{
-                              fontFamily: 'Big Shoulders Display, system-ui',
-                              fontWeight: 700,
-                              fontSize: 13,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              padding: '11px 20px',
-                              borderRadius: 12,
-                              background: 'transparent',
-                              color: TEXT_INTERFACE,
-                              border: `1px solid ${BORDER_STRONG}`,
-                              cursor: 'not-allowed',
-                              opacity: 0.45,
-                            }}
-                          >
-                            Create League
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <OnThisDayFeed
+                onPlayerPress={(id) => navigate(`/players/${id}`)}
+              />
             </section>
+          )}
 
-            {/* On This Day — baseball only */}
-            {defaultSport === 'baseball' && (
-              <section style={{ marginTop: 56 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-end',
-                    gap: 16,
-                    marginBottom: 20,
-                  }}
-                >
-                  <SectionHead
-                    eyebrow="Try the archive"
-                    title="On This Day in Baseball"
-                  />
-                  <button
-                    onClick={() => navigate('/players/stats')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontFamily: 'Big Shoulders Display, system-ui',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: BRAND_GOLD_LIGHT,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: 0,
-                      flexShrink: 0,
-                    }}
-                  >
-                    Full archive
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M5 12h14M13 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-                <OnThisDayFeed
-                  onPlayerPress={(id) => navigate(`/players/${id}`)}
-                />
-              </section>
-            )}
-
-            {/* Stats CTA */}
-            <section style={{ marginTop: 56 }}>
-              <StatsCta onPress={() => navigate('/players/stats')} isNewUser />
-            </section>
-          </ContentContainer>
-        </PageContainer>
-      </ScrollView>
+          {/* Stats CTA */}
+          <section style={{ marginTop: 56 }}>
+            <StatsCta onPress={() => navigate('/players/stats')} isNewUser />
+          </section>
+        </ContentContainer>
+      </PageContainer>
     </>
   );
 }
