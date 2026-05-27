@@ -400,21 +400,19 @@ input.draft-schedule-input[type='datetime-local']::-webkit-datetime-edit-ampm-fi
  * Dark-theme overrides are applied via .app-container.dark.
  * ──────────────────────────────────────────────────────── */
 .date-nav-btn {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 36px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid var(--borderColor, #d0d7de);
-  border-radius: 6px;
+  border: 0;
+  border-radius: 9999px;
   color: var(--color11, #0b1220);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease;
+  transition: background 120ms ease;
 }
 
 .date-nav-btn:hover:not(:disabled) {
@@ -422,7 +420,7 @@ input.draft-schedule-input[type='datetime-local']::-webkit-datetime-edit-ampm-fi
 }
 
 .date-nav-btn:focus-visible {
-  outline: 3px solid var(--focusRing, #2684ff);
+  outline: 2px solid var(--focusRing, #2684ff);
   outline-offset: 2px;
 }
 
@@ -433,12 +431,21 @@ input.draft-schedule-input[type='datetime-local']::-webkit-datetime-edit-ampm-fi
 
 /* Dark-theme overrides */
 .app-container.dark .date-nav-btn {
-  border-color: var(--borderColor, #2f3b53);
   color: var(--color11, #dee6ff);
 }
 
 .app-container.dark .date-nav-btn:hover:not(:disabled) {
   background: var(--color4, #1c2a47);
+}
+
+/* Restore a comfortable touch target on coarse pointers — the global
+ * `button { min-height: 44px }` rule above is overridden by the class
+ * selector, so apply it explicitly here. */
+@media (pointer: coarse) {
+  .date-nav-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ────────────────────────────────────────────────────────
@@ -449,17 +456,30 @@ input.draft-schedule-input[type='datetime-local']::-webkit-datetime-edit-ampm-fi
  * native calendar picker matches the active theme.
  * ──────────────────────────────────────────────────────── */
 input.scoreboard-date-input[type='date'] {
-  background: var(--color2, #ffffff);
-  border: 1px solid var(--borderColor, #d0d7de);
-  border-radius: 6px;
+  background: transparent;
+  border: 0;
   color: var(--color, #0b1220);
-  padding: 0 8px;
+  padding: 0 4px;
   font-size: 14px;
   font-family: inherit;
   color-scheme: light;
-  min-height: 44px;
-  min-width: 140px;
+  min-height: 36px;
+  min-width: 130px;
   cursor: pointer;
+}
+
+input.scoreboard-date-input[type='date']:focus-visible {
+  outline: 2px solid var(--focusRing, #2684ff);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The global `button { min-height: 44px }` coarse-pointer rule above does
+ * not match `input[type="date"]`, so apply the touch target explicitly. */
+@media (pointer: coarse) {
+  input.scoreboard-date-input[type='date'] {
+    min-height: 44px;
+  }
 }
 
 .app-container.dark input.scoreboard-date-input[type='date'] {
