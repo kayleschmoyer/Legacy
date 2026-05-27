@@ -230,6 +230,7 @@ function HeroStat({
       borderWidth={1}
       borderColor={STATS_BORDER}
       borderRadius={16}
+      $sm={{ minWidth: 96, padding: 14 }}
     >
       <Text
         color={TEXT_TERTIARY}
@@ -253,7 +254,7 @@ function HeroStat({
           letterSpacing: '-0.01em',
           fontVariantNumeric: 'tabular-nums',
         }}
-        $sm={{ style: { fontSize: 34 } }}
+        $sm={{ style: { fontSize: 30 } }}
       >
         {value}
       </Text>
@@ -272,6 +273,7 @@ function CareerStatTile({ label, value, accent }: CareerTile) {
       borderWidth={1}
       borderColor={STATS_BORDER}
       borderRadius={16}
+      $sm={{ minWidth: 92, padding: 10 }}
     >
       <Text
         color={TEXT_TERTIARY}
@@ -835,7 +837,7 @@ export function PlayerDetailModal({
             flexWrap="wrap"
           >
             <PortraitAvatar initials={initials} accent={headerAccentColor} />
-            <YStack flex={1} gap={4} minWidth={200}>
+            <YStack flex={1} gap={4} minWidth={200} $sm={{ minWidth: 0 }}>
               <Eyebrow>{eyebrowText}</Eyebrow>
               <EditorialHeading>{resolvedPlayerName}</EditorialHeading>
             </YStack>
