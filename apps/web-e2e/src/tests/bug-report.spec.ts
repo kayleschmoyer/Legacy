@@ -118,6 +118,37 @@ test.describe('Bug Report Button – Mobile @regression', () => {
     ).toBeVisible();
   });
 
+  test('dialog and close button fit within the mobile viewport (LS-4849)', async ({
+    page,
+  }) => {
+    await injectJiraProxyUrl(page);
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.getByRole('button', { name: /report a bug/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error('viewport not configured');
+
+    const dialogBox = await dialog.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    if (!dialogBox) throw new Error('dialog has no bounding box');
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(viewport.width);
+
+    const closeBox = await dialog
+      .getByRole('button', { name: /^close$/i })
+      .first()
+      .boundingBox();
+    expect(closeBox).not.toBeNull();
+    if (!closeBox) throw new Error('close button has no bounding box');
+    expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(viewport.width);
+  });
+
   test('dialog stays open and accepts input after opening from mobile nav', async ({
     page,
   }) => {

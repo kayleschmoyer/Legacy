@@ -351,8 +351,8 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
           data-testid="bug-report-dialog"
           bordered
           elevate
+          width="92%"
           maxWidth={480}
-          width="100%"
           backgroundColor="$background"
           borderRadius="$6"
           animation="quick"
