@@ -415,6 +415,8 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
   }
   if (f.draftDate && f.draftDate < new Date())
     errs.draftDate = 'Draft date must be in the future.';
+  if (f.salaryCapEnabled && f.salaryCap === undefined)
+    errs.salaryCap = 'Salary cap amount is required.';
   return errs;
 }
 
@@ -2367,24 +2369,40 @@ export function LeagueCreatePage(): React.JSX.Element {
                             label="Salary Cap Limit"
                             hint="Maximum total salary each team can spend"
                           >
-                            <Input
-                              size="$3"
-                              value={
-                                formData.salaryCap !== undefined
-                                  ? String(formData.salaryCap)
-                                  : ''
-                              }
-                              onChangeText={(text: string) => {
-                                const n = parseInt(text, 10);
-                                handleInputChange(
-                                  'salaryCap',
-                                  isNaN(n) ? 0 : n,
-                                );
-                              }}
-                              placeholder="e.g. 50000000"
-                              keyboardType="numeric"
-                              disabled={isFormDisabled}
-                            />
+                            <XStack alignItems="center" gap="$3">
+                              <Input
+                                size="$3"
+                                value={
+                                  formData.salaryCap !== undefined
+                                    ? String(formData.salaryCap)
+                                    : ''
+                                }
+                                onChangeText={(text: string) => {
+                                  const n = parseInt(text, 10);
+                                  handleInputChange(
+                                    'salaryCap',
+                                    isNaN(n) ? undefined : n,
+                                  );
+                                }}
+                                placeholder="e.g. 50000000"
+                                keyboardType="numeric"
+                                disabled={isFormDisabled}
+                                borderColor={
+                                  validationErrors.salaryCap
+                                    ? '$red8'
+                                    : '$borderColor'
+                                }
+                              />
+                              {validationErrors.salaryCap && (
+                                <Text
+                                  fontFamily="$body"
+                                  fontSize={12}
+                                  color="$red10"
+                                >
+                                  {validationErrors.salaryCap}
+                                </Text>
+                              )}
+                            </XStack>
                           </FieldRow>
                         )}
                       </YStack>
