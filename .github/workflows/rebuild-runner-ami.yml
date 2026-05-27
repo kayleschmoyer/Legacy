@@ -159,11 +159,12 @@ jobs:
         id: network
         run: |
           set -euo pipefail
-          # Build instance runs in the legacy-sports VPC's first public subnet.
-          # This account has no default VPC, so we look up the project VPC by
-          # its Name tag. Packer needs a public subnet because the build
-          # instance pulls packages from public repositories (apt, npm, GitHub,
-          # Docker Hub, Android SDK).
+          # Build instance runs in the legacy-sports VPC's first truly-public
+          # subnet — defined as one whose associated route table has a 0.0.0.0/0
+          # route pointing at an Internet Gateway. The earlier heuristic only
+          # required map-public-ip-on-launch=true, which does not guarantee a
+          # working IGW route — silently re-broken builds on the next infra change
+          # (LS-4920).
           VPC_ID=$(aws ec2 describe-vpcs \
             --filters "Name=tag:Name,Values=legacy-sports-dev-vpc" \
             --query "Vpcs[0].VpcId" --output text)
@@ -171,14 +172,56 @@ jobs:
             echo "::error::Could not find legacy-sports-dev-vpc"
             exit 1
           fi
-          SUBNET_ID=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$VPC_ID" "Name=map-public-ip-on-launch,Values=true" \
-            --query "Subnets[0].SubnetId" --output text)
-          if [[ "$SUBNET_ID" == "None" || -z "$SUBNET_ID" ]]; then
-            echo "::error::Could not resolve a public subnet in $VPC_ID for Packer build"
+
+          VPC_CIDR=$(aws ec2 describe-vpcs \
+            --vpc-ids "$VPC_ID" \
+            --query "Vpcs[0].CidrBlock" --output text)
+          if [[ "$VPC_CIDR" == "None" || -z "$VPC_CIDR" ]]; then
+            echo "::error::Could not resolve CIDR block for $VPC_ID"
             exit 1
           fi
+
+          # Find every subnet whose explicitly-associated route table has a
+          # 0.0.0.0/0 route to an Internet Gateway. We rely on explicit subnet
+          # associations rather than the VPC's main route table: the legacy-sports
+          # public subnets are explicitly associated with the IGW route table
+          # (terraform/main provisions them that way), and using only explicit
+          # associations avoids surprising matches against the main RT in case it
+          # ever has an IGW route added.
+          PUBLIC_SUBNETS=$(aws ec2 describe-route-tables \
+            --filters "Name=vpc-id,Values=$VPC_ID" \
+                      "Name=route.gateway-id,Values=igw-*" \
+                      "Name=route.destination-cidr-block,Values=0.0.0.0/0" \
+            --query "RouteTables[].Associations[?SubnetId!=\`null\`].SubnetId" \
+            --output text | tr '\t' '\n' | sort -u | grep -v '^$' || true)
+
+          if [[ -z "$PUBLIC_SUBNETS" ]]; then
+            echo "::error::No subnet in $VPC_ID has a 0.0.0.0/0 route to an Internet Gateway"
+            exit 1
+          fi
+
+          # Pick the first subnet that also has map-public-ip-on-launch=true so the
+          # instance actually gets a public IP for outbound package pulls.
+          SUBNET_ID=""
+          while read -r CANDIDATE; do
+            [[ -z "$CANDIDATE" ]] && continue
+            MAP_PUBLIC=$(aws ec2 describe-subnets \
+              --subnet-ids "$CANDIDATE" \
+              --query "Subnets[0].MapPublicIpOnLaunch" --output text)
+            if [[ "$MAP_PUBLIC" == "True" ]]; then
+              SUBNET_ID="$CANDIDATE"
+              break
+            fi
+          done <<< "$PUBLIC_SUBNETS"
+
+          if [[ -z "$SUBNET_ID" ]]; then
+            echo "::error::No IGW-routed subnet in $VPC_ID has map-public-ip-on-launch=true"
+            exit 1
+          fi
+
+          echo "Resolved public subnet $SUBNET_ID with verified IGW route in $VPC_ID"
           echo "vpc_id=$VPC_ID"       >> "$GITHUB_OUTPUT"
+          echo "vpc_cidr=$VPC_CIDR"   >> "$GITHUB_OUTPUT"
           echo "subnet_id=$SUBNET_ID" >> "$GITHUB_OUTPUT"
 
       - name: Setup Packer
@@ -192,6 +235,7 @@ jobs:
         env:
           VERSION: ${{ steps.lockfile.outputs.version }}
           VPC_ID: ${{ steps.network.outputs.vpc_id }}
+          VPC_CIDR: ${{ steps.network.outputs.vpc_cidr }}
           SUBNET_ID: ${{ steps.network.outputs.subnet_id }}
         run: |
           set -euo pipefail
@@ -200,6 +244,7 @@ jobs:
             -var "playwright_version=$VERSION" \
             -var "vpc_id=$VPC_ID" \
             -var "subnet_id=$SUBNET_ID" \
+            -var "ssh_source_cidr=$VPC_CIDR" \
             runner-ami.pkr.hcl 2>&1 | tee packer-build.log
 
           # Extract the new AMI ID from the build log. Packer's amazon-ebs builder

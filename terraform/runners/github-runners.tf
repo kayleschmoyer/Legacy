@@ -341,6 +341,21 @@ module "github_runners" {
       to_port          = 80
       description      = "EC2 instance metadata - spot interruption notices and IMDSv2 token service"
     },
+    {
+      # SSH egress to in-VPC build instances. Required for rebuild-runner-ami.yml:
+      # Packer launches a c7a.xlarge in a public subnet and the runner SSHes into
+      # it via private IP to provision the new AMI. Scoped to the VPC CIDR so this
+      # does not weaken the "no public SSH egress" posture (LS-4920).
+      cidr_blocks      = [local.vpc_cidr_block]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 22
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 22
+      description      = "SSH - in-VPC Packer build instances (rebuild-runner-ami)"
+    },
   ]
 
   # ── IAM hardening (LS-1653) ────────────────────────────────────────────────

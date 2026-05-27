@@ -96,6 +96,12 @@ variable "subnet_id" {
   description = "Public subnet ID for the Packer build instance (must have IGW route)"
 }
 
+variable "ssh_source_cidr" {
+  type        = string
+  description = "CIDR block allowed to SSH into the Packer build instance via the auto-created temporary security group. The build runs inside the legacy-sports VPC and Packer connects via private IP, so this is the VPC CIDR rather than 0.0.0.0/0 (LS-4920)."
+  default     = "10.0.0.0/16"
+}
+
 # NOTE: The AMI name must begin with "legacy-sports-runner-pw<playwright_version>-"
 # because terraform/github-runners.tf filters by this exact prefix to select the AMI
 # without an explicit AMI ID. Changing this prefix requires a coordinated update to
@@ -120,6 +126,14 @@ source "amazon-ebs" "runner" {
   vpc_id                      = var.vpc_id
   subnet_id                   = var.subnet_id
   associate_public_ip_address = true
+
+  # SSH from the self-hosted runner (which runs inside this VPC) to the build
+  # instance's private IP, not the public IP. The runner's egress SG only allows
+  # port 22 to the VPC CIDR — talking to the public IP would force an IGW hairpin
+  # and trip "no public SSH" egress rules (LS-4920). The instance keeps its public
+  # IP for outbound provisioning (apt, npm, etc.).
+  ssh_interface                         = "private_ip"
+  temporary_security_group_source_cidrs = [var.ssh_source_cidr]
 
   # Tag the temporary EC2 build instance and its volumes with a deterministic
   # Name prefix so the runner-ami-builder IAM role's tag-scoped
