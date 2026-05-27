@@ -217,6 +217,81 @@ module "github_runners" {
     fi
   EOT
 
+  # ── Pre-job env injection hook (LS-4948) ──────────────────────────────────
+  # Runs before each job's steps via ACTIONS_RUNNER_HOOK_JOB_STARTED.
+  #
+  # The runner systemd service does not load /etc/environment (no PAMName=,
+  # no EnvironmentFile=) and does not source /etc/profile.d/*.sh (non-login
+  # shell), so Packer-baked env vars like JAVA_HOME, ANDROID_HOME, and
+  # PLAYWRIGHT_BROWSERS_PATH never reach a default `runs: |` job step. Writing
+  # them to /opt/actions-runner/.env from Packer also fails — the runner
+  # agent's config.sh overwrites .env at boot, dropping anything Packer wrote
+  # (this is why LS-4902 / LS-4936 looked correct but never reached a live
+  # runner; see drift instances D-1/D-2/D-3 in docs/runners/ami-env-drift.md).
+  #
+  # The reliable channel is the runner agent's own job_started hook — it runs
+  # in the same shell context as the job's steps, has $GITHUB_ENV and
+  # $GITHUB_PATH available, and the values it writes there are exposed to
+  # every step that follows.
+  #
+  # Source of truth: the Packer-baked /etc/profile.d/*.sh files. We source
+  # them here and forward an explicit, named list of vars to $GITHUB_ENV so
+  # the contract is reviewable rather than implicit.
+  runner_hook_job_started = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+
+    # Source the Packer-baked env files (login-shell semantics) so the
+    # variables they define are present in this hook's shell. Each file is
+    # optional — a missing file means that toolchain is not installed on
+    # this AMI and we silently skip its var.
+    for f in /etc/profile.d/java.sh /etc/profile.d/android-sdk.sh /etc/profile.d/playwright.sh; do
+      # shellcheck disable=SC1090
+      [[ -f "$f" ]] && source "$f"
+    done
+
+    # Forward the named contract to $GITHUB_ENV so every step in this job
+    # inherits the vars. Skipping empty values keeps the env clean if a
+    # toolchain is intentionally missing on a future AMI variant.
+    #
+    # Security: each value is single-line by contract (these are file paths
+    # baked in by Packer at AMI build time, see /etc/profile.d/{java,android-sdk,playwright}.sh).
+    # We defensively reject any value containing a newline or carriage return
+    # before writing to $GITHUB_ENV — without this, a future change that
+    # routes a less-trusted source through this hook could let an attacker
+    # who controls the source inject extra `NAME=value` lines (e.g.
+    # `JAVA_HOME=foo\nEVIL=1`), which the runner would then expose to every
+    # subsequent step. The GitHub Actions multiline-value protocol for
+    # $GITHUB_ENV is a heredoc (NAME<<EOF…EOF), not URL-encoding; rejecting
+    # the input outright is the right shape for single-line-by-contract vars.
+    emit_env() {
+      local name="$1" value="$2"
+      if [[ -z "$value" ]]; then
+        return
+      fi
+      if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+        echo "[hook_job_started] WARN: refusing to emit $name — value contains newline/CR" >&2
+        return
+      fi
+      echo "$name=$value" >> "$GITHUB_ENV"
+    }
+    emit_env JAVA_HOME               "$${JAVA_HOME:-}"
+    emit_env ANDROID_HOME            "$${ANDROID_HOME:-}"
+    # ANDROID_SDK_ROOT is the newer name; modern Android tooling prefers it
+    # but still honors ANDROID_HOME, so we export both as aliases.
+    emit_env ANDROID_SDK_ROOT        "$${ANDROID_HOME:-}"
+    emit_env PLAYWRIGHT_BROWSERS_PATH "$${PLAYWRIGHT_BROWSERS_PATH:-}"
+
+    # Forward PATH additions to $GITHUB_PATH so `sdkmanager`, `adb`, `aapt2`,
+    # and `javac` resolve from a bare `runs: | sdkmanager ...` step without
+    # forcing every workflow to use `shell: bash -l {0}`.
+    {
+      [[ -n "$${JAVA_HOME:-}"    ]] && echo "$JAVA_HOME/bin"
+      [[ -n "$${ANDROID_HOME:-}" ]] && echo "$ANDROID_HOME/cmdline-tools/latest/bin"
+      [[ -n "$${ANDROID_HOME:-}" ]] && echo "$ANDROID_HOME/platform-tools"
+    } >> "$GITHUB_PATH"
+  EOT
+
   # ── Inter-job cleanup hook (non-ephemeral isolation) ───────────────────────
   # Runs after each job completes via ACTIONS_RUNNER_HOOK_JOB_COMPLETED.
   # Removes workspace and temp artifacts to prevent cross-job data leakage.
