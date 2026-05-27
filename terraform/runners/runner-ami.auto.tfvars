@@ -28,4 +28,7 @@
 # match, so a freshly-baked AMI built off the current packer config (e.g. after
 # LS-4902 added JDK 17 + Android build-tools to PATH) is picked up by
 # runner-terraform-apply.yml on the next merge that touches terraform/runners/**.
+#
+# LS-4909: touch to force runner-terraform-apply.yml to re-roll the launch
+# template after rebuild-runner-ami.yml builds the new JDK-17 AMI.
 runner_ami_playwright_version = "1.59.1"

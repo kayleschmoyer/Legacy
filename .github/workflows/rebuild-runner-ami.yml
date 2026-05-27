@@ -188,7 +188,7 @@ jobs:
 
       - name: Build AMI via Packer
         id: build
-        working-directory: terraform/packer
+        working-directory: terraform/runners/packer
         env:
           VERSION: ${{ steps.lockfile.outputs.version }}
           VPC_ID: ${{ steps.network.outputs.vpc_id }}
