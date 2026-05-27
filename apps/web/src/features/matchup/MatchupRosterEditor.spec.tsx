@@ -1,15 +1,18 @@
 /**
- * Regression coverage for LS-4037: when the matchup locks mid-interaction
- * (e.g. status flips from Scheduled → InProgress while the user has a swap
- * click queued), the parent wrapper's mutation handlers must re-check the
- * latest `locked` value via a ref and bail out instead of submitting.
+ * Regression coverage for:
  *
- * Without the ref-based guard, a handler captured at render-time when
- * `locked === false` would still fire `swapPositions` / `updatePosition`
- * after a subsequent rerender with `locked === true`.
+ * LS-4037: when the matchup locks mid-interaction (e.g. status flips from
+ * Scheduled → InProgress while the user has a swap click queued), the parent
+ * wrapper's mutation handlers must re-check the latest `locked` value via a
+ * ref and bail out instead of submitting.
+ *
+ * LS-4051: immediately before submitting, handlers must re-query the server
+ * (network-only) to verify the matchup is still Scheduled. If the server
+ * reports a non-Scheduled status, the mutation must be skipped and the UI
+ * must transition to locked state.
  */
 import React from 'react';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { MatchupRosterEditorView } from '@legacy-sports/shared-components/roster';
 import { MatchupRosterEditor } from './MatchupRosterEditor';
 import {
@@ -21,6 +24,7 @@ import {
   useUpdateMatchupPlayerPosition,
 } from '../../hooks/useMatchup';
 import {
+  useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '../../api/db/graphql.generated';
@@ -31,6 +35,7 @@ jest.mock('../../api/db/graphql.generated', () => {
   >('../../api/db/graphql.generated');
   return {
     ...actual,
+    useGetMatchupByIdLazyQuery: jest.fn(),
     useGetMatchupPlayersQuery: jest.fn(),
     useGetPositionsForLeagueQuery: jest.fn(),
   };
@@ -119,16 +124,29 @@ const positionsResponse = {
   loading: false,
 };
 
+const scheduledStatusResponse = {
+  data: { getMatchupById: { ...matchup, status: MatchupStatus.Scheduled } },
+};
+
 describe('MatchupRosterEditor — locked-prop race (LS-4037)', () => {
   const swapPositions = jest.fn().mockResolvedValue(undefined);
   const updatePosition = jest.fn().mockResolvedValue(undefined);
+  const fetchMatchupStatus = jest
+    .fn()
+    .mockResolvedValue(scheduledStatusResponse);
 
   beforeEach(() => {
     swapPositions.mockClear();
     updatePosition.mockClear();
+    fetchMatchupStatus.mockClear();
+    fetchMatchupStatus.mockResolvedValue(scheduledStatusResponse);
     playersResponse.refetch.mockClear();
     viewPropsRef.current = null;
 
+    (useGetMatchupByIdLazyQuery as jest.Mock).mockReturnValue([
+      fetchMatchupStatus,
+      {},
+    ]);
     (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue(playersResponse);
     (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue(
       positionsResponse,
@@ -216,5 +234,179 @@ describe('MatchupRosterEditor — locked-prop race (LS-4037)', () => {
 
     expect(swapPositions).toHaveBeenCalledTimes(1);
     expect(playersResponse.refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MatchupRosterEditor — server-side lock re-check (LS-4051)', () => {
+  const swapPositions = jest.fn().mockResolvedValue(undefined);
+  const updatePosition = jest.fn().mockResolvedValue(undefined);
+  const fetchMatchupStatus = jest.fn();
+
+  beforeEach(() => {
+    swapPositions.mockClear();
+    updatePosition.mockClear();
+    fetchMatchupStatus.mockClear();
+    playersResponse.refetch.mockClear();
+    viewPropsRef.current = null;
+
+    (useGetMatchupByIdLazyQuery as jest.Mock).mockReturnValue([
+      fetchMatchupStatus,
+      {},
+    ]);
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue(playersResponse);
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue(
+      positionsResponse,
+    );
+    (useSwapMatchupPlayerPositions as jest.Mock).mockReturnValue({
+      swapPositions,
+      loading: false,
+    });
+    (useUpdateMatchupPlayerPosition as jest.Mock).mockReturnValue({
+      updatePosition,
+      loading: false,
+    });
+  });
+
+  it('skips swap and locks UI when server reports InProgress', async () => {
+    fetchMatchupStatus.mockResolvedValue({
+      data: {
+        getMatchupById: { ...matchup, status: MatchupStatus.InProgress },
+      },
+    });
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const swap = viewPropsRef.current?.onSwapPositions;
+    if (!swap) throw new Error('expected onSwapPositions to be set');
+    await act(async () => {
+      await swap('101', null, '102', 1);
+    });
+
+    expect(swapPositions).not.toHaveBeenCalled();
+    expect(playersResponse.refetch).not.toHaveBeenCalled();
+    expect(viewPropsRef.current?.locked).toBe(true);
+  });
+
+  it('skips move and locks UI when server reports InProgress', async () => {
+    fetchMatchupStatus.mockResolvedValue({
+      data: {
+        getMatchupById: { ...matchup, status: MatchupStatus.InProgress },
+      },
+    });
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const move = viewPropsRef.current?.onMoveToPosition;
+    if (!move) throw new Error('expected onMoveToPosition to be set');
+    await act(async () => {
+      await move('101', 1);
+    });
+
+    expect(updatePosition).not.toHaveBeenCalled();
+    expect(playersResponse.refetch).not.toHaveBeenCalled();
+    expect(viewPropsRef.current?.locked).toBe(true);
+  });
+
+  it('locks UI when pre-flight fetch throws a network error', async () => {
+    fetchMatchupStatus.mockRejectedValue(new Error('Network error'));
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const swap = viewPropsRef.current?.onSwapPositions;
+    if (!swap) throw new Error('expected onSwapPositions to be set');
+    await act(async () => {
+      await swap('101', null, '102', 1);
+    });
+
+    expect(swapPositions).not.toHaveBeenCalled();
+    expect(viewPropsRef.current?.locked).toBe(true);
+  });
+
+  it('fires mutations and does not lock UI when server confirms Scheduled', async () => {
+    fetchMatchupStatus.mockResolvedValue(scheduledStatusResponse);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const swap = viewPropsRef.current?.onSwapPositions;
+    if (!swap) throw new Error('expected onSwapPositions to be set');
+    await swap('101', null, '102', 1);
+
+    expect(swapPositions).toHaveBeenCalledTimes(1);
+    expect(playersResponse.refetch).toHaveBeenCalledTimes(1);
+    expect(viewPropsRef.current?.locked).toBe(false);
+  });
+
+  it('does not lock UI when swapPositions mutation throws', async () => {
+    fetchMatchupStatus.mockResolvedValue(scheduledStatusResponse);
+    swapPositions.mockRejectedValue(new Error('Mutation failed'));
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const swap = viewPropsRef.current?.onSwapPositions;
+    if (!swap) throw new Error('expected onSwapPositions to be set');
+    await act(async () => {
+      await swap('101', null, '102', 1);
+    });
+
+    expect(swapPositions).toHaveBeenCalledTimes(1);
+    expect(viewPropsRef.current?.locked).toBe(false);
+  });
+
+  it('does not lock UI when updatePosition mutation throws', async () => {
+    fetchMatchupStatus.mockResolvedValue(scheduledStatusResponse);
+    updatePosition.mockRejectedValue(new Error('Mutation failed'));
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const move = viewPropsRef.current?.onMoveToPosition;
+    if (!move) throw new Error('expected onMoveToPosition to be set');
+    await act(async () => {
+      await move('101', 1);
+    });
+
+    expect(updatePosition).toHaveBeenCalledTimes(1);
+    expect(viewPropsRef.current?.locked).toBe(false);
   });
 });

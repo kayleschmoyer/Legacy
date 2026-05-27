@@ -1,15 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Card, Spinner, Text, XStack } from 'tamagui';
 import {
   type MatchupPlayerData,
   MatchupRosterEditorView,
   POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components/roster';
+import { LOGGER } from '@legacy-sports/logging';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
+  useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '../../api/db/graphql.generated';
@@ -79,6 +87,12 @@ export function MatchupRosterEditor({
 
   const mutating = updateLoading || swapLoading;
 
+  const [fetchMatchupStatus] = useGetMatchupByIdLazyQuery({
+    fetchPolicy: 'network-only',
+  });
+  // Tracks whether a pre-flight check revealed the matchup is no longer Scheduled.
+  const [lockDiscovered, setLockDiscovered] = useState(false);
+
   // ── Derived data ────────────────────────────────────────────────────────
   const positionMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -131,14 +145,14 @@ export function MatchupRosterEditor({
 
   // ── Mutation callbacks ──────────────────────────────────────────────────
 
-  // Track `locked` via a ref so the async mutation callbacks always observe
-  // the latest value. Without this, a click registered while the matchup was
-  // unlocked could still fire the mutation after the matchup locked mid-flow
-  // (e.g. status flips to InProgress between selection and submission).
-  const lockedRef = useRef(locked);
+  // effectiveLocked merges the external prop with any lock discovered via
+  // server-side pre-flight check. The ref lets async callbacks always observe
+  // the latest value without stale-closure risk.
+  const effectiveLocked = locked || lockDiscovered;
+  const lockedRef = useRef(effectiveLocked);
   useEffect(() => {
-    lockedRef.current = locked;
-  }, [locked]);
+    lockedRef.current = effectiveLocked;
+  }, [effectiveLocked]);
 
   const handleSwapPositions = useCallback(
     async (
@@ -148,24 +162,70 @@ export function MatchupRosterEditor({
       newPosition2Id: number | null,
     ) => {
       if (lockedRef.current) return;
-      await swapPositions(
-        parseId(player1Id),
-        newPosition1Id,
-        parseId(player2Id),
-        newPosition2Id,
-      );
-      await refetchPlayers();
+      try {
+        const { data } = await fetchMatchupStatus({
+          variables: { id: matchupId },
+        });
+        if (data?.getMatchupById?.status !== MatchupStatus.Scheduled) {
+          setLockDiscovered(true);
+          return;
+        }
+      } catch (error) {
+        LOGGER.error(
+          'Failed to fetch matchup status before swap',
+          error instanceof Error ? error : String(error),
+        );
+        setLockDiscovered(true);
+        return;
+      }
+      try {
+        await swapPositions(
+          parseId(player1Id),
+          newPosition1Id,
+          parseId(player2Id),
+          newPosition2Id,
+        );
+        await refetchPlayers();
+      } catch (error) {
+        LOGGER.error(
+          'Failed to swap matchup player positions',
+          error instanceof Error ? error : String(error),
+        );
+      }
     },
-    [swapPositions, refetchPlayers],
+    [swapPositions, refetchPlayers, fetchMatchupStatus, matchupId],
   );
 
   const handleMoveToPosition = useCallback(
     async (playerId: string, positionId: number | null) => {
       if (lockedRef.current) return;
-      await updatePosition(parseId(playerId), positionId);
-      await refetchPlayers();
+      try {
+        const { data } = await fetchMatchupStatus({
+          variables: { id: matchupId },
+        });
+        if (data?.getMatchupById?.status !== MatchupStatus.Scheduled) {
+          setLockDiscovered(true);
+          return;
+        }
+      } catch (error) {
+        LOGGER.error(
+          'Failed to fetch matchup status before move',
+          error instanceof Error ? error : String(error),
+        );
+        setLockDiscovered(true);
+        return;
+      }
+      try {
+        await updatePosition(parseId(playerId), positionId);
+        await refetchPlayers();
+      } catch (error) {
+        LOGGER.error(
+          'Failed to update matchup player position',
+          error instanceof Error ? error : String(error),
+        );
+      }
     },
-    [updatePosition, refetchPlayers],
+    [updatePosition, refetchPlayers, fetchMatchupStatus, matchupId],
   );
 
   // ── Guard states ────────────────────────────────────────────────────────
@@ -203,7 +263,7 @@ export function MatchupRosterEditor({
       players={players}
       positionMap={positionMap}
       positionOptions={positionOptions}
-      locked={locked}
+      locked={effectiveLocked}
       mutating={mutating}
       onSwapPositions={handleSwapPositions}
       onMoveToPosition={handleMoveToPosition}
