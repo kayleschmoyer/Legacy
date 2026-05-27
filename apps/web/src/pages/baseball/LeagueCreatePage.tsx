@@ -1721,7 +1721,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                   {/* Divisions */}
                   <FieldRow
                     label="Number of Divisions"
-                    hint="How many divisions to split your teams into"
+                    hint={
+                      formData.numberOfTeams % 2 === 1
+                        ? `With ${formData.numberOfTeams} teams, only odd division counts (${ALL_DIVISION_COUNT_OPTIONS.filter((d) => d <= formData.numberOfTeams && d % 2 === 1).join(', ')}) are allowed for equal team distribution.`
+                        : 'How many divisions to split your teams into'
+                    }
                   >
                     <ButtonGroup
                       value={formData.numberOfDivisions}
