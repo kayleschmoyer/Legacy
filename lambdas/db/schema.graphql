@@ -2102,7 +2102,7 @@ type Mutation {
     pickTimeLimitSeconds: Int
 
     """
-    Player pool to draft from: "all" (default), "nl" (NL only), or "al" (AL only)
+    Player pool to draft from. Baseball: "all" (default), "nl" (NL only), "al" (AL only). Football: "all", "nfl", "afc" (AFC only), "nfc" (NFC only).
     """
     playerPool: String
 

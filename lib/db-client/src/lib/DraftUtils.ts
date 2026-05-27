@@ -295,8 +295,12 @@ export const ERA_RANGES: Record<string, [number, number]> = {
 };
 
 export interface LeagueEligibilitySettings {
-  /** 'all' | 'nl' | 'al' — restricts to players who appeared in that league */
-  playerPool: string;
+  /**
+   * Restricts to players who appeared in that league. Intentionally narrowed to
+   * mirror the `leagues.playerPool` Postgres enum exactly — adding a value here
+   * requires a corresponding DB migration.
+   */
+  playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
   /** Minimum total career games (batting + pitching) a player must have */
   minCareerGames: number;
   /** Minimum distinct seasons a player must have appeared in */
@@ -309,6 +313,8 @@ export interface LeagueEligibilitySettings {
   customEraStartYear?: number | null;
   /** End year for custom era (only used when baseballEraFilter = 'custom') */
   customEraEndYear?: number | null;
+  /** Sport discriminator — when 'football', all baseball-specific filters are skipped. */
+  sport?: 'baseball' | 'football';
 }
 
 export interface EligibilityFilterResult {
@@ -457,6 +463,23 @@ export async function filterPlayerIdsByLeagueEligibility(
   let excludedByCareerSeasons = 0;
   let excludedByHofOnly = 0;
   let excludedByEraFilter = 0;
+
+  // All current filters (playerPool, career games/seasons, HoF, era) are
+  // baseball-specific. Football leagues skip them entirely until sport-specific
+  // filter logic is implemented.
+  if (settings.sport === 'football') {
+    LOGGER.info(
+      `[filterPlayerIdsByLeagueEligibility] Football league — skipping baseball filters, ${currentIds.length} players eligible`,
+    );
+    return {
+      eligibleIds: new Set(currentIds),
+      excludedByPool,
+      excludedByCareerGames,
+      excludedByCareerSeasons,
+      excludedByHofOnly,
+      excludedByEraFilter,
+    };
+  }
 
   // 1. Player pool (AL / NL restriction)
   // Check both season_batting and season_pitching so that pure pitchers

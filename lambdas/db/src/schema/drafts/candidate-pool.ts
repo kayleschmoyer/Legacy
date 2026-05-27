@@ -186,6 +186,7 @@ async function fetchUndraftedCandidates(
         SELECT 1 FROM draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )
+      AND p.sport = ${league.sport}
       ORDER BY fpg DESC
       LIMIT 1000`,
   );
@@ -203,6 +204,7 @@ async function fetchUndraftedCandidates(
       baseballEraFilter: league.baseballEraFilter ?? 'all',
       customEraStartYear: league.customEraStartYear ?? null,
       customEraEndYear: league.customEraEndYear ?? null,
+      sport: league.sport,
     },
   );
 

@@ -379,7 +379,7 @@ async function buildPlayerPool(
   leaguePositions: Array<{ id: number; positionType: string }>,
   config: {
     gamesPerMatchup: number | null;
-    playerPool: string;
+    playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
     minCareerGames: number;
     minCareerSeasons: number;
     baseballHofOnly: boolean;

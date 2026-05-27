@@ -30,7 +30,7 @@ import { ENTITLEMENTS } from '../../entitlements';
 // ── Allowed values ───────────────────────────────────────────────────────────
 
 const VALID_DRAFT_ORDERS = ['snake', 'linear'] as const;
-const VALID_PLAYER_POOLS = ['all', 'nl', 'al'] as const;
+const VALID_PLAYER_POOLS = ['all', 'nl', 'al', 'nfl', 'afc', 'nfc'] as const;
 
 type DraftOrder = (typeof VALID_DRAFT_ORDERS)[number];
 type PlayerPool = (typeof VALID_PLAYER_POOLS)[number];
@@ -103,7 +103,7 @@ builder.mutationField('initializeMockDraft', (t) =>
       playerPool: t.arg.string({
         required: false,
         description:
-          'Player pool to draft from: "all" (default), "nl" (NL only), or "al" (AL only)',
+          'Player pool to draft from. Baseball: "all" (default), "nl" (NL only), "al" (AL only). Football: "all", "nfl", "afc" (AFC only), "nfc" (NFC only).',
       }),
     },
     resolve: async (_parent, args, context) => {
@@ -144,7 +144,9 @@ builder.mutationField('initializeMockDraft', (t) =>
         throw UserInputError('draftOrder must be "snake" or "linear"');
       }
       if (!isValidPlayerPool(playerPool)) {
-        throw UserInputError('playerPool must be "all", "nl", or "al"');
+        throw UserInputError(
+          'playerPool must be one of: "all", "nl", "al", "nfl", "afc", "nfc"',
+        );
       }
       if (rawTimeLimit !== null && rawTimeLimit !== undefined) {
         if (rawTimeLimit < 10 || rawTimeLimit > 300) {

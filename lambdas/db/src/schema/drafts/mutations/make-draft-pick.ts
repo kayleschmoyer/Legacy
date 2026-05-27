@@ -588,6 +588,7 @@ builder.mutationField('makeDraftPick', (t) =>
                         SELECT 1 FROM draft_picks dp
                         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
                       )
+                      AND p.sport = ${apLeague.sport}
                       ORDER BY p.id ASC`,
                   );
                   const undraftedIds = undraftedRows.rows.map(
@@ -607,6 +608,7 @@ builder.mutationField('makeDraftPick', (t) =>
                         baseballEraFilter: apLeague.baseballEraFilter ?? 'all',
                         customEraStartYear: apLeague.customEraStartYear ?? null,
                         customEraEndYear: apLeague.customEraEndYear ?? null,
+                        sport: apLeague.sport,
                       },
                     );
                   const eligibleIds = undraftedIds.filter((id) =>
