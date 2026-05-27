@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
-import { getRepoRoot, getRepoOwnerName } from '../auth.js';
+import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
@@ -56,11 +56,16 @@ function getUpstreamBranch(cwd: string): Promise<string | null> {
 }
 
 export async function createPR(params: CreatePRParams): Promise<ToolResult> {
-  // Validate and resolve worktreePath
+  // Validate and resolve worktreePath.
+  // In Lambda the server runs on a different host than the caller, so the
+  // worktreePath is a client-side path that does NOT exist on Lambda's
+  // filesystem — skip the existence check and ignore the path for `cwd`
+  // (we cannot run git in the worktree anyway; no git binary). The caller
+  // must pass `head` explicitly in Lambda mode. (LS-4881)
+  const lambda = isLambda();
   let cwd = getRepoRoot();
   if (params.worktreePath) {
-    const resolved = resolve(params.worktreePath);
-    if (!isAbsolute(resolved)) {
+    if (!isAbsolute(params.worktreePath)) {
       return {
         isError: true,
         content: [
@@ -71,15 +76,21 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
         ],
       };
     }
-    if (!existsSync(resolved)) {
-      return {
-        isError: true,
-        content: [
-          { type: 'text', text: `worktreePath does not exist: "${resolved}"` },
-        ],
-      };
+    if (!lambda) {
+      const resolved = resolve(params.worktreePath);
+      if (!existsSync(resolved)) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `worktreePath does not exist: "${resolved}"`,
+            },
+          ],
+        };
+      }
+      cwd = resolved;
     }
-    cwd = resolved;
   }
 
   try {
@@ -94,6 +105,21 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
     let head: string;
     if (params.head) {
       head = params.head;
+    } else if (lambda) {
+      // Lambda has no git binary, so auto-detection from the worktree is
+      // impossible. Require the caller to pass `head` explicitly. (LS-4881)
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text:
+              'In the URL-based (Lambda) GitHub MCP server, `head` must be passed explicitly — ' +
+              'git is not available on the server to auto-detect the branch from `worktreePath`. ' +
+              'Pass `head` set to the local branch name (e.g. `claude/<random-name>`).',
+          },
+        ],
+      };
     } else {
       const currentBranch = await getCurrentBranch(cwd);
       const upstream = await getUpstreamBranch(cwd);

@@ -40,7 +40,7 @@ let cachedRepo: { owner: string; name: string } | null = null;
  * `https://github.com/login/device/code` (which can 404 from inside Lambda
  * regardless of the underlying app-token failure).
  */
-function isLambda(): boolean {
+export function isLambda(): boolean {
   return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
 }
 
@@ -791,6 +791,18 @@ export async function getRepoOwnerName(): Promise<{
   const repoRoot = getRepoRoot();
   let remoteUrl = readGitRemoteUrl(repoRoot);
   if (!remoteUrl) {
+    // In Lambda there is no bundled `.git/` and no `git` binary on PATH.
+    // Falling through to execFile produces the misleading `spawn git ENOENT`
+    // for every GitHub MCP tool call (LS-4881). Short-circuit with an
+    // actionable error pointing at the env-var contract instead.
+    if (isLambda()) {
+      throw new Error(
+        'GitHub MCP server (Lambda): could not resolve repo owner/name. ' +
+          'Set `GITHUB_REPO_OWNER` and `GITHUB_REPO_NAME` (or `GITHUB_REPOSITORY=owner/repo`) ' +
+          'env vars on the Lambda (see terraform/main/lambda-mcp-github.tf). ' +
+          'Git binary and `.git/config` are not available in the Lambda runtime.',
+      );
+    }
     remoteUrl = await new Promise<string>((res, reject) => {
       execFile(
         'git',
