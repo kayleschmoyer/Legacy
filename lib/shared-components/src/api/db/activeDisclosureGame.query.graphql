@@ -1,0 +1,13 @@
+query ActiveDisclosureGame {
+  activeDisclosureGame {
+    id
+    cluesRevealed
+    totalClues
+    revealedClues {
+      clueText
+      difficultyTier
+      clueIndex
+      isLastClue
+    }
+  }
+}

@@ -16,6 +16,7 @@ import type { GraphQLSchema } from 'graphql';
 describe('disclosure-game resolvers', () => {
   let schema: GraphQLSchema;
   let mockDisclosureGameService: {
+    getActiveSession: jest.Mock;
     getBestScore: jest.Mock;
     startSession: jest.Mock;
     nextClue: jest.Mock;
@@ -31,6 +32,7 @@ describe('disclosure-game resolvers', () => {
     jest.resetModules();
 
     mockDisclosureGameService = {
+      getActiveSession: jest.fn().mockResolvedValue(null),
       getBestScore: jest.fn().mockResolvedValue(null),
       startSession: jest
         .fn()
@@ -312,6 +314,70 @@ describe('disclosure-game resolvers', () => {
       expect(result.playerSeasons).toBe(2_000_000);
       expect(typeof result.playersTracked).toBe('number');
       expect(result.playersTracked).toBe(10_000);
+    });
+  });
+
+  // ── activeDisclosureGame query ────────────────────────────────────────────
+
+  describe('activeDisclosureGame query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('activeDisclosureGame');
+      await expect(
+        resolver({}, {}, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('returns null when the user has no active session', async () => {
+      mockDisclosureGameService.getActiveSession.mockResolvedValueOnce(null);
+
+      const resolver = getQuery('activeDisclosureGame');
+      const result = await resolver({}, {}, mockContext, undefined as never);
+
+      expect(result).toBeNull();
+      expect(mockDisclosureGameService.getActiveSession).toHaveBeenCalledWith(
+        42,
+      );
+    });
+
+    it('returns the active session with revealed clues when present', async () => {
+      mockDisclosureGameService.getActiveSession.mockResolvedValueOnce({
+        id: 7,
+        cluesRevealed: 2,
+        totalClues: 5,
+        createdAt: '2026-05-27T00:00:00Z',
+        revealedClues: [
+          {
+            clueText: 'Clue one',
+            difficultyTier: 'vague',
+            clueIndex: 1,
+            isLastClue: false,
+          },
+          {
+            clueText: 'Clue two',
+            difficultyTier: 'moderate',
+            clueIndex: 2,
+            isLastClue: false,
+          },
+        ],
+      });
+
+      const resolver = getQuery('activeDisclosureGame');
+      const result = (await resolver(
+        {},
+        {},
+        mockContext,
+        undefined as never,
+      )) as {
+        id: number;
+        cluesRevealed: number;
+        totalClues: number;
+        revealedClues: unknown[];
+      } | null;
+
+      expect(result?.id).toBe(7);
+      expect(result?.cluesRevealed).toBe(2);
+      expect(result?.totalClues).toBe(5);
+      expect(result?.revealedClues).toHaveLength(2);
     });
   });
 

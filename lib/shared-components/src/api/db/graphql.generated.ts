@@ -64,6 +64,17 @@ export type AchievementRestriction = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** The caller's currently-active disclosure game session, including the text of every clue revealed so far. Used to resume a game after navigating away. */
+export type ActiveDisclosureGame = {
+  __typename?: 'ActiveDisclosureGame';
+  cluesRevealed?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** Clues already revealed for this session, in reveal order */
+  revealedClues: Array<DisclosureClue>;
+  totalClues?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AdminRevenueStats = {
   __typename?: 'AdminRevenueStats';
   conversionRate?: Maybe<Scalars['Float']['output']>;
@@ -2782,6 +2793,8 @@ export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
+  /** Return the caller's currently-active disclosure game session, or null if none exists. Includes the text of every clue revealed so far so the client can resume the game in-place. */
+  activeDisclosureGame?: Maybe<ActiveDisclosureGame>;
   /** Admin-only aggregate revenue and subscription metrics. */
   adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */
@@ -4478,6 +4491,27 @@ export type WaiverClaim = {
   status?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ActiveDisclosureGameQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type ActiveDisclosureGameQuery = {
+  __typename?: 'Query';
+  activeDisclosureGame?: {
+    __typename?: 'ActiveDisclosureGame';
+    id?: number | null;
+    cluesRevealed?: number | null;
+    totalClues?: number | null;
+    revealedClues: Array<{
+      __typename?: 'DisclosureClue';
+      clueText?: string | null;
+      difficultyTier?: string | null;
+      clueIndex?: number | null;
+      isLastClue?: boolean | null;
+    }>;
+  } | null;
 };
 
 export type AuctionStateFragmentFragment = {
@@ -9822,6 +9856,99 @@ export const TradeOfferFragmentDoc = gql`
   }
   ${TradeOfferPlayerFragmentDoc}
 `;
+export const ActiveDisclosureGame = gql`
+  query ActiveDisclosureGame {
+    activeDisclosureGame {
+      id
+      cluesRevealed
+      totalClues
+      revealedClues {
+        clueText
+        difficultyTier
+        clueIndex
+        isLastClue
+      }
+    }
+  }
+`;
+
+/**
+ * __useActiveDisclosureGameQuery__
+ *
+ * To run a query within a React component, call `useActiveDisclosureGameQuery` and pass it any options that fit your needs.
+ * When your component renders, `useActiveDisclosureGameQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useActiveDisclosureGameQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useActiveDisclosureGameQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    ActiveDisclosureGameQuery,
+    ActiveDisclosureGameQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    ActiveDisclosureGameQuery,
+    ActiveDisclosureGameQueryVariables
+  >(ActiveDisclosureGame, options);
+}
+export function useActiveDisclosureGameLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    ActiveDisclosureGameQuery,
+    ActiveDisclosureGameQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    ActiveDisclosureGameQuery,
+    ActiveDisclosureGameQueryVariables
+  >(ActiveDisclosureGame, options);
+}
+export function useActiveDisclosureGameSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        ActiveDisclosureGameQuery,
+        ActiveDisclosureGameQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    ActiveDisclosureGameQuery,
+    ActiveDisclosureGameQueryVariables
+  >(
+    ActiveDisclosureGame,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          ActiveDisclosureGameQuery,
+          ActiveDisclosureGameQueryVariables
+        >,
+  );
+}
+export type ActiveDisclosureGameQueryHookResult = ReturnType<
+  typeof useActiveDisclosureGameQuery
+>;
+export type ActiveDisclosureGameLazyQueryHookResult = ReturnType<
+  typeof useActiveDisclosureGameLazyQuery
+>;
+export type ActiveDisclosureGameSuspenseQueryHookResult = ReturnType<
+  typeof useActiveDisclosureGameSuspenseQuery
+>;
+export type ActiveDisclosureGameQueryResult = Apollo.QueryResult<
+  ActiveDisclosureGameQuery,
+  ActiveDisclosureGameQueryVariables
+>;
 export const GetAuctionState = gql`
   query GetAuctionState($draftId: Int!) {
     auctionState(draftId: $draftId) {

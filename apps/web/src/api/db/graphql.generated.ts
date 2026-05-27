@@ -58,6 +58,17 @@ export type AchievementRestriction = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** The caller's currently-active disclosure game session, including the text of every clue revealed so far. Used to resume a game after navigating away. */
+export type ActiveDisclosureGame = {
+  __typename?: 'ActiveDisclosureGame';
+  cluesRevealed?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** Clues already revealed for this session, in reveal order */
+  revealedClues: Array<DisclosureClue>;
+  totalClues?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AdminRevenueStats = {
   __typename?: 'AdminRevenueStats';
   conversionRate?: Maybe<Scalars['Float']['output']>;
@@ -2776,6 +2787,8 @@ export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
+  /** Return the caller's currently-active disclosure game session, or null if none exists. Includes the text of every clue revealed so far so the client can resume the game in-place. */
+  activeDisclosureGame?: Maybe<ActiveDisclosureGame>;
   /** Admin-only aggregate revenue and subscription metrics. */
   adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */

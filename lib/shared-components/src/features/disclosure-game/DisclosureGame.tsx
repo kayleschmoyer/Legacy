@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
   H1,
@@ -18,6 +18,7 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import {
+  useActiveDisclosureGameLazyQuery,
   useGiveUpDisclosureGameMutation,
   useNextClueMutation,
   useSearchPlayersForDisclosureLazyQuery,
@@ -171,7 +172,20 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
   // ── Error state ────────────────────────────────────────────────────────
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // ── Resume state ───────────────────────────────────────────────────────
+  // When the user navigates away mid-game and returns, we surface their
+  // in-progress session as a Resume CTA on the idle screen rather than
+  // silently abandoning it and starting a fresh round.
+  const [resumable, setResumable] = useState<{
+    sessionId: number;
+    totalClues: number;
+    revealedClues: Clue[];
+    isLastClue: boolean;
+  } | null>(null);
+
   // ── GraphQL hooks ──────────────────────────────────────────────────────
+  const [fetchActiveGame, { loading: checkingActive }] =
+    useActiveDisclosureGameLazyQuery({ fetchPolicy: 'network-only' });
   const [startGame, { loading: starting }] = useStartDisclosureGameMutation();
   const [revealClue, { loading: revealing }] = useNextClueMutation();
   const [guess, { loading: guessing }] = useSubmitGuessMutation();
@@ -179,10 +193,47 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
   const [searchPlayers, { loading: searching }] =
     useSearchPlayersForDisclosureLazyQuery();
 
+  // On mount, check for an in-progress session so the user can resume.
+  useEffect(() => {
+    void (async () => {
+      const { data } = await fetchActiveGame();
+      const active = data?.activeDisclosureGame;
+      if (
+        !active ||
+        active.id == null ||
+        active.cluesRevealed == null ||
+        active.totalClues == null ||
+        active.cluesRevealed >= active.totalClues
+      ) {
+        return;
+      }
+      const totalClues = active.totalClues;
+      const revealed: Clue[] = (active.revealedClues ?? []).flatMap((c) => {
+        if (c.clueText == null || c.clueIndex == null) return [];
+        return [
+          {
+            clueText: c.clueText,
+            difficultyTier: c.difficultyTier ?? 'vague',
+            clueIndex: c.clueIndex,
+          },
+        ];
+      });
+      setResumable({
+        sessionId: active.id,
+        totalClues,
+        revealedClues: revealed,
+        isLastClue: revealed.some((c) => c.clueIndex === totalClues),
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Handlers ───────────────────────────────────────────────────────────
 
   const handleStart = async () => {
     setErrorMsg(null);
+    // User explicitly chose to start a new game — drop any resumable session.
+    setResumable(null);
     try {
       const { data } = await startGame();
       const session = data?.startDisclosureGame;
@@ -200,6 +251,21 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
     } catch (_e) {
       setErrorMsg('Could not start a game. Please try again.');
     }
+  };
+
+  const handleResume = () => {
+    if (!resumable) return;
+    setErrorMsg(null);
+    setSessionId(resumable.sessionId);
+    setTotalClues(resumable.totalClues);
+    setRevealedClues(resumable.revealedClues);
+    setIsLastClue(resumable.isLastClue);
+    setGuessText('');
+    setSuggestions([]);
+    setSelectedPlayer(null);
+    setResult(null);
+    setResumable(null);
+    setPhase('playing');
   };
 
   const handleNextClue = async () => {
@@ -388,18 +454,67 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
               <RuleCard num="02" text="Guess (or reveal another)" />
               <RuleCard num="03" text="Fewer clues = higher score" />
             </XStack>
-            <XStack gap="$3" marginTop="$3">
+            {resumable && (
+              <Stack
+                width="100%"
+                padding="$4"
+                gap="$2"
+                backgroundColor={withAlpha(BRAND_GOLD, 0.08)}
+                borderWidth={1}
+                borderColor={withAlpha(BRAND_GOLD, 0.4)}
+                borderRadius="$4"
+                testID="resume-game-banner"
+              >
+                <Eyebrow color={BRAND_GOLD_LIGHT}>Game In Progress</Eyebrow>
+                <Paragraph color="$color" fontSize={15}>
+                  You have an active round with {resumable.revealedClues.length}{' '}
+                  of {resumable.totalClues} clue
+                  {resumable.totalClues === 1 ? '' : 's'} revealed.
+                </Paragraph>
+              </Stack>
+            )}
+            <XStack
+              gap="$3"
+              marginTop="$3"
+              flexWrap="wrap"
+              justifyContent="center"
+            >
+              {resumable && (
+                <Button
+                  size="$5"
+                  backgroundColor="$brandGold"
+                  color="$brandNavy"
+                  fontWeight="800"
+                  onPress={handleResume}
+                  pressStyle={{ backgroundColor: '$brandGoldDark' }}
+                  testID="resume-game-button"
+                >
+                  Resume Game
+                </Button>
+              )}
               <Button
                 size="$5"
-                backgroundColor="$brandGold"
-                color="$brandNavy"
+                backgroundColor={resumable ? '$surfacePanel' : '$brandGold'}
+                color={resumable ? '$color' : '$brandNavy'}
                 fontWeight="800"
                 onPress={() => void handleStart()}
-                disabled={starting}
-                pressStyle={{ backgroundColor: '$brandGoldDark' }}
+                disabled={starting || checkingActive}
+                pressStyle={{
+                  backgroundColor: resumable
+                    ? '$surfacePanel'
+                    : '$brandGoldDark',
+                }}
+                variant={resumable ? 'outlined' : undefined}
+                borderColor={resumable ? '$surfacePanelBorder' : undefined}
                 testID="start-game-button"
               >
-                {starting ? 'Starting…' : 'Start Game'}
+                {starting
+                  ? 'Starting…'
+                  : resumable
+                    ? 'Start New Game'
+                    : checkingActive
+                      ? 'Checking…'
+                      : 'Start Game'}
               </Button>
               <Button
                 size="$5"

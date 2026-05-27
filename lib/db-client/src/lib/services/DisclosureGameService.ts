@@ -1024,6 +1024,104 @@ export class DisclosureGameService {
   }
 
   /**
+   * Return the user's currently-active disclosure game session, if any, along
+   * with the text of every clue revealed so far.
+   *
+   * Used by the resume flow: when a user re-opens the game after navigating
+   * away, the UI calls this to restore session state instead of starting a
+   * fresh round. Returns null when the user has no active session.
+   */
+  async getActiveSession(userId: number): Promise<{
+    id: number;
+    cluesRevealed: number;
+    totalClues: number;
+    createdAt: string;
+    revealedClues: Array<{
+      clueText: string;
+      difficultyTier: string;
+      clueIndex: number;
+      isLastClue: boolean;
+    }>;
+  } | null> {
+    const [session] = await this.db
+      .select()
+      .from(PublicSchema.disclosureGameSessions)
+      .where(
+        and(
+          eq(PublicSchema.disclosureGameSessions.userId, userId),
+          eq(PublicSchema.disclosureGameSessions.status, 'active'),
+        ),
+      )
+      .orderBy(desc(PublicSchema.disclosureGameSessions.createdAt))
+      .limit(1);
+
+    if (!session) return null;
+
+    const orderedFactIds = session.orderedFactIds;
+    const totalClues = orderedFactIds.length;
+    const revealedFactIds = orderedFactIds.slice(0, session.cluesRevealed);
+
+    let revealedClues: Array<{
+      clueText: string;
+      difficultyTier: string;
+      clueIndex: number;
+      isLastClue: boolean;
+    }> = [];
+
+    if (revealedFactIds.length > 0) {
+      const factRows = await this.db
+        .select({
+          id: PublicSchema.playerFacts.id,
+          clueText: PublicSchema.playerFacts.clueText,
+          difficultyTier: PublicSchema.playerFacts.difficultyTier,
+        })
+        .from(PublicSchema.playerFacts)
+        .where(inArray(PublicSchema.playerFacts.id, revealedFactIds));
+
+      const factById = new Map(factRows.map((f) => [f.id, f]));
+      revealedClues = revealedFactIds.map((factId, idx) => {
+        const fact = factById.get(factId);
+        if (!fact) {
+          // `player_facts` rows referenced by `ordered_fact_ids` are immutable
+          // for the life of the session — a missing row indicates DB
+          // corruption, not a normal state, so fail loudly rather than return
+          // a session whose `cluesRevealed` count silently disagrees with the
+          // returned clue list.
+          throw new Error(
+            `Disclosure session ${session.id} references missing player_fact ${factId}`,
+          );
+        }
+        const clueIndex = idx + 1;
+        return {
+          clueText: fact.clueText,
+          difficultyTier: fact.difficultyTier,
+          clueIndex,
+          isLastClue: clueIndex === totalClues,
+        };
+      });
+    }
+
+    // Invariant: `cluesRevealed` (the count persisted on the session row) and
+    // `revealedClues.length` must always agree. We slice exactly `cluesRevealed`
+    // fact IDs above and the strict map throws if any are missing, so they
+    // cannot drift — but assert here so a future refactor can't silently
+    // re-introduce the inconsistency the client UI depends on.
+    if (revealedClues.length !== session.cluesRevealed) {
+      throw new Error(
+        `Disclosure session ${session.id} invariant violation: cluesRevealed=${session.cluesRevealed} but revealedClues.length=${revealedClues.length}`,
+      );
+    }
+
+    return {
+      id: session.id,
+      cluesRevealed: session.cluesRevealed,
+      totalClues,
+      createdAt: session.createdAt,
+      revealedClues,
+    };
+  }
+
+  /**
    * Return the user's best score across all won disclosure game sessions.
    * Returns null if the user has never won a session.
    */

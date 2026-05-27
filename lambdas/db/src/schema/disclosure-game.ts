@@ -170,7 +170,58 @@ let cachedMinigamesStats: MinigamesStatsShape | null = null;
 let cachedMinigamesStatsExpiresAt = 0;
 const MINIGAMES_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const ActiveDisclosureGame = builder.objectRef<{
+  id: number;
+  cluesRevealed: number;
+  totalClues: number;
+  createdAt: string;
+  revealedClues: Array<{
+    clueText: string;
+    difficultyTier: string;
+    clueIndex: number;
+    isLastClue: boolean;
+  }>;
+}>('ActiveDisclosureGame');
+
+ActiveDisclosureGame.implement({
+  description:
+    "The caller's currently-active disclosure game session, including the text of every clue revealed so far. Used to resume a game after navigating away.",
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    cluesRevealed: t.exposeInt('cluesRevealed'),
+    totalClues: t.exposeInt('totalClues'),
+    createdAt: t.exposeString('createdAt'),
+    revealedClues: t.field({
+      type: [DisclosureClue],
+      nullable: { list: false, items: false },
+      description: 'Clues already revealed for this session, in reveal order',
+      resolve: (s) =>
+        s.revealedClues.map((c) => ({
+          clueText: c.clueText,
+          difficultyTier: c.difficultyTier,
+          clueIndex: c.clueIndex,
+          totalClues: s.totalClues,
+          isLastClue: c.isLastClue,
+        })),
+    }),
+  }),
+});
+
 builder.queryFields((t) => ({
+  activeDisclosureGame: t.field({
+    type: ActiveDisclosureGame,
+    nullable: true,
+    description:
+      "Return the caller's currently-active disclosure game session, or null if none exists. Includes the text of every clue revealed so far so the client can resume the game in-place.",
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+      const svc = new DisclosureGameService(context.db);
+      return svc.getActiveSession(context.user.id);
+    },
+  }),
+
   disclosureGameSession: t.field({
     type: DisclosureGameSession,
     nullable: true,

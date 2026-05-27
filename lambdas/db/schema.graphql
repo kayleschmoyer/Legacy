@@ -37,6 +37,21 @@ type AchievementRestriction {
   updatedAt: String
 }
 
+"""
+The caller's currently-active disclosure game session, including the text of every clue revealed so far. Used to resume a game after navigating away.
+"""
+type ActiveDisclosureGame {
+  cluesRevealed: Int
+  createdAt: String
+  id: Int
+
+  """
+  Clues already revealed for this session, in reveal order
+  """
+  revealedClues: [DisclosureClue!]!
+  totalClues: Int
+}
+
 type AdminRevenueStats {
   conversionRate: Float
   newSubscribersThisMonth: Int
@@ -2894,6 +2909,11 @@ type Query {
   Return all achievement restrictions configured for a league, sorted by achievement type
   """
   achievementRestrictions(leagueId: Int!): [AchievementRestriction!]
+
+  """
+  Return the caller's currently-active disclosure game session, or null if none exists. Includes the text of every clue revealed so far so the client can resume the game in-place.
+  """
+  activeDisclosureGame: ActiveDisclosureGame
 
   """
   Admin-only aggregate revenue and subscription metrics.
