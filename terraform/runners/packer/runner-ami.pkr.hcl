@@ -205,15 +205,40 @@ build {
     ]
   }
 
-  # Node.js + corepack + pnpm
+  # Node.js + pnpm (LS-4949)
+  #
+  # pnpm is installed as a standalone release binary, NOT via corepack. The
+  # previous flow used `corepack prepare pnpm@${var.pnpm_version} --activate`
+  # which left a corepack shim at /usr/bin/pnpm. That shim resolves the actual
+  # pnpm version from corepack's lastKnownGood state, which proved drift-prone
+  # on the live AMI (LS-4947 D-4 observed pnpm 11.3.0 instead of the pinned
+  # 9.12.1). Corepack's COREPACK_DEFAULT_TO_LATEST behavior, combined with
+  # corepack upgrades pulled in by node apt updates, can silently bump the
+  # resolved version, and there is no system-wide corepack config file we can
+  # drop to lock it.
+  #
+  # Installing pnpm as a real binary at /usr/local/bin/pnpm bypasses corepack
+  # entirely. /usr/local/bin precedes /usr/bin on the default PATH the actions
+  # runner inherits, so this binary wins even if some later step (apt upgrade
+  # of nodejs, a workflow's `corepack enable`) re-creates a shim at
+  # /usr/bin/pnpm. The verify-env-contract post-provisioner below asserts
+  # `pnpm --version` equals ${var.pnpm_version} on a clean PATH so any future
+  # regression here fails the build instead of leaking into the live fleet.
   provisioner "shell" {
     inline = [
       "curl -fsSL https://deb.nodesource.com/setup_${var.node_version}.x | sudo bash -",
       "sudo apt-get install -y -qq nodejs",
       "node --version",
-      "sudo npm install -g corepack",
-      "sudo corepack enable",
-      "sudo corepack prepare pnpm@${var.pnpm_version} --activate",
+      "curl -fsSL https://github.com/pnpm/pnpm/releases/download/v${var.pnpm_version}/pnpm-linux-x64 -o /tmp/pnpm",
+      "curl -fsSL https://github.com/pnpm/pnpm/releases/download/v${var.pnpm_version}/pnpm-linux-x64.sha256 -o /tmp/pnpm.sha256",
+      # The pnpm release .sha256 file may contain either just the hex digest
+      # or the standard `<hash>  <filename>` format. Extract the hash with
+      # awk so this works either way, then verify against the downloaded
+      # binary with sha256sum -c.
+      "PNPM_HASH=$(awk '{print $1}' /tmp/pnpm.sha256) && echo \"$PNPM_HASH  /tmp/pnpm\" | sha256sum -c -",
+      "sudo install -m 0755 -o root -g root /tmp/pnpm /usr/local/bin/pnpm",
+      "rm /tmp/pnpm /tmp/pnpm.sha256",
+      "command -v pnpm",
       "pnpm --version",
     ]
   }
