@@ -208,6 +208,11 @@ Use `db_migration_status` instead of `pnpm --prefix lib/db-client run db:status`
 
 Use `aws_logs_tail` instead of `aws logs tail` via Bash, and `aws_sso_status` to check credentials before any AWS operation. If `aws_sso_status` returns expired or unconfigured, **stop immediately and prompt the user to run `aws sso login`** — do not retry the failing command. See `.agents/skills/infrastructure/references/aws-sso-login.md` for the exact prompt pattern.
 
+| Shell command                                                                                                  | MCP tool (use this)                                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aws apigateway get-rest-apis` / `get-resources` / `get-method` (v1 REST APIs)                                 | `aws_apigateway_inspect({ path?, environment })` — v1 REST API inspector                                                                                                                                                          |
+| `aws apigatewayv2 get-apis` / `get-routes` / `get-authorizers` / `get-integrations` (v2 HTTP & WebSocket APIs) | `aws_apigatewayv2_inspect({ apiNameFilter?, includeRoutes?, includeAuthorizers?, includeIntegrations? })` — v2 inspector; covers MCP HTTP APIs and the WebSocket API in a single call. Read-only; mutations go through terraform. |
+
 ## Claude Built-in Integrations
 
 Claude Code provides native integrations that work without local credentials:

@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { apigatewayInspect } from './tools/apigateway-inspect.js';
+import { apigatewayV2Inspect } from './tools/apigatewayv2-inspect.js';
 import {
   ec2ConsoleOutput,
   ec2DescribeImage,
@@ -52,6 +53,39 @@ server.tool(
       .describe('AWS environment (default: dev)'),
   },
   async (params) => apigatewayInspect(params),
+);
+
+// --- aws_apigatewayv2_inspect ---
+server.tool(
+  'aws_apigatewayv2_inspect',
+  'Inspect API Gateway v2 (HTTP and WebSocket) APIs. Lists v2 APIs and optionally expands their routes, authorizers, and integrations. Read-only — mutating ops (update-route, delete-authorizer, etc.) go through terraform. Replaces shell fallback to `aws apigatewayv2 get-apis / get-routes / get-authorizers / get-integrations`.',
+  {
+    apiNameFilter: z
+      .string()
+      .optional()
+      .describe(
+        'Case-insensitive substring filter applied to API names (e.g. "mcp" matches the 3 MCP HTTP APIs). Omit to list all v2 APIs.',
+      ),
+    includeRoutes: z
+      .boolean()
+      .default(true)
+      .describe(
+        "Include each API's routes (RouteId, RouteKey, AuthorizationType, AuthorizerId, Target). Default: true.",
+      ),
+    includeAuthorizers: z
+      .boolean()
+      .default(true)
+      .describe(
+        "Include each API's authorizers (AuthorizerType, JwtConfiguration, IdentitySource, AuthorizerUri). Default: true.",
+      ),
+    includeIntegrations: z
+      .boolean()
+      .default(true)
+      .describe(
+        "Include each API's integrations (IntegrationType, IntegrationUri, IntegrationMethod, PayloadFormatVersion). Default: true.",
+      ),
+  },
+  async (params) => apigatewayV2Inspect(params),
 );
 
 // --- aws_logs_tail ---
