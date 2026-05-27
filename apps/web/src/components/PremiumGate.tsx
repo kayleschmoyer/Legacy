@@ -76,15 +76,23 @@ export function PremiumGate({
   return (
     <>
       <YStack
+        width="100%"
+        maxWidth="100%"
         position={isPremium ? undefined : 'relative'}
         overflow={isPremium ? undefined : 'hidden'}
         borderRadius={isPremium ? undefined : '$4'}
+        minHeight={isPremium ? undefined : 240}
+        style={isPremium ? undefined : { minWidth: 0 }}
       >
         {/* Content — blurred tease for free users, normal for premium */}
         <YStack
+          width="100%"
+          maxWidth="100%"
           pointerEvents={isPremium ? undefined : 'none'}
           style={
-            isPremium ? undefined : { filter: 'blur(6px)', userSelect: 'none' }
+            isPremium
+              ? undefined
+              : { filter: 'blur(6px)', userSelect: 'none', minWidth: 0 }
           }
           opacity={isPremium ? undefined : 0.45}
         >
@@ -109,16 +117,22 @@ export function PremiumGate({
             <YStack
               alignItems="center"
               gap="$3"
+              maxWidth="100%"
               backgroundColor={withAlpha(SURFACE_CARD, 0.92)}
               borderWidth={1}
               borderColor={withAlpha(BRAND_GOLD, 0.45)}
               borderRadius="$5"
-              paddingHorizontal="$6"
+              paddingHorizontal="$4"
+              $gtSm={{ paddingHorizontal: '$6' }}
               paddingVertical="$5"
-              style={{ boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.5)}` }}
+              marginHorizontal="$3"
+              style={{
+                boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.5)}`,
+                boxSizing: 'border-box',
+              }}
             >
               <Lock size={30} color={BRAND_GOLD_LIGHT} />
-              <YStack alignItems="center" gap="$1">
+              <YStack alignItems="center" gap="$1" maxWidth="100%">
                 <Text
                   color={BRAND_GOLD}
                   fontSize="$5"
@@ -132,6 +146,7 @@ export function PremiumGate({
                   fontSize="$3"
                   textAlign="center"
                   maxWidth={280}
+                  width="100%"
                 >
                   {featureDescription ??
                     `${featureName} is available on the Premium plan.`}
