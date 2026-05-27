@@ -31,6 +31,17 @@ If `allAuthenticated: false`, read the `hint` for each failing service, surface 
 - Fall back to `acli` or raw `curl` with auth headers as a workaround for missing tokens
 - Proceed with a workflow after `auth_check_all` reports a failing service
 
+## Mid-Session Token Expiry (URL MCP Servers)
+
+The 3 URL-based MCP servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) authenticate with the Cognito ID token in `MCP_AUTH_TOKEN` (~8 h TTL) that is baked into the request headers when the transport is spawned at session start. If that token expires **during** a session, those servers begin returning HTTP 401 with a body Claude Code's MCP transport cannot parse, surfacing as `ZodError: expected string, received undefined` on every call. **The agent cannot recover this mid-session** — writing a fresh token to `.env.local` does not propagate to the already-spawned transports.
+
+When you recognise the symptom:
+
+1. Surface the recovery prompt verbatim to the user — run `node scripts/mcp-auth.mjs` to refresh, then **restart the Claude Code session**.
+2. Do not retry. Do not fall back to `gh` / `acli` / `curl`. Stop and wait for the user.
+
+Full diagnosis and the exact prompt to send are in `.agents/skills/mcp-diagnostics/SKILL.md` (Mid-Session 401 / Token Expiry section).
+
 ## Recovery Pattern
 
 When `auth_check_all` returns `ok: false` for one or more services:

@@ -145,6 +145,38 @@ When MCP servers are confirmed missing and recovery is not possible in the curre
 5. **Stop implementation until the session is healthy** — MCP tool availability is a gate, not
    an advisory. A session running on Bash fallbacks is not a valid implementation environment.
 
+## Mid-Session 401 / Token Expiry (LS-4874)
+
+The 3 URL-based servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) authenticate every request with the Cognito ID token in `MCP_AUTH_TOKEN` (~8 h TTL). When that token expires **during** an active session, the API Gateway JWT authorizer rejects subsequent requests with HTTP 401 and a body of `{"message":"Unauthorized"}`. Claude Code's MCP transport tries to parse that body as a JSON-RPC response and fails Zod validation, surfacing an error in the tool result that looks like:
+
+```
+HTTP 401 ... ZodError: expected string, received undefined
+  at path: error / jsonrpc
+```
+
+When you see that exact shape on **any** of the three URL servers mid-session, the diagnosis is **almost always token expiry**, not a server bug or a transient network failure.
+
+### Recovery — agent steps
+
+1. **Stop.** Do not retry, do not fall back to `gh` / `acli` / raw `curl` — that masks the failure and produces MCP gap audit entries.
+2. **Surface the recovery prompt verbatim to the user** (the agent cannot complete this — it requires either interactive AWS SSO or a browser handshake the agent has no terminal for):
+
+   > Your `MCP_AUTH_TOKEN` has expired mid-session, so `legacy-sports-github`, `legacy-sports-jira`, and `legacy-sports-ci` are returning HTTP 401. To recover:
+   >
+   > 1. In your terminal, run `node scripts/mcp-auth.mjs` (refresh) — or `node scripts/mcp-auth.mjs --setup` if the refresh token is also gone.
+   > 2. **Restart this Claude Code session.** MCP servers read `MCP_AUTH_TOKEN` once at startup; writing a new value to `.env.local` mid-session does not propagate to the already-spawned transport.
+
+3. **Wait for the user.** Do not proceed with implementation. A session running with these three servers down is not a valid environment for any workflow that touches GitHub, Jira, or CI.
+
+### Why the agent can't auto-recover
+
+- `aws_mcp_auth_refresh` (in the `legacy-sports-aws` MCP server) can write a fresh token to `.env.local`, but the URL-server transports were spawned at session start with the **old** token already baked into their `Authorization` header — they do not re-read `.env.local`. The new token only takes effect on the next session.
+- AWS SSO login (`aws sso login`) is a user-only action per the credentials skill — agents must never run it.
+
+### Why we surface this as documentation rather than fixing the parser
+
+The `ZodError` originates inside Claude Code's MCP SDK (`StreamableHTTPClientTransport`), which validates every HTTP response against the JSON-RPC schema. We do not own that parser. The proper structural fix is to have our Lambdas return a well-formed JSON-RPC error envelope on auth failure (instead of API Gateway's raw `{"message":"Unauthorized"}`), which requires removing the API Gateway JWT authorizer and validating the bearer token inside each Lambda — tracked as **LS-4941**. Until that ships, recognising the symptom and prompting for re-auth is the recovery path.
+
 ## Pre-flight Auth Check (Separate from Load Failures)
 
 Call `auth_check_all()` (worktree MCP server) at the start of any workflow requiring GitHub,
