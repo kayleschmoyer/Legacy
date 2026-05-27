@@ -163,13 +163,17 @@ export const CSS = `
 .d-root {
   /* Use fixed positioning to escape any padded layout wrappers (e.g. nav +
      YStack padding) so the draft board fills the viewport below the sticky
-     nav bar without causing a page-level scrollbar. */
+     nav bar without causing a page-level scrollbar. z-index sits BELOW the
+     nav so dropdown menus that open from the nav header (e.g. Help & Support
+     "Report a bug") remain tappable when they extend past the nav into the
+     draft area. The fixed-position element doesn't visually overlap the nav
+     itself (top is NAV_HEIGHT_PX), so a lower z-index is safe. */
   position: fixed;
   top: ${NAV_HEIGHT_PX}px;
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: ${NAV_Z_INDEX + 1};
+  z-index: ${NAV_Z_INDEX - 2};
   background: var(--d-bg);
   color: var(--d-text);
   font-family: 'Literata', Georgia, 'Times New Roman', serif;
