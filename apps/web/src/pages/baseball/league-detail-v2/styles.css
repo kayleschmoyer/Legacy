@@ -2531,6 +2531,13 @@
     left: 10px;
     right: 10px;
   }
+  /* Trailing spacer so the last tab (e.g. Commissioner) can scroll past
+     the 28px right-edge mask fade; without it the rightmost label
+     visually clips into the fade when fully scrolled. */
+  .ls-tabbar-inner::after {
+    content: '';
+    flex: 0 0 28px;
+  }
 
   /* Section card head: wrap the right-aligned sub-tabs (e.g. the Overview
      Activity / Chat / Scoring pills) onto their own row so they cannot get
