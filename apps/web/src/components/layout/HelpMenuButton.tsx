@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bug, HelpCircle, MessageSquare, Star } from '@tamagui/lucide-icons';
+import { Bug, HelpCircle, MessageSquare } from '@tamagui/lucide-icons';
 import { FONT_DISPLAY, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import {
   BRAND_GOLD_LIGHT,
-  BRAND_SEAM_RED,
   OUTLINE_SUBTLE,
   SURFACE_PANEL,
 } from '../../constants/colors';
@@ -190,48 +189,6 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
               {item.label}
             </button>
           ))}
-
-          {/* Divider */}
-          <div
-            style={{
-              height: 1,
-              background: OUTLINE_SUBTLE,
-              margin: '6px 12px',
-            }}
-          />
-
-          {/* What's new */}
-          <button
-            role="menuitem"
-            onClick={() => setIsOpen(false)}
-            style={MENU_ITEM_STYLE}
-            onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                'rgba(27,58,92,0.3)')
-            }
-            onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                'transparent')
-            }
-          >
-            <Star size={16} color="#9CAAC5" />
-            What&apos;s new
-            <span
-              style={{
-                marginLeft: 'auto',
-                background: BRAND_SEAM_RED,
-                color: '#fff',
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 700,
-                fontSize: 9,
-                letterSpacing: '0.12em',
-                padding: '2px 7px',
-                borderRadius: 9999,
-              }}
-            >
-              3
-            </span>
-          </button>
 
           {/* Footer */}
           <div
