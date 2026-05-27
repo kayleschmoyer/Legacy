@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { styled, Text, XStack } from 'tamagui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useGetScoreboardQuery } from '../../api/db/graphql.generated';
 import {
   NAV_HEIGHT_PX,
@@ -291,6 +292,7 @@ function Separator() {
  * Auto-polls every 15 seconds while any game is live.
  */
 export function ScoreboardTicker() {
+  const { isAuthenticated } = useAuth();
   const { data, startPolling, stopPolling, refetch } = useGetScoreboardQuery({
     fetchPolicy: 'cache-and-network',
     // Preserve cached games on poll errors so a transient 504 (e.g. while the
@@ -301,6 +303,12 @@ export function ScoreboardTicker() {
     // unavailable the ticker simply renders nothing — suppress the global
     // error toast so failures here don't pollute unrelated pages.
     context: { suppressGlobalError: true },
+    // The ticker is laid out under a sticky Navigation that renders only when
+    // authenticated; without that nav the fixed strip's `top: NAV_HEIGHT_PX`
+    // offset leaves no room above and overlaps page content. Skip the query
+    // entirely while unauthenticated so the ticker stays hidden on public
+    // routes (e.g. /scoreboard, sign-in).
+    skip: !isAuthenticated,
   });
 
   // Refetch when the tab regains visibility or focus after a long idle
@@ -394,8 +402,10 @@ export function ScoreboardTicker() {
     };
   }, [prefersReducedMotion]);
 
-  // Don't render when no games — no ticker strip and no spacer
-  if (games.length === 0) return null;
+  // Don't render when unauthenticated (the ticker's `top: NAV_HEIGHT_PX`
+  // offset assumes a sticky Navigation above, which only renders for
+  // authenticated users) or when no games — no ticker strip and no spacer.
+  if (!isAuthenticated || games.length === 0) return null;
 
   const scrollDuration = scrollDurationSecs(games.length);
 
