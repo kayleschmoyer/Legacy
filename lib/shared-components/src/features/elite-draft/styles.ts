@@ -1075,9 +1075,26 @@ export const CSS = `
 }
 @media (max-width: 768px) {
   .d-side-l { display: none; }
-  .d-controls { flex-direction: column; align-items: stretch; }
-  .d-pills { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
-  .d-view-tabs { overflow-x: auto; }
+  .d-main { padding: 12px 14px; }
+  .d-controls { flex-direction: column; align-items: stretch; padding: 12px; }
+  .d-search-wrap { min-width: 0; }
+  /* Horizontal scroll for tabs/pills: children must not shrink, or the
+     flex row collapses (LS-4851 — pills rendered ~4px tall with text gone). */
+  .d-view-tabs {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .d-view-tabs::-webkit-scrollbar { display: none; }
+  .d-view-tab { flex-shrink: 0; padding: 12px 14px; font-size: 13px; }
+  .d-pills {
+    overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .d-pills::-webkit-scrollbar { display: none; }
+  .d-pill {
+    flex-shrink: 0; min-height: 36px; padding: 8px 14px;
+    display: inline-flex; align-items: center;
+  }
 }
 
 /* ===== Pick Announcement ===== */
