@@ -91,7 +91,7 @@ export default function FootballHome() {
               </Text>
             </Button>
           </Link>
-          <Link href="/football/leagues" asChild>
+          <Link href="/league-discovery" asChild>
             <Button flex={1} backgroundColor="$orange9" borderRadius="$3">
               <Text color="$white" fontSize="$4" fontWeight="bold">
                 Browse Leagues
