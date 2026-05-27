@@ -8,7 +8,6 @@ import React, {
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
-  H1,
   Paragraph,
   Separator,
   XStack,
@@ -1354,19 +1353,18 @@ const PreferencesPage: React.FC = () => {
             >
               Settings
             </Paragraph>
-            <H1
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 36,
-                fontWeight: 800,
-                lineHeight: 1,
-                letterSpacing: -0.5,
-                color: isDark ? '#FFFFFF' : BRAND_NAVY,
-                margin: 0,
-              }}
+            <Paragraph
+              tag="h1"
+              fontFamily={FONT_DISPLAY}
+              fontWeight="800"
+              fontSize={36}
+              lineHeight={36}
+              letterSpacing={-0.5}
+              color={isDark ? '#FFFFFF' : BRAND_NAVY}
+              margin={0}
             >
               Preferences
-            </H1>
+            </Paragraph>
             <Paragraph size="$4" color="$colorPress" marginTop="$1">
               Tune the app to your taste. All changes save automatically — no
               submit button, no fuss.
