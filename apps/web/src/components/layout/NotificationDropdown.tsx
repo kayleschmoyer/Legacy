@@ -4,6 +4,7 @@ import { useApolloClient } from '@apollo/client/react';
 import { Link } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { LOGGER } from '@legacy-sports/logging';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
 import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
@@ -113,6 +114,7 @@ export const NotificationDropdown: React.FC = () => {
   });
   const [markAsRead] = useMarkNotificationAsReadMutation();
   const [markAllAsRead] = useMarkAllNotificationsAsReadMutation();
+  const [markAllReadError, setMarkAllReadError] = useState<string | null>(null);
 
   const unreadCount = countData?.getUnreadNotificationCount ?? 0;
   const notifications = historyData?.getNotificationHistory ?? [];
@@ -189,6 +191,7 @@ export const NotificationDropdown: React.FC = () => {
   );
 
   const handleMarkAllAsRead = useCallback(() => {
+    setMarkAllReadError(null);
     const now = new Date().toISOString();
     void markAllAsRead({
       optimisticResponse: { markAllNotificationsAsRead: true },
@@ -220,6 +223,10 @@ export const NotificationDropdown: React.FC = () => {
         }
       },
       refetchQueries: ['GetNotificationHistory', 'GetUnreadNotificationCount'],
+      onError: (error) => {
+        setMarkAllReadError('Failed to mark all as read. Please try again.');
+        LOGGER.error('Failed to mark all notifications as read', error);
+      },
     });
   }, [markAllAsRead]);
 
@@ -289,6 +296,20 @@ export const NotificationDropdown: React.FC = () => {
               </Button>
             )}
           </DropdownHeader>
+
+          {markAllReadError && (
+            <XStack
+              paddingHorizontal="$4"
+              paddingVertical="$2"
+              backgroundColor="$color1"
+              borderBottomWidth={1}
+              borderBottomColor="$borderColor"
+            >
+              <Paragraph size="$2" color={BRAND_SEAM_RED}>
+                {markAllReadError}
+              </Paragraph>
+            </XStack>
+          )}
 
           <YStack maxHeight={400} overflowY="auto">
             {loading && notifications.length === 0 ? (
