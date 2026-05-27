@@ -293,6 +293,10 @@ function Separator() {
 export function ScoreboardTicker() {
   const { data, startPolling, stopPolling, refetch } = useGetScoreboardQuery({
     fetchPolicy: 'cache-and-network',
+    // Preserve cached games on poll errors so a transient 504 (e.g. while the
+    // window is unfocused) does not wipe `data` and make the ticker
+    // disappear — see LS-4741.
+    errorPolicy: 'all',
     // Scoreboard is a non-critical ambient feature. If the MLB API is
     // unavailable the ticker simply renders nothing — suppress the global
     // error toast so failures here don't pollute unrelated pages.

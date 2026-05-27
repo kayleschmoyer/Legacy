@@ -341,6 +341,11 @@ export function Scoreboard() {
     useGetScoreboardQuery({
       variables: { date },
       fetchPolicy: 'cache-and-network',
+      // Keep previously-fetched data on poll errors (e.g. a transient 504 from
+      // the upstream MLB feed while the tab is backgrounded). Without this,
+      // Apollo's default 'none' policy nulls out `data` on any network error,
+      // which would make the rendered scoreboard vanish — see LS-4741.
+      errorPolicy: 'all',
       // Skip the network round-trip while NFL is selected — there is no NFL
       // backend yet, and reusing MLB data under an "NFL" label would be
       // misleading.
@@ -395,7 +400,13 @@ export function Scoreboard() {
         <>
           {loading && !data && <LoadingState />}
 
-          {error && <ErrorView />}
+          {/*
+           * Only show the full-page error card when there is no cached data
+           * to fall back on. With `errorPolicy: 'all'` a poll error keeps the
+           * existing scoreboard rendered; replacing the page with ErrorView
+           * in that case would make the scoreboard disappear (LS-4741).
+           */}
+          {error && !data?.scoreboard && <ErrorView />}
 
           {!loading && !error && data && data.scoreboard === null && (
             <NoDataView />
