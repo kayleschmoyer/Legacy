@@ -32,6 +32,7 @@ import FootballLeagueCreatePage from './football/league/create';
 import JoinLeagueByCode from './baseball/league/join';
 import JoinFootballLeagueByCode from './football/league/join';
 import MatchupDetail from './baseball/matchup';
+import FootballMatchupDetail from './football/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FootballTeam, { FootballTeamHeader } from './football/team/[teamId]';
 import FreeAgents from './FreeAgents';
@@ -70,6 +71,7 @@ export type AppDrawerParamList = {
   'football/players': undefined;
   'football/league/create': undefined;
   'football/league/join': undefined;
+  'football/matchup': { matchupId: string; leagueId: string };
   DraftBoardPage: { leagueId?: string } | undefined;
   'league-discovery': undefined;
   'season-draft/index': undefined;
@@ -469,6 +471,11 @@ export default function Layout() {
             name="baseball/matchup"
             options={{ drawerLabel: () => null, title: 'Matchup Detail' }}
             component={MatchupDetail}
+          />
+          <Screen
+            name="football/matchup"
+            options={{ drawerLabel: () => null, title: 'Matchup Detail' }}
+            component={FootballMatchupDetail}
           />
           <Screen
             name="about"

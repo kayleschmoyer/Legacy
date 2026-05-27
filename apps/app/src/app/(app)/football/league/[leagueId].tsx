@@ -468,7 +468,7 @@ export default function FootballLeagueId(): React.JSX.Element {
             onMatchupPress={(matchup) => {
               if (matchup.id != null) {
                 router.navigate({
-                  pathname: '/baseball/matchup',
+                  pathname: '/football/matchup',
                   params: {
                     matchupId: String(matchup.id),
                     leagueId: String(numLeagueId),

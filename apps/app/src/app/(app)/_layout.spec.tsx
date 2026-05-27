@@ -352,6 +352,10 @@ jest.mock('./baseball/matchup', () => ({
   __esModule: true,
   default: () => 'MatchupDetail',
 }));
+jest.mock('./football/matchup', () => ({
+  __esModule: true,
+  default: () => 'FootballMatchupDetail',
+}));
 jest.mock('./baseball/league/[leagueId]', () => ({
   __esModule: true,
   default: () => 'LeagueId',
@@ -634,6 +638,7 @@ describe('App Drawer Layout', () => {
         'baseball/league/join',
         'football/league/join',
         'baseball/matchup',
+        'football/matchup',
         'about',
         'help',
         'profile-settings',
@@ -744,6 +749,11 @@ describe('App Drawer Layout', () => {
     it('defines matchup parameters for matchup detail route', () => {
       render(<Layout />);
       expect(screen.getByTestId('screen-baseball/matchup')).toBeTruthy();
+    });
+
+    it('defines matchup parameters for football matchup detail route', () => {
+      render(<Layout />);
+      expect(screen.getByTestId('screen-football/matchup')).toBeTruthy();
     });
   });
 });
