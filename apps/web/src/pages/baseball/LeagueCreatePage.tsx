@@ -2081,8 +2081,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 >
                   <PillToggle
                     value={formData.baseballHofOnly}
-                    offLabel="🏆 Hall of Famers Only — OFF"
-                    onLabel="🏆 Hall of Famers Only — ON"
+                    offLabel="🏆 Off"
+                    onLabel="🏆 On"
                     onChange={(v) => handleInputChange('baseballHofOnly', v)}
                     disabled={isFormDisabled}
                   />
