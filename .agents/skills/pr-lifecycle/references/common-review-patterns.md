@@ -651,3 +651,23 @@ Before every push, scan your diff against this checklist:
 | Terraform resource renames use `moved {}` blocks                                       | #42           |
 | Shell variables have explicit fallbacks after `\|\| true` patterns                     | #43           |
 | No `@ts-ignore` or `eslint-disable` (fix root cause instead)                           | standards     |
+
+---
+
+## CI / Reviewer Infrastructure Recovery Recipes
+
+These are not review findings — they are CI check failures from the reviewer infra itself. They look alarming but each has a single, mechanical recovery. Knowing them prevents wasted "what's broken?" investigation cycles.
+
+### "SHA Sanity Check" failed twice (or more) on the same PR
+
+- **Symptom**: in the check rollup, two or more failed runs of `🔐 SHA Sanity Check` plus a failed `review` check from `Reviewer (W1)`.
+- **Root cause**: a force-push (typically a rebase) landed while a `Reviewer (W1)` run was already in flight. The reviewer's recorded base SHA no longer matches HEAD, so the SHA Sanity Check fails and the review run aborts.
+- **Recovery**: push a fresh commit (or a rebase that lands a new HEAD SHA) **after** the cancelled run finishes. The next `synchronize` event with `bot:ready-for-review` present fires a clean cycle. Do **not** just re-toggle the label without a new SHA — Reviewer (W1) will fail SHA Sanity again on the same HEAD.
+- **Reference PRs**: #4324, #4349, #4359 (2026-05-26 sweep).
+
+### "Verify All Migrations Applied" check failed
+
+- **Symptom**: this single check is failing in CI; the PR otherwise looks fine. Often appears on long-running PRs.
+- **Root cause**: a migration was added to `main` after this branch diverged; the workflow detects the gap.
+- **Recovery**: rebase to current `main`, run `db_migrate(worktreePath: "<wt>")` locally to confirm a clean apply, then push. Do **not** add a no-op migration — the fix is purely the rebase.
+- **Reference PRs**: #4315, #4259 (2026-05-26 sweep).
