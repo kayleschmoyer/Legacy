@@ -1,9 +1,9 @@
 /**
- * Unit tests for filterPlayerIdsByLeagueEligibility (LS-4835).
+ * Unit tests for filterPlayerIdsByLeagueEligibility (LS-4835 / LS-4896).
  *
- * Covers the football early-return path that was missing before this fix:
- * football leagues must skip all baseball-specific filters (playerPool,
- * career games/seasons, HoF, era) and return every candidate as eligible.
+ * Covers the football early-return path: football leagues must skip all
+ * baseball-specific filters (playerPool, career games/seasons, HoF, era) and
+ * return every candidate as eligible.
  *
  * Also verifies the baseball path still applies filters when sport is
  * 'baseball' (or omitted for backwards-compatibility).
@@ -123,6 +123,20 @@ describe('filterPlayerIdsByLeagueEligibility', () => {
 
       // No pool filter means excludedByPool stays 0 (all IDs survive to next stage)
       expect(result.excludedByPool).toBe(0);
+    });
+
+    it('defaults to baseball behaviour when sport is omitted', async () => {
+      const result = await filterPlayerIdsByLeagueEligibility(
+        makeAlwaysEmptyDb(),
+        PLAYER_IDS,
+        {
+          playerPool: 'al',
+          minCareerGames: 0,
+          minCareerSeasons: 0,
+        },
+      );
+
+      expect(result.excludedByPool).toBe(PLAYER_IDS.length);
     });
   });
 });

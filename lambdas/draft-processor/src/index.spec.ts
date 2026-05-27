@@ -2,6 +2,30 @@ import type { SQSEvent, SQSRecord } from 'aws-lambda';
 
 // ── Mocks (must precede module import) ──────────────────────────────────────
 
+// Stub drizzle-orm so that eq/and/etc. don't throw when passed mock string
+// columns (PublicSchema fields are strings in tests, not real Drizzle columns).
+jest.mock('drizzle-orm', () => ({
+  and: (...args: unknown[]) => ({ _type: 'and', args }),
+  eq: (l: unknown, r: unknown) => ({ _type: 'eq', l, r }),
+  gte: (l: unknown, r: unknown) => ({ _type: 'gte', l, r }),
+  inArray: (col: unknown, vals: unknown) => ({ _type: 'inArray', col, vals }),
+  isNull: (col: unknown) => ({ _type: 'isNull', col }),
+  notInArray: (col: unknown, vals: unknown) => ({
+    _type: 'notInArray',
+    col,
+    vals,
+  }),
+  or: (...args: unknown[]) => ({ _type: 'or', args }),
+  sql: Object.assign(
+    (strings: TemplateStringsArray, ...vals: unknown[]) => ({
+      _type: 'sql',
+      strings,
+      vals,
+    }),
+    { param: (v: unknown) => v },
+  ),
+}));
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
@@ -67,11 +91,21 @@ const mockValidateDraftMode = jest.fn();
 const mockValidateSelectionMethod = jest.fn();
 const mockValidateUserAccess = jest.fn();
 
+// jest.requireActual cannot be used here: db-client's module-level code
+// (materialized view in Players.ts) calls drizzle-orm's sql tag and expects
+// a full Drizzle SQL object with inlineParams. Since drizzle-orm is mocked
+// in this file, requireActual would fail with "query.inlineParams is not a
+// function". The manual mock is therefore required, not a style preference.
 jest.mock('@legacy-sports/db-client', () => ({
   createAllMatchupsForLeague: (...args: unknown[]): unknown =>
     mockCreateAllMatchupsForLeague(...args),
   filterPlayerIdsByLeagueEligibility: (...args: unknown[]): unknown =>
     mockFilterPlayerIdsByLeagueEligibility(...args),
+  inArrayAny: (col: unknown, vals: unknown) => ({
+    _type: 'inArrayAny',
+    col,
+    vals,
+  }),
   finalizeDraftCompletion: (...args: unknown[]): unknown =>
     mockFinalizeDraftCompletion(...args),
   PublicDb: {},
@@ -82,15 +116,33 @@ jest.mock('@legacy-sports/db-client', () => ({
       lastName: 'lastName',
       brefId: 'brefId',
       statsLastFetchedAt: 'statsLastFetchedAt',
+      sport: 'sport',
     },
     teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
     teamMembers: { leagueId: 'leagueId' },
+    leaguePosition: {
+      leagueId: 'leagueId',
+      positionType: 'positionType',
+      id: 'id',
+    },
     leaguePositions: {
       leagueId: 'leagueId',
       positionType: 'positionType',
       id: 'id',
     },
-    leagues: { id: 'id' },
+    leagues: {
+      id: 'id',
+      sport: 'sport',
+      gamesPerMatchup: 'gamesPerMatchup',
+      playerPool: 'playerPool',
+      minCareerGames: 'minCareerGames',
+      minCareerSeasons: 'minCareerSeasons',
+      baseballHofOnly: 'baseballHofOnly',
+      baseballEraFilter: 'baseballEraFilter',
+      customEraStartYear: 'customEraStartYear',
+      customEraEndYear: 'customEraEndYear',
+      maxRosterSize: 'maxRosterSize',
+    },
     seasonBatting: {
       playerId: 'playerId',
       g: 'g',
@@ -178,10 +230,11 @@ function makeValidStartDraftMessage(overrides: Record<string, unknown> = {}) {
 import { withRollbar } from '@legacy-sports/rollbar';
 import { shuffleArray } from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
+import type { PublicDb } from '@legacy-sports/db-client';
 
 // ── Import under test ───────────────────────────────────────────────────────
 
-import { buildBenchAssignments, handler } from './index';
+import { buildBenchAssignments, buildPlayerPool, handler } from './index';
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -444,5 +497,214 @@ describe('buildBenchAssignments', () => {
     const teams = [{ id: 100 }];
     const result = buildBenchAssignments(players, teams, 0, 1);
     expect(result).toEqual([]);
+  });
+});
+
+// ── buildPlayerPool sport-aware tests ────────────────────────────────────────
+
+describe('buildPlayerPool', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  function makePlayer(id: number) {
+    return {
+      id,
+      firstName: `First${id}`,
+      lastName: `Last${id}`,
+      brefId: `bref${id}`,
+      statsLastFetchedAt: null,
+    };
+  }
+
+  function makePosition(playerId: number, position: string) {
+    return { playerId, position };
+  }
+
+  // A minimal Drizzle-fluent mock DB.
+  // Each call to `.from()` pops the next response from the queue.
+  // Supports both .limit() termination and direct thenable await.
+  // Critically: each query chain shares a SINGLE lazy slot so that
+  // db.select().from().where().orderBy().limit() and
+  // db.select().from().where() both consume exactly one response.
+  function makeSequentialDb(
+    responses: unknown[][],
+    options: { forbiddenTables?: string[] } = {},
+  ) {
+    let callIdx = 0;
+
+    return {
+      select: jest.fn().mockImplementation(() => ({
+        from: jest.fn().mockImplementation((table: Record<string, unknown>) => {
+          if (
+            options.forbiddenTables?.some((name) =>
+              Object.values(table ?? {}).includes(name),
+            )
+          ) {
+            throw new Error(
+              `Forbidden table queried: ${JSON.stringify(table)}`,
+            );
+          }
+
+          // Each from() owns a single lazy slot shared by all terminal calls.
+          let fetched = false;
+          let slotValue: unknown[] = [];
+          const fetch = () => {
+            if (!fetched) {
+              slotValue = responses[callIdx++] ?? [];
+              fetched = true;
+            }
+            return slotValue;
+          };
+
+          const afterWhere = {
+            orderBy: jest.fn().mockImplementation(() => ({
+              limit: jest
+                .fn()
+                .mockImplementation(() => Promise.resolve(fetch())),
+            })),
+            limit: jest.fn().mockImplementation(() => Promise.resolve(fetch())),
+            then: (
+              resolve: (v: unknown[]) => unknown,
+              reject?: (e: unknown) => unknown,
+            ) => Promise.resolve(fetch()).then(resolve, reject),
+            catch: (reject: (e: unknown) => unknown) =>
+              Promise.resolve(fetch()).catch(reject),
+          };
+
+          return {
+            where: jest.fn().mockImplementation(() => afterWhere),
+            orderBy: jest.fn().mockImplementation(() => ({
+              limit: jest
+                .fn()
+                .mockImplementation(() => Promise.resolve(fetch())),
+            })),
+          };
+        }),
+      })),
+    };
+  }
+
+  const LEAGUE_ID = 42;
+  const NUM_TEAMS = 2;
+  const POSITIONS = [{ id: 1, positionType: 'OF' }];
+  const BASE_CONFIG = {
+    gamesPerMatchup: 5,
+    playerPool: 'all' as const,
+    minCareerGames: 50,
+    minCareerSeasons: 3,
+    baseballHofOnly: false as boolean,
+    eraFilter: 'all',
+    customEraStartYear: null,
+    customEraEndYear: null,
+    maxRosterSize: 25,
+  };
+
+  it('for football: passes sport="football" to filterPlayerIdsByLeagueEligibility', async () => {
+    const players = [makePlayer(1), makePlayer(2)];
+    const positions = [makePosition(1, 'OF'), makePosition(2, 'OF')];
+
+    // Sequence: candidatePlayers → playerEligiblePositions
+    const db = makeSequentialDb([players, positions]);
+
+    mockFilterPlayerIdsByLeagueEligibility.mockResolvedValue({
+      eligibleIds: new Set([1, 2]),
+      excludedByPool: 0,
+      excludedByCareerGames: 0,
+      excludedByCareerSeasons: 0,
+      excludedByHofOnly: 0,
+      excludedByEraFilter: 0,
+    });
+
+    await buildPlayerPool(
+      db as unknown as PublicDb,
+      LEAGUE_ID,
+      NUM_TEAMS,
+      POSITIONS,
+      {
+        ...BASE_CONFIG,
+        sport: 'football',
+      },
+    );
+
+    expect(mockFilterPlayerIdsByLeagueEligibility).toHaveBeenCalledWith(
+      db,
+      [1, 2],
+      expect.objectContaining({ sport: 'football' }),
+    );
+  });
+
+  it('for football: does not query season_batting/pitching/fielding tables', async () => {
+    const players = [makePlayer(1)];
+    const positions = [makePosition(1, 'OF')];
+
+    // season_batting has a unique mock field 'playerId' on lgId col.
+    // We detect forbidden access by checking for 'lgId' in the table object.
+    const db = makeSequentialDb([players, positions], {
+      forbiddenTables: ['lgId'],
+    });
+
+    mockFilterPlayerIdsByLeagueEligibility.mockResolvedValue({
+      eligibleIds: new Set([1]),
+      excludedByPool: 0,
+      excludedByCareerGames: 0,
+      excludedByCareerSeasons: 0,
+      excludedByHofOnly: 0,
+      excludedByEraFilter: 0,
+    });
+
+    await expect(
+      buildPlayerPool(
+        db as unknown as PublicDb,
+        LEAGUE_ID,
+        NUM_TEAMS,
+        POSITIONS,
+        {
+          ...BASE_CONFIG,
+          sport: 'football',
+        },
+      ),
+    ).resolves.not.toThrow();
+  });
+
+  it('for baseball: passes sport="baseball" to filterPlayerIdsByLeagueEligibility', async () => {
+    const players = [makePlayer(1)];
+    const positions = [makePosition(1, 'OF')];
+
+    // Sequence: candidatePlayers → battingStats → pitchingStats → fieldingStats → playerPositions
+    // battingStats must include player 1 with g >= gamesPerMatchup*SEASON_MATCHUP_MULTIPLIER (5*3=15)
+    const db = makeSequentialDb([
+      players,
+      [{ playerId: 1, g: 50 }],
+      [],
+      [],
+      positions,
+    ]);
+
+    mockFilterPlayerIdsByLeagueEligibility.mockResolvedValue({
+      eligibleIds: new Set([1]),
+      excludedByPool: 0,
+      excludedByCareerGames: 0,
+      excludedByCareerSeasons: 0,
+      excludedByHofOnly: 0,
+      excludedByEraFilter: 0,
+    });
+
+    await buildPlayerPool(
+      db as unknown as PublicDb,
+      LEAGUE_ID,
+      NUM_TEAMS,
+      POSITIONS,
+      {
+        ...BASE_CONFIG,
+        sport: 'baseball',
+      },
+    );
+
+    expect(mockFilterPlayerIdsByLeagueEligibility).toHaveBeenCalledWith(
+      db,
+      expect.any(Array),
+      expect.objectContaining({ sport: 'baseball' }),
+    );
   });
 });

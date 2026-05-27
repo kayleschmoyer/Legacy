@@ -372,7 +372,7 @@ interface PlayerPoolResult {
  * @param leaguePositions  Explicit roster positions for the league.
  * @param config   League settings that control player eligibility.
  */
-async function buildPlayerPool(
+export async function buildPlayerPool(
   db: PublicDb,
   leagueId: number,
   numTeams: number,
@@ -387,6 +387,7 @@ async function buildPlayerPool(
     customEraStartYear: number | null;
     customEraEndYear: number | null;
     maxRosterSize: number;
+    sport: 'baseball' | 'football';
   },
 ): Promise<PlayerPoolResult> {
   const gamesPerMatchup = config.gamesPerMatchup ?? 5;
@@ -400,6 +401,7 @@ async function buildPlayerPool(
     customEraStartYear,
     customEraEndYear,
     maxRosterSize,
+    sport,
   } = config;
 
   // ── 1. Fetch candidate players ordered by stats availability ─────────────
@@ -417,6 +419,7 @@ async function buildPlayerPool(
       statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
     })
     .from(PublicSchema.players)
+    .where(eq(PublicSchema.players.sport, sport))
     .orderBy(
       sql`${PublicSchema.players.statsLastFetchedAt} DESC NULLS LAST`,
       PublicSchema.players.id,
@@ -430,91 +433,106 @@ async function buildPlayerPool(
   // ── 2. Filter to players with at least one valid season ───────────────────
   const candidatePlayerIds = candidatePlayers.map((p) => p.id);
 
-  // Negro-league filter pushed to SQL: rows with NULL lg_id are non-NL and
-  // must be kept, so we use (lg_id IS NULL OR lg_id NOT IN (...)).
-  const notNegroLeague = (
-    lgIdCol:
-      | typeof PublicSchema.seasonBatting.lgId
-      | typeof PublicSchema.seasonPitching.lgId
-      | typeof PublicSchema.seasonFielding.lgId,
-  ) => or(isNull(lgIdCol), notInArray(lgIdCol, negroLeagueList));
+  let players: typeof candidatePlayers;
 
-  const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
-    db
-      .select({
-        playerId: PublicSchema.seasonBatting.playerId,
-        g: PublicSchema.seasonBatting.g,
-      })
-      .from(PublicSchema.seasonBatting)
-      .where(
-        and(
-          inArrayAny(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
-          gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
-          gte(PublicSchema.seasonBatting.g, minGames),
-          notNegroLeague(PublicSchema.seasonBatting.lgId),
-        ),
-      ),
-    db
-      .select({
-        playerId: PublicSchema.seasonPitching.playerId,
-        g: PublicSchema.seasonPitching.g,
-      })
-      .from(PublicSchema.seasonPitching)
-      .where(
-        and(
-          inArrayAny(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
-          gte(PublicSchema.seasonPitching.season, MIN_SEASON_WITH_GAME_DATA),
-          gte(PublicSchema.seasonPitching.g, minGames),
-          notNegroLeague(PublicSchema.seasonPitching.lgId),
-        ),
-      ),
-    db
-      .select({
-        playerId: PublicSchema.seasonFielding.playerId,
-        season: PublicSchema.seasonFielding.season,
-        g: PublicSchema.seasonFielding.g,
-      })
-      .from(PublicSchema.seasonFielding)
-      .where(
-        and(
-          inArrayAny(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
-          gte(PublicSchema.seasonFielding.season, MIN_SEASON_WITH_GAME_DATA),
-          notNegroLeague(PublicSchema.seasonFielding.lgId),
-        ),
-      ),
-  ]);
+  if (sport === 'football') {
+    // season_batting / season_pitching / season_fielding are baseball-only tables.
+    // All sport-filtered candidates are considered valid for football leagues.
+    players = candidatePlayers;
+    LOGGER.info(
+      `[buildPlayerPool] Football league — skipping baseball season validity check, ${players.length} candidates treated as valid`,
+    );
+  } else {
+    // Negro-league filter pushed to SQL: rows with NULL lg_id are non-NL and
+    // must be kept, so we use (lg_id IS NULL OR lg_id NOT IN (...)).
+    const notNegroLeague = (
+      lgIdCol:
+        | typeof PublicSchema.seasonBatting.lgId
+        | typeof PublicSchema.seasonPitching.lgId
+        | typeof PublicSchema.seasonFielding.lgId,
+    ) => or(isNull(lgIdCol), notInArray(lgIdCol, negroLeagueList));
 
-  const fieldingByPlayerSeason = new Map<string, number>();
-  for (const stat of fieldingStats) {
-    const key = `${stat.playerId}-${stat.season}`;
-    fieldingByPlayerSeason.set(
-      key,
-      (fieldingByPlayerSeason.get(key) ?? 0) + (stat.g ?? 0),
+    const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
+      db
+        .select({
+          playerId: PublicSchema.seasonBatting.playerId,
+          g: PublicSchema.seasonBatting.g,
+        })
+        .from(PublicSchema.seasonBatting)
+        .where(
+          and(
+            inArrayAny(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
+            gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
+            gte(PublicSchema.seasonBatting.g, minGames),
+            notNegroLeague(PublicSchema.seasonBatting.lgId),
+          ),
+        ),
+      db
+        .select({
+          playerId: PublicSchema.seasonPitching.playerId,
+          g: PublicSchema.seasonPitching.g,
+        })
+        .from(PublicSchema.seasonPitching)
+        .where(
+          and(
+            inArrayAny(
+              PublicSchema.seasonPitching.playerId,
+              candidatePlayerIds,
+            ),
+            gte(PublicSchema.seasonPitching.season, MIN_SEASON_WITH_GAME_DATA),
+            gte(PublicSchema.seasonPitching.g, minGames),
+            notNegroLeague(PublicSchema.seasonPitching.lgId),
+          ),
+        ),
+      db
+        .select({
+          playerId: PublicSchema.seasonFielding.playerId,
+          season: PublicSchema.seasonFielding.season,
+          g: PublicSchema.seasonFielding.g,
+        })
+        .from(PublicSchema.seasonFielding)
+        .where(
+          and(
+            inArrayAny(
+              PublicSchema.seasonFielding.playerId,
+              candidatePlayerIds,
+            ),
+            gte(PublicSchema.seasonFielding.season, MIN_SEASON_WITH_GAME_DATA),
+            notNegroLeague(PublicSchema.seasonFielding.lgId),
+          ),
+        ),
+    ]);
+
+    const fieldingByPlayerSeason = new Map<string, number>();
+    for (const stat of fieldingStats) {
+      const key = `${stat.playerId}-${stat.season}`;
+      fieldingByPlayerSeason.set(
+        key,
+        (fieldingByPlayerSeason.get(key) ?? 0) + (stat.g ?? 0),
+      );
+    }
+
+    // Batting and pitching rows already satisfy g >= minGames (filtered in SQL).
+    const playersWithValidSeasons = new Set<number>();
+    for (const stat of battingStats) {
+      playersWithValidSeasons.add(stat.playerId);
+    }
+    for (const stat of pitchingStats) {
+      playersWithValidSeasons.add(stat.playerId);
+    }
+    // Fielding requires per-season aggregation (multiple positions per season).
+    for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
+      if (totalGames >= minGames) {
+        playersWithValidSeasons.add(parseInt(key.split('-')[0]));
+      }
+    }
+
+    players = candidatePlayers.filter((p) => playersWithValidSeasons.has(p.id));
+
+    LOGGER.info(
+      `[buildPlayerPool] ${players.length} players with valid seasons (≥${minGames} games)`,
     );
   }
-
-  // Batting and pitching rows already satisfy g >= minGames (filtered in SQL).
-  const playersWithValidSeasons = new Set<number>();
-  for (const stat of battingStats) {
-    playersWithValidSeasons.add(stat.playerId);
-  }
-  for (const stat of pitchingStats) {
-    playersWithValidSeasons.add(stat.playerId);
-  }
-  // Fielding requires per-season aggregation (multiple positions per season).
-  for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
-    if (totalGames >= minGames) {
-      playersWithValidSeasons.add(parseInt(key.split('-')[0]));
-    }
-  }
-
-  let players = candidatePlayers.filter((p) =>
-    playersWithValidSeasons.has(p.id),
-  );
-
-  LOGGER.info(
-    `[buildPlayerPool] ${players.length} players with valid seasons (≥${minGames} games)`,
-  );
 
   // ── 3. Apply league eligibility settings ─────────────────────────────────
   const eligibilityResult = await filterPlayerIdsByLeagueEligibility(
@@ -528,6 +546,7 @@ async function buildPlayerPool(
       baseballEraFilter: eraFilter,
       customEraStartYear,
       customEraEndYear,
+      sport,
     },
   );
   players = players.filter((p) => eligibilityResult.eligibleIds.has(p.id));
@@ -671,6 +690,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            sport: PublicSchema.leagues.sport,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -690,6 +710,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       const customEraStartYear = leagueConfig[0]?.customEraStartYear ?? null;
       const customEraEndYear = leagueConfig[0]?.customEraEndYear ?? null;
       const maxRosterSizeFromConfig = leagueConfig[0]?.maxRosterSize ?? 25;
+      const leagueSport = leagueConfig[0]?.sport ?? ('baseball' as const);
 
       LOGGER.info('Draft season requirements', {
         gamesPerMatchup,
@@ -728,6 +749,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           customEraStartYear,
           customEraEndYear,
           maxRosterSize: maxRosterSizeFromConfig,
+          sport: leagueSport,
         },
       );
 
@@ -982,6 +1004,7 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
             eraFilter: PublicSchema.leagues.baseballEraFilter,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            sport: PublicSchema.leagues.sport,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -1097,6 +1120,7 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
           customEraStartYear: config.customEraStartYear,
           customEraEndYear: config.customEraEndYear,
           maxRosterSize,
+          sport: config.sport ?? ('baseball' as const),
         },
       );
 
