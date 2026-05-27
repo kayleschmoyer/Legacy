@@ -1,0 +1,52 @@
+# prune-runner-amis.yml — Standalone runner-AMI prune entry point. LS-4946.
+#
+# Purpose:
+#   Manually trigger an AMI prune without running a Packer build. Useful when
+#   the AMI count drifts above bounds (e.g. after a burst of rebuilds) and we
+#   want to reclaim EBS snapshot space without waiting for the next rebuild.
+#
+#   Post-build pruning lives inline at the end of rebuild-runner-ami.yml
+#   (per LS-4000 — prune-after-successful-build keeps the AMI count bounded
+#   without a cron). This workflow is the explicit standalone counterpart.
+#
+# Triggers:
+#   - workflow_dispatch only.
+#
+# Why a dedicated workflow (vs. a prune-only flag on rebuild-runner-ami.yml):
+#   Mutually-exclusive inputs on one dispatch form (pr-number vs. prune-only)
+#   produced silent misuse — empty pr-number with prune-only=false failed at
+#   a runtime validation step. Splitting the entry points makes each one's
+#   input schema GitHub-enforced documentation of what it needs (LS-4946).
+
+name: Prune Runner AMIs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: prune-runner-amis
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: Prune old runner AMIs
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    env:
+      AWS_REGION: us-east-1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Configure AWS credentials (Packer builder role)
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-runner-ami-builder
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Prune
+        uses: ./.github/actions/prune-runner-amis

@@ -1,5 +1,5 @@
 # rebuild-runner-ami.yml — Build a new runner AMI via Packer in CI and commit
-# the version updates back to the triggering PR branch. LS-2429.
+# the version updates back to the triggering PR branch. LS-2429, LS-4946.
 #
 # Purpose:
 #   Removes the "AWS SSO access" bottleneck for Playwright bumps. Dependabot (or
@@ -15,9 +15,12 @@
 #        `runner_ami_playwright_version` value in runner-ami.auto.tfvars.
 #     4. Commits those updates back to the PR branch using a bot token so the
 #        runner-ami-drift-check workflow re-runs and passes.
-#     5. Prunes old AMIs: retains the 5 most recent by creation date, plus any
-#        version still referenced by main or an open PR branch (LS-3885).
-#        This replaces the former prune-runner-amis.yml scheduled job.
+#     5. Prunes old AMIs as a final step in the build job, via the shared
+#        ./.github/actions/prune-runner-amis composite action. Standalone
+#        pruning (no build) lives in prune-runner-amis.yml. LS-4946 split
+#        the former `prune-only: true` flag into its own workflow so each
+#        entry point's input schema is GitHub-enforced documentation of what
+#        it needs.
 #
 #   After the PR merges, `runner-terraform-apply.yml` rolls the launch template
 #   to the new AMI automatically.
@@ -25,9 +28,7 @@
 # Triggers:
 #   - pull_request with the label `rebuild-runner-ami` (added manually or by a
 #     future dependabot auto-labeller).
-#   - workflow_dispatch with a PR number input (for manual kick).
-#   - workflow_dispatch with prune-only: true (to prune without a full build,
-#     e.g. to bring the AMI count back into bounds after accumulation). LS-4000.
+#   - workflow_dispatch with a required PR number input (for manual kick).
 #
 # Why label-triggered and not automatic:
 #   Packer builds take ~10 min and cost ~$0.50 each. We deliberately require an
@@ -42,14 +43,9 @@ on:
   workflow_dispatch:
     inputs:
       pr-number:
-        description: "PR number to build AMI against (required unless prune-only is true)"
-        required: false
+        description: "PR number to build AMI against"
+        required: true
         type: string
-      prune-only:
-        description: "Skip the build and only run the AMI prune step (no PR needed)"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   id-token: write
@@ -57,15 +53,14 @@ permissions:
   pull-requests: write
 
 concurrency:
-  # One AMI build per PR at a time. Use 'prune' as the group key for prune-only runs.
-  group: rebuild-runner-ami-${{ github.event.pull_request.number || github.event.inputs.pr-number || 'prune' }}
+  # One AMI build per PR at a time.
+  group: rebuild-runner-ami-${{ github.event.pull_request.number || github.event.inputs.pr-number }}
   cancel-in-progress: false
 
 jobs:
   build:
     name: Build runner AMI
-    # Skip the build when prune-only is requested via workflow_dispatch.
-    if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.prune-only != 'true') || github.event.label.name == 'rebuild-runner-ami' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.label.name == 'rebuild-runner-ami' }}
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     env:
@@ -86,16 +81,6 @@ jobs:
           private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
-
-      - name: Validate required inputs
-        run: |
-          set -euo pipefail
-          PR_NUMBER="${{ github.event.inputs.pr-number }}"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -z "$PR_NUMBER" ]]; then
-            echo "::error::pr-number is required when prune-only is false."
-            echo "::error::To run a prune without a build, set prune-only to true."
-            exit 1
-          fi
 
       - name: Resolve PR ref
         id: pr
@@ -352,117 +337,11 @@ jobs:
           and should now pass. On merge, \`runner-terraform-apply.yml\` will roll the
           launch template to the new AMI."
 
-  prune:
-    name: Prune old runner AMIs
-    needs: [build]
-    # Run after a successful build, OR standalone when prune-only is requested
-    # via workflow_dispatch (LS-4000). The always() guard ensures this job
-    # evaluates its condition even when the build job was skipped.
-    if: ${{ always() && (needs.build.result == 'success' || (github.event_name == 'workflow_dispatch' && github.event.inputs.prune-only == 'true')) }}
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    env:
-      AWS_REGION: us-east-1
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Configure AWS credentials (Packer builder role)
-        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
-        with:
-          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-runner-ami-builder
-          aws-region: ${{ env.AWS_REGION }}
-
+      # Prune old runner AMIs as a post-build step. Retains the 5 most recent
+      # AMIs by creation date plus any version still referenced by main or an
+      # open PR branch. Keeps the AMI count bounded without a cron job —
+      # prune at build time, not on a timer (LS-3885, LS-4000). Shared logic
+      # lives in the composite action; standalone pruning (no build) is in
+      # prune-runner-amis.yml.
       - name: Prune old runner AMIs
-        # Retain the 5 most recent AMIs by creation date, plus any version still
-        # referenced by main or an open PR branch. This keeps the AMI count bounded
-        # without a cron job — prune at build time, not on a timer (LS-3885).
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          KEEP_COUNT=5
-
-          echo "=== Post-build AMI prune (retain $KEEP_COUNT most recent) ==="
-
-          # Protected versions = main's runner_ami_playwright_version + every
-          # open PR branch's runner_ami_playwright_version. A PR that has not
-          # yet rebuilt the AMI still references the old version, so we keep
-          # it alive until the PR merges or closes.
-          {
-            awk '
-              /^runner_ami_playwright_version[[:space:]]*=/ {
-                match($0, /"[0-9.]+"/)
-                print substr($0, RSTART + 1, RLENGTH - 2)
-                exit
-              }
-            ' terraform/runners/runner-ami.auto.tfvars
-
-            gh pr list --state open --json headRefName --limit 100 \
-              | jq -r '.[].headRefName' \
-              | while read -r BRANCH; do
-                  gh api "repos/${{ github.repository }}/contents/terraform/runners/runner-ami.auto.tfvars?ref=$BRANCH" \
-                    --jq '.content' 2>/dev/null \
-                    | base64 -d 2>/dev/null \
-                    | awk '
-                        /^runner_ami_playwright_version[[:space:]]*=/ {
-                          match($0, /"[0-9.]+"/)
-                          print substr($0, RSTART + 1, RLENGTH - 2)
-                          exit
-                        }
-                      ' || true
-                done
-          } | sort -u > protected-versions.txt
-
-          echo "Protected versions (main + open PRs):"
-          cat protected-versions.txt
-
-          ALL_AMIS=$(aws ec2 describe-images \
-            --owners self \
-            --filters "Name=name,Values=legacy-sports-runner-*" \
-            --query "sort_by(Images, &CreationDate) | reverse(@) | [*].{Id:ImageId,Name:Name,Created:CreationDate}" \
-            --output json)
-
-          echo "Total AMIs: $(echo "$ALL_AMIS" | jq 'length')"
-
-          KEEP_IDS=$(echo "$ALL_AMIS" | jq -r --argjson n "$KEEP_COUNT" '.[0:$n] | .[].Id')
-
-          while read -r VERSION; do
-            [[ -z "$VERSION" ]] && continue
-            MATCH_IDS=$(echo "$ALL_AMIS" \
-              | jq -r --arg v "$VERSION" '.[] | select(.Name | contains("-pw" + $v + "-")) | .Id')
-            KEEP_IDS=$(printf "%s\n%s" "$KEEP_IDS" "$MATCH_IDS")
-          done < protected-versions.txt
-
-          KEEP_IDS_UNIQUE=$(echo "$KEEP_IDS" | sort -u | grep -v '^$' || true)
-          echo "Keeping AMIs:"
-          printf "%s\n" "$KEEP_IDS_UNIQUE"
-
-          DELETE_IDS=$(echo "$ALL_AMIS" | jq -r '.[].Id' \
-            | grep -vFxf <(echo "$KEEP_IDS_UNIQUE") || true)
-
-          if [[ -z "$DELETE_IDS" ]]; then
-            echo "✅ Nothing to prune."
-            exit 0
-          fi
-
-          echo "Pruning $(echo "$DELETE_IDS" | wc -l | tr -d ' ') AMI(s):"
-          printf "%s\n" "$DELETE_IDS"
-
-          for AMI_ID in $DELETE_IDS; do
-            SNAPSHOTS=$(aws ec2 describe-images \
-              --image-ids "$AMI_ID" \
-              --query "Images[0].BlockDeviceMappings[?Ebs.SnapshotId].Ebs.SnapshotId" \
-              --output text 2>/dev/null || echo "")
-
-            echo "Deregistering $AMI_ID..."
-            aws ec2 deregister-image --image-id "$AMI_ID"
-
-            for SNAPSHOT_ID in $SNAPSHOTS; do
-              echo "  Deleting snapshot $SNAPSHOT_ID..."
-              aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID" || \
-                echo "::warning::Failed to delete snapshot $SNAPSHOT_ID (may be in use)"
-            done
-          done
-
-          echo "✅ Prune complete."
+        uses: ./.github/actions/prune-runner-amis
