@@ -346,6 +346,7 @@ build {
       # .env file, so our pre-baked .env is preserved and read by the runner on
       # startup (it is the canonical mechanism for injecting env into job steps).
       # Without this, the .env writes below get silently skipped (LS-4936).
+      # AMI rebuild trigger: LS-4942 — refresh live runners to pick up this fix.
       "sudo mkdir -p /opt/actions-runner",
     ]
   }
