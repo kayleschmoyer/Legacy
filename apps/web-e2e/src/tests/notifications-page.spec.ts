@@ -14,6 +14,31 @@ import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
+const PAGE_SIZE = 20;
+
+/** Generate N mock notification items starting from a given id offset. */
+function makeMockNotifications(
+  count: number,
+  idOffset = 200,
+): typeof MOCK_NOTIFICATIONS {
+  return Array.from({ length: count }, (_, i) => ({
+    __typename: 'NotificationHistoryItem' as const,
+    id: idOffset + i,
+    userId: 1,
+    notificationType: 'MATCHUP_STARTED',
+    channel: 'push',
+    matchupId: 100 + i,
+    leagueId: 10,
+    title: `Matchup ${idOffset + i}`,
+    message: `Message for notification ${idOffset + i}.`,
+    metadata: null,
+    read: false,
+    sentAt: agoIso((i + 1) * 60 * 1000),
+    readAt: null,
+    createdAt: agoIso((i + 1) * 60 * 1000),
+  }));
+}
+
 const MOCK_NOTIFICATIONS = [
   {
     __typename: 'NotificationHistoryItem',
@@ -158,5 +183,74 @@ test.describe('Notifications page — /notifications @regression', () => {
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
+  });
+
+  test('enables Next button when server returns PAGE_SIZE+1 items', async ({
+    page,
+  }) => {
+    // PAGE_SIZE+1 items means a next page exists.
+    const items = makeMockNotifications(PAGE_SIZE + 1);
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('getnotificationhistory')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getNotificationHistory: items } }),
+        });
+        return;
+      }
+      if (postData.includes('getunreadnotificationcount')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getUnreadNotificationCount: 0 } }),
+        });
+        return;
+      }
+      await unmockedGraphQLFallback(route);
+    });
+
+    await page.goto('/notifications');
+    await page.waitForLoadState('load');
+
+    const nextBtn = page.getByRole('button', { name: 'Next page' });
+    await expect(nextBtn).toBeVisible();
+    await expect(nextBtn).toBeEnabled();
+  });
+
+  test('disables Next button when server returns exactly PAGE_SIZE items (regression LS-4096)', async ({
+    page,
+  }) => {
+    // Exactly PAGE_SIZE items means we are on the last page. The old code
+    // incorrectly inferred hasNextPage=true from notifications.length===PAGE_SIZE.
+    const items = makeMockNotifications(PAGE_SIZE);
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('getnotificationhistory')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getNotificationHistory: items } }),
+        });
+        return;
+      }
+      if (postData.includes('getunreadnotificationcount')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getUnreadNotificationCount: 0 } }),
+        });
+        return;
+      }
+      await unmockedGraphQLFallback(route);
+    });
+
+    await page.goto('/notifications');
+    await page.waitForLoadState('load');
+
+    const nextBtn = page.getByRole('button', { name: 'Next page' });
+    await expect(nextBtn).toBeVisible();
+    await expect(nextBtn).toBeDisabled();
   });
 });

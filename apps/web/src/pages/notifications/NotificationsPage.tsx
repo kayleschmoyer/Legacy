@@ -579,7 +579,7 @@ const NotificationsPage: React.FC = () => {
   const [page, setPage] = useState(0);
 
   const { data, loading, error, refetch } = useGetNotificationHistoryQuery({
-    variables: { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+    variables: { limit: PAGE_SIZE + 1, offset: page * PAGE_SIZE },
     fetchPolicy: 'cache-and-network',
   });
   const { data: countData } = useGetUnreadNotificationCountQuery();
@@ -592,12 +592,17 @@ const NotificationsPage: React.FC = () => {
     }
   }, [error]);
 
-  const notifications = useMemo(
+  const allFetched = useMemo(
     () => data?.getNotificationHistory ?? [],
     [data?.getNotificationHistory],
   );
+  // Slice to PAGE_SIZE for display; the extra item is only used as a sentinel.
+  const notifications = useMemo(
+    () => allFetched.slice(0, PAGE_SIZE),
+    [allFetched],
+  );
   const unreadCount = countData?.getUnreadNotificationCount ?? 0;
-  const hasNextPage = notifications.length === PAGE_SIZE;
+  const hasNextPage = allFetched.length > PAGE_SIZE;
   const hasPreviousPage = page > 0;
   const isError = error != null && notifications.length === 0;
   const isLoading = loading && notifications.length === 0;
