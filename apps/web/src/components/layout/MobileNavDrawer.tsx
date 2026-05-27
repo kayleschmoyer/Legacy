@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart2,
@@ -92,8 +93,13 @@ export const MobileNavDrawer: React.FC<Props> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  // Render via portal to document.body so the drawer escapes the nav's
+  // sticky-positioned stacking context (which is capped at NAV_Z_INDEX = 200,
+  // matching the fixed MobileBottomBar). Without the portal, the drawer's
+  // own zIndex: 300 is bounded and the bottom nav paints over it.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -503,6 +509,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
           Sign out
         </button>
       </nav>
-    </div>
+    </div>,
+    document.body,
   );
 };
