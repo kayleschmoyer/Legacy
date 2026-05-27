@@ -488,4 +488,91 @@ describe('errorLink', () => {
       expect.objectContaining({ context: 'apollo:TestOp' }),
     );
   });
+
+  it('dispatches a friendly message for INTERNAL_SERVER_ERROR instead of the raw "Internal server error" (LS-4850)', async () => {
+    const dispatchSpy = jest
+      .spyOn(window, 'dispatchEvent')
+      .mockImplementation(() => true);
+
+    const internalError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          {
+            message: 'Internal server error',
+            extensions: { code: 'INTERNAL_SERVER_ERROR' },
+          },
+        ],
+      },
+      [
+        {
+          message: 'Internal server error',
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        },
+      ],
+    );
+
+    await runWithError(internalError, {});
+
+    const apolloErrors = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'apollo:error',
+      );
+    expect(apolloErrors).toHaveLength(1);
+    expect(apolloErrors[0].detail.message).toBe(
+      'Something went wrong on our end — please try again in a moment.',
+    );
+    // Still captured to Rollbar — visibility into the failing operation
+    // remains the only way to fix the underlying server-side bug.
+    expect(captureError).toHaveBeenCalledTimes(1);
+
+    dispatchSpy.mockRestore();
+  });
+
+  it('prefers PREMIUM_REQUIRED message over the INTERNAL_SERVER_ERROR fallback when both are present', async () => {
+    const dispatchSpy = jest
+      .spyOn(window, 'dispatchEvent')
+      .mockImplementation(() => true);
+
+    const mixedErrors = new CombinedGraphQLErrors(
+      {
+        errors: [
+          {
+            message: 'Internal server error',
+            extensions: { code: 'INTERNAL_SERVER_ERROR' },
+          },
+          {
+            message: 'Upgrade to premium to unlock this feature.',
+            extensions: { code: 'PREMIUM_REQUIRED' },
+          },
+        ],
+      },
+      [
+        {
+          message: 'Internal server error',
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        },
+        {
+          message: 'Upgrade to premium to unlock this feature.',
+          extensions: { code: 'PREMIUM_REQUIRED' },
+        },
+      ],
+    );
+
+    await runWithError(mixedErrors, {});
+
+    const apolloErrors = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'apollo:error',
+      );
+    expect(apolloErrors).toHaveLength(1);
+    expect(apolloErrors[0].detail.message).toBe(
+      'Upgrade to premium to unlock this feature.',
+    );
+
+    dispatchSpy.mockRestore();
+  });
 });

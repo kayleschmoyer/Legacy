@@ -296,10 +296,21 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
           (e.extensions?.['code'] as string | undefined) === 'PREMIUM_REQUIRED',
       );
 
+      // The server's formatError sanitizes unexpected exceptions to the raw
+      // string "Internal server error" (code: INTERNAL_SERVER_ERROR). Showing
+      // that string verbatim — as observed on the mobile draft route (LS-4850)
+      // — gives the user no actionable context. Swap in a friendlier message
+      // that matches the warmer tone used for upstream gateway failures.
+      const firstError = error.errors[0];
+      const isInternalServerError =
+        (firstError?.extensions?.['code'] as string | undefined) ===
+          'INTERNAL_SERVER_ERROR' && !premiumError;
+
       dispatchApolloError(
         premiumError?.message ??
-          error.errors[0]?.message ??
-          'An unexpected error occurred',
+          (isInternalServerError
+            ? 'Something went wrong on our end — please try again in a moment.'
+            : (firstError?.message ?? 'An unexpected error occurred')),
       );
 
       const isExpectedError = error.errors.every((e) =>
