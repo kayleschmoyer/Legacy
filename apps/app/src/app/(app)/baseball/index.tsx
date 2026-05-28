@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Alert, ImageBackground, Modal } from 'react-native';
-import { NavigationProp } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import {
   Button,
@@ -18,17 +17,7 @@ import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useGetUserLeaguesQuery } from '../../../api/db/graphql.generated';
 
-type RootStackParamList = {
-  LeagueHome: { leagueName: string };
-};
-
-interface BaseballHomeProps {
-  navigation: NavigationProp<RootStackParamList>;
-}
-
-export default function BaseballHome({
-  navigation: _navigation,
-}: BaseballHomeProps) {
+export default function BaseballHome() {
   const [modalVisible, setModalVisible] = useState(false);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState('');

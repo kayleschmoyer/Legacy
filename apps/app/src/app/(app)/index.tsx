@@ -1,24 +1,14 @@
 import React from 'react';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter } from 'expo-router';
 import { Button, H1, ScrollView, Text, XStack, YStack } from 'tamagui';
 
 const sports = [
-  { name: 'Football', route: 'Football' as const },
-  { name: 'Baseball', route: 'Baseball' as const },
+  { name: 'Football', route: '/football' as const },
+  { name: 'Baseball', route: '/baseball' as const },
 ];
 
-type RootStackParamList = {
-  Home: undefined;
-  Football: undefined;
-  Baseball: undefined;
-  About: undefined;
-};
-
-type NavigationProp = StackNavigationProp<RootStackParamList>;
-
 export default function Home() {
-  const navigation = useNavigation<NavigationProp>();
+  const router = useRouter();
 
   return (
     <ScrollView testID="home-screen" contentContainerStyle={{ flexGrow: 1 }}>
@@ -54,7 +44,7 @@ export default function Home() {
               padding="$5"
               width="45%"
               marginBottom="$5"
-              onPress={() => navigation.navigate(sport.route)}
+              onPress={() => router.push(sport.route)}
             >
               <Text color="$color" fontSize="$6" fontWeight="600">
                 {sport.name}
@@ -72,7 +62,7 @@ export default function Home() {
           padding="$4"
           width="100%"
           marginTop="$4"
-          onPress={() => navigation.navigate('About')}
+          onPress={() => router.push('/about')}
         >
           <YStack>
             <Text color="$color" fontSize="$5" fontWeight="600">

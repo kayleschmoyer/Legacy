@@ -122,10 +122,6 @@ const MOCK_LEAGUES = [
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('BaseballHome', () => {
-  const defaultNavigation = { navigate: jest.fn() } as unknown as Parameters<
-    typeof BaseballHome
-  >[0]['navigation'];
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseGetUserLeaguesQuery.mockReturnValue({
@@ -136,24 +132,24 @@ describe('BaseballHome', () => {
 
   describe('rendering', () => {
     it('renders the hero section', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByText('Baseball Fantasy')).toBeTruthy();
       expect(screen.getByText('Where Legends Are Made')).toBeTruthy();
     });
 
     it('renders league management buttons', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByText('Create New League')).toBeTruthy();
       expect(screen.getByText('Join League')).toBeTruthy();
     });
 
     it('renders the Invite Friends button', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByText('Invite Friends')).toBeTruthy();
     });
 
     it('renders section headers', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByText('Manage Your Leagues')).toBeTruthy();
       expect(screen.getByText('Your Current Leagues')).toBeTruthy();
     });
@@ -161,13 +157,13 @@ describe('BaseballHome', () => {
 
   describe('league list', () => {
     it('renders all user leagues', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByText('Fantasy Legends')).toBeTruthy();
       expect(screen.getByText('Slugger League')).toBeTruthy();
     });
 
     it('renders league links with correct league IDs', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByTestId('link-league-1')).toBeTruthy();
       expect(screen.getByTestId('link-league-2')).toBeTruthy();
     });
@@ -177,7 +173,7 @@ describe('BaseballHome', () => {
         data: null,
         loading: true,
       });
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(screen.getByTestId('spinner')).toBeTruthy();
     });
 
@@ -186,7 +182,7 @@ describe('BaseballHome', () => {
         data: { userLeagues: [] },
         loading: false,
       });
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       // With empty leagues array, the map renders nothing
       expect(screen.queryByText('Fantasy Legends')).toBeNull();
       expect(screen.queryByText('Slugger League')).toBeNull();
@@ -195,7 +191,7 @@ describe('BaseballHome', () => {
 
   describe('user leagues query', () => {
     it('passes skip option based on user authentication', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({
         skip: false,
       });
@@ -204,7 +200,7 @@ describe('BaseballHome', () => {
 
   describe('create league modal', () => {
     it('opens create league modal when Create New League is pressed', () => {
-      render(<BaseballHome navigation={defaultNavigation} />);
+      render(<BaseballHome />);
       fireEvent.press(
         screen.getByRole('button', { name: 'Create New League' }),
       );

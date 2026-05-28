@@ -5,7 +5,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft, MessageSquare, Send, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';

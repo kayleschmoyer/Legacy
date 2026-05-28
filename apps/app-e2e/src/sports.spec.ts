@@ -127,7 +127,7 @@ describe('Sports Feature Infrastructure', () => {
       expect(content).toContain('Fantasy Sports Hub');
       expect(content).toContain("name: 'Football'");
       expect(content).toContain("name: 'Baseball'");
-      expect(content).toContain('navigation.navigate');
+      expect(content).toContain('router.push');
     });
   });
 });
