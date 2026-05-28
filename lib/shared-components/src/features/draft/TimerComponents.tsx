@@ -37,7 +37,7 @@ export function useTimer({
   const colorAnim = useRef(new Animated.Value(1) as AnimatedValue).current;
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (isActive && time > 0) {
       interval = setInterval(() => {
