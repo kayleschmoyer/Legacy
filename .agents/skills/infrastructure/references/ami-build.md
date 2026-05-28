@@ -6,20 +6,20 @@ The self-hosted GitHub Actions runners use a pre-baked Ubuntu 22.04 AMI built wi
 
 ### Baked-in tools
 
-| Tool                  | Version                                       | Purpose                                             |
-| --------------------- | --------------------------------------------- | --------------------------------------------------- |
-| Node.js               | 22                                            | JS runtime                                          |
-| pnpm                  | 9.12.1                                        | Package manager                                     |
-| Playwright + Chromium | 1.59.1                                        | E2E tests (installed at `/opt/playwright-browsers`) |
-| serve                 | 14.2.4                                        | Static file server for Playwright shards            |
-| Terraform             | 1.14.0                                        | Infrastructure-as-code                              |
-| uv                    | latest                                        | Python package manager (skill linting)              |
-| Snyk CLI              | 1.1293.1                                      | Security scanning                                   |
-| Docker Engine         | 28.1.1                                        | Container-based Actions (e.g. osv-scanner-action)   |
-| GitHub CLI (`gh`)     | latest stable                                 | PR operations, artifact management                  |
-| AWS CLI v2            | latest                                        | AWS operations                                      |
-| Java 17               | openjdk-17-jre-headless                       | Android SDK tooling (sdkmanager is JVM-based)       |
-| Android SDK           | API 36, build-tools 36.0.0, NDK 27.1.12297006 | Mobile CI (API level tracks apps/app Expo SDK)      |
+| Tool                  | Version                                                | Purpose                                                                                             |
+| --------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Node.js               | 22                                                     | JS runtime                                                                                          |
+| pnpm                  | 9.12.1                                                 | Package manager                                                                                     |
+| Playwright + Chromium | 1.59.1                                                 | E2E tests (installed at `/opt/playwright-browsers`)                                                 |
+| serve                 | 14.2.4                                                 | Static file server for Playwright shards                                                            |
+| Terraform             | 1.14.0                                                 | Infrastructure-as-code                                                                              |
+| uv                    | latest                                                 | Python package manager (skill linting)                                                              |
+| Snyk CLI              | 1.1293.1                                               | Security scanning                                                                                   |
+| Docker Engine         | 28.1.1                                                 | Container-based Actions (e.g. osv-scanner-action)                                                   |
+| GitHub CLI (`gh`)     | latest stable                                          | PR operations, artifact management                                                                  |
+| AWS CLI v2            | latest                                                 | AWS operations                                                                                      |
+| Java 17               | openjdk-17-jre-headless                                | Android SDK tooling (sdkmanager is JVM-based)                                                       |
+| Android SDK           | API 36, build-tools 36.0.0 + 35.0.0, NDK 27.1.12297006 | Mobile CI (API level tracks apps/app Expo SDK; build-tools 35.0.0 is the AGP-pinned compat version) |
 
 > Some tool versions are pinned in `terraform/runners/packer/runner-ami.pkr.hcl`; entries marked `latest` or `latest stable` are installed at whatever version is current at build time, so the AMI can drift across rebuilds. Keep `playwright_version` in sync with the **resolved** `@playwright/test` version used by the repo — check the lockfile rather than `package.json` if it uses a caret range. A mismatch causes CI to re-download browsers on every run.
 >

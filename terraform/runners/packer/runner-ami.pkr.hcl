@@ -59,8 +59,21 @@ variable "android_api_level" {
 
 variable "android_build_tools_version" {
   type = string
-  # Pair with android_api_level — Expo SDK 54 / AGP 8.x expects build-tools 36.0.0.
+  # Primary build-tools version — used for the PATH export, the AMI tag, the
+  # /etc/legacy-sports-runner-version embed, and the verify-env-contract
+  # landmark. Forward-looking 36.0.0.
   default = "36.0.0"
+}
+
+variable "android_build_tools_version_compat" {
+  type = string
+  # Expo SDK 54 / AGP pins buildToolsVersion = 35.0.0 even though
+  # compileSdkVersion = 36 (the two are independent). LS-5032 swapped 35.0.0
+  # out for 36.0.0 and broke the Android build — AGP requested build-tools
+  # 35.0.0 and couldn't self-install into the read-only /opt/android-sdk
+  # (LS-5033). We bake BOTH: 35.0.0 (what AGP pins today) and 36.0.0
+  # (forward-looking). Drop this compat var once Expo's AGP pin moves to 36.0.0.
+  default = "35.0.0"
 }
 
 variable "android_ndk_version" {
@@ -453,7 +466,10 @@ build {
       "sudo mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest",
       "rm /tmp/cmdline-tools.zip",
       "yes | sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1",
-      "sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platform-tools' 'platforms;android-${var.android_api_level}' 'build-tools;${var.android_build_tools_version}' 'ndk;${var.android_ndk_version}'",
+      # Install BOTH build-tools versions: the compat one Expo/AGP pins today
+      # (35.0.0) and the forward-looking primary (36.0.0). See the
+      # android_build_tools_version_compat variable comment (LS-5033).
+      "sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platform-tools' 'platforms;android-${var.android_api_level}' 'build-tools;${var.android_build_tools_version}' 'build-tools;${var.android_build_tools_version_compat}' 'ndk;${var.android_ndk_version}'",
       "sudo chmod -R a+rX $ANDROID_HOME",
       # Set ANDROID_HOME globally so login shells and Gradle pick it up
       "echo 'export ANDROID_HOME=/opt/android-sdk' | sudo tee /etc/profile.d/android-sdk.sh",
