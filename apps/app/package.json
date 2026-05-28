@@ -12,7 +12,12 @@
   },
   "dependencies": {
     "@expo/metro-config": "~56.0.13",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/rollbar": "workspace:*",
+    "@legacy-sports/scoring": "workspace:*",
+    "@legacy-sports/shared-components": "workspace:*",
     "@legacy-sports/tamagui-config": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
     "@react-native-firebase/analytics": "^23.8.8",
     "@react-native-firebase/app": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.2",

@@ -754,9 +754,24 @@ importers:
       '@expo/metro-config':
         specifier: ~56.0.13
         version: 56.0.13(bufferutil@4.1.0)(expo@56.0.6)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../../lib/logging
+      '@legacy-sports/rollbar':
+        specifier: workspace:*
+        version: link:../../lib/rollbar
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../../lib/scoring
+      '@legacy-sports/shared-components':
+        specifier: workspace:*
+        version: link:../../lib/shared-components
       '@legacy-sports/tamagui-config':
         specifier: workspace:*
         version: link:../../lib/tamagui-config
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../../lib/utils
       '@react-native-firebase/analytics':
         specifier: ^23.8.8
         version: 23.8.8(@react-native-firebase/app@23.8.8(expo@56.0.6)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))
