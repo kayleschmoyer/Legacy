@@ -49,13 +49,18 @@ variable "snyk_version" {
 }
 
 variable "android_api_level" {
-  type    = string
-  default = "35"
+  type = string
+  # Must cover apps/app's Expo SDK compileSdkVersion/targetSdkVersion. Expo SDK
+  # 54 (apps/app/package.json "expo": "^54") requires android-36. The Android
+  # Gradle Plugin cannot auto-install a missing platform at job time because
+  # /opt/android-sdk is root-owned + read-only to the runner user (LS-5032).
+  default = "36"
 }
 
 variable "android_build_tools_version" {
-  type    = string
-  default = "35.0.0"
+  type = string
+  # Pair with android_api_level — Expo SDK 54 / AGP 8.x expects build-tools 36.0.0.
+  default = "36.0.0"
 }
 
 variable "android_ndk_version" {

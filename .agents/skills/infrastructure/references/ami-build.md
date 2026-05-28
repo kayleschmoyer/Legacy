@@ -19,7 +19,7 @@ The self-hosted GitHub Actions runners use a pre-baked Ubuntu 22.04 AMI built wi
 | GitHub CLI (`gh`)     | latest stable                                 | PR operations, artifact management                  |
 | AWS CLI v2            | latest                                        | AWS operations                                      |
 | Java 17               | openjdk-17-jre-headless                       | Android SDK tooling (sdkmanager is JVM-based)       |
-| Android SDK           | API 35, build-tools 35.0.0, NDK 27.1.12297006 | Mobile CI                                           |
+| Android SDK           | API 36, build-tools 36.0.0, NDK 27.1.12297006 | Mobile CI (API level tracks apps/app Expo SDK)      |
 
 > Some tool versions are pinned in `terraform/runners/packer/runner-ami.pkr.hcl`; entries marked `latest` or `latest stable` are installed at whatever version is current at build time, so the AMI can drift across rebuilds. Keep `playwright_version` in sync with the **resolved** `@playwright/test` version used by the repo — check the lockfile rather than `package.json` if it uses a caret range. A mismatch causes CI to re-download browsers on every run.
 >
