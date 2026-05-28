@@ -90,7 +90,7 @@ variable "android_cmdline_tools_build" {
 variable "gradle_version" {
   type        = string
   description = "Gradle distribution version pre-baked into ~/.gradle/wrapper/dists/. MUST match the version pinned in apps/app/android/gradle/wrapper/gradle-wrapper.properties — if it drifts, the wrapper will redownload at build time (cache miss, ~150MB). Bump together with the gradle-wrapper.properties pin."
-  default     = "8.14.3"
+  default     = "9.3.1"
 }
 
 variable "android_cmdline_tools_sha256" {

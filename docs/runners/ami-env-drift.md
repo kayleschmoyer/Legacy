@@ -64,7 +64,7 @@ disk, and vice versa.
 | `android_build_tools_version` | `36.0.0`        | Android `build-tools/36.0.0` (+ `build-tools/35.0.0` via `android_build_tools_version_compat`, the version Expo 54/AGP pins — LS-5033) | Path appended in `/etc/profile.d/android-sdk.sh` (login shell only — see drift entry below)                         |
 | `android_ndk_version`         | `27.1.12297006` | Android NDK                                                                                                                            | No explicit env export — under `$ANDROID_HOME/ndk/`                                                                 |
 | `android_cmdline_tools_build` | `14742923`      | `sdkmanager`, `avdmanager`                                                                                                             | Path appended in `/etc/profile.d/android-sdk.sh` (login shell only)                                                 |
-| `gradle_version`              | `8.14.3`        | Pre-baked wrapper dist at `~/.gradle/wrapper/dists/gradle-8.14.3-bin/<hash>/`                                                          | No env export — wrapper reads `$GRADLE_USER_HOME`, derived from `$HOME`                                             |
+| `gradle_version`              | `9.3.1`         | Pre-baked wrapper dist at `~/.gradle/wrapper/dists/gradle-9.3.1-bin/<hash>/`                                                           | No env export — wrapper reads `$GRADLE_USER_HOME`, derived from `$HOME`                                             |
 
 ### Literal env exports (Packer-written files)
 
@@ -167,7 +167,7 @@ All Packer-baked paths verified present with expected ownership:
 - ✅ `/opt/android-sdk/platform-tools` — has `adb`, `fastboot`
 - ✅ `/opt/actions-runner` (**ubuntu:ubuntu 755**) — LS-4936 pre-create succeeded
 - ✅ `/opt/actions-runner/.env` (ubuntu:root 644, **89 bytes**) — file exists, content clobbered (see above)
-- ✅ `/home/ubuntu/.gradle/wrapper/dists/gradle-8.14.3-bin/` — LS-4934 pre-bake succeeded
+- ✅ `/home/ubuntu/.gradle/wrapper/dists/gradle-9.3.1-bin/` — LS-4934 pre-bake succeeded (bumped to 9.3.1 in LS-5036)
 - ✅ `/usr/lib/jvm/java-17-openjdk-amd64`
 - ✅ `/usr/local/bin/{terraform,snyk,aws,uv}`
 
