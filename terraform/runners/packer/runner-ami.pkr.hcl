@@ -470,7 +470,14 @@ build {
       # (35.0.0) and the forward-looking primary (36.0.0). See the
       # android_build_tools_version_compat variable comment (LS-5033).
       "sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platform-tools' 'platforms;android-${var.android_api_level}' 'build-tools;${var.android_build_tools_version}' 'build-tools;${var.android_build_tools_version_compat}' 'ndk;${var.android_ndk_version}'",
-      "sudo chmod -R a+rX $ANDROID_HOME",
+      # LS-5034: AGP 8.x revalidates the SDK on every build and writes install-properties
+      # markers under $ANDROID_HOME (build-tools/<v>/package.xml mtime, .knownPackages, etc.).
+      # A root-owned a+rX SDK makes that write fail and AGP then falls through to a
+      # re-install attempt that dies with SDK directory is not writable -- even when
+      # the requested build-tools is already present (LS-5032/LS-5033). Give the runner
+      # user ownership so AGP metadata writes succeed; group/other stay read-only.
+      "sudo chown -R ubuntu:ubuntu $ANDROID_HOME",
+      "sudo chmod -R u+rwX,go+rX $ANDROID_HOME",
       # Set ANDROID_HOME globally so login shells and Gradle pick it up
       "echo 'export ANDROID_HOME=/opt/android-sdk' | sudo tee /etc/profile.d/android-sdk.sh",
       "echo 'export PATH=$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/build-tools/${var.android_build_tools_version}' | sudo tee -a /etc/profile.d/android-sdk.sh",
