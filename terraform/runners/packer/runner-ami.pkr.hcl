@@ -522,7 +522,13 @@ build {
   #
   # This file is the single source of truth that the verify-env-contract
   # post-provisioner below asserts against.
+  #
+  # `inline_shebang = "/bin/bash -e"` is required because the embedded
+  # heredoc uses `set -euo pipefail` (bash-only — dash, Ubuntu's default
+  # /bin/sh, rejects `-o pipefail` with "Illegal option"). Packer's default
+  # inline shebang is /bin/sh -e, which is dash on Ubuntu.
   provisioner "shell" {
+    inline_shebang = "/bin/bash -e"
     environment_vars = [
       "NODE_VERSION=${var.node_version}",
       "PNPM_VERSION=${var.pnpm_version}",
@@ -593,7 +599,12 @@ build {
   # Failing this check fails the Packer build, which means a broken AMI
   # never reaches the runner fleet. New drift cases extend the table below;
   # this is the single source of truth for the build-time contract.
+  #
+  # `inline_shebang = "/bin/bash -e"` — same reason as the embed-runner-version
+  # provisioner above: the heredoc uses `set -euo pipefail` and bash arrays/
+  # functions, neither of which work under dash.
   provisioner "shell" {
+    inline_shebang = "/bin/bash -e"
     environment_vars = [
       "EXPECT_NODE_MAJOR=${var.node_version}",
       "EXPECT_PNPM=${var.pnpm_version}",
