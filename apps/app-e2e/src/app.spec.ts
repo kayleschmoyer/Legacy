@@ -45,7 +45,7 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
       const layoutPath = path.join(APP_ROOT, 'app/(app)/_layout.tsx');
       const content = fs.readFileSync(layoutPath, 'utf8');
 
-      expect(content).toContain('createDrawerNavigator');
+      expect(content).toContain("from 'expo-router/drawer'");
       expect(content).toContain("title: 'Home'");
       expect(content).toContain("title: 'Football'");
       expect(content).toContain("title: 'Baseball'");

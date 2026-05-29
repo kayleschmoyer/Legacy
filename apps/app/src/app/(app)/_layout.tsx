@@ -1,8 +1,5 @@
 import { Redirect, useRouter } from 'expo-router';
-import {
-  createDrawerNavigator,
-  DrawerContentComponentProps,
-} from '@react-navigation/drawer';
+import { Drawer } from 'expo-router/drawer';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, XStack, YStack } from 'tamagui';
@@ -11,41 +8,10 @@ import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { LOGGER } from '@legacy-sports/logging';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 
-import BaseballHome from './baseball';
-import DraftBoardPage from './DraftBoardPage';
-import FootballHome from './football';
-import FootballPlayers from './football/players';
-import LeagueDiscoveryScreen from './league-discovery';
-import SeasonDraftGamesScreen from './season-draft';
-import SeasonDraftGameScreen from './season-draft/[gameId]';
-import SeasonDraftGameCreateScreen from './season-draft/create';
-import PlayerDetail from './PlayerDetail';
-import PlayerStats from './PlayerStats';
-import ViewCareerStats from './view_career_stats';
-import ViewGameLogs from './view_game_logs';
-import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
-import FootballLeagueId, {
-  FootballLeagueIdHeader,
-} from './football/league/[leagueId]';
-import LeagueCreatePage from './baseball/league/create';
-import FootballLeagueCreatePage from './football/league/create';
-import JoinLeagueByCode from './baseball/league/join';
-import JoinFootballLeagueByCode from './football/league/join';
-import MatchupDetail from './baseball/matchup';
-import FootballMatchupDetail from './football/matchup';
-import Team, { TeamIdHeader } from './baseball/team/[teamId]';
-import FootballTeam, { FootballTeamHeader } from './football/team/[teamId]';
-import FreeAgents from './FreeAgents';
-import TradeCenterPage from './TradeCenterPage';
-import DirectMessagesScreen from './DirectMessages';
-import ManagementScreen from './management';
-import AboutScreen from './about';
-import HelpScreen from './help';
-import ProfileSettingsScreen from './profile-settings';
-import PreferencesScreen from './preferences';
-import NotificationsScreen from './notifications';
-import SubscriptionSettingsScreen from './subscription-settings';
-import UpdateCheckScreen from './update-check';
+import { LeagueIdHeader } from './baseball/league/[leagueId]';
+import { FootballLeagueIdHeader } from './football/league/[leagueId]';
+import { TeamIdHeader } from './baseball/team/[teamId]';
+import { FootballTeamHeader } from './football/team/[teamId]';
 import {
   useDisableDeviceTokenMutation,
   useGetUnreadNotificationCountQuery,
@@ -57,7 +23,6 @@ import {
 } from '../../common/auth/AuthHooks';
 import { usePushNotifications } from '../../features/notifications/hooks/usePushNotifications';
 import { isPhysicalDevice } from '../../common/utilities/DeviceUtils';
-import Home from '.';
 
 export type AppDrawerParamList = {
   index: undefined;
@@ -96,7 +61,9 @@ export type AppDrawerParamList = {
   'update-check': undefined;
 };
 
-const { Navigator, Screen } = createDrawerNavigator<AppDrawerParamList>();
+interface DrawerNavigationLike {
+  closeDrawer: () => void;
+}
 
 interface Route {
   title: string;
@@ -202,9 +169,9 @@ const ROUTES = Object.freeze<Route[]>([
     : []),
 ]);
 
-function CustomDrawerContent(
-  props: DrawerContentComponentProps,
-): React.JSX.Element {
+function CustomDrawerContent(props: {
+  navigation: DrawerNavigationLike;
+}): React.JSX.Element {
   const router = useRouter();
   const { logout } = useAuthHandlers();
   const [disableDeviceToken] = useDisableDeviceTokenMutation();
@@ -315,8 +282,8 @@ export default function Layout() {
   return (
     <AuthorizedUserContextProvider>
       <GestureHandlerRootView testID="gesture-handler" style={{ flex: 1 }}>
-        <Navigator
-          drawerContent={(props: DrawerContentComponentProps) => (
+        <Drawer
+          drawerContent={(props: { navigation: DrawerNavigationLike }) => (
             <CustomDrawerContent {...props} />
           )}
           screenOptions={{
@@ -325,197 +292,153 @@ export default function Layout() {
             },
           }}
         >
-          <Screen
+          <Drawer.Screen
             name="index"
             options={{
               drawerLabel: 'Home',
               title: '',
             }}
-            component={Home}
           />
-          <Screen name="view_game_logs" component={ViewGameLogs} />
-          <Screen name="view_career_stats" component={ViewCareerStats} />
-          <Screen
+          <Drawer.Screen name="view_game_logs" />
+          <Drawer.Screen name="view_career_stats" />
+          <Drawer.Screen
             name="football/index"
             options={{ title: 'Football Home' }}
-            component={FootballHome}
           />
-          <Screen
+          <Drawer.Screen
             name="football/players"
             options={{ title: 'Football Players' }}
-            component={FootballPlayers}
           />
-          <Screen
+          <Drawer.Screen
             name="football/league/create"
             options={{
               drawerLabel: () => null,
               headerShown: true,
               headerTitle: 'Create Football League',
             }}
-            component={FootballLeagueCreatePage}
           />
-          <Screen
+          <Drawer.Screen
             name="baseball/index"
             options={{ title: 'Baseball Home' }}
-            component={BaseballHome}
           />
-          <Screen
+          <Drawer.Screen
             name="baseball/league/create"
             options={{
               drawerLabel: () => null,
               headerShown: true,
               headerTitle: 'Create League',
             }}
-            component={LeagueCreatePage}
           />
-          <Screen
+          <Drawer.Screen
             name="baseball/league/[leagueId]"
             options={{ headerTitle: LeagueIdHeader }}
-            component={LeagueId}
           />
-          <Screen
+          <Drawer.Screen
             name="football/league/[leagueId]"
             options={{ headerTitle: FootballLeagueIdHeader }}
-            component={FootballLeagueId}
           />
-          <Screen
+          <Drawer.Screen
             name="baseball/team/[teamId]"
             options={{
               drawerLabel: () => null,
               headerShown: true,
               headerTitle: () => <TeamIdHeader />,
             }}
-            component={Team}
           />
-          <Screen
+          <Drawer.Screen
             name="football/team/[teamId]"
             options={{
               drawerLabel: () => null,
               headerShown: true,
               headerTitle: () => <FootballTeamHeader />,
             }}
-            component={FootballTeam}
           />
-          <Screen
+          <Drawer.Screen
             name="DraftBoardPage"
             options={{ title: 'Draft Board' }}
-            component={DraftBoardPage}
           />
-          <Screen
+          <Drawer.Screen
             name="season-draft/index"
             options={{ title: 'Season Draft Games' }}
-            component={SeasonDraftGamesScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="season-draft/[gameId]"
             options={{
               drawerLabel: () => null,
               title: 'Season Draft Game',
             }}
-            component={SeasonDraftGameScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="season-draft/create"
             options={{
               drawerLabel: () => null,
               title: 'Create Season Draft Game',
             }}
-            component={SeasonDraftGameCreateScreen}
           />
-          <Screen
-            name="FreeAgents"
-            options={{ title: 'Free Agents' }}
-            component={FreeAgents}
-          />
-          <Screen
+          <Drawer.Screen name="FreeAgents" options={{ title: 'Free Agents' }} />
+          <Drawer.Screen
             name="TradeCenterPage"
             options={{ title: 'Trade Center' }}
-            component={TradeCenterPage}
           />
-          <Screen
+          <Drawer.Screen
             name="PlayerStats"
             options={{ title: 'Player Statistics' }}
-            component={PlayerStats}
           />
-          <Screen
+          <Drawer.Screen
             name="PlayerDetail"
             options={{ title: 'Player Details' }}
-            component={PlayerDetail}
           />
-          <Screen
+          <Drawer.Screen
             name="DirectMessages"
             options={{ title: 'Messages' }}
-            component={DirectMessagesScreen}
           />
-          <Screen
-            name="management"
-            options={{ title: 'Management' }}
-            component={ManagementScreen}
-          />
-          <Screen
+          <Drawer.Screen name="management" options={{ title: 'Management' }} />
+          <Drawer.Screen
             name="baseball/league/join"
             options={{ title: 'Join League' }}
-            component={JoinLeagueByCode}
           />
-          <Screen
+          <Drawer.Screen
             name="football/league/join"
             options={{ title: 'Join Football League' }}
-            component={JoinFootballLeagueByCode}
           />
-          <Screen
+          <Drawer.Screen
             name="league-discovery"
             options={{ title: 'Browse Leagues' }}
-            component={LeagueDiscoveryScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="baseball/matchup"
             options={{ drawerLabel: () => null, title: 'Matchup Detail' }}
-            component={MatchupDetail}
           />
-          <Screen
+          <Drawer.Screen
             name="football/matchup"
             options={{ drawerLabel: () => null, title: 'Matchup Detail' }}
-            component={FootballMatchupDetail}
           />
-          <Screen
-            name="about"
-            options={{ title: 'About' }}
-            component={AboutScreen}
-          />
-          <Screen
-            name="help"
-            options={{ title: 'Help & Support' }}
-            component={HelpScreen}
-          />
-          <Screen
+          <Drawer.Screen name="about" options={{ title: 'About' }} />
+          <Drawer.Screen name="help" options={{ title: 'Help & Support' }} />
+          <Drawer.Screen
             name="profile-settings"
             options={{ title: 'Profile Settings' }}
-            component={ProfileSettingsScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="preferences"
             options={{ title: 'Preferences' }}
-            component={PreferencesScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="notifications"
             options={{ title: 'Notifications' }}
-            component={NotificationsScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="subscription-settings"
             options={{
               drawerLabel: () => null,
               title: 'Subscription & Billing',
             }}
-            component={SubscriptionSettingsScreen}
           />
-          <Screen
+          <Drawer.Screen
             name="update-check"
             options={{ title: 'Check for Updates' }}
-            component={UpdateCheckScreen}
           />
-        </Navigator>
+        </Drawer>
       </GestureHandlerRootView>
     </AuthorizedUserContextProvider>
   );

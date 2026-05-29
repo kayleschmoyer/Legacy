@@ -55,49 +55,46 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
-// Mock @react-navigation/drawer
+// Mock expo-router/drawer
 const mockCloseDrawer = jest.fn();
 
-jest.mock('@react-navigation/drawer', () => {
+jest.mock('expo-router/drawer', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View, Text } = require('react-native') as RNComponents;
 
-  return {
-    createDrawerNavigator: () => ({
-      Navigator: ({
-        children,
-        drawerContent,
-      }: {
-        children: React.ReactNode;
-        drawerContent?: (props: MockDrawerContentProps) => React.ReactNode;
-        screenOptions?: Record<string, unknown>;
-      }) => (
-        <View testID="drawer-navigator">
-          {drawerContent?.({
-            navigation: {
-              closeDrawer: mockCloseDrawer,
-              navigate: jest.fn(),
-            },
-            state: { routes: [], index: 0 },
-            descriptors: {},
-          })}
-          {children}
-        </View>
-      ),
-      Screen: ({
-        name,
-        component: _component,
-      }: {
-        name: string;
-        component: React.ComponentType;
-        options?: Record<string, unknown>;
-      }) => (
-        <View testID={`screen-${name}`}>
-          <Text>{name}</Text>
-        </View>
-      ),
-    }),
-  };
+  const Drawer = ({
+    children,
+    drawerContent,
+  }: {
+    children: React.ReactNode;
+    drawerContent?: (props: MockDrawerContentProps) => React.ReactNode;
+    screenOptions?: Record<string, unknown>;
+  }) => (
+    <View testID="drawer-navigator">
+      {drawerContent?.({
+        navigation: {
+          closeDrawer: mockCloseDrawer,
+          navigate: jest.fn(),
+        },
+        state: { routes: [], index: 0 },
+        descriptors: {},
+      })}
+      {children}
+    </View>
+  );
+
+  Drawer.Screen = ({
+    name,
+  }: {
+    name: string;
+    options?: Record<string, unknown>;
+  }) => (
+    <View testID={`screen-${name}`}>
+      <Text>{name}</Text>
+    </View>
+  );
+
+  return { Drawer };
 });
 
 // Mock expo-notifications

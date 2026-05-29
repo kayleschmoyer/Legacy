@@ -26,7 +26,6 @@ describe('Sports Feature Infrastructure', () => {
 
       expect(content).toContain("title: 'Football'");
       expect(content).toContain('name="football/index"');
-      expect(content).toContain('FootballHome');
     });
   });
 
@@ -45,7 +44,6 @@ describe('Sports Feature Infrastructure', () => {
 
       expect(content).toContain("title: 'Baseball'");
       expect(content).toContain('name="baseball/index"');
-      expect(content).toContain('BaseballHome');
     });
 
     it('should have league management screens', () => {
