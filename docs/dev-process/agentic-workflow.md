@@ -34,7 +34,7 @@ Neither gate may be skipped to "save time".
 | 7   | Draft PR         | [`pr-lifecycle`](../../.agents/skills/pr-lifecycle/SKILL.md)                                                                                                                                    |
 | 8   | Mark ready       | [`workflow-overview` Phase 2](../../.agents/skills/workflow-overview/SKILL.md#phase-2-pr-creation)                                                                                              |
 | 9   | CI pipeline      | [`workflow-overview` Phase 3](../../.agents/skills/workflow-overview/SKILL.md#phase-3-ci-pipeline) · [ci-checks-reference](../../.agents/skills/pr-lifecycle/references/ci-checks-reference.md) |
-| 10  | Bot review       | [Author Agent Contract](../../AGENTS.md#author-agent-contract-bot-pr-flow)                                                                                                                      |
+| 10  | Bot review       | [Author Agent Contract](../../.agents/skills/pr-lifecycle/SKILL.md#author-agent-contract-bot-pr-flow)                                                                                           |
 | 11  | Watch to merge   | [`workflow-overview` Phase 5–6](../../.agents/skills/workflow-overview/SKILL.md#phase-5-jira-branch-sync-jira-branch-syncyml)                                                                   |
 | 12  | Merge queue      | [`workflow-overview` Phase 6](../../.agents/skills/workflow-overview/SKILL.md#phase-6-merge-queue-merge-queueyml)                                                                               |
 | 13  | Post-merge       | [`workflow-overview` Phase 7](../../.agents/skills/workflow-overview/SKILL.md#phase-7-post-merge)                                                                                               |
@@ -53,7 +53,7 @@ After the PR is marked ready, the Code Reviewer Bot drives a structured review l
 | Cycle 2  | `FIX: <sha>` only                          | If the bot returns LGTM with no new findings, **stop** — do not post anything.                    |
 | Cycle 3+ | `FIX: <sha>` · `CANNOT-COMPLY: <issue-id>` | `CANNOT-COMPLY` escalates to a human; resolve `FIX:` threads, leave `CANNOT-COMPLY` threads open. |
 
-The full contract — including format errors, override labels (`review-bot-override`, `security-review-override`), and the no-edit-bot-comments rule — lives in [`AGENTS.md` § Author Agent Contract](../../AGENTS.md#author-agent-contract-bot-pr-flow).
+The full contract — including format errors, override labels (`review-bot-override`, `security-review-override`), and the no-edit-bot-comments rule — lives in [`pr-lifecycle/SKILL.md` § Author Agent Contract](../../.agents/skills/pr-lifecycle/SKILL.md#author-agent-contract-bot-pr-flow).
 
 ## Common stop conditions
 
