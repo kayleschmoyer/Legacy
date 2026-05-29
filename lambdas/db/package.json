@@ -14,6 +14,7 @@
   "dependencies": {
     "@apollo/server": "*",
     "@as-integrations/aws-lambda": "*",
+    "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/mlb-client": "workspace:*",
     "@legacy-sports/scoring": "workspace:*",

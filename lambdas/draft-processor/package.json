@@ -8,6 +8,7 @@
     "serve": "node dist/index.js"
   },
   "dependencies": {
+    "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",

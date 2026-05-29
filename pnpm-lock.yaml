@@ -974,6 +974,9 @@ importers:
       '@as-integrations/aws-lambda':
         specifier: '*'
         version: 4.0.1(@apollo/server@5.5.0(graphql@16.13.2))
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../../lib/aws-utils
       '@legacy-sports/db-client':
         specifier: workspace:*
         version: link:../../lib/db-client
@@ -1026,6 +1029,9 @@ importers:
 
   lambdas/draft-processor:
     dependencies:
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../../lib/aws-utils
       '@legacy-sports/db-client':
         specifier: workspace:*
         version: link:../../lib/db-client
