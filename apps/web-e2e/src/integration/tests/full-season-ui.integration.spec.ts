@@ -25,6 +25,7 @@ import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { gqlFetch } from '../helpers/gql-fetch';
 import { graphqlOk } from '../helpers/graphql';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
@@ -380,20 +381,23 @@ test.describe
         'Unexpected Application Error',
       );
 
-      // After a completed draft the roster page should show:
-      // 1. Roster section headers (Pitching, Infield, Outfield)
+      // After a completed draft the roster page (RosterBoardV2) should show
+      // the three section cards: "Starting Hitters", "Starting Pitchers",
+      // and "Bench". Auto-draft → roster query can lag a render tick behind
+      // `waitForSeasonActive`, so reload until the first section appears.
+      await reloadUntilVisible(
+        page,
+        page.getByText('Starting Hitters', { exact: false }).first(),
+      );
       await expect(
-        page.getByText('Pitching', { exact: false }).first(),
-      ).toBeVisible({ timeout: 15000 });
-      await expect(
-        page.getByText('Infield', { exact: false }).first(),
+        page.getByText('Starting Pitchers', { exact: false }).first(),
       ).toBeVisible();
       await expect(
-        page.getByText('Outfield', { exact: false }).first(),
+        page.getByText('Bench', { exact: false }).first(),
       ).toBeVisible();
 
-      // 2. Player buttons prove positions are filled.
-      //    Accessible names: "Bob Hasty at SP", "Bill Fahey at C", etc.
+      // Player buttons prove positions are filled. The SlotRow aria-label
+      // is `${playerName} at ${posType}` (e.g. "Bob Hasty at SP").
       const playerButtons = page.getByRole('button', {
         name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH)$/i,
       });
