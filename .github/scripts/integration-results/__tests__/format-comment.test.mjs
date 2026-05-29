@@ -129,6 +129,96 @@ describe('format-comment.mjs (LS-4617)', () => {
     assert.equal(/drop\.integration\.spec\.ts/.test(out), false);
   });
 
+  it('matches --specs when the report stores config-dir-relative paths (LS-5049)', () => {
+    // Playwright writes `spec.file` relative to the config dir (`apps/web-e2e/`),
+    // but the workflow passes repo-root-relative paths via --specs. The filter
+    // must still line them up.
+    const reportPath = join(dir, 'config-relative.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        suites: [
+          {
+            file: 'src/integration/tests/foo.integration.spec.ts',
+            specs: [
+              {
+                file: 'src/integration/tests/foo.integration.spec.ts',
+                title: 't',
+                tests: [{ results: [{ status: 'passed', duration: 42 }] }],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const out = run(reportPath, [
+      '--specs',
+      'apps/web-e2e/src/integration/tests/foo.integration.spec.ts',
+    ]);
+    assert.match(
+      out,
+      /spec: apps\/web-e2e\/src\/integration\/tests\/foo\.integration\.spec\.ts/,
+    );
+    assert.match(out, /status: passed/);
+  });
+
+  it('matches --specs when the report stores absolute paths (LS-5049)', () => {
+    const reportPath = join(dir, 'absolute.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        suites: [
+          {
+            specs: [
+              {
+                file: '/runner/work/legacy-sports/legacy-sports/apps/web-e2e/src/integration/tests/foo.integration.spec.ts',
+                title: 't',
+                tests: [{ results: [{ status: 'failed', duration: 5 }] }],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const out = run(reportPath, [
+      '--specs',
+      'apps/web-e2e/src/integration/tests/foo.integration.spec.ts',
+    ]);
+    assert.match(
+      out,
+      /spec: apps\/web-e2e\/src\/integration\/tests\/foo\.integration\.spec\.ts/,
+    );
+    assert.match(out, /status: failed/);
+  });
+
+  it('matches --specs when the report stores Windows-style backslash paths (LS-5049)', () => {
+    const reportPath = join(dir, 'windows.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        suites: [
+          {
+            specs: [
+              {
+                file: 'src\\integration\\tests\\foo.integration.spec.ts',
+                title: 't',
+                tests: [{ results: [{ status: 'passed', duration: 1 }] }],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const out = run(reportPath, [
+      '--specs',
+      'apps/web-e2e/src/integration/tests/foo.integration.spec.ts',
+    ]);
+    assert.match(
+      out,
+      /spec: apps\/web-e2e\/src\/integration\/tests\/foo\.integration\.spec\.ts/,
+    );
+  });
+
   it('emits an explanatory line when no specs match the filter', () => {
     const reportPath = join(dir, 'empty.json');
     writeFileSync(

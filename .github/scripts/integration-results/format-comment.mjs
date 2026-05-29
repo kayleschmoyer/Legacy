@@ -76,6 +76,37 @@ function collectSpecs(report) {
   return out;
 }
 
+/**
+ * Match Playwright report `spec.file` entries against the workflow-supplied
+ * `--specs` list. Playwright writes `spec.file` relative to the config dir
+ * (e.g. `src/integration/tests/foo.spec.ts`), while the workflow passes
+ * repo-root-relative paths (`apps/web-e2e/src/integration/tests/foo.spec.ts`),
+ * so a Set-membership check never matches. We normalize separators and use a
+ * bidirectional suffix check so any of {repo-relative, config-relative,
+ * absolute, basename-only} from either side lines up. Emitted blocks use the
+ * filter-side path so downstream consumers see the canonical repo-relative
+ * form.
+ *
+ * @param {Array<{ file: string, status: string, durationMs: number }>} specs
+ * @param {string[]} filterEntries
+ * @returns {Array<{ file: string, status: string, durationMs: number }>}
+ */
+function filterByTouchedSpecs(specs, filterEntries) {
+  const norm = (p) => p.replace(/\\/g, '/');
+  const out = [];
+  for (const filterEntry of filterEntries) {
+    const f = norm(filterEntry);
+    const match = specs.find((s) => {
+      const r = norm(s.file);
+      return r === f || r.endsWith('/' + f) || f.endsWith('/' + r);
+    });
+    if (match) {
+      out.push({ ...match, file: filterEntry });
+    }
+  }
+  return out;
+}
+
 function statusRank(status) {
   switch (status) {
     case 'failed':
@@ -151,17 +182,15 @@ function main() {
     typeof args['report-url'] === 'string' ? args['report-url'] : '';
   const specFilter =
     typeof args.specs === 'string'
-      ? new Set(
-          args.specs
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-        )
+      ? args.specs
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : null;
 
   const allSpecs = collapseByFile(collectSpecs(report));
   const specs = specFilter
-    ? allSpecs.filter((s) => specFilter.has(s.file))
+    ? filterByTouchedSpecs(allSpecs, specFilter)
     : allSpecs;
 
   const lines = ['## Integration Test Results', ''];
