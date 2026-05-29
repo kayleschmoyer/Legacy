@@ -754,6 +754,9 @@ importers:
       '@expo/metro-config':
         specifier: ~56.0.13
         version: 56.0.13(bufferutil@4.1.0)(expo@56.0.6)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../../lib/env-utilities
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
