@@ -285,7 +285,9 @@ export const TradesTab: React.FC<TradesTabProps> = ({
           title="Spectator Mode"
           sub="Join the league to propose, accept, and review trades."
         />
-        <Section title="Trading Center">
+        <Section
+          title={<span data-testid="trade-center-heading">Trading Center</span>}
+        >
           <Empty
             icon={<I.ArrowLeftRight size={32} />}
             title="Join this league to trade"
@@ -311,6 +313,9 @@ export const TradesTab: React.FC<TradesTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <h2 data-testid="trade-center-heading" className="ls-card-title">
+        Trading Center
+      </h2>
       <Section
         title="Pending Trade Offers"
         sub={

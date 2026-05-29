@@ -31,6 +31,7 @@
       "lambdas/draft-processor/**"
     ],
     "apps/web-e2e/src/integration/tests/full-season-ui.integration.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
       "apps/web/src/pages/draft/**",
       "apps/web/src/pages/management/**",
       "apps/web/src/pages/matchup/**",
@@ -41,6 +42,7 @@
       "lambdas/game-selection/**"
     ],
     "apps/web-e2e/src/integration/tests/full-season.integration.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
       "apps/web/src/pages/draft/**",
       "apps/web/src/pages/management/**",
       "apps/web/src/pages/matchup/**",
@@ -55,6 +57,7 @@
       "lambdas/oauth-proxy/**"
     ],
     "apps/web-e2e/src/integration/tests/league-activity-feed-ui.integration.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
       "apps/web/src/pages/management/**",
       "apps/web/src/components/league/**",
       "apps/web/src/features/management/**"
@@ -125,6 +128,7 @@
       "apps/web/src/components/common/**"
     ],
     "apps/web-e2e/src/integration/tests/trade-flow-ui.integration.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
       "apps/web/src/features/roster/**",
       "apps/web/src/components/roster/**",
       "apps/web/src/pages/management/**"
