@@ -10,7 +10,22 @@
       "Bash(aws sso logout*)",
       "Bash(gh auth login*)",
       "Bash(acli auth login*)",
-      "Bash(acli config auth*)"
+      "Bash(acli config auth*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.p12)",
+      "Read(**/*.p8)",
+      "Read(**/*.jks)",
+      "Read(**/*.mobileprovision)",
+      "Read(**/*.keystore)",
+      "Read(**/*.tfstate)",
+      "Read(**/*.tfstate.*)",
+      "Read(**/terraform.tfvars)",
+      "Read(resources/dev.dump)"
     ],
     "allow": [
       "mcp__legacy-sports-aws__aws_apigateway_inspect",
