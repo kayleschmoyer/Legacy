@@ -151,9 +151,6 @@ export * from './features/stats/CareerStatsViewer';
 // Navigation components
 export * from './navigation';
 
-// Enhanced components (final migration)
-export * from './navigation/TamaguiAppNavigator';
-
 // Real-time WebSocket hooks
 export * from './hooks/useWebSocket';
 

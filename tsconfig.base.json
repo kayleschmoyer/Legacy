@@ -64,9 +64,6 @@
       "@legacy-sports/shared-components/matchup": [
         "lib/shared-components/src/entry/matchup.ts"
       ],
-      "@legacy-sports/shared-components/navigation": [
-        "lib/shared-components/src/entry/navigation.ts"
-      ],
       "@legacy-sports/shared-components/players": [
         "lib/shared-components/src/entry/players.ts"
       ],
