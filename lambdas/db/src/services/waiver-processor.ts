@@ -11,7 +11,7 @@ import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
-import type { SportKind } from '@legacy-sports/utils/positions';
+import type { SportKind } from '@legacy-sports/utils';
 import {
   getDiscordWebhookUrls,
   notifyDiscordWaiverClaim,

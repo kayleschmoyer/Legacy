@@ -6,7 +6,7 @@ import {
   OFFENSIVE_POSITIONS,
   PITCHING_POSITIONS,
   type SportKind,
-} from '@legacy-sports/utils/positions';
+} from '@legacy-sports/utils';
 
 export {
   ALLOWED_POSITIONS,
@@ -16,12 +16,12 @@ export {
   OFFENSIVE_POSITIONS,
   PITCHING_POSITIONS,
 };
-// `SportKind` is defined in `@legacy-sports/utils/positions` (the data-layer
-// source of truth, since it keys `ALLOWED_POSITIONS_BY_SPORT`). Within
-// shared-components it is surfaced through `config/sports`, which the package
-// barrel re-exports; we intentionally do not re-export it from here too, since
-// having two re-exports through `lib/shared-components/src/index.ts` would
-// cause a TS2308 ambiguity.
+// `SportKind` is defined in `@legacy-sports/utils` (the data-layer source of
+// truth, since it keys `ALLOWED_POSITIONS_BY_SPORT`). Within shared-components
+// it is surfaced through `config/sports`, which the package barrel re-exports;
+// we intentionally do not re-export it from here too, since having two
+// re-exports through `lib/shared-components/src/index.ts` would cause a TS2308
+// ambiguity.
 
 // -- Sport-scoped position types -----------------------------------------
 // The flat `Position` union is split per sport (ADR 0011). Callers narrow on

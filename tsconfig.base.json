@@ -92,16 +92,7 @@
       "@legacy-sports/test-fixtures": ["lib/test-fixtures/src/index.ts"],
       "@legacy-sports/ui-abstractions": ["lib/ui-abstractions/src/index.ts"],
       "@legacy-sports/utils": ["lib/utils/src/index.ts"],
-      "@legacy-sports/utils/help-content": [
-        "lib/utils/src/lib/help-content.ts"
-      ],
       "@legacy-sports/utils/node": ["lib/utils/src/node.ts"],
-      "@legacy-sports/utils/notification-types": [
-        "lib/utils/src/lib/notification-types.ts"
-      ],
-      "@legacy-sports/utils/positions": [
-        "lib/utils/src/lib/allowed-positions.ts"
-      ],
       "@legacy-sports/websocket-client": ["lib/websocket-client/src/index.ts"],
       "__PLATFORM_COMPONENTS__": [
         "lib/shared-components/src/platform-components/web/index.ts"

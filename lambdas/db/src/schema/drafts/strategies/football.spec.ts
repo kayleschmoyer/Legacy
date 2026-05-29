@@ -8,7 +8,7 @@
  * up filled by a position-eligible player.
  */
 
-import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils/positions';
+import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils';
 import {
   ALLOWED_POSITIONS_FOOTBALL,
   effectiveFootballFpg,

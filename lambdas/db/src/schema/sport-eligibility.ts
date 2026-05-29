@@ -7,7 +7,7 @@
  * without an explicit error.
  */
 
-import type { SportKind } from '@legacy-sports/utils/positions';
+import type { SportKind } from '@legacy-sports/utils';
 import { UserInputError } from './graphql-errors';
 
 export interface PlayerSportRow {

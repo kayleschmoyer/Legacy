@@ -8,7 +8,7 @@ import {
   HELP_FAQ_ITEMS,
   HELP_HISTORICAL_FAQ_ITEMS,
   type HelpFaqItem,
-} from '@legacy-sports/utils/help-content';
+} from '@legacy-sports/utils';
 import {
   AlertTriangle,
   BarChart3,
