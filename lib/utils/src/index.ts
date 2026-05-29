@@ -8,6 +8,7 @@ export {
   extractPlayerNameFromDescription,
 } from './lib/utils';
 export * from './lib/ErrorHandling';
+export * from './lib/help-content';
 export * from './lib/league-utils';
 export * from './lib/notification-copy';
 export * from './lib/notification-types';

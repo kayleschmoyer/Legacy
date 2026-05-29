@@ -5,7 +5,7 @@ import {
   HELP_GETTING_STARTED_STEPS,
   HELP_HISTORICAL_FAQ_ITEMS,
   type HelpFaqItem,
-} from '@legacy-sports/utils/help-content';
+} from '@legacy-sports/utils';
 import React, { useState } from 'react';
 import { Linking, ScrollView } from 'react-native';
 import { H1, H3, Separator, Text, XStack, YStack } from 'tamagui';
