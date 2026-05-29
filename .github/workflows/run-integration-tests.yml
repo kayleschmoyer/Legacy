@@ -169,8 +169,12 @@ jobs:
           GOOGLE_TEST_EMAIL: ${{ secrets.GOOGLE_TEST_EMAIL }}
           GOOGLE_TEST_PASSWORD: ${{ secrets.GOOGLE_TEST_PASSWORD }}
           # Playwright's json reporter reads this env var to set the output file.
-          # The "json:file" CLI colon syntax is not supported in Playwright 1.59.
-          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results.json
+          # PLAYWRIGHT_JSON_OUTPUT_FILE is resolved relative to process.cwd() (the
+          # workspace root here), so the file lands at ./test-results.json — exactly
+          # where the persist step below looks. PLAYWRIGHT_JSON_OUTPUT_NAME would
+          # instead resolve relative to the config's directory (apps/web-e2e/), and
+          # the "json:file" CLI colon syntax is not supported in Playwright 1.59.
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results.json
         run: |
           set -euo pipefail
           # Convert the comma-separated touched-specs list into discrete args so
@@ -179,7 +183,7 @@ jobs:
           echo "Running ${#SPEC_ARGS[@]} touched integration spec(s):"
           printf '  - %s\n' "${SPEC_ARGS[@]}"
           # Reporters: line for live console output; json writes to test-results.json
-          # (path set via PLAYWRIGHT_JSON_OUTPUT_NAME above).
+          # (path set via PLAYWRIGHT_JSON_OUTPUT_FILE above).
           pnpm exec playwright test \
             --config=apps/web-e2e/playwright.integration.config.ts \
             --workers=1 \
@@ -194,9 +198,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The integration config's `json` reporter writes test-results.json to
-          # the workspace root by default when no outputFile is configured. Fall
-          # back to the html-report's data file if the workspace copy is missing.
+          # The json reporter writes test-results.json to the workspace root via
+          # PLAYWRIGHT_JSON_OUTPUT_FILE (set in the test step). Fall back to the
+          # html-report's data file if the workspace copy is somehow missing.
           if [ -f test-results.json ]; then
             echo "test-results.json present at workspace root"
           elif [ -f playwright-report/data/test-results.json ]; then
