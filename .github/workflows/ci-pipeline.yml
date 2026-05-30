@@ -404,6 +404,50 @@ jobs:
           log: ${{ runner.temp }}/ci-custom-checks.log
 
   # ============================================================================
+  # Lockfile drift check — validates pnpm-lock.yaml against every workspace
+  # package.json without doing a full install. Runs in seconds because
+  # --lockfile-only skips downloading packages and writing node_modules, and
+  # --frozen-lockfile makes pnpm exit non-zero on drift rather than regenerate
+  # the lockfile. Independent of detect-changes so it starts immediately. LS-5060.
+  # ============================================================================
+  lockfile-check:
+    name: "lockfile-check"
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: false
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Validate pnpm-lock.yaml matches workspace package.json files"
+        env:
+          CI: "true"
+        run: |
+          set -o pipefail
+          # --frozen-lockfile: exit non-zero if pnpm-lock.yaml would change (drift)
+          # --lockfile-only:   parse manifests + resolve; do NOT write node_modules
+          # --ignore-scripts:  skip lifecycle scripts (never reached with the above)
+          # On drift, pnpm prints ERR_PNPM_OUTDATED_LOCKFILE naming the package
+          # whose specifier no longer matches the lockfile.
+          if ! pnpm install --frozen-lockfile --lockfile-only --ignore-scripts; then
+            echo ""
+            echo "::error::pnpm-lock.yaml is out of sync with one or more workspace package.json files."
+            echo "::error::Fix: run 'pnpm install' locally, then commit the updated pnpm-lock.yaml."
+            exit 1
+          fi
+          echo "pnpm-lock.yaml matches all workspace package.json files"
+
+  # ============================================================================
   # STAGE 3 — E2E tests (runs after lint, format, test, AND build all pass)
   # ============================================================================
   e2e:
@@ -637,7 +681,7 @@ jobs:
   # ============================================================================
   summarize:
     name: "Summarize & Report"
-    needs: [detect-changes, e2e, lint, format, test, build, custom-checks]
+    needs: [detect-changes, e2e, lint, format, test, build, custom-checks, lockfile-check]
     if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -668,6 +712,7 @@ jobs:
           echo "test.result               = ${{ needs.test.result }}"
           echo "build.result              = ${{ needs.build.result }}"
           echo "custom-checks.result      = ${{ needs.custom-checks.result }}"
+          echo "lockfile-check.result     = ${{ needs.lockfile-check.result }}"
           echo "e2e.result                = ${{ needs.e2e.result }}"
           echo "::endgroup::"
 
@@ -683,10 +728,11 @@ jobs:
               "test":            "${{ needs.test.result }}",
               "build":           "${{ needs.build.result }}",
               "custom-checks":   "${{ needs.custom-checks.result }}",
+              "lockfile-check":  "${{ needs.lockfile-check.result }}",
               "e2e-testing":     "${{ needs.e2e.result }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
-          failure-threshold: "lint,format,test,build,custom-checks,e2e-testing"
+          failure-threshold: "lint,format,test,build,custom-checks,lockfile-check,e2e-testing"
 
       - name: "Deployment Gate"
         id: deployment-gate
