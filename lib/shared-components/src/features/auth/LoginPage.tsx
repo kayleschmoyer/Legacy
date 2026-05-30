@@ -135,6 +135,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   // Listen for One Tap events (GSI automatic sign-in)
   useEffect(() => {
+    // GSI One Tap is web-only; on React Native `window` is polyfilled but does
+    // not expose addEventListener, which would throw during effect mount and
+    // trip the ErrorBoundary on app boot.
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function'
+    ) {
+      return;
+    }
+
     const handleOneTapSuccess = async (event: Event) => {
       const customEvent = event as CustomEvent<OneTapEventDetail>;
       setIsLoading(true);
