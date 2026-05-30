@@ -1,6 +1,8 @@
 # Add files here to ignore them from prettier formatting
 /dist
 /coverage
+# Content-addressable node_modules pool — never format pooled trees
+/.modules-pool
 /.nx/cache
 /.nx/workspace-data
 # Static bundles are checked in but should not be reformatted automatically

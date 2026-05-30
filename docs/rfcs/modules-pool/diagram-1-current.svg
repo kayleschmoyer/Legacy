@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 540" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#1B3A5C"/>
+    </marker>
+    <marker id="a1r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#C41E3A"/>
+    </marker>
+  </defs>
+  <rect width="920" height="540" fill="#ffffff"/>
+  <text x="460" y="38" text-anchor="middle" font-size="21" font-weight="700" fill="#0A0F1A">Today — one mutable node_modules, shared by symlink</text>
+
+  <!-- worktrees -->
+  <g>
+    <rect x="50" y="96"  width="230" height="64" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="66" y="124" font-size="15" font-weight="700" fill="#1B3A5C">worktree-A</text>
+    <text x="66" y="146" font-size="13" fill="#3a4a5e">node_modules  ⇒  symlink</text>
+
+    <rect x="50" y="196" width="230" height="64" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="66" y="224" font-size="15" font-weight="700" fill="#1B3A5C">worktree-B</text>
+    <text x="66" y="246" font-size="13" fill="#C41E3A">node.exe running (holds files open)</text>
+
+    <rect x="50" y="296" width="230" height="64" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="66" y="324" font-size="15" font-weight="700" fill="#1B3A5C">worktree-C</text>
+    <text x="66" y="346" font-size="13" fill="#3a4a5e">node_modules  ⇒  symlink</text>
+  </g>
+
+  <!-- main mutable node_modules -->
+  <rect x="560" y="110" width="320" height="210" rx="10" fill="#1B3A5C"/>
+  <text x="720" y="140" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">D:\code\legacy-sports\node_modules</text>
+  <text x="720" y="162" text-anchor="middle" font-size="12.5" fill="#C5A55A">single mutable copy — everyone points here</text>
+  <rect x="600" y="232" width="240" height="46" rx="6" fill="#ffffff"/>
+  <text x="720" y="261" text-anchor="middle" font-size="13" font-weight="700" fill="#C41E3A">bufferutil.node  🔒 locked</text>
+
+  <!-- symlink arrows -->
+  <line x1="280" y1="128" x2="556" y2="155" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a1)"/>
+  <line x1="280" y1="228" x2="556" y2="205" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a1)"/>
+  <line x1="280" y1="328" x2="556" y2="270" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a1)"/>
+
+  <!-- lock relationship -->
+  <line x1="280" y1="246" x2="598" y2="256" stroke="#C41E3A" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a1r)"/>
+
+  <!-- failure callout -->
+  <rect x="50" y="418" width="830" height="100" rx="10" fill="#fdeef0" stroke="#C41E3A" stroke-width="1.5"/>
+  <text x="70" y="448" font-size="14" font-weight="700" fill="#C41E3A">Two failure modes</text>
+  <text x="70" y="474" font-size="13.5" fill="#5a2530">✗  make install in main must unlink bufferutil.node  →  EPERM: file held open by worktree-B's node process.</text>
+  <text x="70" y="500" font-size="13.5" fill="#5a2530">✗  lockfile changes in main  →  every worktree silently runs mismatched package versions.</text>
+</svg>

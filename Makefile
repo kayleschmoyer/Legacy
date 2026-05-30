@@ -16,7 +16,7 @@
 	fix-windows-locks diagnose kill-stale \
 	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
-	wt-setup \
+	wt-setup modules-link modules-gc \
 	stabilize-after-rebase lint-review-patterns ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
 	ship-pr
 .DEFAULT_GOAL := help
@@ -178,6 +178,18 @@ ifeq ($(DETECTED_OS),Windows)
 else
 	@echo "wt-setup is currently Windows-only. Run: make install && cp .env from main repo."
 endif
+
+# Pass WT/DAYS/DRY through make's exported environment — never interpolated into
+# the shell command line — so user-supplied values cannot inject extra arguments
+# or shell commands. The scripts read MODULES_POOL_* from process.env.
+modules-link: export MODULES_POOL_WT := $(WT)
+modules-link: ## [opt-in] Link this worktree's node_modules to a content-addressable pool slot (RFC: docs/rfcs/modules-pool). Usage: make modules-link [WT=<path>]
+	@node scripts/modules-pool/link.mjs
+
+modules-gc: export MODULES_POOL_DAYS := $(DAYS)
+modules-gc: export MODULES_POOL_DRY := $(DRY)
+modules-gc: ## [opt-in] Prune orphan node_modules pool slots. Usage: make modules-gc [DAYS=14] [DRY=1]
+	@node scripts/modules-pool/gc.mjs
 
 setup-hooks: ## Install git hooks from .github/hooks/ into .git/hooks/
 ifeq ($(DETECTED_OS),Windows)

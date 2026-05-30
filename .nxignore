@@ -6,3 +6,4 @@ logs/
 certs/
 terraform/
 playwright-report/
+.modules-pool/

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 600" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#1B3A5C"/>
+    </marker>
+    <marker id="a2g" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#8a7a3a"/>
+    </marker>
+  </defs>
+  <rect width="940" height="600" fill="#ffffff"/>
+  <text x="470" y="38" text-anchor="middle" font-size="21" font-weight="700" fill="#0A0F1A">Proposed — an immutable, lockfile-keyed modules pool</text>
+
+  <!-- consumers -->
+  <g font-size="13.5">
+    <rect x="40" y="96"  width="210" height="52" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="56" y="118" font-weight="700" fill="#1B3A5C">main repo</text>
+    <text x="56" y="138" fill="#3a4a5e">node_modules ⇒</text>
+
+    <rect x="40" y="176" width="210" height="52" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="56" y="198" font-weight="700" fill="#1B3A5C">worktree-A</text>
+    <text x="56" y="218" fill="#3a4a5e">node_modules ⇒</text>
+
+    <rect x="40" y="256" width="210" height="52" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="56" y="278" font-weight="700" fill="#1B3A5C">worktree-B</text>
+    <text x="56" y="298" fill="#3a4a5e">node_modules ⇒</text>
+
+    <rect x="40" y="336" width="210" height="52" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="56" y="358" font-weight="700" fill="#1B3A5C">worktree-C</text>
+    <text x="56" y="378" fill="#3a4a5e">node_modules ⇒</text>
+  </g>
+
+  <!-- pool -->
+  <rect x="380" y="70" width="520" height="330" rx="12" fill="#f7f4ec" stroke="#C5A55A" stroke-width="2"/>
+  <text x="400" y="98" font-size="14" font-weight="700" fill="#8a7a3a">&lt;repo&gt;\.modules-pool\   (git-ignored, immutable snapshots)</text>
+
+  <g font-size="13.5">
+    <rect x="410" y="116" width="460" height="62" rx="8" fill="#ffffff" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="428" y="142" font-weight="700" fill="#1B3A5C">a1b2c3…\node_modules</text>
+    <text x="428" y="162" fill="#3a4a5e">lockfile shared by main + worktree-A</text>
+
+    <rect x="410" y="196" width="460" height="62" rx="8" fill="#ffffff" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="428" y="222" font-weight="700" fill="#1B3A5C">d4e5f6…\node_modules</text>
+    <text x="428" y="242" fill="#3a4a5e">lockfile @ worktree-B</text>
+
+    <rect x="410" y="276" width="460" height="62" rx="8" fill="#ffffff" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="428" y="302" font-weight="700" fill="#1B3A5C">9f8e7d…\node_modules</text>
+    <text x="428" y="322" fill="#3a4a5e">lockfile @ worktree-C</text>
+  </g>
+
+  <!-- symlink arrows to slots -->
+  <line x1="250" y1="122" x2="406" y2="142" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a2)"/>
+  <line x1="250" y1="202" x2="406" y2="150" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a2)"/>
+  <line x1="250" y1="282" x2="406" y2="224" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a2)"/>
+  <line x1="250" y1="362" x2="406" y2="304" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a2)"/>
+
+  <!-- CAS store -->
+  <rect x="380" y="438" width="520" height="74" rx="10" fill="#e9eef5" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="640" y="468" text-anchor="middle" font-size="14" font-weight="700" fill="#1B3A5C">D:\.pnpm-store\v3</text>
+  <text x="640" y="490" text-anchor="middle" font-size="12.5" fill="#3a4a5e">content-addressable file store — every slot hardlinks into here</text>
+
+  <!-- hardlink dashed arrows -->
+  <line x1="500" y1="178" x2="520" y2="436" stroke="#8a7a3a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a2g)"/>
+  <line x1="640" y1="258" x2="640" y2="436" stroke="#8a7a3a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a2g)"/>
+  <line x1="780" y1="338" x2="760" y2="436" stroke="#8a7a3a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a2g)"/>
+
+  <text x="470" y="556" text-anchor="middle" font-size="13.5" fill="#3a4a5e">Key:  hash = sha256(pnpm-lock.yaml).  Each consumer symlinks to the slot matching its own lockfile.</text>
+  <text x="470" y="578" text-anchor="middle" font-size="13.5" fill="#8a7a3a" font-weight="700">A snapshot is written once and never mutated.</text>
+</svg>

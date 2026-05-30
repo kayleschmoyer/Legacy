@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 600" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#1B3A5C"/>
+    </marker>
+  </defs>
+  <rect width="920" height="600" fill="#ffffff"/>
+  <text x="460" y="38" text-anchor="middle" font-size="21" font-weight="700" fill="#0A0F1A">modules link &lt;worktree&gt; — resolve algorithm</text>
+
+  <!-- start -->
+  <rect x="180" y="66" width="280" height="46" rx="23" fill="#1B3A5C"/>
+  <text x="320" y="95" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">modules link &lt;worktree&gt;</text>
+
+  <!-- hash -->
+  <rect x="170" y="142" width="300" height="50" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="320" y="172" text-anchor="middle" font-size="13.5" fill="#1B3A5C">hash = sha256(worktree\pnpm-lock.yaml)</text>
+
+  <!-- decision diamond centered (320,270) -->
+  <polygon points="320,212 470,272 320,332 170,272" fill="#f7f4ec" stroke="#C5A55A" stroke-width="2"/>
+  <text x="320" y="266" text-anchor="middle" font-size="12.5" font-weight="700" fill="#8a7a3a">pool\&lt;hash&gt; exists</text>
+  <text x="320" y="284" text-anchor="middle" font-size="12.5" font-weight="700" fill="#8a7a3a">&amp; healthy?</text>
+
+  <!-- YES branch right -->
+  <line x1="470" y1="272" x2="560" y2="272" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a3)"/>
+  <text x="500" y="262" text-anchor="middle" font-size="12.5" font-weight="700" fill="#2e7d32">YES</text>
+  <rect x="560" y="246" width="320" height="52" rx="8" fill="#e7f3e8" stroke="#2e7d32" stroke-width="1.5"/>
+  <text x="720" y="270" text-anchor="middle" font-size="13" fill="#1f5022">repoint symlink:</text>
+  <text x="720" y="288" text-anchor="middle" font-size="13" font-weight="700" fill="#1f5022">node_modules → pool\&lt;hash&gt;</text>
+
+  <rect x="600" y="338" width="240" height="46" rx="8" fill="#2e7d32"/>
+  <text x="720" y="366" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">✓ cache hit — done in ms</text>
+  <line x1="720" y1="298" x2="720" y2="336" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a3)"/>
+
+  <!-- NO branch down -->
+  <line x1="320" y1="332" x2="320" y2="372" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a3)"/>
+  <text x="338" y="358" font-size="12.5" font-weight="700" fill="#C41E3A">NO</text>
+
+  <rect x="150" y="372" width="340" height="50" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="320" y="402" text-anchor="middle" font-size="13" fill="#1B3A5C">pnpm install --frozen-lockfile  (in worktree)</text>
+
+  <line x1="320" y1="422" x2="320" y2="456" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a3)"/>
+  <rect x="120" y="456" width="400" height="62" rx="8" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="320" y="481" text-anchor="middle" font-size="13" fill="#1B3A5C">move node_modules → pool\&lt;hash&gt;.tmp.&lt;pid&gt;</text>
+  <text x="320" y="500" text-anchor="middle" font-size="13" font-weight="700" fill="#1B3A5C">→ atomic rename → pool\&lt;hash&gt;</text>
+
+  <line x1="320" y1="518" x2="320" y2="552" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a3)"/>
+  <rect x="160" y="552" width="320" height="44" rx="8" fill="#2e7d32"/>
+  <text x="320" y="579" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">✓ slot materialized + linked</text>
+</svg>

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a4" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#1B3A5C"/>
+    </marker>
+    <marker id="a4g" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#8a7a3a"/>
+    </marker>
+  </defs>
+  <rect width="960" height="520" fill="#ffffff"/>
+  <text x="480" y="36" text-anchor="middle" font-size="21" font-weight="700" fill="#0A0F1A">Adding a package never mutates an existing snapshot</text>
+
+  <line x1="480" y1="60" x2="480" y2="430" stroke="#d4dae2" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+  <!-- BEFORE -->
+  <text x="240" y="86" text-anchor="middle" font-size="15" font-weight="700" fill="#3a4a5e">BEFORE</text>
+  <g font-size="13">
+    <rect x="40" y="110" width="150" height="42" rx="7" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="115" y="136" text-anchor="middle" font-weight="700" fill="#1B3A5C">main</text>
+    <rect x="40" y="170" width="150" height="42" rx="7" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="115" y="196" text-anchor="middle" font-weight="700" fill="#1B3A5C">worktree-A</text>
+    <rect x="40" y="230" width="150" height="42" rx="7" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="115" y="256" text-anchor="middle" font-weight="700" fill="#1B3A5C">worktree-B</text>
+  </g>
+  <rect x="270" y="150" width="170" height="82" rx="8" fill="#ffffff" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="355" y="186" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1B3A5C">slot H1</text>
+  <text x="355" y="208" text-anchor="middle" font-size="12" fill="#3a4a5e">node_modules</text>
+  <line x1="190" y1="131" x2="266" y2="178" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a4)"/>
+  <line x1="190" y1="191" x2="266" y2="191" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a4)"/>
+  <line x1="190" y1="251" x2="266" y2="204" stroke="#1B3A5C" stroke-width="2" marker-end="url(#a4)"/>
+
+  <!-- AFTER -->
+  <text x="720" y="86" text-anchor="middle" font-size="15" font-weight="700" fill="#3a4a5e">AFTER  ·  pnpm add &lt;pkg&gt;  in main</text>
+  <g font-size="13">
+    <rect x="520" y="110" width="150" height="42" rx="7" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="595" y="136" text-anchor="middle" font-weight="700" fill="#1B3A5C">main</text>
+    <rect x="520" y="170" width="150" height="42" rx="7" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="595" y="196" text-anchor="middle" font-weight="700" fill="#1B3A5C">worktree-A</text>
+    <rect x="520" y="230" width="150" height="42" rx="7" fill="#eef2f8" stroke="#1B3A5C" stroke-width="1.5"/>
+    <text x="595" y="256" text-anchor="middle" font-weight="700" fill="#1B3A5C">worktree-B</text>
+  </g>
+  <!-- new slot H2 -->
+  <rect x="760" y="96" width="170" height="74" rx="8" fill="#f7f4ec" stroke="#C5A55A" stroke-width="2.5"/>
+  <text x="845" y="126" text-anchor="middle" font-size="13.5" font-weight="700" fill="#8a7a3a">slot H2  (new)</text>
+  <text x="845" y="148" text-anchor="middle" font-size="12" fill="#8a7a3a">H1 + newpkg</text>
+  <!-- old slot H1 untouched -->
+  <rect x="760" y="196" width="170" height="74" rx="8" fill="#e7f3e8" stroke="#2e7d32" stroke-width="2"/>
+  <text x="845" y="226" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f5022">slot H1</text>
+  <text x="845" y="248" text-anchor="middle" font-size="12" fill="#1f5022">untouched</text>
+
+  <line x1="670" y1="131" x2="756" y2="133" stroke="#8a7a3a" stroke-width="2.2" marker-end="url(#a4g)"/>
+  <line x1="670" y1="191" x2="756" y2="221" stroke="#2e7d32" stroke-width="2" marker-end="url(#a4)"/>
+  <line x1="670" y1="251" x2="756" y2="240" stroke="#2e7d32" stroke-width="2" marker-end="url(#a4)"/>
+
+  <!-- caption -->
+  <rect x="60" y="448" width="840" height="56" rx="10" fill="#e7f3e8" stroke="#2e7d32" stroke-width="1.5"/>
+  <text x="480" y="472" text-anchor="middle" font-size="13.5" fill="#1f5022">H1's bytes are never unlinked → no EPERM.  worktree-A / worktree-B keep their exact versions → no skew.</text>
+  <text x="480" y="494" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f5022">main simply repoints its symlink at the freshly-built slot H2.</text>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 500" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a5" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#8a7a3a"/>
+    </marker>
+  </defs>
+  <rect width="920" height="500" fill="#ffffff"/>
+  <text x="460" y="36" text-anchor="middle" font-size="21" font-weight="700" fill="#0A0F1A">Side-by-side cost = the diff, thanks to the hardlink store</text>
+
+  <!-- slot H1 -->
+  <rect x="60" y="78" width="240" height="210" rx="10" fill="#ffffff" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="180" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#1B3A5C">slot H1\node_modules</text>
+  <g font-size="13" fill="#3a4a5e">
+    <text x="84" y="138">react</text>
+    <text x="84" y="162">@apollo/client</text>
+    <text x="84" y="186">… 4,300 packages</text>
+    <text x="84" y="210">bufferutil</text>
+  </g>
+
+  <!-- slot H2 -->
+  <rect x="620" y="78" width="240" height="210" rx="10" fill="#f7f4ec" stroke="#C5A55A" stroke-width="2"/>
+  <text x="740" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#8a7a3a">slot H2\node_modules</text>
+  <g font-size="13" fill="#3a4a5e">
+    <text x="644" y="138">react</text>
+    <text x="644" y="162">@apollo/client</text>
+    <text x="644" y="186">… 4,300 packages</text>
+    <text x="644" y="210">bufferutil</text>
+    <text x="644" y="238" fill="#8a7a3a" font-weight="700">+ newpkg</text>
+  </g>
+
+  <!-- CAS store -->
+  <rect x="300" y="350" width="320" height="90" rx="10" fill="#e9eef5" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="460" y="382" text-anchor="middle" font-size="14" font-weight="700" fill="#1B3A5C">D:\.pnpm-store\v3</text>
+  <text x="460" y="404" text-anchor="middle" font-size="12.5" fill="#3a4a5e">one physical copy of every file block</text>
+  <text x="460" y="424" text-anchor="middle" font-size="12.5" fill="#8a7a3a">shared blocks + 1 new block for newpkg</text>
+
+  <!-- hardlink arrows -->
+  <line x1="180" y1="288" x2="370" y2="348" stroke="#8a7a3a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a5)"/>
+  <line x1="740" y1="288" x2="550" y2="348" stroke="#8a7a3a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a5)"/>
+  <text x="250" y="330" font-size="12" fill="#8a7a3a">hardlinks</text>
+  <text x="620" y="330" font-size="12" fill="#8a7a3a">hardlinks</text>
+
+  <text x="460" y="474" text-anchor="middle" font-size="13.5" fill="#3a4a5e">H1 and H2 share 4,300 packages as hardlinks into a single store — only <tspan fill="#8a7a3a" font-weight="700">newpkg</tspan> adds real bytes.</text>
+</svg>
