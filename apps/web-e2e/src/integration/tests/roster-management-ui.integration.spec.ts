@@ -34,6 +34,7 @@
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
@@ -264,18 +265,22 @@ test.describe
     });
 
     await test.step('Verify roster section headers are visible', async () => {
-      // Extend timeout to 30 s: after a long draft Lambda is cold, so
-      // userTeamId + teamMembers each need a cold-start window before
-      // "Loading roster..." clears and the section headers render (LS-4362).
+      // After a completed draft the roster page (RosterBoardV2) should show
+      // the three section cards: "Starting Hitters", "Starting Pitchers",
+      // and "Bench". The legacy "Pitching/Infield/Outfield" headers were
+      // replaced in LS-4674 (LS-5053). Auto-draft → roster query can lag a
+      // render tick behind `waitForSeasonActive`, so reload until the first
+      // section appears — mirrors the LS-5050 pattern in full-season-ui.
+      await reloadUntilVisible(
+        page,
+        page.getByText('Starting Hitters', { exact: false }).first(),
+      );
       await expect(
-        page.getByText('Pitching', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30_000 });
+        page.getByText('Starting Pitchers', { exact: false }).first(),
+      ).toBeVisible();
       await expect(
-        page.getByText('Infield', { exact: false }).first(),
-      ).toBeVisible({ timeout: 5_000 });
-      await expect(
-        page.getByText('Outfield', { exact: false }).first(),
-      ).toBeVisible({ timeout: 5_000 });
+        page.getByText('Bench', { exact: false }).first(),
+      ).toBeVisible();
     });
 
     await test.step('Verify player slots are filled', async () => {
@@ -570,7 +575,7 @@ test.describe
       // would silently time out. Asserting a roster section heading
       // surfaces that failure mode with a meaningful error instead.
       await expect(
-        page.getByText('Pitching', { exact: false }).first(),
+        page.getByText('Starting Hitters', { exact: false }).first(),
       ).toBeVisible({ timeout: 30_000 });
     });
 
