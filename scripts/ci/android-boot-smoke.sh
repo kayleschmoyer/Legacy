@@ -76,4 +76,23 @@ if [ -z "${PID}" ]; then
   exit 1
 fi
 
-echo "✅ App running (pid=$PID) — boot smoke passed"
+# Process being alive is not enough: the React ErrorBoundary catches JS throws
+# during initial render and swaps in a fallback UI, leaving the native process
+# running. `pidof` would report success even though the user sees only
+# "Oops! Something went wrong". Scan logcat for the boundary's marker string
+# (LOGGER.error('Error Boundary caught an error', ...) in
+# lib/shared-components/src/components/ErrorBoundary.tsx -> console.error ->
+# ReactNativeJS:E in logcat) and fail if it appears within the settle window.
+BOUNDARY_HITS=$(adb logcat -d ReactNativeJS:E "*:S" | grep -F "Error Boundary caught an error" || true)
+if [ -n "${BOUNDARY_HITS}" ]; then
+  echo "❌ React ErrorBoundary tripped during boot — app rendered fallback UI instead of the app"
+  echo ""
+  echo "=== Boundary log lines ==="
+  echo "${BOUNDARY_HITS}"
+  echo ""
+  echo "=== ReactNativeJS error+warn context (last 200 lines) ==="
+  adb logcat -d -t 200 ReactNativeJS:W "*:S" || true
+  exit 1
+fi
+
+echo "✅ App running (pid=$PID), no ErrorBoundary trip — boot smoke passed"
