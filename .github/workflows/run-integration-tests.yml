@@ -92,8 +92,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
-          MERGE_BASE=$(git merge-base "origin/$BASE_REF" HEAD || git merge-base FETCH_HEAD HEAD || echo "")
+          # The "Checkout PR head" step above uses fetch-depth: 0 (full history),
+          # so origin/$BASE_REF is already populated with ancestry. A redundant
+          # shallow fetch here can leave origin/$BASE_REF pointing at a commit
+          # whose ancestry isn't local, causing merge-base to fail and the
+          # fallback to run all 22 integration specs (LS-5064).
+          MERGE_BASE=$(git merge-base "origin/$BASE_REF" HEAD || echo "")
           if [ -z "$MERGE_BASE" ]; then
             echo "::warning::Could not compute merge-base — falling back to running every integration spec."
             mapfile -t SPECS < <(find apps/web-e2e/src/integration/tests -type f -name '*.integration.spec.ts' | sort)
