@@ -19,6 +19,7 @@
     "@legacy-sports/shared-components": "workspace:*",
     "@legacy-sports/tamagui-config": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
+    "@legacy-sports/websocket-client": "workspace:*",
     "@react-native-firebase/analytics": "^23.8.8",
     "@react-native-firebase/app": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.2",
