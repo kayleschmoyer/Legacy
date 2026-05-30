@@ -56,6 +56,18 @@ adb install -r "$APK"
 echo "🧹 Clearing logcat buffer before launch"
 adb logcat -c
 
+# Tee logcat to a file from launch onward so the full multi-line ErrorBoundary
+# error body survives ring-buffer eviction. Filtering with `*:S` here would
+# silently drop the ReactNativeJS error context object's continuation lines on
+# some logcat builds, so we capture verbose and grep it on failure.
+LOGCAT_FILE="${LOGCAT_FILE:-./artifacts/logcat-boot.txt}"
+mkdir -p "$(dirname "$LOGCAT_FILE")"
+adb logcat ReactNativeJS:V AndroidRuntime:V "${PKG}":V "*:S" > "$LOGCAT_FILE" 2>&1 &
+LOGCAT_PID=$!
+# Stop the background logcat when this script exits for any reason so it
+# doesn't outlive the emulator shutdown step.
+trap 'kill "$LOGCAT_PID" 2>/dev/null || true' EXIT
+
 echo "🚀 Launching ${PKG}/${ACTIVITY}"
 adb shell am start -W -n "${PKG}/${ACTIVITY}"
 
@@ -68,8 +80,8 @@ PID=$(adb shell pidof "${PKG}" | tr -d '\r\n' || true)
 if [ -z "${PID}" ]; then
   echo "❌ App process not running — APK crashed on launch"
   echo ""
-  echo "=== Crash logcat (AndroidRuntime + ReactNativeJS + ${PKG}) ==="
-  adb logcat -d AndroidRuntime:E ReactNativeJS:E "${PKG}":V "*:S" || true
+  echo "=== Captured logcat since launch ($LOGCAT_FILE) ==="
+  cat "$LOGCAT_FILE" || true
   echo ""
   echo "=== Last 200 lines of full logcat ==="
   adb logcat -d -t 200 || true
@@ -83,15 +95,20 @@ fi
 # (LOGGER.error('Error Boundary caught an error', ...) in
 # lib/shared-components/src/components/ErrorBoundary.tsx -> console.error ->
 # ReactNativeJS:E in logcat) and fail if it appears within the settle window.
-BOUNDARY_HITS=$(adb logcat -d ReactNativeJS:E "*:S" | grep -F "Error Boundary caught an error" || true)
+# Check both the captured file (full context, survives eviction) and the
+# live ring buffer (defensive fallback in case the background tee failed
+# silently). Either source detecting a hit is sufficient to fail the run.
+BOUNDARY_HITS_FILE=$(grep -F "Error Boundary caught an error" "$LOGCAT_FILE" 2>/dev/null || true)
+BOUNDARY_HITS_BUFFER=$(adb logcat -d ReactNativeJS:E "*:S" | grep -F "Error Boundary caught an error" || true)
+BOUNDARY_HITS="${BOUNDARY_HITS_FILE:-$BOUNDARY_HITS_BUFFER}"
 if [ -n "${BOUNDARY_HITS}" ]; then
   echo "❌ React ErrorBoundary tripped during boot — app rendered fallback UI instead of the app"
   echo ""
   echo "=== Boundary log lines ==="
   echo "${BOUNDARY_HITS}"
   echo ""
-  echo "=== ReactNativeJS error+warn context (last 200 lines) ==="
-  adb logcat -d -t 200 ReactNativeJS:W "*:S" || true
+  echo "=== Full captured logcat since launch ($LOGCAT_FILE) ==="
+  cat "$LOGCAT_FILE" || true
   exit 1
 fi
 
