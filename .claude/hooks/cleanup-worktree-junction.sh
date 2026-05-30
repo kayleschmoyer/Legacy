@@ -26,6 +26,14 @@ if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
   exit 0
 fi
 
+# Fast bail: if node_modules is a symlink (Git Bash reports junctions as plain dirs, only
+# real symlinks as links), this hook has nothing to do — cleanup-worktree-symlink.sh handles
+# it. Return before the LinkType probe below so we never spawn a powershell/cmd process (each
+# flashes a console window) in the common symlink case.
+if [ -L "$NM" ]; then
+  exit 0
+fi
+
 # Only act if the link is an NTFS junction (not a symlink — those are handled by
 # cleanup-worktree-symlink.sh). Junctions report LinkType "Junction" via PowerShell.
 # Skip the check on non-Windows hosts where junctions cannot exist.

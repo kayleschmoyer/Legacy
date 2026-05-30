@@ -24,7 +24,18 @@ if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
   exit 0
 fi
 
-# Attempt non-recursive removal whenever node_modules exists in an ephemeral worktree.
+# Fast path: if node_modules is a symlink (the normal case — setup-worktree-node-modules.mjs
+# creates a directory symlink), remove it with plain `rm`. `rm` on a symlink unlinks the link
+# itself and never recurses into the target, and — unlike `cmd //c rmdir` — it spawns no
+# console window. This is what was flashing a CMD window on every session stop.
+if [ -L "$NM" ]; then
+  rm -f "$NM" >/dev/null 2>&1
+  exit 0
+fi
+
+# Fallback for non-symlink links (e.g. NTFS junctions): non-recursive cmd rmdir removes the
+# link without touching the target. This branch still spawns a brief console window, but it is
+# only reached for junctions, which the setup script no longer creates.
 WIN_PATH=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
 cmd //c "rmdir \"$WIN_PATH\"" >/dev/null 2>&1
 
