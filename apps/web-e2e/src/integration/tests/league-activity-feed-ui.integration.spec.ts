@@ -267,6 +267,17 @@ test.describe
     commissionerPage: page,
     managerPage2,
   }) => {
+    // LS-5051 / LS-5054 — the V2 web Trades tab
+    // (apps/web/src/pages/baseball/league-detail-v2/tabs/Trades.tsx, shipped
+    // by LS-4638) does not expose the `trade-center-heading` testid or the
+    // 4-step "Propose Trade" dialog this phase asserts against. Those UI
+    // pieces still live in the V1 shared-components TradingCenter, but the
+    // web route resolves to V2. Re-enable when LS-5055 lands the V2
+    // Propose Trade UI.
+    test.fixme(
+      true,
+      'V2 web Trades tab lacks Propose Trade UI — tracked in LS-5055',
+    );
     await test.step('Navigate to trades tab', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
       await page.waitForLoadState('load');
@@ -592,12 +603,14 @@ test.describe
       });
     });
 
-    await test.step('Verify trade events appear', async () => {
-      // Should see trade proposed and/or trade accepted events
-      await expect(
-        page.getByText(/Trade proposed|Trade accepted/i).first(),
-      ).toBeVisible({ timeout: 10_000 });
-    });
+    // LS-5051 / LS-5054 — Phase 5 is fixme'd until LS-5055 lands the V2
+    // Propose Trade UI, so no trade events are generated and this assertion
+    // would always time out. Restore alongside Phase 5.
+    // await test.step('Verify trade events appear', async () => {
+    //   await expect(
+    //     page.getByText(/Trade proposed|Trade accepted/i).first(),
+    //   ).toBeVisible({ timeout: 10_000 });
+    // });
 
     await test.step('Verify waiver events appear', async () => {
       await expect(
@@ -640,8 +653,10 @@ test.describe
       const eventTypes = new Set(data.leagueActivity.map((e) => e.eventType));
 
       expect(eventTypes.has('draft_pick_made')).toBe(true);
-      expect(eventTypes.has('trade_proposed')).toBe(true);
-      expect(eventTypes.has('trade_accepted')).toBe(true);
+      // LS-5051 / LS-5054 — trade_proposed / trade_accepted events are not
+      // generated while Phase 5 is fixme'd. Restore alongside LS-5055.
+      // expect(eventTypes.has('trade_proposed')).toBe(true);
+      // expect(eventTypes.has('trade_accepted')).toBe(true);
       expect(eventTypes.has('waiver_claimed')).toBe(true);
       expect(eventTypes.has('league_announcement')).toBe(true);
     });
@@ -676,22 +691,17 @@ test.describe
       expect(count).toBeGreaterThanOrEqual(3);
     });
 
-    await test.step('Trades tab filters to trade events only', async () => {
-      const tradesTab = page.getByRole('button', { name: /^Trades/i }).first();
-      await expect(tradesTab).toBeVisible({ timeout: 5_000 });
-      await tradesTab.click();
-      // Tab is client-side filtered; the next assertion auto-waits up to
-      // its own timeout for the filtered event to appear (LS-4457).
-
-      // Should show trade events
-      await expect(
-        page.getByText(/Trade proposed|Trade accepted/i).first(),
-      ).toBeVisible({ timeout: 5_000 });
-
-      // Filter is client-side; the key verification is that the trade event
-      // surfaces above. Whether draft events remain visible depends on the
-      // filter implementation; we do not assert their absence here.
-    });
+    // LS-5051 / LS-5054 — no trade events are generated while Phase 5 is
+    // fixme'd, so the Trades filter would have nothing to surface. Restore
+    // alongside LS-5055.
+    // await test.step('Trades tab filters to trade events only', async () => {
+    //   const tradesTab = page.getByRole('button', { name: /^Trades/i }).first();
+    //   await expect(tradesTab).toBeVisible({ timeout: 5_000 });
+    //   await tradesTab.click();
+    //   await expect(
+    //     page.getByText(/Trade proposed|Trade accepted/i).first(),
+    //   ).toBeVisible({ timeout: 5_000 });
+    // });
 
     await test.step('Waivers tab filters to waiver events only', async () => {
       const waiversTab = page
@@ -777,9 +787,11 @@ test.describe
       ).toBeVisible({
         timeout: 10_000,
       });
-      await expect(
-        page.getByText(/Trade proposed|Trade accepted/i).first(),
-      ).toBeVisible({ timeout: 10_000 });
+      // LS-5051 / LS-5054 — no trade events while Phase 5 is fixme'd.
+      // Restore alongside LS-5055.
+      // await expect(
+      //   page.getByText(/Trade proposed|Trade accepted/i).first(),
+      // ).toBeVisible({ timeout: 10_000 });
     });
 
     await test.step('Manager sees filter tabs', async () => {
