@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo/metro-config": "~56.0.13",
+    "@expo/dom-webview": "~56.0.5",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",
