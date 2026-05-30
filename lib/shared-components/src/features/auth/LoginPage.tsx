@@ -93,7 +93,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   );
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // `resize` is web-only; on React Native `window` is polyfilled but does not
+    // expose addEventListener, which would throw during effect mount and trip
+    // the ErrorBoundary on app boot.
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function'
+    ) {
+      return;
+    }
 
     const handleResize = () => {
       setScreenWidth(window.innerWidth);
