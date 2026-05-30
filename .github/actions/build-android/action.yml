@@ -159,9 +159,9 @@ runs:
         #    Expo prebuild regenerates android/ each run so this never persists to repo.
         #    Belt-and-suspenders: also write $HOME/.gradle/gradle.properties (truncate).
         if grep -q '^org\.gradle\.jvmargs=' gradle.properties; then
-          sed -i 's|^org\.gradle\.jvmargs=.*|org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m|' gradle.properties
+          sed -i 's|^org\.gradle\.jvmargs=.*|org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g|' gradle.properties
         else
-          printf '\norg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' >> gradle.properties
+          printf '\norg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g\n' >> gradle.properties
         fi
         EFFECTIVE_JVMARGS="$(grep -m1 '^org\.gradle\.jvmargs=' gradle.properties || true)"
         if [ -z "$EFFECTIVE_JVMARGS" ]; then
@@ -170,7 +170,7 @@ runs:
         fi
         echo "ℹ️  Effective jvmargs: $EFFECTIVE_JVMARGS"
         mkdir -p "$HOME/.gradle"
-        printf 'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' > "$HOME/.gradle/gradle.properties"
+        printf 'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g\n' > "$HOME/.gradle/gradle.properties"
 
         # 2. Limit parallel C++ jobs per CMake invocation.
         #    Ninja defaults to nCPU parallel clang++ processes.
@@ -185,16 +185,19 @@ runs:
         trap "kill $MEM_MONITOR_PID 2>/dev/null || true" EXIT
 
         # Memory budget on 8GB runner:
-        #   Gradle daemon JVM:  2GB (jvmargs above)
+        #   Gradle daemon JVM:  2GB heap + up to 1GB metaspace = ~3GB (jvmargs above)
         #   Node/Metro:         2GB (NODE_OPTIONS in workflow)
         #   Native clang++:    ~2 clang++ × 400MB ≈ 800MB (sequential --no-parallel)
         #   OS + other:        ~500MB
-        #   Total:             ~5.3GB ✅
+        #   Total:             ~6.3GB ✅
 
         # Shared Gradle flags — single source of truth for all Android builds
         # --no-parallel: prevents same-project ABI tasks running concurrently,
         #   which was causing ~4 simultaneous clang++ compilations even with --max-workers=2.
-        GRADLE_FLAGS="--no-daemon --stacktrace --no-parallel --max-workers=1 --build-cache"
+        # --warning-mode=all: enumerate each Gradle deprecation (incl. Gradle 10
+        #   incompatibilities) by source location instead of the default summary
+        #   line. Cheap visibility for future upgrade work.
+        GRADLE_FLAGS="--no-daemon --stacktrace --no-parallel --max-workers=1 --build-cache --warning-mode=all"
 
         # ABI filtering — Reanimated v4 C++ worklet compilation is expensive
         # Debug:   arm64-v8a only (single ABI, fast iteration)
