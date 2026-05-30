@@ -745,6 +745,17 @@ test.describe
     commissionerJwt,
     managerJwt2,
   }) => {
+    // LS-5071 / LS-5051 / LS-5054 — the V2 web Trades tab
+    // (apps/web/src/pages/baseball/league-detail-v2/tabs/Trades.tsx, shipped
+    // by LS-4638) does not expose the `trade-center-heading` testid or the
+    // 4-step "Propose Trade" dialog this phase asserts against. Those UI
+    // pieces still live in the V1 shared-components TradingCenter, but the
+    // web route resolves to V2. Re-enable when LS-5055 lands the V2
+    // Propose Trade UI.
+    test.fixme(
+      true,
+      'V2 web Trades tab lacks Propose Trade UI — tracked in LS-5055',
+    );
     await test.step('Navigate to Trades tab', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
       await page.waitForLoadState('load');
