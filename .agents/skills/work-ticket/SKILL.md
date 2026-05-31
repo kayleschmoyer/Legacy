@@ -217,9 +217,9 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 3.  **Setup**:
     - **Native flow (REQUIRED before any pnpm/make command)**: `.claude/worktrees/<name>/` has no `node_modules`. Symlink from the main repo first (LS-2903/LS-3003):
       ```
-      node scripts/setup-worktree-node-modules.mjs
+      node scripts/modules-pool/link.mjs
       ```
-      Idempotent, no escaping needed. Requires Windows Developer Mode. Fallback if Developer Mode unavailable: `make install` inside the worktree (independent `node_modules`). After either step `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
+      It links `node_modules` to the content-addressable pool slot for the worktree's lockfile (and symlinks `.env`/`.env.local` from main). Idempotent, no escaping needed. Requires Windows Developer Mode — there is no independent-install fallback. After it, `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
     - **Sibling flow**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`.
     - **Pre-populate task list (both flows)** — create a `TodoWrite` checklist covering every remaining workflow step before writing any code. Agents with an explicit pending list are far less likely to stop at intermediate checkpoints (self-review, `make pc`, PR creation):
 
@@ -317,7 +317,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
     > **Precondition for the task being complete: the PR is merged** (see the TaskCreate checklist in Critical Rules). `make pc` passing closes none of those tasks — it is a checkpoint, not the finish line. Continue to Step 7 (Ship) immediately.
     >
-    > **⚠️ E2E/integration spec gate**: If **any** of the following are true, local spec execution is **mandatory before `worktree_push()`**: the ticket description contains a "failing test" section, a "run the spec locally" requirement, or a "DO NOT SUBMIT" block; the ticket names a specific spec as a verification gate; or **you modified any `.integration.spec.ts` file during implementation**. — `make pc` passing is not sufficient for these tickets. Before running the spec: (1) verify `node_modules/.bin/playwright` exists — if not, run `node scripts/setup-worktree-node-modules.mjs` first (the binary will be missing in freshly set up worktrees); (2) run the specific failing spec against the live backend and confirm it passes. Only after the spec passes should you proceed to Ship.
+    > **⚠️ E2E/integration spec gate**: If **any** of the following are true, local spec execution is **mandatory before `worktree_push()`**: the ticket description contains a "failing test" section, a "run the spec locally" requirement, or a "DO NOT SUBMIT" block; the ticket names a specific spec as a verification gate; or **you modified any `.integration.spec.ts` file during implementation**. — `make pc` passing is not sufficient for these tickets. Before running the spec: (1) verify `node_modules/.bin/playwright` exists — if not, run `node scripts/modules-pool/link.mjs` first (the binary will be missing in freshly set up worktrees); (2) run the specific failing spec against the live backend and confirm it passes. Only after the spec passes should you proceed to Ship.
     >
     > The following are **not** valid reasons to skip this gate — each is a stop-and-ask, not a skip:
     >

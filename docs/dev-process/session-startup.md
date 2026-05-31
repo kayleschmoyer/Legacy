@@ -46,7 +46,7 @@ fi
 
 ### Why not just add retries?
 
-The pre-fix code already polled for `node_modules/.bin/tsx` for up to 3 seconds before warning. That polling masked the same race the `.env.local` check was hitting — it papered over an ordering dependency instead of expressing it. Retries make the warning "less wrong on average" but never eliminate it, because the race window scales with setup-script runtime (`node setup-worktree-node-modules.mjs` takes ~0.5–2 s on a cold worktree). LS-4505 removed the retry loop alongside the sibling registration.
+The pre-fix code already polled for `node_modules/.bin/tsx` for up to 3 seconds before warning. That polling masked the same race the `.env.local` check was hitting — it papered over an ordering dependency instead of expressing it. Retries make the warning "less wrong on average" but never eliminate it, because the race window scales with resolver runtime (`node scripts/modules-pool/link.mjs` re-links in milliseconds on a pool hit but runs a full `pnpm install` on a cold-lockfile miss). LS-4505 removed the retry loop alongside the sibling registration.
 
 ## MCP-server launch (independent of hook ordering)
 
@@ -61,15 +61,15 @@ The `mcp-bootstrap.mjs` audit performed alongside LS-4505 confirmed it touches o
 
 Real warnings (post-LS-4505) mean what they say. Walk the checklist:
 
-| Warning                                               | Cause                                                                                                   | First fix to try                                                                                         |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `node_modules/.bin/tsx is missing`                    | Symlink absent, broken, or points at an empty target                                                    | `node scripts/setup-worktree-node-modules.mjs` from worktree root, or `make install` inside the worktree |
-| `.mcp.json not found`                                 | `CLAUDE_PROJECT_DIR` not set to the worktree path                                                       | Restart Claude Code from inside the worktree                                                             |
-| `mcp-bootstrap.mjs missing`                           | File deleted from working tree                                                                          | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`                                           |
-| `MCP_AUTH_TOKEN not set in .env.local`                | `.env.local` is missing, malformed, or the token row is absent                                          | `node scripts/mcp-auth.mjs --setup` then restart                                                         |
-| `MCP_AUTH_TOKEN has expired` / `expires in N minutes` | OIDC JWT past its lifetime                                                                              | `node scripts/mcp-auth.mjs` then restart                                                                 |
-| `MCP_*_URL not set in .env.local`                     | API Gateway URL not written by terraform                                                                | `node scripts/mcp-auth.mjs` (runs `terraform apply` first when URLs are missing)                         |
-| `.env.local not found`                                | Main repo has no `.env.local` (cold-start case), or the worktree's symlink-creation legitimately failed | Check `<main-repo>/.env.local` exists, then `node scripts/setup-worktree-node-modules.mjs`               |
+| Warning                                               | Cause                                                                                                   | First fix to try                                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `node_modules/.bin/tsx is missing`                    | Symlink absent, broken, or the pool slot is unhealthy                                                   | `node scripts/modules-pool/link.mjs` from worktree root (or `make install`)      |
+| `.mcp.json not found`                                 | `CLAUDE_PROJECT_DIR` not set to the worktree path                                                       | Restart Claude Code from inside the worktree                                     |
+| `mcp-bootstrap.mjs missing`                           | File deleted from working tree                                                                          | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`                   |
+| `MCP_AUTH_TOKEN not set in .env.local`                | `.env.local` is missing, malformed, or the token row is absent                                          | `node scripts/mcp-auth.mjs --setup` then restart                                 |
+| `MCP_AUTH_TOKEN has expired` / `expires in N minutes` | OIDC JWT past its lifetime                                                                              | `node scripts/mcp-auth.mjs` then restart                                         |
+| `MCP_*_URL not set in .env.local`                     | API Gateway URL not written by terraform                                                                | `node scripts/mcp-auth.mjs` (runs `terraform apply` first when URLs are missing) |
+| `.env.local not found`                                | Main repo has no `.env.local` (cold-start case), or the worktree's symlink-creation legitimately failed | Check `<main-repo>/.env.local` exists, then `node scripts/modules-pool/link.mjs` |
 
 The full diagnostic checklist (including pre-flight `auth_check_all` and the report-don't-fall-back protocol) is [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md).
 
@@ -78,4 +78,4 @@ The full diagnostic checklist (including pre-flight `auth_check_all` and the rep
 - [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md) — the executable diagnostic checklist this doc orients you to.
 - [`.agents/skills/mcp-first/SKILL.md`](../../.agents/skills/mcp-first/SKILL.md) — server load order and per-server tool substitution table.
 - [`AGENTS.md` § MCP Servers](../../AGENTS.md#mcp-servers) — agent-facing rules for MCP-server health.
-- [`scripts/setup-worktree-node-modules.mjs`](../../scripts/setup-worktree-node-modules.mjs) — the dependency-free Node script that owns symlink creation.
+- [`scripts/modules-pool/link.mjs`](../../scripts/modules-pool/link.mjs) — the dependency-free Node resolver that owns `node_modules` pool-slot linking and `.env`/`.env.local` symlinking.

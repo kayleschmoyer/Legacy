@@ -33,44 +33,33 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
    ```
-7. **Symlink `node_modules` and secret env files from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
+7. **Link `node_modules` and secret env files from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
 
    ```
-   node scripts/setup-worktree-node-modules.mjs
+   node scripts/modules-pool/link.mjs
    ```
 
-   Run from the worktree root. Uses Node.js `fs` APIs internally — no shell escaping needed. Idempotent (safe to call if symlinks already exist). Requires Windows Developer Mode for symlinks. **Precondition for any manual symlink creation in a worktree: the setup script and `make install` have both failed.** Manual `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, and `mklink /J` bypass `.modules.yaml` path consistency checks and cause Nx graph failures, so they are not a supported fallback.
+   Run from the worktree root. It hashes the worktree's `pnpm-lock.yaml` and links `node_modules` to the matching content-addressable pool slot (`<main>/.modules-pool/<hash>/node_modules`), materialising the slot on a miss (`pnpm install --frozen-lockfile` → atomic publish) and re-linking in milliseconds on a hit. Uses Node.js `fs`/`cmd` internally — no shell escaping needed. Idempotent. Requires Windows Developer Mode for the directory symlink. **Precondition for any manual symlink creation in a worktree: the resolver has failed.** Manual `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, and `mklink /J` bypass `.modules.yaml` path consistency checks and cause Nx graph failures, so they are not a supported fallback.
 
-   In addition to `node_modules`, the script also links the main repo's gitignored secret files (`.env`, `.env.local`) into the worktree as file symlinks. This is what lets agents run integration tests locally — `playwright.integration.config.ts` loads `<repo>/.env` for `E2E_COMMISSIONER_*`, `E2E_MANAGER_*`, `VITE_OAUTH_PROXY_URL`, etc. — without manual per-worktree credential copying. Symlinks (not copies) ensure secret rotations in main propagate automatically. If a real file is already present in the worktree (not a symlink), the script leaves it alone — delete it manually if you want to switch to the linked copy.
+   In addition to `node_modules`, the resolver also links the main repo's gitignored secret files (`.env`, `.env.local`) into the worktree as file symlinks. This is what lets agents run integration tests locally — `playwright.integration.config.ts` loads `<repo>/.env` for `E2E_COMMISSIONER_*`, `E2E_MANAGER_*`, `VITE_OAUTH_PROXY_URL`, etc. — without manual per-worktree credential copying. Symlinks (not copies) ensure secret rotations in main propagate automatically. If a real file is already present in the worktree (not a symlink), the resolver leaves it alone — delete it manually if you want to switch to the linked copy.
 
-   If Windows Developer Mode is not available, use `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe. You will need to copy `.env` / `.env.local` from main manually in that case.
-
-   > **Verify after setup — main repo `node_modules` may be empty**: The symlink target (`D:\code\legacy-sports\node_modules`) may contain **0 packages** if the last `make install` ran inside a sibling worktree rather than the main repo — the symlink resolves without error but all tools (`nx`, `prettier`, etc.) are missing. After running the script, confirm the install is populated:
+   > **Verify after setup**: confirm the linked slot is populated:
    >
    > ```
    > test -d node_modules/nx && echo ok || echo EMPTY
    > ```
    >
-   > If `EMPTY`, fall back to an independent install:
-   >
-   > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the empty symlink
-   > 2. `make install` inside the worktree — creates a standalone `node_modules`
-   >
-   > Never attempt to re-point the junction/symlink manually.
+   > If `EMPTY`, the slot did not materialise — re-run `node scripts/modules-pool/link.mjs` and read its output for a `pnpm install` error or a Developer-Mode symlink failure.
 
-   > **Installing new packages in a worktree** — **Precondition for `pnpm add` or `make install`: the symlink has been removed first.** While `node_modules` is symlinked to the main repo, running either command in place risks corrupting the shared `node_modules` used by every worktree (the `preinstall-guard` exists as a safety net, but even partial execution before it fires can damage sibling worktrees). To add/remove/update dependencies:
+   > **Installing new packages in a worktree** — a worktree's `node_modules` is a symlink into an **immutable** shared pool slot, so never `pnpm add`/`pnpm install` straight through it. Adding a package changes the lockfile → a new slot:
    >
-   > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the symlink only, not the main repo's `node_modules`
-   > 2. `pnpm add -w <package>` — adds the package to root `package.json`
-   > 3. `make install` — creates independent `node_modules` in the worktree
+   > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the symlink only, not the pool slot
+   > 2. `pnpm add -w <package>` — adds the package to root `package.json` (rewrites the lockfile)
+   > 3. `make install` (or `node scripts/modules-pool/link.mjs`) — materialises and links the new slot
    >
    > See [install-packages.md](../repo-tooling/references/install-packages.md) for the full procedure.
 
-   > **Broken, empty, or missing `node_modules` recovery**: if the symlink is broken, missing, pointing to the wrong location, **or the target resolved but contains 0 packages** (empty main-repo `node_modules`):
-   >
-   > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`. If `node_modules` is already missing, skip this step.
-   > 2. Run `node scripts/setup-worktree-node-modules.mjs` to recreate the symlink, **or** run `make install` for an independent `node_modules`
-   > 3. **Precondition for manual symlink recreation: the setup script and `make install` have both failed.** `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, and `New-Item -ItemType SymbolicLink` bypass `.modules.yaml` path consistency checks and cause Nx graph failures, so they are not a supported fallback.
+   > **Broken or missing `node_modules` recovery**: re-run `node scripts/modules-pool/link.mjs` from the worktree root. If a healthy slot exists it re-links instantly; otherwise it materialises a fresh one. **Precondition for manual symlink recreation: the resolver has failed.** `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, and `New-Item -ItemType SymbolicLink` bypass `.modules.yaml` path consistency checks and cause Nx graph failures, so they are not a supported fallback.
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
@@ -89,7 +78,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 - **`make_wt_setup` is NOT used** — it's sibling-only. The symlink command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. Run `node scripts/setup-worktree-node-modules.mjs` (from the worktree root) to recreate the symlink, then restart the session. If Windows Developer Mode is unavailable, run `make install` inside the worktree instead. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass path consistency checks. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
+- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. Run `node scripts/modules-pool/link.mjs` (from the worktree root) to link `node_modules` to the worktree's content-addressable pool slot, then restart the session. Directory symlinks require Windows Developer Mode. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass path consistency checks. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
 
 ## Chip Dispatch (preferred for multi-ticket orchestrators)
 
@@ -118,7 +107,7 @@ for each ticket/PR needing code work:
       Setup (REQUIRED before any pnpm/make command):
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
-      3. node scripts/setup-worktree-node-modules.mjs   # or `make install` if Developer Mode unavailable — NEVER use mklink /J or New-Item junction commands
+      3. node scripts/modules-pool/link.mjs   # links node_modules to the pool slot (requires Developer Mode) — NEVER use mklink /J or New-Item junction commands
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
       5. If you need to install new packages: powershell -NoProfile -Command "Remove-Item -Path node_modules -Force" first, then pnpm add -w <pkg>, then make install
 
@@ -157,7 +146,7 @@ original_branch = git branch --show-current
 for each target:
   git fetch origin <branch>
   git checkout <branch>
-  node scripts/setup-worktree-node-modules.mjs   # idempotent — skips if symlink already correct
+  node scripts/modules-pool/link.mjs   # idempotent — re-links instantly if the slot is already built
   # ... do work, commit, push ...
   # (must commit+push before switching — dirty working tree blocks checkout)
 git checkout $original_branch

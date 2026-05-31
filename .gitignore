@@ -346,7 +346,7 @@ scratch/*
 # Claude Code built-in worktrees (ephemeral, not ticket-tracked)
 .claude/worktrees/
 
-# Content-addressable node_modules pool (opt-in; immutable per-lockfile snapshots)
+# Content-addressable node_modules pool (default resolver; immutable per-lockfile snapshots)
 .modules-pool/
 
 # Scheduled-tasks MCP server runtime lock (sessionId/pid/acquiredAt)

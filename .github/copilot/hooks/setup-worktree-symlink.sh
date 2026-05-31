@@ -1,14 +1,18 @@
 #!/bin/bash
-# sessionStart hook: validate and recreate the node_modules symlink for
-# Copilot worktrees (<repo>.worktrees/<name>/).
+# sessionStart hook: link node_modules for Copilot sibling worktrees
+# (<repo>.worktrees/<name>/) to a content-addressable pool slot.
 #
-# Mirrors the logic of .claude/hooks/setup-worktree-symlink.sh but guards on
-# the *.worktrees/<name> sibling directory pattern instead of .claude/worktrees/.
+# Delegates to scripts/modules-pool/link.mjs — a dependency-free Node resolver
+# that hashes the worktree's pnpm-lock.yaml and links node_modules to the
+# matching slot under <main>/.modules-pool/<hash>/node_modules, materialising the
+# slot on a pool miss. link.mjs auto-detects the sibling-worktree main repo, so
+# no path derivation is needed here. On Windows it calls cmd.exe directly via
+# execFileSync — no MSYS2 path mangling (LS-3084).
 #
-# Why symlinks (not junctions):
-#   Directory symlinks (mklink /D on Windows) are NOT followed by recursive-delete
-#   tools. When a worktree directory is deleted, only the link is removed — the
-#   target node_modules in the main repo is left intact.
+# Why directory symlinks (not junctions):
+#   `git worktree remove` follows NTFS junctions and recursively deletes the
+#   target; directory symlinks (mklink /D) are not followed. Requires Windows
+#   Developer Mode.
 #
 # Worktree path pattern this script guards:
 #   <root>/<repo>.worktrees/<name>/   (e.g. /d/code/legacy-sports.worktrees/agents-foo/)
@@ -28,81 +32,15 @@ if [[ "$PARENT_NAME" != *.worktrees ]]; then
   exit 0
 fi
 
-# --- 2. Derive main repo path from the .worktrees parent --------------------
-ROOT_DIR=$(dirname "$PARENT_DIR")
-MAIN_REPO_NAME="${PARENT_NAME%.worktrees}"
-MAIN_REPO="$ROOT_DIR/$MAIN_REPO_NAME"
-MAIN_NM="$MAIN_REPO/node_modules"
-
-if [ ! -d "$MAIN_NM" ]; then
-  echo "WARNING: Main repo node_modules not found at: $MAIN_NM" >&2
-  echo "  Run 'make install' in the main repo first." >&2
-  exit 0
+# --- 2. Delegate to the pool resolver ----------------------------------------
+# Non-fatal: a SessionStart hook must never block startup. Failures (e.g. node
+# missing, Developer Mode off) are surfaced as a warning; check-mcp-servers.sh
+# reports the downstream tsx/node_modules symptom.
+if ! (cd "$WORKTREE" && node "scripts/modules-pool/link.mjs"); then
+  echo "WARNING: scripts/modules-pool/link.mjs failed — node_modules may be missing in $WORKTREE" >&2
+  echo "  Directory symlinks require Windows Developer Mode (Settings > System > For Developers)." >&2
 fi
 
-# --- 3. Check if symlink already exists and is healthy ----------------------
-NM="$WORKTREE/node_modules"
-BIN="$NM/.bin"
-
-needs_recreate=false
-
-if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
-  needs_recreate=true
-elif [ ! -d "$BIN" ] || [ -z "$(ls -A "$BIN" 2>/dev/null | head -c1)" ]; then
-  # .bin missing or empty — stale/broken link
-  needs_recreate=true
-fi
-
-# Also recreate if the existing link is an NTFS junction (LS-3084).
-# `git worktree remove` follows junctions and recursively deletes the target,
-# which would destroy the main repo's node_modules. Symlinks are safe.
-if [ "$needs_recreate" = "false" ] && [ -e "$NM" ] && command -v cygpath &>/dev/null; then
-  WIN_NM_CHECK=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  LINK_TYPE=$(powershell -NoProfile -NonInteractive -Command \
-    "(Get-Item -LiteralPath '$WIN_NM_CHECK' -Force -ErrorAction SilentlyContinue).LinkType" 2>/dev/null || true)
-  if [ "$LINK_TYPE" = "Junction" ]; then
-    needs_recreate=true
-  fi
-fi
-
-if [ "$needs_recreate" = "false" ]; then
-  echo "node_modules symlink is healthy at: $NM"
-  # Refresh session marker
-  date +%s > "$WORKTREE/.copilot-session"
-  exit 0
-fi
-
-# --- 4. Remove stale link + recreate as directory symlink -------------------
-# IMPORTANT: `cmd //c "mklink /D ..."` from bash/MSYS2 silently fails because
-# MSYS2 path translation mangles the mklink arguments (LS-3084). Inline
-# PowerShell -Command strings also break due to bash/PS escaping conflicts.
-# The fix: delegate to scripts/mklink-symlink.ps1 for Windows.
-if command -v cygpath &>/dev/null; then
-  # Windows (git-bash): delegate to PowerShell script
-  WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  WIN_MAIN_NM=$(cygpath -w "$MAIN_NM" 2>/dev/null || echo "$MAIN_NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  WIN_WORKTREE=$(cygpath -w "$WORKTREE" 2>/dev/null || echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g')
-
-  MKLINK_SCRIPT="$WIN_WORKTREE\\scripts\\mklink-symlink.ps1"
-  powershell -NoProfile -NonInteractive -File "$MKLINK_SCRIPT" \
-    -Link "$WIN_NM" -Target "$WIN_MAIN_NM" -Force \
-    >/dev/null 2>&1 || true
-
-  if [ ! -d "$NM" ]; then
-    echo "WARNING: Failed to create node_modules symlink in worktree." >&2
-    echo "  Directory symlinks require Windows Developer Mode to be enabled." >&2
-    echo "  Enable it: Settings > System > For Developers > Developer Mode" >&2
-    exit 1
-  fi
-else
-  # Linux / macOS: standard rm + ln -s
-  if [ -e "$NM" ] || [ -L "$NM" ]; then
-    rm -rf "$NM"
-  fi
-  ln -s "$MAIN_NM" "$NM"
-fi
-
-echo "node_modules symlink created: $NM  -->  $MAIN_NM"
 # Write session marker so cleanup-orphaned-symlinks can distinguish live vs crashed sessions
 date +%s > "$WORKTREE/.copilot-session"
 exit 0

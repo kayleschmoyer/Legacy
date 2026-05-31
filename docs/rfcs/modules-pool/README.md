@@ -2,7 +2,7 @@
 
 |             |                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**  | Draft — for review                                                                                                             |
+| **Status**  | Accepted — Phase 0 (LS-5069) and Phases 2+3 (LS-5081) landed; the pool is the default and the legacy symlink path is removed   |
 | **Author**  | (drafted with Claude Code)                                                                                                     |
 | **Date**    | 2026-05-30                                                                                                                     |
 | **Affects** | `scripts/setup-worktree-node-modules.mjs`, `scripts/pnpm-install-lock.ps1`, `make install`, `make wt-setup`, SessionStart hook |
@@ -183,10 +183,9 @@ The inner `node_modules` directories are auto-skipped by virtually every tool al
 
 ## 7. Rollout
 
-- **Phase 0** — land `modules link` + `modules gc` as opt-in scripts; no behaviour change by default.
+- **Phase 0** ✅ (LS-5069) — landed `modules link` + `modules gc` as opt-in scripts; no behaviour change by default.
 - **Phase 1** — dogfood on a few worktrees; run the validation plan; fix Q1/Q2 fallout.
-- **Phase 2** — flip `make wt-setup` / SessionStart to use the pool by default; keep the old symlink path behind `MODULES_LEGACY=1`.
-- **Phase 3** — remove `pnpm-install-lock.ps1` detach logic and the legacy path once the pool has soaked.
+- **Phase 2 + 3** ✅ (LS-5081) — flipped `make install` / `make wt-setup` (`scripts/setup-worktree.ps1`) / SessionStart hooks (Claude + Copilot) to resolve `node_modules` via `scripts/modules-pool/link.mjs` by default, and **removed** the legacy path in the same change: deleted `scripts/setup-worktree-node-modules.mjs` (+ its test), `scripts/pnpm-install-lock.ps1`, and `scripts/mklink-symlink.ps1`; dropped the `node_modules_DELETE_ME_*` detach machinery from `make refresh`. Phases 2 and 3 were combined (no `MODULES_LEGACY=1` soak window) by repo-owner direction — recovery is `git revert`. Directory symlinks (Windows Developer Mode) are now required; there is no independent-install fallback. `make install` routes through the pool only on Windows; the Linux/CI branch keeps a plain `pnpm install --frozen-lockfile`, so CI is unaffected.
 
 ## 8. Alternatives considered
 

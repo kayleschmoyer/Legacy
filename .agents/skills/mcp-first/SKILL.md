@@ -87,7 +87,7 @@ Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For aff
 
 ## Make Targets
 
-Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool enforces a target whitelist, sets appropriate timeouts, and provides structured output. For worktree creation use `make_worktree_create`; for worktree setup use `make_wt_setup` (supports symlink removal + independent `make install`).
+Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool enforces a target whitelist, sets appropriate timeouts, and provides structured output. For worktree creation use `make_worktree_create`; for worktree setup use `make_wt_setup`, which links `node_modules` to the content-addressable pool slot for the worktree's lockfile via `scripts/modules-pool/link.mjs` (directory symlinks require Windows Developer Mode).
 
 | Shell command  | MCP tool (use this)               |
 | -------------- | --------------------------------- |

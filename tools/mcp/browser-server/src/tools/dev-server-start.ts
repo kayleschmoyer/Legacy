@@ -190,7 +190,7 @@ export async function devServerStart(
             ok: false,
             error: `nx binary not found at ${nxBin}. The worktree's node_modules may not be set up.`,
             remedy:
-              'Run `node scripts/setup-worktree-node-modules.mjs` or `make install` inside the worktree to restore node_modules, then retry.',
+              'Run `node scripts/modules-pool/link.mjs` or `make install` inside the worktree to restore node_modules, then retry.',
           }),
         },
       ],
@@ -285,8 +285,8 @@ export async function devServerStart(
             error: `Failed to start dev server: ${message}`,
             processOutputTail: tail || '(no output captured)',
             remedy: isTimeout
-              ? `The server did not start in time. Inspect processOutputTail above for the last ${OUTPUT_TAIL_BYTES} bytes of nx/Vite output. Common causes: (a) Vite bound only to ::1 or 127.0.0.1 — the probe checks both, so see if the "Local:" line ever printed; (b) node_modules symlink broken (run \`node scripts/setup-worktree-node-modules.mjs\` or \`make install\`); (c) stale process holding the port (run \`make kill-stale\`). Retry with a larger timeoutMs (e.g. 180000) if the machine is slow.`
-              : 'Check that the worktree has node_modules installed (`node scripts/setup-worktree-node-modules.mjs` or `make install`) and that the port is not in use.',
+              ? `The server did not start in time. Inspect processOutputTail above for the last ${OUTPUT_TAIL_BYTES} bytes of nx/Vite output. Common causes: (a) Vite bound only to ::1 or 127.0.0.1 — the probe checks both, so see if the "Local:" line ever printed; (b) node_modules symlink broken (run \`node scripts/modules-pool/link.mjs\` or \`make install\`); (c) stale process holding the port (run \`make kill-stale\`). Retry with a larger timeoutMs (e.g. 180000) if the machine is slow.`
+              : 'Check that the worktree has node_modules installed (`node scripts/modules-pool/link.mjs` or `make install`) and that the port is not in use.',
           }),
         },
       ],

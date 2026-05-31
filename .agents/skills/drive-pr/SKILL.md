@@ -150,7 +150,7 @@ If no worktree exists, there are two paths depending on where the session starte
 Then set up node_modules (required in both cases):
 
 ```
-node scripts/setup-worktree-node-modules.mjs
+node scripts/modules-pool/link.mjs
 ```
 
 ### Step 5: Fix blocking issues

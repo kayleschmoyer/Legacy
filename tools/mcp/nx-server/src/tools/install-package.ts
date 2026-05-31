@@ -105,8 +105,8 @@ export async function installPackage(
               success: false,
               error: 'SYMLINK_DETECTED',
               message:
-                'node_modules is a symlink to the main repo. Running pnpm install here would mutate the shared node_modules and break every other worktree. ' +
-                'To install a package: (1) run the install in the main repo directory, or (2) remove the symlink first (rm -rf node_modules in Git Bash) then run make install.',
+                'node_modules is a symlink into a shared, immutable content-addressable pool slot. Running pnpm add here would mutate a slot other worktrees may be running. ' +
+                'To add a package: remove the symlink first (rm -rf node_modules in Git Bash), run `pnpm add -w <pkg>` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot.',
               cwd,
             },
             null,

@@ -58,7 +58,7 @@ orchestrator for the monorepo.
 
 - Worktree sessions require careful `node_modules` setup: the content-addressable store lives in the
   main repo, so native ephemeral worktrees must symlink or independently install `node_modules`
-  before any Nx command runs (see `scripts/setup-worktree-node-modules.mjs`).
+  before any Nx command runs (see `scripts/modules-pool/link.mjs`).
 - Upgrading Nx is a coordinated effort across all plugin packages (`nx migrate` must be applied and
   tested end-to-end).
 - Developers unfamiliar with Nx must learn its project graph and target conventions before

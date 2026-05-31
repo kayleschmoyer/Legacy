@@ -34,7 +34,7 @@ Before touching any code, verify:
 1. **Worktree `.env` symlink exists** — integration tests require credentials from the main repo `.env`. The worktree setup script creates this:
 
    ```
-   node scripts/setup-worktree-node-modules.mjs
+   node scripts/modules-pool/link.mjs
    ```
 
    Confirm: `test -L apps/web-e2e/.env && echo "symlink ok" || echo "MISSING"`
@@ -103,7 +103,7 @@ nx_run({ project: "web-e2e", target: "integration", args: ["--grep", "<exact tes
 | Test **fails** locally                       | Confirmed reproduction — proceed to Phase 2                                                        |
 | Test **passes** locally but fails in CI      | Likely env or parallelism issue — see [Passes Locally / Fails in CI](#passes-locally--fails-in-ci) |
 | Test **errors** before running (setup crash) | Fixture or auth issue — check `.env` symlink and `INTEGRATION_BASE_URL`                            |
-| Command not found / `tsx` missing            | Run `node scripts/setup-worktree-node-modules.mjs` to restore `node_modules`                       |
+| Command not found / `tsx` missing            | Run `node scripts/modules-pool/link.mjs` to restore `node_modules`                                 |
 
 > Reproducing locally before writing code is non-negotiable. Remote CI runs are 15–30 min each and produce no diagnostic signal you cannot get locally in 60–90 seconds. Every push without local verification risks an infinite CI loop.
 

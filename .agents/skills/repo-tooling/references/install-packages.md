@@ -19,48 +19,37 @@ How to correctly install npm packages in the Legacy Sports pnpm monorepo. All de
 
 ## Installing in a Worktree
 
-Worktrees share `node_modules` with the main repo via a symlink. To install a new package in a worktree, you must break the symlink first and install independently:
+Each worktree's `node_modules` is a directory symlink into an **immutable** content-addressable pool slot (`<main>\.modules-pool\<sha256(pnpm-lock.yaml)>\node_modules`) keyed by the worktree's lockfile — see [the modules-pool RFC](../../../../docs/rfcs/modules-pool/README.md). Because a slot is shared by every consumer on that lockfile and is never mutated after it is built, you must **not** `pnpm add` straight through the symlink — that would rewrite a slot other worktrees may be running. Adding a package changes the lockfile, which means a **new** slot: detach, add, then re-link.
 
-1. **Remove the symlink** (does NOT delete the main repo's `node_modules`):
+1. **Remove the symlink** (unlinks only the link; the pool slot it points at is untouched):
 
    ```powershell
    powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"
    ```
 
-2. **Add the package** to the root `package.json` (still use `-w`):
+2. **Add the package** to the root `package.json` (always `-w`) — this rewrites `pnpm-lock.yaml`:
 
    ```powershell
    pnpm add -w <package-name>
    ```
 
-3. **Run `make install`** in the worktree to get independent `node_modules`:
+3. **Re-link to the new pool slot** — `make install` (or `node scripts/modules-pool/link.mjs`) hashes the updated lockfile, materialises the new slot, and points `node_modules` at it:
+
    ```powershell
    make install
    ```
 
-> **Do NOT install in the main repo** while symlinked worktrees exist -- this is unsafe and can corrupt shared symlinks. The `preinstall-guard` script only blocks installs when lockfiles are already dirty, and `pnpm add` can sometimes slip through before it dirties the lockfile. Always install in the worktree after removing its symlink.
+> Adding a package in a worktree never touches the main repo or any other worktree: each consumer links to the slot matching _its own_ lockfile, and slots are immutable. There is no longer a shared `node_modules` to corrupt — the old "never install in main while worktrees are symlinked" hazard is gone.
 
-> **After the worktree is cleaned up**, the main repo's symlink remains as it was. The next time you create a worktree, `make wt-setup` will re-create a fresh symlink.
+### Recovering a broken pool slot from a worktree
 
-### Recovering a broken shared `node_modules` from a worktree
-
-When the main repo's `node_modules` is corrupted or incomplete (for example `node_modules/.bin/tsx` is missing, which breaks every MCP server that launches via `pnpm exec tsx …`), you no longer need to drop the symlink by hand.
-
-From the worktree, just run:
+When a worktree's `node_modules` is missing or its pool slot is unhealthy (for example `node_modules/.bin/tsx` is missing, which breaks every MCP server that launches via `pnpm exec tsx …`), re-run the resolver from the worktree root:
 
 ```powershell
-make install
+node scripts/modules-pool/link.mjs
 ```
 
-`scripts/pnpm-install-lock.ps1` detects that the target of the worktree's `node_modules` symlink is unhealthy (missing one of `.bin/{tsx,nx}`), drops the symlink itself, and then falls through to a private `pnpm install --frozen-lockfile`. The worktree ends up with its own `node_modules` and is **detached** from the shared directory until the next `node scripts/setup-worktree-node-modules.mjs` / `make wt-setup`.
-
-If the symlink target is already healthy, `make install` inside the worktree is a fast no-op — it logs `[ok] node_modules is a healthy symlink` and exits 0 without reinstalling.
-
-To opt out of the auto-recovery (e.g. you want the script to block and instruct you by hand like it used to), pass `KEEP_SYMLINK=1`:
-
-```powershell
-make install KEEP_SYMLINK=1
-```
+If a healthy slot already exists for the lockfile it re-links in milliseconds; otherwise it materialises a fresh slot (`pnpm install --frozen-lockfile` → atomic publish) and links it. `make install` and `make wt-setup` do the same thing. Directory symlinks require Windows Developer Mode — there is no independent-install fallback.
 
 ## Prerequisites
 

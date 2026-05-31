@@ -800,7 +800,7 @@ function restoreNodeModulesSymlink(cwd: string, log: string[]): void {
       const msg = e instanceof Error ? e.message : String(e);
       log.push(
         `(warning: node_modules symlink ${reason} but could not be restored: ${msg})`,
-        '(run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to restore it manually)',
+        '(run `node scripts/modules-pool/link.mjs` from the worktree root to restore it manually)',
       );
     }
   };
@@ -1616,7 +1616,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         '(3) retry pnpm install up to 3 times, removing EPERM/ENOTEMPTY/EBUSY offenders on each failure, ' +
         '(4) if still failing, escalate to pnpm install --force. ' +
         'Returns structured result with attempts made, paths cleaned, and final node_modules state. ' +
-        'Do NOT use on symlinked node_modules — run `node scripts/setup-worktree-node-modules.mjs` to recreate the symlink instead.',
+        'Do NOT use on symlinked node_modules — run `node scripts/modules-pool/link.mjs` to recreate the symlink instead.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -5247,7 +5247,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 type: 'text',
                 text:
                   `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
-                  'Run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to repair it, then retry.',
+                  'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
               },
             ],
             isError: true,
@@ -5329,7 +5329,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   text:
                     `[cwd: ${targetDir}]\n$ ${command}\n\n` +
                     `node_modules is missing or broken in ${targetDir}.\n` +
-                    'Run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to repair it, then retry.',
+                    'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
                 },
               ],
               isError: true,
@@ -6353,7 +6353,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     success: false,
                     message:
                       'node_modules is a symlink to the main repo. ' +
-                      'Run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to verify or repair it.',
+                      'Run `node scripts/modules-pool/link.mjs` from the worktree root to verify or repair it.',
                   },
                   null,
                   2,
@@ -9178,7 +9178,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     `Worktree is now active — run worktree_set({ key: "${branch}" }) to re-activate after server restart`,
                     setup
                       ? 'Setup complete'
-                      : 'Symlink node_modules if needed: `node scripts/setup-worktree-node-modules.mjs`',
+                      : 'Symlink node_modules if needed: `node scripts/modules-pool/link.mjs`',
                   ],
                 },
                 null,

@@ -52,22 +52,20 @@ github_create_pr(title: "LS-1234 fix(scope): description", body: <markdown>, dra
 
 ## If the Worktree `node_modules` Symlink Is Broken or Missing
 
-When a worktree's `node_modules` symlink is missing, dangling, or pointing to the wrong location, **do not recreate the symlink manually**. Manual junctions to the main repo's `node_modules` cause `.modules.yaml` path mismatches and Nx graph failures.
+When a worktree's `node_modules` symlink is missing, dangling, pointing to the wrong location, or an NTFS junction, **do not recreate it manually**. Manual junctions cause `.modules.yaml` path mismatches and Nx graph failures.
 
 ### Recovery Steps
 
 ```powershell
-# 1. Remove the broken symlink (safe — only removes the link, not the target)
-# Skip this step if node_modules is already missing.
-powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"
-
-# 2. Install independently in the worktree
-make install
+# Re-run the pool resolver from the worktree root. It removes a broken/wrong link,
+# then links node_modules to the content-addressable slot for this lockfile —
+# re-linking instantly on a pool hit, or materialising a fresh slot on a miss.
+node scripts/modules-pool/link.mjs
 ```
 
-This gives the worktree its own independent `node_modules`. The worktree will no longer share with the main repo, which is safe and avoids cross-contamination.
+`make install` and `make wt-setup` do the same thing. Directory symlinks require Windows Developer Mode.
 
 ### What NOT to Do
 
-- **Never** create a Windows junction or symlink to the main repo's `node_modules` manually using `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, or raw `mklink /J`. Use `node scripts/setup-worktree-node-modules.mjs` (native flow) or `make_wt_setup` (sibling flow) to create the symlink — they handle `.modules.yaml` path consistency and junction detection.
-- **Never** run `pnpm install` directly — always use `make install`, which includes the correct flags and lockfile handling.
+- **Never** create a Windows junction or symlink for `node_modules` manually using `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, or raw `mklink /J`. Use `node scripts/modules-pool/link.mjs` (native flow) or `make_wt_setup` (sibling flow) — they handle slot materialisation, `.modules.yaml` path consistency, and junction→symlink conversion.
+- **Never** run `pnpm install` straight through the slot symlink — always use the resolver / `make install`, which build a fresh immutable slot instead of mutating the shared one.

@@ -24,8 +24,8 @@ if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
   exit 0
 fi
 
-# Fast path: if node_modules is a symlink (the normal case — setup-worktree-node-modules.mjs
-# creates a directory symlink), remove it with plain `rm`. `rm` on a symlink unlinks the link
+# Fast path: if node_modules is a symlink (the normal case — the pool resolver
+# scripts/modules-pool/link.mjs creates a directory symlink), remove it with plain `rm`. `rm` on a symlink unlinks the link
 # itself and never recurses into the target, and — unlike `cmd //c rmdir` — it spawns no
 # console window. This is what was flashing a CMD window on every session stop.
 if [ -L "$NM" ]; then

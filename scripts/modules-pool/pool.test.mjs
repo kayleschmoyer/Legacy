@@ -16,6 +16,7 @@ import {
   mkdtempSync,
   mkdirSync,
   writeFileSync,
+  readFileSync,
   rmSync,
   existsSync,
   lstatSync,
@@ -191,6 +192,105 @@ test(
       // Idempotent: a second run keeps the same link, no throw.
       runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
       assert.equal(realpathSync(nm), realpathSync(slotNm));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+// --- .env / .env.local symlinking (linkSecretEnvFiles / linkEnvFile) ---------
+// link.mjs symlinks the main repo's gitignored secret env files into the
+// worktree after linking node_modules. These run on the pool-hit path, so they
+// need a pre-built healthy slot (same setup as the 'pool hit' test) and a
+// symlink-capable host.
+
+/** Build a healthy slot for the worktree's lockfile so link.mjs is a cache hit. */
+function prebuildSlot(root, wt) {
+  const hash = runLink([
+    `--worktree=${wt}`,
+    `--main-repo=${root}`,
+    '--print-hash',
+  ]).trim();
+  makeHealthyNodeModules(join(root, '.modules-pool', hash, 'node_modules'));
+  return hash;
+}
+
+test(
+  'links .env and .env.local from main into the worktree',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      writeFileSync(join(root, '.env'), 'MAIN_ENV=1\n');
+      writeFileSync(join(root, '.env.local'), 'MCP_AUTH_TOKEN=abc\n');
+      const wt = makeWorktree(root, 'env-wt');
+      prebuildSlot(root, wt);
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+
+      for (const name of ['.env', '.env.local']) {
+        const linkPath = join(wt, name);
+        assert.ok(
+          lstatSync(linkPath).isSymbolicLink(),
+          `${name} should be a symlink`,
+        );
+        assert.equal(
+          realpathSync(linkPath),
+          realpathSync(join(root, name)),
+          `${name} should target the main repo copy`,
+        );
+      }
+
+      // Idempotent: a second run keeps the links and does not throw.
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      assert.ok(lstatSync(join(wt, '.env')).isSymbolicLink());
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'does not overwrite a real (non-symlink) .env already in the worktree',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      writeFileSync(join(root, '.env'), 'MAIN_ENV=1\n');
+      const wt = makeWorktree(root, 'realenv-wt');
+      writeFileSync(join(wt, '.env'), 'WORKTREE_LOCAL=keepme\n'); // a real file
+      prebuildSlot(root, wt);
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+
+      const wtEnv = join(wt, '.env');
+      assert.ok(
+        !lstatSync(wtEnv).isSymbolicLink(),
+        'a real .env must be left as a real file',
+      );
+      assert.equal(
+        readFileSync(wtEnv, 'utf-8'),
+        'WORKTREE_LOCAL=keepme\n',
+        'a real .env must not be overwritten',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'env linking is a no-op (no error) when the main repo has no .env',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'noenv-wt');
+      prebuildSlot(root, wt);
+
+      const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      assert.match(out, /\.env: not present in main repo/);
+      assert.ok(!existsSync(join(wt, '.env')), 'no .env should be created');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

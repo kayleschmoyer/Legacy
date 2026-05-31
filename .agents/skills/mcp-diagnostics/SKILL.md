@@ -99,23 +99,14 @@ echo "MCP_TIMEOUT: ${MCP_TIMEOUT:-unset (default applied by Claude Code)}"
 
 ### Recovery: Missing node_modules
 
-**Option A — standalone script** (run from your terminal; works before MCP servers are connected):
+Run the pool resolver from your terminal (works before MCP servers are connected):
 
 ```bat
 cd D:\code\legacy-sports\.claude\worktrees\<name>
-node scripts/setup-worktree-node-modules.mjs
+node scripts/modules-pool/link.mjs
 ```
 
-The script is idempotent — it repairs broken symlinks, converts junctions to symlinks, and recreates missing ones. Requires Windows Developer Mode for directory symlinks (Settings › System › For Developers › Developer Mode).
-
-**Option B — independent install** (always works, no Developer Mode required):
-
-```powershell
-cd D:\code\legacy-sports\.claude\worktrees\<name>
-make install
-```
-
-This gives the worktree its own independent `node_modules` (not a symlink). Slower on first run but has no Windows prerequisites.
+The resolver is idempotent — it links `node_modules` to the content-addressable pool slot for the worktree's lockfile (re-linking instantly on a hit, materialising it via `pnpm install --frozen-lockfile` on a miss), converts junctions to symlinks, and also symlinks `.env`/`.env.local` from the main repo. `make install` and `make wt-setup` do the same thing. **Directory symlinks require Windows Developer Mode** (Settings › System › For Developers › Developer Mode) — there is no independent-install fallback; if Developer Mode is off, enable it and re-run.
 
 **After repair: restart the Claude Code session.** MCP servers are launched once at session start and do not reconnect automatically.
 
@@ -141,7 +132,7 @@ When MCP servers are confirmed missing and recovery is not possible in the curre
 2. **State which check failed** — e.g. "Check 1 failed: `node_modules/.bin/tsx` missing".
 3. **Do not silently fall back** — using `gh`/`git`/`make` Bash fallbacks without reporting
    produces false MCP gap audit entries and hides the root cause from the team.
-4. **Surface the repair command** — give the user the exact `node scripts/setup-worktree-node-modules.mjs` command or instruct them to run `make install` in the worktree for an independent `node_modules`.
+4. **Surface the repair command** — give the user the exact `node scripts/modules-pool/link.mjs` command (or `make install`), run from the worktree root.
 5. **Stop implementation until the session is healthy** — MCP tool availability is a gate, not
    an advisory. A session running on Bash fallbacks is not a valid implementation environment.
 
@@ -189,5 +180,5 @@ failing service and stop. See `.agents/skills/credentials/SKILL.md`.
 - `docs/dev-process/session-startup.md` — sequence diagram + orientation for the SessionStart hook chain that produces `[MCP WARNING]` output (LS-4505)
 - `.agents/skills/mcp-first/SKILL.md` — server load order and per-server tool substitution table
 - `.agents/skills/credentials/SKILL.md` — auth configuration for each service
-- `.agents/skills/worktree-workflow/SKILL.md` — `scripts/setup-worktree-node-modules.mjs` details
+- `.agents/skills/worktree-workflow/SKILL.md` — `scripts/modules-pool/link.mjs` details
 - `AGENTS.md` `## MCP Servers` section — `MCP_TIMEOUT` setting and symlink repair notes

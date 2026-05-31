@@ -24,7 +24,7 @@ overrides:
 
 packageExtensionsChecksum: f82047138a008e1073df626cfbc513eb
 
-pnpmfileChecksum: lacqhz3tp5w4g3mjakpoqjptlq
+pnpmfileChecksum: ku3eoulzvjjwx46izu3v5lepau
 
 patchedDependencies:
   expo-modules-core@56.0.13:

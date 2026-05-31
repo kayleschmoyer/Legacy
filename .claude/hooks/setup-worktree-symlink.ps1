@@ -1,9 +1,9 @@
 # SessionStart hook: create node_modules symlink in ephemeral worktrees.
 # Handles both Claude Code (.claude/worktrees/<name>) and Copilot (<repo>.worktrees/<name>) patterns.
 #
-# Delegates to scripts/setup-worktree-node-modules.mjs — same script as the bash hook.
-# The PS hook may run concurrently with the bash hook; the setup script is intended
-# to be idempotent, but concurrent callers can still race during symlink creation.
+# Delegates to scripts/modules-pool/link.mjs — same resolver as the bash hook.
+# The PS hook may run concurrently with the bash hook; the resolver is idempotent
+# and uses atomic-rename publish, so concurrent callers converge on one pool slot.
 #
 # Claude Code equivalent: .claude/hooks/setup-worktree-symlink.sh
 
@@ -48,15 +48,15 @@ elseif ($worktree -match [regex]::Escape('\.claude\worktrees\') + '[^\\]+$') {
 
 if (-not $isWorktree) { exit 0 }
 
-# --- 2. Delegate to the Node.js setup script ----------------------------------
-# node is available system-wide; the script is dependency-free (no node_modules needed).
+# --- 2. Delegate to the Node.js pool resolver ----------------------------------
+# node is available system-wide; the resolver is dependency-free (no node_modules needed).
 # Capture stderr to a log file rather than discarding it — the hook must never
 # block session startup, but we still want the root cause visible when node
 # fails (missing node, script bug, mklink permission denied, etc.).
 $tempDir = if ($env:TEMP) { $env:TEMP } elseif ($env:TMP) { $env:TMP } else { '/tmp' }
 $setupLog = Join-Path $tempDir 'claude-setup-worktree-symlink.log'
 "--- $((Get-Date).ToUniversalTime().ToString('o')) worktree=$worktree ---" | Out-File -FilePath $setupLog -Append -Encoding utf8
-& node "$worktree\scripts\setup-worktree-node-modules.mjs" "--worktree=$worktree" *>> $setupLog
+& node "$worktree\scripts\modules-pool\link.mjs" "--worktree=$worktree" *>> $setupLog
 # Cap log at 500 lines so it doesn't grow unbounded over many sessions.
 if (Test-Path $setupLog) {
     $tail = Get-Content -LiteralPath $setupLog -Tail 500 -ErrorAction SilentlyContinue

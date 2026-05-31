@@ -20,9 +20,14 @@
  *   3. pool miss -> `pnpm install --frozen-lockfile` in the worktree, move the
  *      result into <pool>/.tmp-<pid>, atomic-rename to <pool>/<hash>, then symlink.
  *
+ * After linking node_modules it also symlinks the main repo's gitignored secret
+ * env files (.env, .env.local) into the worktree — what lets agents run
+ * integration tests and pick up MCP_* credentials. This mirrors the behaviour of
+ * the SessionStart hook before the pool became the default resolver.
+ *
  * Run with plain `node` — no tsx, no pnpm-for-resolution, no MCP required. This is
- * intentionally dependency-free so it works when node_modules is absent (the same
- * bootstrap constraint as scripts/setup-worktree-node-modules.mjs).
+ * intentionally dependency-free so it works when node_modules is absent and runs
+ * before tsx/MCP exist (it is the SessionStart hook's node_modules resolver).
  *
  * Usage:
  *   node scripts/modules-pool/link.mjs [--worktree=<path>] [--main-repo=<path>]
@@ -30,7 +35,8 @@
  *
  * --worktree    Absolute path to the worktree. Defaults to cwd.
  * --main-repo   Absolute path to the main repo root (holds .modules-pool). Auto-
- *               detected when omitted, same rules as setup-worktree-node-modules.mjs.
+ *               detected when omitted (native `.claude/worktrees/<name>` and
+ *               sibling `<repo>.worktrees/<name>` layouts, or the main repo itself).
  * --no-salt     Hash the lockfile only (omit the pnpm version salt).
  * --print-hash  Print the resolved hash and exit (no filesystem changes).
  */
@@ -104,13 +110,20 @@ if (isHealthy(slotNm)) {
   console.log('[hit] pool slot already built — linking.');
   linkWorktreeToSlot(slotNm);
   console.log('[ok] node_modules → pool slot (cache hit).');
-  process.exit(0);
+} else {
+  console.log('[miss] no healthy slot for this lockfile — materialising.');
+  materialiseSlot();
+  linkWorktreeToSlot(slotNm);
+  console.log('[ok] slot materialised and linked.');
 }
 
-console.log('[miss] no healthy slot for this lockfile — materialising.');
-materialiseSlot();
-linkWorktreeToSlot(slotNm);
-console.log('[ok] slot materialised and linked.');
+// Link the main repo's gitignored secret env files (.env, .env.local) into the
+// worktree, mirroring the behaviour the SessionStart hook relied on before the
+// pool became the default resolver. The .env link is what lets agents run
+// integration tests (playwright.integration.config.ts loads <repo>/.env) and
+// pick up MCP_* credentials. Failures here are non-fatal: node_modules — the
+// primary mission — is already linked.
+linkSecretEnvFiles();
 
 // ---------------------------------------------------------------------------
 // Materialisation (pool miss)
@@ -178,7 +191,7 @@ function linkWorktreeToSlot(target) {
 
   if (process.platform === 'win32') {
     // mklink /D = directory symlink (NOT a junction — safe for recursive-delete).
-    // Requires Windows Developer Mode, same as setup-worktree-node-modules.mjs.
+    // Requires Windows Developer Mode.
     let mkErr;
     try {
       execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, target], {
@@ -363,6 +376,85 @@ function safeReadlink(p) {
 
 function nonEmpty(v) {
   return v != null && v !== '' ? v : null;
+}
+
+// ---------------------------------------------------------------------------
+// Secret env-file linking (.env, .env.local)
+// ---------------------------------------------------------------------------
+// These files live only in the main repo (gitignored, contain local creds).
+// Symlinking — rather than copying — means rotations in main propagate to all
+// worktrees automatically. All failures are non-fatal.
+function linkSecretEnvFiles() {
+  console.log('');
+  for (const name of ['.env', '.env.local']) {
+    linkEnvFile(name);
+  }
+}
+
+function linkEnvFile(name) {
+  const mainPath = join(mainRepo, name);
+  const wtPath = join(worktree, name);
+
+  if (!existsSync(mainPath)) {
+    console.log(`[skip] ${name}: not present in main repo, nothing to link.`);
+    return;
+  }
+
+  if (lstatExists(wtPath)) {
+    const st = safeLstat(wtPath);
+    if (st && st.isSymbolicLink()) {
+      const target = safeRealpath(wtPath);
+      if (target && normalize(target) === normalize(mainPath)) {
+        console.log(`[ok] ${name}: symlink already points to main repo.`);
+        return;
+      }
+      console.log(`[info] ${name}: symlink points elsewhere — replacing.`);
+      try {
+        rmSync(wtPath, { force: true });
+      } catch (err) {
+        // Could not drop the wrong-target link (e.g. a file lock). Bail without
+        // creating a second link, but make it loud: the worktree is still
+        // pointing at the WRONG file, so integration tests / MCP auth may read
+        // stale values until it is fixed by hand.
+        console.warn(
+          `[warn] ${name}: could not remove the existing wrong-target symlink: ${String(err.message ?? err)}\n` +
+            `       The worktree is still linked to an INCORRECT ${name}. Remove it manually ` +
+            `(rm -f "${wtPath}") and re-run this resolver before relying on integration tests or MCP auth.`,
+        );
+        return;
+      }
+    } else {
+      console.log(
+        `[skip] ${name}: real file present in worktree (not a symlink). ` +
+          'Delete it manually to switch to the linked copy.',
+      );
+      return;
+    }
+  }
+
+  try {
+    if (process.platform === 'win32') {
+      // mklink without /D = file symlink. Requires Windows Developer Mode.
+      execFileSync('cmd', ['/c', 'mklink', wtPath, mainPath], {
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+    } else {
+      symlinkSync(mainPath, wtPath, 'file');
+    }
+  } catch (err) {
+    const msg = String(err.message ?? err);
+    const devMode = /privilege|EPERM|1314/i.test(msg);
+    console.warn(
+      `[warn] ${name}: failed to create symlink: ${msg}` +
+        (devMode
+          ? '\n       File symlinks require Windows Developer Mode; ' +
+            `copy the main repo's ${name} into this worktree manually instead.`
+          : ''),
+    );
+    return;
+  }
+  console.log(`[ok] ${name}: linked → ${mainPath}`);
 }
 
 function fail(msg) {

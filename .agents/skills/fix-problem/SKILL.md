@@ -138,7 +138,7 @@ After creation, announce the ticket key:
 
 Follow the [work-ticket](../work-ticket/SKILL.md) leaf mode workflow from Step 2 onward, with these bug-specific requirements:
 
-1. **Environment setup** — use the environment-appropriate setup from `work-ticket`: in native/local flow, verify you're in an ephemeral worktree and run `node scripts/setup-worktree-node-modules.mjs` if not already done; in cloud/non-worktree flow, work directly in the repo root and do not require an ephemeral worktree.
+1. **Environment setup** — use the environment-appropriate setup from `work-ticket`: in native/local flow, verify you're in an ephemeral worktree and run `node scripts/modules-pool/link.mjs` if not already done; in cloud/non-worktree flow, work directly in the repo root and do not require an ephemeral worktree.
 
 2. **Reproduce before fixing** — follow the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type). Capture before-state evidence (screenshot, failing test, query result). This is not optional — you cannot prove a fix works without showing the broken state first.
 

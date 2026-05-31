@@ -3,10 +3,11 @@
 # for ephemeral worktrees (.claude/worktrees/<name>/ or <repo>.worktrees/<name>/),
 # then run check-mcp-servers.sh sequentially to surface any precondition failures.
 #
-# Delegates to scripts/setup-worktree-node-modules.mjs — a dependency-free Node
-# script that handles detection, stale-link cleanup, symlink creation, and
-# virtualStoreDir validation. Node calls cmd.exe directly via execFileSync, so
-# there is no MSYS2 path-mangling issue (LS-3084).
+# Delegates to scripts/modules-pool/link.mjs — a dependency-free Node script that
+# hashes the worktree's pnpm-lock.yaml and links node_modules to the matching
+# content-addressable pool slot (<main>/.modules-pool/<hash>/node_modules),
+# materialising the slot on a pool miss. Node calls cmd.exe directly via
+# execFileSync, so there is no MSYS2 path-mangling issue (LS-3084).
 #
 # Chained-not-concurrent: check-mcp-servers.sh used to be a sibling SessionStart
 # entry that ran in parallel with this hook. That created a race — the check
@@ -72,9 +73,10 @@ if [ "$RUN_SETUP" = "true" ]; then
   fi
 fi
 
-# Delegate entirely to the standalone Node.js setup script. It is intentionally
-# dependency-free (no tsx, no pnpm, no node_modules required) and handles all
-# cases: missing symlink, wrong target, NTFS junction, stale virtualStoreDir.
+# Delegate entirely to the standalone Node.js pool resolver. It is intentionally
+# dependency-free (no tsx, no pnpm-for-resolution, no node_modules required) and
+# handles all cases: missing symlink, wrong target, NTFS junction, pool hit
+# (instant relink) and pool miss (frozen-lockfile install + atomic publish).
 # On Windows, node calls cmd.exe via execFileSync — no MSYS2 path mangling.
 # Output is captured to a log (see SETUP_LOG below); tsx absence is also surfaced
 # at session-start by the chained check-mcp-servers.sh invocation at the bottom
@@ -92,7 +94,7 @@ if [ "$RUN_SETUP" = "true" ]; then
   SETUP_LOG="${TMPDIR:-/tmp}/claude-setup-worktree-symlink.log"
   {
     echo "--- $(date -u +%Y-%m-%dT%H:%M:%SZ) WORKTREE=$WORKTREE ---"
-    (cd "$WORKTREE" && node "scripts/setup-worktree-node-modules.mjs")
+    (cd "$WORKTREE" && node "scripts/modules-pool/link.mjs")
   } >>"$SETUP_LOG" 2>&1
   # Cap log at 500 lines so it doesn't grow unbounded over many sessions.
   if [ -f "$SETUP_LOG" ]; then

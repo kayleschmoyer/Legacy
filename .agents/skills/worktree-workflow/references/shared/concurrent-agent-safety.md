@@ -1,72 +1,71 @@
-# Concurrent Agent Safety (Shared node_modules)
+# Concurrent Agent Safety (node_modules pool)
 
-When multiple agents work in parallel, **all symlinked worktrees share the same physical
-`node_modules` directory** in the main repo. This creates race conditions if any agent
-mutates that directory.
+Each worktree's `node_modules` is a directory symlink into a content-addressable
+**pool slot** keyed by the worktree's `pnpm-lock.yaml` hash
+(`<main>\.modules-pool\<hash>\node_modules`). Slots are **immutable**: built once,
+never mutated. This is what makes concurrent work safe — installing in one
+worktree builds a _new_ slot and can never change the packages another worktree
+is running, and `make install` can no longer `EPERM`-fail on a native binary
+another worktree holds open. See [the modules-pool RFC](../../../../../docs/rfcs/modules-pool/README.md).
 
 ## Rules for concurrent agents
 
-1. **Never run `make clean`, `make install`, `make install-force`, or `pnpm install` in the
-   main repo** (`D:\code\legacy-sports`) while worktrees are active. These mutate or destroy
-   the shared `node_modules`, breaking every symlinked worktree mid-build/test.
-2. **Only run install/clean inside your own worktree** — and only after breaking the symlink
-   so the worktree has independent (non-symlinked) `node_modules`. To break the symlink and
-   install independently: `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` → `pnpm add -w <pkg>` (if adding) →
-   `make install`. See [install-packages.md](../../../repo-tooling/references/install-packages.md).
-3. **All install operations are serialized** — `make install`, `make install-force`, `make install-node`,
-   and `make wt-setup` all share a file lock (`.pnpm-install.lock`) in the main repo so concurrent
-   agents don't race on `node_modules`. If another install is in progress, yours will wait (up to 5 min).
-   **Never run raw `pnpm install`** — always use the Makefile targets.
-4. **`make clean` and `make force-clean` are symlink-safe** — they detect symlinks and
-   only unlink them (`cmd rmdir`) instead of recursively deleting the target contents.
-5. **Runtime guards enforce these rules** — `make install` (via `pnpm-install-lock.ps1`) will
-   **refuse to run** if `node_modules` is a symlink, and `make clean` will **refuse to run** if
-   other worktrees have symlinks pointing to the shared `node_modules`. These guards exist
-   because agents ignoring the instructions above caused cascading failures across all worktrees.
+1. **Never run raw `pnpm install` / `pnpm add` straight through a worktree's
+   `node_modules`.** It is a symlink into a _shared, immutable_ pool slot; writing
+   through it would mutate a slot other worktrees are running. Always go through
+   the resolver: `node scripts/modules-pool/link.mjs`, `make install`, or
+   `make wt-setup`. `preinstall-guard.js` is the safety net — it detects a
+   symlinked `node_modules` and exits 1.
+2. **To add/remove/update dependencies in a worktree**, break the symlink first,
+   then add, then re-link — adding a package changes the lockfile, so the resolver
+   builds and links a _new_ slot:
+   `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` →
+   `pnpm add -w <pkg>` → `make install`. See [install-packages.md](../../../repo-tooling/references/install-packages.md).
+3. **`make install` in the main repo is safe while worktrees are active.**
+   Worktrees no longer symlink into main's `node_modules` — each points at its own
+   pool slot — so a main-repo install (which links main's own slot) cannot break a
+   worktree mid-build.
+4. **`make clean` / `make force-clean` are symlink-safe** — they detect the
+   `node_modules` symlink and only unlink it (`cmd rmdir`) instead of recursively
+   deleting the slot it points at.
 
 ## What is safe in parallel
 
-- Reading `node_modules` via symlinks (builds, tests, lint) — multiple readers are fine.
-- Running `make wt-setup` concurrently (serialized by lock).
-- Running `make install` in a worktree with independent `node_modules`
-  (i.e., after breaking the symlink with `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`), because the
-  approved Makefile install targets are serialized by lock.
-- Running `pnpm add -w <pkg>` in a worktree with independent `node_modules` as part of the
+- Reading `node_modules` through the slot symlink (builds, tests, lint) — many
+  readers of one immutable slot are fine.
+- Running `make wt-setup` / `node scripts/modules-pool/link.mjs` concurrently in
+  different worktrees — materialisation publishes via atomic rename, so concurrent
+  builders of the same hash converge on one slot and the losers discard their temp
+  copy.
+- `pnpm add -w <pkg>` in a _detached_ worktree (symlink removed) as part of the
   documented package-add flow, followed by `make install`.
 
 ## Never manually remove worktrees
 
-Running `git worktree remove` or deleting a worktree directory (e.g., `Remove-Item -Recurse`)
-**destroys the `node_modules` symlink target** — the main repo's `node_modules`. This breaks
-every other symlinked worktree and requires a full `make install` to recover. Always use
-`twig worktree clean`, which safely unlinks symlinks before removing the directory.
+Running `git worktree remove` or deleting a worktree directory with a
+recursive-delete tool can follow an NTFS _junction_ and destroy its target. The
+resolver always creates directory _symlinks_ (never junctions) precisely so
+recursive-delete tools unlink the link without recursing — but always use
+`twig worktree clean`, which unlinks safely before removing the directory. Orphan
+pool slots left behind by cleaned-up worktrees are reclaimed by `make modules-gc`.
 
-## When node_modules appears broken in a symlinked worktree
+## When node_modules appears broken in a worktree
 
-> This is the #1 agent failure mode. An agent sees "missing `.bin/`" or "module not found"
-> and reflexively runs `make install` — which mutates the shared `node_modules` and breaks
-> every other agent's worktree simultaneously, triggering a cascade of install attempts.
+Re-run the resolver from the worktree root — it is the one safe recovery for every
+case (missing link, wrong target, junction, unhealthy slot):
 
-1. **Check if `node_modules` is a symlink** (it almost always is):
-   ```powershell
-   (Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint
-   ```
-2. **If it IS a symlink** → the problem is in the main repo's `node_modules`, not yours.
-   **Ask the user** to fix it. An agent must never autonomously run `make install` in the
-   main repo while other worktrees are active.
-3. **If the symlink is missing** → re-run `make wt-setup WT=<this-worktree-path>` to
-   recreate it. This is safe — it only creates a symlink, it doesn't mutate `node_modules`.
+```powershell
+node scripts/modules-pool/link.mjs
+```
+
+If a healthy slot already exists for the lockfile it re-links in milliseconds;
+otherwise it materialises a fresh slot (`pnpm install --frozen-lockfile` → atomic
+publish) and links it. This never touches any other worktree's slot.
 
 ## Runtime Guards
 
-Multiple layers prevent agents from accidentally mutating shared `node_modules`:
-
-| Guard                            | File                      | Trigger                                | What it blocks                                                        |
-| -------------------------------- | ------------------------- | -------------------------------------- | --------------------------------------------------------------------- |
-| **Package manager enforcement**  | `preinstall-guard.js`     | Any `npm install` / `yarn install`     | Non-pnpm package managers (checks `npm_config_user_agent`)            |
-| **Symlink mutation (worktree)**  | `preinstall-guard.js`     | `pnpm install` in a symlinked worktree | Detects symlink via `fs.readlinkSync()`, exits 1                      |
-| **Symlink mutation (main repo)** | `preinstall-guard.js`     | `pnpm install` in main repo            | Detects worktrees with symlinks pointing here via `git worktree list` |
-| **PowerShell symlink guard**     | `pnpm-install-lock.ps1`   | `make install`, `make install-force`   | Same as above two, with richer error messages and recovery steps      |
-| **Main-repo worktree guard**     | `pnpm-install-lock.ps1`   | `make install` in main repo            | Scans all worktrees for symlinks targeting this `node_modules`        |
-| **File lock serialization**      | `pnpm-install-lock.ps1`   | All install ops                        | `.pnpm-install.lock` exclusive file handle (5-min timeout)            |
-| **Clean guard**                  | `Makefile` (`make clean`) | `make clean` in worktree or main repo  | Blocks if symlinks exist (self or siblings)                           |
+| Guard                           | File                      | Trigger                                | What it blocks                                             |
+| ------------------------------- | ------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| **Package manager enforcement** | `preinstall-guard.js`     | Any `npm install` / `yarn install`     | Non-pnpm package managers (checks `npm_config_user_agent`) |
+| **Symlink mutation (worktree)** | `preinstall-guard.js`     | `pnpm install` in a symlinked worktree | Detects symlink via `fs.readlinkSync()`, exits 1           |
+| **Clean guard**                 | `Makefile` (`make clean`) | `make clean` in worktree or main repo  | Blocks if `node_modules` is a symlink (self or siblings)   |

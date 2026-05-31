@@ -10,7 +10,8 @@
 //
 // Guards implemented here mirror those in scripts/preinstall-guard.js so
 // that direct `pnpm install` calls are protected the same way `make install`
-// (which uses pnpm-install-lock.ps1) already is.
+// (which routes through the content-addressable node_modules pool,
+// scripts/modules-pool/link.mjs) already is.
 
 'use strict';
 

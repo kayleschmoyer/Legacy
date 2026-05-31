@@ -41,14 +41,14 @@ work and confuses traceability.
 
 > 📎 **Design rationale** (why one-worktree-per-branch beats reusable static worktrees, disk cost analysis): see [worktree-design-rationale.md](./worktree-design-rationale.md)
 
-## ⚠️ Concurrent Agent Safety (Shared node_modules)
+## ⚠️ Concurrent Agent Safety (node_modules pool)
 
-Symlinked sibling worktrees share the main repo's `node_modules`. Key rules:
+Each sibling worktree's `node_modules` is a symlink into an immutable content-addressable pool slot keyed by its lockfile (`<main>\.modules-pool\<hash>\node_modules`). Key rules:
 
-- **Never `make clean`/`make install`/`pnpm install` in the main repo** while sibling worktrees exist — it breaks all symlinks.
-- **Never manually remove worktrees** — always use `twig worktree clean` (unlinks symlinks safely).
-- **Broken node_modules?** Check if it's a symlink first: `(Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint`. If yes, **ask the user** to fix the main repo — never run `make install` autonomously.
-- All install ops are serialized via `.pnpm-install.lock`. **Never run raw `pnpm install`** — use Makefile targets.
+- **Never run raw `pnpm install`/`pnpm add` straight through a worktree's `node_modules`** — it would mutate a shared immutable slot. Use the resolver (`node scripts/modules-pool/link.mjs`) or Makefile targets, which build a fresh slot.
+- **`make install` in the main repo is safe** while sibling worktrees exist — they link their own slots, not main's `node_modules`.
+- **Never manually remove worktrees** — always use `twig worktree clean` (unlinks symlinks safely). Orphan slots are reclaimed by `make modules-gc`.
+- **Broken node_modules?** Re-run `node scripts/modules-pool/link.mjs` from the worktree root — it re-links a healthy slot instantly or materialises a fresh one.
 
 > 📎 **Full concurrent safety rules, recovery steps, and what's safe in parallel**: see [concurrent-agent-safety.md](../shared/concurrent-agent-safety.md)
 

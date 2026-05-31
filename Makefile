@@ -111,27 +111,22 @@ endif
 install: ## Install all dependencies (Node.js and Python)
 	@$(call echo_blue,Installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck) $(if $(KEEP_SYMLINK),-KeepSymlink)
+	@node scripts/modules-pool/link.mjs
 else
 	pnpm install --frozen-lockfile
 endif
 	@$(CHECK_POETRY)
 	@$(MAKE) setup-hooks
 
-refresh: ## Pull latest main and update shared node_modules (safe with symlinked worktrees)
-	@$(call echo_blue,Refreshing main repo and shared node_modules...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -Command "Get-ChildItem -Path '$(WORKSPACE_PATH_WIN)' -Directory -Filter 'node_modules_DELETE_ME_*' -EA SilentlyContinue | ForEach-Object { $$dir = $$_; try { Remove-Item $$dir.FullName -Recurse -Force -EA Stop; Write-Host ('  Cleaned up ' + $$dir.Name) -ForegroundColor Green } catch { Write-Host ('  Could not remove ' + $$dir.Name + ' (still locked)') -ForegroundColor Yellow } }"
-else
-	@find . -maxdepth 1 -name 'node_modules_DELETE_ME_*' -type d -exec rm -rf {} + 2>/dev/null && echo "  Cleaned up leftover node_modules_DELETE_ME_* directories" || true
-endif
+refresh: ## Pull latest main and relink node_modules to the matching pool slot
+	@$(call echo_blue,Refreshing main repo and node_modules pool slot...)
 	@git pull origin main --ff-only
-	@$(MAKE) install SKIP_SYMLINK_CHECK=1
+	@$(MAKE) install
 
-install-force: ## Force install dependencies (handles Windows file locks)
+install-force: ## Force install dependencies (Windows file locks are obsoleted by the node_modules pool)
 	@$(call echo_blue,Force installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -ForceClean -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck) $(if $(KEEP_SYMLINK),-KeepSymlink)
+	@node scripts/modules-pool/link.mjs
 else
 	@$(call echo_yellow,Stopping potential background processes...)
 	@$(KILL_NODE)
@@ -152,7 +147,7 @@ install-tools: ## Install additional development tools (npkill, rimraf)
 install-node: ## Install only Node.js dependencies
 	@$(call echo_blue,Installing Node.js dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(KEEP_SYMLINK),-KeepSymlink)
+	@node scripts/modules-pool/link.mjs
 else
 	pnpm install --frozen-lockfile
 endif
@@ -183,12 +178,12 @@ endif
 # the shell command line — so user-supplied values cannot inject extra arguments
 # or shell commands. The scripts read MODULES_POOL_* from process.env.
 modules-link: export MODULES_POOL_WT := $(WT)
-modules-link: ## [opt-in] Link this worktree's node_modules to a content-addressable pool slot (RFC: docs/rfcs/modules-pool). Usage: make modules-link [WT=<path>]
+modules-link: ## Link this worktree's node_modules to a content-addressable pool slot (RFC: docs/rfcs/modules-pool). Usage: make modules-link [WT=<path>]
 	@node scripts/modules-pool/link.mjs
 
 modules-gc: export MODULES_POOL_DAYS := $(DAYS)
 modules-gc: export MODULES_POOL_DRY := $(DRY)
-modules-gc: ## [opt-in] Prune orphan node_modules pool slots. Usage: make modules-gc [DAYS=14] [DRY=1]
+modules-gc: ## Prune orphan node_modules pool slots. Usage: make modules-gc [DAYS=14] [DRY=1]
 	@node scripts/modules-pool/gc.mjs
 
 setup-hooks: ## Install git hooks from .github/hooks/ into .git/hooks/

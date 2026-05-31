@@ -21,8 +21,8 @@ Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx
 
 `nx_install_package` enforces the monorepo's package installation rules:
 
-1. **Symlink detection** — refuses to install if `node_modules` is a symlink (shared with other worktrees)
-2. **Lock file** — uses `pnpm-install-lock.ps1` to acquire an exclusive lock, preventing concurrent installs from corrupting `node_modules`
+1. **Symlink detection** — refuses to install if `node_modules` is a symlink into a shared pool slot (it would mutate a slot other worktrees may be running)
+2. **Immutable pool slots** — the content-addressable `node_modules` pool (`scripts/modules-pool/link.mjs`) makes concurrent installs safe by construction: a new lockfile builds a separate immutable slot, so installs never corrupt another worktree's `node_modules`
 3. **Workspace root** — always installs with `-w` flag (all deps are hoisted to the root)
 4. **Post-install scanning** — checks for nested `node_modules` in `lib/` that signal version duplication
 5. **Types detection** — reports whether the package bundles types or needs an `@types/` companion
