@@ -110,14 +110,27 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         const oauthProxy = getMobileOAuthConfig().oauthProxyUrl;
 
         // Handle both web (code/credential) and mobile (serverAuthCode) responses
-        const authPayload: { code?: string; credential?: string } = {};
+        const authPayload: {
+          code?: string;
+          credential?: string;
+          redirect_uri?: string;
+        } = {};
 
-        if (response.code) {
-          // Authorization code flow (web and mobile)
-          authPayload.code = response.code;
-        } else if (response.serverAuthCode) {
-          // Mobile server auth code
+        if (response.serverAuthCode) {
+          // Native Google Sign-In serverAuthCode. Google mints it without a
+          // redirect_uri, so the proxy must exchange it with an empty
+          // redirect_uri — omitting it would default to 'postmessage' (the web
+          // GSI value) and Google would reject the exchange with invalid_grant,
+          // leaving the user with no JWT and bouncing them back to login.
+          // (MobileOAuthProvider always populates serverAuthCode for the native
+          // flow, so this branch is what the Android/iOS app actually hits.)
           authPayload.code = response.serverAuthCode;
+          authPayload.redirect_uri = '';
+        } else if (response.code) {
+          // Bare authorization code without a native serverAuthCode. Leave
+          // redirect_uri unset so the proxy applies its default ('postmessage')
+          // instead of being forced down the native (empty redirect_uri) path.
+          authPayload.code = response.code;
         } else if (response.credential) {
           // Web ID token from One Tap
           authPayload.credential = response.credential;

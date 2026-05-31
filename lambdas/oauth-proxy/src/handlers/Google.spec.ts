@@ -263,10 +263,43 @@ describe('handleSecureGoogleAuth — redirect_uri validation', () => {
     expect(result.statusCode).not.toBe(400);
   });
 
-  it('defaults to postmessage when redirect_uri is an empty string', async () => {
+  it('treats an explicit empty redirect_uri as the native mobile flow', async () => {
     const event = makeCodeEvent({ redirect_uri: '' });
     const result = await handleSecureGoogleAuth(event);
     expect(result.statusCode).not.toBe(400);
+  });
+
+  it('exchanges the native serverAuthCode with an empty redirect_uri', async () => {
+    const googleMock = jest.requireMock<{ OAuth2Client: jest.Mock }>(
+      'google-auth-library',
+    );
+
+    await handleSecureGoogleAuth(makeCodeEvent({ redirect_uri: '' }));
+
+    // The code-exchange client must be constructed with an empty redirect_uri
+    // so Google accepts the native serverAuthCode — 'postmessage' (the web GSI
+    // value) would be rejected with invalid_grant.
+    expect(googleMock.OAuth2Client).toHaveBeenCalledWith(
+      'test-client-id',
+      'test-client-secret',
+      '',
+    );
+  });
+
+  it('exchanges a web/omitted-redirect code with postmessage', async () => {
+    const googleMock = jest.requireMock<{ OAuth2Client: jest.Mock }>(
+      'google-auth-library',
+    );
+
+    await handleSecureGoogleAuth(makeCodeEvent());
+
+    // With no redirect_uri the web GSI popup (initCodeClient) flow is assumed,
+    // which requires 'postmessage' for the exchange.
+    expect(googleMock.OAuth2Client).toHaveBeenCalledWith(
+      'test-client-id',
+      'test-client-secret',
+      'postmessage',
+    );
   });
 
   it('accepts postmessage as redirect_uri', async () => {

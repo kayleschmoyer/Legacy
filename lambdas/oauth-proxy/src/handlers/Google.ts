@@ -75,6 +75,23 @@ const getOAuthClient = memoizeOne((clientId: string, clientSecret: string) => {
   return new OAuth2Client(clientId, clientSecret, 'postmessage');
 });
 
+/**
+ * Build an OAuth client bound to a specific `redirect_uri` for the
+ * authorization-code exchange. google-auth-library falls back to the client's
+ * constructor `redirect_uri` whenever the `getToken()` option is falsy, so the
+ * native mobile flow's empty redirect_uri must be baked into the client itself
+ * — passing `{ redirect_uri: '' }` to the 'postmessage' client would silently
+ * revert to 'postmessage' and Google would reject the serverAuthCode with
+ * `invalid_grant`.
+ */
+function getOAuthClientForRedirect(
+  clientId: string,
+  clientSecret: string,
+  redirectUri: string,
+): OAuth2Client {
+  return new OAuth2Client(clientId, clientSecret, redirectUri);
+}
+
 interface GoogleAuthRequest {
   code?: string; // Authorization code (mobile flow)
   credential?: string; // ID token JWT (web flow)
@@ -300,6 +317,16 @@ function validateRedirectUri(
   redirectUri: string | undefined,
   event: APIGatewayEvent,
 ): string {
+  // An *explicitly* empty string denotes the native mobile flow
+  // (react-native-google-signin `serverAuthCode`). Google mints that code
+  // without a redirect_uri, so the token exchange must also use an empty
+  // redirect_uri — sending 'postmessage' (the web GSI value) makes Google
+  // reject the exchange with `invalid_grant`. An *omitted* redirect_uri still
+  // defaults to 'postmessage' for the web GSI popup (initCodeClient) flow.
+  // Empty is not an open-redirect target, so it bypasses the allowlist safely.
+  if (redirectUri === '') {
+    return '';
+  }
   const normalized = redirectUri?.trim();
   const resolved = normalized || 'postmessage';
   if (!getAllowedRedirectUris(event).has(resolved)) {
@@ -365,15 +392,16 @@ export const handleSecureGoogleAuth = async (
 
     // Get OAuth settings upfront — needed for signature verification in Step 1
     const { clientId, clientSecret } = await getGoogleAuthSettings();
-    const oauthClient = getOAuthClient(clientId, clientSecret);
 
     // Step 1: Verify the credential/code to get the cryptographically-confirmed email.
-    // Using oauthClient.verifyIdToken() ensures the Google signature is checked before
-    // the email is trusted for any database operation.
+    // The OAuth client is built per-branch: the code flow binds the resolved
+    // redirect_uri into the client (native mobile needs an empty redirect_uri),
+    // while the One Tap flow only verifies a signature and is redirect-agnostic.
     let userEmail: string;
 
     if (body.credential) {
       // For One Tap flow, verify the ID token signature with Google's public keys
+      const oauthClient = getOAuthClient(clientId, clientSecret);
       try {
         const ticket = await oauthClient.verifyIdToken({
           idToken: body.credential,
@@ -430,10 +458,19 @@ export const handleSecureGoogleAuth = async (
         };
       }
 
+      // Bind the redirect_uri into the client (see getOAuthClientForRedirect)
+      // so the native mobile flow's empty redirect_uri is preserved rather
+      // than reverting to the 'postmessage' default. The same client verifies
+      // the resulting id_token below.
+      const oauthClient = getOAuthClientForRedirect(
+        clientId,
+        clientSecret,
+        redirectUri,
+      );
+
       try {
         const { tokens } = await oauthClient.getToken({
           code: body.code,
-          redirect_uri: redirectUri,
         });
         if (!tokens.id_token) {
           throw new Error(
