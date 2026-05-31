@@ -44,6 +44,7 @@
 import {
   existsSync,
   lstatSync,
+  statSync,
   readdirSync,
   realpathSync,
   readFileSync,
@@ -197,6 +198,7 @@ function linkWorktreeToSlot(target) {
       execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, target], {
         encoding: 'utf-8',
         timeout: 15_000,
+        windowsHide: true,
       });
     } catch (err) {
       mkErr = err;
@@ -273,7 +275,12 @@ function isHealthy(nm) {
 }
 
 function pnpmInstall(cwdDir) {
-  const opts = { cwd: cwdDir, stdio: 'inherit', timeout: 30 * 60_000 };
+  const opts = {
+    cwd: cwdDir,
+    stdio: 'inherit',
+    timeout: 30 * 60_000,
+    windowsHide: true,
+  };
   if (process.platform === 'win32') {
     execFileSync('cmd', ['/c', 'pnpm', 'install', '--frozen-lockfile'], opts);
   } else {
@@ -291,6 +298,7 @@ function removeNodeModulesEntry(p) {
         execFileSync('cmd', ['/c', 'rmdir', p], {
           encoding: 'utf-8',
           timeout: 10_000,
+          windowsHide: true,
         });
         return;
       } catch {
@@ -313,18 +321,16 @@ function removeDir(p) {
 
 function winPathIsContainer(p) {
   if (process.platform !== 'win32') return true;
+  // Pure-Node check: statSync follows symlinks, so a healthy directory symlink
+  // (node_modules → pool slot) reports isDirectory() === true, while a broken
+  // link throws and falls through to false. This intentionally avoids shelling
+  // out to powershell — winPathIsContainer runs on EVERY session start via
+  // isHealthy(), and a `powershell` (or `cmd`) child spawned from the
+  // SessionStart bash hook allocates a visible console window each time, which
+  // flashed on screen and stole focus on every session (LS-5068 fixed the same
+  // class of flash for the Stop hook).
   try {
-    const out = execFileSync(
-      'powershell',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Test-Path -LiteralPath '${p.replace(/'/g, "''")}' -PathType Container`,
-      ],
-      { encoding: 'utf-8', timeout: 10_000 },
-    ).trim();
-    return out === 'True';
+    return statSync(p).isDirectory();
   } catch {
     return false;
   }
@@ -438,6 +444,7 @@ function linkEnvFile(name) {
       execFileSync('cmd', ['/c', 'mklink', wtPath, mainPath], {
         encoding: 'utf-8',
         timeout: 10_000,
+        windowsHide: true,
       });
     } else {
       symlinkSync(mainPath, wtPath, 'file');

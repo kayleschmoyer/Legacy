@@ -332,7 +332,11 @@ function getWindowsLinkType(p: string): 'SymbolicLink' | 'Junction' | null {
         '-Command',
         `(Get-Item -LiteralPath '${p.replace(/'/g, "''")}' -Force).LinkType`,
       ],
-      { encoding: 'utf-8', timeout: 10_000 },
+      // windowsHide: this server runs as a hidden stdio MCP child, so a
+      // powershell.exe spawned without CREATE_NO_WINDOW pops a visible console
+      // window each call (same flash class fixed for the SessionStart/Stop
+      // hooks in LS-5068).
+      { encoding: 'utf-8', timeout: 10_000, windowsHide: true },
     ).trim();
     if (out === 'SymbolicLink' || out === 'Junction') return out;
     return null;
@@ -791,6 +795,7 @@ function restoreNodeModulesSymlink(cwd: string, log: string[]): void {
         execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, mainNmPath], {
           encoding: 'utf-8',
           timeout: 15_000,
+          windowsHide: true,
         });
       } else {
         symlinkSync(mainNmPath, nmPath);
@@ -5283,6 +5288,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             encoding: 'utf-8' as const,
             timeout: 120_000,
             maxBuffer: 10 * 1024 * 1024,
+            // Suppress the console window the cmd.exe/bash shell would otherwise
+            // flash on Windows (this server runs as a hidden stdio MCP child).
+            windowsHide: true,
           };
           if (isCmdShell) {
             // Use execFile with explicit /d /s /c args so cmd.exe handling is
@@ -7769,6 +7777,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               env: { ...process.env },
               shell:
                 process.platform === 'win32' ? 'powershell.exe' : undefined,
+              // Hide the powershell.exe console window on Windows (hidden stdio
+              // MCP child — without this each `make` run flashes a window).
+              windowsHide: true,
             },
             (error, stdout, stderr) => {
               const durationMs = Date.now() - start;
@@ -9152,6 +9163,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   encoding: 'utf-8',
                   timeout: 300_000,
                   maxBuffer: 10 * 1024 * 1024,
+                  windowsHide: true,
                 },
               );
               log.push(makeOutput);
