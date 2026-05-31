@@ -126,18 +126,20 @@ export class MobileOAuthProvider implements OAuthProvider {
         );
       }
 
-      const userInfo = googleResponse as GoogleSignInResponse;
+      // After the type guard above, googleResponse is SignInSuccessResponse.
+      // .data is the User object: { user: {...}, serverAuthCode, idToken, scopes }
+      const { user, serverAuthCode } = googleResponse.data;
 
       // Extract the relevant information
       const response: OAuthResponse = {
-        serverAuthCode: userInfo.serverAuthCode || undefined,
-        code: userInfo.serverAuthCode || undefined,
-        user: userInfo.user
+        serverAuthCode: serverAuthCode || undefined,
+        code: serverAuthCode || undefined,
+        user: user
           ? {
-              id: userInfo.user.id,
-              email: userInfo.user.email,
-              name: userInfo.user.name || undefined,
-              photo: userInfo.user.photo || undefined,
+              id: user.id,
+              email: user.email,
+              name: user.name || undefined,
+              photo: user.photo || undefined,
             }
           : undefined,
       };
