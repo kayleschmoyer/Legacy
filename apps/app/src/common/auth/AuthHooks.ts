@@ -1,11 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import axios from 'axios';
-import Constants from 'expo-constants';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'expo-router';
 import {
   ISecureStorage,
-  OAuthConfig,
   OAuthError,
   OAuthProvider,
   OAuthResponse,
@@ -14,6 +12,7 @@ import {
 import type { OAuthErrorCode } from '@legacy-sports/shared-components';
 import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { LOGGER } from '@legacy-sports/logging';
+import { getMobileOAuthConfig } from './mobileOAuthConfig';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 
@@ -45,35 +44,6 @@ export enum Secret {
 }
 
 let KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
-
-const DEFAULT_GOOGLE_CLIENT_ID =
-  '1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com';
-const PLACEHOLDER_GOOGLE_CLIENT_ID = 'placeholder-google-client-id';
-
-function getExpoExtraString(key: string): string | undefined {
-  const value: unknown = Constants.expoConfig?.extra?.[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function getMobileOAuthConfig(): OAuthConfig {
-  const configuredClientId =
-    getEnvVarOptional(EnvironmentVariable.GOOGLE_OAUTH_CLIENT_ID) ??
-    getExpoExtraString('googleClientId');
-  const googleClientId =
-    configuredClientId && configuredClientId !== PLACEHOLDER_GOOGLE_CLIENT_ID
-      ? configuredClientId
-      : DEFAULT_GOOGLE_CLIENT_ID;
-
-  return {
-    googleClientId,
-    oauthProxyUrl:
-      getEnvVarOptional(EnvironmentVariable.OAUTH_PROXY) ??
-      getExpoExtraString('oauthProxyUrl') ??
-      'http://localhost:5001',
-    additionalScopes: ['openid', 'profile', 'email'],
-    offlineAccess: true,
-  };
-}
 
 // Use platform-specific secure storage from platform-components
 const secureStorage: ISecureStorage = SecureStorageProvider;

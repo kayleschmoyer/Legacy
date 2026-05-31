@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
-import Constants from 'expo-constants';
 import { Slot, usePathname } from 'expo-router';
 import { GrowthBook, GrowthBookProvider } from '@growthbook/growthbook-react';
 import { ApolloProvider } from '@apollo/client/react';
@@ -19,6 +18,7 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { DbClientContext } from '../common/ApolloClientContext';
+import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import { ThemeProvider } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
@@ -46,17 +46,10 @@ if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
 
-// Create modern OAuth configuration for mobile
-const authConfig: OAuthConfig = {
-  googleClientId:
-    (Constants.expoConfig?.extra?.googleClientId as string) ||
-    '1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com',
-  oauthProxyUrl:
-    (Constants.expoConfig?.extra?.oauthProxyUrl as string) ||
-    'http://localhost:5001', // OAuth proxy lambda URL
-  additionalScopes: ['openid', 'profile', 'email'],
-  offlineAccess: true,
-};
+// Modern OAuth configuration for mobile — resolved by the single shared helper
+// so the AuthProvider config and the imperative googleLogin flow stay in sync
+// and the app.json placeholder client ID can never leak into GoogleSignin.
+const authConfig: OAuthConfig = getMobileOAuthConfig();
 
 /**
  * Runs inside AppProvider (Apollo context) to set analytics identity using
