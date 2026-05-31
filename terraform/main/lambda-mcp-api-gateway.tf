@@ -240,6 +240,83 @@ resource "aws_cognito_user_pool_client" "mcp_cli" {
   prevent_user_existence_errors = "ENABLED"
 }
 
+# ── Machine (client_credentials) grant — headless MCP auth (LS-5090) ─────────
+#
+# mcp_cli above is a *public* client driving the interactive
+# authorization-code + PKCE flow for human developers. It cannot serve
+# headless / non-SSO environments (cloud agents, lapsed-SSO worktrees) because
+# there is no machine-to-machine grant — RFC failure F2 / GAP-1
+# (docs/rfcs/draft-seamless-mcp-auth.md, Track A step 1).
+#
+# This resource server + confidential client add that grant:
+#   * a resource server "mcp" exposing one scope per hosted MCP server, so a
+#     minted token can be scoped to exactly the server(s) a context needs
+#     (least privilege, RFC OQ-4) — a token bearing only `mcp/jira` is useless
+#     against the GitHub or CI Lambda once they enforce scope (LS-5092);
+#   * a confidential client (generate_secret = true) restricted to the
+#     `client_credentials` flow, which exchanges the machine secret for a
+#     short-lived access token with no human in the loop.
+#
+# The client-side minting command (headersHelper, LS-5091) and the Lambda-side
+# scope enforcement (LS-5092) are out of scope here. This story only provisions
+# the Cognito grant and publishes its identifiers (SSM + Secrets Manager below).
+
+resource "aws_cognito_resource_server" "mcp" {
+  user_pool_id = aws_cognito_user_pool.mcp_dev.id
+  identifier   = "mcp"
+  name         = "${local.name_prefix}-mcp"
+
+  # The full scope string a client requests is "<identifier>/<scope_name>" →
+  # "mcp/jira", "mcp/github", "mcp/ci".
+  scope {
+    scope_name        = "jira"
+    scope_description = "Invoke the Jira MCP server"
+  }
+  scope {
+    scope_name        = "github"
+    scope_description = "Invoke the GitHub MCP server"
+  }
+  scope {
+    scope_name        = "ci"
+    scope_description = "Invoke the CI MCP server"
+  }
+}
+
+# Confidential client for the headless machine-to-machine grant. Separate from
+# mcp_cli (which stays public/interactive — do not fold these together).
+resource "aws_cognito_user_pool_client" "mcp_machine" {
+  name         = "${local.name_prefix}-mcp-machine"
+  user_pool_id = aws_cognito_user_pool.mcp_dev.id
+
+  # Confidential client — the generated secret is the long-lived machine
+  # credential. It is exchanged for a short-lived access token via
+  # client_credentials and (per RFC Track A) never transits the MCP wire.
+  generate_secret = true
+
+  allowed_oauth_flows                  = ["client_credentials"]
+  allowed_oauth_flows_user_pool_client = true
+
+  # Only the custom resource-server scopes — client_credentials cannot request
+  # openid/email/profile. Referencing scope_identifiers also orders the
+  # resource server before this client on apply.
+  allowed_oauth_scopes = aws_cognito_resource_server.mcp.scope_identifiers
+
+  # No callback/logout URLs and no explicit_auth_flows: client_credentials is a
+  # back-channel token exchange with no browser redirect and no user auth flow.
+  # No supported_identity_providers: the grant authenticates the client itself
+  # (COGNITO), not a federated user.
+
+  # client_credentials issues only an access token (no id/refresh token), so
+  # only access_token_validity applies. The headersHelper (LS-5091) re-mints
+  # per connect, but a single long-lived connection must outlive its token to
+  # satisfy RFC AC-G1 (>24h session survives without re-auth). 24h is Cognito's
+  # per-token maximum; LS-5091 verification owns any further tuning.
+  access_token_validity = 24
+  token_validity_units {
+    access_token = "hours"
+  }
+}
+
 # ── SSM — publish Cognito identifiers for scripts/mcp-auth.mjs ────────────────
 
 resource "aws_ssm_parameter" "mcp_cognito_user_pool_id" {
@@ -256,11 +333,41 @@ resource "aws_ssm_parameter" "mcp_cognito_client_id" {
   tags  = local.common_tags
 }
 
+# Machine (client_credentials) client id — non-sensitive, published to SSM
+# alongside the interactive client id above. Its secret is sensitive and goes
+# to Secrets Manager (below). The headersHelper minting command (LS-5091) reads
+# both to perform the client_credentials exchange.
+resource "aws_ssm_parameter" "mcp_cognito_machine_client_id" {
+  name  = "/${local.name_prefix}/mcp/cognito/machine-client-id"
+  type  = "String"
+  value = aws_cognito_user_pool_client.mcp_machine.id
+  tags  = local.common_tags
+}
+
 resource "aws_ssm_parameter" "mcp_cognito_domain" {
   name  = "/${local.name_prefix}/mcp/cognito/domain"
   type  = "String"
   value = local.mcp_cognito_hosted_ui
   tags  = local.common_tags
+}
+
+# ── Secrets Manager — machine client secret ──────────────────────────────────
+# The confidential client's generated secret is the long-lived machine
+# credential. It is co-located here (rather than secrets.tf) with the client
+# that generates it, per LS-5090. Terraform sources the value directly from the
+# Cognito client, so — unlike the externally-provided secrets in secrets.tf —
+# this needs no manual `put-secret-value` bootstrap. NOTE: the value therefore
+# lives in Terraform state; protect the state backend accordingly (same posture
+# as database_password / rollbar_access_token in secrets.tf).
+resource "aws_secretsmanager_secret" "mcp_machine_client_secret" {
+  name        = "${var.environment}/mcp-machine-client-secret"
+  description = "Cognito client_credentials secret for headless MCP server auth (LS-5090)"
+  tags        = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "mcp_machine_client_secret" {
+  secret_id     = aws_secretsmanager_secret.mcp_machine_client_secret.id
+  secret_string = aws_cognito_user_pool_client.mcp_machine.client_secret
 }
 
 # ── HTTP APIs (one per server) ────────────────────────────────────────────────
@@ -354,6 +461,11 @@ output "mcp_api_gateway_urls" {
 output "mcp_cognito_hosted_ui" {
   description = "Cognito hosted UI base URL — use this to invite users via the AWS console"
   value       = local.mcp_cognito_hosted_ui
+}
+
+output "mcp_cognito_machine_client_id" {
+  description = "Cognito client_credentials (machine) app client id — used by the headless MCP minting command (LS-5091). The secret lives in Secrets Manager at <env>/mcp-machine-client-secret."
+  value       = aws_cognito_user_pool_client.mcp_machine.id
 }
 
 # ── SAML SP details — paste into the IC SAML application registration ────────

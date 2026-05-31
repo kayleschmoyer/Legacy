@@ -862,6 +862,7 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/ga-api-secret*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-access-token*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-github-token*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-machine-client-secret*",
         ]
       },
       # Cognito user-pool management — for the MCP JWT auth user pool
@@ -888,6 +889,13 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "cognito-idp:UpdateUserPoolClient",
           "cognito-idp:DescribeUserPoolClient",
           "cognito-idp:ListUserPoolClients",
+          # Resource server CRUD — for the MCP machine-grant scopes
+          # (mcp/jira, mcp/github, mcp/ci) added in lambda-mcp-api-gateway.tf
+          # (LS-5090). Resource servers are sub-resources of the user pool, so
+          # the userpool/* scope below already covers them. Wildcarded to one
+          # entry (covers Create/Describe/Update/Delete) to conserve policy
+          # bytes — the supplemental managed policy is near its 6 KB limit.
+          "cognito-idp:*ResourceServer",
           "cognito-idp:CreateUserPoolDomain",
           "cognito-idp:DeleteUserPoolDomain",
           "cognito-idp:UpdateUserPoolDomain",
@@ -1442,6 +1450,8 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "cognito-idp:DescribeUserPool",
           "cognito-idp:DescribeUserPoolClient",
           "cognito-idp:ListUserPoolClients",
+          # Resource server refresh for the MCP machine-grant scopes (LS-5090).
+          "cognito-idp:DescribeResourceServer",
           "cognito-idp:GetUserPoolMfaConfig",
           # SAML identity provider read — for the IC → Cognito federation
           # (LS-4473). Needed by terraform plan to refresh aws_cognito_identity_provider.
