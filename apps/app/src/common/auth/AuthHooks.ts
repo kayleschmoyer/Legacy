@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from 'react';
-import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'expo-router';
 import {
+  buildGoogleAuthPayload,
+  exchangeGoogleCode,
   ISecureStorage,
   OAuthError,
   OAuthProvider,
@@ -107,49 +108,20 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   const successHandler = useCallback(
     async (response: OAuthResponse) => {
       try {
-        const oauthProxy = getMobileOAuthConfig().oauthProxyUrl;
-
-        // Handle both web (code/credential) and mobile (serverAuthCode) responses
-        const authPayload: {
-          code?: string;
-          credential?: string;
-          redirect_uri?: string;
-        } = {};
-
-        if (response.serverAuthCode) {
-          // Native Google Sign-In serverAuthCode. Google mints it without a
-          // redirect_uri, so the proxy must exchange it with an empty
-          // redirect_uri — omitting it would default to 'postmessage' (the web
-          // GSI value) and Google would reject the exchange with invalid_grant,
-          // leaving the user with no JWT and bouncing them back to login.
-          // (MobileOAuthProvider always populates serverAuthCode for the native
-          // flow, so this branch is what the Android/iOS app actually hits.)
-          authPayload.code = response.serverAuthCode;
-          authPayload.redirect_uri = '';
-        } else if (response.code) {
-          // Bare authorization code without a native serverAuthCode. Leave
-          // redirect_uri unset so the proxy applies its default ('postmessage')
-          // instead of being forced down the native (empty redirect_uri) path.
-          authPayload.code = response.code;
-        } else if (response.credential) {
-          // Web ID token from One Tap
-          authPayload.credential = response.credential;
-        } else {
-          throw new Error(
-            'No valid authentication code or credential received',
-          );
+        const { oauthProxyUrl } = getMobileOAuthConfig();
+        if (!oauthProxyUrl) {
+          throw new Error('OAuth proxy URL is not configured');
         }
 
-        // Posts to the secure Google flow (`/oauth/google` once the `/oauth`
-        // base segment is applied) — the same endpoint the web client uses.
-        // The proxy router has no `/google/auth` route, so the old suffix 404'd
-        // and the user was bounced back to login without a JWT.
-        const tokenResponse = await axios.post<OAuthProxyTokens>(
-          `${oauthProxy}/google`,
-          authPayload,
-        );
+        // Payload assembly (incl. the serverAuthCode/redirect_uri
+        // disambiguation) and transport now live in the shared
+        // `googleAuthExchange` helpers so web and mobile can never drift again
+        // (the root cause of LS-5082 and LS-5084). Only the mobile-specific
+        // token storage (secure storage) stays here.
+        const authPayload = buildGoogleAuthPayload(response);
+        const result = await exchangeGoogleCode(oauthProxyUrl, authPayload);
 
-        await storeToken(tokenResponse.data);
+        await storeToken({ jwt: result.jwt });
 
         if (onSuccess) {
           onSuccess();

@@ -1,8 +1,7 @@
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
-import axios from 'axios';
 // ── Import types for test data ──────────────────────────────────────────────
-import type { LegacySportsJwt, OAuthProxyTokens } from './AuthHooks';
+import type { LegacySportsJwt } from './AuthHooks';
 
 // ── Import module under test (jest.mock calls are hoisted above this) ───────
 import {
@@ -15,10 +14,22 @@ import {
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
 
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
-const mockAxiosPost = jest.fn();
-mockedAxios.post = mockAxiosPost;
+// The Google code-exchange now goes through the shared `exchangeGoogleCode`
+// helper (lib/shared-components), which uses `fetch` rather than axios. We mock
+// the global `fetch` and let the REAL shared helpers run (see the
+// shared-components mock below) so these tests still assert the actual POST URL
+// (`${base}/google`) and payload assembly.
+const mockFetch = jest.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
+
+/** Build a successful `fetch` Response stub for the shared exchange helper. */
+function okJsonResponse(body: unknown): unknown {
+  return {
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(JSON.stringify(body)),
+  };
+}
 
 // Mock expo-constants (uses native expo-modules-core which is unavailable in Jest)
 jest.mock('expo-constants', () => ({
@@ -68,18 +79,31 @@ const mockSignIn = jest.fn();
 const mockSignOut = jest.fn();
 const mockConfigure = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  OAuthProvider: {
-    configure: (...args: unknown[]): unknown => mockConfigure(...args),
-    signIn: (...args: unknown[]): unknown => mockSignIn(...args),
-    signOut: (...args: unknown[]): unknown => mockSignOut(...args),
-  },
-  SecureStorageProvider: {
-    getItem: (...args: unknown[]): unknown => mockGetItem(...args),
-    setItem: (...args: unknown[]): unknown => mockSetItem(...args),
-    removeItem: (...args: unknown[]): unknown => mockRemoveItem(...args),
-  },
-}));
+jest.mock('@legacy-sports/shared-components', () => {
+  // Use the REAL shared payload/transport helpers (their only import is a
+  // type, so requiring the source file directly pulls in nothing native) while
+  // still stubbing the native OAuthProvider/SecureStorageProvider. This keeps
+  // the POST-URL and payload assertions below exercising production code.
+  const { buildGoogleAuthPayload, exchangeGoogleCode } = jest.requireActual<
+    typeof import('@legacy-sports/shared-components')
+  >(
+    '../../../../../lib/shared-components/src/features/auth/services/googleAuthExchange',
+  );
+  return {
+    buildGoogleAuthPayload,
+    exchangeGoogleCode,
+    OAuthProvider: {
+      configure: (...args: unknown[]): unknown => mockConfigure(...args),
+      signIn: (...args: unknown[]): unknown => mockSignIn(...args),
+      signOut: (...args: unknown[]): unknown => mockSignOut(...args),
+    },
+    SecureStorageProvider: {
+      getItem: (...args: unknown[]): unknown => mockGetItem(...args),
+      setItem: (...args: unknown[]): unknown => mockSetItem(...args),
+      removeItem: (...args: unknown[]): unknown => mockRemoveItem(...args),
+    },
+  };
+});
 
 // Mock env utilities
 const mockEnvVars: Record<string, string> = {
@@ -192,9 +216,8 @@ describe('AuthHooks', () => {
 
   describe('useAuthHandlers - googleLogin', () => {
     it('exchanges server auth code for JWT and stores token', async () => {
-      const tokenResponse: OAuthProxyTokens = { jwt: TEST_JWT };
       mockSignIn.mockResolvedValue({ serverAuthCode: 'auth-code-123' });
-      mockAxiosPost.mockResolvedValue({ data: tokenResponse });
+      mockFetch.mockResolvedValue(okJsonResponse({ jwt: TEST_JWT }));
 
       const onSuccess = jest.fn();
       const { result } = renderHook(() => useAuthHandlers({ onSuccess }));
@@ -203,18 +226,23 @@ describe('AuthHooks', () => {
         await result.current.googleLogin();
       });
 
-      expect(mockAxiosPost).toHaveBeenCalledWith(
+      // Native serverAuthCode must be sent as `code` with an explicit empty
+      // `redirect_uri` (the LS-5082 fix), to the `/google` route (the LS-5084
+      // fix) — both now enforced by the shared helper.
+      expect(mockFetch).toHaveBeenCalledWith(
         'https://oauth-proxy.example.com/google',
-        { code: 'auth-code-123', redirect_uri: '' },
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ code: 'auth-code-123', redirect_uri: '' }),
+        }),
       );
       expect(mockSetItem).toHaveBeenCalledWith('INTERNAL_JWT', TEST_JWT);
       expect(onSuccess).toHaveBeenCalled();
     });
 
     it('exchanges authorization code flow for JWT', async () => {
-      const tokenResponse: OAuthProxyTokens = { jwt: TEST_JWT };
       mockSignIn.mockResolvedValue({ code: 'web-auth-code' });
-      mockAxiosPost.mockResolvedValue({ data: tokenResponse });
+      mockFetch.mockResolvedValue(okJsonResponse({ jwt: TEST_JWT }));
 
       const { result } = renderHook(() => useAuthHandlers());
 
@@ -222,16 +250,19 @@ describe('AuthHooks', () => {
         await result.current.googleLogin();
       });
 
-      expect(mockAxiosPost).toHaveBeenCalledWith(
+      // Bare code leaves `redirect_uri` unset so the proxy applies its default.
+      expect(mockFetch).toHaveBeenCalledWith(
         'https://oauth-proxy.example.com/google',
-        { code: 'web-auth-code' },
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ code: 'web-auth-code' }),
+        }),
       );
     });
 
     it('exchanges credential (One Tap ID token) for JWT', async () => {
-      const tokenResponse: OAuthProxyTokens = { jwt: TEST_JWT };
       mockSignIn.mockResolvedValue({ credential: 'google-id-token' });
-      mockAxiosPost.mockResolvedValue({ data: tokenResponse });
+      mockFetch.mockResolvedValue(okJsonResponse({ jwt: TEST_JWT }));
 
       const { result } = renderHook(() => useAuthHandlers());
 
@@ -239,9 +270,12 @@ describe('AuthHooks', () => {
         await result.current.googleLogin();
       });
 
-      expect(mockAxiosPost).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'https://oauth-proxy.example.com/google',
-        { credential: 'google-id-token' },
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ credential: 'google-id-token' }),
+        }),
       );
     });
 
@@ -261,7 +295,7 @@ describe('AuthHooks', () => {
 
     it('calls onFailure when OAuth proxy returns error', async () => {
       mockSignIn.mockResolvedValue({ serverAuthCode: 'auth-code-123' });
-      mockAxiosPost.mockRejectedValue(new Error('Network Error'));
+      mockFetch.mockRejectedValue(new Error('Network Error'));
 
       const onFailure = jest.fn();
       const { result } = renderHook(() => useAuthHandlers({ onFailure }));
@@ -292,7 +326,6 @@ describe('AuthHooks', () => {
 
     it('calls onFailure when response has no valid auth code or credential', async () => {
       mockSignIn.mockResolvedValue({});
-      mockAxiosPost.mockResolvedValue({ data: { jwt: TEST_JWT } });
 
       const onFailure = jest.fn();
       const { result } = renderHook(() => useAuthHandlers({ onFailure }));
@@ -301,6 +334,8 @@ describe('AuthHooks', () => {
         await result.current.googleLogin();
       });
 
+      // The shared payload builder throws before any network call is made.
+      expect(mockFetch).not.toHaveBeenCalled();
       expect(onFailure).toHaveBeenCalledWith(
         'No valid authentication code or credential received',
       );
@@ -381,7 +416,7 @@ describe('AuthHooks', () => {
       });
 
       expect(result.current.data).toBeNull();
-      const refreshWasCalled = mockAxiosPost.mock.calls.some(
+      const refreshWasCalled = mockFetch.mock.calls.some(
         ([url]) => typeof url === 'string' && url.includes('/refresh'),
       );
       expect(refreshWasCalled).toBe(false);

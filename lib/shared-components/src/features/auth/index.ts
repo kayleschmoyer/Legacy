@@ -3,6 +3,15 @@ export { LoginPage } from './LoginPage';
 export { AuthProvider, useAuth, useOptionalAuth } from './hooks/useAuth';
 export type { UseAuthResult } from './hooks/useAuth';
 export { AuthService, AuthSessionExpiredError } from './services/AuthService';
+export {
+  buildGoogleAuthPayload,
+  exchangeGoogleCode,
+  OAuthServiceError,
+} from './services/googleAuthExchange';
+export type {
+  GoogleAuthPayload,
+  GoogleAuthExchangeResult,
+} from './services/googleAuthExchange';
 export * from './EnhancedAuthGuard';
 
 // Platform types (convenience re-exports)

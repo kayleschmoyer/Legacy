@@ -1,8 +1,17 @@
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  buildGoogleAuthPayload,
+  exchangeGoogleCode,
+} from './googleAuthExchange';
+import type { GoogleAuthExchangeResult } from './googleAuthExchange';
 import type {
   OAuthConfig,
   OAuthResponse,
 } from '../../../platform-components/types';
+
+// Re-exported for backward compatibility: the canonical definition now lives in
+// `googleAuthExchange` alongside the transport that throws it.
+export { OAuthServiceError } from './googleAuthExchange';
 
 interface User {
   id: number;
@@ -25,46 +34,9 @@ const TOKEN_EXPIRY_KEY = 'ls_token_expiry';
 const ADMIN_PROFILE_KEY = 'ls_admin_profile';
 const IMPERSONATED_USER_KEY = 'ls_impersonated_user';
 
-interface SecureOAuthResponse {
-  jwt: string;
-  refreshToken?: string;
-  csrfToken?: string;
-}
-
 // Type for Vite environment configuration
 interface ViteEnvironment {
   VITE_OAUTH_PROXY_URL?: string;
-}
-
-// Extended response interface that may include user data
-interface ExtendedSecureOAuthResponse extends SecureOAuthResponse {
-  user?: {
-    id: number;
-    email: string;
-    username: string;
-    accessLevel: 'none' | 'user' | 'admin';
-  };
-}
-
-interface UnauthorizedUserError {
-  error: string;
-  message: string;
-  userEmail?: string;
-}
-
-/**
- * Error thrown by OAuth calls that preserves the HTTP status code so callers
- * can distinguish 4xx (expected auth failures) from 5xx (server errors) and
- * route logging/user-facing messages accordingly.
- */
-export class OAuthServiceError extends Error {
-  readonly statusCode: number;
-
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.name = 'OAuthServiceError';
-    this.statusCode = statusCode;
-  }
 }
 
 /**
@@ -389,67 +361,16 @@ export class AuthService {
    */
   private async callSecureOAuth(
     oauthResponse: OAuthResponse,
-  ): Promise<ExtendedSecureOAuthResponse> {
-    const requestBody: Record<string, string> = {};
-
-    // Format request based on OAuth response type
-    if (oauthResponse.code) {
-      // Mobile flow - authorization code
-      requestBody.code = oauthResponse.code;
-    } else if (oauthResponse.credential) {
-      // Web flow - ID token
-      requestBody.credential = oauthResponse.credential;
-    } else {
-      throw new Error('Invalid OAuth response - missing code or credential');
-    }
-
-    const response = await fetch(`${this.oauthProxyUrl}/google`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+  ): Promise<GoogleAuthExchangeResult> {
+    // Payload assembly (incl. the serverAuthCode/redirect_uri disambiguation)
+    // and transport now live in the shared `googleAuthExchange` helpers so web
+    // and mobile can never drift again. Web persists the JWT via the HttpOnly
+    // cookie the server sets when `credentials: 'include'` is passed — token
+    // storage stays here in the platform-specific caller, not the helper.
+    const payload = buildGoogleAuthPayload(oauthResponse);
+    return exchangeGoogleCode(this.oauthProxyUrl, payload, {
       credentials: 'include',
-      body: JSON.stringify(requestBody),
     });
-
-    // Handle different response scenarios
-    if (response.status === 403) {
-      // User not pre-authorized
-      const errorData = (await response.json()) as UnauthorizedUserError;
-      throw new OAuthServiceError(
-        errorData.message || 'User not authorized for this application',
-        response.status,
-      );
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      // Always prefix with the status so downstream matchers (e.g. "failed: 500")
-      // and human logs retain the HTTP status signal. The statusCode is also
-      // attached to the thrown error so callers can branch programmatically.
-      let message = `Secure OAuth failed: ${response.status}`;
-      try {
-        const errorData = JSON.parse(errorText) as { message?: string };
-        if (errorData.message) {
-          message = `Secure OAuth failed: ${response.status} - ${errorData.message}`;
-        }
-      } catch {
-        if (errorText) {
-          message = `Secure OAuth failed: ${response.status} - ${errorText}`;
-        }
-      }
-      throw new OAuthServiceError(message, response.status);
-    }
-
-    const responseText = await response.text();
-
-    const result = JSON.parse(responseText) as SecureOAuthResponse;
-
-    if (!result.jwt) {
-      throw new Error('Secure OAuth did not return JWT');
-    }
-
-    return result;
   }
 
   /**
