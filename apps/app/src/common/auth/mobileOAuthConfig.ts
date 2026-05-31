@@ -51,7 +51,7 @@ export function getMobileOAuthConfig(): OAuthConfig {
     oauthProxyUrl:
       getEnvVarOptional(EnvironmentVariable.OAUTH_PROXY) ??
       getExpoExtraString('oauthProxyUrl') ??
-      'http://localhost:5001',
+      'http://localhost:5001/oauth',
     additionalScopes: ['openid', 'profile', 'email'],
     offlineAccess: true,
   };

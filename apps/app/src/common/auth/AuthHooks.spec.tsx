@@ -204,7 +204,7 @@ describe('AuthHooks', () => {
       });
 
       expect(mockAxiosPost).toHaveBeenCalledWith(
-        'https://oauth-proxy.example.com/google/auth',
+        'https://oauth-proxy.example.com/google',
         { code: 'auth-code-123', redirect_uri: '' },
       );
       expect(mockSetItem).toHaveBeenCalledWith('INTERNAL_JWT', TEST_JWT);
@@ -223,7 +223,7 @@ describe('AuthHooks', () => {
       });
 
       expect(mockAxiosPost).toHaveBeenCalledWith(
-        'https://oauth-proxy.example.com/google/auth',
+        'https://oauth-proxy.example.com/google',
         { code: 'web-auth-code' },
       );
     });
@@ -240,7 +240,7 @@ describe('AuthHooks', () => {
       });
 
       expect(mockAxiosPost).toHaveBeenCalledWith(
-        'https://oauth-proxy.example.com/google/auth',
+        'https://oauth-proxy.example.com/google',
         { credential: 'google-id-token' },
       );
     });

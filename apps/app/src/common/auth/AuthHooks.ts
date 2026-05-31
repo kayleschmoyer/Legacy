@@ -140,8 +140,12 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
           );
         }
 
+        // Posts to the secure Google flow (`/oauth/google` once the `/oauth`
+        // base segment is applied) — the same endpoint the web client uses.
+        // The proxy router has no `/google/auth` route, so the old suffix 404'd
+        // and the user was bounced back to login without a JWT.
         const tokenResponse = await axios.post<OAuthProxyTokens>(
-          `${oauthProxy}/google/auth`,
+          `${oauthProxy}/google`,
           authPayload,
         );
 

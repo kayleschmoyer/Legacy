@@ -12,7 +12,7 @@
     },
     "assetBundlePatterns": ["**/*"],
     "extra": {
-      "oauthProxyUrl": "http://localhost:5001",
+      "oauthProxyUrl": "http://localhost:5001/oauth",
       "googleClientId": "placeholder-google-client-id"
     },
     "ios": {
