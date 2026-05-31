@@ -6,14 +6,18 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 ## 🚀 CI Status
 
-[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI-Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![CI Pipeline](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml/badge.svg?branch=main)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last-Updated.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 
 Pipeline stages:
 [![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Change-Detection.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Quality Gates](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Quality-Gates.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Lint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Lint.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Format](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Format.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Test](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Test.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Custom Checks](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Custom-Checks.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Build Validation](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Validation.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Lockfile Check](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Lockfile-Check.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![E2E Testing](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/E2E-Testing.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 
 [![Playwright Report](https://img.shields.io/badge/Playwright-Test%20Report-blue?logo=playwright)](https://bkrupa.github.io/legacy-sports-deploys/playwright-report/)

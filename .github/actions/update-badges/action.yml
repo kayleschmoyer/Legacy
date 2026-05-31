@@ -134,12 +134,14 @@ runs:
             
             # Create badges for known CI steps with default success status
             declare -a ci_steps=(
-              "Change Detection"  
-              "Execution Plan"
-              "Quality Gates"
+              "Change Detection"
+              "Lint"
+              "Format"
+              "Test"
+              "Custom Checks"
               "Build Validation"
+              "Lockfile Check"
               "E2E Testing"
-              "Deployment Gate"
             )
             
             for step in "${ci_steps[@]}"; do

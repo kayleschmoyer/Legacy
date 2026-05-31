@@ -815,8 +815,9 @@ jobs:
               "Lint":             "${{ needs.lint.result }}",
               "Format":           "${{ needs.format.result }}",
               "Test":             "${{ needs.test.result }}",
-              "Build":            "${{ needs.build.result }}",
               "Custom Checks":    "${{ needs.custom-checks.result }}",
+              "Build Validation": "${{ needs.build.result }}",
+              "Lockfile Check":   "${{ needs.lockfile-check.result }}",
               "E2E Testing":      "${{ needs.e2e.result }}"
             }
           workflow-run-id: ${{ github.run_id }}
