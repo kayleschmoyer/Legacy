@@ -40,7 +40,11 @@ export async function restoreDevSeed(
     // Detect available PowerShell executable (pwsh preferred, powershell fallback)
     let psExe = 'pwsh';
     try {
-      execFileSync('pwsh', ['-Version'], { timeout: 5_000, stdio: 'ignore' });
+      execFileSync('pwsh', ['-Version'], {
+        timeout: 5_000,
+        stdio: 'ignore',
+        windowsHide: true,
+      });
     } catch {
       psExe = 'powershell';
     }
