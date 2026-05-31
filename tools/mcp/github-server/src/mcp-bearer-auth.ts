@@ -194,7 +194,151 @@ export async function authenticateMcpRequest(
   }
   const jwks = getRemoteJwks(config.issuer);
   const result = await verifyBearerToken(event.headers, config, jwks);
-  return result ? buildAuthErrorResponse(result) : null;
+  if (!result) return null;
+  // Missing/invalid token → spec-compliant 401 challenge so an OAuth client
+  // (Claude Code web) can discover the Cognito authorization server. The
+  // challenge body remains a well-formed JSON-RPC error envelope.
+  const resourceMetadataUrl = `${resourceIdentifier(
+    event.requestContext?.domainName,
+  )}${OAUTH_PROTECTED_RESOURCE_PATH}`;
+  return buildAuthChallengeResponse(result, resourceMetadataUrl);
+}
+
+// ── OAuth 2.0 Authorization (MCP Authorization spec, Track B) ────────────────
+//
+// Claude Code on the web registers MCP servers through its connector UI, which
+// only accepts OAuth — there is no static-bearer field (claude-ai-mcp#112). To
+// be reachable there, the Lambda must implement the MCP Authorization spec:
+//   1. serve OAuth 2.0 Protected Resource Metadata (RFC 9728) at a well-known
+//      path, advertising the Cognito authorization server, and
+//   2. answer an unauthenticated/invalid request with a 401 carrying a
+//      `WWW-Authenticate` challenge that points back at that metadata, so an
+//      OAuth-capable client can discover the auth server and start consent.
+// The token validation itself is unchanged — a valid Cognito token still
+// passes through the same `jwtVerify` path used for the static-bearer flow.
+
+/** RFC 9728 well-known path for OAuth 2.0 Protected Resource Metadata. */
+export const OAUTH_PROTECTED_RESOURCE_PATH =
+  '/.well-known/oauth-protected-resource';
+
+/** OAuth 2.0 Protected Resource Metadata document (RFC 9728). */
+export interface ProtectedResourceMetadata {
+  resource: string;
+  authorization_servers: string[];
+  scopes_supported: string[];
+  bearer_methods_supported: string[];
+}
+
+/**
+ * Scopes advertised in the metadata document. Defaults to `openid` (the only
+ * scope the current Cognito client issues); overridable via `MCP_OAUTH_SCOPES`
+ * (whitespace/comma separated) once per-server `mcp/*` scopes exist (Track A).
+ */
+function readScopesFromEnv(): string[] {
+  const raw = process.env['MCP_OAUTH_SCOPES'];
+  if (!raw) return ['openid'];
+  const scopes = raw
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return scopes.length > 0 ? scopes : ['openid'];
+}
+
+/** Canonical resource identifier for this MCP server (its public origin). */
+function resourceIdentifier(domainName: string | undefined): string {
+  return `https://${domainName ?? 'localhost'}`;
+}
+
+/** Build the Protected Resource Metadata document for the requesting host. */
+export function buildProtectedResourceMetadata(
+  event: Pick<APIGatewayProxyEventV2, 'requestContext'>,
+  config: AuthConfig,
+): ProtectedResourceMetadata {
+  return {
+    resource: resourceIdentifier(event.requestContext?.domainName),
+    authorization_servers: [config.issuer.replace(/\/+$/, '')],
+    scopes_supported: readScopesFromEnv(),
+    bearer_methods_supported: ['header'],
+  };
+}
+
+function buildJsonResponse(
+  statusCode: number,
+  payload: unknown,
+): APIGatewayProxyResultV2 {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  };
+}
+
+/**
+ * Serve Protected Resource Metadata when the request targets the RFC 9728
+ * well-known path; return `null` otherwise so the caller falls through to
+ * normal MCP handling. This endpoint is intentionally public — it is the
+ * document a client reads *before* it has any token.
+ */
+export function handleOAuthMetadataRequest(
+  event: Pick<APIGatewayProxyEventV2, 'requestContext' | 'rawPath'>,
+): APIGatewayProxyResultV2 | null {
+  const path = event.rawPath ?? '';
+  if (!path.endsWith(OAUTH_PROTECTED_RESOURCE_PATH)) return null;
+  const method = event.requestContext?.http?.method ?? 'GET';
+  if (method !== 'GET') {
+    return buildJsonResponse(405, { error: 'method_not_allowed' });
+  }
+  const config = readConfigFromEnv();
+  if ('code' in config) {
+    // Server misconfigured (issuer/audience unset). Don't emit a half-formed
+    // metadata doc pointing clients at an empty authorization server.
+    return buildJsonResponse(500, {
+      error: 'server_error',
+      error_description: config.message,
+    });
+  }
+  return buildJsonResponse(200, buildProtectedResourceMetadata(event, config));
+}
+
+/**
+ * Strip characters that would break the `WWW-Authenticate` header grammar:
+ * a double quote terminates an auth-param value early and CR/LF would enable
+ * header injection.
+ */
+function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n"]+/g, ' ').trim();
+}
+
+/**
+ * Build the spec-compliant 401 challenge (RFC 6750 + RFC 9728). The
+ * `WWW-Authenticate` header advertises the protected-resource metadata URL so
+ * an OAuth-capable client (Claude Code web) can discover the Cognito
+ * authorization server and begin consent. The body retains a well-formed
+ * JSON-RPC error envelope so clients that surface the body still get the
+ * actionable recovery hint (preserving the LS-4941 behavior — the original
+ * problem was API Gateway returning a non-JSON-RPC body, not the status code).
+ */
+export function buildAuthChallengeResponse(
+  failure: AuthFailure,
+  resourceMetadataUrl: string,
+): APIGatewayProxyResultV2 {
+  const challenge = [
+    'error="invalid_token"',
+    `error_description="${sanitizeHeaderValue(failure.message)}"`,
+    `resource_metadata="${resourceMetadataUrl}"`,
+  ].join(', ');
+  return {
+    statusCode: 401,
+    headers: {
+      'Content-Type': 'application/json',
+      'WWW-Authenticate': `Bearer ${challenge}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: failure.code, message: failure.message },
+    }),
+  };
 }
 
 // Re-exported for test ergonomics so spec files don't need a second import.

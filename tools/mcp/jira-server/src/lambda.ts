@@ -26,7 +26,10 @@ import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { getTransitions } from './tools/get-transitions.js';
 import { tryGetJiraCredentials } from './netrc.js';
-import { authenticateMcpRequest } from './mcp-bearer-auth.js';
+import {
+  authenticateMcpRequest,
+  handleOAuthMetadataRequest,
+} from './mcp-bearer-auth.js';
 
 const sm = new SecretsManagerClient({});
 let credentialsInitialized = false;
@@ -308,6 +311,11 @@ function createMcpServer(): McpServer {
 export const handler = async (
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
+  // Public OAuth discovery endpoint — served before auth so a tokenless client
+  // can fetch it (MCP Authorization spec / RFC 9728).
+  const metadataResponse = handleOAuthMetadataRequest(event);
+  if (metadataResponse) return metadataResponse;
+
   const authError = await authenticateMcpRequest(event);
   if (authError) return authError;
 

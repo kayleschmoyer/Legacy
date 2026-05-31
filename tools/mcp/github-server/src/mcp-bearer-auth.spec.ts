@@ -3,9 +3,13 @@ import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 type SigningKey = Awaited<ReturnType<typeof generateKeyPair>>['privateKey'];
 import {
   MCP_AUTH_ERROR_CODE,
+  OAUTH_PROTECTED_RESOURCE_PATH,
   authenticateMcpRequest,
+  buildAuthChallengeResponse,
   buildAuthErrorResponse,
+  buildProtectedResourceMetadata,
   createLocalJWKSet,
+  handleOAuthMetadataRequest,
   isFunctionUrlInvocation,
   verifyBearerToken,
   type AuthConfig,
@@ -247,18 +251,177 @@ describe('authenticateMcpRequest', () => {
     expect(result).toBeNull();
   });
 
-  it('rejects gateway requests with no bearer token', async () => {
+  it('challenges gateway requests with no bearer token (401 + WWW-Authenticate)', async () => {
     process.env['MCP_COGNITO_ISSUER'] = ISSUER;
     process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
     const result = await authenticateMcpRequest(gatewayEvent() as never);
     if (result === null || typeof result === 'string') {
       throw new Error('expected structured auth error response');
     }
-    expect(result.statusCode).toBe(200);
+    expect(result.statusCode).toBe(401);
+    const wwwAuth = (result.headers ?? {})['WWW-Authenticate'];
+    expect(wwwAuth).toMatch(/^Bearer /);
+    expect(wwwAuth).toContain(
+      `resource_metadata="https://${API_GW_DOMAIN}${OAUTH_PROTECTED_RESOURCE_PATH}"`,
+    );
+    // Body remains a well-formed JSON-RPC envelope (LS-4941).
     const parsed = JSON.parse(result.body ?? '{}') as {
+      jsonrpc: string;
       error: { code: number; message: string };
     };
+    expect(parsed.jsonrpc).toBe('2.0');
     expect(parsed.error.code).toBe(MCP_AUTH_ERROR_CODE);
     expect(parsed.error.message).toMatch(/Authorization header missing/);
+  });
+
+  it('challenges gateway requests with an invalid bearer token (401)', async () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    const result = await authenticateMcpRequest(
+      gatewayEvent({ authorization: 'Bearer not-a-jwt' }) as never,
+    );
+    if (result === null || typeof result === 'string') {
+      throw new Error('expected structured auth error response');
+    }
+    expect(result.statusCode).toBe(401);
+    expect((result.headers ?? {})['WWW-Authenticate']).toMatch(
+      /^Bearer .*resource_metadata=/,
+    );
+  });
+});
+
+// ── OAuth 2.0 Authorization surface (MCP Authorization spec, AC-B1) ──────────
+
+const WELL_KNOWN_DOMAIN = API_GW_DOMAIN;
+
+function metadataEvent(
+  path = OAUTH_PROTECTED_RESOURCE_PATH,
+  method = 'GET',
+  domainName = WELL_KNOWN_DOMAIN,
+) {
+  return {
+    rawPath: path,
+    requestContext: { domainName, http: { method } },
+  };
+}
+
+describe('buildProtectedResourceMetadata', () => {
+  it('builds a well-formed metadata document pointing at the Cognito issuer', () => {
+    const metadata = buildProtectedResourceMetadata(
+      { requestContext: { domainName: WELL_KNOWN_DOMAIN } } as never,
+      CONFIG,
+    );
+    expect(metadata.resource).toBe(`https://${WELL_KNOWN_DOMAIN}`);
+    expect(metadata.authorization_servers).toEqual([ISSUER]);
+    expect(metadata.scopes_supported.length).toBeGreaterThan(0);
+    expect(metadata.bearer_methods_supported).toContain('header');
+  });
+});
+
+describe('handleOAuthMetadataRequest', () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it('serves metadata on GET of the well-known path', () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    const result = handleOAuthMetadataRequest(metadataEvent() as never);
+    if (result === null || typeof result === 'string') {
+      throw new Error('expected a metadata response');
+    }
+    expect(result.statusCode).toBe(200);
+    expect((result.headers ?? {})['Content-Type']).toBe('application/json');
+    const body = JSON.parse(result.body ?? '{}') as {
+      resource: string;
+      authorization_servers: string[];
+    };
+    expect(body.resource).toBe(`https://${WELL_KNOWN_DOMAIN}`);
+    expect(body.authorization_servers).toEqual([ISSUER]);
+  });
+
+  it('honors MCP_OAUTH_SCOPES override', () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    process.env['MCP_OAUTH_SCOPES'] = 'mcp/github openid';
+    const result = handleOAuthMetadataRequest(metadataEvent() as never);
+    if (result === null || typeof result === 'string') {
+      throw new Error('expected a metadata response');
+    }
+    const body = JSON.parse(result.body ?? '{}') as {
+      scopes_supported: string[];
+    };
+    expect(body.scopes_supported).toEqual(['mcp/github', 'openid']);
+  });
+
+  it('returns null for non-well-known paths (falls through to MCP handling)', () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    expect(handleOAuthMetadataRequest(metadataEvent('/') as never)).toBeNull();
+    expect(
+      handleOAuthMetadataRequest(metadataEvent('/mcp') as never),
+    ).toBeNull();
+  });
+
+  it('rejects non-GET methods on the well-known path with 405', () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    const result = handleOAuthMetadataRequest(
+      metadataEvent(OAUTH_PROTECTED_RESOURCE_PATH, 'POST') as never,
+    );
+    if (result === null || typeof result === 'string') {
+      throw new Error('expected a 405 response');
+    }
+    expect(result.statusCode).toBe(405);
+  });
+
+  it('returns 500 when the server is misconfigured (issuer unset)', () => {
+    delete process.env['MCP_COGNITO_ISSUER'];
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    const result = handleOAuthMetadataRequest(metadataEvent() as never);
+    if (result === null || typeof result === 'string') {
+      throw new Error('expected a 500 response');
+    }
+    expect(result.statusCode).toBe(500);
+  });
+});
+
+describe('buildAuthChallengeResponse', () => {
+  const metadataUrl = `https://${WELL_KNOWN_DOMAIN}${OAUTH_PROTECTED_RESOURCE_PATH}`;
+
+  it('returns 401 with a WWW-Authenticate challenge and JSON-RPC body', () => {
+    const response = buildAuthChallengeResponse(
+      { code: MCP_AUTH_ERROR_CODE, message: 'boom' },
+      metadataUrl,
+    );
+    if (typeof response === 'string') {
+      throw new Error('expected structured response, got string');
+    }
+    expect(response.statusCode).toBe(401);
+    const wwwAuth = (response.headers ?? {})['WWW-Authenticate'];
+    expect(wwwAuth).toBe(
+      `Bearer error="invalid_token", error_description="boom", resource_metadata="${metadataUrl}"`,
+    );
+    const body = parseBody(response.body);
+    expect(body.jsonrpc).toBe('2.0');
+    expect(body.error.code).toBe(MCP_AUTH_ERROR_CODE);
+  });
+
+  it('sanitizes quotes/newlines out of the error_description', () => {
+    const response = buildAuthChallengeResponse(
+      { code: MCP_AUTH_ERROR_CODE, message: 'bad "token"\r\ninjected' },
+      metadataUrl,
+    );
+    if (typeof response === 'string') {
+      throw new Error('expected structured response, got string');
+    }
+    const wwwAuth = String((response.headers ?? {})['WWW-Authenticate'] ?? '');
+    const descMatch = /error_description="([^"]*)"/.exec(wwwAuth);
+    expect(descMatch).not.toBeNull();
+    // No stray double-quotes or CR/LF leaked into the auth-param value.
+    expect(descMatch?.[1]).not.toMatch(/["\r\n]/);
+    expect(descMatch?.[1]).toContain('bad');
+    expect(descMatch?.[1]).toContain('injected');
   });
 });

@@ -8,7 +8,10 @@ import {
 } from '@aws-sdk/client-secrets-manager';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createServer } from './index.js';
-import { authenticateMcpRequest } from './mcp-bearer-auth.js';
+import {
+  authenticateMcpRequest,
+  handleOAuthMetadataRequest,
+} from './mcp-bearer-auth.js';
 
 const sm = new SecretsManagerClient({});
 let credentialsInitialized = false;
@@ -51,6 +54,11 @@ async function ensureCredentials(): Promise<void> {
 export const handler = async (
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
+  // Public OAuth discovery endpoint — served before auth so a tokenless client
+  // can fetch it (MCP Authorization spec / RFC 9728).
+  const metadataResponse = handleOAuthMetadataRequest(event);
+  if (metadataResponse) return metadataResponse;
+
   const authError = await authenticateMcpRequest(event);
   if (authError) return authError;
 
