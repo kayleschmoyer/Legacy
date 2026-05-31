@@ -79,6 +79,7 @@ These are published automatically by CI workflows — no manual steps required.
 ### Android APK
 
 [![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/latest/download/legacy-sports-latest.apk)
+[![Latest Release Date](https://img.shields.io/github/release-date/bkrupa/legacy-sports?style=for-the-badge&label=Released&color=C5A55A&logo=github)](https://github.com/bkrupa/legacy-sports/releases/latest)
 
 **Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases?q=android)
 
