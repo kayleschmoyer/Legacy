@@ -40,7 +40,7 @@ Lambda uploads:
 
 [![DB Migrations](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/DB-Migrations.json)](https://github.com/bkrupa/legacy-sports/tree/main/lib/db-client/migrations)
 
-Badge updates automatically whenever a migration is committed to `main`. It shows the total count and the date of the latest migration file in the repo. Run `pnpm run db:migrate` (or `npm run db:migrate` from the root) to apply any pending migrations to your local database.
+Badge updates automatically whenever a migration is committed to `main`. It shows the total count and the date of the latest migration file in the repo. Run `pnpm run db:migrate` from the root to apply any pending migrations to your local database.
 
 ## 🏥 Lambda Health Status
 

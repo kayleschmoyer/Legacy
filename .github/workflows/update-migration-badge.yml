@@ -30,15 +30,17 @@ jobs:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.CI_BADGES_GIST_ID }}
         run: |
-          # Count migration files, excluding spec files
+          # Count migration files, excluding spec files and non-date-prefixed files (e.g. schema.ts, relations.ts)
           TOTAL=$(ls lib/db-client/migrations/*.ts 2>/dev/null \
             | grep -v '\.spec\.' \
+            | grep -E '/[0-9]{8}_' \
             | wc -l \
             | tr -d ' ')
 
           # Derive date of the latest migration from its filename (YYYYMMDD prefix)
           LATEST_FILE=$(ls lib/db-client/migrations/*.ts 2>/dev/null \
             | grep -v '\.spec\.' \
+            | grep -E '/[0-9]{8}_' \
             | sort \
             | tail -1 \
             | xargs basename)
