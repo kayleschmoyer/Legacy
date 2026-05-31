@@ -180,5 +180,6 @@ failing service and stop. See `.agents/skills/credentials/SKILL.md`.
 - `docs/dev-process/session-startup.md` — sequence diagram + orientation for the SessionStart hook chain that produces `[MCP WARNING]` output (LS-4505)
 - `.agents/skills/mcp-first/SKILL.md` — server load order and per-server tool substitution table
 - `.agents/skills/credentials/SKILL.md` — auth configuration for each service
+- `docs/authentication/mcp-machine-credential-lifecycle.md` — rotation, revocation, and blast-radius runbook for the long-lived Cognito `client_credentials` machine secret (epic LS-5089, Track A)
 - `.agents/skills/worktree-workflow/SKILL.md` — `scripts/modules-pool/link.mjs` details
 - `AGENTS.md` `## MCP Servers` section — `MCP_TIMEOUT` setting and symlink repair notes
