@@ -56,7 +56,10 @@ jest.mock('../server/stripe', () => ({
   getStripeClient: jest.fn(),
 }));
 
-import { expireSubscriptionGracePeriods } from './subscriptions';
+import {
+  expireSubscriptionGracePeriods,
+  getOrCreateStripeCustomer,
+} from './subscriptions';
 
 type NotifyMock = jest.Mock<
   Promise<void>,
@@ -217,5 +220,122 @@ describe('expireSubscriptionGracePeriods', () => {
 
     expect(result).toEqual({ expired: 1, errors: [] });
     expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(401, {});
+  });
+});
+
+// ─── getOrCreateStripeCustomer (LS-5129) ─────────────────────────────────────
+
+function makeStripe(overrides?: {
+  retrieve?: jest.Mock;
+  create?: jest.Mock;
+  list?: jest.Mock;
+}) {
+  return {
+    customers: {
+      retrieve: overrides?.retrieve ?? jest.fn(),
+      create: overrides?.create ?? jest.fn(),
+      list: overrides?.list ?? jest.fn(),
+    },
+  } as unknown as import('stripe').default;
+}
+
+describe('getOrCreateStripeCustomer', () => {
+  it('retrieves by stored ID when existingCustomerId is provided', async () => {
+    const existing = { id: 'cus_stored', deleted: false, metadata: {} };
+    const retrieve = jest.fn().mockResolvedValue(existing);
+    const create = jest.fn();
+    const list = jest.fn();
+    const stripe = makeStripe({ retrieve, create, list });
+
+    const result = await getOrCreateStripeCustomer(
+      stripe,
+      1,
+      'user@example.com',
+      'cus_stored',
+    );
+
+    expect(result).toBe(existing);
+    expect(retrieve).toHaveBeenCalledWith('cus_stored');
+    expect(create).not.toHaveBeenCalled();
+    // Must never list by email — that's the security bug being fixed.
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it('creates a new customer when no existingCustomerId is provided', async () => {
+    const created = { id: 'cus_new', deleted: false, metadata: {} };
+    const retrieve = jest.fn();
+    const create = jest.fn().mockResolvedValue(created);
+    const list = jest.fn();
+    const stripe = makeStripe({ retrieve, create, list });
+
+    const result = await getOrCreateStripeCustomer(
+      stripe,
+      2,
+      'new@example.com',
+    );
+
+    expect(result).toBe(created);
+    expect(create).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      metadata: { userId: '2' },
+    });
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it('creates a new customer when existingCustomerId is null', async () => {
+    const created = { id: 'cus_null', deleted: false, metadata: {} };
+    const retrieve = jest.fn();
+    const create = jest.fn().mockResolvedValue(created);
+    const stripe = makeStripe({ retrieve, create });
+
+    const result = await getOrCreateStripeCustomer(
+      stripe,
+      3,
+      'null@example.com',
+      null,
+    );
+
+    expect(result).toBe(created);
+    expect(create).toHaveBeenCalledWith({
+      email: 'null@example.com',
+      metadata: { userId: '3' },
+    });
+    expect(retrieve).not.toHaveBeenCalled();
+  });
+
+  it('creates a new customer when stored Stripe customer has been deleted', async () => {
+    const deleted = { id: 'cus_deleted', deleted: true };
+    const created = { id: 'cus_fresh', deleted: false, metadata: {} };
+    const retrieve = jest.fn().mockResolvedValue(deleted);
+    const create = jest.fn().mockResolvedValue(created);
+    const stripe = makeStripe({ retrieve, create });
+
+    const result = await getOrCreateStripeCustomer(
+      stripe,
+      4,
+      'gone@example.com',
+      'cus_deleted',
+    );
+
+    expect(result).toBe(created);
+    expect(retrieve).toHaveBeenCalledWith('cus_deleted');
+    expect(create).toHaveBeenCalledWith({
+      email: 'gone@example.com',
+      metadata: { userId: '4' },
+    });
+  });
+
+  it('omits email when email string is empty', async () => {
+    const created = { id: 'cus_noemail', deleted: false, metadata: {} };
+    const create = jest.fn().mockResolvedValue(created);
+    const stripe = makeStripe({ create });
+
+    await getOrCreateStripeCustomer(stripe, 5, '');
+
+    expect(create).toHaveBeenCalledWith({
+      email: undefined,
+      metadata: { userId: '5' },
+    });
   });
 });

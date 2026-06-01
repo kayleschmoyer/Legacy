@@ -448,6 +448,7 @@ builder.mutationField('createCheckoutSession', (t) =>
         stripe,
         userId,
         email ?? '',
+        existing?.stripeCustomerId,
       );
 
       let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
@@ -626,28 +627,22 @@ async function getSubscriptionForUser(userId: number) {
   });
 }
 
-async function getOrCreateStripeCustomer(
+export async function getOrCreateStripeCustomer(
   stripe: Stripe,
   userId: number,
   email: string,
+  existingCustomerId?: string | null,
 ): Promise<Stripe.Customer> {
-  // Attempt to retrieve an existing customer by email first.
-  if (email) {
-    const listResult = await stripe.customers.list({ email, limit: 1 });
-    if (listResult.data.length > 0) {
-      const customer = listResult.data[0];
-      // Ensure our userId is present in the customer metadata so the webhook
-      // handler can correlate the Stripe customer back to our user record.
-      if (!customer.metadata['userId']) {
-        await stripe.customers.update(customer.id, {
-          metadata: { userId: String(userId) },
-        });
-      }
+  // If we have a stored customer ID, retrieve directly — never search by email
+  // (email search can match a customer belonging to a different user account).
+  if (existingCustomerId) {
+    const customer = await stripe.customers.retrieve(existingCustomerId);
+    if (!customer.deleted) {
       return customer;
     }
   }
 
-  // No existing customer found — create a new one.
+  // No valid stored customer — create a new one.
   return stripe.customers.create({
     email: email || undefined,
     metadata: { userId: String(userId) },
