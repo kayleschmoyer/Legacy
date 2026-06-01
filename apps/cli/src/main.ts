@@ -47,6 +47,7 @@ import { handleGetPlayerFielding } from './commands/getPlayerFielding';
 import { handleTriggerGameSelection } from './commands/triggerGameSelection';
 import { handleTestWorkflow } from './commands/testWorkflow';
 import { handleRetryFailedPlayers } from './commands/retryFailedPlayers';
+import { handleQueuePlayers, parseSport, Sport } from './commands/queuePlayers';
 import { handleStatsLoadingStatus } from './commands/statsLoadingStatus';
 import { handleTestDraftTimer } from './commands/testDraftTimer';
 import { handleLoadWobaWeights } from './commands/loadWobaWeights';
@@ -566,6 +567,26 @@ export function buildProgram(): Command {
           dryRun: options.dryRun,
           processDlq: options.processDlq,
         }),
+    );
+
+  program
+    .command('queue-players')
+    .description(
+      'Discover players for a sport and batch-enqueue them to the stats SQS queue. ' +
+        'Baseball reads existing players from the DB; football scrapes the PFR A-Z index, ' +
+        'upserts players, then queues them. Queue URLs are read from env, not hardcoded.',
+    )
+    .requiredOption(
+      '--sport <sport>',
+      "Sport to queue ('baseball' or 'football')",
+      parseSport,
+    )
+    .option(
+      '--letter <letter>',
+      'Process only players whose ID starts with this letter (for testing)',
+    )
+    .action((options: { sport: Sport; letter?: string }) =>
+      handleQueuePlayers({ sport: options.sport, letter: options.letter }),
     );
 
   program
