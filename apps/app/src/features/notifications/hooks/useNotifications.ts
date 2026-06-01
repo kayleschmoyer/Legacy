@@ -53,7 +53,10 @@ export function useNotifications(userId: number) {
   const isPollingRef = useRef(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setUnreadCount(0);
+      return;
+    }
 
     function handleAppStateChange(nextState: AppStateStatus) {
       if (nextState === 'active') {

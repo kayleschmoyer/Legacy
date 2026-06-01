@@ -64,15 +64,19 @@ export function useNotifications(
       skip: !userId,
     });
 
-  // Update unread count when data changes
+  // Update unread count when data changes; reset to 0 on logout
   useEffect(() => {
+    if (!userId) {
+      setUnreadCount(0);
+      return;
+    }
     if (
       countData?.getUnreadNotificationCount !== undefined &&
       countData.getUnreadNotificationCount !== null
     ) {
       setUnreadCount(countData.getUnreadNotificationCount);
     }
-  }, [countData]);
+  }, [userId, countData]);
 
   // Subscribe to WebSocket pushes so the badge updates within ~1s when a
   // new in-app notification lands. Refetch both the unread count and the
