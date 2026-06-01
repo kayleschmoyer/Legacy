@@ -1,5 +1,6 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { MobileOAuthProvider } from './MobileOAuthProvider';
+import { OAuthErrorCode } from '../types/auth';
 
 // Mock LOGGER to avoid console output in tests
 jest.mock('@legacy-sports/logging', () => ({
@@ -101,5 +102,21 @@ describe('MobileOAuthProvider.signIn', () => {
     expect(response.code).toBeUndefined();
     expect(response.serverAuthCode).toBeUndefined();
     expect(response.user?.id).toBe('user-1');
+  });
+
+  // DEVELOPER_ERROR (status code 10) means the app's package name + signing
+  // SHA-1 are not registered as an Android OAuth client in the Google project.
+  // It must surface as a CONFIGURATION_ERROR (actionable) rather than being
+  // swallowed by the default branch as a generic UNKNOWN_ERROR "Sign-in failed".
+  it('maps DEVELOPER_ERROR to a CONFIGURATION_ERROR with an actionable message', async () => {
+    mockedSignIn.mockRejectedValue({
+      code: 'DEVELOPER_ERROR',
+      message: 'DEVELOPER_ERROR',
+    });
+
+    await expect(provider.signIn()).rejects.toMatchObject({
+      code: OAuthErrorCode.CONFIGURATION_ERROR,
+    });
+    await expect(provider.signIn()).rejects.toThrow(/DEVELOPER_ERROR/);
   });
 });

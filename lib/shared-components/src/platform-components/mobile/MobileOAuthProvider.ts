@@ -169,6 +169,34 @@ export class MobileOAuthProvider implements OAuthProvider {
               error,
             );
           default:
+            // DEVELOPER_ERROR (Android status code 10) means Google could not
+            // match the calling app against a registered Android OAuth client.
+            // This is almost always a project-config gap, not a runtime fault:
+            // the app's package name + signing-certificate SHA-1 are not
+            // registered as an Android OAuth client (client_type 1) in the
+            // Google Cloud / Firebase project, or the build was signed with a
+            // key whose SHA-1 isn't registered. Surface it explicitly so it
+            // isn't swallowed as a generic "Sign-in failed". This version of
+            // `statusCodes` doesn't expose DEVELOPER_ERROR, so match the raw
+            // code (string name or the native numeric 10) directly.
+            if (errorObj.code === 'DEVELOPER_ERROR' || errorObj.code === '10') {
+              LOGGER.error(
+                'Google Sign-In DEVELOPER_ERROR: the app is not authorized for ' +
+                  'Google Sign-In. Verify an Android OAuth client exists for ' +
+                  "this app's package name and signing-certificate SHA-1 in the " +
+                  'Google Cloud / Firebase project, and that the running build ' +
+                  'is signed with that registered key.',
+                error instanceof Error ? error : new Error(String(error)),
+              );
+              throw this.createOAuthError(
+                OAuthErrorCode.CONFIGURATION_ERROR,
+                'Google Sign-In is not configured for this app ' +
+                  '(DEVELOPER_ERROR): the signing certificate SHA-1 / package ' +
+                  'name is not registered as an Android OAuth client in the ' +
+                  'Google project.',
+                error,
+              );
+            }
             throw this.createOAuthError(
               OAuthErrorCode.UNKNOWN_ERROR,
               errorObj.message || 'Sign-in failed',
