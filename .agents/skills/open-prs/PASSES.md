@@ -366,10 +366,7 @@ After Passes 1-3, Copilot may have re-reviewed pushed changes. Instead of waitin
    github_get_review_threads(number: <PR#>, unresolvedOnly: true)
    ```
 2. If new threads appeared, queue the PR for the next Pass 2 iteration
-3. For bot-authored PRs where all threads are now resolved, explicitly request Copilot re-review to trigger auto-approve:
-   ```
-   github_request_review(prs: [<PR#>])
-   ```
+3. For bot-authored PRs where all threads are now resolved, apply `bot:ready-for-review` to trigger the next review cycle: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`.
 
 This decouples Copilot review from the critical path — the sweep continues working while Copilot reviews asynchronously, and catches up in a batch at the end of each pass cycle.
 
@@ -462,10 +459,7 @@ REPEAT (max 10 passes):
   regular_prs    = [pr for pr in workable if pr not in dependabot_prs]
 
   Pass 0: API-Fast Triage (NO git ops — ~2 min total)
-    - 0a: Request Copilot reviews on regular (non-Dependabot) workable PRs that have none
-      - Claim PR → github_request_review() → release claim
-      - Bot-authored PRs need explicit request (uses user OAuth token via gh auth)
-    - 0b: Handle Dependabot PRs (comment-only, no worktree needed)
+    - 0a: Handle Dependabot PRs (comment-only, no worktree needed)
       - For each pr in dependabot_prs:
           - Claim PR via github_manage_labels(prs: [<pr.number>], add: ["sweep-claimed"]) before acting
           - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
@@ -581,7 +575,7 @@ For each PR marked as settled in this sweep, verify:
    github_view_pr(number: <PR#>)
    ```
 
-   If `reviewDecision` is `null` and, based on the latest `github_pr_dashboard` / `github_pr_batch_status` data, Copilot's last review is `COMMENTED` with 0 unresolved threads → re-request Copilot review via `github_request_review(prs: [<PR#>])`.
+   If `reviewDecision` is `null` and, based on the latest `github_pr_dashboard` / `github_pr_batch_status` data, Copilot's last review is `COMMENTED` with 0 unresolved threads → apply `bot:ready-for-review` label to trigger the next review cycle: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`.
 
 3. **If CI appears not to have run** (e.g., `statusCheckRollup` is empty, has fewer than 3 entries, _or_ the dashboard-computed CI status / `summarizeCIStatus` reports `ciStatus === "none"`): flag as "CI may not have run", then:
    - Use `ci_list_runs` to discover the latest run (if any) for the PR's branch.

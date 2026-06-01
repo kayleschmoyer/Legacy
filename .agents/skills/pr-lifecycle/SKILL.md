@@ -233,8 +233,8 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
    - Thread node IDs come from the `id` field of each thread in `github_get_review_threads` output (PRRT\_... format).
    - **Alternative**: if you only have numeric comment `databaseId` values (e.g. from `mcp__github__*` `get_review_comments`), pass them as `commentDatabaseIds` instead — the tool maps them to thread IDs internally: `github_resolve_threads({ commentDatabaseIds: [<databaseId>, ...], prNumber: PR# })`.
    - **If bot-review still fails after resolution**: `github_resolve_threads` with `prNumber` attempts to re-dispatch the Copilot Auto-Approve workflow, but may be silently skipped if the app token lacks `actions: write`. If `bot-review` still shows failure after thread resolution, re-dispatch manually: `ci_dispatch_workflow({ workflow: "Copilot Auto-Approve", ref: "<branch>", inputs: { pr_number: "<PR#>" } })`. Wait ~20 seconds for the recheck job and verify `bot-review` flips to success before attempting merge.
-6. **Re-request review**: `github_request_review({ prs: [PR#] })`
-   - **After re-requesting, subscribe — do not poll**: use `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` (Claude Code built-in, local sessions only) to receive the review event as it arrives. Do **not** use `sleep N && gh api repos/{owner}/{repo}/pulls/{pr}/reviews` polling — this wastes 4–5 min per review cycle and may miss the event if the sleep is too short. If `subscribe_pr_activity` is unavailable (cloud/headless sessions or MCP not loaded), fall back to a **capped** retry: poll at most 5 times with 30-second gaps, and note the degraded mode in session output.
+6. **Apply `bot:ready-for-review` label**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this fires the next Reviewer (W1) cycle. Copilot review is triggered automatically by the platform; no explicit `github_request_review` call is needed.
+   - **Subscribe — do not poll**: use `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` (Claude Code built-in, local sessions only) to receive the review event as it arrives. If unavailable (cloud/headless), fall back to a **capped** retry: poll at most 5 times with 30-second gaps, and note the degraded mode in session output.
 
 > **`bot-review` still stuck after resolving threads?** Manually re-dispatch the recheck using the `ci_dispatch_workflow` MCP tool — **never** `gh workflow run copilot-auto-approve.yml` via Bash:
 >
@@ -310,8 +310,7 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 10. **Batch known PR fixes into one push** -- when a PR simultaneously has unresolved review threads and failing checks, gather both the thread set and CI evidence before editing. The default remediation unit is one review/CI round -> one validation -> one push. Multiple pushes for already-known issues create avoidable Copilot re-reviews and CI cycles.
 11. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup.
 12. **Re-dispatch `bot-review` via MCP — never `gh workflow run`** -- if `bot-review` remains stuck after resolving threads, use `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })`. Never use `gh workflow run copilot-auto-approve.yml` via Bash — always use the `ci_dispatch_workflow` MCP tool. See [cloud-agent-mode/SKILL.md](../cloud-agent-mode/SKILL.md#quirk-3-ci_dispatch_workflow-returns-403-in-cloud--agent_author_app-lacks-actionswrite) for the 403 fallback in cloud sessions.
-13. **Precondition for waiting on a Copilot review**: after `github_request_review({ prs: [PR#] })`, subscribe to the review event via `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` (Claude Code built-in, local sessions only). The subscription delivers the review event as a push notification — no polling needed. **Fallback precondition** (cloud/headless or MCP not loaded): cap retries at 5 with 30-second gaps and note the degraded mode in session output. `sleep N && gh api repos/{owner}/{repo}/pulls/{pr}/reviews` loops waste 4–5 minutes per cycle and miss the event when the sleep window misaligns — the same anti-pattern as CI polling (see Rule 9).
-14. **Precondition after every fix-push: apply `bot:ready-for-review`.** `Reviewer (W1)` fires on `opened`, `ready_for_review`, `labeled` (with `bot:ready-for-review`/`review-bot-degraded`/`bot:reset-cycle-counter`), and `synchronize` **only when `bot:ready-for-review` is already present**. A plain push without the label starts no reviewer cycle and no orchestrated CI. After resolving threads and pushing, call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this is the most common workflow stall. Not needed at PR creation (`github_mark_pr_ready` fires `ready_for_review` for Cycle 1). The reviewer workflow auto-removes the label; if still present (rate-limited prior cycle), remove and re-add it. Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`.
+13. **Precondition after every fix-push: apply `bot:ready-for-review`.** `Reviewer (W1)` fires on `opened`, `ready_for_review`, `labeled` (with `bot:ready-for-review`/`review-bot-degraded`/`bot:reset-cycle-counter`), and `synchronize` **only when `bot:ready-for-review` is already present**. A plain push without the label starts no reviewer cycle and no orchestrated CI. After resolving threads and pushing, call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this is the most common workflow stall. Not needed at PR creation (`github_mark_pr_ready` fires `ready_for_review` for Cycle 1). The reviewer workflow auto-removes the label; if still present (rate-limited prior cycle), remove and re-add it. Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`.
 
 **CI tool reference — instant snapshots:**
 
@@ -332,7 +331,6 @@ github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])   # while still d
 github_mark_pr_ready(number: <PR#>)
 github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MUST be last label op — see note below
 mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # Claude Code built-in ONLY — NOT in legacy-sports-github; unavailable in cloud/headless; fallback: poll via github_view_pr + ci_list_runs with ScheduleWakeup
-github_request_review(prs: [<PR#>])
 jira_transition(key: "LS-####", status: "In Review")
 
 # After EACH fix-and-push round (resolve threads → push → re-trigger review + CI)
@@ -427,9 +425,6 @@ github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 
 # 4. Mark ready for review
 github_mark_pr_ready(number: <PR#>)
-
-# 5. Request Copilot review
-github_request_review(prs: [<PR#>])
 ```
 
 **Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `head` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.

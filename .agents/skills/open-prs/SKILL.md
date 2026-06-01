@@ -21,19 +21,18 @@ Supports three modes:
 
 ## Environment Compatibility
 
-| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                              |
-| ---------------------------------- | :---------: | :---------: | ------------------------------------------------------- |
-| Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                                   |
-| Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status`              |
-| Request Copilot reviews            |     ✅      |     ✅      | `github_request_review` (required for bot-authored PRs) |
-| Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                              |
-| Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`                         |
-| Resolve process/meta threads       |     ✅      |     ✅      | `github_resolve_thread`                                 |
-| Fetch review thread details        |     ✅      |     ✅      | `github_get_review_threads`                             |
-| Rebase conflicting PRs             |     ✅      |     ❌      | — (requires git checkout + push)                        |
-| Fix review comments (code changes) |     ✅      |     ❌      | — (requires file edits + commit)                        |
-| Fix CI failures (code changes)     |     ✅      |     ❌      | — (requires file edits + commit)                        |
-| Post-rebase stabilization          |     ✅      |     ❌      | — (requires make pc + push)                             |
+| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                 |
+| ---------------------------------- | :---------: | :---------: | ------------------------------------------ |
+| Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                      |
+| Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status` |
+| Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                 |
+| Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`            |
+| Resolve process/meta threads       |     ✅      |     ✅      | `github_resolve_thread`                    |
+| Fetch review thread details        |     ✅      |     ✅      | `github_get_review_threads`                |
+| Rebase conflicting PRs             |     ✅      |     ❌      | — (requires git checkout + push)           |
+| Fix review comments (code changes) |     ✅      |     ❌      | — (requires file edits + commit)           |
+| Fix CI failures (code changes)     |     ✅      |     ❌      | — (requires file edits + commit)           |
+| Post-rebase stabilization          |     ✅      |     ❌      | — (requires make pc + push)                |
 
 > **Cloud agents cannot commit or push code.** Any operation that requires file edits, git commits, or git push must be deferred to a local agent or human developer. The cloud workflow focuses on API-only actions and producing an actionable report.
 

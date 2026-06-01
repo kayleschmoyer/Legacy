@@ -4,19 +4,18 @@ Detailed workflow for orchestrating PR maintenance across all open PRs, includin
 
 ## Environment Compatibility
 
-| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                  |
-| ---------------------------------- | :---------: | :---------: | ------------------------------------------- |
-| Scan & classify all PRs            |     Yes     |     Yes     | `github_pr_dashboard`                       |
-| Detailed PR inspection             |     Yes     |     Yes     | `github_view_pr`, `github_pr_batch_status`  |
-| Request Copilot reviews (fallback) |     Yes     |     Yes     | `github_request_review` (auto via workflow) |
-| Re-run flaky / failed CI           |     Yes     |     Yes     | `ci_rerun`                                  |
-| Diagnose CI failures (read logs)   |     Yes     |     Yes     | `ci_get_logs`, `ci_search_logs`             |
-| Resolve process/meta threads       |     Yes     |     Yes     | `github_resolve_thread`                     |
-| Fetch review thread details        |     Yes     |     Yes     | `github_get_review_threads`                 |
-| Rebase conflicting PRs             |     Yes     |     No      | — (requires git checkout + push)            |
-| Fix review comments (code changes) |     Yes     |     No      | — (requires file edits + commit)            |
-| Fix CI failures (code changes)     |     Yes     |     No      | — (requires file edits + commit)            |
-| Post-rebase stabilization          |     Yes     |     No      | — (requires make pc + push)                 |
+| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                 |
+| ---------------------------------- | :---------: | :---------: | ------------------------------------------ |
+| Scan & classify all PRs            |     Yes     |     Yes     | `github_pr_dashboard`                      |
+| Detailed PR inspection             |     Yes     |     Yes     | `github_view_pr`, `github_pr_batch_status` |
+| Re-run flaky / failed CI           |     Yes     |     Yes     | `ci_rerun`                                 |
+| Diagnose CI failures (read logs)   |     Yes     |     Yes     | `ci_get_logs`, `ci_search_logs`            |
+| Resolve process/meta threads       |     Yes     |     Yes     | `github_resolve_thread`                    |
+| Fetch review thread details        |     Yes     |     Yes     | `github_get_review_threads`                |
+| Rebase conflicting PRs             |     Yes     |     No      | — (requires git checkout + push)           |
+| Fix review comments (code changes) |     Yes     |     No      | — (requires file edits + commit)           |
+| Fix CI failures (code changes)     |     Yes     |     No      | — (requires file edits + commit)           |
+| Post-rebase stabilization          |     Yes     |     No      | — (requires make pc + push)                |
 
 > **Cloud agents cannot commit or push code.** Any operation that requires file edits, git commits, or git push must be deferred to a local agent or human developer. The cloud workflow focuses on API-only actions and producing an actionable report.
 
@@ -159,14 +158,14 @@ After Passes 1-3, batch-check all modified PRs for new Copilot review threads in
 
 1. Check each modified PR for new unresolved threads: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
 2. Queue PRs with new threads for the next Pass 2 iteration
-3. For bot-authored PRs with all threads resolved, request Copilot re-review: `github_request_review(prs: [<PR#>])`
+3. For bot-authored PRs with all threads resolved, apply `bot:ready-for-review` to trigger the next review cycle: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`.
 
 ### Verify Clean PRs Are Labeled
 
-After all fixes, verify that clean PRs have been labeled by the `copilot-auto-approve` bot. If any PRs are missing the label, request a Copilot review to trigger the auto-approve flow:
+After all fixes, verify that clean PRs have been labeled by the `copilot-auto-approve` bot. If any PRs are missing the label, apply `bot:ready-for-review` to fire a fresh Reviewer Bot cycle:
 
 ```
-github_request_review(prs: [<PR#>], copilot: true)
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])
 ```
 
 > **Only the Reviewer Bot should add `merge-when-ready`** (on APPROVED verdict). The Author Agent / Sweep Agent never applies this label manually — see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership). Also do **not** manually add or remove `merge-to-parent` — that label is managed by maintainers for stacked PRs targeting non-main branches.
@@ -232,11 +231,10 @@ The response includes a `summary` object with counts and a `prs` array with per-
 
 ### Cloud Step 2: Verify Reviewer Bot Labeling
 
-The **Reviewer Bot** (`.github/workflows/review.yml` → `.github/scripts/reviewer/index.mjs:914`) applies `merge-when-ready` itself on APPROVED verdict. Do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership)). If a clean PR is missing the label, re-apply `bot:ready-for-review` to fire a fresh Reviewer Bot cycle and/or request a Copilot review:
+The **Reviewer Bot** (`.github/workflows/review.yml` → `.github/scripts/reviewer/index.mjs:914`) applies `merge-when-ready` itself on APPROVED verdict. Do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership)). If a clean PR is missing the label, re-apply `bot:ready-for-review` to fire a fresh Reviewer Bot cycle:
 
 ```
 github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])
-github_request_review(prs: [<PR#>], copilot: true)
 ```
 
 ### Cloud Step 3: Re-run Flaky / Failed CI
@@ -256,15 +254,7 @@ ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", context: 5)
 | Consistent lint/type/build/test error            | **Defer** — flag for local agent (requires code fix) |
 | Formatting failure (`nx format:write` would fix) | **Defer** — flag for local agent                     |
 
-### Cloud Step 4: Request Copilot Reviews
-
-Find PRs without a Copilot review and request one:
-
-```
-github_request_review(prs: [<PR#>], copilot: true)
-```
-
-### Cloud Step 5: Resolve Process / Meta Review Threads
+### Cloud Step 4: Resolve Process / Meta Review Threads
 
 Some review threads suggest no code change — they are process comments or "nice to have" suggestions. For each PR with unresolved threads:
 

@@ -125,7 +125,7 @@ This is the runbook for default Claude Code on the web sessions. Three diagnosti
    git commit -m "<type>(<scope>): <msg> (LS-####)"
    git push -u origin HEAD                               # sets upstream on first push
    ```
-8. **Open PR**: `mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })`. Then `mcp__github__update_pull_request({ pullNumber: N, draft: false })` → `mcp__github__request_copilot_review({ pullNumber: N })`.
+8. **Open PR**: `mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })`. Then `mcp__github__update_pull_request({ pullNumber: N, draft: false })`.
 9. **Transition Jira to In Review**: `transitionJiraIssue({ ..., transition: { id: "2" } })`.
 10. **Watch for bot review** — Claude Code surfaces review events natively, no polling needed.
     - **Cycle 1 clean (LGTM)** → merge via `mcp__github__merge_pull_request` if available, or ask the user to merge.
@@ -257,14 +257,12 @@ On **Claude Code on the web**, the built-in `mcp__github__*` tools are the **aut
 ```
 1. Create PR (draft)     → mcp__github__create_pull_request({ owner, repo, title, head, base, draft: true })
 2. Mark ready            → mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })
-3. Request Copilot       → mcp__github__request_copilot_review({ owner, repo, pullNumber })
-4. [Claude Code surfaces PR events natively — CI results, Copilot comments, merge status]
-5. Read review threads   → github_get_review_threads({ number: <PR#>, unresolvedOnly: true })  ← custom server (returns GraphQL thread node IDs)
-6. Fix code, validate (`make pc`), self-review the changed files, commit & push
-7. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })  ← built-in (bot identity)
-8. Resolve threads       → github_resolve_threads({ threadIds: [...], prNumber: <PR#> })  ← custom server (batch; prNumber triggers bot-review recheck — may 403 on app tokens but threads are still resolved)
-9. Re-request review     → mcp__github__request_copilot_review({ owner, repo, pullNumber })
-10. [Loop back to 4 if new comments arrive, cap at 2 rounds]
+3. [Claude Code surfaces PR events natively — CI results, Copilot comments, merge status; Copilot review triggers automatically]
+4. Read review threads   → github_get_review_threads({ number: <PR#>, unresolvedOnly: true })  ← custom server (returns GraphQL thread node IDs)
+5. Fix code, validate (`make pc`), self-review the changed files, commit & push
+6. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })  ← built-in (bot identity)
+7. Resolve threads       → github_resolve_threads({ threadIds: [...], prNumber: <PR#> })  ← custom server (batch; prNumber triggers bot-review recheck — may 403 on app tokens but threads are still resolved)
+8. [Loop back to 3 if new comments arrive, cap at 2 rounds]
 ```
 
 ### Thread ID resolution
@@ -298,7 +296,6 @@ Three strategies, in preference order:
 | Create PR              | PR author appears as bot, not user                                             | `mcp__github__create_pull_request`                   | `github_create_pr`                       |
 | Mark PR ready          | `ready_for_review` event attributed to bot                                     | `mcp__github__update_pull_request({ draft: false })` | `github_mark_pr_ready`                   |
 | Reply to review thread | Comment appears under bot identity, not user                                   | `mcp__github__add_reply_to_pull_request_comment`     | `github_reply_to_review_thread`          |
-| Request Copilot review | App tokens silently fail; platform handles auth                                | `mcp__github__request_copilot_review`                | `github_request_review`                  |
 | View PR / list reviews | Read-only, but routing through built-in avoids waking the custom server's auth | `mcp__github__pull_request_read`                     | `github_view_pr`, `github_list_reviews`  |
 
 > **On Copilot Coding Agent**: the built-in `mcp__github__*` surface is not available. Use the custom `legacy-sports-github` server for the same operations — it authenticates via the Agent Author GitHub App installation token (provisioned by `.github/copilot-setup-steps.yml`), which is itself a bot identity, so PR/comment authorship is still bot-attributed, not user-attributed. The rule "built-in is authoritative" applies only where built-in is loaded.

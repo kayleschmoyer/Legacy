@@ -187,7 +187,7 @@ If there are unresolved review threads:
 3. Cross-reference with Jira ticket context (don't apply suggestions that contradict AC)
 4. Fix the code, validate with `make pc`, self-review fix code against `skills/pr-lifecycle/references/common-review-patterns.md`, then commit and push
 5. Resolve threads: `github_resolve_threads(threadIds: [...], prNumber: <PR#>)`
-6. Re-request review: `github_request_review(prs: [<PR#>])`
+6. Apply `bot:ready-for-review` label: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])` — fires the next review cycle; Copilot triggers automatically.
 
 Cap at **2 fix-review rounds**. After round 2, resolve remaining threads as "acknowledged" and proceed.
 

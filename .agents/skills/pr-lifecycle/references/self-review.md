@@ -90,9 +90,8 @@ If you arrived here from `/work-ticket`, `/fix-pr`, `/drive-pr`, `/sweep-prs`, `
 3. `github_create_pr({ title: "LS-#### type(scope): msg", body: "...", draft: true, head: <branch-name> })`
 4. `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`
 5. `github_mark_pr_ready({ number: <PR#> })`
-6. `github_request_review({ prs: [<PR#>] })`
-7. `jira_transition({ key: "LS-####", status: "In Review" })`
-8. Watch the PR through to merge — prefer native PR-event subscriptions / push notifications when the harness streams them (Claude Code on the desktop and web); fall back to a capped, explicit degraded-mode poll only when subscriptions are unavailable (e.g. some headless cloud sessions). The hard prohibition is on **unbounded polling loops** (`sleep N && gh pr view ...` repeated indefinitely, or one-shot snapshot tools called in a loop) — see the `pr-lifecycle` skill's CI-operations guidance.
+6. `jira_transition({ key: "LS-####", status: "In Review" })`
+7. Watch the PR through to merge — prefer native PR-event subscriptions / push notifications when the harness streams them (Claude Code on the desktop and web); fall back to a capped, explicit degraded-mode poll only when subscriptions are unavailable (e.g. some headless cloud sessions). The hard prohibition is on **unbounded polling loops** (`sleep N && gh pr view ...` repeated indefinitely, or one-shot snapshot tools called in a loop) — see the `pr-lifecycle` skill's CI-operations guidance.
 
 **A clean Self-Review Summary with "no issues found" is the most common point at which agents incorrectly conclude the task.** It feels like an ending; it is not. If your todo list still has `commit`, `push`, `create-pr`, `mark-ready`, `watch-pr`, or `merge` items pending, they are still pending — keep going.
 

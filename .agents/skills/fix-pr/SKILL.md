@@ -69,7 +69,7 @@ Build a triage list:
 5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `skills/pr-lifecycle/references/common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
 6. **Commit + push once**: single commit covering all review fixes and any already-identified CI/root-cause fixes you intentionally batched into the same round.
 7. **Resolve threads immediately after push**: call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does not auto-resolve threads. **Precondition for any GraphQL / `Invoke-RestMethod` / `curl` fallback**: first call `github_resolve_threads` and receive a connection error or explicit tool-not-found response. The MCP tool handles thread-ID batching and worktree-path resolution; shell fallbacks bypass both.
-8. **Re-request Copilot review**: `github_request_review({ prs: [<PR#>] })`
+8. **Apply `bot:ready-for-review` label**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — fires the next Reviewer (W1) cycle. Copilot review triggers automatically; no explicit `github_request_review` call needed.
 
 **Two-round cap**: Round 1 fixes security/bugs/type safety. Round 2 fixes remaining actionable comments. After round 2, resolve remaining threads as "acknowledged" and proceed.
 

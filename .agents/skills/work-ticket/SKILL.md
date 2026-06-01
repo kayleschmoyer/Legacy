@@ -238,7 +238,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
         { id: "commit",         content: "Commit: worktree_commit",                                                                        status: "pending" },
         { id: "push",           content: "Push: worktree_push",                                                                            status: "pending" },
         { id: "create-pr",      content: "Create PR: github_create_pr (draft: true) + github_manage_labels(add: ['agent-in-progress'])",  status: "pending" },
-        { id: "mark-ready",     content: "Mark PR ready + request review: github_mark_pr_ready + github_request_review",                  status: "pending" },
+        { id: "mark-ready",     content: "Mark PR ready: github_mark_pr_ready",                                                           status: "pending" },
         { id: "jira-in-review", content: "Transition Jira to In Review: jira_transition",                                                 status: "pending" },
         { id: "watch-pr",       content: "Watch PR: handle CI failures and review threads until checks pass",                              status: "pending" },
         { id: "merge",          content: "Merge PR (review_approved + all checks passing)",                                               status: "pending" },
@@ -274,7 +274,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
        Load Skill(skill: "work-ticket") FIRST, before any other tool call, and follow every step in it. The skill is authoritative — it owns the read-the-full-ticket gate, scope discipline (Out of Scope is a hard boundary; one ticket = one PR), and the AC verification gate that runs before self-review.
 
-       Drive to merge per AGENTS.md: blocker check → claim (jira_transition to In Progress) → worktree → implement → validate → self-review → push → PR → github_mark_pr_ready → github_request_review → Jira "In Review" → handle bot review cycles → merge → Jira "Done" → MCP gap audit → cleanup. Cap at 2 review rounds before escalating.
+       Drive to merge per AGENTS.md: blocker check → claim (jira_transition to In Progress) → worktree → implement → validate → self-review → push → PR → github_mark_pr_ready → Jira "In Review" → handle bot review cycles → merge → Jira "Done" → MCP gap audit → cleanup. Cap at 2 review rounds before escalating.
 
        A task is complete only when the PR is MERGED and Jira is "Done".`
        })
@@ -330,7 +330,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
     >
     > **Precondition for closing out a code-change ticket: PR opened, marked ready, and watched to merge.** After the local spec gate (if applicable) passes, proceed directly to Step 7. Every code change produces a PR — "the change is small", "I'm not sure it's ready", and "the user can review it locally" are not exit conditions. Stopping here is the most common agent failure mode; the TaskCreate checklist in Critical Rules makes this mechanically checkable.
 
-7.  **Ship** — every code-change ticket reaches this step. **Precondition: step 5 self-review is complete and every issue it raised is fixed** (if step 5 was skipped, return to it before creating the PR): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", head: "<branch-name>", draft: true)` → `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(prs: [<PR#>])` → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 8 (watch to merge) first, then run the MCP gap audit in step 9 after merge.
+7.  **Ship** — every code-change ticket reaches this step. **Precondition: step 5 self-review is complete and every issue it raised is fixed** (if step 5 was skipped, return to it before creating the PR): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", head: "<branch-name>", draft: true)` → `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 8 (watch to merge) first, then run the MCP gap audit in step 9 after merge.
 
     > **Precondition for marking the ticket done: the merge event has arrived.** Creating the PR closes only one of the six TaskCreate items in Critical Rules. Continue to step 8 and handle CI/review events as push notifications deliver them.
 
@@ -467,7 +467,7 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
    Load Skill(skill: "work-ticket") FIRST, before any other tool call, and follow every step in it. The skill is authoritative — it owns the read-the-full-ticket gate (quote back ACs as AC1, AC2, ... before any state-changing tool call), scope discipline (Out of Scope is a hard boundary; one ticket = one PR), and the AC verification gate that runs before self-review.
 
-   Drive to merge per AGENTS.md: worktree → implement → validate (make pc) → self-review → push → PR → github_mark_pr_ready → github_request_review → Jira "In Review" → handle bot review cycles → merge → Jira "Done" → MCP gap audit → cleanup. Cap at 2 review rounds before escalating to the user.
+   Drive to merge per AGENTS.md: worktree → implement → validate (make pc) → self-review → push → PR → github_mark_pr_ready → Jira "In Review" → handle bot review cycles → merge → Jira "Done" → MCP gap audit → cleanup. Cap at 2 review rounds before escalating to the user.
 
    A task is complete only when the PR is MERGED and Jira is "Done".`
    })
@@ -601,7 +601,7 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
 
   Load Skill(skill: "work-ticket") FIRST, before any other tool call, and follow every step in it. The skill is authoritative — it owns the read-the-full-ticket gate (quote back ACs as AC1, AC2, ... before any state-changing tool call), the scope discipline rules (Out of Scope is a hard boundary; one ticket = one worktree = one PR), and the AC verification gate that runs before self-review.
 
-  Drive to merge per AGENTS.md: worktree → implement → validate (make pc) → self-review → push → PR → github_mark_pr_ready → github_request_review → Jira "In Review" → handle bot review cycles → merge → Jira "Done" → MCP gap audit → cleanup. Cap at 2 review rounds before escalating to the user. If the ticket is blocked or genuinely impossible, transition back to "To Do" with a comment explaining why, and stop.
+  Drive to merge per AGENTS.md: worktree → implement → validate (make pc) → self-review → push → PR → github_mark_pr_ready → Jira "In Review" → handle bot review cycles → merge → Jira "Done" → MCP gap audit → cleanup. Cap at 2 review rounds before escalating to the user. If the ticket is blocked or genuinely impossible, transition back to "To Do" with a comment explaining why, and stop.
 
   A task is complete only when the PR is MERGED and Jira is "Done".`
   })

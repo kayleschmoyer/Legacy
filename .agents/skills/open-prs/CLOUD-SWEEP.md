@@ -65,17 +65,7 @@ ci_rerun(runId: <runId>, failedOnly: true)
 
 After re-running, the PR moves to `ciPending`. Track these for the final report.
 
-## Cloud Step 4: Request Copilot Reviews
-
-Find PRs without a Copilot review and request one. This is **required** for bot-authored PRs (e.g. `legacy-sports-code-bot`) — the repository ruleset only auto-triggers Copilot review for user-authored PRs. The `requestReviewers` REST API silently drops Copilot when called with GitHub App installation tokens (`ghs_*`); only user OAuth tokens work.
-
-```
-github_request_review(prs: [<PR#>], copilot: true)
-```
-
-> **Note**: The MCP tool automatically uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token. If no user token is available, it will report an error instead of silently failing.
-
-## Cloud Step 5: Resolve Process / Meta Review Threads
+## Cloud Step 4: Resolve Process / Meta Review Threads
 
 Some review threads suggest no code change — they are process comments, "nice to have" suggestions, or scope observations (pattern #10 in the common Copilot review patterns). These can be resolved directly without code changes.
 
