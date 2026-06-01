@@ -178,12 +178,14 @@ function ConversationThread({
           {messageText.length > 1900 && (
             <Text
               fontSize="$1"
-              color={messageText.length >= 2000 ? '$red10' : '$textMuted'}
+              color={messageText.length >= 2000 ? '$red10' : '$orange10'}
               textAlign="right"
               paddingHorizontal="$3"
               paddingTop="$1"
             >
-              {messageText.length}/2000
+              {messageText.length >= 2000
+                ? 'Character limit reached'
+                : `${2000 - messageText.length} characters remaining`}
             </Text>
           )}
           <XStack padding="$3" gap="$2" alignItems="center">
