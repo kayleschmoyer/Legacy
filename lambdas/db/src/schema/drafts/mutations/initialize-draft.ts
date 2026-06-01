@@ -96,7 +96,7 @@ builder.mutationField('initializeDraft', (t) =>
           );
         }
 
-        // Verify user is the league owner
+        // Verify user is the league commissioner
         const [membership] = await context.db
           .select()
           .from(PublicSchema.leagueMembers)
@@ -108,13 +108,9 @@ builder.mutationField('initializeDraft', (t) =>
           )
           .limit(1);
 
-        if (
-          !membership ||
-          (membership.permissionLevel !== 'general_manager' &&
-            membership.permissionLevel !== 'commissioner')
-        ) {
+        if (!membership || membership.permissionLevel !== 'commissioner') {
           throw ForbiddenError(
-            'Only the league General Manager or commissioner can initialize a draft',
+            'Only the league Commissioner can initialize a draft',
           );
         }
 

@@ -616,7 +616,7 @@ builder.mutationField('startDraft', (t) =>
       const { leagueId } = args;
       const userId = context.user.id;
 
-      // Verify caller is commissioner or GM of this league before delegating
+      // Verify caller is commissioner of this league before delegating
       // to DraftService. Defense in depth — do not rely solely on
       // validateUserAccess in the service layer (LS-2496). Kept outside the
       // try/catch so ForbiddenError is not rewrapped as a generic Error.
@@ -633,13 +633,9 @@ builder.mutationField('startDraft', (t) =>
         )
         .limit(1);
 
-      if (
-        !membership ||
-        (membership.permissionLevel !== 'commissioner' &&
-          membership.permissionLevel !== 'general_manager')
-      ) {
+      if (!membership || membership.permissionLevel !== 'commissioner') {
         throw ForbiddenError(
-          'Only the league Commissioner or General Manager can start the draft',
+          'Only the league Commissioner can start the draft',
         );
       }
 
