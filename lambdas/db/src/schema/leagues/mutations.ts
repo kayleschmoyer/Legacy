@@ -1191,11 +1191,6 @@ builder.mutationField('deleteLeague', (t) =>
           throw UserInputError('League not found');
         }
 
-        // Check if user is the General Manager or admin
-        if (!context.user) {
-          throw AuthenticationError('User not authenticated');
-        }
-
         if (league[0].owner !== context.user.id && !context.user.isAdmin) {
           throw ForbiddenError(
             'Only the league owner or admin can delete this league',
