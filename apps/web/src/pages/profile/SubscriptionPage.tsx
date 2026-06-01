@@ -201,15 +201,12 @@ function getStatusLabel(status: string): string {
   }
 }
 
-function getTierLabel(tier: string): string {
-  switch (tier) {
-    case 'monthly':
-      return 'Premium (Monthly)';
-    case 'annual':
-      return 'Premium (Annual)';
-    default:
-      return 'Premium';
-  }
+// The subscriptions table stores only `free` or `premium` for `tier` — the
+// billing interval (monthly vs annual) is held by Stripe and is not surfaced on
+// this field. Map the two real values directly; do not switch on interval names
+// that can never appear here.
+export function getTierLabel(tier: string): string {
+  return tier === 'premium' ? 'Premium' : 'Free';
 }
 
 /* ─── Sub-Components ─── */
