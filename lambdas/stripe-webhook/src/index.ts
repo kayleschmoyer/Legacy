@@ -646,7 +646,7 @@ async function handleSubscriptionEvent(
 async function handlePaymentFailed(
   stripeSubscriptionId: string,
 ): Promise<number | null> {
-  return runWithInternalClient(getDbOptions(), async (db) => {
+  const result = await runWithInternalClient(getDbOptions(), async (db) => {
     const existing = await db
       .select()
       .from(InternalSchema.subscriptions)
@@ -702,8 +702,16 @@ async function handlePaymentFailed(
       });
     }
 
-    return record.userId;
+    return { userId: record.userId, withinGracePeriod };
   });
+
+  if (result === null) return null;
+
+  if (!result.withinGracePeriod) {
+    await applyTierChangeSideEffects(result.userId, 'premium', 'free');
+  }
+
+  return result.userId;
 }
 
 /**

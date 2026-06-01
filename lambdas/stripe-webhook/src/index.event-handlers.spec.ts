@@ -909,6 +909,20 @@ describe('stripe-webhook event handlers', () => {
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+
+    it('calls applyTierChangeSideEffects when grace period has expired', async () => {
+      const expiredDate = new Date(Date.now() - 86400000);
+      makePaymentFailedEvent('sub_123', { gracePeriodEndsAt: expiredDate });
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(
+        42,
+        expect.anything(),
+      );
     });
 
     it('returns 200 and skips processing when no subscription record exists', async () => {
