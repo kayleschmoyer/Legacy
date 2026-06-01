@@ -75,18 +75,22 @@ function validateCertificateChain(pemCerts: string[]): void {
     assertCertValidAt(cert, now);
   }
 
-  // Verify name chaining: each cert's issuer must match the next cert's subject
+  // Verify name chaining: each cert must be issued by the next cert in the
+  // chain. Use checkIssued (which compares the normalized issuer/subject DNs
+  // and authority/subject key identifiers) rather than raw DN string equality —
+  // DN string formatting can differ across Node.js versions and Apple cert
+  // issuances, causing valid chains to be falsely rejected (LS-5194).
   for (let i = 0; i < certObjects.length - 1; i++) {
-    if (certObjects[i].issuer !== certObjects[i + 1].subject) {
+    if (!certObjects[i].checkIssued(certObjects[i + 1])) {
       throw new Error(
-        `Certificate chain subject/issuer mismatch at index ${i}: cert.issuer=${certObjects[i].issuer} != nextCert.subject=${certObjects[i + 1].subject}`,
+        `Certificate chain subject/issuer mismatch at index ${i}: cert.subject=${certObjects[i].subject} not issued by nextCert.subject=${certObjects[i + 1].subject}`,
       );
     }
   }
   const last = certObjects[certObjects.length - 1];
-  if (last.issuer !== rootCert.subject) {
+  if (!last.checkIssued(rootCert)) {
     throw new Error(
-      `Last certificate issuer does not match Apple Root CA G3 subject: cert.issuer=${last.issuer}`,
+      `Last certificate is not issued by Apple Root CA G3: cert.subject=${last.subject}`,
     );
   }
 
