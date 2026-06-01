@@ -3,15 +3,18 @@
 # "Require review from Code Owners" is ENABLED in branch protection (T17, LS-3998).
 # require_code_owner_review:true is set in .github/ruleset.json.
 #
-# Default catch-all (*) is intentionally omitted until T3 (LS-3860) provisions the
-# reviewer service account and its GitHub username is confirmed.  Add it as:
-#   *    @<service-account-username>
-# once T3 is complete.
-#
 # Order matters: last matching pattern wins, so general rules come first,
 # path-specific rules come last.
 #
+# The catch-all (*) assigns legacy-sports-review-bot as default owner for all
+# files not covered by a more specific rule below (LS-5153, completing T3/LS-3860).
+# This means the bot's APPROVE satisfies require_code_owner_review for normal code,
+# and only the explicitly enumerated sensitive paths below require @bkrupa.
+#
 # All handles confirmed via LS-3859 (T2) — sole developer, no GitHub org teams.
+
+# Default owner — review bot satisfies CODEOWNERS for all non-sensitive files
+*                                 @legacy-sports-review-bot[bot]
 
 # Workflows, CI config, and CI scripts
 .github/workflows/**              @bkrupa
@@ -34,7 +37,13 @@ lambdas/apple-iap/**              @bkrupa
 
 # Database migrations
 lib/db-client/migrations/**       @bkrupa
-lambdas/db/**                     @bkrupa
+
+# Auth / authorization logic in the GraphQL lambda (security-sensitive subset only)
+# The broad lambdas/db/** pattern previously required @bkrupa on every GraphQL
+# resolver change; narrowed here so normal feature work falls through to the
+# catch-all review-bot owner (LS-5153).
+lambdas/db/src/schema/authorization*.ts   @bkrupa
+lambdas/db/src/schema/entitlements.ts     @bkrupa
 
 # CI design docs
 docs/ci-cd/ci-greenfield-design.md         @bkrupa
