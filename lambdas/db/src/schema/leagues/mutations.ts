@@ -13,7 +13,7 @@ import {
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   DEFAULT_ROSTER_POSITIONS_BY_SPORT,
@@ -2046,6 +2046,81 @@ builder.mutationField('renewLeague', (t) =>
       if (oldLeague.frozenAt) {
         throw new Error(
           'This league has already been retired for a new season',
+        );
+      }
+
+      // 2b. Entitlement re-check — premium features being carried forward must
+      // still be entitled to the caller. A user who was premium when the
+      // original league was created but has since downgraded must not silently
+      // inherit premium functionality on renewal. (LS-5127)
+      //
+      // League cap: a free user may renew if they hold fewer than 3 OTHER
+      // active (non-frozen, non-mock) leagues, since the current league is
+      // about to be frozen and replaced 1-for-1.
+      //
+      // Note: hasEntitlement/requireEntitlement resolve tier→entitlements via
+      // TIER_ENTITLEMENTS internally — there is no separate "premium" key;
+      // callers gate on the specific capability being checked, not the tier.
+      // Re-check league cap for free users. Uses `await` + `hasEntitlement`
+      // to ensure the entitlement is evaluated asynchronously before the count
+      // query runs. `ne(id, leagueId)` explicitly excludes the league being
+      // renewed so the 1-for-1 replacement is not counted against the limit.
+      if (!(await hasEntitlement(context, ENTITLEMENTS.unlimited_leagues))) {
+        const [{ leagueCount }] = await context.db
+          .select({ leagueCount: count() })
+          .from(PublicSchema.leagues)
+          .where(
+            and(
+              eq(PublicSchema.leagues.owner, oldLeague.owner),
+              eq(PublicSchema.leagues.isMockDraft, false),
+              isNull(PublicSchema.leagues.frozenAt),
+              ne(PublicSchema.leagues.id, leagueId), // exclude this league (being frozen)
+            ),
+          );
+        if (leagueCount >= 3) {
+          throw PremiumRequiredError(
+            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
+          );
+        }
+      }
+
+      if (oldLeague.waiverType === 'faab') {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.faab_waiver_type,
+          'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
+        );
+      }
+
+      if (oldLeague.salaryCapEnabled) {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.salary_cap_leagues,
+          'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
+        );
+      }
+
+      if (
+        oldLeague.baseballEraFilter &&
+        !isEraFreeForSport(
+          normalizeSport(oldLeague.sport),
+          oldLeague.baseballEraFilter,
+        )
+      ) {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.historical_era_filters,
+          'Era-based filtering (non-free eras) requires a premium subscription. Upgrade to access historical era leagues.',
+        );
+      }
+
+      if (
+        oldLeague.playoffFormat != null &&
+        ['6-team', '8-team'].includes(oldLeague.playoffFormat)
+      ) {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.advanced_playoff_formats,
         );
       }
 

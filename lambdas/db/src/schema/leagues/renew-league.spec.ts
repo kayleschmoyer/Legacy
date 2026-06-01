@@ -254,6 +254,7 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
     // Reads issued before the transaction opens, in order:
     //   1. membership (must be commissioner to pass auth gate)
     //   2. oldLeague row
+    //   2b. subscription tier (for entitlement re-check added in LS-5127)
     //   3. oldTeams
     //   4. oldMembers
     //   5. oldPositions
@@ -277,7 +278,8 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
           rosterLockTiming: 'matchup-start',
           schedulingStrategy: 'round-robin',
           playerPool: 'all',
-          eraFilter: null,
+          sport: 'baseball',
+          baseballEraFilter: null,
           baseballHofOnly: false,
           customEraStartYear: null,
           customEraEndYear: null,
@@ -308,6 +310,7 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
           auctionMinBid: null,
         },
       ], // oldLeague
+      [{ tier: 'premium' }], // subscription tier lookup (step 2b, LS-5127)
       [], // oldTeams (empty so teams insert maps zero rows, but still runs)
       [], // oldMembers
       [], // oldPositions
@@ -411,5 +414,196 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
     expect(infoMessages).not.toContain('Season renewal complete');
     expect(infoMessages).not.toContain('Season renewal roster summary');
     expect(infoMessages).not.toContain('Salary escalation and decay applied');
+  });
+
+  describe('entitlement re-check on renewal (LS-5127)', () => {
+    /**
+     * Build a resolve + context pair for a free-tier user, with a customisable
+     * old-league record and a pre-populated leagueCount for the cap check.
+     *
+     * Reads in order:
+     *  1. membership
+     *  2. oldLeague (passed as `leagueOverrides`)
+     *  2b. subscription tier → 'free'
+     *  2b2. league count (if tier is free, always consumed)
+     *  (resolver throws before further reads when entitlement fails)
+     */
+    function setupFreeUser(
+      leagueOverrides: Record<string, unknown>,
+      otherActiveLeagueCount = 0,
+    ) {
+      const baseLeague = {
+        id: 1,
+        name: 'Test League',
+        owner: 42,
+        frozenAt: null,
+        seasonNumber: 1,
+        maxRosterSize: 25,
+        minGamesPerSeason: null,
+        gamesPerMatchup: 1,
+        tradeDeadlineWeek: null,
+        rosterLockTiming: 'matchup-start',
+        schedulingStrategy: 'round-robin',
+        playerPool: 'all',
+        sport: 'baseball',
+        baseballEraFilter: null,
+        baseballHofOnly: false,
+        customEraStartYear: null,
+        customEraEndYear: null,
+        waiverType: 'standard',
+        waiverEnabled: false,
+        faabBudgetDefault: 100,
+        pitcherStartsPerMatchup: null,
+        minCareerGames: null,
+        minCareerSeasons: null,
+        totalMatchups: null,
+        numberOfDivisions: 1,
+        playoffEnabled: false,
+        playoffFormat: null,
+        playoffMultiWeek: false,
+        isPublic: false,
+        logoUrl: null,
+        bannerUrl: null,
+        primaryColor: null,
+        secondaryColor: null,
+        salaryCapEnabled: false,
+        salaryCap: null,
+        salaryFloor: null,
+        luxuryTaxThreshold: null,
+        minSalary: 1,
+        salaryEscalationPct: 0,
+        salaryDecayPct: 0,
+        auctionBudget: null,
+        auctionMinBid: null,
+        isMockDraft: false,
+        ...leagueOverrides,
+      };
+
+      const readQueue: unknown[] = [
+        [{ permissionLevel: 'commissioner' }],
+        [baseLeague],
+        [{ tier: 'free' }],
+        [{ leagueCount: otherActiveLeagueCount }],
+        // resolver throws before consuming further items when entitlement fails
+      ];
+
+      const { db, insertCalls } = makeChainableDb(readQueue);
+      const context = {
+        user: { id: 42, isAdmin: false, username: 'commish' },
+        db,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().renewLeague;
+      if (!field?.resolve) throw new Error('renewLeague resolver not found');
+
+      return { resolve: field.resolve.bind(field), context, insertCalls };
+    }
+
+    it('blocks a free user who already holds 3 other active leagues', async () => {
+      const { resolve, context } = setupFreeUser({}, 3);
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('3-league limit');
+    });
+
+    it('allows a free user who holds fewer than 3 other active leagues', async () => {
+      // waiverType: 'standard', salaryCapEnabled: false → no premium features
+      // to gate; should complete normally with 2 other leagues
+      const { resolve, context } = setupFreeUser({}, 2);
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('blocks a free user renewing a league with FAAB waivers', async () => {
+      const { resolve, context } = setupFreeUser({ waiverType: 'faab' }, 0);
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('FAAB waiver type requires a premium subscription');
+    });
+
+    it('blocks a free user renewing a salary-cap league', async () => {
+      const { resolve, context } = setupFreeUser({ salaryCapEnabled: true }, 0);
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary cap leagues require a premium subscription');
+    });
+
+    it('blocks a free user renewing a league with a non-free era filter', async () => {
+      const { resolve, context } = setupFreeUser(
+        { sport: 'baseball', baseballEraFilter: 'dead_ball' },
+        0,
+      );
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Era-based filtering');
+    });
+
+    it('blocks a free user renewing a league with an advanced playoff format', async () => {
+      const { resolve, context } = setupFreeUser(
+        { playoffFormat: '6-team' },
+        0,
+      );
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Advanced playoff formats');
+    });
+
+    it('allows a free user to renew a league with only free features', async () => {
+      const { resolve, context } = setupFreeUser(
+        {
+          sport: 'baseball',
+          baseballEraFilter: 'modern',
+          playoffFormat: '4-team',
+        },
+        0,
+      );
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).resolves.toBeDefined();
+    });
   });
 });
