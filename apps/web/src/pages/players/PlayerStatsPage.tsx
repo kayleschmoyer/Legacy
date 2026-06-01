@@ -263,17 +263,35 @@ export function PlayerStatsPage() {
             text: 'Check out these player statistics from Legacy Sports',
             url: url,
           });
-        } else {
+        } else if (navigator.clipboard) {
           await navigator.clipboard.writeText(url);
           setLiveMsg('Link copied to clipboard.');
+        } else {
+          setLiveMsg('Could not share link. Please copy the URL manually.');
         }
       } catch (error) {
-        LOGGER.error('Error sharing:', String(error));
-        try {
-          await navigator.clipboard.writeText(url);
-          setLiveMsg('Link copied to clipboard.');
-        } catch (clipboardError) {
-          LOGGER.error('Clipboard error:', String(clipboardError));
+        // AbortError means the user dismissed the native share sheet — not an error
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        LOGGER.error(
+          'Error sharing:',
+          error instanceof Error ? error : String(error),
+        );
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(url);
+            setLiveMsg('Link copied to clipboard.');
+          } catch (clipboardError) {
+            LOGGER.error(
+              'Clipboard error:',
+              clipboardError instanceof Error
+                ? clipboardError
+                : String(clipboardError),
+            );
+            setLiveMsg('Could not share link. Please copy the URL manually.');
+          }
+        } else {
           setLiveMsg('Could not share link. Please copy the URL manually.');
         }
       }
