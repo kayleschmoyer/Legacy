@@ -25,7 +25,7 @@ This skill covers the complete PR lifecycle: creation, self-review, review fixin
 Use the `github_create_pr` MCP tool (**always preferred**):
 
 ```
-github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, worktreePath: <path>)
+github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, head: <branch-name>)
 ```
 
 <details>

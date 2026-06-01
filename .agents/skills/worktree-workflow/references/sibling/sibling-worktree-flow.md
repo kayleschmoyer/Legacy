@@ -391,7 +391,7 @@ If tests fail:
 See the [pr-lifecycle skill](../../../pr-lifecycle/SKILL.md) for the full PR template workflow. Use the MCP tool (preferred):
 
 ```
-github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, worktreePath: <path>)
+github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, head: <branch-name>)
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 ```
@@ -474,7 +474,7 @@ db_migrate(worktreePath: "$wt")
 make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc) — MCP tools primary
-github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: $wt)
+github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, head: <branch-name>)
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])  # apply while still draft
 github_mark_pr_ready(number: <PR#>)
 jira_transition(key: "LS-####", status: "In Review")

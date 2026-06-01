@@ -119,7 +119,7 @@ Work subagents inherit all MCP connections from the parent session (all 9 server
 
 ```
 worktree_push(worktree: "<subagent-worktree-path>", setUpstream: true)
-github_create_pr(worktreePath: "<absolute-subagent-worktree-path>", title: "...", body: "...", draft: true)
+github_create_pr(head: "<branch-name>", title: "...", body: "...", draft: true)  # branch-name from subagent's worktree_status().headRefName
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 github_request_review(prs: [<PR#>])

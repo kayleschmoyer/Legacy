@@ -64,7 +64,10 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
   // must pass `head` explicitly in Lambda mode. (LS-4881)
   const lambda = isLambda();
   let cwd = getRepoRoot();
-  if (params.worktreePath) {
+  // Only use worktreePath for branch auto-detection when head is not explicitly provided.
+  // worktreePath is meaningless in Lambda (no client filesystem access), and Windows paths
+  // fail Unix isAbsolute() checks even when head is already known. (LS-5217)
+  if (params.worktreePath && !params.head) {
     if (!isAbsolute(params.worktreePath)) {
       return {
         isError: true,
@@ -138,7 +141,7 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
         content: [
           {
             type: 'text',
-            text: `Auto-detected head branch "${head}" matches base "${base}". Pass \`head\` explicitly (the branch name to merge from) or pass \`worktreePath\` so the tool can detect the branch from your worktree.`,
+            text: `Auto-detected head branch "${head}" matches base "${base}". Pass \`head\` explicitly with the branch name to merge from (e.g. "claude/<name>").`,
           },
         ],
       };

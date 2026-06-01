@@ -34,7 +34,7 @@ You must produce a **structured Self-Review Summary** (see the template in the r
 
 ### Phase 2: Create PR with Jira Linkage
 
-> **Precondition for opening a PR**: call `github_create_pr` (MCP tool). It routes via `worktreePath`, handles structured body encoding, and is audited by the MCP gap checker. `gh pr create` silently uses the shell's working directory instead of `worktreePath`, which targets the wrong branch in multi-worktree sessions. **Precondition for `gh pr create` fallback**: `github_auth_status()` returns `configured: false` and the user has explicitly authorized the CLI fallback.
+> **Precondition for opening a PR**: call `github_create_pr` (MCP tool) with `head: <branch-name>` (from `worktree_status().headRefName`). The tool runs on a remote Lambda and cannot resolve client-side paths — pass the branch name directly. `gh pr create` silently uses the shell's working directory and targets the wrong branch in multi-worktree sessions. **Precondition for `gh pr create` fallback**: `github_auth_status()` returns `configured: false` and the user has explicitly authorized the CLI fallback.
 
 Before creating a PR, verify GitHub auth is working:
 
@@ -327,7 +327,7 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 
 ```
 # MCP (preferred) — full post-creation sequence
-github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
+github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, head: <branch-name>)
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])   # while still draft — MUST come before bot:ready-for-review
 github_mark_pr_ready(number: <PR#>)
 github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MUST be last label op — see note below
@@ -414,9 +414,9 @@ worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: tru
 # OR if worktree_set is active for the subagent's worktree:
 worktree_run(command: "git push --set-upstream origin <branch>")
 
-# 2. Create the PR as a draft, targeting the subagent's worktree
+# 2. Create the PR as a draft, using the subagent's branch name (from worktree_status().headRefName)
 github_create_pr(
-  worktreePath: "<absolute path to subagent worktree>",
+  head: "<branch-name>",    # from worktree_status().headRefName
   title: "LS-#### type(scope): msg",
   body: <markdown>,
   draft: true
@@ -432,7 +432,7 @@ github_mark_pr_ready(number: <PR#>)
 github_request_review(prs: [<PR#>])
 ```
 
-**Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `worktreePath` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.
+**Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `head` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.
 
 **Shell fallback (only if MCP server is unavailable):**
 

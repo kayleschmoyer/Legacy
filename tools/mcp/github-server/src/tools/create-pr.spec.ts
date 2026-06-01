@@ -50,14 +50,30 @@ describe('createPR Lambda behavior (LS-4881)', () => {
       expect(mockGithubRest).toHaveBeenCalled();
     });
 
-    it('still rejects non-absolute worktreePath', async () => {
+    it('ignores non-absolute worktreePath when head is provided (LS-5217)', async () => {
+      // When head is explicitly provided, worktreePath is skipped entirely —
+      // no path validation, no filesystem check. This is the fix for Windows
+      // D:\... paths that fail Unix isAbsolute() even though head is already known.
       const result = await createPR({
-        title: 'LS-4881 fix(mcp): test',
+        title: 'LS-5217 fix(mcp): test',
         body: 'body',
         worktreePath: 'relative/path',
         head: 'claude/some-branch',
       });
 
+      expect(result.isError).toBeFalsy();
+      expect(mockGithubRest).toHaveBeenCalled();
+    });
+
+    it('still rejects non-absolute worktreePath when head is not provided', async () => {
+      const result = await createPR({
+        title: 'LS-4881 fix(mcp): test',
+        body: 'body',
+        worktreePath: 'relative/path',
+      });
+
+      // In Lambda without head, the worktreePath validation runs (non-absolute → error).
+      // This checks that we didn't accidentally remove the validation entirely.
       expect(result.isError).toBe(true);
       const text = result.content?.[0];
       expect(text && 'text' in text ? text.text : '').toMatch(/absolute path/);
@@ -105,12 +121,25 @@ describe('createPR Lambda behavior (LS-4881)', () => {
       mockIsLambda.mockReturnValue(false);
     });
 
-    it('still validates worktreePath existence', async () => {
+    it('ignores worktreePath existence when head is provided (LS-5217)', async () => {
+      // head takes precedence — worktreePath is skipped entirely regardless of whether
+      // the path exists, so this should succeed rather than return a path error.
+      const result = await createPR({
+        title: 'LS-5217 fix(mcp): test',
+        body: 'body',
+        worktreePath: '/path/that/does/not/exist/anywhere/realistic',
+        head: 'claude/some-branch',
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockGithubRest).toHaveBeenCalled();
+    });
+
+    it('still validates worktreePath existence when head is not provided', async () => {
       const result = await createPR({
         title: 'LS-4881 fix(mcp): test',
         body: 'body',
         worktreePath: '/path/that/does/not/exist/anywhere/realistic',
-        head: 'claude/some-branch',
       });
 
       expect(result.isError).toBe(true);

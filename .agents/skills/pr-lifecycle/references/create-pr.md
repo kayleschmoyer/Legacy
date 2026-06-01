@@ -24,7 +24,7 @@ github_create_pr(
   title: "LS-#### type(scope): Brief description",
   body: <PR body markdown>,
   draft: true,
-  worktreePath: <worktree path>
+  head: <branch-name>    # from worktree_status().headRefName
 )
 ```
 

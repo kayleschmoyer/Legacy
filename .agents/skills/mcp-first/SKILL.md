@@ -110,7 +110,7 @@ Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` vi
 
 ## GitHub PR Operations
 
-> **Precondition for opening a PR**: call `github_create_pr` (MCP tool). It resolves `worktreePath` correctly, so the PR opens from the worktree's branch rather than the shell's CWD. `gh pr create` ignores `worktreePath` and silently targets the shell's working directory — use it only after confirming the MCP server is unavailable, and add a follow-up MCP gap ticket when you do.
+> **Precondition for opening a PR**: call `github_create_pr` (MCP tool). Pass `head` set to the local branch name (from `worktree_status().headRefName`); the tool runs on a remote Lambda and cannot resolve client-side paths. `gh pr create` silently targets the shell's working directory — use it only after confirming the MCP server is unavailable, and add a follow-up MCP gap ticket when you do.
 
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
 
