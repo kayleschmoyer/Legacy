@@ -24,7 +24,9 @@
     "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "@pothos/core": "*",
-    "graphql": "*"
+    "graphql": "*",
+    "jose": "*",
+    "zod": "*"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^11.13.0",

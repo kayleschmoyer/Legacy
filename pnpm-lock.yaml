@@ -1019,6 +1019,12 @@ importers:
       graphql:
         specifier: '*'
         version: 16.13.2
+      jose:
+        specifier: '*'
+        version: 6.2.2
+      zod:
+        specifier: '*'
+        version: 4.3.6
     devDependencies:
       '@testcontainers/postgresql':
         specifier: ^11.13.0
@@ -1588,6 +1594,8 @@ importers:
         version: 2.8.1
 
   lib/logging: {}
+
+  lib/mcp-bearer-auth: {}
 
   lib/mlb-client:
     dependencies:

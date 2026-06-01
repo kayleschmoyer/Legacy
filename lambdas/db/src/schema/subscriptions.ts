@@ -27,6 +27,10 @@ import {
   GOOGLE_PLAY_PACKAGE_NAME,
   isActiveGoogleSubscription,
 } from '../server/google-play';
+import {
+  decodeAndVerifyJwsTransaction,
+  type VerifiedAppleTransactionPayload,
+} from '../apple-jws';
 
 // Number of trial days to apply on new subscriptions, or undefined if no trial.
 const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
@@ -851,16 +855,18 @@ builder.mutationField('verifyApplePurchase', (t) =>
 
       const userId = context.user.id;
 
-      // Decode the JWS transaction string (self-signed by Apple via x5c chain)
+      // Decode and cryptographically verify the JWS transaction (x5c chain + ES256 signature)
       let transaction: AppleTransactionPayload;
       try {
-        transaction = decodeJwsPayload(args.jwsTransaction);
+        transaction = await decodeAndVerifyJwsTransaction(args.jwsTransaction);
       } catch (err) {
-        LOGGER.warn('verifyApplePurchase — failed to decode JWS transaction', {
+        LOGGER.warn('verifyApplePurchase — failed to verify JWS transaction', {
           userId,
           err,
         });
-        throw new Error('Invalid JWS transaction: could not decode payload');
+        throw UserInputError(
+          'Invalid JWS transaction: could not verify payload',
+        );
       }
 
       const { originalTransactionId, productId, expiresDate, bundleId } =
@@ -969,9 +975,18 @@ builder.mutationField('restoreApplePurchases', (t) =>
 
       let transaction: AppleTransactionPayload;
       try {
-        transaction = decodeJwsPayload(args.jwsTransaction);
-      } catch {
-        throw new Error('Invalid JWS transaction: could not decode payload');
+        transaction = await decodeAndVerifyJwsTransaction(args.jwsTransaction);
+      } catch (err) {
+        LOGGER.warn(
+          'restoreApplePurchases — failed to verify JWS transaction',
+          {
+            userId,
+            err,
+          },
+        );
+        throw UserInputError(
+          'Invalid JWS transaction: could not verify payload',
+        );
       }
 
       const { originalTransactionId, productId, expiresDate } = transaction;
@@ -1041,37 +1056,7 @@ builder.mutationField('restoreApplePurchases', (t) =>
 
 // ─── Apple IAP Helpers ────────────────────────────────────────────────────────
 
-interface AppleTransactionPayload {
-  originalTransactionId: string;
-  transactionId: string;
-  productId: string;
-  bundleId: string;
-  /** Expiry date in milliseconds since epoch */
-  expiresDate?: number;
-  purchaseDate: number;
-  appAccountToken?: string;
-}
-
-/**
- * Decode a JWS transaction string without full certificate-chain verification.
- * The apple-iap Lambda performs full verification for App Store Server
- * Notifications. Here we trust the client-provided JWS and decode the payload
- * to read the transaction details (bundle ID validation acts as a guard).
- *
- * For production hardening the apple-iap Lambda handles all subscription
- * lifecycle events with full JWS verification; this mutation is the initial
- * purchase confirmation path.
- */
-function decodeJwsPayload(jwsTransaction: string): AppleTransactionPayload {
-  const parts = jwsTransaction.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWS format: expected 3 dot-separated parts');
-  }
-  // Base64url-decode the payload (second part)
-  const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-  const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
-  return JSON.parse(payloadJson) as AppleTransactionPayload;
-}
+type AppleTransactionPayload = VerifiedAppleTransactionPayload;
 
 function tierFromAppleProductId(productId: string): 'free' | 'premium' {
   // Product IDs configured in App Store Connect:
