@@ -199,27 +199,47 @@ builder.queryField('donationPaymentLink', (t) =>
   }),
 );
 
-/** In-memory TTL cache for Stripe prices (avoids hitting Stripe on every request). */
-let cachedPrices: {
+type StripePriceResult = {
   monthlyPriceCents: number;
   annualTotalCents: number;
   monthlyPriceId: string;
   annualPriceId: string;
-} | null = null;
+};
+
+/**
+ * In-memory TTL cache for Stripe prices. Stores the in-flight Promise rather
+ * than the resolved value so concurrent callers on cold start or TTL expiry
+ * all await the same fetch instead of each triggering a separate Stripe call.
+ */
+let cachedPrices: Promise<StripePriceResult> | null = null;
 let cachedPricesExpiresAt = 0;
 const PRICE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-async function fetchStripePrices(): Promise<{
-  monthlyPriceCents: number;
-  annualTotalCents: number;
-  monthlyPriceId: string;
-  annualPriceId: string;
-}> {
+export async function fetchStripePrices(): Promise<StripePriceResult> {
   const now = Date.now();
   if (cachedPrices && now < cachedPricesExpiresAt) {
     return cachedPrices;
   }
 
+  // Assign the promise synchronously before any await so every concurrent
+  // caller that passes the TTL check above shares this single in-flight fetch.
+  cachedPricesExpiresAt = now + PRICE_CACHE_TTL_MS;
+  const promise = doFetchStripePrices();
+  cachedPrices = promise;
+  promise.catch(() => {
+    cachedPrices = null;
+    cachedPricesExpiresAt = 0;
+  });
+  return promise;
+}
+
+/** Reset the price cache. Exposed for unit tests only. */
+export function _resetStripePricesCache(): void {
+  cachedPrices = null;
+  cachedPricesExpiresAt = 0;
+}
+
+async function doFetchStripePrices(): Promise<StripePriceResult> {
   const monthlyPriceId = process.env['STRIPE_MONTHLY_PRICE_ID'];
   const annualPriceId = process.env['STRIPE_ANNUAL_PRICE_ID'];
 
@@ -244,17 +264,12 @@ async function fetchStripePrices(): Promise<{
     );
   }
 
-  const result = {
+  return {
     monthlyPriceCents: monthlyPrice.unit_amount,
     annualTotalCents: annualPrice.unit_amount,
     monthlyPriceId,
     annualPriceId,
   };
-
-  cachedPrices = result;
-  cachedPricesExpiresAt = now + PRICE_CACHE_TTL_MS;
-
-  return result;
 }
 
 builder.queryField('stripePrices', (t) =>

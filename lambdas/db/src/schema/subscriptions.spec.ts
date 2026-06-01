@@ -56,6 +56,11 @@ jest.mock('../server/stripe', () => ({
   getStripeClient: jest.fn(),
 }));
 
+// Stub out apple-jws (imports jose which is ESM-only and cannot be loaded by Jest).
+jest.mock('../apple-jws', () => ({
+  decodeAndVerifyJwsTransaction: jest.fn(),
+}));
+
 // Stub out the Google Play client loader (subscriptions.ts imports it at the top).
 jest.mock('../server/google-play', () => ({
   fetchGoogleSubscription: jest.fn(),
@@ -64,7 +69,9 @@ jest.mock('../server/google-play', () => ({
 }));
 
 import {
+  _resetStripePricesCache,
   expireSubscriptionGracePeriods,
+  fetchStripePrices,
   getOrCreateStripeCustomer,
 } from './subscriptions';
 
@@ -344,5 +351,98 @@ describe('getOrCreateStripeCustomer', () => {
       email: undefined,
       metadata: { userId: '5' },
     });
+  });
+});
+
+// ─── fetchStripePrices (LS-5134) ─────────────────────────────────────────────
+
+import { getStripeClient } from '../server/stripe';
+
+function makeStripeWithPrices(monthly: number, annual: number) {
+  const retrieve = jest
+    .fn()
+    .mockResolvedValueOnce({ unit_amount: monthly })
+    .mockResolvedValueOnce({ unit_amount: annual });
+  (getStripeClient as jest.Mock).mockResolvedValue({
+    prices: { retrieve },
+  } as unknown as import('stripe').default);
+  return retrieve;
+}
+
+describe('fetchStripePrices', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    _resetStripePricesCache();
+    process.env['STRIPE_MONTHLY_PRICE_ID'] = 'price_monthly';
+    process.env['STRIPE_ANNUAL_PRICE_ID'] = 'price_annual';
+  });
+
+  afterEach(() => {
+    delete process.env['STRIPE_MONTHLY_PRICE_ID'];
+    delete process.env['STRIPE_ANNUAL_PRICE_ID'];
+    _resetStripePricesCache();
+  });
+
+  it('deduplicates concurrent calls — only one Stripe fetch fires (thundering herd protection)', async () => {
+    const retrieve = makeStripeWithPrices(999, 8999);
+
+    const results = await Promise.all([
+      fetchStripePrices(),
+      fetchStripePrices(),
+      fetchStripePrices(),
+    ]);
+
+    // All three callers share the same in-flight promise: retrieve fires exactly
+    // twice (once for monthly, once for annual), not 6 times.
+    expect(retrieve).toHaveBeenCalledTimes(2);
+    for (const r of results) {
+      expect(r).toEqual({
+        monthlyPriceCents: 999,
+        annualTotalCents: 8999,
+        monthlyPriceId: 'price_monthly',
+        annualPriceId: 'price_annual',
+      });
+    }
+  });
+
+  it('returns cached promise on subsequent calls within TTL', async () => {
+    const retrieve = makeStripeWithPrices(500, 4999);
+
+    await fetchStripePrices();
+    await fetchStripePrices();
+
+    expect(retrieve).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears cache on failure so the next call retries', async () => {
+    // Promise.all calls retrieve for both price IDs simultaneously on each attempt,
+    // so 4 Once values are needed: [monthly-fail, annual-fail, monthly-ok, annual-ok].
+    const retrieve = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Stripe timeout')) // monthly, attempt 1 → rejects Promise.all
+      .mockResolvedValueOnce({ unit_amount: 0 }) // annual, attempt 1 → consumed but discarded
+      .mockResolvedValueOnce({ unit_amount: 999 }) // monthly, attempt 2
+      .mockResolvedValueOnce({ unit_amount: 8999 }); // annual, attempt 2
+    const client = {
+      prices: { retrieve },
+    } as unknown as import('stripe').default;
+    (getStripeClient as jest.Mock).mockResolvedValue(client);
+
+    await expect(fetchStripePrices()).rejects.toThrow('Stripe timeout');
+
+    // Allow the .catch handler to clear the cache.
+    await Promise.resolve();
+
+    const result = await fetchStripePrices();
+    expect(result.monthlyPriceCents).toBe(999);
+    expect(result.annualTotalCents).toBe(8999);
+  });
+
+  it('throws when price IDs are not configured', async () => {
+    delete process.env['STRIPE_MONTHLY_PRICE_ID'];
+
+    await expect(fetchStripePrices()).rejects.toThrow(
+      'Stripe price IDs are not configured',
+    );
   });
 });
