@@ -1222,6 +1222,11 @@ builder.mutationField('verifyGooglePurchase', (t) =>
       const tier = tierFromGoogleProductId(productId);
       const status = 'active';
 
+      // Record the renewal date so Android subscribers see their next billing
+      // period and expiry is tracked (mirrors the Apple path).
+      const expiryTime = googleSub.lineItems?.[0]?.expiryTime;
+      const currentPeriodEnd = expiryTime ? new Date(expiryTime) : null;
+
       // Determine previous tier to apply side effects on tier change
       const previousTier =
         await getPreviousTierForGooglePurchase(purchaseToken);
@@ -1235,7 +1240,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
             googleProductId: productId,
             status,
             tier,
-            currentPeriodEnd: null,
+            currentPeriodEnd,
             cancelAtPeriodEnd: false,
           })
           .onConflictDoUpdate({
@@ -1244,6 +1249,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
               googleProductId: productId,
               status,
               tier,
+              currentPeriodEnd,
               updatedAt: new Date(),
             },
           });
@@ -1323,6 +1329,11 @@ builder.mutationField('restoreGooglePurchases', (t) =>
       const tier = tierFromGoogleProductId(productId);
       const status = 'active';
 
+      // Record the renewal date so Android subscribers see their next billing
+      // period and expiry is tracked (mirrors the Apple path).
+      const expiryTime = googleSub.lineItems?.[0]?.expiryTime;
+      const currentPeriodEnd = expiryTime ? new Date(expiryTime) : null;
+
       await runWithInternalClient(getDbOptions(), async (db) => {
         await db
           .insert(InternalSchema.subscriptions)
@@ -1332,7 +1343,7 @@ builder.mutationField('restoreGooglePurchases', (t) =>
             googleProductId: productId,
             status,
             tier,
-            currentPeriodEnd: null,
+            currentPeriodEnd,
             cancelAtPeriodEnd: false,
           })
           .onConflictDoUpdate({
@@ -1341,6 +1352,7 @@ builder.mutationField('restoreGooglePurchases', (t) =>
               googleProductId: productId,
               status,
               tier,
+              currentPeriodEnd,
               updatedAt: new Date(),
             },
           });

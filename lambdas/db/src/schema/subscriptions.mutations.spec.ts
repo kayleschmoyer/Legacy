@@ -8,6 +8,16 @@
 
 import type { GraphQLSchema } from 'graphql';
 
+// jose is ESM-only (v6) and cannot be parsed by jest's CJS transform. It is
+// pulled in transitively via apple-jws.ts when the schema is imported. These
+// tests only exercise the Google Play path and never touch Apple JWS
+// verification, so mock it out (mirrors apple-jws.spec.ts).
+jest.mock('jose', () => ({
+  decodeProtectedHeader: jest.fn(),
+  importX509: jest.fn(),
+  jwtVerify: jest.fn(),
+}));
+
 describe('Google Play mutation validation (LS-5121)', () => {
   let schema: GraphQLSchema;
   let mockFetchGoogleSubscription: jest.Mock;
@@ -298,6 +308,130 @@ describe('Google Play mutation validation (LS-5121)', () => {
         expect.objectContaining({
           subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
         }),
+      );
+    });
+  });
+
+  // LS-5191: the active path must record currentPeriodEnd from the Google Play
+  // lineItems[0].expiryTime so Android subscribers have a renewal date.
+  describe('currentPeriodEnd recording (LS-5191)', () => {
+    /**
+     * Build a mock db whose insert chain captures the values passed to
+     * .values() and the set passed to .onConflictDoUpdate(), and whose select
+     * chain returns no previous subscription (so getPreviousTierForGooglePurchase
+     * resolves to null).
+     */
+    function installActiveDbCapture(): {
+      values: () => Record<string, unknown> | undefined;
+      updateSet: () => Record<string, unknown> | undefined;
+    } {
+      let capturedValues: Record<string, unknown> | undefined;
+      let capturedUpdateSet: Record<string, unknown> | undefined;
+
+      const mockDb = {
+        select: () => ({
+          from: () => ({
+            where: () => ({ limit: async () => [] }),
+          }),
+        }),
+        insert: () => ({
+          values: (v: Record<string, unknown>) => {
+            capturedValues = v;
+            return {
+              onConflictDoUpdate: (arg: { set: Record<string, unknown> }) => {
+                capturedUpdateSet = arg.set;
+                return Promise.resolve();
+              },
+            };
+          },
+        }),
+        update: () => ({
+          set: () => ({ where: async () => undefined }),
+        }),
+      };
+
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      dbClient.runWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: typeof mockDb) => unknown) =>
+          cb(mockDb),
+      );
+
+      return {
+        values: () => capturedValues,
+        updateSet: () => capturedUpdateSet,
+      };
+    }
+
+    const productId = 'com.legacysports.app.premium.monthly';
+
+    it('verifyGooglePurchase records currentPeriodEnd from lineItems expiryTime', async () => {
+      const expiryTime = '2026-07-01T00:00:00.000Z';
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId, expiryTime }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const captured = installActiveDbCapture();
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await resolve(
+        {},
+        { purchaseToken: 'fake-token', productId },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(captured.values()?.['currentPeriodEnd']).toEqual(
+        new Date(expiryTime),
+      );
+      expect(captured.updateSet()?.['currentPeriodEnd']).toEqual(
+        new Date(expiryTime),
+      );
+    });
+
+    it('verifyGooglePurchase records null currentPeriodEnd when expiryTime is absent', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const captured = installActiveDbCapture();
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await resolve(
+        {},
+        { purchaseToken: 'fake-token', productId },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(captured.values()?.['currentPeriodEnd']).toBeNull();
+      expect(captured.updateSet()?.['currentPeriodEnd']).toBeNull();
+    });
+
+    it('restoreGooglePurchases records currentPeriodEnd from lineItems expiryTime', async () => {
+      const expiryTime = '2026-08-15T12:30:00.000Z';
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ productId, expiryTime }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const captured = installActiveDbCapture();
+
+      const resolve = getResolver('restoreGooglePurchases');
+      const result = await resolve(
+        {},
+        { purchaseToken: 'fake-token', productId },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(captured.values()?.['currentPeriodEnd']).toEqual(
+        new Date(expiryTime),
+      );
+      expect(captured.updateSet()?.['currentPeriodEnd']).toEqual(
+        new Date(expiryTime),
       );
     });
   });
