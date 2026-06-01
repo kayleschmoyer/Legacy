@@ -230,9 +230,15 @@ jest.mock('../components/baseball', () => ({
   BaseballScreen: () => <div>Baseball Screen</div>,
 }));
 
-// Mock football screen
+// Mock football screen (kept for FootballLandingPage usage elsewhere)
 jest.mock('../components/football', () => ({
   FootballScreen: () => <div>Football Screen</div>,
+  FootballLandingPage: () => <div>Football Screen</div>,
+}));
+
+// Mock football hub page (used for /football route)
+jest.mock('../pages/football/FootballHubPage', () => ({
+  FootballHubPage: () => <div>Football Hub</div>,
 }));
 
 // Mock hooks
@@ -495,8 +501,8 @@ describe('App', () => {
     });
   });
 
-  describe('FootballScreen', () => {
-    it('should render football screen when navigating to /football', async () => {
+  describe('FootballHubPage', () => {
+    it('should render football hub when navigating to /football', async () => {
       const { container } = render(
         <MemoryRouter
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -509,8 +515,8 @@ describe('App', () => {
       // Flush React.lazy's Promise (timers don't help; microtask flush does)
       await act(() => Promise.resolve());
 
-      // Verify football screen content is rendered
-      expect(container).toHaveTextContent('Football Screen');
+      // Verify football hub content is rendered
+      expect(container).toHaveTextContent('Football Hub');
       expect(
         container.querySelector('img[alt="Legacy Sports"]'),
       ).toBeInTheDocument();
@@ -528,7 +534,7 @@ describe('App', () => {
 
       // Since we now show authenticated content immediately, no need to advance timers
       // Verify football content is present and matches expected structure
-      expect(container).toHaveTextContent('Football Screen');
+      expect(container).toHaveTextContent('Football Hub');
       expect(
         container.querySelector('img[alt="Legacy Sports"]'),
       ).toBeInTheDocument();
@@ -540,7 +546,7 @@ describe('App', () => {
       expect(container).toHaveTextContent('League Switcher');
     });
 
-    it('should match football screen snapshot', () => {
+    it('should match football hub snapshot', () => {
       const { container } = render(
         <MemoryRouter
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -559,7 +565,7 @@ describe('App', () => {
       expect(footballContent).toMatchSnapshot();
     });
 
-    it('should render football screen with navigation and layout', () => {
+    it('should render football hub with navigation and layout', () => {
       const { container } = render(
         <MemoryRouter
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -573,7 +579,7 @@ describe('App', () => {
       expect(
         container.querySelector('img[alt="Legacy Sports"]'),
       ).toBeInTheDocument();
-      expect(container).toHaveTextContent('Football Screen');
+      expect(container).toHaveTextContent('Football Hub');
 
       // Should show navigation links
       const homeLink = container.querySelector('[href="/"]');
@@ -599,7 +605,7 @@ describe('App', () => {
       expect(
         container.querySelector('img[alt="Legacy Sports"]'),
       ).toBeInTheDocument();
-      expect(container).toHaveTextContent('Football Screen');
+      expect(container).toHaveTextContent('Football Hub');
     });
 
     it('should match complete football page layout snapshot', () => {

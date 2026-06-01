@@ -4675,6 +4675,7 @@ export type LeagueFragment = {
   playerPool?: string | null;
   waiverEnabled?: boolean | null;
   waiverType?: string | null;
+  weekAdvanceStatus?: string | null;
   sport?: Sport | null;
   defensiveFormat?: DefensiveFormat | null;
   userMembership?: {
@@ -4725,6 +4726,7 @@ export type GetLeagueByIdQuery = {
     playerPool?: string | null;
     waiverEnabled?: boolean | null;
     waiverType?: string | null;
+    weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
     userMembership?: {
@@ -4763,6 +4765,7 @@ export type CreateLeagueMutation = {
       playerPool?: string | null;
       waiverEnabled?: boolean | null;
       waiverType?: string | null;
+      weekAdvanceStatus?: string | null;
       sport?: Sport | null;
       defensiveFormat?: DefensiveFormat | null;
       userMembership?: {
@@ -4809,6 +4812,7 @@ export type GetUserLeaguesQuery = {
     playerPool?: string | null;
     waiverEnabled?: boolean | null;
     waiverType?: string | null;
+    weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
     userMembership?: {
@@ -4850,6 +4854,7 @@ export type StartDraftMutation = {
     playerPool?: string | null;
     waiverEnabled?: boolean | null;
     waiverType?: string | null;
+    weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
     userMembership?: {
@@ -6507,6 +6512,7 @@ export const LeagueFragmentDoc = gql`
     playerPool
     waiverEnabled
     waiverType
+    weekAdvanceStatus
     sport
     defensiveFormat
     userMembership {

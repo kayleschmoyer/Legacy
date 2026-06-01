@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`App FootballScreen should match complete football page layout snapshot 1`] = `
+exports[`App FootballHubPage should match complete football page layout snapshot 1`] = `
 <div>
   <div>
     Global Announcer
@@ -127,7 +127,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     tag="main"
   >
     <div>
-      Football Screen
+      Football Hub
     </div>
   </div>
   <div
@@ -136,7 +136,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
 </div>
 `;
 
-exports[`App FootballScreen should match football screen snapshot 1`] = `null`;
+exports[`App FootballHubPage should match football hub snapshot 1`] = `null`;
 
 exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `null`;
 

@@ -74,6 +74,9 @@
       "@legacy-sports/shared-components/season-draft": [
         "lib/shared-components/src/entry/season-draft.ts"
       ],
+      "@legacy-sports/shared-components/football": [
+        "lib/shared-components/src/entry/football.ts"
+      ],
       "@legacy-sports/shared-components/sports": [
         "lib/shared-components/src/entry/sports.ts"
       ],

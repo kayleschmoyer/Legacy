@@ -36,11 +36,6 @@ const BaseballScreen = lazyWithRetry(() =>
     default: m.BaseballScreen,
   })),
 );
-const FootballScreen = lazyWithRetry(() =>
-  import('../components/football').then((m) => ({
-    default: m.FootballScreen,
-  })),
-);
 const PlayerStatsPage = lazyWithRetry(() =>
   import('../pages/players/PlayerStatsPage').then((m) => ({
     default: m.PlayerStatsPage,
@@ -131,6 +126,11 @@ const TermsOfServicePage = lazyWithRetry(
 const EliteDraftBoardScreen = lazyWithRetry(() =>
   import('../components/EliteDraftBoard').then((m) => ({
     default: m.EliteDraftBoardScreen,
+  })),
+);
+const FootballHubPage = lazyWithRetry(() =>
+  import('../pages/football/FootballHubPage').then((m) => ({
+    default: m.FootballHubPage,
   })),
 );
 const FootballPlayersPage = lazyWithRetry(() =>
@@ -508,7 +508,7 @@ function App() {
               path="/football"
               element={
                 <FootballGate>
-                  <FootballScreen />
+                  <FootballHubPage />
                 </FootballGate>
               }
             />

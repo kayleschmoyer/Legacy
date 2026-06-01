@@ -1,1 +1,1 @@
-export { NFLHome, type NFLHomeProps } from './NFLHome';
+export { NFLHome, type NFLHomeProps, type NFLHomeLeague } from './NFLHome';

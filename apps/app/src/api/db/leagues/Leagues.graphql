@@ -12,6 +12,7 @@ fragment League on League {
   playerPool
   waiverEnabled
   waiverType
+  weekAdvanceStatus
   sport
   defensiveFormat
   userMembership {
