@@ -56,6 +56,13 @@ jest.mock('../server/stripe', () => ({
   getStripeClient: jest.fn(),
 }));
 
+// Stub out the Google Play client loader (subscriptions.ts imports it at the top).
+jest.mock('../server/google-play', () => ({
+  fetchGoogleSubscription: jest.fn(),
+  isActiveGoogleSubscription: jest.fn(),
+  GOOGLE_PLAY_PACKAGE_NAME: 'com.legacySports',
+}));
+
 import {
   expireSubscriptionGracePeriods,
   getOrCreateStripeCustomer,

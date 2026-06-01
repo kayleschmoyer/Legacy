@@ -22,6 +22,11 @@ import {
   requireNotImpersonating,
 } from './authorization';
 import { getStripeClient } from '../server/stripe';
+import {
+  fetchGoogleSubscription,
+  GOOGLE_PLAY_PACKAGE_NAME,
+  isActiveGoogleSubscription,
+} from '../server/google-play';
 
 // Number of trial days to apply on new subscriptions, or undefined if no trial.
 const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
@@ -1171,6 +1176,22 @@ builder.mutationField('verifyGooglePurchase', (t) =>
         throw new Error(`Unknown Google Play product ID: ${productId}`);
       }
 
+      // Verify the purchase token against the Google Play Developer API
+      const googleSub = await fetchGoogleSubscription(
+        GOOGLE_PLAY_PACKAGE_NAME,
+        purchaseToken,
+      );
+      if (!isActiveGoogleSubscription(googleSub)) {
+        LOGGER.warn('verifyGooglePurchase — subscription not active', {
+          userId,
+          productId,
+          subscriptionState: googleSub.subscriptionState,
+        });
+        throw UserInputError(
+          `Google Play subscription is not active: ${googleSub.subscriptionState}`,
+        );
+      }
+
       const tier = tierFromGoogleProductId(productId);
       const status = 'active';
 
@@ -1257,6 +1278,20 @@ builder.mutationField('restoreGooglePurchases', (t) =>
 
       const userId = context.user.id;
       const { purchaseToken, productId } = args;
+
+      // Verify the purchase token against the Google Play Developer API
+      const googleSub = await fetchGoogleSubscription(
+        GOOGLE_PLAY_PACKAGE_NAME,
+        purchaseToken,
+      );
+      if (!isActiveGoogleSubscription(googleSub)) {
+        LOGGER.warn('restoreGooglePurchases — subscription not active', {
+          userId,
+          productId,
+          subscriptionState: googleSub.subscriptionState,
+        });
+        return false;
+      }
 
       const tier = tierFromGoogleProductId(productId);
       const status = 'active';
