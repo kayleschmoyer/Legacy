@@ -39,12 +39,13 @@ import {
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { and, count, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import type { Context } from './builder';
 import {
   AuthenticationError,
   ForbiddenError,
   PremiumRequiredError,
+  UserInputError,
 } from './graphql-errors';
 import {
   ENTITLEMENT_LABELS,
@@ -505,38 +506,50 @@ export async function checkPlayersNotLocked(
 
   if (weekNumber == null) return;
 
-  for (const member of members) {
-    if (!member.teamId) continue;
+  const membersWithTeam = members.filter(
+    (m): m is TeamMemberInfo & { teamId: number } => m.teamId != null,
+  );
+  if (membersWithTeam.length === 0) return;
 
-    const locked = await db
-      .select({ cnt: count() })
-      .from(PublicSchema.matchupPlayerGames)
-      .innerJoin(
-        PublicSchema.matchupPlayers,
-        eq(
-          PublicSchema.matchupPlayerGames.matchupPlayerId,
-          PublicSchema.matchupPlayers.id,
-        ),
-      )
-      .innerJoin(
-        PublicSchema.matchups,
-        eq(PublicSchema.matchupPlayers.matchupId, PublicSchema.matchups.id),
-      )
-      .where(
-        and(
-          eq(PublicSchema.matchupPlayers.playerId, member.playerId),
-          eq(PublicSchema.matchupPlayers.teamId, member.teamId),
-          eq(PublicSchema.matchups.leagueId, leagueId),
-          eq(PublicSchema.matchups.weekNumber, weekNumber),
-          or(
-            eq(PublicSchema.matchups.team1Id, member.teamId),
-            eq(PublicSchema.matchups.team2Id, member.teamId),
-          ),
-        ),
-      );
+  const playerIds = membersWithTeam.map((m) => m.playerId);
 
-    if (locked[0] && Number(locked[0].cnt) > 0) {
-      throw new Error(
+  const lockedRows = await db
+    .selectDistinct({
+      playerId: PublicSchema.matchupPlayers.playerId,
+      teamId: PublicSchema.matchupPlayers.teamId,
+    })
+    .from(PublicSchema.matchupPlayerGames)
+    .innerJoin(
+      PublicSchema.matchupPlayers,
+      eq(
+        PublicSchema.matchupPlayerGames.matchupPlayerId,
+        PublicSchema.matchupPlayers.id,
+      ),
+    )
+    .innerJoin(
+      PublicSchema.matchups,
+      eq(PublicSchema.matchupPlayers.matchupId, PublicSchema.matchups.id),
+    )
+    .where(
+      and(
+        inArray(PublicSchema.matchupPlayers.playerId, playerIds),
+        eq(PublicSchema.matchups.leagueId, leagueId),
+        eq(PublicSchema.matchups.weekNumber, weekNumber),
+        or(
+          eq(PublicSchema.matchups.team1Id, PublicSchema.matchupPlayers.teamId),
+          eq(PublicSchema.matchups.team2Id, PublicSchema.matchupPlayers.teamId),
+        ),
+      ),
+    );
+
+  if (lockedRows.length > 0) {
+    const lockedPairs = new Set(
+      lockedRows.map((r) => `${r.playerId}:${r.teamId}`),
+    );
+    if (
+      membersWithTeam.some((m) => lockedPairs.has(`${m.playerId}:${m.teamId}`))
+    ) {
+      throw UserInputError(
         'Player is locked — game selections have already been made for the current matchup',
       );
     }

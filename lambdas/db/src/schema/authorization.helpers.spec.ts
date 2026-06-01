@@ -414,32 +414,30 @@ describe('checkPlayersNotLocked', () => {
         const where = jest.fn().mockResolvedValue(memberRows);
         return { from: jest.fn(() => ({ where })) };
       }
-      if (selectCall === 2) {
-        // League query — currentWeek is set (should NOT need refMatchup lookup)
-        const limit = jest
-          .fn()
-          .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
-        return {
-          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
-        };
-      }
-      // locked count query — no game selections for current week
-      const where = jest.fn(() => ({
-        then: jest.fn((resolve: (v: unknown) => void) => resolve([{ cnt: 0 }])),
-      }));
+      // League query — currentWeek is set (should NOT need refMatchup lookup)
+      const limit = jest
+        .fn()
+        .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+      return {
+        from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+      };
+    });
+    // locked check — no game selections for current week
+    const selectDistinct = jest.fn(() => {
+      const where = jest.fn().mockResolvedValue([]);
       const innerJoin = jest.fn().mockReturnThis();
-      const from = jest.fn(() => ({ where, innerJoin }));
+      const from = jest.fn(() => ({ innerJoin, where }));
       return { from };
     });
-    const db = { select };
+    const db = { select, selectDistinct };
 
     // Should resolve without error — skips the refMatchup lookup entirely
     await expect(
       checkPlayersNotLocked(db as never, [1]),
     ).resolves.toBeUndefined();
-    // Only 3 select calls: getTeamMemberInfo, league, locked count
+    // Only 2 select calls: getTeamMemberInfo, league
     // (no refMatchup call because currentWeek was set)
-    expect(selectCall).toBe(3);
+    expect(selectCall).toBe(2);
   });
 
   it('falls back to currentMatchup FK when currentWeek is null', async () => {
@@ -461,28 +459,26 @@ describe('checkPlayersNotLocked', () => {
           from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
         };
       }
-      if (selectCall === 3) {
-        // refMatchup week number (legacy fallback)
-        const limit = jest.fn().mockResolvedValue([{ weekNumber: 5 }]);
-        return {
-          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
-        };
-      }
-      // locked count query
-      const where = jest.fn(() => ({
-        then: jest.fn((resolve: (v: unknown) => void) => resolve([{ cnt: 0 }])),
-      }));
+      // refMatchup week number (legacy fallback)
+      const limit = jest.fn().mockResolvedValue([{ weekNumber: 5 }]);
+      return {
+        from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+      };
+    });
+    // locked check — no game selections for current week
+    const selectDistinct = jest.fn(() => {
+      const where = jest.fn().mockResolvedValue([]);
       const innerJoin = jest.fn().mockReturnThis();
-      const from = jest.fn(() => ({ where, innerJoin }));
+      const from = jest.fn(() => ({ innerJoin, where }));
       return { from };
     });
-    const db = { select };
+    const db = { select, selectDistinct };
 
     await expect(
       checkPlayersNotLocked(db as never, [1]),
     ).resolves.toBeUndefined();
-    // 4 select calls: getTeamMemberInfo, league, refMatchup, locked count
-    expect(selectCall).toBe(4);
+    // 3 select calls: getTeamMemberInfo, league, refMatchup
+    expect(selectCall).toBe(3);
   });
 
   it('throws when a player is locked (game selections exist)', async () => {
@@ -495,25 +491,22 @@ describe('checkPlayersNotLocked', () => {
         const where = jest.fn().mockResolvedValue(memberRows);
         return { from: jest.fn(() => ({ where })) };
       }
-      if (selectCall === 2) {
-        // League query — currentWeek is set
-        const limit = jest
-          .fn()
-          .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
-        return {
-          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
-        };
-      }
-      // locked count query
-      const where = jest.fn(() => ({
-        // resolved Promise-like for the full chain
-        then: jest.fn((resolve: (v: unknown) => void) => resolve([{ cnt: 1 }])),
-      }));
+      // League query — currentWeek is set
+      const limit = jest
+        .fn()
+        .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+      return {
+        from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+      };
+    });
+    // locked check — player 50 on team 10 has game selections
+    const selectDistinct = jest.fn(() => {
+      const where = jest.fn().mockResolvedValue([{ playerId: 50, teamId: 10 }]);
       const innerJoin = jest.fn().mockReturnThis();
-      const from = jest.fn(() => ({ where, innerJoin }));
+      const from = jest.fn(() => ({ innerJoin, where }));
       return { from };
     });
-    const db = { select };
+    const db = { select, selectDistinct };
 
     await expect(checkPlayersNotLocked(db as never, [1])).rejects.toThrow(
       'Player is locked — game selections have already been made for the current matchup',
@@ -745,23 +738,21 @@ describe('authorized() wrapper', () => {
             ]);
           return { from: jest.fn(() => ({ where })) };
         }
-        if (selectCall === 4) {
-          // checkPlayersNotLocked → league currentWeek + currentMatchup
-          const limit = jest
-            .fn()
-            .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
-          return {
-            from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
-          };
-        }
-        // checkPlayersNotLocked → locked count (player is locked)
-        const where = jest.fn(() => ({
-          then: jest.fn((resolve: (v: unknown) => void) =>
-            resolve([{ cnt: 1 }]),
-          ),
-        }));
+        // checkPlayersNotLocked → league currentWeek + currentMatchup
+        const limit = jest
+          .fn()
+          .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }),
+      // checkPlayersNotLocked → locked check (player is locked)
+      selectDistinct: jest.fn(() => {
+        const where = jest
+          .fn()
+          .mockResolvedValue([{ playerId: 50, teamId: 10 }]);
         const innerJoin = jest.fn().mockReturnThis();
-        const from = jest.fn(() => ({ where, innerJoin }));
+        const from = jest.fn(() => ({ innerJoin, where }));
         return { from };
       }),
     };
