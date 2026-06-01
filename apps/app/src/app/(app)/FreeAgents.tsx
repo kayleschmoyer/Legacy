@@ -34,6 +34,7 @@ function LeagueFreeAgents({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [position, setPosition] = useState('ALL');
+  const isSearchDebouncing = search !== debouncedSearch;
   const [claimingPlayerId, setClaimingPlayerId] = useState<number | null>(null);
   const [faabBid, setFaabBid] = useState('');
 
@@ -285,7 +286,11 @@ function LeagueFreeAgents({
 
       {/* Search */}
       <XStack padding="$3" paddingTop="$1" gap="$2" alignItems="center">
-        <Search size={16} color="$textMuted" />
+        {isSearchDebouncing ? (
+          <Spinner size="small" color="$color" />
+        ) : (
+          <Search size={16} color="$textMuted" />
+        )}
         <Input
           flex={1}
           size="$3"

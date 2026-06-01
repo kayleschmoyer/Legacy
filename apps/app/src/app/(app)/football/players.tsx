@@ -336,6 +336,7 @@ export default function FootballPlayers(): React.JSX.Element {
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<FootballPlayerNode[]>([]);
+  const [isFilterChanging, setIsFilterChanging] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -350,6 +351,7 @@ export default function FootballPlayers(): React.JSX.Element {
       prevFiltersRef.current = { position, teamFilter, debouncedSearch };
       setCursor(undefined);
       setAllNodes([]);
+      setIsFilterChanging(true);
     }
   }, [position, teamFilter, debouncedSearch]);
 
@@ -384,6 +386,7 @@ export default function FootballPlayers(): React.JSX.Element {
       setAllNodes(filtered);
     }
     prevCursorRef.current = cursor;
+    setIsFilterChanging(false);
   }, [data, cursor, teamFilter]);
 
   const pageInfo = data?.footballPlayers?.pageInfo;
@@ -522,7 +525,7 @@ export default function FootballPlayers(): React.JSX.Element {
       )}
 
       {/* Player list */}
-      {isInitialLoad ? (
+      {isInitialLoad || isFilterChanging ? (
         <YStack flex={1} alignItems="center" justifyContent="center">
           <Spinner size="large" color="$orange9" />
         </YStack>
