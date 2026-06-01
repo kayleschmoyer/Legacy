@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, SafeAreaView, TextInput } from 'react-native';
 import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown } from '@tamagui/lucide-icons';
+import type { NflTeam } from '@legacy-sports/shared-components';
 import { NFL_TEAMS } from '@legacy-sports/shared-components';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useFootballPlayersQuery } from '../../../api/db/graphql.generated';
@@ -51,10 +52,12 @@ const TEAM_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'All', label: 'All Teams' },
   { value: 'AFC', label: 'AFC' },
   { value: 'NFC', label: 'NFC' },
-  ...Object.values(NFL_TEAMS).map((t) => ({
-    value: t.abbreviation,
-    label: `${t.abbreviation} — ${t.fullName}`,
-  })),
+  ...Object.values(NFL_TEAMS)
+    .filter((t): t is NflTeam => t != null)
+    .map((t) => ({
+      value: t.abbreviation,
+      label: `${t.abbreviation} — ${t.fullName}`,
+    })),
 ];
 
 function fmt(n: number | null | undefined): string {

@@ -22,7 +22,7 @@ export interface NflTeam {
   secondaryColor: string;
 }
 
-export const NFL_TEAMS: Record<string, NflTeam> = {
+export const NFL_TEAMS: { readonly [key: string]: NflTeam | undefined } = {
   // AFC East
   BUF: {
     abbreviation: 'BUF',

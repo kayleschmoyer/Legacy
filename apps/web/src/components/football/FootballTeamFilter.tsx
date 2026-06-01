@@ -1,6 +1,7 @@
 import React from 'react';
 import { Select, YStack } from 'tamagui';
 import { Check, ChevronDown } from '@tamagui/lucide-icons';
+import type { NflTeam } from '@legacy-sports/shared-components';
 import { NFL_TEAMS } from '@legacy-sports/shared-components';
 import {
   OUTLINE_SUBTLE,
@@ -18,10 +19,12 @@ const CONFERENCE_OPTIONS: Array<{ value: TeamFilter; label: string }> = [
   { value: 'NFC', label: 'NFC' },
 ];
 
-const TEAM_OPTIONS = Object.values(NFL_TEAMS).map((t) => ({
-  value: t.abbreviation,
-  label: `${t.abbreviation} — ${t.fullName}`,
-}));
+const TEAM_OPTIONS = Object.values(NFL_TEAMS)
+  .filter((t): t is NflTeam => t != null)
+  .map((t) => ({
+    value: t.abbreviation,
+    label: `${t.abbreviation} — ${t.fullName}`,
+  }));
 
 interface Props {
   selected: TeamFilter;
