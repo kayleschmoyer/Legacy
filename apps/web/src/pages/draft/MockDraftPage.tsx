@@ -8,10 +8,11 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { Skeleton } from '@legacy-sports/shared-components';
 import { FootballMockPoolPreview } from '@legacy-sports/shared-components/draft';
 import { useInitializeMockDraftMutation } from '../../api/db/graphql.generated';
 import { PremiumGate } from '../../components/PremiumGate';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { PageMeta } from '../../components/PageMeta';
 import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 import {
@@ -493,11 +494,49 @@ function SetupScreen({
   );
 }
 
+// ─── Loading Skeleton ───────────────────────────────────────────────────────
+
+/**
+ * Placeholder shown while premium status is still resolving (LS-5195).
+ *
+ * Premium users would otherwise see a 200-500ms flash of the PremiumGate lock
+ * overlay because `useIsPremiumStatus` reports `isPremium=false` until the user
+ * record loads. We render this neutral skeleton (mirroring the SetupScreen's
+ * centered card layout) until `isLoading` resolves, then render either the
+ * setup screen or the gate based on the confirmed status.
+ */
+function MockDraftSkeleton(): React.JSX.Element {
+  return (
+    <YStack
+      minHeight="100vh"
+      alignItems="center"
+      justifyContent="center"
+      padding="$5"
+      style={{ background: GRADIENT_BOARD_BG }}
+    >
+      <YStack width="100%" maxWidth={560} gap="$7">
+        {/* Header placeholder */}
+        <YStack alignItems="center" gap="$3">
+          <Skeleton width={120} height={24} radius={9999} />
+          <Skeleton width={320} height={40} />
+          <Skeleton width={420} height={16} />
+        </YStack>
+        {/* Settings card placeholder */}
+        <YStack gap="$4">
+          <Skeleton width="100%" height={64} radius={12} />
+          <Skeleton width="100%" height={64} radius={12} />
+          <Skeleton width="100%" height={48} radius={12} />
+        </YStack>
+      </YStack>
+    </YStack>
+  );
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
 export function MockDraftPage(): React.JSX.Element {
   const navigate = useNavigate();
-  const isPremium = useIsPremium();
+  const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const footballMockEnabled = useFeatureIsOn(FOOTBALL_MOCK_PLAYERS_FLAG);
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
@@ -536,6 +575,12 @@ export function MockDraftPage(): React.JSX.Element {
       setMissingLeagueIdError("Couldn't start mock draft — please try again.");
     }
   };
+
+  // Render a neutral skeleton while premium status resolves so premium users
+  // don't see a flash of the PremiumGate lock overlay (LS-5195).
+  if (premiumLoading) {
+    return <MockDraftSkeleton />;
+  }
 
   return (
     <PremiumGate
