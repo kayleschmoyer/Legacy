@@ -24,6 +24,7 @@ import {
 } from 'react-native-iap';
 import type { Purchase } from 'react-native-iap';
 import {
+  useGetMySubscriptionQuery,
   useRestoreApplePurchasesMutation,
   useVerifyApplePurchaseMutation,
 } from '../../api/db/graphql.generated';
@@ -131,6 +132,9 @@ export function useIAP(): UseIAPResult {
   const [error, setError] = useState<string | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
+  const { refetch: refetchSubscription } = useGetMySubscriptionQuery({
+    skip: Platform.OS !== 'ios',
+  });
   const [verifyApplePurchase] = useVerifyApplePurchaseMutation();
   const [restoreApplePurchasesMutation] = useRestoreApplePurchasesMutation();
 
@@ -173,6 +177,7 @@ export function useIAP(): UseIAPResult {
 
         if (result.data?.verifyApplePurchase?.success) {
           setIsSubscribed(true);
+          void refetchSubscription();
         } else {
           setError('Purchase verification failed. Please contact support.');
         }
@@ -186,7 +191,7 @@ export function useIAP(): UseIAPResult {
         }
       }
     },
-    [verifyApplePurchase],
+    [verifyApplePurchase, refetchSubscription],
   );
 
   useEffect(() => {
@@ -309,6 +314,7 @@ export function useIAP(): UseIAPResult {
 
       if (result.data?.restoreApplePurchases === true) {
         setIsSubscribed(true);
+        void refetchSubscription();
       } else {
         setError('Restore failed. Please try again or contact support.');
       }
