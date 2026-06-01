@@ -222,6 +222,11 @@ export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
   const runHook = useCallback(async () => {
     void lastUpdateTime;
     if (getEnvVarOptional(EnvironmentVariable.BYPASS_AUTH) === 'true') {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'BYPASS_AUTH is set in a production build — remove EXPO_PUBLIC_BYPASS_AUTH from your production environment.',
+        );
+      }
       return LOCAL_USER;
     }
     return await getJwt();

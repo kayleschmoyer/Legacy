@@ -436,5 +436,25 @@ describe('AuthHooks', () => {
         username: 'LOCAL USER',
       });
     });
+
+    it('surfaces an error when BYPASS_AUTH is true in a production build', async () => {
+      mockEnvVars['EXPO_PUBLIC_BYPASS_AUTH'] = 'true';
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      try {
+        const { result } = renderHook(() => useCurrentUserInfo());
+
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.data).toBeNull();
+        expect(result.current.error?.message).toMatch(
+          /BYPASS_AUTH.*production/i,
+        );
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
   });
 });
