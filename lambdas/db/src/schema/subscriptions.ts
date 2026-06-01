@@ -414,6 +414,36 @@ builder.queryField('adminRevenueStats', (t) =>
   }),
 );
 
+/**
+ * Subscription statuses that mean the user already has a Stripe-managed
+ * subscription and should be sent to the Billing Portal instead of being allowed
+ * to start a new Checkout Session. `trialing` is included so a trial user is not
+ * allowed to create a duplicate subscription alongside their active trial
+ * (LS-5196).
+ */
+const BILLING_PORTAL_SUBSCRIPTION_STATUSES = new Set([
+  'active',
+  'past_due',
+  'trialing',
+]);
+
+/**
+ * Returns true when an existing subscription should redirect the user to the
+ * Stripe Billing Portal rather than create a new Checkout Session. Requires both
+ * a billing-portal-eligible status and a Stripe customer ID to manage.
+ */
+export function shouldRedirectToBillingPortal<
+  T extends { status: string; stripeCustomerId: string | null },
+>(
+  existing: T | null | undefined,
+): existing is T & { stripeCustomerId: string } {
+  return (
+    !!existing &&
+    BILLING_PORTAL_SUBSCRIPTION_STATUSES.has(existing.status) &&
+    !!existing.stripeCustomerId
+  );
+}
+
 // ─── Mutations ───────────────────────────────────────────────────────────────
 
 builder.mutationField('createCheckoutSession', (t) =>
@@ -450,14 +480,11 @@ builder.mutationField('createCheckoutSession', (t) =>
       const { id: userId, email } = context.user;
       const stripe = await getStripeClient();
 
-      // If the user already has an active or past-due subscription, send them
-      // to the Billing Portal to manage it rather than creating a new checkout.
+      // If the user already has an active, past-due, or trialing subscription,
+      // send them to the Billing Portal to manage it rather than creating a new
+      // checkout (which would duplicate the subscription for a trialing user).
       const existing = await getSubscriptionForUser(userId);
-      if (
-        existing &&
-        (existing.status === 'active' || existing.status === 'past_due') &&
-        existing.stripeCustomerId
-      ) {
+      if (shouldRedirectToBillingPortal(existing)) {
         LOGGER.info('User already subscribed; redirecting to billing portal', {
           userId,
         });

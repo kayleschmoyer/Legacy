@@ -73,6 +73,7 @@ import {
   expireSubscriptionGracePeriods,
   fetchStripePrices,
   getOrCreateStripeCustomer,
+  shouldRedirectToBillingPortal,
 } from './subscriptions';
 
 type NotifyMock = jest.Mock<
@@ -444,5 +445,67 @@ describe('fetchStripePrices', () => {
     await expect(fetchStripePrices()).rejects.toThrow(
       'Stripe price IDs are not configured',
     );
+  });
+});
+
+// ─── shouldRedirectToBillingPortal (LS-5196) ─────────────────────────────────
+
+describe('shouldRedirectToBillingPortal', () => {
+  it('redirects active subscribers with a Stripe customer', () => {
+    expect(
+      shouldRedirectToBillingPortal({
+        status: 'active',
+        stripeCustomerId: 'cus_active',
+      }),
+    ).toBe(true);
+  });
+
+  it('redirects past_due subscribers with a Stripe customer', () => {
+    expect(
+      shouldRedirectToBillingPortal({
+        status: 'past_due',
+        stripeCustomerId: 'cus_pastdue',
+      }),
+    ).toBe(true);
+  });
+
+  // Regression: a trialing user previously fell through this check and was
+  // allowed to create a new checkout session, duplicating their subscription.
+  it('redirects trialing subscribers with a Stripe customer (LS-5196)', () => {
+    expect(
+      shouldRedirectToBillingPortal({
+        status: 'trialing',
+        stripeCustomerId: 'cus_trial',
+      }),
+    ).toBe(true);
+  });
+
+  it('does not redirect when there is no Stripe customer ID', () => {
+    expect(
+      shouldRedirectToBillingPortal({
+        status: 'trialing',
+        stripeCustomerId: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not redirect canceled or incomplete subscriptions', () => {
+    expect(
+      shouldRedirectToBillingPortal({
+        status: 'canceled',
+        stripeCustomerId: 'cus_canceled',
+      }),
+    ).toBe(false);
+    expect(
+      shouldRedirectToBillingPortal({
+        status: 'incomplete',
+        stripeCustomerId: 'cus_incomplete',
+      }),
+    ).toBe(false);
+  });
+
+  it('does not redirect when there is no existing subscription', () => {
+    expect(shouldRedirectToBillingPortal(null)).toBe(false);
+    expect(shouldRedirectToBillingPortal(undefined)).toBe(false);
   });
 });
