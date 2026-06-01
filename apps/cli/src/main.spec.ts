@@ -127,6 +127,38 @@ describe('apps/cli command option wiring (LS-2516)', () => {
     });
   });
 
+  describe('unblock-league', () => {
+    it('parses --id into handler options as a number', async () => {
+      const program = buildProgram().exitOverride();
+      const spy = spyOnCommand(program, 'unblock-league');
+
+      await program.parseAsync(['unblock-league', '--id', '93'], {
+        from: 'user',
+      });
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(firstArg(spy)).toMatchObject({ id: 93 });
+    });
+
+    it('rejects invocation without --id', async () => {
+      const program = buildProgram().exitOverride();
+      spyOnCommand(program, 'unblock-league');
+
+      await expect(
+        program.parseAsync(['unblock-league'], { from: 'user' }),
+      ).rejects.toThrow(/required option.*--id/i);
+    });
+
+    it('rejects a non-positive-integer --id', async () => {
+      const program = buildProgram().exitOverride();
+      spyOnCommand(program, 'unblock-league');
+
+      await expect(
+        program.parseAsync(['unblock-league', '--id', 'abc'], { from: 'user' }),
+      ).rejects.toThrow(/positive integer/);
+    });
+  });
+
   describe('reset-database', () => {
     it('parses --confirm into handler options', async () => {
       const program = buildProgram().exitOverride();

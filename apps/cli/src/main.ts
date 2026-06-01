@@ -23,6 +23,7 @@ import { handleResetDatabase } from './commands/resetDatabase';
 import { fixUsersTable } from './commands/fixUsersTable';
 import { testInternal } from './commands/testInternal';
 import { handleCreateMatchup } from './commands/createMatchup';
+import { handleUnblockLeague, parseLeagueId } from './commands/unblockLeague';
 import { handleTestDb } from './commands/testDb';
 import { handleTestRawConnection } from './commands/testRawConnection';
 import { handleDecodeJwt } from './commands/decodeJwt';
@@ -242,6 +243,15 @@ export function buildProgram(): Command {
     .command('create-matchup')
     .description('Creates the matchup records for players in the matchup')
     .action(handleCreateMatchup);
+
+  program
+    .command('unblock-league')
+    .description(
+      'Create all matchups for a stuck league (calls createAllMatchupsForLeague). ' +
+        'Use when a draft completed but matchups were never generated.',
+    )
+    .requiredOption('--id <leagueId>', 'League ID to unblock', parseLeagueId)
+    .action((options: { id: number }) => handleUnblockLeague(options));
 
   program
     .command('test-db')
