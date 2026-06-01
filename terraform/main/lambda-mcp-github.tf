@@ -115,15 +115,3 @@ resource "aws_lambda_function" "mcp_github" {
 
   tags = local.common_tags
 }
-
-# ── Lambda Function URL (AWS_IAM) — used by cloud agents via SigV4 ────────────
-
-resource "aws_lambda_function_url" "mcp_github" {
-  function_name      = aws_lambda_function.mcp_github.function_name
-  authorization_type = "AWS_IAM"
-}
-
-output "mcp_github_function_url" {
-  description = "Lambda Function URL for the MCP GitHub server (AWS_IAM auth — cloud agents use SigV4)"
-  value       = aws_lambda_function_url.mcp_github.function_url
-}

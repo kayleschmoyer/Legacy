@@ -274,42 +274,23 @@ function readConfigFromEnv(requiredScope: string): AuthConfig | AuthFailure {
 }
 
 /**
- * True when the Lambda was invoked via its Function URL rather than the
- * Cognito-fronted API Gateway. Function URLs are configured with
- * `authorization_type = "AWS_IAM"`, so SigV4 has already been validated by
- * Lambda's invoke surface — there is no Cognito bearer token to verify, and
- * adding one would break cloud agents (GitHub Actions / Claude Code on the
- * web) that call the Function URL directly with SigV4-signed requests.
- *
- * Lambda Function URLs always have a domain matching
- * `<id>.lambda-url.<region>.on.aws`; API Gateway HTTP APIs use
- * `<id>.execute-api.<region>.amazonaws.com`. We use this discriminator
- * instead of inspecting the Authorization header because anyone who can
- * reach the Lambda Function URL has already been authenticated by IAM —
- * relying on a header value the caller fully controls would be unsafe.
- */
-export function isFunctionUrlInvocation(
-  event: Pick<APIGatewayProxyEventV2, 'requestContext'>,
-): boolean {
-  const domain = event.requestContext?.domainName ?? '';
-  return /\.lambda-url\.[^.]+\.on\.aws$/.test(domain);
-}
-
-/**
  * Authenticate an incoming Lambda request. Returns `null` when the request
- * is permitted (valid Cognito bearer for this server, OR Function URL
- * invocation already authenticated by SigV4); otherwise returns a
+ * carries a valid Cognito bearer for this server; otherwise returns a
  * well-formed JSON-RPC error response the handler should return immediately
  * without invoking any tools.
  *
  * `options.requiredScope` is the calling server's own scope (e.g.
  * `MCP_SCOPE.github`); it is what a machine token must carry to be accepted.
+ *
+ * All callers now reach the Lambda through the Cognito-fronted API Gateway and
+ * present a short-lived machine-grant bearer (RFC AC-A6/A7, GAP-9 — local +
+ * Copilot unified on the machine credential). The legacy AWS_IAM Lambda
+ * Function URL / SigV4 bypass was retired in LS-5093.
  */
 export async function authenticateMcpRequest(
   event: Pick<APIGatewayProxyEventV2, 'requestContext' | 'headers'>,
   options: AuthenticateOptions,
 ): Promise<APIGatewayProxyResultV2 | null> {
-  if (isFunctionUrlInvocation(event)) return null;
   const config = readConfigFromEnv(options.requiredScope);
   if ('code' in config) {
     // Missing/invalid MCP_COGNITO_* / MCP_AUTH_MODE config — surface as a

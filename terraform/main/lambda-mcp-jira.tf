@@ -1,8 +1,10 @@
 # MCP Jira Server Lambda
-# Hosts the tools/mcp/jira-server as an HTTP API Lambda. Cloud agents call the
-# Lambda Function URL directly with SigV4 (via the GitHub Actions OIDC role).
-# Developers access it via the HTTP API Gateway (lambda-mcp-api-gateway.tf)
-# with a Cognito-issued OIDC JWT.
+# Hosts the tools/mcp/jira-server as an HTTP API Lambda. All callers reach it
+# via the HTTP API Gateway (lambda-mcp-api-gateway.tf) with a Cognito-issued
+# bearer — an interactive ID token for developers, or a machine
+# client_credentials access token for headless/Copilot environments. The
+# legacy AWS_IAM Lambda Function URL / SigV4 path was retired in LS-5093
+# (RFC AC-A6/A7, GAP-9).
 
 # ── IAM role ──────────────────────────────────────────────────────────────────
 
@@ -109,16 +111,4 @@ resource "aws_lambda_function" "mcp_jira" {
   ]
 
   tags = local.common_tags
-}
-
-# ── Lambda Function URL (AWS_IAM) — used by cloud agents via SigV4 ────────────
-
-resource "aws_lambda_function_url" "mcp_jira" {
-  function_name      = aws_lambda_function.mcp_jira.function_name
-  authorization_type = "AWS_IAM"
-}
-
-output "mcp_jira_function_url" {
-  description = "Lambda Function URL for the MCP Jira server (AWS_IAM auth — cloud agents use SigV4)"
-  value       = aws_lambda_function_url.mcp_jira.function_url
 }

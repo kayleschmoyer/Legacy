@@ -8,7 +8,6 @@ import {
   buildProtectedResourceMetadata,
   createLocalJWKSet,
   handleOAuthMetadataRequest,
-  isFunctionUrlInvocation,
   type JSONWebKeySet,
   MCP_AUTH_ERROR_CODE,
   MCP_SCOPE,
@@ -17,18 +16,10 @@ import {
 } from './index';
 
 const API_GW_DOMAIN = 'abc123.execute-api.us-east-1.amazonaws.com';
-const FUNC_URL_DOMAIN = 'xyz789.lambda-url.us-east-1.on.aws';
 
 function gatewayEvent(headers: Record<string, string | undefined> = {}) {
   return {
     requestContext: { domainName: API_GW_DOMAIN },
-    headers,
-  };
-}
-
-function functionUrlEvent(headers: Record<string, string | undefined> = {}) {
-  return {
-    requestContext: { domainName: FUNC_URL_DOMAIN },
     headers,
   };
 }
@@ -399,20 +390,6 @@ describe('buildAuthErrorResponse', () => {
   });
 });
 
-describe('isFunctionUrlInvocation', () => {
-  it.each([
-    ['xyz789.lambda-url.us-east-1.on.aws', true],
-    ['abc.lambda-url.eu-west-2.on.aws', true],
-    ['abc123.execute-api.us-east-1.amazonaws.com', false],
-    ['localhost', false],
-    ['', false],
-  ])('domain %s → %s', (domainName, expected) => {
-    expect(
-      isFunctionUrlInvocation({ requestContext: { domainName } as never }),
-    ).toBe(expected);
-  });
-});
-
 describe('authenticateMcpRequest', () => {
   const ORIGINAL_ENV = { ...process.env };
   const OPTIONS = { requiredScope: SCOPE };
@@ -485,20 +462,6 @@ describe('authenticateMcpRequest', () => {
     }
     const parsed = parseBody(result.body);
     expect(parsed.error.message).toMatch(/MCP_AUTH_MODE/);
-  });
-
-  it('skips bearer validation for Function URL invocations (SigV4 already authenticated)', async () => {
-    // Intentionally leave Cognito env vars unset — the helper must not even
-    // try to read them when the request came in via the Function URL.
-    delete process.env['MCP_COGNITO_ISSUER'];
-    delete process.env['MCP_COGNITO_AUDIENCE'];
-    const result = await authenticateMcpRequest(
-      functionUrlEvent({
-        authorization: 'AWS4-HMAC-SHA256 Credential=…',
-      }) as never,
-      OPTIONS,
-    );
-    expect(result).toBeNull();
   });
 
   it('challenges gateway requests with no bearer token (401 + WWW-Authenticate)', async () => {

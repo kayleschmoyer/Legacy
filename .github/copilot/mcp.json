@@ -2,7 +2,8 @@
   "servers": {
     "legacy-sports-ci": {
       "type": "http",
-      "url": "http://localhost:4197"
+      "url": "$MCP_CI_URL",
+      "headers": { "Authorization": "Bearer $MCP_CI_BEARER" }
     },
     "legacy-sports-db": {
       "type": "stdio",
@@ -17,7 +18,8 @@
     },
     "legacy-sports-jira": {
       "type": "http",
-      "url": "http://localhost:4195"
+      "url": "$MCP_JIRA_URL",
+      "headers": { "Authorization": "Bearer $MCP_JIRA_BEARER" }
     },
     "worktree": {
       "type": "stdio",
@@ -43,7 +45,8 @@
     },
     "legacy-sports-github": {
       "type": "http",
-      "url": "http://localhost:4196"
+      "url": "$MCP_GITHUB_URL",
+      "headers": { "Authorization": "Bearer $MCP_GITHUB_BEARER" }
     },
     "legacy-sports-nx": {
       "type": "stdio",

@@ -10,7 +10,7 @@ This section applies to **all** cloud agent platforms (Claude Code on the web, C
 When running as a **cloud coding agent**:
 
 - **No worktrees/twig/acli** — work directly in the repo root. Use `git` for branches, MCP tools for Jira.
-- **Limited AWS access** — the OIDC role grants `lambda:InvokeFunctionUrl` for the hosted Jira/GitHub/CI MCP servers only. DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`.
+- **No AWS access for MCP** — the hosted Jira/GitHub/CI MCP servers are reached with a Cognito machine-grant bearer (minted by copilot-setup-steps.yml), not an AWS role; the SigV4/OIDC Function-URL path was retired (LS-5093). DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`.
 - **Linux** — `bash` shell, `/` paths. No symlinks or file locks.
 - **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available.
 
@@ -53,7 +53,7 @@ The "cloud agent" label covers three distinct configurations with very different
 
 **Cloud workflow (MCP-first — Copilot Coding Agent or fully-configured CC web):**
 
-> The flow below assumes the full hosted-Lambda toolchain is connected (custom MCP servers all available via SigV4-signed Function URLs on Copilot, or Cognito-authenticated API Gateway endpoints on developer machines). On default Claude Code on the web sessions where these servers do **not** auto-load, follow [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) instead.
+> The flow below assumes the full hosted-Lambda toolchain is connected (custom MCP servers all reached over Cognito-authenticated API Gateway endpoints — a machine-grant bearer on Copilot, an interactive token on developer machines). On default Claude Code on the web sessions where these servers do **not** auto-load, follow [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) instead.
 
 1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_claim_ticket({ key: "LS-####" })` (atomically checks blockers, validates status, and transitions to In Progress)
    - `action: "PROCEED"` → claimed; use `branchRecommendation` to decide git base (main vs a blocker branch)
@@ -378,11 +378,11 @@ For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a 
 
 ## Jira Authentication
 
-The `legacy-sports-jira` MCP server is **hosted on AWS** (Lambda Function URL). Jira credentials are stored in AWS Secrets Manager on the Lambda side — no Jira credential env vars are needed in the cloud agent environment.
+The `legacy-sports-jira` MCP server is **hosted on AWS** (API Gateway + Lambda). Jira credentials are stored in AWS Secrets Manager on the Lambda side — no Jira credential env vars are needed in the cloud agent environment.
 
-The MCP client calls the Lambda Function URL directly with a SigV4-signed request using the OIDC-derived AWS session (`copilot-setup-steps.yml` configures the credentials). The hosted server reads Jira OAuth credentials from Secrets Manager on each invocation.
+The MCP client calls the API Gateway endpoint (`$MCP_JIRA_URL`) with a short-lived Cognito machine-grant bearer in the `Authorization` header. `copilot-setup-steps.yml` mints that bearer from the `client_credentials` secret (LS-5093, RFC AC-A6); the legacy SigV4/OIDC Function-URL path was retired. The hosted server reads Jira OAuth credentials from Secrets Manager on each invocation.
 
-> **Precondition for Jira access in cloud environments**: use the `legacy-sports-jira` MCP server (or, on Claude Code on the web, the Atlassian plugin — see below). `acli` is a local-only CLI not installed in Copilot Coding Agent or Claude Code on the web containers; a "command not found" from `acli jira workitem view` in a cloud session is the wrong-tool signal, not an inaccessible-Jira signal. Use `jira_auth_status()` to verify connectivity; if it returns `configured: false`, check that `MCP_JIRA_URL` is set in the copilot environment secrets and the OIDC role assumption succeeded in the bootstrap logs.
+> **Precondition for Jira access in cloud environments**: use the `legacy-sports-jira` MCP server (or, on Claude Code on the web, the Atlassian plugin — see below). `acli` is a local-only CLI not installed in Copilot Coding Agent or Claude Code on the web containers; a "command not found" from `acli jira workitem view` in a cloud session is the wrong-tool signal, not an inaccessible-Jira signal. Use `jira_auth_status()` to verify connectivity; if it returns `configured: false`, check that `MCP_JIRA_URL` and `MCP_JIRA_BEARER` are set in the copilot environment (the bearer is minted by `copilot-setup-steps.yml`) and that the bearer-minting step succeeded in the bootstrap logs.
 
 On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai_Atlassian__*`) is available without any credential configuration and is the **preferred** option. It connects to `bkrupa.atlassian.net` (cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`) via OAuth 2.1 with `read:jira-work` + `write:jira-work` scopes. The auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false` or API calls fail, use the native plugin tools (pass `cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528"` to all calls). On **Copilot Coding Agent**, native Claude integrations are not available, so Jira credentials must be configured as repository secrets.
 
@@ -406,37 +406,40 @@ Copilot Coding Agent **does** support custom stdio MCP servers via the Settings 
 
 ### How it works
 
-1. **Environment bootstrap**: `.github/copilot-setup-steps.yml` runs before every Copilot agent task. It sets up Node/pnpm, installs dependencies, starts Docker PostgreSQL, seeds the DB, and exports env vars (`GH_TOKEN`, `DATABASE_URL`, `USE_LOCAL_CREDENTIALS`, and optionally Jira credentials) to `$GITHUB_ENV` so MCP server subprocesses inherit them.
+1. **Environment bootstrap**: `.github/workflows/copilot-setup-steps.yml` runs before every Copilot agent task. It sets up Node/pnpm, installs dependencies, starts Docker PostgreSQL, runs migrations, generates the Agent Author `GH_TOKEN`, **mints the three MCP machine-grant bearers** (`MCP_{JIRA,GITHUB,CI}_BEARER`) from the Cognito `client_credentials` secret, and exports env vars (`GH_TOKEN`, `DATABASE_URL`, `USE_LOCAL_CREDENTIALS`, `MCP_*_URL`, `MCP_*_BEARER`) to `$GITHUB_ENV` so the MCP HTTP transports and stdio subprocesses inherit them.
 
 2. **MCP config**: paste the contents of the `mcpServers` object from `.github/copilot/copilot-cloud-mcp-config.json` into Settings → Copilot → Cloud agent → MCP configuration (JSON editor in the GitHub Settings UI — not a file in the repo). Do not paste the entire file including `_instructions`.
 
 3. **Secrets**: add the following to Settings → Environments → `copilot` → Environment secrets:
 
-   | Secret           | Purpose                                                                                       |
-   | ---------------- | --------------------------------------------------------------------------------------------- |
-   | `MCP_JIRA_URL`   | Lambda Function URL for the hosted Jira MCP server (from `terraform output mcp_jira_url`)     |
-   | `MCP_GITHUB_URL` | Lambda Function URL for the hosted GitHub MCP server (from `terraform output mcp_github_url`) |
-   | `MCP_CI_URL`     | Lambda Function URL for the hosted CI MCP server (from `terraform output mcp_ci_url`)         |
+   | Secret                      | Purpose                                                                                                      |
+   | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+   | `MCP_JIRA_URL`              | API Gateway invoke URL for the hosted Jira MCP server (from SSM `/<name_prefix>/mcp/jira/api-url`)           |
+   | `MCP_GITHUB_URL`            | API Gateway invoke URL for the hosted GitHub MCP server                                                      |
+   | `MCP_CI_URL`                | API Gateway invoke URL for the hosted CI MCP server                                                          |
+   | `MCP_MACHINE_CLIENT_ID`     | Cognito `client_credentials` client id (SSM `/<name_prefix>/mcp/cognito/machine-client-id`)                  |
+   | `MCP_MACHINE_CLIENT_SECRET` | Cognito `client_credentials` secret (Secrets Manager `<env>/mcp-machine-client-secret`) — the long-lived key |
+   | `MCP_AUTH_COGNITO_DOMAIN`   | Cognito hosted-UI domain (token-endpoint base) used for the `client_credentials` exchange                    |
 
    Jira credentials (`JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_CLOUD_ID`, `JIRA_EMAIL`, `JIRA_API_TOKEN`) are **no longer required** as environment secrets — they are stored in AWS Secrets Manager on the hosted Lambda and injected server-side.
 
-   > **Not needed as secrets**: `GH_TOKEN` (generated from the Agent Author GitHub App by copilot-setup-steps.yml), `GITHUB_TOKEN` (standard GitHub-provided Actions token), `DATABASE_URL` (exported by copilot-setup-steps.yml), `USE_LOCAL_CREDENTIALS` (also exported automatically), any AWS credentials (the GitHub Actions OIDC role `arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions` already has the `mcp_invoke` policy — `copilot-setup-steps.yml` assumes it via OIDC).
+   > **Not needed as secrets**: `GH_TOKEN` (generated from the Agent Author GitHub App by copilot-setup-steps.yml), `GITHUB_TOKEN` (standard GitHub-provided Actions token), `DATABASE_URL` (exported by copilot-setup-steps.yml), `USE_LOCAL_CREDENTIALS` (also exported automatically), `MCP_{JIRA,GITHUB,CI}_BEARER` (minted per task by copilot-setup-steps.yml from `MCP_MACHINE_CLIENT_SECRET`). **No AWS credentials or OIDC role are used** — the SigV4/OIDC Function-URL path and the `mcp_invoke` policy were retired in LS-5093.
 
 ### Available MCP servers in Copilot cloud
 
-| Server                  | Available      | Notes                                                                                                                                                                 |
-| ----------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-github`  | ✅             | Hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role — no GH_TOKEN required in env                                                          |
-| `legacy-sports-ci`      | ✅             | Hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role                                                                                        |
-| `legacy-sports-jira`    | ✅             | Hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role; Jira credentials in Secrets Manager — no Jira env vars required                       |
-| `legacy-sports-nx`      | ✅             | pnpm install run by copilot-setup-steps.yml                                                                                                                           |
-| `legacy-sports-make`    | ✅             | Same as above                                                                                                                                                         |
-| `legacy-sports-db`      | ✅             | `DATABASE_URL` exported by copilot-setup-steps.yml                                                                                                                    |
-| `legacy-sports-browser` | ⚠️ needs setup | Not included by default; to enable: add `npx playwright install chromium` to copilot-setup-steps.yml then add the server entry to the cloud MCP config                |
-| `worktree`              | ✅             | git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list |
-| `legacy-sports-aws`     | ❌             | Full AWS SSO access not available; the OIDC role is scoped to `lambda:InvokeFunctionUrl` for MCP servers only — use `ci_get_logs` for CI log access                   |
+| Server                  | Available      | Notes                                                                                                                                                                  |
+| ----------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-github`  | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_GITHUB_BEARER`) minted by copilot-setup-steps.yml — no GH_TOKEN required in env |
+| `legacy-sports-ci`      | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_CI_BEARER`)                                                                     |
+| `legacy-sports-jira`    | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_JIRA_BEARER`); Jira credentials in Secrets Manager — no Jira env vars required  |
+| `legacy-sports-nx`      | ✅             | pnpm install run by copilot-setup-steps.yml                                                                                                                            |
+| `legacy-sports-make`    | ✅             | Same as above                                                                                                                                                          |
+| `legacy-sports-db`      | ✅             | `DATABASE_URL` exported by copilot-setup-steps.yml                                                                                                                     |
+| `legacy-sports-browser` | ⚠️ needs setup | Not included by default; to enable: add `npx playwright install chromium` to copilot-setup-steps.yml then add the server entry to the cloud MCP config                 |
+| `worktree`              | ✅             | git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list  |
+| `legacy-sports-aws`     | ❌             | Full AWS SSO access not available; cloud agents no longer use an AWS role for MCP (bearer auth replaced SigV4) — use `ci_get_logs` for CI log access                   |
 
-> **Auth note**: all three hosted servers are invoked via SigV4-signed requests using the GitHub Actions OIDC role (which carries the `mcp_invoke` IAM policy). If a server is unreachable, verify that `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are set as copilot environment secrets with valid Lambda Function URLs and that `copilot-setup-steps.yml` successfully assumed the OIDC role.
+> **Auth note**: all three hosted servers are reached over their API Gateway endpoints with a short-lived Cognito machine-grant bearer in the `Authorization` header (minted per task by `copilot-setup-steps.yml` from `MCP_MACHINE_CLIENT_SECRET`; LS-5093 / RFC AC-A6). If a server is unreachable, verify that `MCP_{JIRA,GITHUB,CI}_URL` and `MCP_MACHINE_CLIENT_{ID,SECRET}` + `MCP_AUTH_COGNITO_DOMAIN` are set as copilot environment secrets and that the bearer-minting step succeeded in the bootstrap logs.
 
 ### Verifying auth in a Copilot session
 
@@ -452,7 +455,7 @@ db_check_health()         # legacy-sports-db
 worktree_ping()           # worktree
 ```
 
-If `github_auth_status`, `ci_auth_status`, or `jira_auth_status` fail to connect, check that the OIDC role assumption succeeded in the bootstrap logs and that `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are configured as copilot environment secrets.
+If `github_auth_status`, `ci_auth_status`, or `jira_auth_status` fail to connect, check that the MCP bearer-minting step succeeded in the bootstrap logs and that `MCP_{JIRA,GITHUB,CI}_URL` and `MCP_MACHINE_CLIENT_{ID,SECRET}` + `MCP_AUTH_COGNITO_DOMAIN` are configured as copilot environment secrets.
 
 ## Known cloud-environment quirks
 
@@ -460,7 +463,7 @@ These are environment behaviors that look like bugs but are not — they cost re
 
 ### Quirk 1: `legacy-sports-jira` MCP server `fetch failed` (Claude Code on the web only)
 
-> **Copilot Coding Agent**: this quirk no longer applies — the Jira MCP server is hosted on AWS Lambda and called via a SigV4-signed Lambda Function URL. The outbound request goes to AWS (not `api.atlassian.com`), which is not blocked by the cloud-session proxy.
+> **Copilot Coding Agent**: this quirk no longer applies — the Jira MCP server is hosted on AWS (API Gateway + Lambda) and called with a Cognito machine-grant bearer. The outbound request goes to AWS (not `api.atlassian.com`), which is not blocked by the cloud-session proxy.
 
 **Symptom** (Claude Code on the web only): every call to `mcp__legacy-sports-jira__jira_*` returns one of:
 
@@ -630,16 +633,16 @@ searchJiraIssuesUsingJql(..., startAt: 100)
 
 ## Available MCP Servers in Cloud
 
-- `legacy-sports-ci` — CI log queries, workflow reruns (hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role)
+- `legacy-sports-ci` — CI log queries, workflow reruns (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer)
 - `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
-- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role; Jira credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are an alternative that requires no secrets
-- `legacy-sports-github` — PR and review lifecycle management (hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role; GitHub credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native GitHub connector is an alternative that requires no secrets
+- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer; Jira credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are an alternative that requires no secrets
+- `legacy-sports-github` — PR and review lifecycle management (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer; GitHub credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native GitHub connector is an alternative that requires no secrets
 - `legacy-sports-nx` — Nx project discovery, affected analysis, and target execution
 
 **Unavailable in cloud (by design):**
 
 - `worktree` — no worktree management needed (worktree server is present but only an allow-listed subset of tools is enabled)
-- `legacy-sports-aws` — full AWS access not available; OIDC role is scoped to MCP Lambda invocation only
+- `legacy-sports-aws` — full AWS access not available; cloud agents use a Cognito machine-grant bearer for MCP, not an AWS role
 
 ## Cloud-to-Local Teleport
 

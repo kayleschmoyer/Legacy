@@ -1,0 +1,142 @@
+name: Copilot Setup Steps
+
+# GitHub Copilot Coding Agent runs the job named `copilot-setup-steps` from this
+# file to provision its ephemeral environment **before** the agent starts. Any
+# env vars written to `$GITHUB_ENV` here are inherited by the agent process and
+# by every MCP server subprocess it launches.
+#
+# MCP authentication (RFC docs/rfcs/draft-seamless-mcp-auth.md, Track A — AC-A6):
+#   The three hosted MCP servers (legacy-sports-{github,jira,ci}) are reached
+#   through their Cognito-fronted API Gateway endpoints with a short-lived
+#   machine-grant bearer. This workflow mints one token per server scope
+#   (mcp/jira, mcp/github, mcp/ci) from the long-lived Cognito client_credentials
+#   secret and exports them as MCP_{JIRA,GITHUB,CI}_BEARER; the committed Copilot
+#   MCP config (.github/copilot/copilot-cloud-mcp-config.json) sends each bearer
+#   in the server's Authorization header.
+#
+#   This replaces the retired SigV4/OIDC path (AWS_IAM Lambda Function URLs +
+#   the mcp_invoke IAM policy, deleted in LS-5093 / RFC AC-A7, GAP-9). The long-
+#   lived secret never reaches the MCP servers — only the short-lived per-server
+#   tokens transit the wire (RFC AC-A4). No AWS credentials are required here.
+#
+# Required `copilot` environment secrets (Settings → Environments → copilot):
+#   AGENT_AUTHOR_APP_PRIVATE_KEY  — PEM for the Agent Author GitHub App (id 3158619)
+#   MCP_MACHINE_CLIENT_ID         — Cognito client_credentials client id   (SSM /…/mcp/cognito/machine-client-id)
+#   MCP_MACHINE_CLIENT_SECRET     — Cognito client_credentials secret       (Secrets Manager <env>/mcp-machine-client-secret)
+#   MCP_AUTH_COGNITO_DOMAIN       — Cognito hosted-UI domain (token endpoint base)
+#   MCP_JIRA_URL / MCP_GITHUB_URL / MCP_CI_URL — the three API Gateway invoke URLs
+#
+# GitHub Copilot Coding Agent runs the `copilot-setup-steps` job by name before
+# every task regardless of triggers. `workflow_dispatch` is added only so the
+# setup can be validated manually (Actions → Run workflow). It is intentionally
+# NOT wired to push/pull_request: the bearer-minting step needs the `copilot`
+# environment secrets, which are not present in a default PR/push context, so a
+# PR-triggered run would fail spuriously.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  copilot-setup-steps:
+    name: Copilot Setup Steps
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: legacy_sports
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup workspace (Node + pnpm + dependencies)
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      # GitHub auth for the custom legacy-sports-github MCP server. The Agent
+      # Author app token is a bot identity (not a user PAT), so PR/comment
+      # authorship stays bot-attributed.
+      - name: Generate Agent Author GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
+      - name: Export GitHub token
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          {
+            echo "GH_TOKEN=${APP_TOKEN}"
+            echo "GITHUB_TOKEN=${APP_TOKEN}"
+          } >> "$GITHUB_ENV"
+
+      # Local Postgres for the legacy-sports-db MCP server. db-client reads the
+      # DB_* vars individually when USE_LOCAL_CREDENTIALS=true (bypasses the AWS
+      # Secrets Manager lookup and SSL setup) — see lib/db-client config.
+      - name: Run database migrations (local Postgres)
+        env:
+          USE_LOCAL_CREDENTIALS: "true"
+          DB_HOST: "localhost:5432"
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: legacy_sports
+        run: pnpm --filter @legacy-sports/db-client run db:migrate
+
+      - name: Export database + credential env
+        run: |
+          {
+            echo "USE_LOCAL_CREDENTIALS=true"
+            echo "DB_HOST=localhost:5432"
+            echo "DB_USER=postgres"
+            echo "DB_PASSWORD=postgres"
+            echo "DB_NAME=legacy_sports"
+            echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/legacy_sports"
+          } >> "$GITHUB_ENV"
+
+      # Core of AC-A6: mint one short-lived bearer per MCP server scope from the
+      # Cognito client_credentials secret and export them for the MCP config.
+      # Reuses the same exchange logic as the local Claude Code headersHelper
+      # (scripts/mcp-mint-token.mjs, LS-5092) so both environments share one
+      # tested code path. The secret is exchanged with Cognito over TLS only and
+      # never reaches the MCP servers.
+      - name: Mint MCP machine-grant bearer tokens
+        env:
+          MCP_MACHINE_CLIENT_ID: ${{ secrets.MCP_MACHINE_CLIENT_ID }}
+          MCP_MACHINE_CLIENT_SECRET: ${{ secrets.MCP_MACHINE_CLIENT_SECRET }}
+          MCP_AUTH_COGNITO_DOMAIN: ${{ secrets.MCP_AUTH_COGNITO_DOMAIN }}
+        run: node scripts/mcp-mint-copilot-bearers.mjs
+
+      - name: Export MCP server URLs
+        env:
+          MCP_JIRA_URL: ${{ secrets.MCP_JIRA_URL }}
+          MCP_GITHUB_URL: ${{ secrets.MCP_GITHUB_URL }}
+          MCP_CI_URL: ${{ secrets.MCP_CI_URL }}
+        run: |
+          {
+            echo "MCP_JIRA_URL=${MCP_JIRA_URL}"
+            echo "MCP_GITHUB_URL=${MCP_GITHUB_URL}"
+            echo "MCP_CI_URL=${MCP_CI_URL}"
+          } >> "$GITHUB_ENV"

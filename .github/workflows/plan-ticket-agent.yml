@@ -18,7 +18,7 @@ name: Plan & Ticket Agent
 #   - The "plan-ticket" label must exist in the repository.
 #   - GitHub Copilot Coding Agent must be enabled for this repository.
 #   - Jira credentials must be configured in the Copilot agent environment
-#     (see .github/copilot-setup-steps.yml for the credential export steps).
+#     (see .github/workflows/copilot-setup-steps.yml for the credential export steps).
 
 on:
   issues:

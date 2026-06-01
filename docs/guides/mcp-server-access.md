@@ -11,9 +11,12 @@ This means:
 - Each invocation is logged on the Lambda side with the Cognito `sub` claim
 - Developers sign in once via the hosted UI; the helper script refreshes silently
 
-> **Cloud agents (GitHub Actions)** continue to use the underlying Lambda
-> Function URLs with SigV4 — the OIDC role already carries the `mcp_invoke`
-> IAM policy. Only developer machines need the Cognito flow described here.
+> **Cloud agents (Copilot Coding Agent)** reach the same API Gateway endpoints
+> with a short-lived Cognito machine-grant bearer minted in
+> `.github/workflows/copilot-setup-steps.yml` from the `client_credentials`
+> secret (LS-5093). The legacy SigV4/OIDC Function-URL path and the `mcp_invoke`
+> IAM policy were retired. Only interactive developer machines use the Cognito
+> ID-token flow described here.
 
 ---
 
@@ -90,11 +93,13 @@ days before re-auth is required).
 
 ## Cloud Agents (GitHub Actions)
 
-Cloud agents do not run `mcp-auth.mjs`. The `github_actions` OIDC role has
-the `mcp_invoke` IAM policy attached (via
-`aws_iam_role_policy_attachment.github_actions_mcp_invoke` in
-`terraform/main/lambda-mcp-shared.tf`), so they call the underlying Lambda
-Function URLs with SigV4 directly.
+Cloud agents do not run `mcp-auth.mjs`. The Copilot Coding Agent mints a
+short-lived Cognito machine-grant bearer per server scope in
+`.github/workflows/copilot-setup-steps.yml` (from the `client_credentials`
+secret) and sends it in the `Authorization` header to the same API Gateway
+endpoints developers use. The earlier SigV4/OIDC Function-URL path — and the
+`mcp_invoke` IAM policy that backed it — was retired in LS-5093 (RFC AC-A6/A7,
+GAP-9).
 
 ---
 

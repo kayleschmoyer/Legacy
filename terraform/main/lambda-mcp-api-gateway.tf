@@ -19,9 +19,11 @@
 # Per-developer token refresh (after initial setup):
 #   node scripts/mcp-auth.mjs
 #
-# Cloud agents (GitHub Actions) continue to call Lambda Function URLs directly
-# via AWS_IAM / SigV4 — the mcp_invoke policy on the github_actions role is
-# unchanged.
+# Cloud agents (Copilot Coding Agent) reach the same API Gateway endpoints with
+# a Cognito machine-grant bearer minted in copilot-setup-steps.yml from the
+# client_credentials secret — the legacy AWS_IAM Lambda Function URL / SigV4
+# path and the mcp_invoke IAM policy were retired in LS-5093 (RFC AC-A6/A7,
+# GAP-9). One auth path everywhere.
 #
 # Why Cognito and not IAM Identity Center direct?
 #   The earlier LS-4466 implementation used an IC Customer-managed OIDC
