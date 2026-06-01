@@ -3,7 +3,7 @@ import { ScrollView } from 'react-native';
 import { H3, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { Bell } from '@tamagui/lucide-icons';
-import { LOGGER } from '@legacy-sports/logging';
+import { handleError } from '../../common/utilities/ErrorHandler';
 import { type NotificationHistoryItem } from '../../api/db/graphql.generated';
 import { NotificationList } from '../../features/notifications/components/NotificationList';
 import { NotificationSettings } from '../../features/notifications/components/NotificationSettings';
@@ -78,35 +78,36 @@ export default function NotificationsScreen(): React.JSX.Element {
     [notifications, activeFilter],
   );
 
-  const handleNotificationPress = (notification: NotificationHistoryItem) => {
-    // Mark as read on tap
-    if (!notification.read && notification.id) {
-      markAsRead(Number(notification.id)).catch((err: unknown) => {
-        LOGGER.warn(
-          'Failed to mark notification as read:',
-          err instanceof Error ? err.message : String(err),
-        );
-      });
-    }
+  const handleNotificationPress = (
+    notification: NotificationHistoryItem,
+  ): void => {
+    const run = async (): Promise<void> => {
+      // Mark as read on tap; await so a failure aborts navigation
+      if (!notification.read && notification.id) {
+        await markAsRead(Number(notification.id));
+      }
 
-    // Deep-link based on notification data
-    if (notification.matchupId && notification.leagueId) {
-      router.push({
-        pathname: '/baseball/matchup' as never,
-        params: {
-          matchupId: String(notification.matchupId),
-          leagueId: String(notification.leagueId),
-        },
-      } as never);
-      return;
-    }
+      // Deep-link based on notification data
+      if (notification.matchupId && notification.leagueId) {
+        router.push({
+          pathname: '/baseball/matchup' as never,
+          params: {
+            matchupId: String(notification.matchupId),
+            leagueId: String(notification.leagueId),
+          },
+        } as never);
+        return;
+      }
 
-    if (notification.leagueId) {
-      router.push({
-        pathname: '/baseball/league/[leagueId]' as never,
-        params: { leagueId: String(notification.leagueId) },
-      } as never);
-    }
+      if (notification.leagueId) {
+        router.push({
+          pathname: '/baseball/league/[leagueId]' as never,
+          params: { leagueId: String(notification.leagueId) },
+        } as never);
+      }
+    };
+
+    run().catch(handleError);
   };
 
   if (loading) {
