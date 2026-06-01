@@ -66,9 +66,17 @@ export default function LeagueId(): React.JSX.Element {
 
   useEffect(() => {
     let active = true;
-    void readKeychainValue(Secret.INTERNAL_JWT).then((token: string | null) => {
-      if (active && token) setWsToken(token);
-    });
+    void (async () => {
+      try {
+        const token = await readKeychainValue(Secret.INTERNAL_JWT);
+        if (active && token) setWsToken(token);
+      } catch (err: unknown) {
+        LOGGER.error(
+          'Failed to read WS token from keychain',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+    })();
     return () => {
       active = false;
     };
