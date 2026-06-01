@@ -1233,26 +1233,27 @@ builder.mutationField('deleteAllLeagues', (t) =>
       }
 
       try {
-        // Admins delete all leagues they are a member of.
-        // Regular users only delete leagues they own (are the owner of)
-        // to match the single-league deleteLeague authorization rules.
-        const allLeagues = await context.db
-          .select({
-            id: PublicSchema.leagues.id,
-          })
-          .from(PublicSchema.leagues)
-          .innerJoin(
-            PublicSchema.leagueMembers,
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, PublicSchema.leagues.id),
-              eq(PublicSchema.leagueMembers.userId, context.user.id),
-            ),
-          )
-          .where(
-            context.user.isAdmin
-              ? undefined
-              : eq(PublicSchema.leagues.owner, context.user.id),
-          );
+        // Admins delete all leagues they are a member of (requires join).
+        // Regular users own their leagues — owner is always a member — so
+        // query directly on leagues.owner without the redundant member join.
+        const allLeagues = context.user.isAdmin
+          ? await context.db
+              .select({ id: PublicSchema.leagues.id })
+              .from(PublicSchema.leagues)
+              .innerJoin(
+                PublicSchema.leagueMembers,
+                and(
+                  eq(
+                    PublicSchema.leagueMembers.leagueId,
+                    PublicSchema.leagues.id,
+                  ),
+                  eq(PublicSchema.leagueMembers.userId, context.user.id),
+                ),
+              )
+          : await context.db
+              .select({ id: PublicSchema.leagues.id })
+              .from(PublicSchema.leagues)
+              .where(eq(PublicSchema.leagues.owner, context.user.id));
 
         if (allLeagues.length === 0) {
           return 'No leagues found to delete';
