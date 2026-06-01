@@ -16,8 +16,7 @@ export function useSubscription() {
   const { data, loading, error, refetch } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
 
-  const isPremium =
-    subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isPremium = subscription?.tier === 'premium';
   const tier = subscription?.tier ?? 'free';
 
   return {
