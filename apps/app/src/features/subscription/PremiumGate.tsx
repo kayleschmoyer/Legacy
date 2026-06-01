@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
+import { useStripePrices } from './useStripePrices';
 import {
   trackPremiumFeatureBlocked,
   trackPremiumFeatureClick,
@@ -39,9 +40,6 @@ export function PremiumGate({
   featureDescription,
   children,
 }: PremiumGateProps) {
-  const router = useRouter();
-  const [pressed, setPressed] = useState(false);
-
   useEffect(() => {
     if (!isPremium) {
       trackPremiumFeatureBlocked(featureName);
@@ -51,6 +49,41 @@ export function PremiumGate({
   if (isPremium) {
     return children as React.JSX.Element;
   }
+
+  return (
+    <PremiumGateOverlay
+      featureName={featureName}
+      featureDescription={featureDescription}
+    >
+      {children}
+    </PremiumGateOverlay>
+  );
+}
+
+interface PremiumGateOverlayProps {
+  /** Feature name used for analytics and upgrade prompt copy. */
+  featureName: string;
+  /** Optional description displayed in the upgrade overlay. */
+  featureDescription?: string;
+  /** Content to tease (dimmed) behind the lock card. */
+  children: React.ReactNode;
+}
+
+/**
+ * Free-tier upgrade overlay for {@link PremiumGate}. Rendered only for
+ * non-premium users, so the `useStripePrices` query fires lazily — premium
+ * users (the common case) never trigger it.
+ */
+function PremiumGateOverlay({
+  featureName,
+  featureDescription,
+  children,
+}: PremiumGateOverlayProps) {
+  const router = useRouter();
+  const [pressed, setPressed] = useState(false);
+  // Live monthly-equivalent price (annual total / 12). Falls back to display
+  // values from FALLBACK_ANNUAL_TOTAL_CENTS when Stripe prices are unavailable.
+  const { annualMonthlyEquivalent } = useStripePrices();
 
   const handleUpgradePress = () => {
     trackPremiumFeatureClick(featureName);
@@ -122,7 +155,7 @@ export function PremiumGate({
             </Text>
           </Button>
           <Text fontSize="$2" color={BRAND_GOLD_LIGHT} textAlign="center">
-            From $3.33/mo
+            From {annualMonthlyEquivalent}/mo
           </Text>
         </YStack>
       </YStack>
