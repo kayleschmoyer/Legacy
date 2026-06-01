@@ -4,6 +4,9 @@
 # In CI these are supplied as TF_VAR_* environment variables from GitHub secrets.
 # Locally, set them in secrets.auto.tfvars (never commit this file).
 #
+# After adding or rotating a value: run `node scripts/sync-github-secrets.mjs`
+# to propagate the new values from SSM → GitHub Actions secrets.
+#
 # Secrets that are only stored in AWS Secrets Manager (fetched by Lambdas at
 # runtime) are NOT managed here — set them directly via AWS CLI:
 #   aws secretsmanager put-secret-value --secret-id dev/<name> --secret-string <value>
@@ -38,6 +41,20 @@ variable "rollbar_access_token" {
   description = "Rollbar server-side (post_server_item) access token for Lambda error tracking"
   type        = string
   sensitive   = true
+}
+
+variable "rollbar_client_access_token" {
+  description = "Rollbar post_client_item access token for browser/mobile error reporting. Used as VITE_ROLLBAR_ACCESS_TOKEN (web) and EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN (mobile). Distinct from rollbar_access_token (server-side)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "giphy_api_key" {
+  description = "Giphy API key for GIF search. Used as VITE_GIPHY_API_KEY in web builds."
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "ga_measurement_id" {

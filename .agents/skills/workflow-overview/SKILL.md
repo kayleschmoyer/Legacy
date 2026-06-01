@@ -543,18 +543,28 @@ These checks are not configured as _required_ branch protection rules, but they 
 | `PREVIEW_APP_PRIVATE_KEY`      | PR preview/Playwright report deploy private key      |
 | `AGENT_AUTHOR_APP_PRIVATE_KEY` | Agent Author (ID 3158619) -- code push + PR creation |
 
-### Web App (Vite Build)
+### Web App (Vite Build) and Mobile App (Expo)
 
-| Secret                      | Purpose                                 |
-| --------------------------- | --------------------------------------- |
-| `VITE_OAUTH_PROXY_URL`      | OAuth proxy endpoint                    |
-| `VITE_GOOGLE_CLIENT_ID`     | Google OAuth client ID                  |
-| `VITE_GRAPHQL_HOST`         | GraphQL API endpoint                    |
-| `VITE_WEBSOCKET_URL`        | WebSocket endpoint                      |
-| `VITE_GA_MEASUREMENT_ID`    | Google Analytics                        |
-| `VITE_GIPHY_API_KEY`        | Giphy integration                       |
-| `VITE_ROLLBAR_ACCESS_TOKEN` | Client-side Rollbar (error tracking)    |
-| `ROLLBAR_ACCESS_TOKEN`      | Server-side Rollbar (sourcemap uploads) |
+Secrets use framework-neutral names in GitHub (AWS SSM is the source of truth — see
+`terraform/main/ssm-github-secrets.tf`). Each workflow applies the correct prefix at
+the step level: `VITE_` for web, `EXPO_PUBLIC_` for mobile.
+
+| GitHub Secret                 | Web env var                 | Mobile env var                        | Purpose                                |
+| ----------------------------- | --------------------------- | ------------------------------------- | -------------------------------------- |
+| `OAUTH_PROXY_URL`             | `VITE_OAUTH_PROXY_URL`      | `EXPO_PUBLIC_OAUTH_PROXY`             | OAuth proxy endpoint                   |
+| `GRAPHQL_HOST`                | `VITE_GRAPHQL_HOST`         | `EXPO_PUBLIC_GRAPHQL_HOST`            | GraphQL API endpoint                   |
+| `WEBSOCKET_URL`               | `VITE_WEBSOCKET_URL`        | `EXPO_PUBLIC_WEBSOCKET_URL`           | WebSocket endpoint                     |
+| `GOOGLE_CLIENT_ID`            | `VITE_GOOGLE_CLIENT_ID`     | `EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID`  | Google OAuth client ID                 |
+| `DISCORD_CLIENT_ID`           | `VITE_DISCORD_CLIENT_ID`    | —                                     | Discord OAuth client ID                |
+| `GA_MEASUREMENT_ID`           | `VITE_GA_MEASUREMENT_ID`    | —                                     | Google Analytics measurement ID        |
+| `GIPHY_API_KEY`               | `VITE_GIPHY_API_KEY`        | —                                     | Giphy integration                      |
+| `ROLLBAR_CLIENT_ACCESS_TOKEN` | `VITE_ROLLBAR_ACCESS_TOKEN` | `EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN`    | Client-side Rollbar (error tracking)   |
+| `STRIPE_MONTHLY_PRICE_ID`     | —                           | `EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID` | Stripe monthly plan price ID           |
+| `STRIPE_ANNUAL_PRICE_ID`      | —                           | `EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID`  | Stripe annual plan price ID            |
+| `ROLLBAR_ACCESS_TOKEN`        | `ROLLBAR_ACCESS_TOKEN`      | —                                     | Server-side Rollbar (sourcemap upload) |
+
+To rotate a value or add a new environment: update the Terraform variable → `terraform apply` →
+`node scripts/sync-github-secrets.mjs`.
 
 ### Jira
 

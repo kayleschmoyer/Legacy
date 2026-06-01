@@ -48,7 +48,7 @@ jobs:
         id: reviewer-token
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
-          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Apply or remove security review override

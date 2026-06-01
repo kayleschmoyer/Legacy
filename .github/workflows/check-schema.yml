@@ -64,7 +64,7 @@ jobs:
         continue-on-error: true
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
-          app-id: 3158619
+          client-id: 3158619
           private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
       - name: "Resolve Runner Label"
         id: resolve

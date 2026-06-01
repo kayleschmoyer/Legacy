@@ -79,7 +79,8 @@ jobs:
       - name: "Setup tflint"
         uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
         with:
-          tflint_version: latest
+          tflint_version: v0.62.1 # pinned — avoids unauthenticated GitHub API call to resolve "latest"
+          github_token: ${{ github.token }} # authenticated fallback if action still needs API access
 
       - name: "tflint"
         shell: bash

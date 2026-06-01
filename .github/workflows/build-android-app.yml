@@ -70,24 +70,25 @@ jobs:
     # http://localhost:5001 and Android blocks it (CLEARTEXT), which surfaces as
     # the post-redirect "login failed" / auth-redirect loop.
     #
-    # Reuse the web app's secrets (the same Terraform-generated vanity URLs +
-    # Google web client) so web and mobile can never drift onto different
-    # backends. See .github/workflows/deploy-web.yml "Build Web App".
+    # Platform-neutral secrets are prefixed here with EXPO_PUBLIC_ for Metro/Babel.
+    # The web build applies VITE_ prefixes to the same underlying secrets — see
+    # .github/workflows/deploy-web.yml "Build Web App". Keeping the secrets
+    # framework-agnostic ensures web and mobile can never drift onto different backends.
     #
     # EXPO_PUBLIC_BYPASS_AUTH is intentionally NOT set — leaving it unset keeps
     # real authentication enforced in shipped builds.
     env:
-      EXPO_PUBLIC_OAUTH_PROXY: ${{ secrets.VITE_OAUTH_PROXY_URL }}
-      EXPO_PUBLIC_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
-      EXPO_PUBLIC_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
-      EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-      EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: ${{ secrets.VITE_ROLLBAR_ACCESS_TOKEN }}
+      EXPO_PUBLIC_OAUTH_PROXY: ${{ secrets.OAUTH_PROXY_URL }}
+      EXPO_PUBLIC_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
+      EXPO_PUBLIC_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
+      EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
       # Stripe subscription config — mobile-only, no web CI equivalent. These are
       # publishable identifiers (not sensitive), but are read from repo secrets
       # so the subscription screen can render plans. If the secrets are unset the
       # references resolve to empty strings and the rest of the app is unaffected.
-      EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID }}
-      EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID }}
+      EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
+      EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_ANNUAL_PRICE_ID }}
     outputs:
       apk_path: ${{ steps.build.outputs.apk-path }}
       apk_name: ${{ steps.apk-name.outputs.apk_name }}

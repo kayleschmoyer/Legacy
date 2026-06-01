@@ -123,10 +123,10 @@ jobs:
         if: steps.pr.outputs.skip != 'true' && steps.download.outputs.success == 'true'
         id: rewrite
         env:
-          VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
-          VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
+          VITE_OAUTH_PROXY_URL: ${{ secrets.OAUTH_PROXY_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
+          VITE_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
         run: |
           set -euo pipefail
           PR_NUM="${{ steps.pr.outputs.number }}"
@@ -178,13 +178,13 @@ jobs:
         if: steps.pr.outputs.skip != 'true' && steps.download.outputs.success != 'true'
         env:
           VITE_BASE_PATH: /legacy-sports-deploys/pr-${{ steps.pr.outputs.number }}/
-          VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_DISCORD_CLIENT_ID: ${{ secrets.VITE_DISCORD_CLIENT_ID }}
-          VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
-          VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
+          VITE_OAUTH_PROXY_URL: ${{ secrets.OAUTH_PROXY_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          VITE_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
+          VITE_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
           VITE_GA_MEASUREMENT_ID: ""
-          VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
+          VITE_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
           VITE_ROLLBAR_ACCESS_TOKEN: ""
           VITE_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
           VITE_APP_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
