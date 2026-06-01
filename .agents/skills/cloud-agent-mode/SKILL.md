@@ -45,6 +45,8 @@ The "cloud agent" label covers three distinct configurations with very different
 
 > **Posture change (epic LS-5089, Phase 3 / LS-5096).** The three hosted servers (`legacy-sports-jira`, `legacy-sports-github`, `legacy-sports-ci`) are now reachable from **Claude Code on the web** as **custom remote MCP connectors** registered in claude.ai. This supersedes the older "CC web is structurally excluded" framing: CC web still does **not** read project `.mcp.json` and its connector UI still exposes **no static-bearer field**, but the Lambdas now implement the MCP OAuth 2.0 Authorization spec (Protected Resource Metadata + `401`/`WWW-Authenticate` challenge — LS-5095), so the OAuth-only connector UI is sufficient.
 
+> **New developer onboarding**: to get access as a new developer, see [`docs/dev-process/mcp-connector-access.md`](../../../docs/dev-process/mcp-connector-access.md) — it covers the full Track B setup (Cognito user invite from an Org Owner → claude.ai connector consent) and Track A setup for local sessions.
+
 **How it works:**
 
 - **Registration is owner-only and out-of-band.** A claude.ai **Org Owner** registers each server's API Gateway URL under **Org settings → Connectors** (Settings → Connectors on Free/Pro/Max). Agents **cannot** perform this step — it is a human, browser-driven action in claude.ai. Once registered, the connector **auto-syncs into Claude Code** for anyone logged in with the same account, so the `mcp__legacy-sports-*` tools appear in CC-web sessions without any `.mcp.json` or token configuration.
