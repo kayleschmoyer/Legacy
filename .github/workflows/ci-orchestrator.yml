@@ -85,7 +85,6 @@ jobs:
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request_review' &&
-       github.event.review.user.login == 'legacy-sports-review-bot[bot]' &&
        github.event.review.state == 'approved') ||
       (github.event_name == 'pull_request' &&
        github.event.action == 'labeled' &&

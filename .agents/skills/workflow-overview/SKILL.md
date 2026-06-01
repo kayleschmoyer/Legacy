@@ -178,7 +178,7 @@ Can be bypassed with `--no-verify`.
 The orchestrator is the entry point for all PR CI. It dispatches reusable workflows:
 
 ```
-pull_request_review (bot approved) | pull_request (ci:run labeled) | merge_group | workflow_dispatch
+pull_request_review (any APPROVED) | pull_request (ci:run labeled) | merge_group | workflow_dispatch
         |
   determine-scope
     |            |
@@ -192,7 +192,7 @@ ci-pipeline   security-scanning (conditional)
 
 **Triggers:**
 
-- `pull_request_review` submitted — only when reviewer is `legacy-sports-review-bot[bot]` and state is `approved`
+- `pull_request_review` submitted — any APPROVED review (bot or human codeowner); the LS-4182 idempotency guard prevents duplicate runs when CI already passed for the SHA (LS-5223)
 - `pull_request` labeled — only when the label being added is `ci:run` (one-shot bypass; label auto-removed after CI completes)
 - `merge_group` — always runs CI + security
 - `workflow_dispatch` — manual with configurable security scan type
