@@ -72,10 +72,16 @@ if [ ! -f "$WORKTREE/.github/copilot/hooks/mcp-bootstrap.mjs" ]; then
   WARNINGS+=("  Restore it: git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs")
 fi
 
-# --- 4. MCP auth token + API Gateway URLs ------------------------------------
-# The 3 URL-based servers (jira, github, ci) now connect via API Gateway HTTP
-# API using an IAM Identity Center OIDC JWT. The token and URLs must be present
-# in .env.local (written by scripts/mcp-auth.mjs). Check both.
+# --- 4. MCP machine credential + API Gateway URLs ----------------------------
+# The 3 URL-based servers (jira, github, ci) connect via API Gateway HTTP API.
+# Auth is the Cognito machine credential (RFC Track A / LS-5094): the
+# headersHelper (scripts/mcp-mint-token.mjs) mints a SHORT-LIVED per-connect
+# bearer token from the long-lived machine secret. There is no per-session
+# expiring MCP_AUTH_TOKEN any more, so there is nothing to warn about
+# expiring — we instead verify the machine credential + URLs are present in
+# .env.local (written by scripts/mcp-auth.mjs --machine). Because the minted
+# token refreshes on every connect, a session of any length stays authed
+# without a refresh (RFC AC-G1/AC-G3).
 ENV_LOCAL="$WORKTREE/.env.local"
 
 read_env_var() {
@@ -84,41 +90,17 @@ read_env_var() {
 }
 
 if [ -f "$ENV_LOCAL" ]; then
-  MCP_TOKEN=$(read_env_var "MCP_AUTH_TOKEN")
-  MCP_EXPIRES=$(read_env_var "MCP_AUTH_EXPIRES_AT")
-
-  if [ -z "$MCP_TOKEN" ]; then
-    WARNINGS+=("[MCP WARNING] MCP_AUTH_TOKEN not set in .env.local — jira/github/ci MCP servers will fail to connect.")
-    WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --setup' (first time) or 'node scripts/mcp-auth.mjs' (refresh).")
-  else
-    # Check expiry using Python (available on Windows + Linux; avoids base64 cross-platform quirks)
-    NOW=$(date +%s)
-    TOKEN_EXP=""
-    if [ -n "$MCP_EXPIRES" ]; then
-      TOKEN_EXP="$MCP_EXPIRES"
-    else
-      TOKEN_EXP=$(python3 -c "
-import base64, json, sys
-try:
-    token = '${MCP_TOKEN}'.split('.')
-    pad = token[1] + '=' * ((4 - len(token[1]) % 4) % 4)
-    print(json.loads(base64.urlsafe_b64decode(pad)).get('exp', 0))
-except Exception:
-    print(0)
-" 2>/dev/null)
+  # Machine credential: client id + secret + Cognito domain (token endpoint).
+  # All three are required for the headersHelper to mint a token.
+  CRED_MISSING=false
+  for CRED_KEY in "MCP_MACHINE_CLIENT_ID" "MCP_MACHINE_CLIENT_SECRET" "MCP_AUTH_COGNITO_DOMAIN"; do
+    if [ -z "$(read_env_var "$CRED_KEY")" ]; then
+      WARNINGS+=("[MCP WARNING] $CRED_KEY not set in .env.local — jira/github/ci MCP servers cannot mint a token and will fail to connect.")
+      CRED_MISSING=true
     fi
-
-    if [ -n "$TOKEN_EXP" ] && [ "$TOKEN_EXP" -gt 0 ] 2>/dev/null; then
-      SECS_LEFT=$((TOKEN_EXP - NOW))
-      if [ "$SECS_LEFT" -lt 0 ]; then
-        WARNINGS+=("[MCP WARNING] MCP_AUTH_TOKEN has expired — jira/github/ci MCP servers will return 401.")
-        WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' to refresh the token, then restart the session.")
-      elif [ "$SECS_LEFT" -lt 900 ]; then
-        MINS_LEFT=$((SECS_LEFT / 60))
-        WARNINGS+=("[MCP WARNING] MCP_AUTH_TOKEN expires in ${MINS_LEFT} minutes — consider refreshing soon.")
-        WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' then restart the session.")
-      fi
-    fi
+  done
+  if [ "$CRED_MISSING" = "true" ]; then
+    WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --machine' to provision the machine credential, then restart the session.")
   fi
 
   # Check that all three API Gateway URLs are populated
@@ -130,23 +112,24 @@ except Exception:
     fi
   done
   if [ "$URL_MISSING" = "true" ]; then
-    WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' (runs terraform apply first if URLs are missing).")
+    WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --machine' (runs terraform apply first if URLs are missing).")
   fi
 else
-  WARNINGS+=("[MCP WARNING] .env.local not found — MCP_AUTH_TOKEN and API Gateway URLs are missing.")
-  WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --setup' then restart the session.")
+  WARNINGS+=("[MCP WARNING] .env.local not found — the MCP machine credential and API Gateway URLs are missing.")
+  WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --machine' then restart the session.")
 fi
 
 # --- 5. .claude/settings.local.json#/env mirror (LS-4592) -------------------
 # When Claude Code is launched from the Claude Desktop GUI app, .env.local is
-# NOT sourced — the only way ${MCP_*} substitutions in .mcp.json resolve is
-# through settings.local.json#/env. scripts/mcp-auth.mjs mirrors the 4 MCP_*
-# vars there; warn if the mirror is missing or stale.
+# NOT sourced — the only way ${MCP_*} substitutions in .mcp.json resolve (and
+# the only way the headersHelper can read the machine credential) is through
+# settings.local.json#/env. scripts/mcp-auth.mjs mirrors the machine
+# credential + URLs there; warn if the mirror is missing or stale.
 SETTINGS_LOCAL="$WORKTREE/.claude/settings.local.json"
 if [ -f "$SETTINGS_LOCAL" ] && command -v python3 >/dev/null 2>&1; then
   MIRROR_STATUS=$(python3 - "$SETTINGS_LOCAL" <<'PY' 2>/dev/null
 import json, sys
-required = ['MCP_AUTH_TOKEN', 'MCP_JIRA_URL', 'MCP_GITHUB_URL', 'MCP_CI_URL']
+required = ['MCP_MACHINE_CLIENT_ID', 'MCP_MACHINE_CLIENT_SECRET', 'MCP_AUTH_COGNITO_DOMAIN', 'MCP_JIRA_URL', 'MCP_GITHUB_URL', 'MCP_CI_URL']
 try:
     with open(sys.argv[1], 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -165,16 +148,16 @@ PY
     OK) ;;
     NO_ENV)
       WARNINGS+=("[MCP WARNING] .claude/settings.local.json has no top-level \"env\" block — Claude Desktop launches will not resolve \${MCP_*} in .mcp.json.")
-      WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' to populate the mirror, then restart the session.")
+      WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --machine' to populate the mirror, then restart the session.")
       ;;
     UNREADABLE)
       WARNINGS+=("[MCP WARNING] .claude/settings.local.json is unreadable or malformed — Claude Desktop launches may fail to resolve \${MCP_*}.")
-      WARNINGS+=("  Fix: repair the JSON or remove the file, then run 'node scripts/mcp-auth.mjs'.")
+      WARNINGS+=("  Fix: repair the JSON or remove the file, then run 'node scripts/mcp-auth.mjs --machine'.")
       ;;
     MISSING:*)
       MISSING_KEYS="${MIRROR_STATUS#MISSING:}"
       WARNINGS+=("[MCP WARNING] .claude/settings.local.json#/env is missing required keys: $MISSING_KEYS — Claude Desktop launches will fail to resolve those \${MCP_*}.")
-      WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs' to refresh the mirror, then restart the session.")
+      WARNINGS+=("  Fix: run 'node scripts/mcp-auth.mjs --machine' to refresh the mirror, then restart the session.")
       ;;
   esac
 fi
