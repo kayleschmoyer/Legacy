@@ -21,7 +21,6 @@ import {
 } from './tools/secretsmanager.js';
 import { ssmGet } from './tools/ssm-get.js';
 import { ssmRunCommand } from './tools/ssm-run-command.js';
-import { mcpAuthRefresh } from './tools/mcp-auth-refresh.js';
 import { ssoLogin } from './tools/sso-login.js';
 import { ssoStatus } from './tools/sso-status.js';
 import { terraformOutput } from './tools/terraform-output.js';
@@ -244,14 +243,6 @@ server.tool(
       ),
   },
   async (params) => listSecrets(params),
-);
-
-// --- aws_mcp_auth_refresh ---
-server.tool(
-  'aws_mcp_auth_refresh',
-  'Refresh the IAM Identity Center OIDC token used by the MCP API Gateway (jira/github/ci servers). Succeeds only when AWS SSO is currently authenticated — call aws_sso_status first if unsure. Uses the stored refresh token in .env.local; returns an error if the refresh token itself has expired (remedy: run node scripts/mcp-auth.mjs). On success, writes the new token to .env.local and reports minutes until expiry. A Claude Code session restart is required for the new token to be picked up by the URL-based MCP servers.',
-  {},
-  async () => mcpAuthRefresh(),
 );
 
 // --- aws_sso_status ---

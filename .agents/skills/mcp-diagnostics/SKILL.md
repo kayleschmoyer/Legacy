@@ -163,7 +163,7 @@ When you see that exact shape on **any** of the three URL servers mid-session, t
 
 ### Why the agent can't auto-recover
 
-- `aws_mcp_auth_refresh` (in the `legacy-sports-aws` MCP server) can write a fresh token to `.env.local`, but the URL-server transports were spawned at session start with the **old** token already baked into their `Authorization` header — they do not re-read `.env.local`. The new token only takes effect on the next session.
+- The URL-server transports bake in the `Authorization` header at session start and never re-read `.env.local` mid-session — there is no automated recovery tool. A new token only takes effect after a session restart.
 - AWS SSO login (`aws sso login`) is a user-only action per the credentials skill — agents must never run it.
 
 ### Why we surface this as documentation rather than fixing the parser

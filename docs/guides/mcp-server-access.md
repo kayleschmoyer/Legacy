@@ -42,8 +42,8 @@ The script:
 1. Reads the Cognito client ID and hosted UI domain from SSM.
 2. Opens the hosted UI in your browser to run the OAuth authorization code +
    PKCE flow.
-3. Writes the ID token, refresh token, and API Gateway URLs to `.env.local`:
-   - `MCP_AUTH_TOKEN`, `MCP_AUTH_REFRESH_TOKEN`, `MCP_AUTH_EXPIRES_AT`
+3. Writes the machine credential and API Gateway URLs to `.env.local`:
+   - `MCP_AUTH_TOKEN`, `MCP_AUTH_EXPIRES_AT`
    - `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL`
 
 After setup, MCP clients can call the API Gateways directly with the bearer
@@ -59,8 +59,7 @@ ID tokens expire after ~8h. Run:
 node scripts/mcp-auth.mjs
 ```
 
-This uses the refresh token to silently mint a new ID token (good for ~30
-days before re-auth is required).
+This uses the stored machine credential to mint a fresh token and updates `.env.local`.
 
 ---
 
