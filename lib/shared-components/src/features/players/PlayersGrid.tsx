@@ -15,6 +15,7 @@ import {
 import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
 import { PlayerCard } from './PlayerCard';
 import { PlayerListRow } from './PlayerListRow';
+import { PlayersStatsTable } from './PlayersStatsTable';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 // `PlayersViewMode` lives in PlayersScreen (LS-4656). Type-only import keeps
 // this leaf component free of the runtime cycle PlayersScreen → PlayersGrid.
@@ -335,7 +336,12 @@ function PlayersGrid({
         </YStack>
       ) : (
         <ScrollView>
-          {viewMode === 'list' ? (
+          {viewMode === 'stats' ? (
+            <PlayersStatsTable
+              players={filteredPlayers}
+              onPlayerSelect={onPlayerSelect}
+            />
+          ) : viewMode === 'list' ? (
             <YStack className="pg-list-stack" flexDirection="column">
               {filteredPlayers.map((player, idx) => (
                 <PlayerListRow

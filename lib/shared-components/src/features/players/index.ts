@@ -5,6 +5,12 @@ export { PlayerDetail, PlayerDetailById } from './PlayerDetail';
 export { PlayerRow } from './PlayerRow';
 export { PlayersGrid } from './PlayersGrid';
 export { PlayersScreen } from './PlayersScreen';
+export {
+  PlayersStatsTable,
+  BASEBALL_STAT_COLUMNS,
+  sortPlayers,
+} from './PlayersStatsTable';
+export type { StatColumn, PlayersStatsTableProps } from './PlayersStatsTable';
 export { PlayersTable } from './PlayersTable';
 
 // Advanced player statistics components

@@ -1043,15 +1043,16 @@ interface ViewToggleOption {
 const VIEW_TOGGLE_OPTIONS: ReadonlyArray<ViewToggleOption> = [
   { id: 'cards', label: 'Cards' },
   { id: 'list', label: 'List' },
-  { id: 'stats', label: 'Stats', disabled: true, disabledHint: 'Coming soon' },
+  // Stats Table enabled in LS-4653 (was disabled "Coming soon" in LS-4650).
+  { id: 'stats', label: 'Stats' },
 ];
 
 /**
  * Pill cluster matching `.pp-viewtoggle` / `.pp-view` rules from
  * docs/design/F89Q4j6WFCFqqsZpQ4VhlQ/legacy-sports-players-page/project/players.css
- * (LS-4650 AC1). Selected option fills BRAND_NAVY with WHITE text; Stats is
- * gated as disabled until the Stats Table slice lands and exposes its tooltip
- * via `title` so users know the option is coming rather than broken.
+ * (LS-4650 AC1). Selected option fills BRAND_NAVY with WHITE text. All three
+ * views (Cards / List / Stats) are now live (Stats added in LS-4653); the
+ * `disabled`/`disabledHint` plumbing remains for any future gated option.
  */
 function ViewToggle({ view, onChange }: ViewToggleProps) {
   return (

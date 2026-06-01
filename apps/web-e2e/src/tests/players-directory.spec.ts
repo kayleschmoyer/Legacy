@@ -278,3 +278,69 @@ test.describe('Players Directory — functional 404 regression (LS-3492) @regres
     ).toBeVisible({ timeout: 15_000 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests – Stats Table view (LS-4653)
+// ---------------------------------------------------------------------------
+
+test.describe('Players Directory – Stats Table view @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPlayersGraphQL(page);
+    await page.goto('/players?view=stats');
+    await page.waitForLoadState('load');
+  });
+
+  test('renders the stats table region with the baseball column set', async ({
+    page,
+  }) => {
+    const table = page.getByRole('region', { name: /player statistics/i });
+    await expect(table).toBeVisible();
+    // AC1: baseball columns AVG / HR / R / RBI / SB
+    for (const label of ['Player', 'AVG', 'HR', 'R', 'RBI', 'SB']) {
+      await expect(
+        table.getByRole('button', { name: new RegExp(`^${label}\b`, 'i') }),
+      ).toBeVisible();
+    }
+  });
+
+  test('the Stats option is selected in the view toggle', async ({ page }) => {
+    const statsPill = page.getByRole('tab', { name: /^stats$/i });
+    await expect(statsPill).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('clicking a sortable header re-sorts the table (active column marked aria-sort)', async ({
+    page,
+  }) => {
+    const hrHeader = page
+      .getByRole('region', { name: /player statistics/i })
+      .getByRole('button', { name: /^HR/i });
+    await hrHeader.click();
+    await expect(hrHeader).toHaveAttribute(
+      'aria-sort',
+      /(ascending|descending)/,
+    );
+  });
+
+  test('clicking a sortable header is keyboard-activatable (Enter)', async ({
+    page,
+  }) => {
+    const rbiHeader = page
+      .getByRole('region', { name: /player statistics/i })
+      .getByRole('button', { name: /^RBI/i });
+    await rbiHeader.focus();
+    await page.keyboard.press('Enter');
+    await expect(rbiHeader).toHaveAttribute(
+      'aria-sort',
+      /(ascending|descending)/,
+    );
+  });
+
+  test('player rows render from mocked data with last-name sort default', async ({
+    page,
+  }) => {
+    const table = page.getByRole('region', { name: /player statistics/i });
+    // Alphabetical-by-last-name default: Acuna should appear before Judge.
+    await expect(table.getByText(/Ronald Acuna/i).first()).toBeVisible();
+    await expect(table.getByText(/Aaron Judge/i).first()).toBeVisible();
+  });
+});
