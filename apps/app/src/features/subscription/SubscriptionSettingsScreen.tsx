@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform, ScrollView } from 'react-native';
 import {
   Button,
@@ -16,6 +16,7 @@ import {
 } from './useSubscription';
 import { BillingCycle, PREMIUM_FEATURES } from './constants';
 import { useStripePrices } from './useStripePrices';
+import { useIAP } from './useIAP';
 
 // Custom URL scheme registered in app.json (scheme: "legacysports").
 const APP_SCHEME = 'legacysports';
@@ -163,7 +164,39 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   const [createBillingPortalSession, { loading: portalLoading }] =
     useBillingPortalSession();
 
+  const {
+    restorePurchases,
+    loading: restoreLoading,
+    error: restoreError,
+    isSubscribed: restoreSubscribed,
+    clearError: clearRestoreError,
+  } = useIAP();
+
+  // isSubscribed and error are set asynchronously inside restorePurchases, so
+  // reading them synchronously after the await always sees the stale closure
+  // value. Track whether a restore was initiated here and surface the outcome
+  // via an effect once the hook state settles (mirrors SubscriptionScreen).
+  const restoreInitiated = useRef(false);
+
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
+
+  useEffect(() => {
+    if (restoreSubscribed && restoreInitiated.current) {
+      restoreInitiated.current = false;
+      Alert.alert(
+        'Purchases Restored',
+        'Your subscription has been restored successfully.',
+      );
+    }
+  }, [restoreSubscribed]);
+
+  useEffect(() => {
+    if (restoreError && restoreInitiated.current) {
+      restoreInitiated.current = false;
+      Alert.alert('Restore Purchases', restoreError);
+      clearRestoreError();
+    }
+  }, [restoreError, clearRestoreError]);
 
   const {
     monthlyPriceDisplay,
@@ -276,7 +309,6 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   };
 
   const handleRestorePurchases = async () => {
-    // For iOS subscribers, open Apple's subscription management page.
     if (Platform.OS !== 'ios') {
       Alert.alert(
         'Restore Purchases',
@@ -284,7 +316,12 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
       );
       return;
     }
-    await Linking.openURL(APPLE_SUBSCRIPTIONS_URL);
+    // Restore via StoreKit and sync the receipt server-side through the
+    // restoreApplePurchases mutation. Opening the Apple subscriptions website
+    // (the previous behavior) never restored premium access on this account.
+    clearRestoreError();
+    restoreInitiated.current = true;
+    await restorePurchases();
   };
 
   return (
@@ -660,10 +697,11 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
               </Paragraph>
               <Button
                 theme="alt1"
+                disabled={restoreLoading}
                 onPress={() => void handleRestorePurchases()}
                 borderRadius="$4"
               >
-                Restore Purchases
+                {restoreLoading ? 'Restoring…' : 'Restore Purchases'}
               </Button>
               <Text fontSize="$2" color="$color10" textAlign="center">
                 Subscriptions auto-renew unless canceled at least 24 hours
