@@ -246,13 +246,11 @@ builder.mutationField('initializeDraft', (t) =>
               initialDeadline,
             };
           } else {
-            // Automated: update league status to 'queued' inside the transaction.
-            // SQS send happens after commit (see below).
-            await tx
-              .update(PublicSchema.leagues)
-              .set({ draftStatus: 'queued' })
-              .where(eq(PublicSchema.leagues.id, leagueId));
-
+            // Automated: do NOT set draftStatus='queued' inside the transaction.
+            // If the Lambda is killed (timeout, OOM, SIGTERM) between commit and
+            // SQS send, the catch block below never runs and the league is left
+            // stuck in 'queued' forever with no SQS message ever sent (LS-5074).
+            // Status is set to 'queued' only after the SQS send succeeds.
             return { draft: txDraft, mode: 'automated' as const };
           }
         });
@@ -294,8 +292,15 @@ builder.mutationField('initializeDraft', (t) =>
             );
           }
         } else {
-          // Automated draft: send SQS message now that DB writes are committed.
-          // If SQS fails, a compensating write rolls back the league status.
+          // Automated draft: send the SQS message FIRST, then mark draftStatus
+          // as 'queued'. Previously the status was set inside the transaction
+          // and SQS sent afterward — if the Lambda was killed (timeout/OOM)
+          // between commit and SQS send the league sat in 'queued' forever
+          // with no message ever sent. Reordering eliminates that race
+          // (LS-5074): if SQS fails we leave the league at 'not-started' and
+          // the caller retries; if the status update fails after a successful
+          // SQS send the draft-processor still progresses the league via its
+          // own `updateDraftStatus('in-progress')` call.
           const queueUrl = process.env.SQS_AUTOMATIC_DRAFTS_URL;
           if (!queueUrl) {
             throw new Error(
@@ -315,24 +320,33 @@ builder.mutationField('initializeDraft', (t) =>
             };
             await sqsService.sendStartDraftMessage(message);
           } catch (sqsError) {
-            // Rollback league status if SQS send failed
             LOGGER.error(
-              'SQS send failed, rolling back draft status',
+              'SQS send failed for automated draft',
               sqsError instanceof Error
                 ? sqsError
                 : new Error(String(sqsError)),
               { leagueId },
             );
-            await context.db
-              .update(PublicSchema.leagues)
-              .set({ draftStatus: 'not-started' })
-              .where(eq(PublicSchema.leagues.id, leagueId));
             throw new Error(
               `Failed to queue automated draft: ${
                 sqsError instanceof Error ? sqsError.message : 'Unknown error'
               }`,
             );
           }
+
+          // Mark league as 'queued' only after SQS confirms acceptance.
+          // Conditional on draftStatus='not-started' so we don't clobber an
+          // 'in-progress'/'completed' state if the draft-processor has
+          // already started consuming the message we just sent.
+          await context.db
+            .update(PublicSchema.leagues)
+            .set({ draftStatus: 'queued' })
+            .where(
+              and(
+                eq(PublicSchema.leagues.id, leagueId),
+                eq(PublicSchema.leagues.draftStatus, 'not-started'),
+              ),
+            );
 
           LOGGER.info('Automated draft queued', {
             leagueId,
