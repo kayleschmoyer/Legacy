@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import BaseballHome from './index';
@@ -205,6 +206,52 @@ describe('BaseballHome', () => {
         screen.getByRole('button', { name: 'Create New League' }),
       );
       expect(screen.getByTestId('create-league-modal')).toBeTruthy();
+    });
+  });
+
+  describe('invite modal', () => {
+    let alertSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+      jest.useRealTimers();
+    });
+
+    it('opens when Invite Friends is pressed', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
+      expect(screen.getByPlaceholderText('Email or Phone Number')).toBeTruthy();
+    });
+
+    it('clears the invite setTimeout on unmount to prevent memory leak (LS-5103 regression)', () => {
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      const { unmount } = render(<BaseballHome />);
+
+      // Open modal, fill in email, and start the invite send (starts 2000ms timer)
+      fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Email or Phone Number'),
+        'test@example.com',
+      );
+      fireEvent.press(screen.getByRole('button', { name: 'Send Invite' }));
+
+      // Unmount before 2000ms elapses — the cleanup must cancel the timer
+      unmount();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      // Advancing all timers must NOT trigger the success Alert, confirming
+      // the timer was cancelled and no post-unmount state update occurs.
+      jest.runAllTimers();
+      expect(alertSpy).not.toHaveBeenCalledWith('Success', expect.any(String));
+
+      clearTimeoutSpy.mockRestore();
     });
   });
 });

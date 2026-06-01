@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, ImageBackground, Modal } from 'react-native';
 import { Link } from 'expo-router';
 import {
@@ -22,7 +22,16 @@ export default function BaseballHome() {
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const inviteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userInfo = useAuthorizedUserInfo();
+
+  useEffect(() => {
+    return () => {
+      if (inviteTimeoutRef.current !== null) {
+        clearTimeout(inviteTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const { data, loading: loadingLeagues } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
@@ -41,7 +50,7 @@ export default function BaseballHome() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    inviteTimeoutRef.current = setTimeout(() => {
       setIsLoading(false);
       Alert.alert('Success', `Invite sent to ${emailOrPhone}`);
       closeInviteModal();
