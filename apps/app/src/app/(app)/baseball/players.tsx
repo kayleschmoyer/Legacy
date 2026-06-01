@@ -109,7 +109,7 @@ export default function Players(): React.JSX.Element {
   );
 
   return (
-    <SafeAreaView style={{ backgroundColor: 'lightcyan', flex: 1 }}>
+    <SafeAreaView style={{ backgroundColor: '#0A0F1A', flex: 1 }}>
       <XStack borderTopColor="#333333" borderTopWidth={1}>
         <Button
           alignItems="center"
@@ -122,7 +122,7 @@ export default function Players(): React.JSX.Element {
           borderRadius={0}
           onPress={() => setSelectedView(TableView.BATTING)}
         >
-          <Text color="darkblue" fontSize="$6" fontWeight="bold">
+          <Text color="$color" fontSize="$6" fontWeight="bold">
             Batting
           </Text>
         </Button>
@@ -137,7 +137,7 @@ export default function Players(): React.JSX.Element {
           borderRadius={0}
           onPress={() => setSelectedView(TableView.PITCHING)}
         >
-          <Text color="darkblue" fontSize="$6" fontWeight="bold">
+          <Text color="$color" fontSize="$6" fontWeight="bold">
             Pitching
           </Text>
         </Button>
@@ -152,7 +152,7 @@ export default function Players(): React.JSX.Element {
           borderRadius={0}
           onPress={() => setSelectedView(TableView.FIELDING)}
         >
-          <Text color="darkblue" fontSize="$6" fontWeight="bold">
+          <Text color="$color" fontSize="$6" fontWeight="bold">
             Fielding
           </Text>
         </Button>
