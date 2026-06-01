@@ -45,7 +45,7 @@ These issues appear repeatedly in reviewer bot CHANGES_REQUESTED cycles. Knowing
 | 37  | Weak test assertions (`toBeDefined()` instead of value)          | Assert the concrete expected value, not just existence                                                | Manual                 |
 | 38  | Duplicate constant across packages (DRY violation)               | Define once in a shared lib; import everywhere                                                        | Manual                 |
 | 39  | ⚠️ Committed symlink / local absolute path                       | Check `file <new-file>` before staging; add to `.gitignore`                                           | Manual                 |
-| 40  | `console.*` / `process.stdout.write` in app code                 | Use `LOGGER` from `@legacy-sports/logging` (exceptions: CLI, migrations, build scripts)               | ESLint                 |
+| 40  | `console.*` / `process.stdout.write` in app code                 | Use `LOGGER` from `@legacy-sports/logging` (exceptions: CLI, migrations, build scripts, `scripts/`)   | ESLint                 |
 | 41  | Error message leaked to UI                                       | Show generic string to user; log real error with `LOGGER.error`                                       | Manual                 |
 | 42  | Terraform resource rename without `moved {}` block               | Add `moved { from = old.name; to = new.name }` to avoid destroy+recreate                              | Manual                 |
 | 43  | Shell variable empty after `\|\| true` pattern                   | Provide explicit fallback: `cmd \| echo "default"`                                                    | Manual                 |
@@ -554,7 +554,7 @@ If `git diff --staged` shows a new file entry that is a symlink or contains a Wi
 
 ### #40 — `console.*` / `process.stdout.write` in application code
 
-All application code (lambdas, resolvers, services, React components, libraries) must use `LOGGER` from `@legacy-sports/logging`. The only exceptions are: `lib/logging/` itself, `apps/cli/`, `lib/db-client/src/cli/`, `lib/db-client/src/scripts/`, migration files, and build-time scripts.
+All application code (lambdas, resolvers, services, React components, libraries) must use `LOGGER` from `@legacy-sports/logging`. The only exceptions are: `lib/logging/` itself, `apps/cli/`, `lib/db-client/src/cli/`, `lib/db-client/src/scripts/`, the **top-level `scripts/` directory**, migration files, and build-time scripts.
 
 ```typescript
 // Bad — in a lambda handler, resolver, or shared lib
@@ -567,6 +567,15 @@ import { LOGGER } from '@legacy-sports/logging';
 LOGGER.info('Processing event', { event });
 LOGGER.error('Failed to load config', err as Error);
 ```
+
+**Do NOT flag `console.*` in `scripts/`.** Many scripts there (bootstrap/toolchain glue
+like `preinstall-guard.js`, `modules-pool/*.mjs`, `mcp-mint-token.mjs`) run before
+`node_modules` is installed or outside the workspace dependency graph and therefore
+**cannot import `@legacy-sports/logging`** — `console.*` is the correct and expected
+output mechanism there. The directory is exempt by design (see `AGENTS.md` and
+`scripts/README.md`). Separately: if a `scripts/` file _does_ import `@legacy-sports/*`
+(a data-operation script), the right review note is not "use `LOGGER`" but "this should
+likely be an `apps/cli` command" — see `scripts/README.md` § _Before you add a script_.
 
 **When to check**: any new file in `lambdas/`, `lib/` (non-CLI), or `apps/web/`. `make pc` will catch `console.*` via ESLint but not `process.stdout.write` — check manually in new files.
 
@@ -646,7 +655,7 @@ Before every push, scan your diff against this checklist:
 | Test assertions check concrete values, not just `toBeDefined()`                        | #37           |
 | No constant duplicated across packages — import from shared lib                        | #38           |
 | No committed symlinks or files containing `D:/` / `C:/` local paths                    | #39           |
-| No `console.*` or `process.stdout.write` in non-CLI app code                           | #40           |
+| No `console.*` or `process.stdout.write` in non-CLI app code (`scripts/` is exempt)    | #40           |
 | Error messages shown to users are generic strings, not `err.message`                   | #41           |
 | Terraform resource renames use `moved {}` blocks                                       | #42           |
 | Shell variables have explicit fallbacks after `\|\| true` patterns                     | #43           |

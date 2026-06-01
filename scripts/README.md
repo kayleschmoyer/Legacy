@@ -2,6 +2,50 @@
 
 This directory contains operational and utility scripts for the Legacy Sports application.
 
+## 🧭 Before you add a script: should this be a CLI command?
+
+**Default to a CLI command in [`apps/cli`](../apps/cli), not a script here.** CLI commands
+go through the normal Nx build, type-check, lint, and test pipeline; they are imported
+from `apps/cli/src/main.ts`, get reviewed like any other application code, and can freely
+import workspace packages (`@legacy-sports/db-client`, `@legacy-sports/logging`, etc.).
+Standalone scripts skip most of that — they are easy to write but harder to maintain,
+test, and review, and they tend to rot. When in doubt, **write a CLI command.**
+
+### ✅ Write an `apps/cli` command when the task…
+
+- Performs **data or business operations** — querying, seeding, backfilling, cleanup,
+  deleting, queueing work, reconciling external services (Stripe, SQS, etc.).
+- **Imports workspace packages** (`@legacy-sports/*`) or talks to our database, GraphQL
+  API, or domain services.
+- Is **operator-facing** and likely to be run more than once or by more than one person.
+- Benefits from typed arguments, `--help`, validation, and a spec.
+
+There is already a large, established command set in `apps/cli/src/commands/` (e.g.
+`cleanupTestLeagues`, `seedDevData`, `queryDb`, `investigateLeague13`, `createMatchup`).
+New data/ops tooling belongs alongside those, not in `scripts/`. To add one:
+
+1. Create `apps/cli/src/commands/<command-name>.ts` exporting an async `handle…` function
+   that takes a typed args interface extending `CommandArgs`.
+2. Register it in `apps/cli/src/main.ts` with
+   `program.command('<name>').option(...).action(handler)`.
+3. Use `LOGGER` from `@legacy-sports/logging` for output and add a spec.
+
+### 🚫 Keep it as a script in `scripts/` **only** when the task…
+
+- Must run **before `node_modules` exists or outside the workspace dependency graph** —
+  bootstrap/toolchain glue that therefore **cannot import `@legacy-sports/*`**
+  (e.g. `preinstall-guard.js`, `postinstall-security.js`, `modules-pool/*.mjs`,
+  `mcp-mint-token.mjs`, `mcp-auth.mjs`, `install-git-hooks.js`, `patch-child-process.js`).
+- Is a **platform-specific developer/CI wrapper** with no app logic — the PowerShell and
+  shell helpers for git, AWS, the DB tunnel, and CI simulation (`*.ps1`, `*.sh`).
+- Is **CI / build glue or repo linting** invoked by Make/CI/package.json hooks
+  (`validate-*.js`, `lint-*.js`, `gen-*.js`, `classify-changes.js`).
+- Is a **pure SQL query** (`*.sql`) or a one-off data-parsing helper for an external
+  source (`*.py`).
+
+If a "script" would import `@legacy-sports/*` and could just as easily live in `apps/cli`,
+that is the signal it should be a CLI command instead.
+
 ## ⚠️ CRITICAL: Database Schema Changes
 
 **Scripts in this directory are for DATA operations and utilities ONLY.**
@@ -151,6 +195,21 @@ try {
   process.exit(1);
 }
 ```
+
+### Logging & console output
+
+The repo-wide `no-console` rule (use `LOGGER` from `@legacy-sports/logging`) **does not
+apply to scripts in this directory.** Many scripts here run before `node_modules` is
+installed or otherwise outside the workspace dependency graph, so they **cannot import
+`@legacy-sports/*`** and must use `console.*` (or `process.stdout.write`) for output.
+This is expected — automated reviewers should not flag `console.*` in `scripts/`. See
+[lint-discipline](../.agents/skills/standards/references/lint-discipline.md) and
+[common review pattern #40](../.agents/skills/pr-lifecycle/references/common-review-patterns.md).
+
+If your script **does** import `@legacy-sports/*` (e.g. a TypeScript script that uses
+`@legacy-sports/db-client`), prefer `LOGGER` for consistency — and reconsider whether it
+should be an [`apps/cli` command](#-before-you-add-a-script-should-this-be-a-cli-command)
+instead.
 
 ## 🔍 Finding the Right Tool
 

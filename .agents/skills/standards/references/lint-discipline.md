@@ -10,15 +10,15 @@ This project enforces strict lint discipline. ESLint disable comments (`eslint-d
 
 Always fix the root cause. Common fixes:
 
-| Lint error                                | Fix                                                           |
-| ----------------------------------------- | ------------------------------------------------------------- |
-| `@typescript-eslint/no-unused-vars`       | Prefix with `_` (e.g., `_context`) or remove                  |
-| `@typescript-eslint/no-explicit-any`      | Add a proper type annotation                                  |
-| `@typescript-eslint/no-unsafe-*`          | Add type assertions or generic parameters                     |
-| `@typescript-eslint/no-floating-promises` | Add `await`, `void`, or `.catch()`                            |
-| `no-console`                              | Use `LOGGER` from `@legacy-sports/logging`                    |
-| `react-hooks/exhaustive-deps`             | Add the missing dep or restructure the hook                   |
-| `import/order`                            | Let auto-fix handle it: `pnpm exec nx affected -t lint --fix` |
+| Lint error                                | Fix                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@typescript-eslint/no-unused-vars`       | Prefix with `_` (e.g., `_context`) or remove                                                                                                     |
+| `@typescript-eslint/no-explicit-any`      | Add a proper type annotation                                                                                                                     |
+| `@typescript-eslint/no-unsafe-*`          | Add type assertions or generic parameters                                                                                                        |
+| `@typescript-eslint/no-floating-promises` | Add `await`, `void`, or `.catch()`                                                                                                               |
+| `no-console`                              | Use `LOGGER` from `@legacy-sports/logging` (exempt: `apps/cli/`, `lib/db-client` CLI/scripts, top-level `scripts/`, migrations — see note below) |
+| `react-hooks/exhaustive-deps`             | Add the missing dep or restructure the hook                                                                                                      |
+| `import/order`                            | Let auto-fix handle it: `pnpm exec nx affected -t lint --fix`                                                                                    |
 
 ### 2. Blanket file-level disables are forbidden
 
@@ -63,6 +63,18 @@ const result = sdk.call();
 ### 5. Never use `@ts-ignore`
 
 Use `@ts-expect-error` instead (it fails when the error is fixed, preventing stale suppressions). But even `@ts-expect-error` should only be used after exhausting type-level fixes.
+
+## `no-console` exemptions (no disable needed)
+
+The `no-console` rule does **not** apply to `apps/cli/`, `lib/db-client/src/cli/`,
+`lib/db-client/src/scripts/`, the top-level `scripts/` directory, migration files, or
+build-time scripts. These are configured via ESLint `no-console: off` overrides (or are
+outside any lint project entirely) — **no inline disable is needed.** The top-level
+`scripts/` directory is exempt because many scripts run before `node_modules` is installed
+or outside the workspace dependency graph and therefore cannot import
+`@legacy-sports/logging`. Automated and human reviewers should not flag `console.*` in
+these locations. For when an operational task should be an `apps/cli` command instead of a
+standalone script, see [`scripts/README.md`](../../../../scripts/README.md).
 
 ## Approved Exceptions
 
