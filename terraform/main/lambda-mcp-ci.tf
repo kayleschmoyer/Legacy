@@ -100,6 +100,9 @@ resource "aws_lambda_function" "mcp_ci" {
       # scope check. Without this it defaults to `openid` only and the token
       # would lack the scope (LS-5151).
       MCP_OAUTH_SCOPES = "openid mcp/ci"
+      # owner/repo used by getRepoSlug() — Lambda has no .git dir and no git
+      # binary, so the file-read and execFile fallbacks both fail (LS-5214).
+      GITHUB_REPOSITORY = "bkrupa/legacy-sports"
     }
   }
 

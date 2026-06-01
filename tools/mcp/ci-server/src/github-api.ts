@@ -202,6 +202,12 @@ export async function getToken(): Promise<string> {
 
 /** Parse owner/repo from the git remote origin URL. */
 async function getRepoSlug(): Promise<string> {
+  // In Lambda environments there is no .git directory and git is not on PATH.
+  // GITHUB_REPOSITORY (format: owner/repo) is the authoritative source there
+  // and also aligns with the standard GitHub Actions env var (LS-5214).
+  const envSlug = process.env['GITHUB_REPOSITORY'];
+  if (envSlug) return envSlug;
+
   // Prefer reading `.git/config` directly — avoids `spawn git ENOENT` when
   // the MCP server process is launched without Git on PATH (LS-4599).
   const repoRoot = getRepoRoot();
