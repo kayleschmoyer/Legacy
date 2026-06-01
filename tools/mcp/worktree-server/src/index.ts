@@ -41,6 +41,7 @@ function getMainRepoPath(): string {
   const gitCommonDir = execSync('git rev-parse --git-common-dir', {
     encoding: 'utf-8',
     timeout: 5_000,
+    windowsHide: true,
   }).trim();
   // In the main repo this returns ".git"; in a worktree it returns the absolute
   // path to the main repo's .git directory.
@@ -104,6 +105,7 @@ function restoreActiveWorktree(): string | null {
         cwd: MAIN_REPO,
         encoding: 'utf-8',
         timeout: 5_000,
+        windowsHide: true,
       });
       const knownPaths = porcelain
         .split('\n')
@@ -372,6 +374,7 @@ function getWorktrees(): WorktreeInfo[] {
     cwd: MAIN_REPO,
     encoding: 'utf-8',
     timeout: 10_000,
+    windowsHide: true,
   });
 
   const worktrees: WorktreeInfo[] = [];
@@ -621,6 +624,7 @@ function resolveWindowsShell(): string {
     const whereOutput = execSync('where bash', {
       encoding: 'utf-8',
       timeout: 3_000,
+      windowsHide: true,
     });
     const lines = whereOutput
       .split(/\r?\n/)
@@ -652,6 +656,7 @@ function runGit(
     timeout: opts?.timeout ?? 120_000,
     maxBuffer: 10 * 1024 * 1024,
     env: { ...process.env, ...opts?.env },
+    windowsHide: true,
   });
 }
 
@@ -848,6 +853,7 @@ function run(
     timeout: opts?.timeout ?? 120_000,
     maxBuffer: 10 * 1024 * 1024,
     env: { ...process.env, ...opts?.env },
+    windowsHide: true,
   });
 }
 
@@ -4325,7 +4331,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const remoteInfo = execFileSync(
             'git',
             ['ls-remote', '--exit-code', 'origin', remoteRef],
-            { cwd, encoding: 'utf8', timeout: 30_000 },
+            { cwd, encoding: 'utf8', timeout: 30_000, windowsHide: true },
           ).trim();
           const remoteSha = remoteInfo.split(/\s+/)[0] ?? '';
           remoteConfirmed = remoteSha === pushedFullSha;
@@ -4387,7 +4393,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               const retryRemoteInfo = execFileSync(
                 'git',
                 ['ls-remote', '--exit-code', 'origin', retryRemoteRef],
-                { cwd, encoding: 'utf8', timeout: 30_000 },
+                { cwd, encoding: 'utf8', timeout: 30_000, windowsHide: true },
               ).trim();
               const retryRemoteSha = retryRemoteInfo.split(/\s+/)[0] ?? '';
               retryRemoteConfirmed = retryRemoteSha === retryPushedFullSha;
@@ -7109,6 +7115,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const remotesOutput = execFileSync('git', ['remote'], {
           cwd: MAIN_REPO,
           encoding: 'utf8',
+          windowsHide: true,
         });
         const remotes = remotesOutput
           .split(/\r?\n/)
@@ -7245,6 +7252,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const configuredRemotes = execFileSync('git', ['remote'], {
           cwd,
           encoding: 'utf8',
+          windowsHide: true,
         })
           .split(/\r?\n/)
           .filter((name) => name.length > 0);
@@ -8111,6 +8119,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             encoding: 'utf-8',
             timeout: 60_000,
             maxBuffer: 10 * 1024 * 1024,
+            windowsHide: true,
           },
         );
         results.push(`Removed worktree: ${branch}`);
@@ -8205,6 +8214,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 cwd: MAIN_REPO,
                 encoding: 'utf-8',
                 timeout: 30_000,
+                windowsHide: true,
               });
             } catch {
               // prune failure is non-fatal
@@ -8218,6 +8228,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 encoding: 'utf-8',
                 timeout: 60_000,
                 maxBuffer: 10 * 1024 * 1024,
+                windowsHide: true,
               },
             );
             results.push(
@@ -8330,6 +8341,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             encoding: 'utf-8',
             timeout: 15_000,
             maxBuffer: 10 * 1024 * 1024,
+            windowsHide: true,
           });
           results.push('Pruned stale worktree references.');
         } catch (pruneErr) {
@@ -8461,6 +8473,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             encoding: 'utf-8',
             timeout: 60_000,
             maxBuffer: 10 * 1024 * 1024,
+            windowsHide: true,
           });
           // Clear active worktree state AFTER successful removal (Thread 1 fix).
           if (!('error' in resolved)) {
@@ -8539,6 +8552,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 encoding: 'utf-8',
                 timeout: 60_000,
                 maxBuffer: 10 * 1024 * 1024,
+                windowsHide: true,
               },
             );
             // Clear active worktree state AFTER successful removal (Thread 1 fix).
@@ -10408,6 +10422,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         gitVersion = execFileSync(cmd, ['--version'], {
           encoding: 'utf-8',
           timeout: 5_000,
+          windowsHide: true,
         }).trim();
       } catch (err) {
         gitError = err instanceof Error ? err.message : String(err);
@@ -10421,6 +10436,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           encoding: 'utf-8',
           cwd: MAIN_REPO,
           timeout: 5_000,
+          windowsHide: true,
         });
         worktreeCount = (out.match(/^worktree /gm) ?? []).length;
         worktreeListOk = true;
@@ -10664,7 +10680,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             '--output',
             'json',
           ],
-          { encoding: 'utf-8', timeout: 8_000 },
+          { encoding: 'utf-8', timeout: 8_000, windowsHide: true },
         );
         const parsed = JSON.parse(awsOut) as {
           UserId?: string;

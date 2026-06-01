@@ -174,18 +174,23 @@ async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
   // Fall back to gh CLI token (local dev)
   const token = await new Promise<string>((resolvePromise, reject) => {
     const cmd = process.platform === 'win32' ? 'gh.exe' : 'gh';
-    execFile(cmd, ['auth', 'token'], { timeout: 5_000 }, (err, stdout) => {
-      if (err) {
-        reject(
-          new Error(
-            'No GITHUB_TOKEN env var and `gh auth token` failed. ' +
-              'Set GITHUB_TOKEN or run `gh auth login`.',
-          ),
-        );
-        return;
-      }
-      resolvePromise(stdout.trim());
-    });
+    execFile(
+      cmd,
+      ['auth', 'token'],
+      { timeout: 5_000, windowsHide: true },
+      (err, stdout) => {
+        if (err) {
+          reject(
+            new Error(
+              'No GITHUB_TOKEN env var and `gh auth token` failed. ' +
+                'Set GITHUB_TOKEN or run `gh auth login`.',
+            ),
+          );
+          return;
+        }
+        resolvePromise(stdout.trim());
+      },
+    );
   });
   return { token };
 }
@@ -207,7 +212,7 @@ async function getRepoSlug(): Promise<string> {
       execFile(
         cmd,
         ['remote', 'get-url', 'origin'],
-        { cwd: repoRoot, timeout: 5_000 },
+        { cwd: repoRoot, timeout: 5_000, windowsHide: true },
         (err, stdout) => {
           if (err) {
             reject(new Error(`Failed to get git remote URL: ${err.message}`));

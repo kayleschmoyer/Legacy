@@ -79,6 +79,9 @@ export function runCommand(
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         shell: needsShell,
+        // CREATE_NO_WINDOW: suppress the console window that cmd.exe/powershell.exe
+        // would otherwise flash when spawned from a hidden stdio MCP child on Windows.
+        windowsHide: true,
         ...(env
           ? {
               env: {

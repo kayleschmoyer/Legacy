@@ -32,7 +32,15 @@ export function runCommand(
     execFile(
       command,
       args,
-      { cwd, timeout: timeoutMs, shell, maxBuffer },
+      {
+        cwd,
+        timeout: timeoutMs,
+        shell,
+        maxBuffer,
+        // CREATE_NO_WINDOW: suppress the console window that cmd.exe/powershell.exe
+        // would otherwise flash when spawned from a hidden stdio MCP child on Windows.
+        windowsHide: true,
+      },
       (err, stdout, stderr) => {
         if (err) {
           const parts = [stdout?.trim(), stderr?.trim()].filter(Boolean);
