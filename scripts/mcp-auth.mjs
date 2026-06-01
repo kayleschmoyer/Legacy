@@ -112,6 +112,17 @@ const USER_CLAUDE_JSON_PATH = USER_HOME
 // carries no static credential of its own.
 const MCP_HEADERS_HELPER = 'node scripts/mcp-mint-token.mjs';
 
+// Legacy PKCE OAuth vars written by the old interactive flow (removed in
+// LS-5094). The new machine-credential flow never writes these keys, but any
+// developer who ran the old flow still has them sitting in .env.local and
+// settings files. Purge them on every run (LS-5219).
+const STALE_OAUTH_KEYS = [
+  'MCP_AUTH_TOKEN',
+  'MCP_AUTH_REFRESH_TOKEN',
+  'MCP_AUTH_EXPIRES_AT',
+  'MCP_AUTH_CLIENT_ID',
+];
+
 // Keys mirrored from .env.local into Claude Code settings#/env so that Claude
 // Code spawned from the Claude Desktop GUI (which does not source .env.local)
 // — and Claude Code sessions running in a worktree (which has no project-local
@@ -246,6 +257,49 @@ function writeEnvLocal(updates) {
   }
 
   fs.writeFileSync(ENV_LOCAL_PATH, content);
+}
+
+function purgeEnvLocal(keys) {
+  if (!fs.existsSync(ENV_LOCAL_PATH)) return;
+  let content = fs.readFileSync(ENV_LOCAL_PATH, 'utf8');
+  let changed = false;
+  for (const key of keys) {
+    const re = new RegExp(`^${key}=.*\\n?`, 'm');
+    if (re.test(content)) {
+      content = content.replace(re, '');
+      changed = true;
+    }
+  }
+  if (changed) {
+    fs.writeFileSync(ENV_LOCAL_PATH, content);
+  }
+}
+
+function purgeEnvFromSettingsFile(settingsPath, keys) {
+  if (!fs.existsSync(settingsPath)) return;
+  const raw = fs.readFileSync(settingsPath, 'utf8');
+  if (raw.trim().length === 0) return;
+  let existing;
+  try {
+    existing = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing))
+    return;
+  const envBlock = existing['env'];
+  if (!envBlock || typeof envBlock !== 'object' || Array.isArray(envBlock))
+    return;
+  let changed = false;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(envBlock, key)) {
+      delete envBlock[key];
+      changed = true;
+    }
+  }
+  if (changed) {
+    fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + '\n');
+  }
 }
 
 // ── Claude Code settings read/write ──────────────────────────────────────────
@@ -397,6 +451,15 @@ function printDivider() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // ── Step 0: purge stale legacy PKCE OAuth vars (LS-5219) ─────────────────
+  // The old interactive flow (removed in LS-5094) wrote these keys; the new
+  // machine-credential flow never reads them. Remove them from all three
+  // target files so they don't mislead agents or developers.
+  purgeEnvLocal(STALE_OAUTH_KEYS);
+  if (USER_CLAUDE_SETTINGS_PATH)
+    purgeEnvFromSettingsFile(USER_CLAUDE_SETTINGS_PATH, STALE_OAUTH_KEYS);
+  purgeEnvFromSettingsFile(CLAUDE_SETTINGS_PATH, STALE_OAUTH_KEYS);
+
   const env = readEnvLocal();
 
   // Terraform environment (default dev; override via MCP_TF_ENV or --env flag)

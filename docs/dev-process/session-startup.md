@@ -53,7 +53,7 @@ The pre-fix code already polled for `node_modules/.bin/tsx` for up to 3 seconds 
 Once the launcher has loaded `.env.local` and expanded `${MCP_*}` placeholders, it spawns each server in [`.mcp.json`](../../.mcp.json). There are two flavors:
 
 - **7 stdio servers** (`worktree`, `legacy-sports-make`, `legacy-sports-nx`, `legacy-sports-db`, `legacy-sports-ci-local`, `legacy-sports-aws`, `legacy-sports-browser`) start with `node .github/copilot/hooks/mcp-bootstrap.mjs node --import tsx tools/mcp/<srv>/src/index.ts`. The bootstrap shim only repairs the `node_modules` symlink if needed; **it does not read `.env.local`**, so it cannot race with symlink setup the way the precondition check did.
-- **3 URL servers** (`legacy-sports-jira`, `legacy-sports-github`, `legacy-sports-ci`) connect via Streamable HTTP to the MCP HTTP API Gateways at `${MCP_JIRA_URL}`, `${MCP_GITHUB_URL}`, `${MCP_CI_URL}`. Their `Authorization` header is produced at each (re)connect by the `headersHelper` command in [`.mcp.json`](../../.mcp.json) (`node scripts/mcp-mint-token.mjs`), which mints a short-lived, per-server-scoped Cognito `client_credentials` token from the locally-held machine secret (epic LS-5089, Track A — the legacy static `${MCP_AUTH_TOKEN}` ID-token header is still dual-accepted server-side during migration, removal tracked in LS-5094). If the launcher's env lacks the `${MCP_*_URL}` values or the machine credential at spawn time, the servers come up unauthenticated — recovery is `node scripts/mcp-auth.mjs` (or `--setup` the first time) followed by a session restart. (Claude Code on the web uses neither path — it reaches these servers via OAuth custom connectors registered in claude.ai; see [`.agents/skills/cloud-agent-mode/SKILL.md`](../../.agents/skills/cloud-agent-mode/SKILL.md) and the [MCP Connector Access Guide](./mcp-connector-access.md) for how to get a Cognito user account and connect the three connectors.)
+- **3 URL servers** (`legacy-sports-jira`, `legacy-sports-github`, `legacy-sports-ci`) connect via Streamable HTTP to the MCP HTTP API Gateways at `${MCP_JIRA_URL}`, `${MCP_GITHUB_URL}`, `${MCP_CI_URL}`. Their `Authorization` header is produced at each (re)connect by the `headersHelper` command in [`.mcp.json`](../../.mcp.json) (`node scripts/mcp-mint-token.mjs`), which mints a short-lived, per-server-scoped Cognito `client_credentials` token from the locally-held machine secret (epic LS-5089, Track A). If the launcher's env lacks the `${MCP_*_URL}` values or the machine credential at spawn time, the servers come up unauthenticated — recovery is `node scripts/mcp-auth.mjs` (or `--setup` the first time) followed by a session restart. (Claude Code on the web uses neither path — it reaches these servers via OAuth custom connectors registered in claude.ai; see [`.agents/skills/cloud-agent-mode/SKILL.md`](../../.agents/skills/cloud-agent-mode/SKILL.md) and the [MCP Connector Access Guide](./mcp-connector-access.md) for how to get a Cognito user account and connect the three connectors.)
 
 The `mcp-bootstrap.mjs` audit performed alongside LS-4505 confirmed it touches only `node_modules` (no `.env.local` read). The race described in this doc is **purely** about the SessionStart hook ordering; bootstrap is unaffected.
 
@@ -61,17 +61,25 @@ The `mcp-bootstrap.mjs` audit performed alongside LS-4505 confirmed it touches o
 
 Real warnings (post-LS-4505) mean what they say. Walk the checklist:
 
-| Warning                                               | Cause                                                                                                   | First fix to try                                                                 |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `node_modules/.bin/tsx is missing`                    | Symlink absent, broken, or the pool slot is unhealthy                                                   | `node scripts/modules-pool/link.mjs` from worktree root (or `make install`)      |
-| `.mcp.json not found`                                 | `CLAUDE_PROJECT_DIR` not set to the worktree path                                                       | Restart Claude Code from inside the worktree                                     |
-| `mcp-bootstrap.mjs missing`                           | File deleted from working tree                                                                          | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`                   |
-| `MCP_AUTH_TOKEN not set in .env.local`                | `.env.local` is missing, malformed, or the token row is absent                                          | `node scripts/mcp-auth.mjs --setup` then restart                                 |
-| `MCP_AUTH_TOKEN has expired` / `expires in N minutes` | OIDC JWT past its lifetime                                                                              | `node scripts/mcp-auth.mjs` then restart                                         |
-| `MCP_*_URL not set in .env.local`                     | API Gateway URL not written by terraform                                                                | `node scripts/mcp-auth.mjs` (runs `terraform apply` first when URLs are missing) |
-| `.env.local not found`                                | Main repo has no `.env.local` (cold-start case), or the worktree's symlink-creation legitimately failed | Check `<main-repo>/.env.local` exists, then `node scripts/modules-pool/link.mjs` |
+| Warning                            | Cause                                                                                                   | First fix to try                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `node_modules/.bin/tsx is missing` | Symlink absent, broken, or the pool slot is unhealthy                                                   | `node scripts/modules-pool/link.mjs` from worktree root (or `make install`)      |
+| `.mcp.json not found`              | `CLAUDE_PROJECT_DIR` not set to the worktree path                                                       | Restart Claude Code from inside the worktree                                     |
+| `mcp-bootstrap.mjs missing`        | File deleted from working tree                                                                          | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`                   |
+| `MCP_*_URL not set in .env.local`  | API Gateway URL not written by terraform                                                                | `node scripts/mcp-auth.mjs` (runs `terraform apply` first when URLs are missing) |
+| `.env.local not found`             | Main repo has no `.env.local` (cold-start case), or the worktree's symlink-creation legitimately failed | Check `<main-repo>/.env.local` exists, then `node scripts/modules-pool/link.mjs` |
 
 The full diagnostic checklist (including pre-flight `auth_check_all` and the report-don't-fall-back protocol) is [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md).
+
+## One-time migration for existing developers (LS-5219)
+
+If you ran the old interactive PKCE flow before LS-5094, your `.env.local` and Claude Code settings files may still contain stale vars (`MCP_AUTH_TOKEN`, `MCP_AUTH_REFRESH_TOKEN`, `MCP_AUTH_EXPIRES_AT`, `MCP_AUTH_CLIENT_ID`). Run the following once after pulling to purge them and refresh your machine credential:
+
+```bash
+node scripts/mcp-auth.mjs --force
+```
+
+`mcp-auth.mjs` now removes those keys automatically on every run (LS-5219), so no further action is required after this one-time cleanup.
 
 ## See also
 
