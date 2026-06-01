@@ -184,7 +184,11 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
           <YStack padding="$5" gap="$4">
             {/* Avatar + Name Summary */}
             <XStack gap="$4" alignItems="center">
-              <YStack onPress={() => setShowAvatarPicker(!showAvatarPicker)}>
+              <YStack
+                onPress={() => setShowAvatarPicker(!showAvatarPicker)}
+                accessibilityRole="button"
+                accessibilityLabel="Edit avatar"
+              >
                 <AvatarImage
                   url={avatarUrl}
                   username={userName}
@@ -457,6 +461,8 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
             borderBottomColor="$borderColor"
             onPress={() => router.navigate('subscription-settings')}
             pressStyle={{ backgroundColor: '$gray3' }}
+            accessibilityRole="button"
+            accessibilityLabel="Subscription and billing settings"
           >
             <YStack
               width={36}

@@ -279,6 +279,8 @@ function LeagueFreeAgents({
           color="$blue10"
           fontSize="$4"
           pressStyle={{ opacity: 0.7 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Back to ${leagueName}`}
         >
           <ChevronLeft size={16} color="$blue10" /> {leagueName}
         </Text>
@@ -318,6 +320,9 @@ function LeagueFreeAgents({
               color={position === pos ? 'white' : '$gray11'}
               fontSize="$2"
               fontWeight={position === pos ? '700' : '500'}
+              accessibilityRole="button"
+              accessibilityLabel={pos === 'ALL' ? 'All positions' : pos}
+              accessibilityState={{ selected: position === pos }}
             >
               {pos}
             </Text>
@@ -422,6 +427,8 @@ export default function FreeAgentsScreen() {
                   name: league.name ?? 'League',
                 })
               }
+              accessibilityRole="button"
+              accessibilityLabel={`Browse free agents for ${league.name ?? 'League'}`}
             >
               <XStack alignItems="center" gap="$3">
                 <YStack

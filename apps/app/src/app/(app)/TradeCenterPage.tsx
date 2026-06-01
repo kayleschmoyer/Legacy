@@ -18,7 +18,12 @@ function BackButton({
   label: string;
 }) {
   return (
-    <Pressable onPress={onPress} style={{ opacity: 1 }}>
+    <Pressable
+      onPress={onPress}
+      style={{ opacity: 1 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
       <XStack alignItems="center" gap="$1">
         <ChevronLeft size={16} color="$blue10" />
         <Text color="$blue10" fontSize="$4">
@@ -230,6 +235,8 @@ export default function TradeCenterPage() {
                   owner: league.owner ?? null,
                 })
               }
+              accessibilityRole="button"
+              accessibilityLabel={`Open trade center for ${league.name ?? 'League'}`}
             >
               <XStack alignItems="center" justifyContent="space-between">
                 <XStack alignItems="center" gap="$3" flex={1}>
