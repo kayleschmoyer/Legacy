@@ -206,4 +206,76 @@ describe('useIsPremiumStatus', () => {
     } as never);
     expect(refetch).not.toHaveBeenCalled();
   });
+
+  describe('checkout redirect refetch', () => {
+    function setLocationSearch(search: string) {
+      Object.defineProperty(window, 'location', {
+        value: { search },
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        value: { search: '' },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('refetches on mount when ?checkout=success is in the URL', () => {
+      setLocationSearch('?checkout=success&session_id=cs_123');
+
+      const refetch = jest.fn().mockResolvedValue({});
+      useAuth.mockReturnValue({
+        user: { id: 42, accessLevel: 'user' },
+        isLoading: false,
+      });
+      useGetUserByIdQuery.mockReturnValue({
+        data: { user: { id: 42, subscriptionTier: 'free' } },
+        loading: false,
+        refetch,
+      });
+
+      renderHook(() => useIsPremiumStatus());
+
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not refetch on mount when ?checkout=success is absent', () => {
+      setLocationSearch('');
+
+      const refetch = jest.fn().mockResolvedValue({});
+      useAuth.mockReturnValue({
+        user: { id: 42, accessLevel: 'user' },
+        isLoading: false,
+      });
+      useGetUserByIdQuery.mockReturnValue({
+        data: { user: { id: 42, subscriptionTier: 'free' } },
+        loading: false,
+        refetch,
+      });
+
+      renderHook(() => useIsPremiumStatus());
+
+      expect(refetch).not.toHaveBeenCalled();
+    });
+
+    it('does not refetch on mount when ?checkout=success is present but user is not authed', () => {
+      setLocationSearch('?checkout=success');
+
+      const refetch = jest.fn().mockResolvedValue({});
+      useAuth.mockReturnValue({ user: undefined, isLoading: false });
+      useGetUserByIdQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+        refetch,
+      });
+
+      renderHook(() => useIsPremiumStatus());
+
+      expect(refetch).not.toHaveBeenCalled();
+    });
+  });
 });

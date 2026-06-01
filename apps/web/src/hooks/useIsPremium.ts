@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
@@ -29,6 +29,10 @@ export function useIsPremium(): boolean {
  * without that context (no live socket available), we fall back to refetching
  * on window focus so a Stripe state change is picked up the next time the
  * tab regains focus instead of being silently missed.
+ *
+ * Additionally, if the hook mounts while `?checkout=success` is present in
+ * the URL (Stripe same-tab redirect flow), it immediately refetches so the
+ * premium badge updates without waiting for a focus or WebSocket event.
  */
 export function useIsPremiumStatus(): {
   isPremium: boolean;
@@ -61,9 +65,25 @@ export function useIsPremiumStatus(): {
     [userId, refetch],
   );
 
+  // Capture at mount whether we landed from a Stripe same-tab redirect.
+  // We use a ref so the flag stays true even after the page navigates away
+  // the checkout query params (which happens before userId may be available).
+  const isCheckoutRedirect = useRef(
+    new URLSearchParams(window.location.search).get('checkout') === 'success',
+  );
+
   useLeagueWebSocket({
     onSubscriptionUpdated: () => refetchSafely('SUBSCRIPTION_UPDATED'),
   });
+
+  // Immediately refetch after a same-tab Stripe checkout redirect so the
+  // premium badge updates without waiting for a focus event. Runs as soon as
+  // refetchSafely stabilises (i.e. userId is available); the ref ensures the
+  // URL check survives the navigate() that cleans up the query param.
+  useEffect(() => {
+    if (!isCheckoutRedirect.current) return;
+    refetchSafely('checkout redirect');
+  }, [refetchSafely]);
 
   // Fallback for pages outside LeagueWebSocketContext: refetch when the tab
   // regains focus so we never silently miss a Stripe state change.
