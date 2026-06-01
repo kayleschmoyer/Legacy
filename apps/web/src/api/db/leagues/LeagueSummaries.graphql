@@ -19,9 +19,14 @@ fragment UserLeagueSummary on UserLeagueSummary {
   totalMatchups
   matchupId
   matchupStatus
+  matchupEndTime
   userScore
   opponentScore
   opponentTeamName
+  eraFilter
+  customEraStartYear
+  customEraEndYear
+  isCommissioner
 }
 
 query GetUserLeagueSummaries {

@@ -4438,13 +4438,18 @@ export type UserDataExport = {
 export type UserLeagueSummary = {
   __typename?: 'UserLeagueSummary';
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
   draftMode?: Maybe<Scalars['String']['output']>;
   draftScheduledAt?: Maybe<Scalars['String']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
+  isCommissioner?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   leagueName?: Maybe<Scalars['String']['output']>;
   leaguePhase?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
+  matchupEndTime?: Maybe<Scalars['String']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
   matchupStatus?: Maybe<Scalars['String']['output']>;
   opponentScore?: Maybe<Scalars['Float']['output']>;

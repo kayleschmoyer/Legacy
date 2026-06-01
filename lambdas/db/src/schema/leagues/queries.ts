@@ -1234,6 +1234,17 @@ builder.queryField('leagueTradeBlock', (t) =>
 
 // ── UserLeagueSummary type ────────────────────────────────────────────────────
 
+/**
+ * Derives the dashboard `isCommissioner` flag from a league_members
+ * permission level. Only the explicit 'commissioner' role qualifies — GMs and
+ * assistant managers do not, and a missing/unknown level is treated as false.
+ */
+export function deriveIsCommissioner(
+  permissionLevel: string | null | undefined,
+): boolean {
+  return permissionLevel === 'commissioner';
+}
+
 type UserLeagueSummaryShape = {
   leagueId: number;
   leagueName: string;
@@ -1255,9 +1266,14 @@ type UserLeagueSummaryShape = {
   totalMatchups: number | null;
   matchupId: number | null;
   matchupStatus: string | null;
+  matchupEndTime: string | null;
   userScore: number | null;
   opponentScore: number | null;
   opponentTeamName: string | null;
+  eraFilter: string | null;
+  customEraStartYear: number | null;
+  customEraEndYear: number | null;
+  isCommissioner: boolean;
 };
 
 const UserLeagueSummary =
@@ -1287,9 +1303,14 @@ builder.objectType(UserLeagueSummary, {
     totalMatchups: t.exposeInt('totalMatchups', { nullable: true }),
     matchupId: t.exposeInt('matchupId', { nullable: true }),
     matchupStatus: t.exposeString('matchupStatus', { nullable: true }),
+    matchupEndTime: t.exposeString('matchupEndTime', { nullable: true }),
     userScore: t.exposeFloat('userScore', { nullable: true }),
     opponentScore: t.exposeFloat('opponentScore', { nullable: true }),
     opponentTeamName: t.exposeString('opponentTeamName', { nullable: true }),
+    eraFilter: t.exposeString('eraFilter', { nullable: true }),
+    customEraStartYear: t.exposeInt('customEraStartYear', { nullable: true }),
+    customEraEndYear: t.exposeInt('customEraEndYear', { nullable: true }),
+    isCommissioner: t.exposeBoolean('isCommissioner'),
   }),
 });
 
@@ -1320,7 +1341,11 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           currentWeek: PublicSchema.leagues.currentWeek,
           totalMatchups: PublicSchema.leagues.totalMatchups,
           seasonNumber: PublicSchema.leagues.seasonNumber,
+          baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+          customEraStartYear: PublicSchema.leagues.customEraStartYear,
+          customEraEndYear: PublicSchema.leagues.customEraEndYear,
           userTeamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
         })
         .from(PublicSchema.leagues)
         .innerJoin(
@@ -1406,6 +1431,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
         opponentTeamId: number | null;
         matchupId: number | null;
         matchupStatus: string | null;
+        matchupEndTime: string | null;
       };
 
       const partials: PartialSummary[] = leagues.map((league) => {
@@ -1419,10 +1445,12 @@ builder.queryField('getUserLeagueSummaries', (t) =>
         let opponentTeamId: number | null = null;
         let matchupId: number | null = null;
         let matchupStatus: string | null = null;
+        let matchupEndTime: string | null = null;
 
         if (matchupRow && league.userTeamId != null) {
           matchupId = matchupRow.id;
           matchupStatus = matchupRow.status;
+          matchupEndTime = matchupRow.endTime ?? null;
           const isTeam1 = matchupRow.team1Id === league.userTeamId;
           userScore = isTeam1
             ? matchupRow.team1Score != null
@@ -1448,6 +1476,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           opponentTeamId,
           matchupId,
           matchupStatus,
+          matchupEndTime,
         };
       });
 
@@ -1480,6 +1509,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           opponentTeamId,
           matchupId,
           matchupStatus,
+          matchupEndTime,
         } = partial;
         const draftRow = draftMap.get(league.id) ?? null;
         const standings = standingsMap.get(league.id) ?? null;
@@ -1514,9 +1544,14 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           totalMatchups: league.totalMatchups,
           matchupId,
           matchupStatus,
+          matchupEndTime,
           userScore,
           opponentScore,
           opponentTeamName,
+          eraFilter: league.baseballEraFilter,
+          customEraStartYear: league.customEraStartYear,
+          customEraEndYear: league.customEraEndYear,
+          isCommissioner: deriveIsCommissioner(league.permissionLevel),
         } satisfies UserLeagueSummaryShape;
       });
     },
@@ -1549,7 +1584,11 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
           currentWeek: PublicSchema.leagues.currentWeek,
           totalMatchups: PublicSchema.leagues.totalMatchups,
           seasonNumber: PublicSchema.leagues.seasonNumber,
+          baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+          customEraStartYear: PublicSchema.leagues.customEraStartYear,
+          customEraEndYear: PublicSchema.leagues.customEraEndYear,
           userTeamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
         })
         .from(PublicSchema.leagues)
         .innerJoin(
@@ -1613,9 +1652,14 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
             totalMatchups: league.totalMatchups,
             matchupId: null,
             matchupStatus: null,
+            matchupEndTime: null,
             userScore: null,
             opponentScore: null,
             opponentTeamName: null,
+            eraFilter: league.baseballEraFilter,
+            customEraStartYear: league.customEraStartYear,
+            customEraEndYear: league.customEraEndYear,
+            isCommissioner: deriveIsCommissioner(league.permissionLevel),
           } satisfies UserLeagueSummaryShape;
         }),
       );

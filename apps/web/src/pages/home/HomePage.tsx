@@ -5,6 +5,11 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Spinner, styled, Text } from 'tamagui';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import { formatDraftDate } from '@legacy-sports/utils';
+import {
+  formatEraDescriptor,
+  formatEraYears,
+  formatMatchupCloses,
+} from './homeSummaryFormatters';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import {
@@ -15,6 +20,7 @@ import {
 import { PageMeta } from '../../components/PageMeta';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
+  useGetArchivedUserLeagueSummariesQuery,
   useGetUserLeagueSummariesQuery,
   type UserLeagueSummaryFragment,
 } from '../../api/db/graphql.generated';
@@ -699,6 +705,24 @@ function LeagueHeroCard({
           {summary.leagueName ?? 'League'}
         </h3>
 
+        {/* Italic editorial sub-line: era descriptor */}
+        {(() => {
+          const eraDesc = formatEraDescriptor(summary);
+          return eraDesc ? (
+            <p
+              style={{
+                fontFamily: 'Literata, Georgia, serif',
+                fontStyle: 'italic',
+                fontSize: 15,
+                color: TEXT_SECONDARY,
+                margin: 0,
+              }}
+            >
+              {eraDesc}
+            </p>
+          ) : null;
+        })()}
+
         {/* Footer meta */}
         <div
           style={{
@@ -744,6 +768,19 @@ function LeagueHeroCard({
               </span>
             </>
           )}
+          {hasMatchup &&
+            (() => {
+              const closes = formatMatchupCloses(summary.matchupEndTime);
+              return closes ? (
+                <>
+                  <span style={{ color: TEXT_SEPARATOR }}>·</span>
+                  <span>
+                    Matchup closes{' '}
+                    <b style={{ color: TEXT_INTERFACE }}>{closes}</b>
+                  </span>
+                </>
+              ) : null;
+            })()}
         </div>
 
         {/* Actions */}
@@ -926,18 +963,26 @@ function LeagueListRow({
         >
           {summary.leagueName ?? 'League'}
         </div>
-        {summary.teamCount != null && (
-          <div
-            style={{
-              fontFamily: 'Literata, Georgia, serif',
-              fontStyle: 'italic',
-              fontSize: 13,
-              color: TEXT_SECONDARY,
-            }}
-          >
-            {summary.teamCount} teams
-          </div>
-        )}
+        {(() => {
+          const years = formatEraYears(summary);
+          const parts: string[] = [];
+          if (years) parts.push(years);
+          if (summary.teamCount != null)
+            parts.push(`${summary.teamCount} teams`);
+          if (summary.isCommissioner) parts.push('You commission this one');
+          return parts.length > 0 ? (
+            <div
+              style={{
+                fontFamily: 'Literata, Georgia, serif',
+                fontStyle: 'italic',
+                fontSize: 13,
+                color: TEXT_SECONDARY,
+              }}
+            >
+              {parts.join(' · ')}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {/* Phase chip + row action */}
@@ -1700,6 +1745,31 @@ function ErrorCard({
             </svg>
             Retry
           </button>
+          <a
+            href={`mailto:support@legacysports.com?subject=${encodeURIComponent(`Homepage load failure (${reference ?? 'unknown'})`)}&body=${encodeURIComponent(
+              `Reference: ${reference ?? 'unknown'}\nOccurred: ${
+                occurredAt ? formatUtcTime(occurredAt) : 'unknown'
+              }\n\nWhat I was doing when this happened:\n`,
+            )}`}
+            style={{
+              fontFamily: 'Big Shoulders Display, system-ui',
+              fontWeight: 700,
+              fontSize: 13,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              padding: '11px 20px',
+              borderRadius: 12,
+              background: 'transparent',
+              color: TEXT_INTERFACE,
+              border: `1px solid ${BORDER_STRONG}`,
+              cursor: 'pointer',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            Report this issue
+          </a>
         </div>
       </div>
     </section>
@@ -1809,6 +1879,17 @@ export function HomePage(): React.JSX.Element {
     useGetArchivedUserLeagueSummariesLazyQuery({
       fetchPolicy: 'cache-and-network',
     });
+
+  // Cache-only read so the toggle can show "Show N archived leagues" when the
+  // archived query has already been resolved (this session, or rehydrated
+  // cache). Returns undefined data without firing a network request when the
+  // cache is cold — keeping the homepage to a single round-trip on first load.
+  const { data: archivedCachedData } = useGetArchivedUserLeagueSummariesQuery({
+    skip: !auth?.user,
+    fetchPolicy: 'cache-only',
+  });
+  const cachedArchivedCount =
+    archivedCachedData?.getArchivedUserLeagueSummaries?.length ?? null;
 
   const handleShowArchived = useCallback(() => {
     setShowArchived(true);
@@ -2211,7 +2292,9 @@ export function HomePage(): React.JSX.Element {
                       >
                         <path d="M6 9l6 6 6-6" />
                       </svg>
-                      Show archived leagues
+                      {cachedArchivedCount != null
+                        ? `Show ${cachedArchivedCount} archived ${cachedArchivedCount === 1 ? 'league' : 'leagues'}`
+                        : 'Show archived leagues'}
                     </button>
                   ) : archivedLoading ? (
                     <XStack gap="$2" alignItems="center" marginTop="$4">

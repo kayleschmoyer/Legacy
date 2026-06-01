@@ -4453,13 +4453,18 @@ Dashboard summary combining league phase, draft state, standings, and current ma
 """
 type UserLeagueSummary {
   currentWeekNumber: Int
+  customEraEndYear: Int
+  customEraStartYear: Int
   draftMode: String
   draftScheduledAt: String
   draftStatus: String
+  eraFilter: String
+  isCommissioner: Boolean
   leagueId: Int
   leagueName: String
   leaguePhase: String
   losses: Int
+  matchupEndTime: String
   matchupId: Int
   matchupStatus: String
   opponentScore: Float

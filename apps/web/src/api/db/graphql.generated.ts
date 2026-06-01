@@ -4438,13 +4438,18 @@ export type UserDataExport = {
 export type UserLeagueSummary = {
   __typename?: 'UserLeagueSummary';
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
   draftMode?: Maybe<Scalars['String']['output']>;
   draftScheduledAt?: Maybe<Scalars['String']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
+  isCommissioner?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   leagueName?: Maybe<Scalars['String']['output']>;
   leaguePhase?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
+  matchupEndTime?: Maybe<Scalars['String']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
   matchupStatus?: Maybe<Scalars['String']['output']>;
   opponentScore?: Maybe<Scalars['Float']['output']>;
@@ -5523,9 +5528,14 @@ export type UserLeagueSummaryFragment = {
   totalMatchups?: number | null;
   matchupId?: number | null;
   matchupStatus?: string | null;
+  matchupEndTime?: string | null;
   userScore?: number | null;
   opponentScore?: number | null;
   opponentTeamName?: string | null;
+  eraFilter?: string | null;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
+  isCommissioner?: boolean | null;
 };
 
 export type GetUserLeagueSummariesQueryVariables = Exact<{
@@ -5556,9 +5566,14 @@ export type GetUserLeagueSummariesQuery = {
     totalMatchups?: number | null;
     matchupId?: number | null;
     matchupStatus?: string | null;
+    matchupEndTime?: string | null;
     userScore?: number | null;
     opponentScore?: number | null;
     opponentTeamName?: string | null;
+    eraFilter?: string | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    isCommissioner?: boolean | null;
   }>;
 };
 
@@ -5590,9 +5605,14 @@ export type GetArchivedUserLeagueSummariesQuery = {
     totalMatchups?: number | null;
     matchupId?: number | null;
     matchupStatus?: string | null;
+    matchupEndTime?: string | null;
     userScore?: number | null;
     opponentScore?: number | null;
     opponentTeamName?: string | null;
+    eraFilter?: string | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    isCommissioner?: boolean | null;
   }>;
 };
 
@@ -10043,9 +10063,14 @@ export const UserLeagueSummaryFragmentDoc = gql`
     totalMatchups
     matchupId
     matchupStatus
+    matchupEndTime
     userScore
     opponentScore
     opponentTeamName
+    eraFilter
+    customEraStartYear
+    customEraEndYear
+    isCommissioner
   }
 `;
 export const LeagueMemberFragmentDoc = gql`
