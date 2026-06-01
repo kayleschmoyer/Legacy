@@ -498,6 +498,62 @@ export async function postKnownLlmFailureReview({
 }
 
 /**
+ * Post an APPROVE review when the review-bot-override label was applied.
+ * Skips LLM analysis entirely — posts a direct APPROVE from the bot account
+ * with a note explaining the override. Requires the same env vars as
+ * postRealReview.
+ *
+ * @param {number} prNumber
+ */
+export async function postOverrideApproveReview(prNumber) {
+  const appId = process.env.REVIEWER_BOT_APP_ID;
+  const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
+
+  if (!appId || !privateKeyPem) {
+    throw new Error(
+      'REVIEWER_BOT_APP_ID and REVIEWER_BOT_APP_PRIVATE_KEY must be set for live review mode',
+    );
+  }
+
+  const repoEnv = process.env.GITHUB_REPOSITORY;
+  if (!repoEnv || !repoEnv.includes('/')) {
+    throw new Error(
+      'GITHUB_REPOSITORY env var is required for live review mode',
+    );
+  }
+  const [owner, repo] = repoEnv.split('/');
+
+  const body =
+    '> [!NOTE]\n' +
+    '> The `review-bot-override` label was applied by a maintainer — this review was automatically approved without running the LLM review pass.\n\n' +
+    'LGTM — override applied.';
+
+  const jwt = mintAppJwt(appId, privateKeyPem);
+  const installToken = await getInstallationToken(jwt, owner, repo);
+
+  execFileSync(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+      '--input',
+      '-',
+    ],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ body, event: 'APPROVE', comments: [] }),
+      env: { ...process.env, GH_TOKEN: installToken },
+    },
+  );
+
+  process.stdout.write(
+    `[reviewer] Override-approve review posted on PR #${prNumber}\n`,
+  );
+}
+
+/**
  * @param {string} kind
  * @param {object} details
  * @returns {{ body: string, event: 'REQUEST_CHANGES' }}

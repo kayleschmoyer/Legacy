@@ -23,6 +23,7 @@ import {
   postInfraErrorReview,
   postKnownLlmFailureReview,
   addLabelAsApp,
+  postOverrideApproveReview,
 } from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 import { withRetry } from './lib/retry.mjs';
@@ -172,6 +173,48 @@ async function main() {
     process.stderr.write(
       `[reviewer] Failed to set bot-review pending: ${err instanceof Error ? err.message : String(err)}\n`,
     );
+  }
+
+  // --- Auto-approve path: review-bot-override label ---
+  // Skip LLM review entirely and post APPROVE directly. The commit status,
+  // merge-when-ready label, and operational label cleanup all run on this path
+  // as on the normal APPROVED path.
+  if (process.env.REVIEWER_AUTO_APPROVE === 'true') {
+    process.stdout.write(
+      '[reviewer] Auto-approve: review-bot-override label detected — skipping LLM review\n',
+    );
+    try {
+      setCommitStatus(sha, 'success', 'Review passed (override)');
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review success: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    try {
+      await postOverrideApproveReview(prNumber);
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to post override-approve review: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    try {
+      addLabel(prNumber, 'merge-when-ready');
+      process.stdout.write(
+        `[reviewer] Added 'merge-when-ready' label to PR #${prNumber}\n`,
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to add label 'merge-when-ready': ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    try {
+      cleanupOperationalLabels(prNumber, { preserveReadyLabel: true });
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to clean up operational labels: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    return;
   }
 
   // --- Cycle counter (T22) ---

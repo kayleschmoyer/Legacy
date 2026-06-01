@@ -3,6 +3,7 @@ name: Reviewer (W1)
 # Posts a real GitHub PR review as the Code Reviewer Bot installation.
 # critical/high findings → REQUEST_CHANGES (blocks merge); clean → APPROVE.
 # Fires on opened/ready_for_review; on labeled for specific labels (G10);
+# on labeled for review-bot-override (auto-approve — skips LLM review);
 # and on synchronize when bot:ready-for-review is present so agents don't
 # need to re-apply the label after each push to trigger a new cycle.
 
@@ -22,17 +23,18 @@ jobs:
   review:
     # Skip drafts, fork PRs, labeled events for irrelevant labels, and
     # synchronize events when bot:ready-for-review is not present.
-    # Also skip when review-bot-override is present — W5 owns the bot-review
-    # status in that case and the reviewer must not overwrite it.
+    # When review-bot-override is labeled, fire in auto-approve mode (no LLM
+    # review). For all other triggers, skip when review-bot-override is present.
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      !contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
-      (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
-       github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
-       github.event.label.name == 'bot:ready-for-review' ||
-       github.event.label.name == 'review-bot-degraded' ||
-       github.event.label.name == 'bot:reset-cycle-counter')
+      (github.event.label.name == 'review-bot-override' ||
+       (!contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
+        (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
+         github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
+         github.event.label.name == 'bot:ready-for-review' ||
+         github.event.label.name == 'review-bot-degraded' ||
+         github.event.label.name == 'bot:reset-cycle-counter')))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,6 +69,7 @@ jobs:
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
+          REVIEWER_AUTO_APPROVE: ${{ github.event.label.name == 'review-bot-override' && 'true' || '' }}
           CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
           TRIGGERED_BY_SYNCHRONIZE: ${{ github.event.action == 'synchronize' && 'true' || '' }}
         run: |
