@@ -39,6 +39,17 @@ The "cloud agent" label covers three distinct configurations with very different
 1. Look at the deferred-tools `<system-reminder>`. If `mcp__legacy-sports-make__*`, `mcp__legacy-sports-nx__*`, `mcp__worktree__*` are absent → no Copilot-style hosted toolchain → default CC web.
 2. Call `jira_auth_status` (worktree/legacy-sports-jira). If the tool itself is unavailable → no custom Jira server → default CC web. If it returns `configured: false` or fetch fails → see [Quirk 1](#quirk-1-legacy-sports-jira-mcp-server-fetch-failed-claude-code-on-the-web-only).
 3. If both 1 and 2 indicate missing custom servers → switch to the degraded-mode workflow.
+4. **If the `mcp__legacy-sports-{jira,github,ci}__*` tools _are_ present in a Claude Code on the web session**, they arrived via the OAuth custom-connector path (see below), not via project `.mcp.json`. Treat the session as fully-configured CC web (column 2 of the matrix) and use the MCP-first workflow.
+
+### Claude Code web custom remote connectors (OAuth) — LS-5089 Track B
+
+> **Posture change (epic LS-5089, Phase 3 / LS-5096).** The three hosted servers (`legacy-sports-jira`, `legacy-sports-github`, `legacy-sports-ci`) are now reachable from **Claude Code on the web** as **custom remote MCP connectors** registered in claude.ai. This supersedes the older "CC web is structurally excluded" framing: CC web still does **not** read project `.mcp.json` and its connector UI still exposes **no static-bearer field**, but the Lambdas now implement the MCP OAuth 2.0 Authorization spec (Protected Resource Metadata + `401`/`WWW-Authenticate` challenge — LS-5095), so the OAuth-only connector UI is sufficient.
+
+**How it works:**
+
+- **Registration is owner-only and out-of-band.** A claude.ai **Org Owner** registers each server's API Gateway URL under **Org settings → Connectors** (Settings → Connectors on Free/Pro/Max). Agents **cannot** perform this step — it is a human, browser-driven action in claude.ai. Once registered, the connector **auto-syncs into Claude Code** for anyone logged in with the same account, so the `mcp__legacy-sports-*` tools appear in CC-web sessions without any `.mcp.json` or token configuration.
+- **Auth is OAuth, not the machine credential.** CC web drives the interactive OAuth consent flow (human in a browser) against Cognito; the per-connect `headersHelper` machine-token model used locally/Copilot (Track A) does **not** apply in CC web. The MCP Gateways stay publicly reachable with OAuth-only authorization (no Anthropic-IP allowlist).
+- **Residual limitation — re-consent on token expiry.** Claude Code does **not** auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). A CC-web session that outlives the OAuth access token must **re-consent via `/mcp`** to keep reaching the three servers; there is no silent refresh today. This is an upstream gap we design around, not a server bug — surface it to the user rather than retrying or falling back. (Local/Copilot sessions are immune because Track A re-mints a short-lived token at every connect; see `mcp-diagnostics`.)
 
 **Cloud workflow (MCP-first — Copilot Coding Agent or fully-configured CC web):**
 
