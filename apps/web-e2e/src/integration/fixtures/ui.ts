@@ -10,7 +10,10 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { assertJwtNotExpired, JwtExpiredError } from '../../utils/jwt';
-import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
+import {
+  getSpecUserJwt,
+  specSlugFromTestInfo,
+} from '../../utils/test-user-auth';
 
 /**
  * Fixtures for live-backend UI E2E tests.
@@ -22,15 +25,19 @@ import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
  *        for local debugging or ad-hoc runs against a specific user)
  *     2. The CLI token store at `~/.legacy-sports/auth.json` (local dev — run
  *        `./ls-cli.ps1 auth login` before running these tests)
- *     3. `getTestUserJwt(TEST_USERS.COMMISSIONER)` — logs in (or registers)
- *        the E2E commissioner user via the OAuth proxy using
- *        `E2E_COMMISSIONER_EMAIL` / `E2E_COMMISSIONER_PASSWORD`. This is the
- *        path used by the nightly CI workflow.
+ *     3. `getSpecUserJwt('COMMISSIONER', <specSlug>)` — registers/logs in a
+ *        **per-spec unique** commissioner derived from the test file name
+ *        (e.g. `commissioner-league-activity-feed-ui@test.legacysports.dev`),
+ *        using `E2E_COMMISSIONER_PASSWORD` as the shared password. This is
+ *        the path used by the nightly CI workflow and avoids the Cognito 429
+ *        collision that surfaced when every spec re-used the same email
+ *        (LS-4940).
  *
- *   Manager JWTs are obtained by logging in each `TEST_USERS.MANAGER_*`
- *   user directly via `getTestUserJwt`. No admin impersonation is used —
- *   each manager has its own credentials provisioned via `E2E_MANAGER_*_EMAIL`
- *   and `E2E_MANAGER_*_PASSWORD` env vars (see `utils/test-user-auth.ts`).
+ *   Manager JWTs are obtained the same way — `getSpecUserJwt('MANAGER_N',
+ *   <specSlug>)` — so each spec gets its own manager identities. No admin
+ *   impersonation is used. The persona passwords still come from the
+ *   `E2E_COMMISSIONER_PASSWORD` / `E2E_MANAGER_*_PASSWORD` env vars; only the
+ *   email is derived from the spec file.
  *
  *   Tests can swap tokens in cookies/localStorage via `switchUser()` to act
  *   as different users within one browser context.
@@ -157,9 +164,10 @@ interface CliAuthData {
 
 /**
  * Read the admin JWT from the CLI auth store (~/.legacy-sports/auth.json).
- * Falls back to INTEGRATION_JWT env var for CI, or registers a local test user.
+ * Falls back to INTEGRATION_JWT env var for CI, or registers a per-spec
+ * unique test commissioner (LS-4940).
  */
-async function getAuthJwt(): Promise<string> {
+async function getAuthJwt(testInfo: TestInfo): Promise<string> {
   if (process.env.INTEGRATION_JWT) {
     const jwt = process.env.INTEGRATION_JWT;
     assertJwtNotExpired(jwt, 'INTEGRATION_JWT env var');
@@ -183,12 +191,12 @@ async function getAuthJwt(): Promise<string> {
       }
     } catch (err) {
       if (err instanceof JwtExpiredError) throw err;
-      // Fall through to local register
+      // Fall through to per-spec register
     }
   }
 
-  // No CLI auth or env var — register/login a test commissioner via local auth
-  return getTestUserJwt(TEST_USERS.COMMISSIONER);
+  // No CLI auth or env var — register/login a per-spec unique commissioner.
+  return getSpecUserJwt('COMMISSIONER', specSlugFromTestInfo(testInfo));
 }
 
 /**
@@ -247,7 +255,7 @@ async function withTracedContext(
 
 export const test = base.extend<UIIntegrationFixtures>({
   commissionerPage: async ({ browser }, use, testInfo) => {
-    const jwt = await getAuthJwt();
+    const jwt = await getAuthJwt(testInfo);
     await withTracedContext(
       browser,
       { baseURL: WEB_BASE, storageState: buildIntegrationStorageState(jwt) },
@@ -257,21 +265,27 @@ export const test = base.extend<UIIntegrationFixtures>({
     );
   },
 
-  commissionerJwt: async ({}, use) => {
-    await use(await getAuthJwt());
+  commissionerJwt: async ({}, use, testInfo) => {
+    await use(await getAuthJwt(testInfo));
   },
 
-  managerJwt1: async ({}, use) => {
-    // Register/login manager directly — no admin impersonation needed
-    await use(await getTestUserJwt(TEST_USERS.MANAGER_1));
+  managerJwt1: async ({}, use, testInfo) => {
+    // Per-spec unique manager identity (LS-4940).
+    await use(
+      await getSpecUserJwt('MANAGER_1', specSlugFromTestInfo(testInfo)),
+    );
   },
 
-  managerJwt2: async ({}, use) => {
-    await use(await getTestUserJwt(TEST_USERS.MANAGER_2));
+  managerJwt2: async ({}, use, testInfo) => {
+    await use(
+      await getSpecUserJwt('MANAGER_2', specSlugFromTestInfo(testInfo)),
+    );
   },
 
-  managerJwt3: async ({}, use) => {
-    await use(await getTestUserJwt(TEST_USERS.MANAGER_3));
+  managerJwt3: async ({}, use, testInfo) => {
+    await use(
+      await getSpecUserJwt('MANAGER_3', specSlugFromTestInfo(testInfo)),
+    );
   },
 
   managerPage1: async ({ browser, managerJwt1 }, use, testInfo) => {

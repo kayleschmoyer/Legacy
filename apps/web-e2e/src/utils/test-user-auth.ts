@@ -8,7 +8,14 @@
  *
  * Usage:
  *   const jwt = await getTestUserJwt({ email: 'mgr1@test.ls', password: 'test-pass-1' });
+ *
+ * For per-spec unique identities (avoids Cognito 429s when multiple specs
+ * share a persona — LS-4940), use `getSpecUserJwt(persona, specSlug)` with
+ * `specSlug = specSlugFromTestInfo(testInfo)`.
  */
+
+import type { TestInfo } from '@playwright/test';
+import { createHash } from 'crypto';
 
 /**
  * Predefined test users for integration tests.
@@ -93,12 +100,18 @@ function sleep(ms: number): Promise<void> {
  * fetch() wrapper that retries on HTTP 429 (rate limited) with exponential
  * backoff. All other status codes are returned immediately.
  *
- * Backoff schedule (maxAttempts=4): no wait → 1 s → 2 s → 4 s, then give up.
+ * Backoff schedule (maxAttempts=7): no wait → 1 s → 2 s → 4 s → 8 s → 16 s → 32 s,
+ * total ~63 s — enough to outlast the OAuth proxy's 60 s rate-limit window
+ * (5 requests / minute per IP per route, see
+ * `lambdas/oauth-proxy/src/index.ts`'s `AUTH_RATE_LIMIT`). Per-spec unique
+ * emails (LS-4940) avoid per-identity contention; this retry covers the
+ * per-IP throttle so back-to-back integration runs from the same host don't
+ * fail when the auth-route bucket fills.
  */
 async function fetchWithRateLimitRetry(
   url: string,
   options: RequestInit,
-  maxAttempts = 4,
+  maxAttempts = 7,
 ): Promise<Response> {
   let last!: Response;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -199,4 +212,84 @@ async function registerOrLogin(
 /** Clear the JWT cache (useful between test suites if needed). */
 export function clearTestUserCache(): void {
   jwtCache.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Per-spec unique test users (LS-4940)
+//
+// Multiple integration specs that share a fixed persona email (commissioner@,
+// manager2@, ...) collide on Cognito login during nightly shard fan-out and
+// hit `429 Too many requests`. The fix is one Cognito identity per spec file:
+// the spec slug is derived from the test's file path, so the same spec uses
+// the same identity across runs (per-test afterAll cleanup still works) but
+// different specs never share a login.
+// ---------------------------------------------------------------------------
+
+export type Persona = 'COMMISSIONER' | 'MANAGER_1' | 'MANAGER_2' | 'MANAGER_3';
+
+const PERSONA_PREFIX: Record<Persona, string> = {
+  COMMISSIONER: 'commissioner',
+  MANAGER_1: 'manager1',
+  MANAGER_2: 'manager2',
+  MANAGER_3: 'manager3',
+};
+
+/**
+ * Derive a stable, unique test-user email per spec file. Format:
+ *   `<persona>-<8charHash>@test.legacysports.dev`
+ *
+ * The 8-char hex hash is derived from the spec slug (deterministic across
+ * runs). Hashing is needed because the underlying `users.username` column is
+ * `varchar(50)` and the raw spec slug (e.g. `league-activity-feed-ui`) pushes
+ * `commissioner-<slug>@test.legacysports.dev` past the limit.
+ *
+ * The domain matches `ALLOWED_TEST_EMAIL_PATTERNS` in global-setup.ts so the
+ * cleanup safety guard still recognises these as test users.
+ */
+export function specUserEmail(persona: Persona, specSlug: string): string {
+  const hash = createHash('sha256').update(specSlug).digest('hex').slice(0, 8);
+  return `${PERSONA_PREFIX[persona]}-${hash}@test.legacysports.dev`;
+}
+
+/**
+ * Stable slug from a Playwright TestInfo (file basename, no extension).
+ * Example: `league-activity-feed-ui.integration.spec.ts` → `league-activity-feed-ui`.
+ *
+ * The slug feeds into `specUserEmail`'s hash — it is never embedded directly
+ * in the email, so length here is unconstrained.
+ */
+export function specSlugFromTestInfo(testInfo: TestInfo): string {
+  const base = testInfo.file.split(/[\\/]/).pop() ?? 'unknown';
+  return base
+    .replace(/\.integration\.spec\.ts$/, '')
+    .replace(/\.spec\.ts$/, '')
+    .replace(/[^a-z0-9-]/gi, '-')
+    .toLowerCase();
+}
+
+/**
+ * Get a JWT for a per-spec unique test user (LS-4940). The user is
+ * auto-registered on first use by the OAuth proxy; the same spec file
+ * deterministically reuses the same identity across runs so per-test
+ * afterAll cleanup remains coherent.
+ *
+ * The password is shared with the base persona credentials
+ * (E2E_COMMISSIONER_PASSWORD / E2E_MANAGER_N_PASSWORD) — same secret, new
+ * email per spec.
+ */
+export async function getSpecUserJwt(
+  persona: Persona,
+  specSlug: string,
+): Promise<string> {
+  const base = TEST_USERS[persona];
+  if (!base.password) {
+    throw new Error(
+      `Test user password missing for ${persona} — set E2E_${persona}_PASSWORD ` +
+        `(or the matching manager env var) in your .env.e2e / CI secrets.`,
+    );
+  }
+  return getTestUserJwt({
+    email: specUserEmail(persona, specSlug),
+    password: base.password,
+  });
 }

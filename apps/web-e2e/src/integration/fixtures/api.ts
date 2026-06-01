@@ -1,9 +1,16 @@
-import { type APIRequestContext, test as base } from '@playwright/test';
+import {
+  type APIRequestContext,
+  test as base,
+  type TestInfo,
+} from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { assertJwtNotExpired, JwtExpiredError } from '../../utils/jwt';
-import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
+import {
+  getSpecUserJwt,
+  specSlugFromTestInfo,
+} from '../../utils/test-user-auth';
 
 export interface IntegrationFixtures {
   api: APIRequestContext;
@@ -22,7 +29,7 @@ interface CliAuthData {
   defaultUser: string;
 }
 
-async function getAuthJwt(): Promise<string> {
+async function getAuthJwt(testInfo: TestInfo): Promise<string> {
   if (process.env.INTEGRATION_JWT_COMMISSIONER) {
     const jwt = process.env.INTEGRATION_JWT_COMMISSIONER;
     assertJwtNotExpired(jwt, 'INTEGRATION_JWT_COMMISSIONER env var');
@@ -46,17 +53,21 @@ async function getAuthJwt(): Promise<string> {
       }
     } catch (err) {
       if (err instanceof JwtExpiredError) throw err;
-      // Fall through to local register
+      // Fall through to per-spec register
     }
   }
 
-  return getTestUserJwt(TEST_USERS.COMMISSIONER);
+  // Per-spec unique commissioner (LS-4940 — avoids 429 collision across shards).
+  return getSpecUserJwt('COMMISSIONER', specSlugFromTestInfo(testInfo));
 }
 
 export const test = base.extend<IntegrationFixtures>({
-  api: async ({ playwright }, use) => {
-    // Register/login manager 1 directly — no admin impersonation needed
-    const jwt = await getTestUserJwt(TEST_USERS.MANAGER_1);
+  api: async ({ playwright }, use, testInfo) => {
+    // Per-spec unique manager 1 identity (LS-4940).
+    const jwt = await getSpecUserJwt(
+      'MANAGER_1',
+      specSlugFromTestInfo(testInfo),
+    );
 
     const api = await playwright.request.newContext({
       baseURL: GQL_BASE,
@@ -69,8 +80,11 @@ export const test = base.extend<IntegrationFixtures>({
     await api.dispose();
   },
 
-  api2: async ({ playwright }, use) => {
-    const jwt = await getTestUserJwt(TEST_USERS.MANAGER_2);
+  api2: async ({ playwright }, use, testInfo) => {
+    const jwt = await getSpecUserJwt(
+      'MANAGER_2',
+      specSlugFromTestInfo(testInfo),
+    );
 
     const api2 = await playwright.request.newContext({
       baseURL: GQL_BASE,
@@ -83,8 +97,8 @@ export const test = base.extend<IntegrationFixtures>({
     await api2.dispose();
   },
 
-  apiCommissioner: async ({ playwright }, use) => {
-    const jwt = await getAuthJwt();
+  apiCommissioner: async ({ playwright }, use, testInfo) => {
+    const jwt = await getAuthJwt(testInfo);
 
     const api = await playwright.request.newContext({
       baseURL: GQL_BASE,

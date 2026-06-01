@@ -52,6 +52,27 @@ pnpm exec nx integration web-e2e -- --grep='Flow Name'
 
 See [`.agents/skills/testing/references/integration-commands.md`](../../.agents/skills/testing/references/integration-commands.md) for credentials and setup details.
 
+#### Per-spec unique test users (LS-4940)
+
+Integration fixtures (`src/integration/fixtures/{ui,api}.ts`) derive each spec's commissioner and manager identities from the spec file name rather than re-using a single shared persona email. Each email embeds an 8-char SHA-256 hash of the spec slug — for `league-activity-feed-ui.integration.spec.ts` (slug `league-activity-feed-ui`, hash `b6d61c69`) the logins are:
+
+```
+commissioner-b6d61c69@test.legacysports.dev
+manager1-b6d61c69@test.legacysports.dev
+manager2-b6d61c69@test.legacysports.dev
+manager3-b6d61c69@test.legacysports.dev
+```
+
+`specSlugFromTestInfo(testInfo)` in [`src/utils/test-user-auth.ts`](src/utils/test-user-auth.ts) returns `<file basename minus extension>`, lowercase; `specUserEmail` hashes it. The hash exists because the underlying `users.username` column is `varchar(50)` and the raw slug would overflow (e.g. `commissioner-league-activity-feed-ui@test.legacysports.dev` is 58 chars). The password is shared across personas via the existing `E2E_<PERSONA>_PASSWORD` env vars — only the email is unique.
+
+**Why**: every spec sharing the same fixed email (`commissioner@test.legacysports.dev`, `manager2@test.legacysports.dev`, ...) hit `429 Too many requests` from Cognito during nightly shard fan-out — both initial login and post-registration login failed back-to-back. Per-spec identities eliminate the collision: each Cognito identity sees at most one login per shard.
+
+**Stable across runs**: the slug is derived from the file path only (not run-id or worker index), so the same spec re-uses the same identity on every run. Per-test `afterAll` cleanup continues to work because each spec's commissioner only ever owns that spec's league(s).
+
+**Adding a new integration spec**: there is nothing to wire up — request `commissionerJwt` / `commissionerPage` / `managerJwt{1,2,3}` from the `ui` fixtures (or `api` / `api2` / `apiCommissioner` from the `api` fixtures) as before; the fixture transparently derives the per-spec identity from `testInfo`.
+
+**Overrides**: `INTEGRATION_JWT` (UI fixtures) / `INTEGRATION_JWT_COMMISSIONER` (API fixtures) still short-circuit the per-spec commissioner with a pre-issued JWT, and the local CLI auth store (`~/.legacy-sports/auth.json`) still wins over the per-spec path for local debugging. The per-spec path is the nightly-CI fallback.
+
 #### Reviewer evidence: the `run:integration` label (LS-4617)
 
 The reviewer bot expects structured evidence for any touched integration spec because the suite does not run on PRs by default. Apply the **`run:integration`** label to a PR to dispatch [`.github/workflows/run-integration-tests.yml`](../../.github/workflows/run-integration-tests.yml):
