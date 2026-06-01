@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, count, eq, sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import {
   DEFAULT_ROSTER_POSITIONS_BY_SPORT,
@@ -101,6 +101,12 @@ export interface CreateLeagueOptions {
   scoringFormat?: 'standard' | 'half_ppr' | 'ppr';
   /** Number of games per matchup week. Defaults to 5. Per-sport max: baseball 162, football 17. */
   gamesPerMatchup?: number;
+  /**
+   * If set, the insert is guarded by a per-user advisory lock that atomically
+   * checks this limit before proceeding. Throws 'LEAGUE_LIMIT_EXCEEDED' if the
+   * user already has >= leagueLimit non-mock leagues.
+   */
+  leagueLimit?: number;
 }
 
 export interface CreateLeagueResult {
@@ -195,6 +201,7 @@ export class LeagueService {
       startDate,
       scoringFormat = 'ppr',
       gamesPerMatchup,
+      leagueLimit,
     } = input;
 
     const maxRosterSize =
@@ -219,6 +226,28 @@ export class LeagueService {
       const inviteCode = await this.generateUniqueInviteCode(db);
 
       const result = await db.transaction(async (tx) => {
+        // 0. Enforce free-tier league limit atomically.
+        //    The advisory lock serializes concurrent create requests for the
+        //    same user so the count check and INSERT form a single critical
+        //    section, eliminating the TOCTOU race (LS-5122).
+        if (leagueLimit !== undefined) {
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(CAST(${ownerId} AS bigint))`,
+          );
+          const [{ existingCount }] = await tx
+            .select({ existingCount: count() })
+            .from(PublicSchema.leagues)
+            .where(
+              and(
+                eq(PublicSchema.leagues.owner, ownerId),
+                eq(PublicSchema.leagues.isMockDraft, false),
+              ),
+            );
+          if (existingCount >= leagueLimit) {
+            throw new Error('LEAGUE_LIMIT_EXCEEDED');
+          }
+        }
+
         // 1. Insert league
         const [league] = await tx
           .insert(PublicSchema.leagues)

@@ -13,7 +13,7 @@ import {
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   DEFAULT_ROSTER_POSITIONS_BY_SPORT,
@@ -255,22 +255,14 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
       // ── Feature-entitlement gating ──────────────────────────────────────────
       // Enforce max 3 non-mock leagues unless the user has unlimited_leagues.
-      if (!(await hasEntitlement(context, ENTITLEMENTS.unlimited_leagues))) {
-        const [{ leagueCount }] = await context.db
-          .select({ leagueCount: count() })
-          .from(PublicSchema.leagues)
-          .where(
-            and(
-              eq(PublicSchema.leagues.owner, userId),
-              eq(PublicSchema.leagues.isMockDraft, false),
-            ),
-          );
-        if (leagueCount >= 3) {
-          throw PremiumRequiredError(
-            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
-          );
-        }
-      }
+      // The limit is enforced atomically inside leagueService.createLeague()
+      // via a pg_advisory_xact_lock, eliminating the TOCTOU race (LS-5122).
+      const leagueLimit = (await hasEntitlement(
+        context,
+        ENTITLEMENTS.unlimited_leagues,
+      ))
+        ? undefined
+        : 3;
 
       if (inputWaiverType === 'faab') {
         await requireEntitlement(
@@ -467,10 +459,19 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           ...(inputGamesPerMatchup != null
             ? { gamesPerMatchup: inputGamesPerMatchup }
             : {}),
+          leagueLimit,
         });
 
         return result;
       } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === 'LEAGUE_LIMIT_EXCEEDED'
+        ) {
+          throw PremiumRequiredError(
+            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
+          );
+        }
         if (error instanceof GraphQLError) {
           throw error;
         }
@@ -965,22 +966,14 @@ builder.mutationField('createLeague', (t) =>
       const userId = context.user.id;
 
       // ── Premium feature gating: max 3 leagues for free tier ──────────────
-      if (!(await hasEntitlement(context, ENTITLEMENTS.unlimited_leagues))) {
-        const [{ leagueCount }] = await context.db
-          .select({ leagueCount: count() })
-          .from(PublicSchema.leagues)
-          .where(
-            and(
-              eq(PublicSchema.leagues.owner, userId),
-              eq(PublicSchema.leagues.isMockDraft, false),
-            ),
-          );
-        if (leagueCount >= 3) {
-          throw PremiumRequiredError(
-            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
-          );
-        }
-      }
+      // The limit is enforced atomically inside leagueService.createLeague()
+      // via a pg_advisory_xact_lock, eliminating the TOCTOU race (LS-5122).
+      const leagueLimit = (await hasEntitlement(
+        context,
+        ENTITLEMENTS.unlimited_leagues,
+      ))
+        ? undefined
+        : 3;
 
       const maxRosterSize = args.maxRosterSize ?? 25;
 
@@ -991,14 +984,24 @@ builder.mutationField('createLeague', (t) =>
           ownerUsername: context.user.username || 'User',
           sport: args.sport ?? 'baseball',
           maxRosterSize,
+          leagueLimit,
         });
 
         return result.league;
       } catch (error) {
-        LOGGER.error('Error creating league', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        if (
+          error instanceof Error &&
+          error.message === 'LEAGUE_LIMIT_EXCEEDED'
+        ) {
+          throw PremiumRequiredError(
+            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
+          );
+        }
+        LOGGER.error(
+          'Error creating league',
+          error instanceof Error ? error : new Error(String(error)),
+          { userId },
+        );
         throw new Error(
           `Failed to create league: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
