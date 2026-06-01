@@ -534,6 +534,7 @@ export default function FootballPlayers(): React.JSX.Element {
           data={allNodes}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <PlayerRow player={item} />}
+          windowSize={10}
           contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
           ListEmptyComponent={
             !loading ? (
