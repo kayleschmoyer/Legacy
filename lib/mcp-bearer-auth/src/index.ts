@@ -1,4 +1,4 @@
-// Bearer-token validation for the HTTP MCP server Lambdas.
+// Bearer-token validation for the HTTP MCP server Lambdas (github / jira / ci).
 //
 // Why this lives in the Lambda instead of the API Gateway JWT authorizer:
 // API Gateway's built-in JWT authorizer responds to invalid/expired tokens
@@ -9,18 +9,21 @@
 // follow-up to LS-4874). Doing validation here lets us return a
 // well-formed JSON-RPC error the client can surface verbatim.
 //
-// This file is intentionally duplicated across the three URL MCP servers
-// (github, jira, ci) — they have no shared workspace package today and the
-// 80-line auth helper isn't worth the lockfile / nx-graph churn to factor
-// out. Keep the three copies in sync when editing.
+// This module is the single shared source for all three URL MCP servers
+// (github, jira, ci). It previously existed as three byte-identical copies
+// under tools/mcp/{github,jira,ci}-server/src/mcp-bearer-auth.ts; they were
+// consolidated here (LS-5091, RFC AC-X1/GAP-3). Each server imports it via
+// the `@legacy-sports/mcp-bearer-auth` path alias and passes its own
+// per-server scope.
 
 import {
   createLocalJWKSet,
   createRemoteJWKSet,
   errors as joseErrors,
+  type JSONWebKeySet,
+  type JWTPayload,
   jwtVerify,
   type JWTVerifyGetKey,
-  type JSONWebKeySet,
 } from 'jose';
 import type {
   APIGatewayProxyEventV2,
@@ -30,17 +33,50 @@ import type {
 /** JSON-RPC error code reserved for MCP auth failure (server-defined range). */
 export const MCP_AUTH_ERROR_CODE = -32001;
 
+/**
+ * The per-server resource-server scopes a machine (`client_credentials`)
+ * access token must carry to reach each server. Fixed by the RFC
+ * (LS-5088); a token bearing only another server's scope is rejected.
+ */
+export const MCP_SCOPE = {
+  github: 'mcp/github',
+  jira: 'mcp/jira',
+  ci: 'mcp/ci',
+} as const;
+
 const RECOVERY_HINT =
-  "Run 'node scripts/mcp-auth.mjs' to refresh MCP_AUTH_TOKEN in .env.local, then restart your Claude Code session.";
+  "Run 'node scripts/mcp-auth.mjs' to refresh the MCP credential in .env.local, then restart your Claude Code session.";
+
+/**
+ * Which token shapes the server accepts. Controlled per-environment via the
+ * `MCP_AUTH_MODE` env var so we can flip with zero downtime (RFC Phase 1/2):
+ *   - `legacy`  — only the user ID token (`aud` = legacy public client id).
+ *   - `machine` — only the machine access token (carries this server's scope).
+ *   - `dual`    — accept either (the migration default).
+ */
+export type AuthMode = 'legacy' | 'machine' | 'dual';
 
 export interface AuthConfig {
   issuer: string;
-  audience: string;
+  /**
+   * Legacy public-client id that a user ID token's `aud` must match. Required
+   * when legacy acceptance is enabled (`legacy` or `dual` mode).
+   */
+  legacyAudience?: string;
+  /** This server's own resource-server scope, e.g. `mcp/github`. */
+  requiredScope: string;
+  /** Which token shapes to accept. */
+  mode: AuthMode;
 }
 
 export interface AuthFailure {
   code: number;
   message: string;
+}
+
+export interface AuthenticateOptions {
+  /** This server's own resource-server scope, e.g. `MCP_SCOPE.github`. */
+  requiredScope: string;
 }
 
 /**
@@ -106,8 +142,49 @@ function classifyVerifyError(err: unknown): AuthFailure {
 }
 
 /**
+ * Scopes carried by a Cognito `client_credentials` access token. Cognito
+ * emits them as a space-delimited `scope` string; we also tolerate the
+ * `scp` array form used by some OIDC providers for defensiveness.
+ */
+function tokenScopes(payload: JWTPayload): string[] {
+  const scope = payload['scope'];
+  if (typeof scope === 'string') return scope.split(' ').filter(Boolean);
+  const scp: unknown = payload['scp'];
+  if (Array.isArray(scp)) {
+    return scp.filter((s: unknown): s is string => typeof s === 'string');
+  }
+  return [];
+}
+
+function audienceMatches(payload: JWTPayload, audience: string): boolean {
+  const aud = payload.aud;
+  if (typeof aud === 'string') return aud === audience;
+  if (Array.isArray(aud)) return aud.includes(audience);
+  return false;
+}
+
+function notAuthorizedReason(config: AuthConfig): string {
+  switch (config.mode) {
+    case 'machine':
+      return `token not authorized for this server (requires scope '${config.requiredScope}')`;
+    case 'legacy':
+      return 'token audience not accepted for this server';
+    case 'dual':
+      return `token not authorized for this server (requires scope '${config.requiredScope}' or a valid legacy audience)`;
+  }
+}
+
+/**
  * Verify a token against a pre-built JWKS getter. Exposed for tests that
  * inject a local JWKS via `createLocalJWKSet`.
+ *
+ * The signature, issuer, and `exp` are always verified. Authorization then
+ * depends on `config.mode`:
+ *   - a machine access token is accepted when it carries `requiredScope`;
+ *   - a legacy user ID token is accepted when its `aud` matches
+ *     `legacyAudience`.
+ * A token that verifies cryptographically but carries only another server's
+ * scope (and no matching legacy audience) is rejected.
  */
 export async function verifyBearerToken(
   headers: Record<string, string | undefined> | undefined,
@@ -116,15 +193,33 @@ export async function verifyBearerToken(
 ): Promise<AuthFailure | null> {
   const parsed = readBearer(headers);
   if ('code' in parsed) return parsed;
+
+  let payload: JWTPayload;
   try {
-    await jwtVerify(parsed.token, jwks, {
+    // No `audience` option here: machine access tokens carry no `aud`, so we
+    // verify signature/issuer/exp first and check audience/scope by mode below.
+    ({ payload } = await jwtVerify(parsed.token, jwks, {
       issuer: config.issuer,
-      audience: config.audience,
-    });
-    return null;
+    }));
   } catch (err) {
     return classifyVerifyError(err);
   }
+
+  const acceptMachine = config.mode === 'machine' || config.mode === 'dual';
+  const acceptLegacy = config.mode === 'legacy' || config.mode === 'dual';
+
+  if (acceptMachine && tokenScopes(payload).includes(config.requiredScope)) {
+    return null;
+  }
+  if (
+    acceptLegacy &&
+    config.legacyAudience !== undefined &&
+    audienceMatches(payload, config.legacyAudience)
+  ) {
+    return null;
+  }
+
+  return failure(notAuthorizedReason(config));
 }
 
 let cachedJwks: JWTVerifyGetKey | null = null;
@@ -138,18 +233,32 @@ function getRemoteJwks(issuer: string): JWTVerifyGetKey {
   return cachedJwks;
 }
 
-function readConfigFromEnv(): AuthConfig | AuthFailure {
+function parseAuthMode(raw: string | undefined): AuthMode | AuthFailure {
+  if (raw === undefined || raw === '') return 'dual';
+  if (raw === 'legacy' || raw === 'machine' || raw === 'dual') return raw;
+  return failure(
+    `MCP server misconfigured: MCP_AUTH_MODE must be 'legacy', 'machine', or 'dual' (got '${raw}')`,
+  );
+}
+
+function readConfigFromEnv(requiredScope: string): AuthConfig | AuthFailure {
   const issuer = process.env['MCP_COGNITO_ISSUER'];
-  const audience = process.env['MCP_COGNITO_AUDIENCE'];
-  if (!issuer)
+  if (!issuer) {
     return failure(
       'MCP server misconfigured: MCP_COGNITO_ISSUER env var not set',
     );
-  if (!audience)
+  }
+  const mode = parseAuthMode(process.env['MCP_AUTH_MODE']);
+  if (typeof mode !== 'string') return mode;
+
+  const legacyAudience = process.env['MCP_COGNITO_AUDIENCE'];
+  const acceptLegacy = mode === 'legacy' || mode === 'dual';
+  if (acceptLegacy && !legacyAudience) {
     return failure(
       'MCP server misconfigured: MCP_COGNITO_AUDIENCE env var not set',
     );
-  return { issuer, audience };
+  }
+  return { issuer, legacyAudience, requiredScope, mode };
 }
 
 /**
@@ -176,17 +285,22 @@ export function isFunctionUrlInvocation(
 
 /**
  * Authenticate an incoming Lambda request. Returns `null` when the request
- * is permitted (valid Cognito bearer, OR Function URL invocation already
- * authenticated by SigV4); otherwise returns a well-formed JSON-RPC error
- * response the handler should return immediately without invoking any tools.
+ * is permitted (valid Cognito bearer for this server, OR Function URL
+ * invocation already authenticated by SigV4); otherwise returns a
+ * well-formed JSON-RPC error response the handler should return immediately
+ * without invoking any tools.
+ *
+ * `options.requiredScope` is the calling server's own scope (e.g.
+ * `MCP_SCOPE.github`); it is what a machine token must carry to be accepted.
  */
 export async function authenticateMcpRequest(
   event: Pick<APIGatewayProxyEventV2, 'requestContext' | 'headers'>,
+  options: AuthenticateOptions,
 ): Promise<APIGatewayProxyResultV2 | null> {
   if (isFunctionUrlInvocation(event)) return null;
-  const config = readConfigFromEnv();
+  const config = readConfigFromEnv(options.requiredScope);
   if ('code' in config) {
-    // Missing MCP_COGNITO_ISSUER / MCP_COGNITO_AUDIENCE — surface as a
+    // Missing/invalid MCP_COGNITO_* / MCP_AUTH_MODE config — surface as a
     // JSON-RPC envelope so the client gets the same actionable error shape
     // as a bad token, rather than the Lambda runtime turning a thrown
     // Error into an opaque 5xx the MCP transport can't parse.
@@ -277,10 +391,12 @@ function buildJsonResponse(
  * Serve Protected Resource Metadata when the request targets the RFC 9728
  * well-known path; return `null` otherwise so the caller falls through to
  * normal MCP handling. This endpoint is intentionally public — it is the
- * document a client reads *before* it has any token.
+ * document a client reads *before* it has any token. `options.requiredScope`
+ * is the calling server's own scope (used only to read the shared config).
  */
 export function handleOAuthMetadataRequest(
   event: Pick<APIGatewayProxyEventV2, 'requestContext' | 'rawPath'>,
+  options: AuthenticateOptions,
 ): APIGatewayProxyResultV2 | null {
   const path = event.rawPath ?? '';
   if (!path.endsWith(OAUTH_PROTECTED_RESOURCE_PATH)) return null;
@@ -288,7 +404,7 @@ export function handleOAuthMetadataRequest(
   if (method !== 'GET') {
     return buildJsonResponse(405, { error: 'method_not_allowed' });
   }
-  const config = readConfigFromEnv();
+  const config = readConfigFromEnv(options.requiredScope);
   if ('code' in config) {
     // Server misconfigured (issuer/audience unset). Don't emit a half-formed
     // metadata doc pointing clients at an empty authorization server.
@@ -325,7 +441,9 @@ export function buildAuthChallengeResponse(
   const challenge = [
     'error="invalid_token"',
     `error_description="${sanitizeHeaderValue(failure.message)}"`,
-    `resource_metadata="${resourceMetadataUrl}"`,
+    // The URL derives from the request's `domainName`; sanitize it too so a
+    // crafted host can never inject into the WWW-Authenticate grammar.
+    `resource_metadata="${sanitizeHeaderValue(resourceMetadataUrl)}"`,
   ].join(', ');
   return {
     statusCode: 401,

@@ -1,0 +1,22 @@
+{
+  "name": "mcp-bearer-auth",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/mcp-bearer-auth/src",
+  "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:util"],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/lib/mcp-bearer-auth"],
+      "options": {
+        "jestConfig": "lib/mcp-bearer-auth/jest.config.ts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p lib/mcp-bearer-auth/tsconfig.json"
+      }
+    }
+  }
+}

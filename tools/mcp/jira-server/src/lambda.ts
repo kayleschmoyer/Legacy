@@ -27,9 +27,10 @@ import { claimTicket } from './tools/claim-ticket.js';
 import { getTransitions } from './tools/get-transitions.js';
 import { tryGetJiraCredentials } from './netrc.js';
 import {
+  MCP_SCOPE,
   authenticateMcpRequest,
   handleOAuthMetadataRequest,
-} from './mcp-bearer-auth.js';
+} from '@legacy-sports/mcp-bearer-auth';
 
 const sm = new SecretsManagerClient({});
 let credentialsInitialized = false;
@@ -313,10 +314,14 @@ export const handler = async (
 ): Promise<APIGatewayProxyResultV2> => {
   // Public OAuth discovery endpoint — served before auth so a tokenless client
   // can fetch it (MCP Authorization spec / RFC 9728).
-  const metadataResponse = handleOAuthMetadataRequest(event);
+  const metadataResponse = handleOAuthMetadataRequest(event, {
+    requiredScope: MCP_SCOPE.jira,
+  });
   if (metadataResponse) return metadataResponse;
 
-  const authError = await authenticateMcpRequest(event);
+  const authError = await authenticateMcpRequest(event, {
+    requiredScope: MCP_SCOPE.jira,
+  });
   if (authError) return authError;
 
   await ensureCredentials();

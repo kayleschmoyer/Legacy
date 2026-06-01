@@ -29,6 +29,7 @@
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
       "@legacy-sports/logging/server": ["lib/logging/src/server.ts"],
+      "@legacy-sports/mcp-bearer-auth": ["lib/mcp-bearer-auth/src/index.ts"],
       "@legacy-sports/mlb-client": ["lib/mlb-client/src/index.ts"],
       "@legacy-sports/pfr-client": ["lib/pfr-client/src/index.ts"],
       "@legacy-sports/narrative": ["lib/narrative/src/index.ts"],

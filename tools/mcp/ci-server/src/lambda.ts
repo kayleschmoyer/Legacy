@@ -9,9 +9,10 @@ import {
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createServer } from './index.js';
 import {
+  MCP_SCOPE,
   authenticateMcpRequest,
   handleOAuthMetadataRequest,
-} from './mcp-bearer-auth.js';
+} from '@legacy-sports/mcp-bearer-auth';
 
 const sm = new SecretsManagerClient({});
 let tokenInitialized = false;
@@ -38,10 +39,14 @@ export const handler = async (
 ): Promise<APIGatewayProxyResultV2> => {
   // Public OAuth discovery endpoint — served before auth so a tokenless client
   // can fetch it (MCP Authorization spec / RFC 9728).
-  const metadataResponse = handleOAuthMetadataRequest(event);
+  const metadataResponse = handleOAuthMetadataRequest(event, {
+    requiredScope: MCP_SCOPE.ci,
+  });
   if (metadataResponse) return metadataResponse;
 
-  const authError = await authenticateMcpRequest(event);
+  const authError = await authenticateMcpRequest(event, {
+    requiredScope: MCP_SCOPE.ci,
+  });
   if (authError) return authError;
 
   await ensureToken();
