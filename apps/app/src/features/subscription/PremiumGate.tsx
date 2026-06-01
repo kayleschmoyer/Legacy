@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
-import { trackPremiumFeatureClick } from '../../utils/analytics';
+import {
+  trackPremiumFeatureBlocked,
+  trackPremiumFeatureClick,
+} from '../../utils/analytics';
 
 export interface PremiumGateProps {
   /** Whether the current user has premium access. */
@@ -23,8 +26,9 @@ const BRAND_NAVY = '#1A2A4A';
  *
  * - Premium users: children rendered normally with no overlay.
  * - Free users: children are dimmed/opaque, overlaid with a lock icon and an
- *   upgrade CTA. Tapping the CTA fires `trackPremiumFeatureClick` and
- *   navigates to the subscription settings screen.
+ *   upgrade CTA. On render, fires `trackPremiumFeatureBlocked`. Tapping the
+ *   CTA fires `trackPremiumFeatureClick` and navigates to the subscription
+ *   settings screen.
  *
  * React Native does not support CSS `filter: blur()`, so the free-tier overlay
  * uses opacity to obscure content rather than a blur effect.
@@ -37,6 +41,12 @@ export function PremiumGate({
 }: PremiumGateProps) {
   const router = useRouter();
   const [pressed, setPressed] = useState(false);
+
+  useEffect(() => {
+    if (!isPremium) {
+      trackPremiumFeatureBlocked(featureName);
+    }
+  }, [featureName, isPremium]);
 
   if (isPremium) {
     return children as React.JSX.Element;
