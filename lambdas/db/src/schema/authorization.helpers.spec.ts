@@ -175,10 +175,10 @@ describe('isCommissionerOrOwner', () => {
     ).toBe(true);
   });
 
-  it('returns true for assistant_manager', () => {
+  it('returns false for assistant_manager', () => {
     expect(
       isCommissionerOrOwner({ ...base, permissionLevel: 'assistant_manager' }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 
@@ -344,8 +344,8 @@ describe('verifyTeamEditAccess', () => {
 
   it('throws FORBIDDEN when the user has a non-elevated role and does not own the team', async () => {
     const members = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
-    // All three valid permissionLevel values pass isCommissionerOrOwner, so we simulate
-    // a hypothetical non-elevated role to exercise the FORBIDDEN branch.
+    // assistant_manager and below do not pass isCommissionerOrOwner; use a
+    // hypothetical non-elevated role to exercise the FORBIDDEN branch.
     const membership = [
       {
         permissionLevel: 'viewer',

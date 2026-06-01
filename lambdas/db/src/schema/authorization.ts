@@ -329,13 +329,12 @@ export async function getLeagueMembership(
 }
 
 /**
- * Returns `true` when the membership has commissioner, general manager, or assistant manager privileges.
+ * Returns `true` when the membership has commissioner or general manager privileges.
  */
 export function isCommissionerOrOwner(membership: LeagueMembership): boolean {
   return (
     membership.permissionLevel === 'commissioner' ||
-    membership.permissionLevel === 'general_manager' ||
-    membership.permissionLevel === 'assistant_manager'
+    membership.permissionLevel === 'general_manager'
   );
 }
 
