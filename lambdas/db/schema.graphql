@@ -4341,6 +4341,7 @@ input UpdateLeagueSettingsInput {
   auctionBudget: Int
   auctionMinBid: Int
   bannerUrl: String
+  faabBudgetDefault: Int
   gamesPerMatchup: Int
   leagueId: Int!
   logoUrl: String
@@ -4360,6 +4361,7 @@ input UpdateLeagueSettingsInput {
   salaryFloor: Int
   secondaryColor: String
   totalMatchups: Int
+  waiverType: String
 }
 
 input UpsertAchievementRestrictionInput {

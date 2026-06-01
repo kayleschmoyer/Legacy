@@ -4339,6 +4339,7 @@ export type UpdateLeagueSettingsInput = {
   auctionBudget?: InputMaybe<Scalars['Int']['input']>;
   auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   bannerUrl?: InputMaybe<Scalars['String']['input']>;
+  faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
@@ -4358,6 +4359,7 @@ export type UpdateLeagueSettingsInput = {
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
+  waiverType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpsertAchievementRestrictionInput = {

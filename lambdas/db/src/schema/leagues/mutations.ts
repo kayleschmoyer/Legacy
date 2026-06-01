@@ -1322,6 +1322,9 @@ const UpdateLeagueSettingsInput = builder.inputType(
       salaryDecayPct: t.int({ required: false }),
       auctionBudget: t.int({ required: false }),
       auctionMinBid: t.int({ required: false }),
+      // ── Waiver settings ──────────────────────────────────────────────────
+      waiverType: t.string({ required: false }), // 'standard' | 'faab'
+      faabBudgetDefault: t.int({ required: false }),
     }),
   },
 );
@@ -1364,6 +1367,9 @@ builder.mutationField('updateLeagueSettings', (t) =>
         salaryDecayPct,
         auctionBudget,
         auctionMinBid,
+        // Waiver settings
+        waiverType,
+        faabBudgetDefault,
       } = args.input;
       const userId = context.user.id;
 
@@ -1422,6 +1428,9 @@ builder.mutationField('updateLeagueSettings', (t) =>
         salaryDecayPct?: number;
         auctionBudget?: number;
         auctionMinBid?: number;
+        // Waiver settings
+        waiverType?: 'standard' | 'faab';
+        faabBudgetDefault?: number;
       } = {};
 
       if (
@@ -1685,6 +1694,30 @@ builder.mutationField('updateLeagueSettings', (t) =>
         if (auctionMinBid < 1)
           throw new Error('Auction minimum bid must be at least 1');
         leagueUpdate.auctionMinBid = auctionMinBid;
+      }
+
+      // ── Waiver settings ──────────────────────────────────────────────────
+      if (waiverType !== null && waiverType !== undefined) {
+        if (!['standard', 'faab'].includes(waiverType)) {
+          throw UserInputError(
+            'Invalid waiver type. Must be "standard" or "faab"',
+          );
+        }
+        if (waiverType === 'faab') {
+          await requireEntitlement(
+            context,
+            ENTITLEMENTS.faab_waiver_type,
+            'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
+          );
+        }
+        leagueUpdate.waiverType = waiverType as 'standard' | 'faab';
+        changeDescriptions.push(`Waiver type: ${waiverType}`);
+      }
+      if (faabBudgetDefault !== null && faabBudgetDefault !== undefined) {
+        if (faabBudgetDefault < 1)
+          throw UserInputError('FAAB budget must be at least 1');
+        leagueUpdate.faabBudgetDefault = faabBudgetDefault;
+        changeDescriptions.push(`FAAB budget default: $${faabBudgetDefault}`);
       }
 
       // Branding fields — set directly (no description logged for silent updates)
