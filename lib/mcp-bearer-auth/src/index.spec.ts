@@ -78,12 +78,18 @@ async function signToken(
     /** Set the space-delimited `scope` claim (machine access token shape). */
     scope?: string;
     expSecondsFromNow?: number;
+    /** Extra claims to merge (e.g. a user access token's token_use/username). */
+    extraClaims?: Record<string, unknown>;
   } = {},
 ): Promise<string> {
   const exp =
     Math.floor(Date.now() / 1000) + (overrides.expSecondsFromNow ?? 3600);
-  const claims =
-    overrides.scope !== undefined ? { scope: overrides.scope } : {};
+  const claims: Record<string, unknown> = {
+    // Spread extraClaims first so the explicit `scope` argument always wins,
+    // even if a caller accidentally passes `extraClaims.scope`.
+    ...(overrides.extraClaims ?? {}),
+    ...(overrides.scope !== undefined ? { scope: overrides.scope } : {}),
+  };
   let builder = new SignJWT(claims)
     .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
     .setIssuer(overrides.issuer ?? ISSUER)
@@ -161,6 +167,64 @@ describe('verifyBearerToken — machine token (client_credentials)', () => {
       createLocalJWKSet(jwks),
     );
     expect(result?.message).toMatch(/not authorized for this server/);
+  });
+});
+
+describe('verifyBearerToken — user authorization-code access token (claude.ai connector)', () => {
+  // claude.ai's custom remote MCP connector completes a Cognito
+  // authorization-code + PKCE flow and sends the resulting *access token* as
+  // the bearer (not the ID token). That token carries `token_use: "access"`, a
+  // `username`/`sub` for the human user, and a space-delimited `scope` claim
+  // including `openid` plus the resource-server scopes the connector requested.
+  // Acceptance is grant-agnostic — it must pass on scope alone (LS-5151).
+  const USER_TOKEN_CLAIMS = {
+    token_use: 'access',
+    username: 'dev@example.com',
+    client_id: 'connector-client-id',
+  };
+
+  it('accepts a user access token carrying this server’s scope (correct scope)', async () => {
+    const { privateKey, jwks } = await buildKeySet();
+    const token = await signToken(privateKey, {
+      scope: `openid ${SCOPE}`,
+      extraClaims: USER_TOKEN_CLAIMS,
+    });
+    const result = await verifyBearerToken(
+      { authorization: `Bearer ${token}` },
+      DUAL_CONFIG,
+      createLocalJWKSet(jwks),
+    );
+    expect(result).toBeNull();
+  });
+
+  it('rejects a user access token bearing only another server’s scope (wrong scope)', async () => {
+    const { privateKey, jwks } = await buildKeySet();
+    const token = await signToken(privateKey, {
+      scope: `openid ${OTHER_SCOPE}`,
+      extraClaims: USER_TOKEN_CLAIMS,
+    });
+    const result = await verifyBearerToken(
+      { authorization: `Bearer ${token}` },
+      DUAL_CONFIG,
+      createLocalJWKSet(jwks),
+    );
+    expect(result?.code).toBe(MCP_AUTH_ERROR_CODE);
+    expect(result?.message).toMatch(/not authorized for this server/);
+    expect(result?.message).toContain(SCOPE);
+  });
+
+  it('accepts a user access token in machine-only mode (no legacy aud needed)', async () => {
+    const { privateKey, jwks } = await buildKeySet();
+    const token = await signToken(privateKey, {
+      scope: `openid ${SCOPE}`,
+      extraClaims: USER_TOKEN_CLAIMS,
+    });
+    const result = await verifyBearerToken(
+      { authorization: `Bearer ${token}` },
+      MACHINE_CONFIG,
+      createLocalJWKSet(jwks),
+    );
+    expect(result).toBeNull();
   });
 });
 
@@ -493,6 +557,26 @@ describe('OAuth 2.0 Authorization surface (Track B)', () => {
     expect(body.resource).toBe(`https://${API_GW_DOMAIN}`);
     expect(body.authorization_servers).toEqual([ISSUER]);
     expect(body.bearer_methods_supported).toContain('header');
+  });
+
+  it('advertises the mcp/* scope from MCP_OAUTH_SCOPES so the connector requests it', () => {
+    // The claude.ai connector reads scopes_supported during consent; advertising
+    // `openid mcp/github` is what makes the issued access token carry the scope
+    // the bearer-auth check requires (LS-5151).
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    process.env['MCP_OAUTH_SCOPES'] = `openid ${SCOPE}`;
+    const result = handleOAuthMetadataRequest(
+      metadataEvent() as never,
+      OPTIONS,
+    );
+    if (result === null || typeof result === 'string') {
+      throw new Error('expected a metadata response');
+    }
+    const body = JSON.parse(result.body ?? '{}') as {
+      scopes_supported: string[];
+    };
+    expect(body.scopes_supported).toEqual(['openid', SCOPE]);
   });
 
   it('returns null for non-metadata paths (falls through to MCP handling)', () => {

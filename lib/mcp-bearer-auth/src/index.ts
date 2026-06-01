@@ -34,9 +34,13 @@ import type {
 export const MCP_AUTH_ERROR_CODE = -32001;
 
 /**
- * The per-server resource-server scopes a machine (`client_credentials`)
- * access token must carry to reach each server. Fixed by the RFC
- * (LS-5088); a token bearing only another server's scope is rejected.
+ * The per-server resource-server scopes an access token must carry to reach
+ * each server. Authorization is scope-based and grant-agnostic: the scope can
+ * be carried by a machine `client_credentials` token (headless agents) OR by a
+ * user authorization-code access token (the claude.ai custom remote MCP
+ * connector — LS-5151, which sends the access token, not the ID token). Fixed
+ * by the RFC (LS-5088); a token bearing only another server's scope is
+ * rejected.
  */
 export const MCP_SCOPE = {
   github: 'mcp/github',
@@ -51,7 +55,11 @@ const RECOVERY_HINT =
  * Which token shapes the server accepts. Controlled per-environment via the
  * `MCP_AUTH_MODE` env var so we can flip with zero downtime (RFC Phase 1/2):
  *   - `legacy`  — only the user ID token (`aud` = legacy public client id).
- *   - `machine` — only the machine access token (carries this server's scope).
+ *   - `machine` — only a scoped access token (carries this server's `mcp/*`
+ *                 scope). Named for the machine `client_credentials` grant it
+ *                 was introduced for, but the check is grant-agnostic: a user
+ *                 authorization-code access token (claude.ai connector,
+ *                 LS-5151) carrying the same scope is accepted identically.
  *   - `dual`    — accept either (the migration default).
  */
 export type AuthMode = 'legacy' | 'machine' | 'dual';
@@ -180,7 +188,11 @@ function notAuthorizedReason(config: AuthConfig): string {
  *
  * The signature, issuer, and `exp` are always verified. Authorization then
  * depends on `config.mode`:
- *   - a machine access token is accepted when it carries `requiredScope`;
+ *   - a token is accepted when its `scope`/`scp` claim contains
+ *     `requiredScope`. Only the scope claim is inspected (not `token_use` or
+ *     the grant type), so any Cognito token bearing the scope qualifies —
+ *     whether minted by the machine `client_credentials` grant or by a user
+ *     authorization-code flow (the claude.ai connector access token, LS-5151);
  *   - a legacy user ID token is accepted when its `aud` matches
  *     `legacyAudience`.
  * A token that verifies cryptographically but carries only another server's

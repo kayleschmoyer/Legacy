@@ -93,6 +93,12 @@ resource "aws_lambda_function" "mcp_jira" {
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME    = aws_secretsmanager_secret.rollbar_access_token.name
       MCP_COGNITO_ISSUER                  = local.mcp_cognito_issuer
       MCP_COGNITO_AUDIENCE                = aws_cognito_user_pool_client.mcp_cli.id
+      # Scopes advertised in this server's OAuth Protected Resource Metadata
+      # (RFC 9728). The claude.ai connector requests these during consent, so
+      # the issued access token carries `mcp/jira` and passes the bearer-auth
+      # scope check. Without this it defaults to `openid` only and the token
+      # would lack the scope (LS-5151).
+      MCP_OAUTH_SCOPES = "openid mcp/jira"
     }
   }
 

@@ -317,6 +317,73 @@ resource "aws_cognito_user_pool_client" "mcp_machine" {
   }
 }
 
+# ── Connector (authorization_code) client — claude.ai custom remote MCP (LS-5151) ──
+#
+# claude.ai's custom remote MCP connector UI requires a *pre-registered* OAuth
+# client_id: Cognito does not support OAuth Dynamic Client Registration
+# (RFC 7591), so the connector cannot self-register one. None of the existing
+# clients fit — mcp_cli is public/PKCE but only has the localhost CLI callback
+# and the bare `openid` scope; mcp_machine is client_credentials only (no
+# browser flow). This public client drives the authorization-code + PKCE flow
+# from the claude.ai connector and requests the resource-server `mcp/*` scopes
+# so the issued *access token* (which claude.ai sends as the bearer, not the ID
+# token) carries them and passes each server's bearer-auth scope check
+# (lib/mcp-bearer-auth). The owner pastes this client's id into the connector
+# dialog (LS-5152).
+resource "aws_cognito_user_pool_client" "mcp_connector" {
+  name         = "${local.name_prefix}-mcp-connector"
+  user_pool_id = aws_cognito_user_pool.mcp_dev.id
+
+  # Public client — claude.ai uses PKCE, no client secret.
+  generate_secret = false
+
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_flows_user_pool_client = true
+
+  # `openid` (so a standard OIDC code flow works) plus every resource-server
+  # scope, so the issued access token carries `mcp/jira`, `mcp/github`, and
+  # `mcp/ci`. Each per-server connector advertises only its own scope via the
+  # Lambda's MCP_OAUTH_SCOPES (see lambda-mcp-<server>.tf), but the client must
+  # be *allowed* all of them so any one server's consent flow succeeds.
+  allowed_oauth_scopes = concat(
+    ["openid"],
+    aws_cognito_resource_server.mcp.scope_identifiers,
+  )
+
+  # The redirect URI claude.ai uses for custom remote MCP connectors.
+  # ⚠ Cognito matches callback URLs EXACTLY. This value must be confirmed
+  # against the claude.ai connector dialog before the owner registers the
+  # connector (LS-5152) — it may be a claude.com variant. If consent fails with
+  # redirect_mismatch, correct this URL and re-apply.
+  callback_urls = ["https://claude.ai/api/mcp/auth_callback"]
+
+  # Static "COGNITO" when no SAML metadata URL is configured; appends the SAML
+  # provider name when set. See locals.mcp_supported_identity_providers.
+  supported_identity_providers = local.mcp_supported_identity_providers
+
+  # Wait for the SAML identity provider (when enabled) so the provider_name in
+  # supported_identity_providers resolves on the first apply — mirrors mcp_cli.
+  depends_on = [aws_cognito_identity_provider.mcp_ic]
+
+  explicit_auth_flows = [
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_SRP_AUTH",
+  ]
+
+  # Match mcp_cli token TTLs: 8h id/access (a leaked token expires within a
+  # workday), 30d refresh (the connector survives without re-consent).
+  access_token_validity  = 8
+  id_token_validity      = 8
+  refresh_token_validity = 30
+  token_validity_units {
+    access_token  = "hours"
+    id_token      = "hours"
+    refresh_token = "days"
+  }
+
+  prevent_user_existence_errors = "ENABLED"
+}
+
 # ── SSM — publish Cognito identifiers for scripts/mcp-auth.mjs ────────────────
 
 resource "aws_ssm_parameter" "mcp_cognito_user_pool_id" {
@@ -341,6 +408,17 @@ resource "aws_ssm_parameter" "mcp_cognito_machine_client_id" {
   name  = "/${local.name_prefix}/mcp/cognito/machine-client-id"
   type  = "String"
   value = aws_cognito_user_pool_client.mcp_machine.id
+  tags  = local.common_tags
+}
+
+# Connector (authorization_code) public client id — non-sensitive (no secret,
+# PKCE). Published alongside the other client ids so the owner can read it from
+# SSM rather than the Terraform output when registering the claude.ai connector
+# (LS-5152).
+resource "aws_ssm_parameter" "mcp_cognito_connector_client_id" {
+  name  = "/${local.name_prefix}/mcp/cognito/connector-client-id"
+  type  = "String"
+  value = aws_cognito_user_pool_client.mcp_connector.id
   tags  = local.common_tags
 }
 
@@ -466,6 +544,11 @@ output "mcp_cognito_hosted_ui" {
 output "mcp_cognito_machine_client_id" {
   description = "Cognito client_credentials (machine) app client id — used by the headless MCP minting command (LS-5091). The secret lives in Secrets Manager at <env>/mcp-machine-client-secret."
   value       = aws_cognito_user_pool_client.mcp_machine.id
+}
+
+output "mcp_cognito_connector_client_id" {
+  description = "Cognito authorization-code (public, PKCE) app client id for the claude.ai custom remote MCP connector (LS-5151). Paste into the claude.ai connector dialog as the OAuth client_id (LS-5152). No secret — public client. Also published to SSM at /<name_prefix>/mcp/cognito/connector-client-id."
+  value       = aws_cognito_user_pool_client.mcp_connector.id
 }
 
 # ── SAML SP details — paste into the IC SAML application registration ────────
