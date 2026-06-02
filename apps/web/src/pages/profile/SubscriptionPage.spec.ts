@@ -1,6 +1,7 @@
 import {
   ACTIVATION_MAX_POLLS,
   ACTIVATION_POLL_INTERVAL_MS,
+  deriveIsPremium,
   getTierLabel,
   shouldContinueActivationPolling,
 } from './SubscriptionPage';
@@ -22,6 +23,31 @@ describe('getTierLabel', () => {
   it('falls back to "Free" for an empty/unknown tier', () => {
     expect(getTierLabel('')).toBe('Free');
     expect(getTierLabel('something-else')).toBe('Free');
+  });
+});
+
+// LS-5177: premium access on the subscription page must be derived from `tier`,
+// not `status`, to match the `useIsPremium` hook (`subscriptionTier === 'premium'`)
+// and the backend `getSubscriptionTier`. The previous status-based derivation
+// (`status === 'active' || status === 'trialing'`) returned false during the
+// grace period (`status='past_due'`, `tier='premium'`), treating paying users
+// as free. `deriveIsPremium` is purely tier-based and ignores `status`.
+describe('deriveIsPremium', () => {
+  it('AC1/AC2: returns true when tier is premium, independent of status (covers the grace period)', () => {
+    // Status is intentionally ignored. During the grace period Stripe marks
+    // status `past_due` while tier stays `premium`, so a tier-only check keeps
+    // the user premium — that is the bug this guards against.
+    expect(deriveIsPremium({ tier: 'premium' })).toBe(true);
+  });
+
+  it('returns false for free-tier subscriptions regardless of status', () => {
+    expect(deriveIsPremium({ tier: 'free' })).toBe(false);
+  });
+
+  it('returns false when there is no subscription', () => {
+    expect(deriveIsPremium(null)).toBe(false);
+    expect(deriveIsPremium(undefined)).toBe(false);
+    expect(deriveIsPremium({ tier: null })).toBe(false);
   });
 });
 

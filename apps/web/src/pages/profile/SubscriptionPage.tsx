@@ -209,6 +209,19 @@ export function getTierLabel(tier: string): string {
   return tier === 'premium' ? 'Premium' : 'Free';
 }
 
+// LS-5177: premium access is determined by `tier`, not `status`. During the
+// grace period the subscription is `status='past_due'` while `tier` remains
+// `'premium'` (the backend `getSubscriptionTier` only downgrades the tier once
+// the grace period actually expires). Deriving premium from status therefore
+// disagreed with the `useIsPremium` hook (`subscriptionTier === 'premium'`) and
+// treated paying grace-period users as free. Gate on tier to restore parity.
+// Extracted as a pure function so the derivation is unit-testable.
+export function deriveIsPremium(
+  subscription: { tier?: string | null } | null | undefined,
+): boolean {
+  return subscription?.tier === 'premium';
+}
+
 // LS-5204: after the Stripe checkout redirect the subscription tier only flips
 // to premium once the (asynchronous) Stripe webhook reaches our Lambda and
 // updates the DB. Cold Lambda delivery takes 5-15s, so a single 3s refetch
@@ -566,8 +579,7 @@ const SubscriptionPage: React.FC = () => {
   const { data, loading, refetch } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
 
-  const isPremium =
-    subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isPremium = deriveIsPremium(subscription);
   const isPastDue = subscription?.status === 'past_due';
   const isCanceled = subscription?.status === 'canceled';
   const isFree = !subscription || subscription.status === null;
@@ -805,18 +817,22 @@ const SubscriptionPage: React.FC = () => {
 
                     <BadgeTag
                       backgroundColor={
-                        isPremium
-                          ? withAlpha(EMERALD, 0.12)
-                          : isPastDue
-                            ? withAlpha(AMBER, 0.12)
-                            : withAlpha(RED, 0.1)
+                        // The badge reflects subscription *status*, not tier, so
+                        // status checks take precedence: with `isPremium` now
+                        // tier-derived (LS-5177), a grace-period user is both
+                        // premium and past_due — past_due must still read amber.
+                        isPastDue
+                          ? withAlpha(AMBER, 0.12)
+                          : isCanceled
+                            ? withAlpha(RED, 0.1)
+                            : withAlpha(EMERALD, 0.12)
                       }
                       borderColor={
-                        isPremium
-                          ? withAlpha(EMERALD, 0.35)
-                          : isPastDue
-                            ? withAlpha(AMBER, 0.35)
-                            : withAlpha(RED, 0.3)
+                        isPastDue
+                          ? withAlpha(AMBER, 0.35)
+                          : isCanceled
+                            ? withAlpha(RED, 0.3)
+                            : withAlpha(EMERALD, 0.35)
                       }
                     >
                       <YStack
@@ -824,7 +840,7 @@ const SubscriptionPage: React.FC = () => {
                         height={8}
                         borderRadius={4}
                         backgroundColor={
-                          isPremium ? EMERALD : isPastDue ? AMBER : RED
+                          isPastDue ? AMBER : isCanceled ? RED : EMERALD
                         }
                         flexShrink={0}
                       />
@@ -833,11 +849,11 @@ const SubscriptionPage: React.FC = () => {
                         fontWeight="600"
                         style={
                           {
-                            color: isPremium
-                              ? EMERALD
-                              : isPastDue
-                                ? AMBER
-                                : RED,
+                            color: isPastDue
+                              ? AMBER
+                              : isCanceled
+                                ? RED
+                                : EMERALD,
                           } as React.CSSProperties
                         }
                       >
