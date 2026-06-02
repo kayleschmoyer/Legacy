@@ -9,7 +9,7 @@
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
-	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
+	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars rebuild-tfvars tfvars-from-aws \
 	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
@@ -544,10 +544,17 @@ endif
 # pre-dated `make terraform-apply`. Use `make terraform-apply` (Lambda app) and
 # `make runner-apply` (runner fleet) instead.
 
-gen-tfvars: ## Generate terraform/main/secrets.auto.tfvars from env vars (safe to re-run)
+gen-tfvars: ## Generate/overlay terraform/main/secrets.auto.tfvars from env vars (merge-aware; preserves existing baseline)
 	@$(call echo_blue,Generating terraform/main/secrets.auto.tfvars...)
 	node scripts/gen-tfvars.js
 	@$(call echo_green,Done — terraform/main/secrets.auto.tfvars updated)
+
+rebuild-tfvars: ## Rebuild terraform/main/secrets.auto.tfvars baseline from AWS (Secrets Manager + SSM)
+	@$(call echo_blue,Rebuilding terraform/main/secrets.auto.tfvars from AWS...)
+	node scripts/rebuild-tfvars-from-aws.mjs
+	@$(call echo_green,Done — AWS baseline written. Run 'make gen-tfvars' to overlay local .env values.)
+
+tfvars-from-aws: rebuild-tfvars gen-tfvars ## Rebuild from AWS baseline, then overlay local .env values (B then A)
 
 # Lambda app infrastructure (terraform/main/) — used by the regular
 # Apply Lambda Infrastructure workflow. Does NOT touch runner resources;
