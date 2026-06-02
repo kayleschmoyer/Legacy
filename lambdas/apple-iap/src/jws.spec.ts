@@ -60,6 +60,56 @@ describe('JWS helpers', () => {
         ),
       ).toThrow(/unparseable validity window/);
     });
+
+    // Clock-skew tolerance (±5 min) — see LS-5250. Construct cert windows
+    // relative to a fixed `now` so boundary offsets land just inside / outside
+    // the tolerance band.
+    describe('clock-skew tolerance', () => {
+      const now = Date.parse('2026-01-01T00:00:00Z');
+      const min = 60 * 1000;
+      const isoAt = (offsetMs: number) =>
+        new Date(now + offsetMs).toISOString();
+
+      it('accepts a cert whose notBefore is within tolerance in the future', () => {
+        const cert = {
+          subject: 'CN=Test Leaf',
+          validFrom: isoAt(3 * min), // not yet valid by 3 min — within ±5 min
+          validTo: isoAt(365 * 24 * 60 * min),
+        };
+        expect(() => assertCertValidAt(cert, now)).not.toThrow();
+      });
+
+      it('accepts a cert whose notAfter is within tolerance in the past', () => {
+        const cert = {
+          subject: 'CN=Test Leaf',
+          validFrom: isoAt(-365 * 24 * 60 * min),
+          validTo: isoAt(-3 * min), // expired 3 min ago — within ±5 min
+        };
+        expect(() => assertCertValidAt(cert, now)).not.toThrow();
+      });
+
+      it('still rejects a cert whose notBefore is beyond tolerance', () => {
+        const cert = {
+          subject: 'CN=Test Leaf',
+          validFrom: isoAt(10 * min), // not yet valid by 10 min — beyond ±5 min
+          validTo: isoAt(365 * 24 * 60 * min),
+        };
+        expect(() => assertCertValidAt(cert, now)).toThrow(
+          /Certificate not yet valid/,
+        );
+      });
+
+      it('still rejects a cert whose notAfter is beyond tolerance', () => {
+        const cert = {
+          subject: 'CN=Test Leaf',
+          validFrom: isoAt(-365 * 24 * 60 * min),
+          validTo: isoAt(-10 * min), // expired 10 min ago — beyond ±5 min
+        };
+        expect(() => assertCertValidAt(cert, now)).toThrow(
+          /Certificate expired/,
+        );
+      });
+    });
   });
 
   describe('assertChainNameLinkage', () => {

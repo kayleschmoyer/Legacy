@@ -14,8 +14,19 @@ export function derToPem(der: string): string {
   return `-----BEGIN CERTIFICATE-----\n${pemBody}\n-----END CERTIFICATE-----`;
 }
 
+// Tolerance applied to certificate validity-window boundaries to absorb modest
+// server clock drift. Without it, a server whose clock drifts past a cert's
+// notBefore/notAfter boundary fails *all* App Store Server Notification
+// verifications with a spurious "Certificate expired" / "not yet valid" error
+// (LS-5250; sibling fix to LS-5202 in lambdas/db/src/apple-jws.ts). Five
+// minutes mirrors the skew tolerance commonly applied to JWT/X.509 time checks
+// and is far smaller than Apple's multi-year cert validity windows, so it does
+// not meaningfully weaken the validity check.
+const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+
 /**
- * Assert a single cert's validity window covers `now` (epoch ms).
+ * Assert a single cert's validity window covers `now` (epoch ms), allowing a
+ * small clock-skew tolerance on both boundaries.
  */
 export function assertCertValidAt(
   cert: { subject: string; validFrom: string; validTo: string },
@@ -28,12 +39,12 @@ export function assertCertValidAt(
       `Certificate has unparseable validity window: validFrom=${cert.validFrom} validTo=${cert.validTo}`,
     );
   }
-  if (now < notBefore) {
+  if (now < notBefore - CLOCK_SKEW_TOLERANCE_MS) {
     throw new Error(
       `Certificate not yet valid (validFrom=${cert.validFrom}): subject=${cert.subject}`,
     );
   }
-  if (now > notAfter) {
+  if (now > notAfter + CLOCK_SKEW_TOLERANCE_MS) {
     throw new Error(
       `Certificate expired (validTo=${cert.validTo}): subject=${cert.subject}`,
     );
