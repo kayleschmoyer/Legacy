@@ -12,6 +12,20 @@ jest.mock('@legacy-sports/db-client', () => ({
       id: 'leagues.id',
       discordWebhookUrl: 'leagues.discordWebhookUrl',
     },
+    tradeOfferPlayers: {
+      playerId: 'tradeOfferPlayers.playerId',
+      fromTeamId: 'tradeOfferPlayers.fromTeamId',
+      tradeOfferId: 'tradeOfferPlayers.tradeOfferId',
+    },
+    players: {
+      id: 'players.id',
+      firstName: 'players.firstName',
+      lastName: 'players.lastName',
+    },
+    tradeOffers: {
+      id: 'tradeOffers.id',
+      proposingTeamId: 'tradeOffers.proposingTeamId',
+    },
   },
 }));
 

@@ -286,10 +286,13 @@ describe('verifyCommissionerAccess', () => {
     });
   });
 
-  it('returns membership for an assistant_manager (member but not commissioner/GM)', async () => {
+  it('throws FORBIDDEN for an assistant_manager (member but not commissioner/GM)', async () => {
     const db = makeDb([{ permissionLevel: 'assistant_manager', teamId: 5 }]);
-    const result = await verifyCommissionerAccess(db as never, 1, 5);
-    expect(result.permissionLevel).toBe('assistant_manager');
+    await expect(
+      verifyCommissionerAccess(db as never, 1, 5),
+    ).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
   });
 
   it('returns membership for a commissioner', async () => {

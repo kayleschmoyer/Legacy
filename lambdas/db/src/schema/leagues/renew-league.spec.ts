@@ -182,6 +182,7 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
     }));
 
     jest.doMock('@legacy-sports/utils', () => ({
+      ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
     }));
     jest.doMock('@legacy-sports/utils/node', () => ({
