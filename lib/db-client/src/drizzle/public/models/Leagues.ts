@@ -14,6 +14,7 @@ import {
   jsonb,
   text,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { players } from './Players';
 import {
   draftOrder,
@@ -153,6 +154,11 @@ export const leagues = pgTable(
       previousLeagueIdIdx: index('leagues_previous_league_id_idx').on(
         table.previousLeagueId,
       ),
+      // Partial index for mock draft weekly count query (LS-5138).
+      // Covers: WHERE owner = $1 AND is_mock_draft = true AND created_at >= $2
+      mockDraftOwnerCreatedAtIdx: index('idx_leagues_owner_created_at_mock')
+        .on(table.owner, table.createdAt)
+        .where(sql`is_mock_draft = true`),
       leaguesPreviousLeagueIdFk: foreignKey({
         columns: [table.previousLeagueId],
         foreignColumns: [table.id],
