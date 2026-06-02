@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog } from '@legacy-sports/shared-components';
 import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
@@ -31,7 +31,10 @@ import {
   WHITE,
   withAlpha,
 } from '../../constants/colors';
-import { useAdminGetUsersQuery } from '../../api/db/graphql.generated';
+import {
+  useAdminGetUsersQuery,
+  useGetUserByIdQuery,
+} from '../../api/db/graphql.generated';
 
 // ─── JWT helpers ──────────────────────────────────────────────────────────────
 
@@ -334,15 +337,37 @@ export function AdminPage(): React.JSX.Element | null {
     }
   };
 
+  const currentUserId = auth.user?.id ?? 0;
+  const {
+    data: serverUserData,
+    loading: serverUserLoading,
+    refetch: refetchServerUser,
+  } = useGetUserByIdQuery({
+    variables: { id: currentUserId },
+    skip: !auth.isAuthenticated || currentUserId === 0,
+    fetchPolicy: 'network-only',
+  });
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (auth.isAuthenticated && currentUserId !== 0) {
+        void refetchServerUser();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [auth.isAuthenticated, currentUserId, refetchServerUser]);
+
   const { data, loading, error } = useAdminGetUsersQuery({
     variables: { limit: 200, offset: 0 },
     skip: !auth.isAuthenticated,
   });
 
-  if (auth.isLoading) {
+  if (auth.isLoading || serverUserLoading) {
     return null;
   }
-  if (auth.user?.accessLevel !== 'admin') {
+  const serverAccessLevel = serverUserData?.user?.accessLevel;
+  if (serverAccessLevel !== 'admin') {
     return <Navigate to="/" replace />;
   }
 
