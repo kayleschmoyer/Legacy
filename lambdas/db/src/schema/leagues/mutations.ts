@@ -15,6 +15,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   and,
+  count,
   countDistinct,
   desc,
   eq,
@@ -815,6 +816,51 @@ export async function claimUnassignedTeamForUser(
   });
 }
 
+/**
+ * Enforce the free-tier active-league cap on the join mutations (LS-5172).
+ *
+ * The `unlimited_leagues` entitlement was previously enforced only on league
+ * creation and renewal, so a free user already at their cap could still join
+ * unlimited additional leagues via invite code or public join. This guard
+ * mirrors the `renewLeague` cap check: a user without the `unlimited_leagues`
+ * entitlement may belong to at most 3 active (non-mock, non-frozen) leagues.
+ *
+ * The count is membership-based (via `league_members`) rather than
+ * ownership-based, because a joiner never owns the league they are joining —
+ * counting owned leagues would not constrain joins at all. Callers verify the
+ * user is not already a member of the target league before invoking this, so a
+ * successful join would be their (count + 1)th active league.
+ */
+async function requireJoinLeagueCapacity(
+  context: Context,
+  userId: number,
+): Promise<void> {
+  if (await hasEntitlement(context, ENTITLEMENTS.unlimited_leagues)) {
+    return;
+  }
+  const [{ leagueCount }] = await context.db
+    .select({ leagueCount: count() })
+    .from(PublicSchema.leagueMembers)
+    .innerJoin(
+      PublicSchema.leagues,
+      eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+    )
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.userId, userId),
+        eq(PublicSchema.leagues.isMockDraft, false),
+        isNull(PublicSchema.leagues.frozenAt),
+      ),
+    );
+  // `count()` can surface as a string/bigint depending on the pg driver;
+  // coerce to a number before the numeric comparison.
+  if (Number(leagueCount) >= 3) {
+    throw PremiumRequiredError(
+      'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
+    );
+  }
+}
+
 // Mutation field to join a league using an invite code
 builder.mutationField('joinLeagueByCode', (t) =>
   t.field({
@@ -870,6 +916,9 @@ builder.mutationField('joinLeagueByCode', (t) =>
         if (existingMembership.length > 0) {
           throw UserInputError('You are already a member of this league');
         }
+
+        // Enforce the free-tier active-league cap before joining (LS-5172).
+        await requireJoinLeagueCapacity(context, userId);
 
         // LS-2497: atomic claim — wraps team selection + rename + membership
         // insert in a transaction with a row-level lock so two concurrent
@@ -1085,6 +1134,9 @@ builder.mutationField('joinLeague', (t) =>
             leagueId: league.id,
           };
         }
+
+        // Enforce the free-tier active-league cap before joining (LS-5172).
+        await requireJoinLeagueCapacity(context, userId);
 
         // LS-2497: atomic claim (transaction + row-level lock) — see
         // claimUnassignedTeamForUser above for why this replaces the previous
@@ -2009,6 +2061,9 @@ builder.mutationField('joinPublicLeague', (t) =>
         if (existingMembership.length > 0) {
           throw UserInputError('You are already a member of this league');
         }
+
+        // Enforce the free-tier active-league cap before joining (LS-5172).
+        await requireJoinLeagueCapacity(context, userId);
 
         // LS-2497: atomic claim (transaction + row-level lock) — see
         // claimUnassignedTeamForUser above for why this replaces the previous
