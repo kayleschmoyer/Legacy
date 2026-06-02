@@ -1,4 +1,4 @@
-import type { Route } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 
 import {
   leagueByIdResponse,
@@ -226,6 +226,41 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
  * });
  */
 export const unmockedGraphQLFallback = routerUnmockedFallback;
+
+/**
+ * Seed GrowthBook feature flags before the app bundle loads.
+ *
+ * `GrowthBookProvider` reads `window.__gbSeededFeatures` at module-load time
+ * (apps/web/src/context/GrowthBookProvider.tsx), so the seed must be injected
+ * via `addInitScript` *before* `page.goto()`.
+ *
+ * The `football_enabled` flag gates the football rollout (LS-4767) — including
+ * the football sport tab on the Create League page, which is filtered out of
+ * the SportSwitcher when the flag is off. CI has no `VITE_GROWTHBOOK_CLIENT_KEY`
+ * so every flag defaults off; any test that needs the football tab visible must
+ * call this helper first. Use `enableFootball(page)` for the common case.
+ *
+ * @example
+ * await seedFeatureFlags(page, { football_enabled: { defaultValue: true } });
+ * await page.goto('/football/league/create');
+ */
+export async function seedFeatureFlags(
+  page: Page,
+  features: Record<string, { defaultValue: unknown }>,
+): Promise<void> {
+  await page.addInitScript((seeded) => {
+    (window as unknown as { __gbSeededFeatures: unknown }).__gbSeededFeatures =
+      seeded;
+  }, features);
+}
+
+/**
+ * Convenience wrapper that turns on the `football_enabled` flag (LS-4767) so the
+ * football sport tab renders. Must be called before `page.goto()`.
+ */
+export async function enableFootball(page: Page): Promise<void> {
+  await seedFeatureFlags(page, { football_enabled: { defaultValue: true } });
+}
 
 /**
  * Extract the GraphQL operationName from a Playwright Route's POST body.

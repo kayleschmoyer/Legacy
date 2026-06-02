@@ -16,7 +16,10 @@
 
 import { test } from '../fixtures/auth';
 import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  enableFootball,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
@@ -92,6 +95,9 @@ test.describe('League Creation — Sport-aware @regression', () => {
   test('renders the baseball form at /baseball/league/create', async ({
     page,
   }) => {
+    // football_enabled gates the football tab (LS-4767, off in CI); seed it so
+    // the inactive football tab is present to assert aria-selected=false on.
+    await enableFootball(page);
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
@@ -116,6 +122,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
   test('renders the football form at /football/league/create', async ({
     page,
   }) => {
+    await enableFootball(page);
     await page.goto('/football/league/create');
     await page.waitForLoadState('networkidle');
 
@@ -147,6 +154,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
   test('clicking the Football tab navigates to /football/league/create and swaps the form', async ({
     page,
   }) => {
+    await enableFootball(page);
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
@@ -231,6 +239,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
   freeUserTest(
     'free user: football mode + FAAB still triggers the premium gate',
     async ({ page }) => {
+      await enableFootball(page);
       await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
 

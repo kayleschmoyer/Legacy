@@ -29,6 +29,7 @@
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import {
+  enableFootball,
   extractOperationName,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
@@ -260,6 +261,13 @@ async function mockFootballLeagueGraphQL(
 // ===========================================================================
 
 test.describe('Scenario 1: Football league creation @regression', () => {
+  // The football sport tab is gated behind the `football_enabled` flag (LS-4767),
+  // which defaults off in CI. Seed it on before every navigation so the football
+  // tab renders and these create-page assertions hold deterministically.
+  test.beforeEach(async ({ page }) => {
+    await enableFootball(page);
+  });
+
   test('football tab is active and heading shows "Create Football League"', async ({
     page,
   }) => {
@@ -635,11 +643,7 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
   }) => {
     // football_enabled flag is not configured in CI (no VITE_GROWTHBOOK_CLIENT_KEY),
     // so seed it before the bundle loads to make the sport tab visible.
-    await page.addInitScript(() => {
-      (window as Record<string, unknown>)['__gbSeededFeatures'] = {
-        football_enabled: { defaultValue: true },
-      };
-    });
+    await enableFootball(page);
     await page.goto('/football/league/create');
     await page.waitForLoadState('networkidle');
 
