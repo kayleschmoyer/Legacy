@@ -56,7 +56,12 @@ function LeagueFreeAgents({
   });
   const waiverEnabled = leagueData?.league?.waiverEnabled ?? false;
   const maxRosterSize = leagueData?.league?.maxRosterSize ?? Infinity;
-  // waiverType available via leagueData?.league?.waiverType for future FAAB vs priority logic
+  // FAAB (Free Agent Acquisition Budget) leagues require a bid amount on every
+  // waiver claim; standard/priority waiver leagues do not. The bid input and
+  // the required-bid validation below are gated on this flag so non-FAAB
+  // leagues never show an irrelevant bid field.
+  const waiverType = leagueData?.league?.waiverType ?? 'standard';
+  const isFaab = waiverEnabled && waiverType === 'faab';
 
   const { data: rosterData } = useGetTeamMembersQuery({
     variables: { teamId: userTeamId ?? 0 },
@@ -106,14 +111,23 @@ function LeagueFreeAgents({
         return;
       }
 
+      // FAAB leagues require a non-negative bid on every claim — the server
+      // rejects a missing or negative bid with a UserInputError. Enforce it
+      // client-side so the user gets clear guidance instead of a raw error.
+      // Require a whole, non-negative integer string: parseInt would otherwise
+      // silently truncate inputs like "15.5" or "15abc", submitting a bid the
+      // user did not intend (the backend expects a GraphQL Int).
       let bidAmount: number | undefined;
-      if (faabBid) {
-        const parsed = parseInt(faabBid, 10);
-        if (Number.isNaN(parsed) || parsed < 0) {
-          Alert.alert('Invalid Bid', 'Please enter a valid FAAB bid amount.');
+      if (isFaab) {
+        const trimmedBid = faabBid.trim();
+        if (!/^\d+$/.test(trimmedBid)) {
+          Alert.alert(
+            'FAAB Bid Required',
+            'Enter a whole FAAB bid amount (0 or more) to submit a waiver claim in this league.',
+          );
           return;
         }
-        bidAmount = parsed;
+        bidAmount = parseInt(trimmedBid, 10);
       }
       void claimFreeAgent({
         variables: {
@@ -123,7 +137,7 @@ function LeagueFreeAgents({
         },
       });
     },
-    [claimFreeAgent, leagueId, faabBid, userRosterSize, maxRosterSize],
+    [claimFreeAgent, leagueId, faabBid, isFaab, userRosterSize, maxRosterSize],
   );
 
   const handleAddDirectly = useCallback(
@@ -199,7 +213,7 @@ function LeagueFreeAgents({
             <YStack alignItems="flex-end" gap="$1">
               {isClaiming ? (
                 <YStack gap="$1" alignItems="flex-end">
-                  {waiverEnabled && (
+                  {isFaab && (
                     <Input
                       size="$2"
                       width={80}
@@ -207,6 +221,7 @@ function LeagueFreeAgents({
                       value={faabBid}
                       onChangeText={setFaabBid}
                       keyboardType="numeric"
+                      accessibilityLabel="FAAB bid amount"
                     />
                   )}
                   <XStack gap="$1">
