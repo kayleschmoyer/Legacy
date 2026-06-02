@@ -14,11 +14,10 @@
  *  6. Return { leagueId, draftId } so the front-end can render EliteDraftBoardScreen
  */
 
-import { randomBytes } from 'node:crypto';
-
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { eq } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
 
 import { builder } from '../../builder';
 import {

@@ -205,7 +205,7 @@ export default function AboutPage() {
             Ready to manage your fantasy sports league? Join Legacy Sports for
             free.
           </Text>
-          <Button onPress={() => navigate('/')} size="$4">
+          <Button onPress={() => navigate('/pricing')} size="$4">
             Get Started Free
           </Button>
         </InfoCard>
