@@ -4007,6 +4007,7 @@ type StripePriceInfo {
   annualTotalCents: Int!
   monthlyPriceCents: Int!
   monthlyPriceId: String!
+  trialPeriodDays: Int!
 }
 
 type SubscriberGrowthPoint {

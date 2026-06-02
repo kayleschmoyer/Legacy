@@ -357,12 +357,20 @@ const COMPARISON_ROWS = [
   { feature: 'Salary cap leagues', free: false, premium: true },
 ];
 
-const FAQ_ITEMS = [
-  {
-    question: 'Can I try Premium before committing?',
-    answer:
-      'We offer a 14-day free trial for Premium. No credit card required to get started.',
-  },
+// The "try Premium" FAQ answer is derived at render time from the live trial
+// config (trialPeriodDays) so the copy never promises a free trial / no-card
+// experience that the actual Stripe checkout does not deliver (LS-5200).
+const TRIAL_FAQ_QUESTION = 'Can I try Premium before committing?';
+
+function trialFaqAnswer(trialPeriodDays: number): string {
+  return trialPeriodDays > 0
+    ? `We offer a ${trialPeriodDays}-day free trial for Premium. No credit card required to get started.`
+    : 'You can upgrade to Premium whenever you’re ready and cancel at any time — there’s no long-term commitment, and your Premium access continues until the end of the billing period.';
+}
+
+// FAQ entries shown after the trial question (index 0 stays the trial item so
+// existing test selectors and accordion ordering are preserved).
+const OTHER_FAQ_ITEMS = [
   {
     question: 'What happens to my leagues if I downgrade?',
     answer:
@@ -434,6 +442,16 @@ export default function PricingPage() {
   // Derive per-month cost from annualTotal so display always matches the billed amount.
   const annualMonthlyPrice = prices.annualTotal / 12;
   const ANNUAL_SAVINGS_PCT = prices.annualSavingsPct;
+
+  // Build the FAQ list with a trial answer that reflects the live Stripe config
+  // rather than an unconditional "14-day free trial, no credit card" claim.
+  const faqItems = [
+    {
+      question: TRIAL_FAQ_QUESTION,
+      answer: trialFaqAnswer(prices.trialPeriodDays),
+    },
+    ...OTHER_FAQ_ITEMS,
+  ];
 
   const pageBackground: React.CSSProperties = {
     background: `
@@ -836,7 +854,7 @@ export default function PricingPage() {
             </SectionHeader>
 
             <YStack gap="$3" maxWidth={720} alignSelf="center" width="100%">
-              {FAQ_ITEMS.map((item, i) => (
+              {faqItems.map((item, i) => (
                 <FAQItem
                   key={i}
                   data-testid={`pricing-faq-item-${i}`}

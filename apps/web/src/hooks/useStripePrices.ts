@@ -76,6 +76,9 @@ export function useStripePrices() {
   // already captured by the hasNullPrices warning above.
   const monthlyPriceId = stripePrices?.monthlyPriceId ?? null;
   const annualPriceId = stripePrices?.annualPriceId ?? null;
+  // Number of free trial days from live Stripe config; defaults to 0 (no trial)
+  // so trial messaging is never shown when the config is unknown (LS-5200).
+  const trialPeriodDays = stripePrices?.trialPeriodDays ?? 0;
 
   const pricesFailed = !loading && (!!error || hasNullPrices);
 
@@ -86,6 +89,7 @@ export function useStripePrices() {
       pricesFailed,
       monthlyPriceId,
       annualPriceId,
+      trialPeriodDays,
     };
   }
 
@@ -95,5 +99,6 @@ export function useStripePrices() {
     pricesFailed: false,
     monthlyPriceId,
     annualPriceId,
+    trialPeriodDays,
   };
 }

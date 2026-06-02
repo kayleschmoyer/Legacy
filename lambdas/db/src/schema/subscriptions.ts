@@ -38,6 +38,31 @@ const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
   ? parseInt(process.env['STRIPE_TRIAL_PERIOD_DAYS'], 10)
   : undefined;
 
+/**
+ * Build the trial-dependent fragments of a Stripe Checkout Session.
+ *
+ * When a trial is configured we apply `trial_period_days` AND defer card
+ * collection via `payment_method_collection: 'if_required'`. Stripe defaults
+ * subscription-mode checkout to collecting a card up front, which would
+ * contradict the "no credit card required" trial copy on the pricing page
+ * (LS-5200). When no trial is configured, both fragments are empty so checkout
+ * behaves exactly as before.
+ *
+ * Exported for unit testing.
+ */
+export function buildCheckoutTrialParams(trialPeriodDays: number | undefined): {
+  session: { payment_method_collection?: 'if_required' };
+  subscription: { trial_period_days?: number };
+} {
+  if (typeof trialPeriodDays === 'number' && trialPeriodDays > 0) {
+    return {
+      session: { payment_method_collection: 'if_required' },
+      subscription: { trial_period_days: trialPeriodDays },
+    };
+  }
+  return { session: {}, subscription: {} };
+}
+
 // Allowlist of valid Stripe Price IDs for subscription plans.
 // When populated, only these IDs are accepted in createCheckoutSession.
 const STRIPE_ALLOWED_PRICE_IDS: ReadonlySet<string> = new Set(
@@ -150,6 +175,7 @@ const StripePriceInfoRef = builder.objectRef<{
   annualTotalCents: number;
   monthlyPriceId: string;
   annualPriceId: string;
+  trialPeriodDays: number;
 }>('StripePriceInfo');
 
 StripePriceInfoRef.implement({
@@ -158,6 +184,10 @@ StripePriceInfoRef.implement({
     annualTotalCents: t.exposeInt('annualTotalCents', { nullable: false }),
     monthlyPriceId: t.exposeString('monthlyPriceId', { nullable: false }),
     annualPriceId: t.exposeString('annualPriceId', { nullable: false }),
+    // Number of free trial days offered on new subscriptions (0 = no trial).
+    // Lets the client keep its trial messaging in sync with the actual Stripe
+    // checkout config instead of hardcoding a trial that may not exist (LS-5200).
+    trialPeriodDays: t.exposeInt('trialPeriodDays', { nullable: false }),
   }),
 });
 
@@ -283,7 +313,8 @@ builder.queryField('stripePrices', (t) =>
       'Results are cached server-side for 5 minutes.',
     resolve: async () => {
       try {
-        return await fetchStripePrices();
+        const prices = await fetchStripePrices();
+        return { ...prices, trialPeriodDays: STRIPE_TRIAL_PERIOD_DAYS ?? 0 };
       } catch (err) {
         LOGGER.warn('Failed to fetch Stripe prices; returning null', {
           error: err,
@@ -503,6 +534,8 @@ builder.mutationField('createCheckoutSession', (t) =>
         existing?.stripeCustomerId,
       );
 
+      const trialParams = buildCheckoutTrialParams(STRIPE_TRIAL_PERIOD_DAYS);
+
       let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
       try {
         session = await stripe.checkout.sessions.create({
@@ -512,14 +545,16 @@ builder.mutationField('createCheckoutSession', (t) =>
           success_url: args.successUrl,
           cancel_url: args.cancelUrl,
           metadata: { userId: String(userId) },
+          // When a trial is configured, defer card collection so the trial is
+          // genuinely "no credit card required" (matches the pricing copy).
+          // Stripe defaults to 'always' for subscription mode, which would ask
+          // for a card up front despite the trial (LS-5200).
+          ...trialParams.session,
           subscription_data: {
             // Always propagate userId so trial_will_end and other subscription
             // events can correlate back to our user record without a DB lookup.
             metadata: { userId: String(userId) },
-            ...(typeof STRIPE_TRIAL_PERIOD_DAYS === 'number' &&
-            STRIPE_TRIAL_PERIOD_DAYS > 0
-              ? { trial_period_days: STRIPE_TRIAL_PERIOD_DAYS }
-              : {}),
+            ...trialParams.subscription,
           },
         });
       } catch (err) {

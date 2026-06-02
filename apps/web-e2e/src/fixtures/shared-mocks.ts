@@ -106,6 +106,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
         annualTotalCents: 3999,
         monthlyPriceId: 'price_monthly_test',
         annualPriceId: 'price_annual_test',
+        trialPeriodDays: 0,
       },
     },
   },

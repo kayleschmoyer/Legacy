@@ -17,6 +17,7 @@ query GetStripePrices {
     annualTotalCents
     monthlyPriceId
     annualPriceId
+    trialPeriodDays
   }
 }
 

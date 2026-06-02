@@ -75,6 +75,7 @@ jest.mock('../apple-jws', () => ({
 
 import {
   _resetStripePricesCache,
+  buildCheckoutTrialParams,
   expireSubscriptionGracePeriods,
   fetchStripePrices,
   getOrCreateStripeCustomer,
@@ -512,5 +513,32 @@ describe('shouldRedirectToBillingPortal', () => {
   it('does not redirect when there is no existing subscription', () => {
     expect(shouldRedirectToBillingPortal(null)).toBe(false);
     expect(shouldRedirectToBillingPortal(undefined)).toBe(false);
+  });
+});
+
+// ─── buildCheckoutTrialParams (LS-5200) ──────────────────────────────────────
+
+describe('buildCheckoutTrialParams', () => {
+  it('defers card collection and applies trial days when a trial is configured', () => {
+    expect(buildCheckoutTrialParams(14)).toEqual({
+      session: { payment_method_collection: 'if_required' },
+      subscription: { trial_period_days: 14 },
+    });
+  });
+
+  it('returns empty fragments when no trial is configured (undefined)', () => {
+    expect(buildCheckoutTrialParams(undefined)).toEqual({
+      session: {},
+      subscription: {},
+    });
+  });
+
+  it('returns empty fragments when the trial period is zero', () => {
+    // A 0-day trial is not a trial — checkout must still collect a card, so the
+    // "no credit card required" copy must not be shown for this config (LS-5200).
+    expect(buildCheckoutTrialParams(0)).toEqual({
+      session: {},
+      subscription: {},
+    });
   });
 });

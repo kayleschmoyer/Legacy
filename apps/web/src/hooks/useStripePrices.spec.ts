@@ -30,6 +30,7 @@ describe('useStripePrices', () => {
           annualTotalCents: 4999,
           monthlyPriceId: 'price_monthly123',
           annualPriceId: 'price_annual456',
+          trialPeriodDays: 14,
         },
       },
       loading: false,
@@ -46,6 +47,7 @@ describe('useStripePrices', () => {
     expect(result.current.pricesFailed).toBe(false);
     expect(result.current.monthlyPriceId).toBe('price_monthly123');
     expect(result.current.annualPriceId).toBe('price_annual456');
+    expect(result.current.trialPeriodDays).toBe(14);
   });
 
   it('returns hardcoded fallbacks when query returns null', () => {
@@ -65,6 +67,8 @@ describe('useStripePrices', () => {
     expect(result.current.pricesFailed).toBe(true);
     expect(result.current.monthlyPriceId).toBeNull();
     expect(result.current.annualPriceId).toBeNull();
+    // No trial promised when the live config is unavailable (LS-5200).
+    expect(result.current.trialPeriodDays).toBe(0);
   });
 
   it('returns hardcoded fallbacks while loading', () => {
