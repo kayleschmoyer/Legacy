@@ -862,11 +862,17 @@ else
 	@./scripts/resolve-generated-conflicts.sh
 endif
 
-# Codegen command varies by platform (needs env var for schema path)
+# Codegen command varies by platform (needs env var for schema path).
+# Uses run-many (all 7 codegen projects) rather than `affected`: the app/cli/web codegen
+# targets list {workspaceRoot}/lambdas/db/schema.graphql in their nx `inputs`, but the
+# inferred lib codegen targets (api/bref-client/data-loaders/shared-components — run-script,
+# no project.json target) do not track the schema file. So on a schema-only change
+# `nx affected` misses those four lib projects, letting drift slip past local validation and
+# only surface in the all-projects CI codegen check (which uses run-many) (LS-5237).
 ifeq ($(DETECTED_OS),Windows)
-_PC_CODEGEN_CMD = set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=$(NX_BASE)
+_PC_CODEGEN_CMD = set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx run-many -t codegen
 else
-_PC_CODEGEN_CMD = GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=$(NX_BASE)
+_PC_CODEGEN_CMD = GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx run-many -t codegen
 endif
 
 pre-commit: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
