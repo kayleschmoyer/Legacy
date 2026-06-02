@@ -20,8 +20,35 @@ type RNComponents = {
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, back: mockBack }),
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    navigate: mockNavigate,
+  }),
+}));
+
+// Premium settings (LS-5174): the create screen now renders shared premium
+// field components gated by the subscription feature. Mock the subscription
+// hook/gate and the shared premium components so these unit tests stay focused
+// on the create form; the shared components have their own specs.
+let mockIsPremium = false;
+jest.mock('../../../../features/subscription', () => ({
+  useSubscription: () => ({ isPremium: mockIsPremium, loading: false }),
+  PremiumGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock('@legacy-sports/shared-components/leagues', () => ({
+  EraFilterGrid: () => null,
+  CustomEraRange: () => null,
+  WaiverSystemField: () => null,
+  FaabBudgetField: () => null,
+  SalaryCapField: () => null,
+}));
+
+jest.mock('../../../../utils/analytics', () => ({
+  trackPremiumFeatureClick: jest.fn(),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -100,6 +127,7 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
 describe('LeagueCreatePage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsPremium = false;
   });
 
   describe('form rendering', () => {
@@ -230,6 +258,32 @@ describe('LeagueCreatePage', () => {
             maxRosterSize: 25,
           }),
         );
+      });
+    });
+
+    it('includes premium field defaults in the mutation input (LS-5174)', async () => {
+      render(<LeagueCreatePage />);
+
+      const input = screen.getByPlaceholderText('Enter your league name');
+      fireEvent.changeText(input, 'My Test League');
+      fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
+
+      await waitFor(() => {
+        expect(mockCreateLeagueMutate).toHaveBeenCalled();
+        const calls = mockCreateLeagueMutate.mock.calls as Array<
+          [{ variables: { input: Record<string, unknown> } }]
+        >;
+        const submitted = calls[0][0].variables.input;
+        expect(submitted).toEqual(
+          expect.objectContaining({
+            eraFilter: 'all',
+            waiverType: 'standard',
+            salaryCapEnabled: false,
+          }),
+        );
+        // FAAB budget and salary cap are only sent when their features are on.
+        expect(submitted).not.toHaveProperty('faabBudgetDefault');
+        expect(submitted).not.toHaveProperty('salaryCap');
       });
     });
 

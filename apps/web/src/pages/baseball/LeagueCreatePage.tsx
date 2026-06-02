@@ -11,17 +11,25 @@ import {
   H1,
   H2,
   Input,
-  Label,
   ScrollView,
   styled,
   Text,
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertCircle, Check, ChevronRight, Lock } from '@tamagui/lucide-icons';
+import { AlertCircle, Check, ChevronRight } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import { GAMES_PER_MATCHUP_BY_SPORT } from '@legacy-sports/shared-components/sports';
+import {
+  CustomEraRange,
+  EraFilterGrid,
+  ERAS_BY_SPORT,
+  FaabBudgetField,
+  FREE_ERA_IDS_BY_SPORT,
+  SalaryCapField,
+  WaiverSystemField,
+} from '@legacy-sports/shared-components/leagues';
 import {
   formatDateAsUTC,
   formatDraftDate,
@@ -149,7 +157,6 @@ interface CreateLeagueFormData {
 
 const TEAM_COUNT_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16];
 const ALL_DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
-const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
 // ── Sport-specific datasets (per docs/design/HI6N3yPYUzeh981B5SkXmw CreateForm.jsx) ──
 
@@ -216,95 +223,9 @@ const SCHEDULING_STRATEGY_OPTIONS = [
   { label: 'Random', value: 'random' },
 ] as const;
 
-interface EraOption {
-  id: string;
-  name: string;
-  years: string;
-  premium: boolean;
-}
-
-const ERAS_BY_SPORT: Record<SportId, ReadonlyArray<EraOption>> = {
-  baseball: [
-    { id: 'all', name: 'All Eras', years: '1871 – Now', premium: false },
-    {
-      id: 'dead_ball',
-      name: 'Dead Ball (pre-1920)',
-      years: '1901 – 1919',
-      premium: true,
-    },
-    {
-      id: 'golden_age',
-      name: 'Golden Age',
-      years: '1920 – 1945',
-      premium: true,
-    },
-    { id: 'expansion', name: 'Expansion', years: '1946 – 1968', premium: true },
-    {
-      id: 'free_agency',
-      name: 'Free Agency',
-      years: '1969 – 1993',
-      premium: true,
-    },
-    {
-      id: 'steroid_era',
-      name: 'Steroid Era',
-      years: '1994 – 2005',
-      premium: true,
-    },
-    {
-      id: 'modern',
-      name: 'Modern (2006+)',
-      years: '2006 – Now',
-      premium: false,
-    },
-    { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
-  ],
-  football: [
-    { id: 'all', name: 'All Eras', years: '1920 – Now', premium: false },
-    { id: 'pioneer', name: 'Pioneer', years: '1920 – 1945', premium: true },
-    {
-      id: 'single_platoon',
-      name: 'Single-Platoon',
-      years: '1946 – 1959',
-      premium: true,
-    },
-    {
-      id: 'super_bowl',
-      name: 'Super Bowl Era',
-      years: '1960 – 1977',
-      premium: true,
-    },
-    {
-      id: 'west_coast',
-      name: 'West Coast',
-      years: '1978 – 1993',
-      premium: true,
-    },
-    {
-      id: 'salary_cap',
-      name: 'Salary Cap',
-      years: '1994 – 2010',
-      premium: true,
-    },
-    {
-      id: 'spread_offense',
-      name: 'Spread Offense',
-      years: '2011 – Now',
-      premium: false,
-    },
-    { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
-  ],
-};
-
-const FREE_ERA_IDS_BY_SPORT: Record<SportId, ReadonlySet<string>> = {
-  baseball: new Set(['all', 'modern']),
-  football: new Set(['all', 'spread_offense']),
-};
-
-const WAIVER_TYPE_OPTIONS = [
-  { label: 'Standard', value: 'standard' },
-  { label: 'FAAB  ·  Premium', value: 'faab' },
-] as const;
+// Era presets, free-era ids, FAAB budgets, and waiver options now live in
+// `@legacy-sports/shared-components/leagues` so web and mobile stay in sync
+// (LS-5174).
 
 // ── Sport theme tones (LS-4631) ─────────────────────────────────────────────
 // Primary swaps navy → forest green; accent swaps seam-red → amber.
@@ -670,123 +591,8 @@ function CollapsibleSection({
   );
 }
 
-// ── EraCardGrid ──────────────────────────────────────────────────────────────
-
-interface EraCardGridProps {
-  sport: SportId;
-  value: string;
-  onChange: (v: string) => void;
-  isPremium: boolean;
-  disabled: boolean;
-  onUpgrade: () => void;
-}
-
-function EraCardGrid({
-  sport,
-  value,
-  onChange,
-  isPremium,
-  disabled,
-  onUpgrade,
-}: EraCardGridProps): React.JSX.Element {
-  const eraOptions = ERAS_BY_SPORT[sport];
-  const themePrimary = THEME_PRIMARY_BY_SPORT[sport];
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 8,
-      }}
-    >
-      {eraOptions.map((era) => {
-        const locked = era.premium && !isPremium;
-        const selected = value === era.id;
-        return (
-          <button
-            key={era.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => {
-              if (locked) {
-                onUpgrade();
-                return;
-              }
-              onChange(era.id);
-            }}
-            style={{
-              background: selected
-                ? era.premium
-                  ? 'rgba(197,165,90,0.08)'
-                  : withAlpha(themePrimary, 0.22)
-                : '#0A0F1A',
-              border: `1px ${locked ? 'dashed' : 'solid'} ${
-                selected
-                  ? era.premium
-                    ? '#C5A55A'
-                    : withAlpha(themePrimary, 0.8)
-                  : '#2F3B53'
-              }`,
-              borderRadius: 8,
-              padding: '12px 14px',
-              textAlign: 'left',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              position: 'relative',
-              minHeight: 76,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3,
-              transition:
-                'border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, opacity 150ms ease',
-              boxShadow: selected
-                ? `0 0 0 1px ${era.premium ? '#C5A55A' : withAlpha(themePrimary, 0.8)} inset`
-                : 'none',
-              opacity: disabled ? 0.5 : 1,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: '"Big Shoulders Display", system-ui, sans-serif',
-                fontWeight: 700,
-                fontSize: 14,
-                color: selected
-                  ? era.premium
-                    ? '#D4BB78'
-                    : '#F8FAFC'
-                  : '#F8FAFC',
-                letterSpacing: 0.1,
-              }}
-            >
-              {era.name}
-            </span>
-            <span
-              style={{
-                fontFamily: '"JetBrains Mono", monospace',
-                fontSize: 11,
-                color: '#9CAAC5',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {era.years}
-            </span>
-            {era.premium && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  color: '#D4BB78',
-                }}
-              >
-                <Lock size={11} />
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+// EraCardGrid now lives in `@legacy-sports/shared-components/leagues` as the
+// cross-platform `EraFilterGrid` (LS-5174).
 
 // ── ButtonGroup helper ───────────────────────────────────────────────────────
 
@@ -1966,7 +1772,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   label="Historical Era Filter"
                   hint="Only players active during this window are draftable."
                 >
-                  <EraCardGrid
+                  <EraFilterGrid
                     sport={formData.sport}
                     value={formData.baseballEraFilter}
                     onChange={(v) => handleInputChange('baseballEraFilter', v)}
@@ -1981,97 +1787,18 @@ export function LeagueCreatePage(): React.JSX.Element {
 
                 {/* Custom era year range */}
                 {formData.baseballEraFilter === 'custom' && (
-                  <XStack gap="$3" alignItems="flex-end" flexWrap="wrap">
-                    <YStack flex={1} gap="$2">
-                      <Label
-                        htmlFor="era-start"
-                        paddingVertical={0}
-                        height="auto"
-                      >
-                        <Text
-                          fontFamily="$display"
-                          fontWeight="700"
-                          fontSize={11}
-                          letterSpacing={1.4}
-                          textTransform="uppercase"
-                          color="$color11"
-                        >
-                          Start Year
-                        </Text>
-                      </Label>
-                      <Input
-                        id="era-start"
-                        size="$3"
-                        testID="create-league-era-start-input"
-                        placeholder="e.g. 1940"
-                        value={
-                          formData.customEraStartYear !== undefined
-                            ? String(formData.customEraStartYear)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          handleInputChange(
-                            'customEraStartYear',
-                            isNaN(year) ? undefined : year,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={isFormDisabled}
-                        borderColor={
-                          validationErrors.customEra
-                            ? '$red8'
-                            : '$brandNavyLight'
-                        }
-                      />
-                    </YStack>
-                    <Text color="$gray9" marginBottom="$3">
-                      –
-                    </Text>
-                    <YStack flex={1} gap="$2">
-                      <Label
-                        htmlFor="era-end"
-                        paddingVertical={0}
-                        height="auto"
-                      >
-                        <Text
-                          fontFamily="$display"
-                          fontWeight="700"
-                          fontSize={11}
-                          letterSpacing={1.4}
-                          textTransform="uppercase"
-                          color="$color11"
-                        >
-                          End Year
-                        </Text>
-                      </Label>
-                      <Input
-                        id="era-end"
-                        size="$3"
-                        testID="create-league-era-end-input"
-                        placeholder="e.g. 1960"
-                        value={
-                          formData.customEraEndYear !== undefined
-                            ? String(formData.customEraEndYear)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          handleInputChange(
-                            'customEraEndYear',
-                            isNaN(year) ? undefined : year,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={isFormDisabled}
-                        borderColor={
-                          validationErrors.customEra
-                            ? '$red8'
-                            : '$brandNavyLight'
-                        }
-                      />
-                    </YStack>
-                  </XStack>
+                  <CustomEraRange
+                    startYear={formData.customEraStartYear}
+                    endYear={formData.customEraEndYear}
+                    onChangeStart={(v) =>
+                      handleInputChange('customEraStartYear', v)
+                    }
+                    onChangeEnd={(v) =>
+                      handleInputChange('customEraEndYear', v)
+                    }
+                    disabled={isFormDisabled}
+                    invalid={!!validationErrors.customEra}
+                  />
                 )}
 
                 {/* HOF Only */}
@@ -2328,32 +2055,16 @@ export function LeagueCreatePage(): React.JSX.Element {
                 >
                   {/* Waiver Type — full width */}
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <FieldRow
-                      label="Waiver System"
-                      hint={
-                        formData.waiverType === 'faab'
-                          ? 'FAAB: weekly blind bidding on free agents.'
-                          : 'Teams have a priority order'
-                      }
-                    >
-                      <ButtonGroup
-                        value={formData.waiverType}
-                        options={WAIVER_TYPE_OPTIONS.map((o) => ({
-                          value: o.value,
-                          label: o.label,
-                        }))}
-                        onChange={(v) => {
-                          if (v === 'faab' && (!isPremium || premiumLoading)) {
-                            trackPremiumFeatureClick('FAAB Waiver Settings');
-                            setShowWaiverUpgradeModal(true);
-                            return;
-                          }
-                          handleInputChange('waiverType', v);
-                        }}
-                        disabled={isFormDisabled}
-                        wide
-                      />
-                    </FieldRow>
+                    <WaiverSystemField
+                      value={formData.waiverType}
+                      onChange={(v) => handleInputChange('waiverType', v)}
+                      isPremium={!!isPremium && !premiumLoading}
+                      disabled={isFormDisabled}
+                      onUpgrade={() => {
+                        trackPremiumFeatureClick('FAAB Waiver Settings');
+                        setShowWaiverUpgradeModal(true);
+                      }}
+                    />
                   </div>
 
                   {/* FAAB Budget (conditional) */}
@@ -2364,22 +2075,13 @@ export function LeagueCreatePage(): React.JSX.Element {
                         featureName="FAAB Waiver Settings"
                         featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding — the most competitive waiver system for serious leagues."
                       >
-                        <FieldRow
-                          label="FAAB Budget (per manager)"
-                          hint="Each manager starts the season with this budget."
-                        >
-                          <ButtonGroup
-                            value={formData.faabBudgetDefault}
-                            options={FAAB_BUDGET_OPTIONS.map((v) => ({
-                              value: v,
-                              label: `$${v}`,
-                            }))}
-                            onChange={(v) =>
-                              handleInputChange('faabBudgetDefault', v)
-                            }
-                            disabled={isFormDisabled}
-                          />
-                        </FieldRow>
+                        <FaabBudgetField
+                          value={formData.faabBudgetDefault}
+                          onChange={(v) =>
+                            handleInputChange('faabBudgetDefault', v)
+                          }
+                          disabled={isFormDisabled}
+                        />
                       </PremiumGate>
                     </div>
                   )}
@@ -2391,69 +2093,23 @@ export function LeagueCreatePage(): React.JSX.Element {
                       featureName="Salary Cap"
                       featureDescription="Track player salaries and enforce roster spending caps for a competitive salary cap league format."
                     >
-                      <YStack gap="$3">
-                        <FieldRow
-                          label="Enable Salary Cap"
-                          hint="Track player salaries and enforce roster spending limits"
-                        >
-                          <PillToggle
-                            value={formData.salaryCapEnabled}
-                            offLabel="Off"
-                            onLabel="On"
-                            onChange={(v) => {
-                              if (v && (!isPremium || premiumLoading)) {
-                                trackPremiumFeatureClick('Salary Cap');
-                                setShowWaiverUpgradeModal(true);
-                                return;
-                              }
-                              handleInputChange('salaryCapEnabled', v);
-                            }}
-                            disabled={isFormDisabled}
-                          />
-                        </FieldRow>
-
-                        {formData.salaryCapEnabled && (
-                          <FieldRow
-                            label="Salary Cap Limit"
-                            hint="Maximum total salary each team can spend"
-                          >
-                            <XStack alignItems="center" gap="$3">
-                              <Input
-                                size="$3"
-                                value={
-                                  formData.salaryCap !== undefined
-                                    ? String(formData.salaryCap)
-                                    : ''
-                                }
-                                onChangeText={(text: string) => {
-                                  const n = parseInt(text, 10);
-                                  handleInputChange(
-                                    'salaryCap',
-                                    isNaN(n) ? undefined : n,
-                                  );
-                                }}
-                                placeholder="e.g. 50000000"
-                                keyboardType="numeric"
-                                disabled={isFormDisabled}
-                                borderColor={
-                                  validationErrors.salaryCap
-                                    ? '$red8'
-                                    : '$borderColor'
-                                }
-                              />
-                              {validationErrors.salaryCap && (
-                                <Text
-                                  fontFamily="$body"
-                                  fontSize={12}
-                                  color="$red10"
-                                >
-                                  {validationErrors.salaryCap}
-                                </Text>
-                              )}
-                            </XStack>
-                          </FieldRow>
-                        )}
-                      </YStack>
+                      <SalaryCapField
+                        enabled={formData.salaryCapEnabled}
+                        amount={formData.salaryCap}
+                        onToggleEnabled={(v) =>
+                          handleInputChange('salaryCapEnabled', v)
+                        }
+                        onAmountChange={(v) =>
+                          handleInputChange('salaryCap', v)
+                        }
+                        isPremium={!!isPremium && !premiumLoading}
+                        disabled={isFormDisabled}
+                        onUpgrade={() => {
+                          trackPremiumFeatureClick('Salary Cap');
+                          setShowWaiverUpgradeModal(true);
+                        }}
+                        error={validationErrors.salaryCap}
+                      />
                     </PremiumGate>
                   </div>
                 </div>
