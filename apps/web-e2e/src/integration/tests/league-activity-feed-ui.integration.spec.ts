@@ -809,10 +809,13 @@ test.describe
     });
 
     await test.step('Manager sees filter tabs', async () => {
-      // Filter tabs should be available to managers too
-      await expect(
-        page.getByRole('button', { name: /^Trades/i }).first(),
-      ).toBeVisible({ timeout: 5_000 });
+      // Filter tabs should be available to managers too. LS-5051 / LS-5054
+      // fixme'd Phase 5, so the Trades tab is suppressed by the feed's
+      // `count === 0` rule (LeagueActivityFeed.tsx) and not asserted here.
+      // Restore the Trades assertion alongside LS-5055.
+      // await expect(
+      //   page.getByRole('button', { name: /^Trades/i }).first(),
+      // ).toBeVisible({ timeout: 5_000 });
       await expect(
         page.getByRole('button', { name: /^Draft/i }).first(),
       ).toBeVisible({ timeout: 5_000 });
