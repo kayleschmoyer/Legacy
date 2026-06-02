@@ -1349,11 +1349,9 @@ builder.mutationField('restoreGooglePurchases', (t) =>
       const previousTier =
         await getPreviousTierForGooglePurchase(purchaseToken);
 
-      // Record the renewal date so Android subscribers see their next billing
-      // period and expiry is tracked (mirrors the Apple path).
-      const expiryTime = googleSub.lineItems?.[0]?.expiryTime;
-      const currentPeriodEnd = expiryTime ? new Date(expiryTime) : null;
-
+      // `currentPeriodEnd` (the renewal date, so Android subscribers see their
+      // next billing period) is derived above by tierAndStatusFromGoogleSubscription,
+      // which matches the lineItem by productId — mirrors the Apple path.
       await runWithInternalClient(getDbOptions(), async (db) => {
         await db
           .insert(InternalSchema.subscriptions)

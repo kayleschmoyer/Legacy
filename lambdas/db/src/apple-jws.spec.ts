@@ -44,6 +44,20 @@ function makeLeafCert(issuer: string = APPLE_ROOT_SUBJECT) {
   };
 }
 
+// Build a leaf cert whose validity window is offset from `now` by the given
+// number of minutes. Negative `notBeforeOffsetMin` => validity already started;
+// positive => starts in the future. `notAfterOffsetMin` is relative to now too.
+function makeLeafCertWithWindow(
+  notBeforeOffsetMin: number,
+  notAfterOffsetMin: number,
+) {
+  const now = Date.now();
+  const cert = makeLeafCert();
+  cert.validFrom = new Date(now + notBeforeOffsetMin * 60_000).toUTCString();
+  cert.validTo = new Date(now + notAfterOffsetMin * 60_000).toUTCString();
+  return cert;
+}
+
 function makeRootCert() {
   return {
     subject: APPLE_ROOT_SUBJECT,
@@ -232,6 +246,97 @@ describe('decodeAndVerifyJwsTransaction', () => {
     await expect(
       decodeAndVerifyJwsTransaction('forged.jws.token'),
     ).rejects.toThrow(/Last certificate is not issued by Apple Root CA G3/);
+  });
+
+  it('accepts a cert that expired within the clock-skew tolerance (LS-5202 regression)', async () => {
+    // Server clock drifted ~3 min past the cert's notAfter. Without skew
+    // tolerance this failed with "Certificate expired"; ±5 min tolerance
+    // accepts it.
+    mockDecodeProtectedHeader.mockReturnValue({
+      alg: 'ES256',
+      x5c: [STUB_DER],
+    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+
+    const leafCert = makeLeafCertWithWindow(-60, -3);
+    const rootCert = makeRootCert();
+    MockX509Certificate.mockReturnValueOnce(leafCert).mockReturnValueOnce(
+      rootCert,
+    );
+
+    mockImportX509.mockResolvedValue(
+      {} as Awaited<ReturnType<typeof importX509>>,
+    );
+    mockJwtVerify.mockResolvedValue({
+      payload: validPayload,
+      protectedHeader: { alg: 'ES256' },
+    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+
+    const result = await decodeAndVerifyJwsTransaction('header.payload.sig');
+
+    expect(result.transactionId).toBe('txn-001');
+  });
+
+  it('accepts a cert not yet valid within the clock-skew tolerance (LS-5202 regression)', async () => {
+    // Server clock is ~3 min behind the cert's notBefore. Within the ±5 min
+    // tolerance this is accepted rather than failing "not yet valid".
+    mockDecodeProtectedHeader.mockReturnValue({
+      alg: 'ES256',
+      x5c: [STUB_DER],
+    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+
+    const leafCert = makeLeafCertWithWindow(3, 60 * 24 * 365);
+    const rootCert = makeRootCert();
+    MockX509Certificate.mockReturnValueOnce(leafCert).mockReturnValueOnce(
+      rootCert,
+    );
+
+    mockImportX509.mockResolvedValue(
+      {} as Awaited<ReturnType<typeof importX509>>,
+    );
+    mockJwtVerify.mockResolvedValue({
+      payload: validPayload,
+      protectedHeader: { alg: 'ES256' },
+    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+
+    const result = await decodeAndVerifyJwsTransaction('header.payload.sig');
+
+    expect(result.transactionId).toBe('txn-001');
+  });
+
+  it('still rejects a cert expired beyond the clock-skew tolerance (LS-5202)', async () => {
+    // Expired ~10 min ago — outside the ±5 min tolerance, so still rejected.
+    mockDecodeProtectedHeader.mockReturnValue({
+      alg: 'ES256',
+      x5c: [STUB_DER],
+    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+
+    const leafCert = makeLeafCertWithWindow(-60, -10);
+    const rootCert = makeRootCert();
+    MockX509Certificate.mockReturnValueOnce(leafCert).mockReturnValueOnce(
+      rootCert,
+    );
+
+    await expect(
+      decodeAndVerifyJwsTransaction('header.payload.sig'),
+    ).rejects.toThrow(/Certificate expired/);
+  });
+
+  it('still rejects a cert not yet valid beyond the clock-skew tolerance (LS-5202)', async () => {
+    // Becomes valid ~10 min from now — outside the ±5 min tolerance, rejected.
+    mockDecodeProtectedHeader.mockReturnValue({
+      alg: 'ES256',
+      x5c: [STUB_DER],
+    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+
+    const leafCert = makeLeafCertWithWindow(10, 60 * 24 * 365);
+    const rootCert = makeRootCert();
+    MockX509Certificate.mockReturnValueOnce(leafCert).mockReturnValueOnce(
+      rootCert,
+    );
+
+    await expect(
+      decodeAndVerifyJwsTransaction('header.payload.sig'),
+    ).rejects.toThrow(/Certificate not yet valid/);
   });
 
   it('accepts a valid chain whose DN strings differ in formatting (LS-5194 regression)', async () => {
