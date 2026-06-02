@@ -1657,6 +1657,32 @@ builder.mutationField('updateLeagueSettings', (t) =>
           `Salary cap: ${salaryCapEnabled ? 'enabled' : 'disabled'}`,
         );
       }
+
+      // Salary cap sub-fields are premium settings, just like enabling the cap
+      // itself. Without this gate a user whose salary_cap_leagues entitlement
+      // lapsed could still mutate the cap values on a league that still has the
+      // cap enabled (e.g. set salaryCap to 1), breaking the league (LS-5197).
+      // The enabling path (salaryCapEnabled === true) is already gated above; we
+      // additionally require the entitlement whenever a sub-field changes and the
+      // league's current persisted cap is enabled.
+      const salaryCapSubFieldUpdated =
+        salaryCap !== undefined ||
+        salaryFloor !== undefined ||
+        luxuryTaxThreshold !== undefined ||
+        (minSalary !== null && minSalary !== undefined) ||
+        (salaryEscalationPct !== null && salaryEscalationPct !== undefined) ||
+        (salaryDecayPct !== null && salaryDecayPct !== undefined);
+      if (salaryCapSubFieldUpdated) {
+        const [currentLeague] = await context.db
+          .select({ salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+        if (currentLeague?.salaryCapEnabled) {
+          await requireEntitlement(context, ENTITLEMENTS.salary_cap_leagues);
+        }
+      }
+
       if (salaryCap !== undefined) {
         if (salaryCap !== null && salaryCap < 1) {
           throw new Error('Salary cap must be a positive integer');

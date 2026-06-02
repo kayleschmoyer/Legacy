@@ -18,7 +18,6 @@ describe('League Mutations', () => {
       from: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
@@ -26,8 +25,11 @@ describe('League Mutations', () => {
       returning: jest.fn().mockReturnThis(),
     };
 
-    // Mock database utilities
+    // Mock database utilities. Spread the real module so entitlement constants
+    // and helpers (ENTITLEMENTS, tierHasEntitlement, ENTITLEMENT_LABELS) used by
+    // the resolver's entitlement checks resolve correctly (LS-5197).
     jest.doMock('@legacy-sports/utils', () => ({
+      ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
     }));
 
@@ -790,6 +792,103 @@ describe('League Mutations', () => {
       ).rejects.toThrow(
         'Only a general manager or commissioner can update league settings',
       );
+    });
+
+    it('should require salary_cap_leagues entitlement to change salaryCap on a cap-enabled league (LS-5197)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) membership lookup → commissioner, 2) current league cap state →
+      // enabled, 3) subscription tier lookup → free (no entitlement)
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ salaryCapEnabled: true }])
+        .mockResolvedValueOnce([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, salaryCap: 1 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/Salary cap leagues requires an upgraded subscription/);
+    });
+
+    it('should require salary_cap_leagues entitlement to change other cap sub-fields on a cap-enabled league (LS-5197)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ salaryCapEnabled: true }])
+        .mockResolvedValueOnce([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          {
+            input: {
+              leagueId: 1,
+              salaryFloor: 100,
+              luxuryTaxThreshold: 200,
+              minSalary: 5,
+              salaryEscalationPct: 10,
+              salaryDecayPct: 5,
+            },
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/Salary cap leagues requires an upgraded subscription/);
+    });
+
+    it('should NOT require entitlement to change cap sub-fields when the league cap is disabled (LS-5197)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // update/set are only exercised on the write path, which the other
+      // updateLeagueSettings specs never reach — add them locally here.
+      mockDb.update = jest.fn().mockReturnThis();
+      mockDb.set = jest.fn().mockReturnThis();
+      // 1) membership lookup → commissioner, 2) current league cap state →
+      // disabled (no tier lookup expected — the gate must not fire)
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ salaryCapEnabled: false }]);
+      // update returning → updated league; chat-message insert returning → row
+      mockDb.returning
+        .mockResolvedValueOnce([
+          { id: 1, salaryCap: 5, salaryCapEnabled: false },
+        ])
+        .mockResolvedValueOnce([{ id: 10, timestamp: 't' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      const result = await field.resolve(
+        {},
+        { input: { leagueId: 1, salaryCap: 5 } },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({ id: 1, salaryCap: 5, salaryCapEnabled: false });
     });
   });
 
