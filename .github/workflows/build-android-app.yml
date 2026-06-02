@@ -89,6 +89,15 @@ jobs:
       # references resolve to empty strings and the rest of the app is unaffected.
       EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
       EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_ANNUAL_PRICE_ID }}
+      # GIF picker in league chat (LeagueChatTab). Reuse the same neutral Giphy
+      # secret the web build prefixes as VITE_GIPHY_API_KEY — one Giphy app, both
+      # platforms. Unset → the picker silently renders no results.
+      EXPO_PUBLIC_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+      # League invite/share deep-link base. Without this the app falls back to the
+      # hard-coded https://legacysports.app default (app/.../league/[leagueId].tsx),
+      # which is NOT the production web domain — invite links would 404. Pin it to
+      # the same custom domain the web app deploys to (deploy-web.yml CNAME).
+      EXPO_PUBLIC_APP_BASE_URL: https://legacy-fantasy.com
     outputs:
       apk_path: ${{ steps.build.outputs.apk-path }}
       apk_name: ${{ steps.apk-name.outputs.apk_name }}
