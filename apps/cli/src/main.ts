@@ -58,6 +58,7 @@ import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
 import { handleCleanupTestUsers } from './commands/cleanupTestUsers';
 import { handleReportToJiraEpic } from './commands/reportToJiraEpic';
 import { handleSeedDisclosureFacts } from './commands/seedDisclosureFacts';
+import { handleSeedStripe } from './commands/seedStripe';
 import { handleLoadFootballCareer } from './commands/loadFootballCareer';
 import { handleGetPlayerFootballPassing } from './commands/getPlayerFootballPassing';
 import { handleGetPlayerFootballRushing } from './commands/getPlayerFootballRushing';
@@ -711,6 +712,16 @@ export function buildProgram(): Command {
         'The seed is idempotent — safe to re-run.',
     )
     .action(() => handleSeedDisclosureFacts());
+
+  program
+    .command('seed-stripe')
+    .description(
+      'Idempotently seed Stripe test-mode features, product, and prices from ' +
+        'the workspace entitlement constants. Refuses to run against a live-mode ' +
+        '(sk_live_) key. Requires STRIPE_SECRET_KEY (sk_test_...). ' +
+        'Prints the monthly/annual price IDs on success. Safe to re-run.',
+    )
+    .action(() => handleSeedStripe());
 
   program
     .command('load-football-career')

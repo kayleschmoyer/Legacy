@@ -1,4 +1,5 @@
 export * from './lib/allowed-positions';
+export * from './lib/entitlements';
 export * from './lib/sport-defaults';
 export {
   shuffleArray,

@@ -1,17 +1,19 @@
 /**
+ * CLI command: seed-stripe
+ *
  * Idempotent Stripe test-mode seed for subscription features, product, and prices.
  *
  * Usage:
- *   STRIPE_SECRET_KEY=sk_test_... pnpm exec tsx scripts/stripe-seed.ts
+ *   STRIPE_SECRET_KEY=sk_test_... ls-cli seed-stripe
  *
  * Run as many times as you like — every object is identified by a stable
  * `lookup_key` (features and prices) or a metadata key (product). Re-running
- * the script will:
+ * the command will:
  *   - find existing objects by their lookup key and leave them in place
  *   - create anything that's missing
  *   - reconcile feature-to-product attachments (add missing, leave extras)
  *
- * This script refuses to run against a live-mode key — it will abort if
+ * This command refuses to run against a live-mode key — it will abort if
  * STRIPE_SECRET_KEY starts with `sk_live_`. Live-mode provisioning should
  * be a deliberate, reviewed change, not an autorun.
  *
@@ -20,11 +22,12 @@
  */
 
 import Stripe from 'stripe';
+import { LOGGER } from '@legacy-sports/logging';
 import {
-  ENTITLEMENTS,
   ENTITLEMENT_LABELS,
   type EntitlementKey,
-} from '../lambdas/db/src/schema/entitlements';
+  ENTITLEMENTS,
+} from '@legacy-sports/utils';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +71,7 @@ interface PriceSpec {
   interval_count: number;
 }
 
-const PRICES: PriceSpec[] = [
+export const PRICES: PriceSpec[] = [
   {
     lookup_key: 'premium_monthly',
     nickname: 'Premium — Monthly',
@@ -87,7 +90,23 @@ const PRICES: PriceSpec[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function upsertFeature(
+/**
+ * Validate the Stripe secret key: it must be set and must not be a live-mode
+ * key. Returns the validated key so callers can use it without re-reading env.
+ */
+export function assertTestModeKey(key: string | undefined): string {
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not set');
+  }
+  if (key.startsWith('sk_live_')) {
+    throw new Error(
+      'Refusing to run against a live-mode key. Use a test-mode key (sk_test_...).',
+    );
+  }
+  return key;
+}
+
+export async function upsertFeature(
   stripe: Stripe,
   spec: FeatureSpec,
 ): Promise<Stripe.Entitlements.Feature> {
@@ -96,7 +115,7 @@ async function upsertFeature(
     limit: 1,
   });
   if (existing.data.length > 0) {
-    console.log(
+    LOGGER.info(
       `  feature[${spec.lookup_key}] exists (${existing.data[0].id}) — leaving in place`,
     );
     return existing.data[0];
@@ -105,11 +124,11 @@ async function upsertFeature(
     name: spec.name,
     lookup_key: spec.lookup_key,
   });
-  console.log(`  feature[${spec.lookup_key}] created (${created.id})`);
+  LOGGER.info(`  feature[${spec.lookup_key}] created (${created.id})`);
   return created;
 }
 
-async function findProductByMetadata(
+export async function findProductByMetadata(
   stripe: Stripe,
 ): Promise<Stripe.Product | null> {
   // Stripe has no direct "list by metadata" filter. Iterate all products
@@ -124,16 +143,16 @@ async function findProductByMetadata(
   return null;
 }
 
-async function upsertProduct(stripe: Stripe): Promise<Stripe.Product> {
+export async function upsertProduct(stripe: Stripe): Promise<Stripe.Product> {
   const existing = await findProductByMetadata(stripe);
   if (existing) {
     if (!existing.active) {
-      console.warn(
+      LOGGER.warn(
         `  product exists (${existing.id}) but is inactive — leaving as-is. ` +
           `Reactivate it in the Stripe dashboard before running checkout.`,
       );
     } else {
-      console.log(`  product exists (${existing.id}) — leaving in place`);
+      LOGGER.info(`  product exists (${existing.id}) — leaving in place`);
     }
     return existing;
   }
@@ -142,11 +161,11 @@ async function upsertProduct(stripe: Stripe): Promise<Stripe.Product> {
     description: PRODUCT.description,
     metadata: { [PRODUCT_METADATA_KEY]: PRODUCT_METADATA_VALUE },
   });
-  console.log(`  product created (${created.id})`);
+  LOGGER.info(`  product created (${created.id})`);
   return created;
 }
 
-async function attachProductFeatures(
+export async function attachProductFeatures(
   stripe: Stripe,
   productId: string,
   featureIdsByLookupKey: Map<string, string>,
@@ -168,17 +187,17 @@ async function attachProductFeatures(
       );
     }
     if (attachedFeatureIds.has(featureId)) {
-      console.log(`  product feature[${lookupKey}] already attached`);
+      LOGGER.info(`  product feature[${lookupKey}] already attached`);
       continue;
     }
     await stripe.products.createFeature(productId, {
       entitlement_feature: featureId,
     });
-    console.log(`  product feature[${lookupKey}] attached`);
+    LOGGER.info(`  product feature[${lookupKey}] attached`);
   }
 }
 
-async function upsertPrice(
+export async function upsertPrice(
   stripe: Stripe,
   productId: string,
   spec: PriceSpec,
@@ -194,10 +213,10 @@ async function upsertPrice(
   const price = existing.data.find((p) => p.active) ?? existing.data[0] ?? null;
   if (price) {
     if (!price.active) {
-      console.warn(
+      LOGGER.warn(
         `  price[${spec.lookup_key}] exists (${price.id}) but is inactive — leaving as-is. ` +
           `Stripe will reject a create with the same lookup_key; reactivate ${price.id} ` +
-          `or remove its lookup_key in the dashboard, then re-run this script.`,
+          `or remove its lookup_key in the dashboard, then re-run this command.`,
       );
       return price;
     }
@@ -206,13 +225,13 @@ async function upsertPrice(
       price.recurring?.interval !== spec.interval ||
       price.product !== productId;
     if (mismatch) {
-      console.warn(
+      LOGGER.warn(
         `  price[${spec.lookup_key}] exists (${price.id}) but its amount/interval/product differs from the spec. ` +
           `Stripe prices are immutable — to change pricing, deactivate ${price.id} manually in the dashboard, ` +
-          `remove its lookup_key, then re-run this script.`,
+          `remove its lookup_key, then re-run this command.`,
       );
     } else {
-      console.log(
+      LOGGER.info(
         `  price[${spec.lookup_key}] exists (${price.id}) — leaving in place`,
       );
     }
@@ -229,57 +248,58 @@ async function upsertPrice(
       interval_count: spec.interval_count,
     },
   });
-  console.log(
+  LOGGER.info(
     `  price[${spec.lookup_key}] created (${created.id}, ${created.unit_amount}¢ / ${spec.interval})`,
   );
   return created;
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Orchestrator ────────────────────────────────────────────────────────────
 
-async function main(): Promise<void> {
-  const key = process.env['STRIPE_SECRET_KEY'];
-  if (!key) {
-    throw new Error('STRIPE_SECRET_KEY is not set');
-  }
-  if (key.startsWith('sk_live_')) {
-    throw new Error(
-      'Refusing to run against a live-mode key. Use a test-mode key (sk_test_...).',
-    );
-  }
-
-  const stripe = new Stripe(key, { apiVersion: '2026-02-25.clover' });
-
-  console.log('Features:');
+/**
+ * Run the full idempotent seed against a configured Stripe client and return
+ * the resolved monthly / annual price IDs.
+ */
+export async function seedStripe(
+  stripe: Stripe,
+): Promise<{ monthlyPriceId?: string; annualPriceId?: string }> {
+  LOGGER.info('Features:');
   const featureIdsByLookupKey = new Map<string, string>();
   for (const spec of FEATURES) {
     const feature = await upsertFeature(stripe, spec);
     featureIdsByLookupKey.set(spec.lookup_key, feature.id);
   }
 
-  console.log('\nProduct:');
+  LOGGER.info('Product:');
   const product = await upsertProduct(stripe);
 
-  console.log('\nProduct feature attachments:');
+  LOGGER.info('Product feature attachments:');
   await attachProductFeatures(stripe, product.id, featureIdsByLookupKey);
 
-  console.log('\nPrices:');
+  LOGGER.info('Prices:');
   const pricesByLookupKey = new Map<string, Stripe.Price>();
   for (const spec of PRICES) {
     const price = await upsertPrice(stripe, product.id, spec);
     pricesByLookupKey.set(spec.lookup_key, price);
   }
 
-  const monthly = pricesByLookupKey.get('premium_monthly');
-  const annual = pricesByLookupKey.get('premium_annual');
-
-  console.log('\n─── Seed complete ───────────────────────────────────────');
-  console.log('Paste into .env.local / secrets:');
-  console.log(`  STRIPE_MONTHLY_PRICE_ID=${monthly?.id ?? '<missing>'}`);
-  console.log(`  STRIPE_ANNUAL_PRICE_ID=${annual?.id ?? '<missing>'}`);
+  return {
+    monthlyPriceId: pricesByLookupKey.get('premium_monthly')?.id,
+    annualPriceId: pricesByLookupKey.get('premium_annual')?.id,
+  };
 }
 
-main().catch((err) => {
-  console.error('Stripe seed failed:', err);
-  process.exit(1);
-});
+// ── Command handler ───────────────────────────────────────────────────────────
+
+export async function handleSeedStripe(): Promise<void> {
+  const key = assertTestModeKey(process.env['STRIPE_SECRET_KEY']);
+
+  const stripe = new Stripe(key, { apiVersion: '2026-02-25.clover' });
+
+  const { monthlyPriceId, annualPriceId } = await seedStripe(stripe);
+
+  LOGGER.info('─── Seed complete ───────────────────────────────────────');
+  LOGGER.info('Paste into .env.local / secrets:');
+  LOGGER.info(`  STRIPE_MONTHLY_PRICE_ID=${monthlyPriceId ?? '<missing>'}`);
+  LOGGER.info(`  STRIPE_ANNUAL_PRICE_ID=${annualPriceId ?? '<missing>'}`);
+}
