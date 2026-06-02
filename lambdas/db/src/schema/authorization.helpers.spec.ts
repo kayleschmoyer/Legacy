@@ -695,6 +695,25 @@ describe('authorized() wrapper', () => {
     expect(handler).toHaveBeenCalled();
   });
 
+  it('throws FORBIDDEN (not PREMIUM_REQUIRED) for a free non-member when memberOf and premium are both set', async () => {
+    const handler = jest.fn();
+    const resolve = authorized(
+      {
+        memberOf: (args: { leagueId: number }) => args.leagueId,
+        premium: true,
+      },
+      handler,
+    );
+
+    const db = makeDb([]); // no membership row → FORBIDDEN
+    const ctx = makeContext(USER, db);
+
+    await expect(resolve({}, { leagueId: 1 }, ctx)).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it('enforces checkPlayersNotLocked when checkLocked and teamMembers are both set', async () => {
     const handler = jest.fn();
     const resolve = authorized(

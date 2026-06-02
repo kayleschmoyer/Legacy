@@ -609,32 +609,32 @@ export function authorized<TArgs, TResult>(
       requireNotImpersonating(context);
     }
 
-    // 3. Premium subscription check
-    if (config.premium) {
-      await requirePremium(context);
-    }
-
-    // 4. League membership check
+    // 3. League membership check
     if (config.memberOf) {
       const leagueId = config.memberOf(args);
       await verifyLeagueMembership(db, leagueId, user.id);
     }
 
-    // 5. Commissioner / owner check
+    // 4. Commissioner / owner check
     if (config.commissionerOf) {
       const leagueId = config.commissionerOf(args);
       await verifyCommissionerAccess(db, leagueId, user.id);
     }
 
-    // 6. Team edit access check (team owner OR commissioner)
+    // 5. Team edit access check (team owner OR commissioner)
     if (config.teamMembers) {
       const memberIds = config.teamMembers(args);
       await verifyTeamEditAccess(db, user.id, memberIds);
 
-      // 7. Player lock check (only meaningful when team members are specified)
+      // 6. Player lock check (only meaningful when team members are specified)
       if (config.checkLocked) {
         await checkPlayersNotLocked(db, memberIds);
       }
+    }
+
+    // 7. Premium subscription check
+    if (config.premium) {
+      await requirePremium(context);
     }
 
     return handler(parent, args, context, user);
