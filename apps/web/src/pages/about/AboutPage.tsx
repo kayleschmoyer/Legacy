@@ -210,11 +210,30 @@ export default function AboutPage() {
         </InfoCard>
       )}
 
-      <YStack marginTop="$4" alignItems="center">
+      <YStack marginTop="$4" alignItems="center" gap="$2">
         <Text color="$gray10" fontSize="$3" textAlign="center">
           © {new Date().getFullYear()} Legacy Sports
         </Text>
-        <Text color="$gray10" fontSize="$3" textAlign="center" marginTop="$2">
+        <XStack gap="$3" alignItems="center">
+          <LinkValue
+            onPress={() => navigate('/privacy')}
+            role="link"
+            aria-label="Privacy Policy"
+          >
+            Privacy
+          </LinkValue>
+          <Text color="$gray10" fontSize="$3">
+            ·
+          </Text>
+          <LinkValue
+            onPress={() => navigate('/terms')}
+            role="link"
+            aria-label="Terms of Service"
+          >
+            Terms
+          </LinkValue>
+        </XStack>
+        <Text color="$gray10" fontSize="$3" textAlign="center">
           Built with React, TypeScript, and Tamagui
         </Text>
       </YStack>
