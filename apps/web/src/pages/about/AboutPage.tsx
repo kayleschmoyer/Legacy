@@ -213,7 +213,7 @@ export default function AboutPage() {
 
       <YStack marginTop="$4" alignItems="center" gap="$2">
         <Text color="$gray10" fontSize="$3" textAlign="center">
-          © {new Date().getFullYear()} Legacy Sports
+          © {new Date().getUTCFullYear()} Legacy Sports
         </Text>
         <XStack gap="$3" alignItems="center">
           <LinkValue
