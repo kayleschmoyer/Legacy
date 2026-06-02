@@ -535,4 +535,64 @@ describe('Google Play mutation validation (LS-5121)', () => {
       );
     });
   });
+
+  // LS-5176: createBillingPortalSession must surface a BAD_USER_INPUT
+  // GraphQLError (not a raw Error → INTERNAL_SERVER_ERROR) when the caller has
+  // no manageable Stripe subscription, so free / IAP users get a clean 4xx-style
+  // error instead of an opaque 500.
+  describe('createBillingPortalSession (LS-5176)', () => {
+    /** Stub the single-row subscription lookup performed via
+     *  runWithInternalClient → getSubscriptionForUser. */
+    function installSubscriptionLookup(rows: unknown[]): void {
+      const mockDb = {
+        select: () => ({
+          from: () => ({
+            where: () => ({ limit: async () => rows }),
+          }),
+        }),
+      };
+
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      dbClient.runWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: typeof mockDb) => unknown) =>
+          cb(mockDb),
+      );
+    }
+
+    it('throws UserInputError (BAD_USER_INPUT) when the user has no subscription row', async () => {
+      installSubscriptionLookup([]);
+
+      const resolve = getResolver('createBillingPortalSession');
+      await expect(
+        resolve(
+          {},
+          { returnUrl: 'https://app.legacy-fantasy.com/profile/subscription' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('No subscription found'),
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('throws UserInputError (BAD_USER_INPUT) when the subscription is not Stripe-managed', async () => {
+      installSubscriptionLookup([
+        { id: 1, status: 'active', tier: 'premium', stripeCustomerId: null },
+      ]);
+
+      const resolve = getResolver('createBillingPortalSession');
+      await expect(
+        resolve(
+          {},
+          { returnUrl: 'https://app.legacy-fantasy.com/profile/subscription' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('App Store'),
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+  });
 });

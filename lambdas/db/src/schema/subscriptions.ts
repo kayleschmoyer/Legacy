@@ -600,13 +600,13 @@ builder.mutationField('createBillingPortalSession', (t) =>
 
       const subscription = await getSubscriptionForUser(context.user.id);
       if (!subscription) {
-        throw new Error(
+        throw UserInputError(
           'No subscription found — cannot open billing portal without an active subscription.',
         );
       }
 
       if (!subscription.stripeCustomerId) {
-        throw new Error(
+        throw UserInputError(
           'Subscription is not managed by Stripe — use the App Store to manage this subscription.',
         );
       }
