@@ -46,6 +46,7 @@ export type AppDrawerParamList = {
   TradeCenterPage: undefined;
   FreeAgents: undefined;
   PlayerStats: undefined;
+  PlayerComparison: undefined;
   PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'football/league/[leagueId]': { leagueId: string };
@@ -87,6 +88,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'PlayerStats',
     title: 'Player Statistics',
+  },
+  {
+    route: 'PlayerComparison',
+    title: 'Compare Players',
   },
   {
     route: 'baseball/index',
@@ -392,6 +397,10 @@ export default function Layout() {
           <Drawer.Screen
             name="PlayerStats"
             options={{ title: 'Player Statistics' }}
+          />
+          <Drawer.Screen
+            name="PlayerComparison"
+            options={{ title: 'Player Comparison' }}
           />
           <Drawer.Screen
             name="PlayerDetail"
