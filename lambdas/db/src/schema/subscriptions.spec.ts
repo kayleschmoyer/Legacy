@@ -68,6 +68,11 @@ jest.mock('../server/google-play', () => ({
   GOOGLE_PLAY_PACKAGE_NAME: 'com.legacySports',
 }));
 
+// Stub apple-jws — it imports jose (ESM-only) which Jest cannot parse.
+jest.mock('../apple-jws', () => ({
+  decodeAndVerifyJwsTransaction: jest.fn(),
+}));
+
 import {
   _resetStripePricesCache,
   expireSubscriptionGracePeriods,

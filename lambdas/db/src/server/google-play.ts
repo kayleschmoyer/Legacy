@@ -1,11 +1,46 @@
 import { type AuthClient, GoogleAuth } from 'google-auth-library';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import { LOGGER } from '@legacy-sports/logging';
 import '../env';
 
 const SERVICE_ACCOUNT_KEY_LOCAL =
   process.env['GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_JSON'] ?? '';
 const SERVICE_ACCOUNT_KEY_SECRET_NAME =
   process.env['GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_SECRET_NAME'] ?? '';
+
+// Validate credentials at module load time so misconfigurations surface in
+// Lambda cold-start logs rather than only at the first API call.
+if (!SERVICE_ACCOUNT_KEY_LOCAL && !SERVICE_ACCOUNT_KEY_SECRET_NAME) {
+  LOGGER.warn(
+    'Google Play service account not configured: ' +
+      'set GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_JSON or ' +
+      'GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_SECRET_NAME. ' +
+      'Calls to fetchGoogleSubscription will throw at runtime.',
+  );
+} else if (SERVICE_ACCOUNT_KEY_LOCAL) {
+  // The inline key is available synchronously — validate it now so a
+  // malformed value fails fast instead of crashing the first API request.
+  try {
+    const parsed: unknown = JSON.parse(SERVICE_ACCOUNT_KEY_LOCAL);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      typeof (parsed as Record<string, unknown>)['client_email'] !== 'string' ||
+      typeof (parsed as Record<string, unknown>)['private_key'] !== 'string'
+    ) {
+      LOGGER.warn(
+        'GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_JSON is set but missing required ' +
+          'client_email or private_key fields. ' +
+          'Calls to fetchGoogleSubscription will fail at runtime.',
+      );
+    }
+  } catch {
+    LOGGER.warn(
+      'GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_JSON is set but contains invalid JSON. ' +
+        'Calls to fetchGoogleSubscription will fail at runtime.',
+    );
+  }
+}
 
 export const GOOGLE_PLAY_PACKAGE_NAME =
   process.env['GOOGLE_PLAY_PACKAGE_NAME'] ?? 'com.legacySports';
@@ -55,7 +90,15 @@ async function initGoogleAuthClient(): Promise<AuthClient> {
     );
   }
 
-  const parsed: unknown = JSON.parse(keyJson);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(keyJson);
+  } catch {
+    throw new Error(
+      'Google Play service account key is not valid JSON. ' +
+        'Verify GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_JSON or the Secrets Manager secret value.',
+    );
+  }
   if (
     typeof parsed !== 'object' ||
     parsed === null ||

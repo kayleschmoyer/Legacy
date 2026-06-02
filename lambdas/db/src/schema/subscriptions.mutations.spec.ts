@@ -200,6 +200,11 @@ describe('Google Play mutation validation (LS-5121)', () => {
       PublicDb: {},
     }));
 
+    // apple-jws imports jose (ESM-only) which Jest cannot parse.
+    jest.doMock('../apple-jws', () => ({
+      decodeAndVerifyJwsTransaction: jest.fn(),
+    }));
+
     const schemaModule = await import('./index');
     schema = schemaModule.schema;
   });
@@ -308,6 +313,101 @@ describe('Google Play mutation validation (LS-5121)', () => {
         expect.objectContaining({
           subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
         }),
+      );
+    });
+
+    it('returns false and logs error when Google Play API call fails', async () => {
+      mockFetchGoogleSubscription.mockRejectedValue(
+        new Error('Network timeout'),
+      );
+
+      const resolve = getResolver('restoreGooglePurchases');
+      const result = await resolve(
+        {},
+        {
+          purchaseToken: 'fake-token',
+          productId: 'com.legacysports.app.premium.monthly',
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(false);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'restoreGooglePurchases — Google Play API call failed',
+        expect.objectContaining({ error: 'Network timeout' }),
+      );
+    });
+
+    it('calls clearLeagueTierFreezes when user upgrades from free to premium', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [
+          {
+            productId: 'com.legacysports.app.premium.monthly',
+            expiryTime: '2030-12-31T00:00:00Z',
+          },
+        ],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+
+      const dbClientModule = jest.requireMock('@legacy-sports/db-client');
+
+      // First runWithInternalClient call: getPreviousTierForGooglePurchase SELECT
+      dbClientModule.runWithInternalClient.mockImplementationOnce(
+        async (
+          _opts: unknown,
+          cb: (db: { select: jest.Mock }) => Promise<unknown>,
+        ) =>
+          cb({
+            select: jest.fn().mockReturnValue({
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockResolvedValue([{ tier: 'free' }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      // Second runWithInternalClient call: INSERT + UPDATE subscription
+      dbClientModule.runWithInternalClient.mockImplementationOnce(
+        async (
+          _opts: unknown,
+          cb: (db: {
+            insert: jest.Mock;
+            update: jest.Mock;
+          }) => Promise<unknown>,
+        ) =>
+          cb({
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockReturnValue({
+                onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+              }),
+            }),
+            update: jest.fn().mockReturnValue({
+              set: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+            }),
+          }),
+      );
+
+      const resolve = getResolver('restoreGooglePurchases');
+      const result = await resolve(
+        {},
+        {
+          purchaseToken: 'fake-token',
+          productId: 'com.legacysports.app.premium.monthly',
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(dbClientModule.clearLeagueTierFreezes).toHaveBeenCalledWith(
+        1,
+        expect.anything(),
       );
     });
   });

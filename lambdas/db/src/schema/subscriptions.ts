@@ -26,6 +26,7 @@ import {
   fetchGoogleSubscription,
   GOOGLE_PLAY_PACKAGE_NAME,
   isActiveGoogleSubscription,
+  type SubscriptionPurchaseV2,
 } from '../server/google-play';
 import {
   decodeAndVerifyJwsTransaction,
@@ -1282,11 +1283,16 @@ builder.mutationField('verifyGooglePurchase', (t) =>
 );
 
 /**
- * restoreGooglePurchases — look up an existing Google Play subscription for
- * this user and refresh the tier/status.
+ * restoreGooglePurchases — validate a Google Play purchase token against the
+ * Play Developer API, then sync the resulting tier/status for this user.
  *
  * Called when the user taps "Restore Purchases" on Android. The caller passes
  * the most recent purchaseToken from react-native-iap's getAvailablePurchases().
+ *
+ * Previously this mutation unconditionally set status:active, allowing any
+ * user with a stale token (cancelled, refunded, expired) to restore premium
+ * indefinitely. Now we validate the token against purchases.subscriptionsv2.get
+ * before writing, matching the expiry-aware logic in restoreApplePurchases.
  */
 builder.mutationField('restoreGooglePurchases', (t) =>
   t.field({
@@ -1312,11 +1318,22 @@ builder.mutationField('restoreGooglePurchases', (t) =>
       const userId = context.user.id;
       const { purchaseToken, productId } = args;
 
-      // Verify the purchase token against the Google Play Developer API
-      const googleSub = await fetchGoogleSubscription(
-        GOOGLE_PLAY_PACKAGE_NAME,
-        purchaseToken,
-      );
+      // Validate the purchase token against the Google Play Developer API.
+      let googleSub;
+      try {
+        googleSub = await fetchGoogleSubscription(
+          GOOGLE_PLAY_PACKAGE_NAME,
+          purchaseToken,
+        );
+      } catch (err) {
+        LOGGER.error('restoreGooglePurchases — Google Play API call failed', {
+          userId,
+          productId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return false;
+      }
+
       if (!isActiveGoogleSubscription(googleSub)) {
         LOGGER.warn('restoreGooglePurchases — subscription not active', {
           userId,
@@ -1326,8 +1343,11 @@ builder.mutationField('restoreGooglePurchases', (t) =>
         return false;
       }
 
-      const tier = tierFromGoogleProductId(productId);
-      const status = 'active';
+      const { tier, status, currentPeriodEnd } =
+        tierAndStatusFromGoogleSubscription(googleSub, productId);
+
+      const previousTier =
+        await getPreviousTierForGooglePurchase(purchaseToken);
 
       // Record the renewal date so Android subscribers see their next billing
       // period and expiry is tracked (mirrors the Apple path).
@@ -1363,11 +1383,21 @@ builder.mutationField('restoreGooglePurchases', (t) =>
           .where(eq(InternalSchema.usersInAppInternal.id, userId));
       });
 
+      // Apply tier-change side effects
+      if (previousTier !== tier) {
+        if (tier === 'free') {
+          await handleSubscriptionDowngrade(userId, getDbOptions());
+        } else if (tier === 'premium' && previousTier === 'free') {
+          await clearLeagueTierFreezes(userId, getDbOptions());
+        }
+      }
+
       LOGGER.info('restoreGooglePurchases — subscription restored', {
         userId,
         productId,
         tier,
         status,
+        subscriptionState: googleSub.subscriptionState,
       });
 
       return true;
@@ -1389,6 +1419,56 @@ function tierFromGoogleProductId(productId: string): 'free' | 'premium' {
     return 'premium';
   }
   return 'free';
+}
+
+/**
+ * Derive tier, status, and currentPeriodEnd from a Google Play
+ * SubscriptionPurchaseV2 resource.
+ *
+ * State mapping:
+ *   ACTIVE            → active / premium
+ *   IN_GRACE_PERIOD   → past_due / premium  (payment failing but within grace window)
+ *   CANCELED/EXPIRED  → canceled / free
+ *   other             → canceled / free
+ */
+export function tierAndStatusFromGoogleSubscription(
+  subscription: SubscriptionPurchaseV2,
+  productId: string,
+): {
+  tier: 'free' | 'premium';
+  status: 'active' | 'past_due' | 'canceled';
+  currentPeriodEnd: Date | null;
+} {
+  const state = subscription.subscriptionState;
+
+  const expiryItem = subscription.lineItems?.find(
+    (item) => item.productId === productId,
+  );
+  const currentPeriodEnd = expiryItem?.expiryTime
+    ? new Date(expiryItem.expiryTime)
+    : null;
+
+  if (state === 'SUBSCRIPTION_STATE_ACTIVE') {
+    return { tier: 'premium', status: 'active', currentPeriodEnd };
+  }
+  if (state === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD') {
+    return { tier: 'premium', status: 'past_due', currentPeriodEnd };
+  }
+  const knownInactiveStates = new Set([
+    'SUBSCRIPTION_STATE_CANCELED',
+    'SUBSCRIPTION_STATE_EXPIRED',
+    'SUBSCRIPTION_STATE_ON_HOLD',
+    'SUBSCRIPTION_STATE_PAUSED',
+    'SUBSCRIPTION_STATE_PENDING',
+    'SUBSCRIPTION_STATE_UNSPECIFIED',
+  ]);
+  if (!knownInactiveStates.has(state)) {
+    LOGGER.warn(
+      'tierAndStatusFromGoogleSubscription — unknown subscriptionState, treating as canceled',
+      { subscriptionState: state },
+    );
+  }
+  return { tier: 'free', status: 'canceled', currentPeriodEnd };
 }
 
 async function getPreviousTierForGooglePurchase(
