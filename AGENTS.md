@@ -92,7 +92,7 @@ The one fact to keep in working memory without loading the skill: **you are the 
 
 **Operational runbook (new-feature entrypoint, the dominant path)**: follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow-overview/SKILL.md` — single source of truth for procedure. Summary:
 
-0. Epic check (Parent Dispatch Mode — **bucket epics auto-batch-dispatch chips for all unblocked To Do descendants; other epics ask user before claiming any child**) → 1. Create/identify ticket → **1b. Planning phase** → 2. Dependency check → 3. Jira "In Progress" → 4. Worktree setup → 5. node_modules symlink → 6. Work in worktree → 7. Code & test → 8. Commit → 9. Rebase → 10. Migrations → 11. `make pc` + self-review → 12. Ship (draft PR → mark ready → bot review → reply threads → Jira "In Review") → 13. Watch PR to merge → 14. MCP gap audit → 15. Complete tracking tasks → 16. Cleanup
+0. Epic check (Parent Dispatch Mode — **all epics auto-batch-dispatch chips for all unblocked To Do descendants without asking; Story/Task parents with children ask user before claiming any child**) → 1. Create/identify ticket → **1b. Planning phase** → 2. Dependency check → 3. Jira "In Progress" → 4. Worktree setup → 5. node_modules symlink → 6. Work in worktree → 7. Code & test → 8. Commit → 9. Rebase → 10. Migrations → 11. `make pc` + self-review → 12. Ship (draft PR → mark ready → bot review → reply threads → Jira "In Review") → 13. Watch PR to merge → 14. MCP gap audit → 15. Complete tracking tasks → 16. Cleanup
 
 For PR creation, review fixing, and thread resolution details, see `.agents/skills/pr-lifecycle/SKILL.md`. For error recovery during any step, see `.agents/skills/workflow-overview/references/error-recovery.md`.
 

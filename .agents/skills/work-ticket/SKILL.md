@@ -1,6 +1,6 @@
 ---
 name: work-ticket
-description: 'Autonomously implement a Jira ticket end-to-end. For leaf tickets (task/story/bug with no children): blocker check, worktree, code, validate, PR, Jira transition. For recognized bucket epics (design-sync, mcp-gaps, client-bugs — identified via jira_get_bucket_epic): auto-batch-dispatch chips for all unblocked To Do descendants without asking the user. For other Epics (or Stories/Tasks with To Do children): never implements the parent itself — gathers To Do descendants two levels deep and asks the user how to dispatch (chips for all / pick one / chips for a subset). Pass --batch to skip the prompt and chip-dispatch every unblocked To Do descendant. Updates ticket and parent statuses automatically. Runs MCP gap audit before finishing. Load when the user gives a ticket key and expects autonomous completion.'
+description: 'Autonomously implement a Jira ticket end-to-end. For leaf tickets (task/story/bug with no children): blocker check, worktree, code, validate, PR, Jira transition. For all Epics: auto-batch-dispatch chips for all unblocked To Do descendants without asking the user. For Story/Task parents with To Do children: never implements the parent itself — gathers To Do descendants two levels deep and asks the user how to dispatch (chips for all / pick one / chips for a subset). Pass --batch to skip the prompt and chip-dispatch every unblocked To Do descendant. Updates ticket and parent statuses automatically. Runs MCP gap audit before finishing. Load when the user gives a ticket key and expects autonomous completion.'
 ---
 
 # Skill: Work Ticket
@@ -10,7 +10,7 @@ description: 'Autonomously implement a Jira ticket end-to-end. For leaf tickets 
 Autonomously work a Jira ticket from To Do through to merge (or Done). Handles three modes:
 
 1. **Leaf ticket** (task/story/bug with no children) — implement it solo using the standard worktree workflow.
-2. **Parent Dispatch Mode** (Epic, or Story/Task with To Do children, no `--batch`) — gather To Do descendants two levels deep. For **recognized bucket epics** (design-sync, mcp-gaps, client-bugs — identified via `jira_get_bucket_epic`): auto-batch-dispatch chips for all unblocked To Do descendants without asking the user. For **other epics/parents**: ask the user how to dispatch them (chips for all / pick one / chips for a subset). **Never implement an epic itself.**
+2. **Parent Dispatch Mode** (Epic, or Story/Task with To Do children, no `--batch`) — gather To Do descendants two levels deep. For **all epics** (`type == "Epic"`): auto-batch-dispatch chips for all unblocked To Do descendants without asking the user. For **Story/Task parents**: ask the user how to dispatch them (chips for all / pick one / chips for a subset). **Never implement an epic itself.**
 3. **Parent Mode — batch chip dispatch** (`--batch` flag) — skip the prompt and dispatch chips for every unblocked To Do descendant, one chip per ticket.
 
 ## When to Use
@@ -33,7 +33,7 @@ work-ticket <ticket-key> [--batch]
 The `--batch` flag is also implied when:
 
 - The user's natural-language request contains phrases like "work all tickets under", "process the full backlog", or "implement all children of".
-- The input ticket is a **recognized bucket epic** (its key matches what `jira_get_bucket_epic` returns for any known bucket: `design-sync`, `mcp-gaps`, `client-bugs`). For bucket epics, auto-batch is the default — no user prompt is needed.
+- The input ticket is an **Epic** (`type == "Epic"`). All epics auto-batch by default — no user prompt is needed.
 
 ## Critical Rules
 
@@ -133,15 +133,14 @@ jira_list_children(key: "LS-####", limit: 100)
 
 > **Pagination required**: if the response contains `nextPageToken`, you must paginate (pass `pageToken` to subsequent calls) until `nextPageToken` is absent. Never assume the first page is complete — default limits (10-25) will silently truncate large epics.
 
-| Condition                                                                                                                | Mode                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No children (or `jira_list_children` returns empty)                                                                      | **Leaf mode** — implement this ticket directly                                                                                                            |
-| `type == "Epic"` AND key matches a known bucket epic (`jira_get_bucket_epic` for `design-sync`/`mcp-gaps`/`client-bugs`) | **Parent Mode (batch chip dispatch)** — auto-dispatch chips for all unblocked To Do descendants; **no user prompt**. **Never implement the epic itself.** |
-| `type == "Epic"` (non-bucket, or unrecognized)                                                                           | **Parent Dispatch Mode** — gather To Do descendants two levels deep, ask the user (chips for all / pick one / subset). **Never implement the epic.**      |
-| Has children, `type` in `{Story, Task}`, `--batch` flag absent                                                           | **Parent Dispatch Mode** — same as non-bucket Epic; ask the user what to do                                                                               |
-| Has children, `--batch` flag present (or implied by user text or bucket-epic detection)                                  | **Parent Mode (batch chip dispatch)** — spawn one chip per unblocked To Do child (chips claim their own tickets), stop                                    |
+| Condition                                                                               | Mode                                                                                                                                                      |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No children (or `jira_list_children` returns empty)                                     | **Leaf mode** — implement this ticket directly                                                                                                            |
+| `type == "Epic"` (any epic, with or without children)                                   | **Parent Mode (batch chip dispatch)** — auto-dispatch chips for all unblocked To Do descendants; **no user prompt**. **Never implement the epic itself.** |
+| Has children, `type` in `{Story, Task}`, `--batch` flag absent                          | **Parent Dispatch Mode** — gather To Do descendants two levels deep, ask the user (chips for all / pick one / subset)                                     |
+| Has children, `--batch` flag present (or implied by user text or bucket-epic detection) | **Parent Mode (batch chip dispatch)** — spawn one chip per unblocked To Do child (chips claim their own tickets), stop                                    |
 
-> **Why Epic input always routes to Parent Dispatch Mode**: silently claiming and working "the first available child" of an epic is rarely what the user meant when they typed `/work-ticket LS-####` with an epic key — especially for bucket epics (e.g. LS-2981 MCP gaps, LS-4568 Design Sync) where children represent independent units of work. The Parent Dispatch Mode flow surfaces the full To Do backlog and lets the user decide; it also enumerates **two levels deep** so a bucket epic containing child epics (each containing the actual story/task children) resolves correctly without further clarification rounds.
+> **Why all Epics auto-batch-dispatch**: every Epic's children are independent units of work ready to be driven in parallel — the user's intent when targeting an epic key is always "work down this backlog", not "implement just the first available child". The two-level enumeration ensures epics containing child epics (each containing the actual story/task children) resolve correctly without further clarification rounds.
 
 > **Bucket epic handling — per-child slash command varies by bucket.** Identify the bucket by calling `jira_get_bucket_epic` once per known bucket name (`design-sync`, `mcp-gaps`, `client-bugs`) and matching the input epic key against each returned key. Different buckets have different per-child workflows — the chip prompt must select the right slash command (`/implement-design` for design-sync children; `/work-ticket` for mcp-gaps, client-bugs, and generic). The full decision table lives in [`references/bucket-epic-routing.md`](references/bucket-epic-routing.md); Parent Dispatch Mode step 5 below selects the chip template accordingly. Never hardcode bucket-epic keys — they rotate. If `jira_get_bucket_epic` does not resolve any known bucket to the input epic, treat it as a generic bucket epic and use `/work-ticket` for its children; do not guess routing from labels or summary prefixes.
 
@@ -405,7 +404,7 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
 4. **Present the To Do descendants to the user** with a single `AskUserQuestion` call. Include each To Do descendant's key + summary in the prompt body (above the question), **annotated with its blocker status from Step 2e** — `✓ clear` if blockers are all Done (or none exist), or `⚠ blocked by LS-####[, LS-####]` if any blocker is still open. The user must see blocker status before choosing dispatch so they can defer or deselect blocked tickets via the `subset` option.
 
-   > **Precondition for `AskUserQuestion` in this step**: the input ticket is **not** a recognized bucket epic. Bucket epics (design-sync, mcp-gaps, client-bugs) identified in the `--batch` check above proceed directly to Step 5 and dispatch chips for all unblocked To Do descendants — the user's intent is already implicit in the bucket-epic semantics.
+   > **Precondition for `AskUserQuestion` in this step**: the input ticket is **not** an Epic (`type == "Epic"`). All epics proceed directly to Step 5 and auto-dispatch chips for all unblocked To Do descendants — no user confirmation is needed for any epic.
 
    Example list rendering (annotate inline; align columns for scannability):
 
