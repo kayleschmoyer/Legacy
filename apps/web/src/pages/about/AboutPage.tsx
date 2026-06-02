@@ -104,10 +104,7 @@ export default function AboutPage() {
       />
       <YStack gap="$2" marginBottom="$4">
         <H1>
-          <span role="img" aria-label="info">
-            ℹ️
-          </span>{' '}
-          About Legacy Sports
+          <span aria-hidden="true">ℹ️</span> About Legacy Sports
         </H1>
         <Text color="$gray11" fontSize="$5">
           Fantasy sports management platform - Version and deployment
