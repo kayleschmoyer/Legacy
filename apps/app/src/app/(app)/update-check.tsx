@@ -263,3 +263,4 @@ export default function UpdateCheckScreen(): React.JSX.Element {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

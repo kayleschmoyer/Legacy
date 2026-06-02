@@ -459,3 +459,4 @@ export default function FreeAgentsScreen() {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

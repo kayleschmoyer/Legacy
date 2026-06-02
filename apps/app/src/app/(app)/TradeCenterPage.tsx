@@ -278,3 +278,4 @@ export default function TradeCenterPage() {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

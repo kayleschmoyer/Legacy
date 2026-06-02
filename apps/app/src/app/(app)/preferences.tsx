@@ -466,3 +466,4 @@ export default function PreferencesScreen(): React.JSX.Element {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

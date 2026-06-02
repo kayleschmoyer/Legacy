@@ -532,3 +532,4 @@ export function TeamIdHeader(): React.JSX.Element {
 
   return <Text>{team?.team?.name}</Text>;
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

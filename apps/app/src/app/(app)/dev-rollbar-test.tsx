@@ -67,3 +67,4 @@ export default function DevRollbarTestScreen(): React.JSX.Element | null {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

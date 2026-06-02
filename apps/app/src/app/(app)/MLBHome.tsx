@@ -25,3 +25,4 @@ export default function BaseballHome() {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

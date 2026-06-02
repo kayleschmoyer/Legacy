@@ -536,3 +536,4 @@ export function FootballLeagueCreatePage(): React.JSX.Element {
 }
 
 export default FootballLeagueCreatePage;
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

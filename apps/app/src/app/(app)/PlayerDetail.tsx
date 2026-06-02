@@ -19,3 +19,4 @@ export default function PlayerDetailScreen() {
 
   return <PlayerDetailById playerId={id} />;
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

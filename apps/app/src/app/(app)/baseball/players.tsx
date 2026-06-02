@@ -181,3 +181,4 @@ export default function Players(): React.JSX.Element {
     </SafeAreaView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

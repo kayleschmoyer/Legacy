@@ -595,3 +595,4 @@ export default function FootballPlayers(): React.JSX.Element {
     </KeyboardAvoidingView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

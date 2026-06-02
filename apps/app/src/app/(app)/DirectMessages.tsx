@@ -436,3 +436,4 @@ export default function DirectMessagesScreen() {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

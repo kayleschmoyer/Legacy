@@ -674,3 +674,4 @@ export function LeagueIdHeader(_props: HeaderTitleProps): React.JSX.Element {
 
   return <H3>{data ? data.league?.name : ''}</H3>;
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

@@ -103,3 +103,4 @@ export default function ViewGameLogs(): React.JSX.Element {
     </KeyboardAvoidingView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

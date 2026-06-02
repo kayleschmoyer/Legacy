@@ -647,3 +647,4 @@ export function FootballLeagueIdHeader(
 
   return <H3>{data ? data.league?.name : ''}</H3>;
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

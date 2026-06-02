@@ -255,3 +255,4 @@ export default function NotificationsScreen(): React.JSX.Element {
     </YStack>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

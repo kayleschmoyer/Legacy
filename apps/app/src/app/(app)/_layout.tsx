@@ -452,3 +452,5 @@ export default function Layout() {
     </AuthorizedUserContextProvider>
   );
 }
+
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

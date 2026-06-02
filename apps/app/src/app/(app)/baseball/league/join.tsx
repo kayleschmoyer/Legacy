@@ -308,3 +308,4 @@ export default function JoinLeagueByCodeScreen(): React.JSX.Element {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

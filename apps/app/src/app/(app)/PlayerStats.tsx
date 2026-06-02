@@ -33,3 +33,4 @@ export default function PlayerStatsScreen() {
     />
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

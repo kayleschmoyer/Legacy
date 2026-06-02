@@ -90,3 +90,4 @@ export default function ViewCareerStats(): React.JSX.Element {
     </KeyboardAvoidingView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

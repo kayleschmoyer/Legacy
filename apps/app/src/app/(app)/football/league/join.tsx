@@ -310,3 +310,4 @@ export default function JoinFootballLeagueByCodeScreen(): React.JSX.Element {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

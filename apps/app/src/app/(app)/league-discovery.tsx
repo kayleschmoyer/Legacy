@@ -289,3 +289,4 @@ export default function LeagueDiscoveryScreen() {
     </YStack>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

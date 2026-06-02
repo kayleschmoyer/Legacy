@@ -38,3 +38,4 @@ export default function DraftBoardPage() {
     />
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

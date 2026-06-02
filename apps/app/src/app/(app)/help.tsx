@@ -328,3 +328,4 @@ export default function HelpScreen(): React.JSX.Element {
     </ScrollView>
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

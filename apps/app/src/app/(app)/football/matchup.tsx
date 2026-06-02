@@ -38,3 +38,4 @@ export default function FootballMatchupRoute(): React.JSX.Element {
     />
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

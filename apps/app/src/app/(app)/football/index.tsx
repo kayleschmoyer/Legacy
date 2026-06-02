@@ -52,3 +52,4 @@ export default function FootballHome() {
     />
   );
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

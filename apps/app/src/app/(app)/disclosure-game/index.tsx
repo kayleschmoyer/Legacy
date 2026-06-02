@@ -13,3 +13,4 @@ export default function DisclosureGameScreen() {
 
   return <DisclosureGame onBack={() => router.back()} />;
 }
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';
