@@ -688,22 +688,31 @@ export async function getToken(): Promise<string> {
     await invalidateCachedToken();
   }
 
-  // 3. GitHub App token (AGENT_AUTHOR_APP_PRIVATE_KEY env var)
+  // 3. GitHub App token (AGENT_AUTHOR_APP_PRIVATE_KEY env var).
+  //    Trust a freshly-generated app token without a validateToken() round-trip.
+  //    It comes straight from a successful installation access-token exchange, and
+  //    an app installation token deterministically fails `GET /user` with 403
+  //    ("Resource not accessible by integration") because it represents an app,
+  //    not a user. Re-validating it therefore adds two cold-start-latency-sensitive
+  //    API calls whose only failure modes here are false negatives — which is
+  //    exactly what surfaced as the intermittent "no valid token" error (LS-5248):
+  //    a valid app token was discarded after a transient validation hiccup, and the
+  //    Lambda short-circuit below then reported it as no-token-at-all. tryResolveToken()
+  //    already skips validation for this reason; keep the two paths consistent. A
+  //    genuinely bad token still self-heals: githubRest() invalidates the cache and
+  //    re-resolves once on the first 401.
+  let appTokenError: string | null = null;
   try {
     const appResult = await generateGitHubAppToken();
     if (appResult) {
-      if (await validateToken(appResult.token)) {
-        cachedToken = appResult.token;
-        await writeCachedToken(appResult.token, appResult.expiresAt);
-        return appResult.token;
-      }
-      process.stderr.write(
-        'Warning: Generated GitHub App token failed validation. Trying other methods.\n',
-      );
+      cachedToken = appResult.token;
+      await writeCachedToken(appResult.token, appResult.expiresAt);
+      return appResult.token;
     }
   } catch (err) {
+    appTokenError = err instanceof Error ? err.message : String(err);
     process.stderr.write(
-      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}. Trying other methods.\n`,
+      `Warning: GitHub App token generation failed: ${appTokenError}. Trying other methods.\n`,
     );
   }
 
@@ -715,10 +724,17 @@ export async function getToken(): Promise<string> {
   // failed. Short-circuit with an honest error instead.
   if (isLambda()) {
     throw new Error(
-      'GitHub MCP server (Lambda): no valid token from env, cached file, or ' +
-        'AGENT_AUTHOR_APP_PRIVATE_KEY. Interactive sources (.netrc, gh CLI, ' +
-        'device flow) are not available in Lambda. Check the GITHUB_TOKEN_SECRET_NAME ' +
-        'secret and the GitHub App installation.',
+      'GitHub MCP server (Lambda): could not provision a GitHub token. ' +
+        (appTokenError
+          ? `The GitHub App installation token exchange failed: ${appTokenError}. ` +
+            'Verify the GITHUB_TOKEN_SECRET_NAME secret holds a valid app_id, ' +
+            'installation_id, and private_key for an installation that includes this repo. '
+          : 'No GitHub App private key was resolved — AGENT_AUTHOR_APP_PRIVATE_KEY is ' +
+            'unset/empty after loading the GITHUB_TOKEN_SECRET_NAME secret. ') +
+        'This is a token-provisioning failure, NOT a permission/scope issue: a 403 ' +
+        '"Resource not accessible by integration" on a specific endpoint would indicate ' +
+        'a missing GitHub App permission instead. Interactive sources (.netrc, gh CLI, ' +
+        'device flow) are not available in Lambda.',
     );
   }
 

@@ -105,8 +105,28 @@ async function doRest<T>(opts: RestOptions, canRetry: boolean): Promise<T> {
 
   if (!response.ok) {
     const text = await response.text();
+    const sanitized = sanitizeErrorBody(text);
+    // A 403 that reaches here is NOT a rate limit (that case is handled above) —
+    // GitHub returns "Resource not accessible by integration" when a token WAS
+    // provisioned and accepted but the GitHub App installation lacks the
+    // repository permission governing this endpoint. Surface that explicitly so
+    // it is not confused with the "no token provisioned" failure thrown by
+    // getToken() (LS-5248).
+    if (
+      response.status === 403 &&
+      /resource not accessible by integration/i.test(text)
+    ) {
+      throw new Error(
+        `GitHub API ${opts.method} ${opts.path} failed (403): ${sanitized}. ` +
+          'This is a missing GitHub App permission/scope, not a missing token — a ' +
+          'token was provisioned and accepted. The Agent Author GitHub App installation ' +
+          'lacks the repository permission governing this endpoint (e.g. "Commit ' +
+          'statuses: Read" for /statuses, "Checks: Read" for /check-runs). Grant the ' +
+          "permission in the App's settings and approve the updated installation, then retry.",
+      );
+    }
     throw new Error(
-      `GitHub API ${opts.method} ${opts.path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
+      `GitHub API ${opts.method} ${opts.path} failed (${response.status}): ${sanitized}`,
     );
   }
 

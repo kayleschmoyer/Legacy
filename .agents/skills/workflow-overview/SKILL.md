@@ -488,12 +488,12 @@ After merge, the merge queue deletes the source branch. Locally:
 
 Three GitHub Apps handle distinct roles to ensure no single identity both authors and approves code:
 
-| App                                   | ID / Client ID                                      | Role                                                                               | Permissions                                                              |
-| ------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Agent Author                          | 3158619                                             | Pushes code, creates PRs                                                           | Contents (rw), Pull requests (rw)                                        |
-| Review Bot (legacy-sports-review-bot) | 3142924                                             | Approves PRs after Copilot review passes, manages `bot-review` status, adds labels | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
-| Merge Queue Bot                       | via `MERGE_QUEUE_APP_ID` secret                     | Processes merge queue, merges PRs, retargets dependents, deletes branches          | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
-| Preview / Deploy App                  | 3027681 / `Iv23liHm7Fumhyh2KIAb` (`PREVIEW_APP_ID`) | Deploys Storybook, PR previews, and Playwright reports to `legacy-sports-deploys`  | Contents (rw) on `legacy-sports-deploys`                                 |
+| App                                   | ID / Client ID                                      | Role                                                                                         | Permissions                                                              |
+| ------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Agent Author                          | 3158619                                             | Pushes code, creates PRs, reads CI check state (backs the `legacy-sports-github` MCP server) | Contents (rw), Pull requests (rw), Checks (r), Statuses (r)              |
+| Review Bot (legacy-sports-review-bot) | 3142924                                             | Approves PRs after Copilot review passes, manages `bot-review` status, adds labels           | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
+| Merge Queue Bot                       | via `MERGE_QUEUE_APP_ID` secret                     | Processes merge queue, merges PRs, retargets dependents, deletes branches                    | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
+| Preview / Deploy App                  | 3027681 / `Iv23liHm7Fumhyh2KIAb` (`PREVIEW_APP_ID`) | Deploys Storybook, PR previews, and Playwright reports to `legacy-sports-deploys`            | Contents (rw) on `legacy-sports-deploys`                                 |
 
 **Key constraint:** The Agent Author app never approves PRs. The Review Bot never pushes code. This ensures separation between code authoring and code approval.
 
