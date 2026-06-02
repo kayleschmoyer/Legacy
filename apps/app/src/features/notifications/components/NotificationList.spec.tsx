@@ -291,4 +291,22 @@ describe('NotificationList', () => {
       expect(screen.getByText('Matchup Started')).toBeTruthy();
     });
   });
+
+  describe('null id handling', () => {
+    it('renders without duplicate-key issues when item.id is null', () => {
+      const notifications = [
+        makeNotification({
+          id: null as unknown as string,
+          title: 'Notification A',
+        }),
+        makeNotification({
+          id: null as unknown as string,
+          title: 'Notification B',
+        }),
+      ];
+      render(<NotificationList notifications={notifications} />);
+      expect(screen.getByText('Notification A')).toBeTruthy();
+      expect(screen.getByText('Notification B')).toBeTruthy();
+    });
+  });
 });

@@ -147,7 +147,9 @@ export function NotificationList({
       <FlatList
         data={notifications}
         renderItem={renderNotification}
-        keyExtractor={(item) => item.id?.toString() ?? ''}
+        keyExtractor={(item, index) =>
+          item.id?.toString() ?? `notification-${index}`
+        }
         contentContainerStyle={{ paddingVertical: 8 }}
         ListHeaderComponent={ListHeaderComponent}
         ListFooterComponent={ListFooterComponent}
