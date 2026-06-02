@@ -13,9 +13,11 @@
  * share a persona — LS-4940), use `getSpecUserJwt(persona, specSlug)` with
  * `specSlug = specSlugFromTestInfo(testInfo)`.
  */
-
 import type { TestInfo } from '@playwright/test';
 import { createHash } from 'crypto';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 /**
  * Predefined test users for integration tests.
@@ -58,6 +60,69 @@ interface AuthResponse {
 /** In-process cache so we don't re-register for every fixture invocation. */
 const jwtCache = new Map<string, string>();
 
+/**
+ * Cross-process JWT cache (LS-5149). Playwright spawns a fresh worker process
+ * per spec file, defeating the in-process `jwtCache` Map. Without a shared
+ * cache, 9 touched specs × 4 users = 36+ auth requests per run, easily
+ * exceeding the oauth-proxy's `AUTH_RATE_LIMIT = { limit: 5, windowMs: 60_000 }`
+ * per IP and producing 429s that cascade as Phase 2 "managers join" failures.
+ *
+ * The file lives in the OS tempdir (purged per CI job) and is gitignored on
+ * the off-chance it ever escapes /tmp.
+ */
+const JWT_DISK_CACHE_PATH = path.join(
+  os.tmpdir(),
+  'legacy-sports-integration-jwts.json',
+);
+
+/** Decode a JWT's `exp` claim (seconds since epoch). Returns undefined on parse error. */
+function decodeJwtExp(jwt: string): number | undefined {
+  try {
+    const payload = jwt.split('.')[1];
+    if (!payload) return undefined;
+    const decoded = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf-8'),
+    ) as { exp?: number };
+    return decoded.exp;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 60s safety margin before the JWT's actual expiry. */
+const JWT_EXPIRY_SAFETY_MS = 60_000;
+
+function isJwtFresh(jwt: string): boolean {
+  const exp = decodeJwtExp(jwt);
+  if (!exp) return false;
+  return exp * 1000 - JWT_EXPIRY_SAFETY_MS > Date.now();
+}
+
+interface DiskCacheEntry {
+  jwt: string;
+}
+
+function readDiskCache(): Record<string, DiskCacheEntry> {
+  try {
+    if (!fs.existsSync(JWT_DISK_CACHE_PATH)) return {};
+    const raw = fs.readFileSync(JWT_DISK_CACHE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as Record<string, DiskCacheEntry>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDiskCache(email: string, jwt: string): void {
+  try {
+    const current = readDiskCache();
+    current[email] = { jwt };
+    fs.writeFileSync(JWT_DISK_CACHE_PATH, JSON.stringify(current), 'utf-8');
+  } catch {
+    // Best-effort: a write failure just means the next worker re-auths.
+  }
+}
+
 function resolveOAuthBaseUrl(): string {
   return (
     process.env.VITE_OAUTH_PROXY_URL ||
@@ -85,9 +150,20 @@ export async function getTestUserJwt(
   const cached = jwtCache.get(creds.email);
   if (cached) return cached;
 
+  // Cold path: try the cross-process disk cache before re-authenticating.
+  // Playwright spawns a fresh worker process per spec file, so the in-process
+  // Map above is hot for the worker's own files only — the disk cache shares
+  // the JWT across workers and prevents oauth-proxy 429s (LS-5149).
+  const onDisk = readDiskCache()[creds.email];
+  if (onDisk?.jwt && isJwtFresh(onDisk.jwt)) {
+    jwtCache.set(creds.email, onDisk.jwt);
+    return onDisk.jwt;
+  }
+
   const oauthUrl = resolveOAuthBaseUrl();
   const jwt = await registerOrLogin(oauthUrl, creds);
   jwtCache.set(creds.email, jwt);
+  writeDiskCache(creds.email, jwt);
   return jwt;
 }
 
@@ -212,6 +288,13 @@ async function registerOrLogin(
 /** Clear the JWT cache (useful between test suites if needed). */
 export function clearTestUserCache(): void {
   jwtCache.clear();
+  try {
+    if (fs.existsSync(JWT_DISK_CACHE_PATH)) {
+      fs.unlinkSync(JWT_DISK_CACHE_PATH);
+    }
+  } catch {
+    // Best-effort: a stale cache file is harmless — expired JWTs fall through.
+  }
 }
 
 // ---------------------------------------------------------------------------

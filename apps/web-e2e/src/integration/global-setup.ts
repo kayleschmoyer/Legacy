@@ -160,6 +160,40 @@ function isAllowedTestUser(email: string): boolean {
   return ALLOWED_TEST_EMAIL_PATTERNS.some((re) => re.test(email));
 }
 
+/**
+ * Mint each test user's JWT once before specs start so worker processes hit
+ * the disk cache instead of stampeding the oauth-proxy's per-IP rate limit
+ * (LS-5149). Runs sequentially with 200 ms spacing — well under the 5/60s
+ * AUTH_RATE_LIMIT in lambdas/oauth-proxy. Best-effort: if a mint fails,
+ * specs fall through to the existing login/register retry path.
+ */
+async function warmTestUserJwtCache(): Promise<void> {
+  const users: Array<[string, (typeof TEST_USERS)[keyof typeof TEST_USERS]]> = [
+    ['COMMISSIONER', TEST_USERS.COMMISSIONER],
+    ['MANAGER_1', TEST_USERS.MANAGER_1],
+    ['MANAGER_2', TEST_USERS.MANAGER_2],
+    ['MANAGER_3', TEST_USERS.MANAGER_3],
+  ];
+  for (const [name, creds] of users) {
+    if (!creds.email || !creds.password) {
+      LOGGER.warn(
+        `[integration-globalsetup] skipping ${name}: credentials not set`,
+      );
+      continue;
+    }
+    try {
+      await getTestUserJwt(creds);
+      LOGGER.info(`[integration-globalsetup] minted JWT for ${creds.email}`);
+    } catch (err) {
+      LOGGER.error(
+        `[integration-globalsetup] failed to mint JWT for ${creds.email}`,
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 export default async function globalSetup(config: FullConfig): Promise<void> {
   // In sharded CI runs, only the first shard runs pre-test cleanup. Shards
   // 2+ skipping here prevents them from deleting leagues that shard 1's tests
@@ -171,6 +205,8 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     );
     return;
   }
+
+  await warmTestUserJwtCache();
 
   const jwt = await getAuthJwt();
   if (!jwt) {

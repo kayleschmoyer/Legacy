@@ -8,3 +8,8 @@ coverage/
 
 # Active-run sentinel written by integration globalSetup (LS-4539)
 .playwright-integration.lock
+
+# Cross-process JWT disk cache for integration tests (LS-5149).
+# Normally lives in os.tmpdir() — this entry is defensive in case the
+# cache path is ever overridden to a repo-local path.
+legacy-sports-integration-jwts.json
