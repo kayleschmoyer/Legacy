@@ -5,6 +5,7 @@
  *   - handleSubscriptionDowngrade: no-op when user has no leagues
  *   - handleSubscriptionDowngrade: keeps first 3 leagues, tier-freezes the rest
  *   - handleSubscriptionDowngrade: disables salary cap in active leagues
+ *   - handleSubscriptionDowngrade: resets advanced (6/8-team) playoff formats to 4-team
  *   - handleSubscriptionDowngrade: converts FAAB waivers to standard
  *   - handleSubscriptionDowngrade: idempotent (already-frozen leagues skipped)
  *   - reapplyLeagueRestrictions: unfreezes selected leagues, freezes the rest
@@ -41,6 +42,7 @@ jest.mock('../client/PublicDbClient', () => ({
       owner: 'leagues.owner',
       isMockDraft: 'leagues.is_mock_draft',
       salaryCapEnabled: 'leagues.salary_cap_enabled',
+      playoffFormat: 'leagues.playoff_format',
       waiverType: 'leagues.waiver_type',
       tierFrozenAt: 'leagues.tier_frozen_at',
       frozenAt: 'leagues.frozen_at',
@@ -74,6 +76,7 @@ const TEST_DB_OPTS = { type: 'pg-remote' as const };
 interface MockLeague {
   id: number;
   salaryCapEnabled: boolean;
+  playoffFormat: '4-team' | '6-team' | '8-team';
   waiverType: 'standard' | 'faab';
   tierFrozenAt: Date | null;
   frozenAt: Date | null;
@@ -86,6 +89,7 @@ function mockLeague(
   return {
     id,
     salaryCapEnabled: false,
+    playoffFormat: '4-team',
     waiverType: 'standard',
     tierFrozenAt: null,
     frozenAt: null,
@@ -230,6 +234,58 @@ describe('handleSubscriptionDowngrade', () => {
       return arg['salaryCapEnabled'] === false;
     });
     expect(capDisableSets).toHaveLength(1);
+  });
+
+  it('resets 6-team and 8-team playoff formats to 4-team in active leagues', async () => {
+    const leagues = [
+      mockLeague(1, { playoffFormat: '6-team' }),
+      mockLeague(2, { playoffFormat: '8-team' }),
+      mockLeague(3),
+    ];
+    const { mockDb, mockSet } = makeMockDb(leagues);
+    setupPublicClient(mockDb);
+
+    await handleSubscriptionDowngrade(1, TEST_DB_OPTS);
+
+    const playoffResets = mockSet.mock.calls.filter((call) => {
+      const arg = call[0] as Record<string, unknown>;
+      return arg['playoffFormat'] === '4-team';
+    });
+    expect(playoffResets).toHaveLength(2);
+  });
+
+  it('leaves 4-team playoff formats untouched', async () => {
+    const leagues = [mockLeague(1), mockLeague(2), mockLeague(3)];
+    const { mockDb, mockUpdate } = makeMockDb(leagues);
+    setupPublicClient(mockDb);
+
+    await handleSubscriptionDowngrade(1, TEST_DB_OPTS);
+
+    // All defaults (4-team playoff, no salary cap, standard waivers, ≤ limit) —
+    // nothing premium to strip, so no update should be issued.
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not reset advanced playoff formats in tier-frozen (excess) leagues', async () => {
+    // 4 leagues; league 4 is excess (beyond limit) and uses 8-team playoffs.
+    // Excess leagues are frozen read-only, not feature-stripped, so its
+    // playoffFormat must not be reset.
+    const leagues = [
+      mockLeague(1),
+      mockLeague(2),
+      mockLeague(3),
+      mockLeague(4, { playoffFormat: '8-team' }),
+    ];
+    const { mockDb, mockSet } = makeMockDb(leagues);
+    setupPublicClient(mockDb);
+
+    await handleSubscriptionDowngrade(1, TEST_DB_OPTS);
+
+    const playoffResets = mockSet.mock.calls.filter((call) => {
+      const arg = call[0] as Record<string, unknown>;
+      return arg['playoffFormat'] === '4-team';
+    });
+    expect(playoffResets).toHaveLength(0);
   });
 
   it('converts FAAB waivers to standard in active leagues', async () => {

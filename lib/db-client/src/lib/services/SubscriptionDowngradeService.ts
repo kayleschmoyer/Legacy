@@ -10,10 +10,12 @@
  *   1. Leagues beyond the free-tier limit (3): marked tier-frozen (read-only).
  *      The lowest-numbered (oldest) leagues are kept active first.
  *   2. Active salary-cap leagues: salary cap features disabled.
- *   3. Active FAAB-waiver leagues: waiver type converted to standard.
- *   4. Mock-draft limit (2/week) is re-enforced by the existing check in
+ *   3. Active advanced-playoff leagues (6/8-team): playoff format reset to
+ *      4-team (6/8-team requires the advanced_playoff_formats entitlement).
+ *   4. Active FAAB-waiver leagues: waiver type converted to standard.
+ *   5. Mock-draft limit (2/week) is re-enforced by the existing check in
  *      initialize-mock-draft — no separate action needed here.
- *   5. Premium-gated features (player comparison, projections, narratives,
+ *   6. Premium-gated features (player comparison, projections, narratives,
  *      draft recommendations) are gated at the GraphQL resolver level via
  *      getSubscriptionTier — no action needed here.
  */
@@ -47,6 +49,7 @@ export async function handleSubscriptionDowngrade(
       .select({
         id: PublicSchema.leagues.id,
         salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+        playoffFormat: PublicSchema.leagues.playoffFormat,
         waiverType: PublicSchema.leagues.waiverType,
         tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
         frozenAt: PublicSchema.leagues.frozenAt,
@@ -80,13 +83,14 @@ export async function handleSubscriptionDowngrade(
       });
     }
 
-    // ── 2 & 3. Convert premium-only features in active leagues ─────────────
+    // ── 2, 3 & 4. Convert premium-only features in active leagues ──────────
     for (const league of activeLeagues) {
       const updates: Partial<{
         salaryCapEnabled: boolean;
         salaryCap: null;
         salaryFloor: null;
         luxuryTaxThreshold: null;
+        playoffFormat: '4-team';
         waiverType: 'standard';
       }> = {};
 
@@ -98,6 +102,24 @@ export async function handleSubscriptionDowngrade(
           userId,
           leagueId: league.id,
         });
+      }
+
+      if (
+        league.playoffFormat === '6-team' ||
+        league.playoffFormat === '8-team'
+      ) {
+        // 6/8-team brackets require the advanced_playoff_formats entitlement;
+        // reset to the free-tier default so the league stops generating
+        // premium brackets after downgrade.
+        updates.playoffFormat = '4-team';
+        LOGGER.info(
+          'Reset advanced playoff format to 4-team on tier downgrade',
+          {
+            userId,
+            leagueId: league.id,
+            previousFormat: league.playoffFormat,
+          },
+        );
       }
 
       if (league.waiverType === 'faab') {
