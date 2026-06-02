@@ -122,7 +122,7 @@ export const FreeAgentsTab: React.FC<FreeAgentsTabProps> = ({
   const leagueId = league.id ?? 0;
   const gamesPerMatchup = league.gamesPerMatchup ?? 5;
 
-  const { data, loading } = useGetPlayersWithStatsQuery({
+  const { data, loading, error } = useGetPlayersWithStatsQuery({
     variables: {
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
@@ -179,6 +179,38 @@ export const FreeAgentsTab: React.FC<FreeAgentsTabProps> = ({
           </div>
           Football free-agent search and waiver claims for NFL players will be
           available here once the football player pool ships.
+        </div>
+      </Section>
+    );
+  }
+
+  // In-page error state — surfaced when the player-pool query fails so the
+  // failure is visible inside #main-content (not only as a transient toast).
+  if (error) {
+    return (
+      <Section title="Free Agents" sub="Available players in the league pool">
+        <div
+          role="alert"
+          style={{
+            padding: '32px 16px',
+            textAlign: 'center',
+            color: 'var(--fg3)',
+            fontSize: 13,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: 14,
+              color: 'var(--fg1)',
+              marginBottom: 6,
+              letterSpacing: '.04em',
+            }}
+          >
+            Unable to load players
+          </div>
+          Refresh the page to try again.
         </div>
       </Section>
     );

@@ -382,9 +382,12 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expandSection(page, 'era-history');
 
     await expect(page.getByText('Historical Era Filter')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /All Eras 1871/ }),
-    ).toBeVisible();
+    // EraFilterGrid (LS-5174) renders each era as a Tamagui card whose
+    // accessible name is the era name only (`aria-label={era.name}`); the year
+    // range is separate muted text. Match the option by its accessible name and
+    // assert the year range via its own text node.
+    await expect(page.getByRole('button', { name: 'All Eras' })).toBeVisible();
+    await expect(page.getByText(/1871\s*[–-]\s*Now/)).toBeVisible();
     await expect(page.getByText('Dead Ball (pre-1920)')).toBeVisible();
     await expect(page.getByText('Modern (2006+)')).toBeVisible();
   });
