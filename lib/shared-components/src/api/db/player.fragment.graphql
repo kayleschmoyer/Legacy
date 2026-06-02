@@ -5,4 +5,14 @@ fragment Player on Player {
   lastName
   brefId
   statsLastFetchedAt
+  # Career batting stats surfaced by the Stats Table view (LS-5165). Only the
+  # columns rendered by BASEBALL_STAT_COLUMNS are selected to keep the list
+  # query payload minimal; resolved via a batched DataLoader (no N+1).
+  careerBatting {
+    battingAverage
+    homeRuns
+    runs
+    rbi
+    stolenBases
+  }
 }

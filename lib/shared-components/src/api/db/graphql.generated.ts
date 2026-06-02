@@ -5558,6 +5558,14 @@ export type GetAllPlayersQuery = {
     lastName?: string | null;
     brefId?: string | null;
     statsLastFetchedAt?: string | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      battingAverage?: number | null;
+      homeRuns?: number | null;
+      runs?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+    } | null;
   }> | null;
 };
 
@@ -7812,6 +7820,14 @@ export type PlayerFragment = {
   lastName?: string | null;
   brefId?: string | null;
   statsLastFetchedAt?: string | null;
+  careerBatting?: {
+    __typename?: 'CareerBatting';
+    battingAverage?: number | null;
+    homeRuns?: number | null;
+    runs?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+  } | null;
 };
 
 export type ProcessWaiverClaimsMutationVariables = Exact<{
@@ -8064,6 +8080,14 @@ export type SearchPlayersForDraftQuery = {
     lastName?: string | null;
     brefId?: string | null;
     statsLastFetchedAt?: string | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      battingAverage?: number | null;
+      homeRuns?: number | null;
+      runs?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+    } | null;
   }> | null;
 };
 
@@ -9709,6 +9733,13 @@ export const PlayerFragmentDoc = gql`
     lastName
     brefId
     statsLastFetchedAt
+    careerBatting {
+      battingAverage
+      homeRuns
+      runs
+      rbi
+      stolenBases
+    }
   }
 `;
 export const LeagueSeasonAwardFragmentDoc = gql`

@@ -163,10 +163,11 @@ const STATS_TABLE_CSS = `
 `;
 
 /** Baseball career stat columns surfaced in the Stats Table view. The
- *  `getValue` extractor returns `null` whenever the field is not yet present on
- *  the Player fragment — rows render an em-dash for missing values, matching
- *  the Featured spotlight scaffold from LS-4646. The `lead` flag marks the
- *  marquee column (AVG) that gets the gold tint per design. */
+ *  `getValue` extractor reads the matching field off the player's
+ *  `careerBatting` stats, returning `null` whenever the player has no career
+ *  batting record (or the individual stat is missing) — those rows render an
+ *  em-dash. The `lead` flag marks the marquee column (AVG) that gets the gold
+ *  tint per design. */
 export type StatColumn = {
   key: string;
   label: string;
@@ -176,20 +177,29 @@ export type StatColumn = {
 };
 
 /** Default baseball stat columns. Mirrors the `BA / HR / R / RBI / SB` set
- *  called out in LS-4653 AC1. Values resolve to `null` until per-player stats
- *  flow through the GraphQL fragment — same scaffold pattern as Featured. */
+ *  called out in LS-4653 AC1. Each `getValue` reads the corresponding field
+ *  from `player.careerBatting` (wired through the Player GraphQL fragment in
+ *  LS-5165), falling back to `null` when the stat is absent. */
 export const BASEBALL_STAT_COLUMNS: StatColumn[] = [
   {
     key: 'avg',
     label: 'AVG',
     lead: true,
-    getValue: () => null,
+    getValue: (p) => p.careerBatting?.battingAverage ?? null,
     format: (v) => v.toFixed(3).replace(/^0/, ''),
   },
-  { key: 'hr', label: 'HR', getValue: () => null },
-  { key: 'r', label: 'R', getValue: () => null },
-  { key: 'rbi', label: 'RBI', getValue: () => null },
-  { key: 'sb', label: 'SB', getValue: () => null },
+  {
+    key: 'hr',
+    label: 'HR',
+    getValue: (p) => p.careerBatting?.homeRuns ?? null,
+  },
+  { key: 'r', label: 'R', getValue: (p) => p.careerBatting?.runs ?? null },
+  { key: 'rbi', label: 'RBI', getValue: (p) => p.careerBatting?.rbi ?? null },
+  {
+    key: 'sb',
+    label: 'SB',
+    getValue: (p) => p.careerBatting?.stolenBases ?? null,
+  },
 ];
 
 export interface PlayersStatsTableProps {

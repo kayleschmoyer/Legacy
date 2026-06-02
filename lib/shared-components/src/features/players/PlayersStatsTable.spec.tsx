@@ -141,3 +141,60 @@ describe('BASEBALL_STAT_COLUMNS (LS-4653)', () => {
     expect(avg?.format?.(0.342)).toBe('.342');
   });
 });
+
+describe('BASEBALL_STAT_COLUMNS getValue (LS-5165)', () => {
+  const ruth = makePlayer({
+    careerBatting: {
+      __typename: 'CareerBatting',
+      battingAverage: 0.342,
+      homeRuns: 714,
+      runs: 2174,
+      rbi: 2214,
+      stolenBases: 123,
+    },
+  });
+
+  function valueFor(key: string, player: PlayerFragment): number | null {
+    const col = BASEBALL_STAT_COLUMNS.find((c) => c.key === key);
+    if (!col) throw new Error(`unknown column ${key}`);
+    return col.getValue(player);
+  }
+
+  it('reads each stat from player.careerBatting', () => {
+    expect(valueFor('avg', ruth)).toBe(0.342);
+    expect(valueFor('hr', ruth)).toBe(714);
+    expect(valueFor('r', ruth)).toBe(2174);
+    expect(valueFor('rbi', ruth)).toBe(2214);
+    expect(valueFor('sb', ruth)).toBe(123);
+  });
+
+  it('returns null when the player has no careerBatting record', () => {
+    const noStats = makePlayer({ careerBatting: null });
+    for (const col of BASEBALL_STAT_COLUMNS) {
+      expect(col.getValue(noStats)).toBeNull();
+    }
+  });
+
+  it('returns null for an individual stat that is missing', () => {
+    const partial = makePlayer({
+      careerBatting: {
+        __typename: 'CareerBatting',
+        battingAverage: 0.305,
+        homeRuns: null,
+        runs: null,
+        rbi: null,
+        stolenBases: null,
+      },
+    });
+    expect(valueFor('avg', partial)).toBe(0.305);
+    expect(valueFor('hr', partial)).toBeNull();
+    expect(valueFor('sb', partial)).toBeNull();
+  });
+
+  it('formats the AVG value read from careerBatting per baseball convention', () => {
+    const avg = BASEBALL_STAT_COLUMNS.find((c) => c.key === 'avg');
+    const raw = valueFor('avg', ruth);
+    expect(raw).not.toBeNull();
+    expect(avg?.format?.(raw as number)).toBe('.342');
+  });
+});
