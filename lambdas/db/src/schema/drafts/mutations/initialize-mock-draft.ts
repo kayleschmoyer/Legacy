@@ -14,6 +14,8 @@
  *  6. Return { leagueId, draftId } so the front-end can render EliteDraftBoardScreen
  */
 
+import { randomBytes } from 'node:crypto';
+
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { eq } from 'drizzle-orm';
@@ -67,10 +69,13 @@ builder.objectType(MockDraftInit, {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateInviteCode(): string {
+  // 32-char alphabet (omits ambiguous 0/O/1/I) → exactly 5 bits per char, so
+  // masking a random byte with 0x1f yields an unbiased index (256 % 32 === 0).
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = randomBytes(8);
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(bytes[i] & 0x1f);
   }
   return code;
 }
