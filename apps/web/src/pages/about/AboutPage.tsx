@@ -125,7 +125,9 @@ export default function AboutPage() {
           <Label>Commit SHA:</Label>
           {commitUrl ? (
             <LinkValue
-              onPress={() => window.open(commitUrl, '_blank')}
+              onPress={() =>
+                window.open(commitUrl, '_blank', 'noopener,noreferrer')
+              }
               role="link"
               aria-label={`View commit ${commitSha} on GitHub`}
             >
@@ -168,7 +170,9 @@ export default function AboutPage() {
 
         <YStack gap="$3">
           <Button
-            onPress={() => window.open(repoUrl, '_blank')}
+            onPress={() =>
+              window.open(repoUrl, '_blank', 'noopener,noreferrer')
+            }
             variant="secondary"
             size="$3"
           >
@@ -179,7 +183,9 @@ export default function AboutPage() {
           </Button>
           {commitUrl && (
             <Button
-              onPress={() => window.open(commitUrl, '_blank')}
+              onPress={() =>
+                window.open(commitUrl, '_blank', 'noopener,noreferrer')
+              }
               variant="secondary"
               size="$3"
             >
