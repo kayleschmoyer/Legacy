@@ -6,6 +6,16 @@
 
 ---
 
+## Platform Availability
+
+**Web Desktop only** — there is no admin UI on Android Native by design.
+
+The Expo Router `ROUTES` constant intentionally excludes an `'admin'` route, and no `Drawer.Screen` for `admin` is registered in `apps/app/src/app/(app)/_layout.tsx`. Admin functionality (user management, revenue stats, JWT decoder, impersonation) is only accessible via the web app at `/admin`.
+
+Admin users on Android will see a notice in the navigation drawer footer directing them to the web dashboard.
+
+---
+
 ## Layout (in order)
 
 1. Page header — "Admin Console" + "Manage users and impersonate accounts for debugging."

@@ -753,4 +753,27 @@ describe('App Drawer Layout', () => {
       expect(screen.getByTestId('screen-football/matchup')).toBeTruthy();
     });
   });
+
+  describe('admin web notice', () => {
+    it('does not show admin notice for non-admin users', () => {
+      mockUseCurrentUserInfo.mockReturnValue({
+        data: { ...mockCurrentUser, isAdmin: false },
+        loading: false,
+      });
+      render(<Layout />);
+      expect(screen.queryByTestId('drawer-admin-web-notice')).toBeNull();
+    });
+
+    it('shows admin web notice for admin users', () => {
+      mockUseCurrentUserInfo.mockReturnValue({
+        data: { ...mockCurrentUser, isAdmin: true },
+        loading: false,
+      });
+      render(<Layout />);
+      expect(screen.getByTestId('drawer-admin-web-notice')).toBeTruthy();
+      expect(
+        screen.getByText('Use the web dashboard for admin tools'),
+      ).toBeTruthy();
+    });
+  });
 });

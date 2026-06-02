@@ -188,6 +188,8 @@ function CustomDrawerContent(props: {
   const { data: unreadData } = useGetUnreadNotificationCountQuery();
   const unreadCount = unreadData?.getUnreadNotificationCount ?? 0;
   const footballEnabled = useFeatureIsOn('football_enabled');
+  const { data: currentUser } = useCurrentUserInfo();
+  const isAdmin = currentUser?.isAdmin ?? false;
   const visibleRoutes = footballEnabled
     ? ROUTES
     : ROUTES.filter(
@@ -259,6 +261,16 @@ function CustomDrawerContent(props: {
           )}
         </XStack>
       ))}
+      {isAdmin && (
+        <Text
+          testID="drawer-admin-web-notice"
+          padding="$3"
+          fontSize="$3"
+          color="$gray10"
+        >
+          Use the web dashboard for admin tools
+        </Text>
+      )}
       <Separator marginVertical="$3" />
       <Text
         testID="drawer-logout"
