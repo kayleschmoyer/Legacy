@@ -1,0 +1,97 @@
+<!--
+  Synthetic main-page fixture for a K (pfrId TuckJu00, Justin Tucker).
+  Two seasons in the `scoring` table. Season 2021 has both FG and XP attempts;
+  season 2022 also has FG and XP attempts. The scoring table also includes a
+  multi-team season (2023) where the player changed teams mid-season — the
+  per-team rows appear first, then the aggregate "2TM" row last, which the
+  parser must prefer (last row per season wins via map overwrite).
+
+  Expected season totals:
+    2021: kicking(g=17, fgm=37, fga=40, xpm=44, xpa=45)
+    2022: kicking(g=17, fgm=31, fga=33, xpm=41, xpa=41)
+    2023: kicking(g=17, fgm=28, fga=30, xpm=35, xpa=36)  ← from 2TM aggregate row
+-->
+<html>
+  <body>
+    <div id="content">
+      <table id="scoring">
+        <thead>
+          <tr>
+            <th data-stat="year_id">Year</th>
+            <th data-stat="team_name_abbr">Tm</th>
+            <th data-stat="games">G</th>
+            <th data-stat="fgm">FGM</th>
+            <th data-stat="fga">FGA</th>
+            <th data-stat="xpm">XPM</th>
+            <th data-stat="xpa">XPA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th data-stat="year_id">2021</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/rav/2021.htm">RAV</a>
+            </td>
+            <td data-stat="games">17</td>
+            <td data-stat="fgm">37</td>
+            <td data-stat="fga">40</td>
+            <td data-stat="xpm">44</td>
+            <td data-stat="xpa">45</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2022</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/rav/2022.htm">RAV</a>
+            </td>
+            <td data-stat="games">17</td>
+            <td data-stat="fgm">31</td>
+            <td data-stat="fga">33</td>
+            <td data-stat="xpm">41</td>
+            <td data-stat="xpa">41</td>
+          </tr>
+          <!-- Multi-team season: per-team rows first, aggregate last. -->
+          <tr>
+            <th data-stat="year_id">2023</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/rav/2023.htm">RAV</a>
+            </td>
+            <td data-stat="games">9</td>
+            <td data-stat="fgm">12</td>
+            <td data-stat="fga">14</td>
+            <td data-stat="xpm">15</td>
+            <td data-stat="xpa">16</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2023</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/chi/2023.htm">CHI</a>
+            </td>
+            <td data-stat="games">8</td>
+            <td data-stat="fgm">16</td>
+            <td data-stat="fga">16</td>
+            <td data-stat="xpm">20</td>
+            <td data-stat="xpa">20</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2023</th>
+            <td data-stat="team_name_abbr">2TM</td>
+            <td data-stat="games">17</td>
+            <td data-stat="fgm">28</td>
+            <td data-stat="fga">30</td>
+            <td data-stat="xpm">35</td>
+            <td data-stat="xpa">36</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">Career</th>
+            <td data-stat="team_name_abbr"></td>
+            <td data-stat="games">51</td>
+            <td data-stat="fgm">96</td>
+            <td data-stat="fga">103</td>
+            <td data-stat="xpm">120</td>
+            <td data-stat="xpa">122</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

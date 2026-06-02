@@ -59,39 +59,6 @@ async function knownGameSeasons(
   return rows.map((r) => r.season).sort((a, b) => a - b);
 }
 
-// Determine which seasons to query for an offensive/kicking player.
-// Checks all four offensive game tables and unions the season sets.
-async function offensiveSeasons(
-  db: PublicDb,
-  playerId: number,
-  startSeasonFallback: number,
-): Promise<number[]> {
-  const [passing, rushing, receiving, kicking] = await Promise.all([
-    knownGameSeasons(db, playerId, PublicSchema.gameFootballPassing),
-    knownGameSeasons(db, playerId, PublicSchema.gameFootballRushing),
-    knownGameSeasons(db, playerId, PublicSchema.gameFootballReceiving),
-    knownGameSeasons(db, playerId, PublicSchema.gameFootballKicking),
-  ]);
-
-  const seasonSet = new Set<number>([
-    ...passing,
-    ...rushing,
-    ...receiving,
-    ...kicking,
-  ]);
-
-  if (seasonSet.size > 0) {
-    return [...seasonSet].sort((a, b) => a - b);
-  }
-
-  // No game data yet — iterate from fallback start year to current year.
-  const seasons: number[] = [];
-  for (let s = startSeasonFallback; s <= currentYear(); s++) {
-    seasons.push(s);
-  }
-  return seasons;
-}
-
 // Aggregate season passing rows into career totals.
 function aggregatePassingSeasons(
   seasons: FootballSeasonPassing[],
@@ -572,35 +539,35 @@ export async function loadFootballCareerStats(
   }
 
   // --- Offensive / kicking path ---
-  const seasons = await offensiveSeasons(
-    db,
-    playerId,
-    startSeasonOverride ?? NFL_SEASON_START,
+  // Fetch the player's main page once to get all career season totals in a
+  // single request (~57x fewer requests than the previous per-season gamelog
+  // approach). Season discovery is implicit — only seasons present on the main
+  // page are returned, eliminating the 1970→currentYear brute-force iteration.
+  LOGGER.info(
+    `Loading offensive career stats for player ${playerId} (${pfrId}) via main page`,
   );
 
-  LOGGER.info(
-    `Loading offensive career stats for player ${playerId} (${pfrId}), ` +
-      `${seasons.length} seasons`,
-  );
+  let allSeasonTotals: CareerStats.SeasonTotals[] = [];
+  try {
+    allSeasonTotals =
+      await CareerStats.getAllSeasonTotalsFromMainPage(pfrPlayer);
+  } catch (err) {
+    LOGGER.warn(
+      `Failed to fetch main page for ${pfrId}:`,
+      err instanceof Error ? err : String(err),
+    );
+  }
 
   const passingSeasons: FootballSeasonPassing[] = [];
   const rushingSeasons: FootballSeasonRushing[] = [];
   const receivingSeasons: FootballSeasonReceiving[] = [];
   const kickingSeasons: FootballSeasonKicking[] = [];
 
-  for (const season of seasons) {
-    try {
-      const totals = await CareerStats.getSeasonTotals(pfrPlayer, season);
-      if (totals.passing) passingSeasons.push(totals.passing);
-      if (totals.rushing) rushingSeasons.push(totals.rushing);
-      if (totals.receiving) receivingSeasons.push(totals.receiving);
-      if (totals.kicking) kickingSeasons.push(totals.kicking);
-    } catch (err) {
-      LOGGER.warn(
-        `Failed to fetch season ${season} for ${pfrId}:`,
-        err instanceof Error ? err : String(err),
-      );
-    }
+  for (const totals of allSeasonTotals) {
+    if (totals.passing) passingSeasons.push(totals.passing);
+    if (totals.rushing) rushingSeasons.push(totals.rushing);
+    if (totals.receiving) receivingSeasons.push(totals.receiving);
+    if (totals.kicking) kickingSeasons.push(totals.kicking);
   }
 
   const careerPassing = aggregatePassingSeasons(passingSeasons, playerId);

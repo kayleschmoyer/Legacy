@@ -2,14 +2,14 @@ import type { PublicDb } from '@legacy-sports/db-client';
 import { loadFootballCareerStats } from './load-football-career-stats';
 
 // Mock pfr-client at the package level
-const mockCareerGetSeasonTotals = jest.fn();
+const mockCareerGetAllSeasonTotals = jest.fn();
 const mockIdpGetSeasonTotals = jest.fn();
 const mockTeamDefenseGetSeasonTotals = jest.fn();
 
 jest.mock('@legacy-sports/pfr-client', () => ({
   CareerStats: {
-    getSeasonTotals: (...args: unknown[]): unknown =>
-      mockCareerGetSeasonTotals(...args),
+    getAllSeasonTotalsFromMainPage: (...args: unknown[]): unknown =>
+      mockCareerGetAllSeasonTotals(...args),
   },
   IDPStats: {
     getSeasonTotals: (...args: unknown[]): unknown =>
@@ -125,7 +125,7 @@ function makeDb(
 describe('loadFootballCareerStats — stat-group routing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCareerGetSeasonTotals.mockResolvedValue(NO_SEASON_TOTALS);
+    mockCareerGetAllSeasonTotals.mockResolvedValue([]);
     mockIdpGetSeasonTotals.mockResolvedValue(null);
     mockTeamDefenseGetSeasonTotals.mockResolvedValue(null);
   });
@@ -147,7 +147,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       'kan',
       2024,
     );
-    expect(mockCareerGetSeasonTotals).not.toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
     expect(mockIdpGetSeasonTotals).not.toHaveBeenCalled();
   });
 
@@ -167,7 +167,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       { id: 1, pfrId: 'TestDl00' },
       2024,
     );
-    expect(mockCareerGetSeasonTotals).not.toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
     expect(mockTeamDefenseGetSeasonTotals).not.toHaveBeenCalled();
   });
 
@@ -184,7 +184,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
     await loadFootballCareerStats(db, 1, 2024);
 
     expect(mockIdpGetSeasonTotals).toHaveBeenCalled();
-    expect(mockCareerGetSeasonTotals).not.toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
   });
 
   it('routes IDP player (DB) to IDPStats', async () => {
@@ -200,7 +200,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
     await loadFootballCareerStats(db, 1, 2024);
 
     expect(mockIdpGetSeasonTotals).toHaveBeenCalled();
-    expect(mockCareerGetSeasonTotals).not.toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
   });
 
   it('routes offensive player (QB) to CareerStats only', async () => {
@@ -215,7 +215,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockCareerGetSeasonTotals).toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).toHaveBeenCalled();
     expect(mockIdpGetSeasonTotals).not.toHaveBeenCalled();
     expect(mockTeamDefenseGetSeasonTotals).not.toHaveBeenCalled();
   });
@@ -232,7 +232,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockCareerGetSeasonTotals).toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).toHaveBeenCalled();
   });
 
   it('routes WR to CareerStats', async () => {
@@ -247,7 +247,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockCareerGetSeasonTotals).toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).toHaveBeenCalled();
   });
 
   it('routes K to CareerStats', async () => {
@@ -262,7 +262,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockCareerGetSeasonTotals).toHaveBeenCalled();
+    expect(mockCareerGetAllSeasonTotals).toHaveBeenCalled();
   });
 
   it('throws when player is not found', async () => {
@@ -346,7 +346,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       position: 'QB',
       sport: 'football',
     });
-    mockCareerGetSeasonTotals.mockResolvedValue(PASSING_SEASON);
+    mockCareerGetAllSeasonTotals.mockResolvedValue([PASSING_SEASON]);
 
     const result = await loadFootballCareerStats(db, 1, 2024);
 
@@ -363,7 +363,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       position: 'WR',
       sport: 'football',
     });
-    mockCareerGetSeasonTotals.mockResolvedValue(NO_SEASON_TOTALS);
+    mockCareerGetAllSeasonTotals.mockResolvedValue([NO_SEASON_TOTALS]);
 
     const result = await loadFootballCareerStats(db, 1, 2024);
 
@@ -379,7 +379,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       position: 'RB',
       sport: 'football',
     });
-    mockCareerGetSeasonTotals.mockRejectedValue(new Error('PFR rate limit'));
+    mockCareerGetAllSeasonTotals.mockRejectedValue(new Error('PFR rate limit'));
 
     const result = await loadFootballCareerStats(db, 1, 2024);
 

@@ -1,0 +1,206 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import * as PFRSession from './PFRSession';
+import {
+  getAllSeasonTotalsFromMainPage,
+  parseMainPageSeasonTotals,
+} from './CareerStats';
+
+jest.mock('./PFRSession');
+const mockGetPlayerPage = jest.mocked(PFRSession.getPlayerPage);
+
+const fix = (name: string) =>
+  readFileSync(join(__dirname, '__fixtures__', name), 'utf-8');
+
+const WR_HTML = fix('wr-main-page.html');
+const RB_HTML = fix('rb-main-page.html');
+const QB_HTML = fix('qb-main-page.html');
+const K_HTML = fix('k-main-page.html');
+
+const wr = { id: 10, pfrId: 'AdamDa01' };
+const rb = { id: 20, pfrId: 'HenrDe00' };
+const qb = { id: 30, pfrId: 'MahoPa00' };
+const kicker = { id: 40, pfrId: 'TuckJu00' };
+
+describe('parseMainPageSeasonTotals — WR (receiving_and_rushing in comment)', () => {
+  it('parses two seasons from comment-wrapped receiving_and_rushing table', () => {
+    const seasons = parseMainPageSeasonTotals(WR_HTML, wr);
+
+    expect(seasons).toHaveLength(2);
+    expect(seasons[0].receiving).toMatchObject({
+      playerId: 10,
+      season: 2014,
+      team: 'GNB',
+      g: 16,
+      tgt: 66,
+      rec: 38,
+      yds: 446,
+      td: 3,
+    });
+    expect(seasons[0].rushing).toBeNull();
+    expect(seasons[0].passing).toBeNull();
+    expect(seasons[0].kicking).toBeNull();
+  });
+
+  it('parses receiving + rushing for a season where WR had carries', () => {
+    const seasons = parseMainPageSeasonTotals(WR_HTML, wr);
+
+    expect(seasons[1].receiving).toMatchObject({
+      season: 2015,
+      g: 15,
+      tgt: 94,
+      rec: 50,
+      yds: 536,
+      td: 1,
+      fumbles: 1,
+    });
+    expect(seasons[1].rushing).toMatchObject({
+      season: 2015,
+      g: 15,
+      att: 2,
+      yds: 8,
+      td: 0,
+    });
+  });
+
+  it('skips the Career totals row', () => {
+    const seasons = parseMainPageSeasonTotals(WR_HTML, wr);
+    // Career row has year_id="Career" which parseInt returns NaN → filtered out.
+    expect(seasons).toHaveLength(2);
+    expect(seasons.map((s) => s.receiving?.season)).toEqual([2014, 2015]);
+  });
+});
+
+describe('parseMainPageSeasonTotals — RB (rushing_and_receiving, no comment)', () => {
+  it('parses rushing + receiving from rushing_and_receiving table', () => {
+    const seasons = parseMainPageSeasonTotals(RB_HTML, rb);
+
+    expect(seasons).toHaveLength(2);
+    expect(seasons[0].rushing).toMatchObject({
+      playerId: 20,
+      season: 2019,
+      g: 16,
+      att: 303,
+      yds: 1540,
+      td: 16,
+      fumbles: 1,
+    });
+    expect(seasons[0].receiving).toMatchObject({
+      season: 2019,
+      g: 16,
+      tgt: 24,
+      rec: 18,
+      yds: 206,
+      td: 2,
+    });
+  });
+
+  it('emits null receiving when rec=0 and tgt=0', () => {
+    const seasons = parseMainPageSeasonTotals(RB_HTML, rb);
+
+    expect(seasons[1].rushing).toMatchObject({
+      season: 2020,
+      att: 378,
+      yds: 2027,
+      td: 17,
+    });
+    expect(seasons[1].receiving).toBeNull();
+  });
+});
+
+describe('parseMainPageSeasonTotals — QB (passing + rushing_and_receiving)', () => {
+  it('parses passing from passing table', () => {
+    const seasons = parseMainPageSeasonTotals(QB_HTML, qb);
+
+    expect(seasons).toHaveLength(2);
+    expect(seasons[0].passing).toMatchObject({
+      playerId: 30,
+      season: 2018,
+      team: 'KAN',
+      g: 16,
+      cmp: 383,
+      att: 580,
+      yds: 5097,
+      td: 50,
+      int: 12,
+    });
+  });
+
+  it('merges QB rushing from skill table into the same season', () => {
+    const seasons = parseMainPageSeasonTotals(QB_HTML, qb);
+
+    expect(seasons[0].rushing).toMatchObject({
+      season: 2018,
+      att: 60,
+      yds: 272,
+      td: 2,
+    });
+    expect(seasons[0].receiving).toBeNull();
+  });
+
+  it('covers both seasons from passing + skill tables', () => {
+    const seasons = parseMainPageSeasonTotals(QB_HTML, qb);
+
+    expect(seasons[1].passing).toMatchObject({ season: 2019, att: 484 });
+    expect(seasons[1].rushing).toMatchObject({ season: 2019, att: 51 });
+  });
+});
+
+describe('parseMainPageSeasonTotals — K (scoring table)', () => {
+  it('parses kicking stats from scoring table', () => {
+    const seasons = parseMainPageSeasonTotals(K_HTML, kicker);
+
+    expect(seasons).toHaveLength(3);
+    expect(seasons[0].kicking).toMatchObject({
+      playerId: 40,
+      season: 2021,
+      team: 'RAV',
+      g: 17,
+      fgm: 37,
+      fga: 40,
+      xpm: 44,
+      xpa: 45,
+    });
+    expect(seasons[0].passing).toBeNull();
+    expect(seasons[0].rushing).toBeNull();
+    expect(seasons[0].receiving).toBeNull();
+  });
+
+  it('uses the aggregate 2TM row for multi-team seasons (last row wins)', () => {
+    const seasons = parseMainPageSeasonTotals(K_HTML, kicker);
+
+    const s2023 = seasons.find((s) => s.kicking?.season === 2023);
+    expect(s2023?.kicking).toMatchObject({
+      season: 2023,
+      // aggregate row: g=17, fgm=28, fga=30, xpm=35, xpa=36
+      g: 17,
+      fgm: 28,
+      fga: 30,
+      xpm: 35,
+      xpa: 36,
+    });
+  });
+
+  it('skips Career totals row', () => {
+    const seasons = parseMainPageSeasonTotals(K_HTML, kicker);
+    expect(seasons.map((s) => s.kicking?.season)).toEqual([2021, 2022, 2023]);
+  });
+});
+
+describe('parseMainPageSeasonTotals — empty page', () => {
+  it('returns empty array when no relevant tables are present', () => {
+    const seasons = parseMainPageSeasonTotals('<html><body></body></html>', wr);
+    expect(seasons).toHaveLength(0);
+  });
+});
+
+describe('getAllSeasonTotalsFromMainPage', () => {
+  it('fetches player main page and delegates to parser', async () => {
+    mockGetPlayerPage.mockResolvedValue(WR_HTML);
+    const seasons = await getAllSeasonTotalsFromMainPage(wr);
+
+    expect(mockGetPlayerPage).toHaveBeenCalledWith('AdamDa01');
+    expect(seasons).toHaveLength(2);
+    expect(seasons[0].receiving?.season).toBe(2014);
+  });
+});

@@ -1,0 +1,107 @@
+<!--
+  Synthetic main-page fixture for a QB (pfrId MahoPa00, Patrick Mahomes).
+  Two seasons in the `passing` table; both seasons also appear in the
+  `rushing_and_receiving` table (QBs carry the ball). No receiving stats
+  (rec=0, tgt=0 rows are not emitted).
+
+  Expected season totals:
+    2018: passing(g=16, cmp=383, att=580, yds=5097, td=50, int=12),
+          rushing(g=16, att=60, yds=272, td=2)
+    2019: passing(g=14, cmp=319, att=484, yds=4031, td=26, int=5),
+          rushing(g=14, att=51, yds=218, td=2)
+-->
+<html>
+  <body>
+    <div id="content">
+      <table id="passing">
+        <thead>
+          <tr>
+            <th data-stat="year_id">Year</th>
+            <th data-stat="team_name_abbr">Tm</th>
+            <th data-stat="games">G</th>
+            <th data-stat="pass_cmp">Cmp</th>
+            <th data-stat="pass_att">Att</th>
+            <th data-stat="pass_yds">Yds</th>
+            <th data-stat="pass_td">TD</th>
+            <th data-stat="pass_int">Int</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th data-stat="year_id">2018</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/kan/2018.htm">KAN</a>
+            </td>
+            <td data-stat="games">16</td>
+            <td data-stat="pass_cmp">383</td>
+            <td data-stat="pass_att">580</td>
+            <td data-stat="pass_yds">5097</td>
+            <td data-stat="pass_td">50</td>
+            <td data-stat="pass_int">12</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2019</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/kan/2019.htm">KAN</a>
+            </td>
+            <td data-stat="games">14</td>
+            <td data-stat="pass_cmp">319</td>
+            <td data-stat="pass_att">484</td>
+            <td data-stat="pass_yds">4031</td>
+            <td data-stat="pass_td">26</td>
+            <td data-stat="pass_int">5</td>
+          </tr>
+        </tbody>
+      </table>
+      <table id="rushing_and_receiving">
+        <thead>
+          <tr>
+            <th data-stat="year_id">Year</th>
+            <th data-stat="team_name_abbr">Tm</th>
+            <th data-stat="games">G</th>
+            <th data-stat="rush_att">Att</th>
+            <th data-stat="rush_yds">Yds</th>
+            <th data-stat="rush_td">TD</th>
+            <th data-stat="targets">Tgt</th>
+            <th data-stat="rec">Rec</th>
+            <th data-stat="rec_yds">Yds</th>
+            <th data-stat="rec_td">TD</th>
+            <th data-stat="fumbles">Fmb</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th data-stat="year_id">2018</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/kan/2018.htm">KAN</a>
+            </td>
+            <td data-stat="games">16</td>
+            <td data-stat="rush_att">60</td>
+            <td data-stat="rush_yds">272</td>
+            <td data-stat="rush_td">2</td>
+            <td data-stat="targets">0</td>
+            <td data-stat="rec">0</td>
+            <td data-stat="rec_yds">0</td>
+            <td data-stat="rec_td">0</td>
+            <td data-stat="fumbles">3</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2019</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/kan/2019.htm">KAN</a>
+            </td>
+            <td data-stat="games">14</td>
+            <td data-stat="rush_att">51</td>
+            <td data-stat="rush_yds">218</td>
+            <td data-stat="rush_td">2</td>
+            <td data-stat="targets">0</td>
+            <td data-stat="rec">0</td>
+            <td data-stat="rec_yds">0</td>
+            <td data-stat="rec_td">0</td>
+            <td data-stat="fumbles">2</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

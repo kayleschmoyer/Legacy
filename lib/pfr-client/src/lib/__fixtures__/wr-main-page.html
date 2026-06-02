@@ -1,0 +1,77 @@
+<!--
+  Synthetic main-page fixture for a WR (pfrId AdamDa01, Davante Adams).
+  Two regular seasons in the `receiving_and_rushing` table, wrapped in an HTML
+  comment as PFR does on live main pages. Season 2014 is receiving-only;
+  season 2015 has both receiving and rushing.
+
+  Expected season totals:
+    2014: receiving(g=16, tgt=66, rec=38, yds=446, td=3), rushing=null
+    2015: receiving(g=15, tgt=94, rec=50, yds=536, td=1, fumbles=1),
+          rushing(g=15, att=2, yds=8, td=0)
+-->
+<html>
+  <body>
+    <div id="content">
+      <!--
+        <table id="receiving_and_rushing">
+          <thead>
+            <tr>
+              <th data-stat="year_id">Year</th>
+              <th data-stat="team_name_abbr">Tm</th>
+              <th data-stat="games">G</th>
+              <th data-stat="targets">Tgt</th>
+              <th data-stat="rec">Rec</th>
+              <th data-stat="rec_yds">Yds</th>
+              <th data-stat="rec_td">TD</th>
+              <th data-stat="rush_att">Att</th>
+              <th data-stat="rush_yds">Yds</th>
+              <th data-stat="rush_td">TD</th>
+              <th data-stat="fumbles">Fmb</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th data-stat="year_id">2014</th>
+              <td data-stat="team_name_abbr"><a href="/teams/gnb/2014.htm">GNB</a></td>
+              <td data-stat="games">16</td>
+              <td data-stat="targets">66</td>
+              <td data-stat="rec">38</td>
+              <td data-stat="rec_yds">446</td>
+              <td data-stat="rec_td">3</td>
+              <td data-stat="rush_att">0</td>
+              <td data-stat="rush_yds">0</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="fumbles">0</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">2015</th>
+              <td data-stat="team_name_abbr"><a href="/teams/gnb/2015.htm">GNB</a></td>
+              <td data-stat="games">15</td>
+              <td data-stat="targets">94</td>
+              <td data-stat="rec">50</td>
+              <td data-stat="rec_yds">536</td>
+              <td data-stat="rec_td">1</td>
+              <td data-stat="rush_att">2</td>
+              <td data-stat="rush_yds">8</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="fumbles">1</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">Career</th>
+              <td data-stat="team_name_abbr"></td>
+              <td data-stat="games">31</td>
+              <td data-stat="targets">160</td>
+              <td data-stat="rec">88</td>
+              <td data-stat="rec_yds">982</td>
+              <td data-stat="rec_td">4</td>
+              <td data-stat="rush_att">2</td>
+              <td data-stat="rush_yds">8</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="fumbles">1</td>
+            </tr>
+          </tbody>
+        </table>
+      -->
+    </div>
+  </body>
+</html>

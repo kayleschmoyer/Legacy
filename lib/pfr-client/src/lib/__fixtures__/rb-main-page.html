@@ -1,0 +1,66 @@
+<!--
+  Synthetic main-page fixture for a RB (pfrId HenrDe00, Derrick Henry).
+  Two seasons in the `rushing_and_receiving` table (RB-primary ordering, NOT
+  comment-wrapped). Season 2019 has both rushing and receiving; season 2020
+  is rushing-only.
+
+  Expected season totals:
+    2019: rushing(g=16, att=303, yds=1540, td=16, fumbles=1),
+          receiving(g=16, tgt=24, rec=18, yds=206, td=2)
+    2020: rushing(g=16, att=378, yds=2027, td=17), receiving=null
+-->
+<html>
+  <body>
+    <div id="content">
+      <table id="rushing_and_receiving">
+        <thead>
+          <tr>
+            <th data-stat="year_id">Year</th>
+            <th data-stat="team_name_abbr">Tm</th>
+            <th data-stat="games">G</th>
+            <th data-stat="rush_att">Att</th>
+            <th data-stat="rush_yds">Yds</th>
+            <th data-stat="rush_td">TD</th>
+            <th data-stat="targets">Tgt</th>
+            <th data-stat="rec">Rec</th>
+            <th data-stat="rec_yds">Yds</th>
+            <th data-stat="rec_td">TD</th>
+            <th data-stat="fumbles">Fmb</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th data-stat="year_id">2019</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/oti/2019.htm">OTI</a>
+            </td>
+            <td data-stat="games">16</td>
+            <td data-stat="rush_att">303</td>
+            <td data-stat="rush_yds">1540</td>
+            <td data-stat="rush_td">16</td>
+            <td data-stat="targets">24</td>
+            <td data-stat="rec">18</td>
+            <td data-stat="rec_yds">206</td>
+            <td data-stat="rec_td">2</td>
+            <td data-stat="fumbles">1</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2020</th>
+            <td data-stat="team_name_abbr">
+              <a href="/teams/oti/2020.htm">OTI</a>
+            </td>
+            <td data-stat="games">16</td>
+            <td data-stat="rush_att">378</td>
+            <td data-stat="rush_yds">2027</td>
+            <td data-stat="rush_td">17</td>
+            <td data-stat="targets">0</td>
+            <td data-stat="rec">0</td>
+            <td data-stat="rec_yds">0</td>
+            <td data-stat="rec_td">0</td>
+            <td data-stat="fumbles">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

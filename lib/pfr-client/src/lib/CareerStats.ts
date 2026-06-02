@@ -1,6 +1,6 @@
 import htmlParser from 'node-html-parser';
 import { LOGGER } from '@legacy-sports/logging';
-import { getPlayerGameLog } from './PFRSession';
+import { getPlayerGameLog, getPlayerPage } from './PFRSession';
 import {
   getTable,
   parseFloatCell,
@@ -414,4 +414,196 @@ export async function getSeasonTotals(
     receiving: aggregateSeasonReceiving(log.receiving, player, season, team),
     kicking: aggregateSeasonKicking(log.kicking, player, season, team),
   };
+}
+
+// --- Main player page season totals ---
+// Parses per-season aggregate tables from the player's main PFR page, yielding
+// all career seasons in a single HTTP request instead of one per season.
+// Tables vary by position: `passing` (QBs), `receiving_and_rushing` /
+// `rushing_and_receiving` (skill players), `scoring` (kickers).
+// For multi-team seasons PFR places individual team rows first and the
+// aggregate "2TM"/"3TM" row last — later map.set() calls overwrite earlier
+// ones, so the aggregate row (with correct combined totals) always wins.
+
+function parseMainPageYear(row: Row): number | null {
+  const year = parseIntCell(row, 'year_id');
+  if (year === null) return null;
+  if (year < 1960 || year > 2100) return null;
+  return year;
+}
+
+function parseMainPageTeam(row: Row): string {
+  return parseTeamCell(row, 'team_name_abbr') ?? '';
+}
+
+interface SkillSeasonRow {
+  season: number;
+  receiving: FootballSeasonReceiving | null;
+  rushing: FootballSeasonRushing | null;
+}
+
+function parseMainPageSkillRow(
+  row: Row,
+  player: PfrPlayer,
+): SkillSeasonRow | null {
+  const season = parseMainPageYear(row);
+  if (season === null) return null;
+  const team = parseMainPageTeam(row);
+  const g = parseIntCell(row, 'games');
+  const fumbles = parseIntCell(row, 'fumbles');
+
+  const tgt = parseIntCell(row, 'targets');
+  const rec = parseIntCell(row, 'rec');
+  const receiving: FootballSeasonReceiving | null =
+    tgt || rec
+      ? {
+          playerId: player.id,
+          season,
+          team,
+          pfrRowId: `${season}`,
+          g,
+          rec,
+          tgt,
+          yds: parseIntCell(row, 'rec_yds'),
+          td: parseIntCell(row, 'rec_td'),
+          fumbles,
+        }
+      : null;
+
+  const rushAtt = parseIntCell(row, 'rush_att');
+  const rushing: FootballSeasonRushing | null = rushAtt
+    ? {
+        playerId: player.id,
+        season,
+        team,
+        pfrRowId: `${season}`,
+        g,
+        att: rushAtt,
+        yds: parseIntCell(row, 'rush_yds'),
+        td: parseIntCell(row, 'rush_td'),
+        fumbles,
+      }
+    : null;
+
+  if (!receiving && !rushing) return null;
+  return { season, receiving, rushing };
+}
+
+function parseMainPagePassingRow(
+  row: Row,
+  player: PfrPlayer,
+): FootballSeasonPassing | null {
+  const season = parseMainPageYear(row);
+  if (season === null) return null;
+  const att = parseIntCell(row, 'pass_att');
+  if (!att) return null;
+  return {
+    playerId: player.id,
+    season,
+    team: parseMainPageTeam(row),
+    pfrRowId: `${season}`,
+    g: parseIntCell(row, 'games'),
+    cmp: parseIntCell(row, 'pass_cmp'),
+    att,
+    yds: parseIntCell(row, 'pass_yds'),
+    td: parseIntCell(row, 'pass_td'),
+    int: parseIntCell(row, 'pass_int'),
+    rating: null,
+  };
+}
+
+function parseMainPageKickingRow(
+  row: Row,
+  player: PfrPlayer,
+): FootballSeasonKicking | null {
+  const season = parseMainPageYear(row);
+  if (season === null) return null;
+  const fga = parseIntCell(row, 'fga');
+  const xpa = parseIntCell(row, 'xpa');
+  if (!fga && !xpa) return null;
+  return {
+    playerId: player.id,
+    season,
+    team: parseMainPageTeam(row),
+    pfrRowId: `${season}`,
+    g: parseIntCell(row, 'games'),
+    fgm: parseIntCell(row, 'fgm'),
+    fga,
+    xpm: parseIntCell(row, 'xpm'),
+    xpa,
+  };
+}
+
+// Exported for unit testing against fixtures without a network call.
+export function parseMainPageSeasonTotals(
+  html: string,
+  player: PfrPlayer,
+): SeasonTotals[] {
+  const root = htmlParser(html, { comment: true });
+
+  const passingBySeason = new Map<number, FootballSeasonPassing>();
+  const receivingBySeason = new Map<number, FootballSeasonReceiving>();
+  const rushingBySeason = new Map<number, FootballSeasonRushing>();
+  const kickingBySeason = new Map<number, FootballSeasonKicking>();
+
+  const passingTable = getTable(root, 'passing');
+  if (passingTable) {
+    parseTableRows(passingTable, (r) =>
+      parseMainPagePassingRow(r, player),
+    ).forEach((s) => passingBySeason.set(s.season, s));
+  }
+
+  // PFR names the skill table by primary position — try both orderings.
+  const skillTable =
+    getTable(root, 'receiving_and_rushing') ??
+    getTable(root, 'rushing_and_receiving');
+  if (skillTable) {
+    parseTableRows(skillTable, (r) => parseMainPageSkillRow(r, player)).forEach(
+      ({ season, receiving, rushing }) => {
+        if (receiving) receivingBySeason.set(season, receiving);
+        if (rushing) rushingBySeason.set(season, rushing);
+      },
+    );
+  }
+
+  const scoringTable = getTable(root, 'scoring');
+  if (scoringTable) {
+    parseTableRows(scoringTable, (r) =>
+      parseMainPageKickingRow(r, player),
+    ).forEach((s) => kickingBySeason.set(s.season, s));
+  }
+
+  const allSeasons = new Set<number>([
+    ...passingBySeason.keys(),
+    ...receivingBySeason.keys(),
+    ...rushingBySeason.keys(),
+    ...kickingBySeason.keys(),
+  ]);
+
+  if (allSeasons.size === 0) {
+    LOGGER.info(`No season data found on main page for ${player.pfrId}`);
+    return [];
+  }
+
+  LOGGER.info(
+    `Main page for ${player.pfrId}: ${allSeasons.size} seasons ` +
+      `(${passingBySeason.size} passing, ${rushingBySeason.size} rushing, ` +
+      `${receivingBySeason.size} receiving, ${kickingBySeason.size} kicking)`,
+  );
+
+  return [...allSeasons]
+    .sort((a, b) => a - b)
+    .map((season) => ({
+      passing: passingBySeason.get(season) ?? null,
+      rushing: rushingBySeason.get(season) ?? null,
+      receiving: receivingBySeason.get(season) ?? null,
+      kicking: kickingBySeason.get(season) ?? null,
+    }));
+}
+
+export async function getAllSeasonTotalsFromMainPage(
+  player: PfrPlayer,
+): Promise<SeasonTotals[]> {
+  const html = await getPlayerPage(player.pfrId);
+  return parseMainPageSeasonTotals(html, player);
 }
