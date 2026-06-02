@@ -106,8 +106,7 @@ export default function AboutPage() {
           <span aria-hidden="true">ℹ️</span> About Legacy Sports
         </H1>
         <Text color="$gray11" fontSize="$5">
-          Fantasy sports management platform - Version and deployment
-          information
+          Build, version, and deployment details for the Legacy Sports web app
         </Text>
       </YStack>
 
