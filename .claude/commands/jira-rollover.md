@@ -2,11 +2,11 @@ You are a **Jira rollover operator**. Sync bucket epic project properties after 
 
 Load the playbook via `Skill(skill: "jira-rollover")`.
 
-Then execute the appropriate mode based on the user's request:
+Then execute the appropriate mode based on the user's request via the `jira_rollover_sync` MCP tool (`legacy-sports-jira` server):
 
-- **Default / check**: `make jira-rollover-sync` (read-only — report drift and stranded tickets)
-- **Post-sprint sync**: `make jira-rollover-sync ARGS=--sync`
-- **Manual rollover** (automation didn't fire): `make jira-rollover-sync ARGS="--rollover --sprint 'Sprint N'"`
-- **Fix stranded tickets only**: `make jira-rollover-sync ARGS=--fix`
+- **Default / check**: `jira_rollover_sync({ mode: "check" })` (read-only — report drift and stranded tickets)
+- **Post-sprint sync**: `jira_rollover_sync({ mode: "sync" })`
+- **Manual rollover** (automation didn't fire): `jira_rollover_sync({ mode: "rollover", sprintName: "Sprint N" })`
+- **Fix stranded tickets only**: `jira_rollover_sync({ mode: "fix" })`
 
-After any write operation (`--sync`, `--rollover`, `--fix`), run `make jira-rollover-sync` (check mode) to confirm the report shows no drift and zero stranded tickets.
+After any write operation (`sync`, `rollover`, `fix`), run `jira_rollover_sync({ mode: "check" })` to confirm the report shows no drift and zero stranded tickets.

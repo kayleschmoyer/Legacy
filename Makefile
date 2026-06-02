@@ -666,9 +666,6 @@ pr: ## Create a GitHub pull request using twig
 	@$(call echo_blue,Creating GitHub pull request...)
 	twig github pr create
 
-jira-rollover-sync: ## Sync Jira bucket epic project properties (ARGS=--sync|--fix|--rollover)
-	pnpm exec tsx scripts/jira-rollover-sync.ts $(ARGS)
-
 sync-worktrees: ## Regenerate .code-workspace with active worktrees (TICKETS=501,493 to select specific ones)
 	@$(call echo_blue,Syncing worktree workspace file...)
 ifeq ($(DETECTED_OS),Windows)

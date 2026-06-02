@@ -10,6 +10,52 @@ interface BucketEpicValue {
   updatedAt?: string;
 }
 
+/** Jira project-property path for a bucket's current epic pointer. */
+function bucketPropertyPath(bucket: string): string {
+  return `/rest/api/3/project/LS/properties/bucket.${bucket}`;
+}
+
+/**
+ * Read a bucket's current epic key directly from the Jira project property.
+ * Returns `null` when the property is unset (404) or empty. Uncached — callers
+ * that need to react to a freshly-written value (e.g. rollover sync) get the
+ * live value, while the cached `getBucketEpic` MCP tool keeps its 5-minute TTL.
+ */
+export async function readBucketEpicKey(
+  bucket: string,
+): Promise<string | null> {
+  try {
+    const result = await jiraRequest<{ value: BucketEpicValue }>({
+      method: 'GET',
+      path: bucketPropertyPath(bucket),
+    });
+    return result?.value?.key?.trim() || null;
+  } catch (error) {
+    // 404 means the property has never been set for this bucket.
+    if (error instanceof Error && error.message.includes('(404)')) return null;
+    throw error;
+  }
+}
+
+/**
+ * Write a bucket's current epic key to the Jira project property and invalidate
+ * the in-process cache so the next `getBucketEpic` read reflects the new value.
+ */
+export async function writeBucketEpicKey(
+  bucket: string,
+  epicKey: string,
+): Promise<void> {
+  await jiraRequest({
+    method: 'PUT',
+    path: bucketPropertyPath(bucket),
+    body: {
+      key: epicKey,
+      updatedAt: new Date().toISOString(),
+    },
+  });
+  cache.delete(bucket);
+}
+
 export async function getBucketEpic(params: {
   bucket: string;
 }): Promise<CallToolResult> {
@@ -35,7 +81,7 @@ export async function getBucketEpic(params: {
   try {
     const result = await jiraRequest<{ value: BucketEpicValue }>({
       method: 'GET',
-      path: `/rest/api/3/project/LS/properties/bucket.${bucket}`,
+      path: bucketPropertyPath(bucket),
     });
     const key = result?.value?.key?.trim();
     if (!key) throw new Error('Property exists but has no key value');
@@ -92,15 +138,7 @@ export async function setBucketEpic(params: {
     };
   }
   try {
-    await jiraRequest({
-      method: 'PUT',
-      path: `/rest/api/3/project/LS/properties/bucket.${bucket}`,
-      body: {
-        key: trimmedKey,
-        updatedAt: new Date().toISOString(),
-      },
-    });
-    cache.delete(bucket); // clear cache so next read reflects the new value
+    await writeBucketEpicKey(bucket, trimmedKey);
     return {
       content: [
         {

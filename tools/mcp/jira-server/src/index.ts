@@ -15,6 +15,7 @@ import { view } from './tools/view.js';
 import { bulkTransition } from './tools/bulk-transition.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
+import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { getTransitions } from './tools/get-transitions.js';
 import { tryGetJiraCredentials } from './netrc.js';
@@ -475,6 +476,31 @@ server.tool(
     epicKey: z.string().describe('Jira issue key, e.g. "LS-2501"'),
   },
   async (params) => setBucketEpic(params),
+);
+
+// --- jira_rollover_sync ---
+server.tool(
+  'jira_rollover_sync',
+  'Manage Jira bucket-epic rollovers at sprint boundaries. ' +
+    'mode="check" (default) reports project-property drift and stranded tickets (read-only); ' +
+    'mode="sync" updates the bucket.client-bugs / bucket.mcp-gaps properties to the newest open epic, ' +
+    're-parents stranded non-Done children, and closes the previous epic with a "Rolled over to" comment; ' +
+    'mode="rollover" creates the new sprint epics (requires sprintName), then runs sync; ' +
+    'mode="fix" re-parents stranded tickets only. ' +
+    'Write modes require project-admin credentials. Replaces the former make jira-rollover-sync script.',
+  {
+    mode: z
+      .enum(['check', 'sync', 'rollover', 'fix'])
+      .default('check')
+      .describe('Operation mode (default: check, read-only)'),
+    sprintName: z
+      .string()
+      .optional()
+      .describe(
+        'Sprint name for mode="rollover" (e.g. "Sprint 8"). Required for rollover.',
+      ),
+  },
+  async (params) => rolloverSync(params),
 );
 
 // Start the server

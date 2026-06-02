@@ -14,7 +14,7 @@ Two long-lived "bucket" epics track ongoing intake queues:
 | Client bugs | `bucket:client-bugs` | resolved at runtime via `jira_get_bucket_epic` |
 | MCP gaps    | `bucket:mcp-gaps`    | resolved at runtime via `jira_get_bucket_epic` |
 
-At each sprint close, a Jira Automation rule creates new bucket epics with the same labels. The sync script updates the Jira project properties so all readers immediately see the new epic.
+At each sprint close, a Jira Automation rule creates new bucket epics with the same labels. The `jira_rollover_sync` MCP tool updates the Jira project properties so all readers immediately see the new epic.
 
 ## When to Use
 
@@ -24,26 +24,26 @@ At each sprint close, a Jira Automation rule creates new bucket epics with the s
 
 ## Steps
 
+All four modes are exposed by the `jira_rollover_sync` MCP tool (`legacy-sports-jira` server). Prefer it over any shell command.
+
 ### 1. Check current state (read-only)
 
 ```
-make jira-rollover-sync
+jira_rollover_sync({ mode: "check" })   // mode defaults to "check"
 ```
-
-Or: `make jira-rollover-sync ARGS=--check`
 
 Reports whether project properties match the newest open epic, and lists any stranded tickets.
 
 ### 2. Sync after sprint close (standard operation)
 
 ```
-make jira-rollover-sync ARGS=--sync
+jira_rollover_sync({ mode: "sync" })
 ```
 
 This:
 
 1. Finds the newest open epic for each bucket (by label)
-2. Updates `bucket.client-bugs` and `bucket.mcp-gaps` project properties
+2. Updates `bucket.client-bugs` and `bucket.mcp-gaps` project properties (and invalidates the in-process `jira_get_bucket_epic` cache)
 3. Closes the previous open epic with a "Rolled over to LS-####" comment
 4. Re-parents any stranded tickets to the new epic
 
@@ -52,15 +52,15 @@ Run this after every sprint close. Takes ~5 seconds.
 ### 3. Manual rollover (if Jira Automation didn't fire)
 
 ```
-make jira-rollover-sync ARGS="--rollover --sprint 'Sprint 8'"
+jira_rollover_sync({ mode: "rollover", sprintName: "Sprint 8" })
 ```
 
-Creates the new epics first, then runs sync.
+Creates the new epics first, then runs sync. `sprintName` is required for this mode.
 
 ### 4. Fix stranded tickets only
 
 ```
-make jira-rollover-sync ARGS=--fix
+jira_rollover_sync({ mode: "fix" })
 ```
 
 Re-parents stranded tickets without touching epic status or project properties. Safe to run any time.
@@ -78,6 +78,6 @@ Result is cached 5 minutes per MCP server process.
 
 ## Gotchas
 
-- **Automation limit**: if the Jira Automation rule didn't fire due to hitting the monthly limit, use `--rollover` to create epics and sync manually.
-- **Permission**: `jira_set_bucket_epic` and `--sync`/`--rollover` modes require "Administer Projects" on the LS project. The local service account has this. Lambda and agent read-only calls don't.
-- **Cache**: `jira_get_bucket_epic` caches for 5 minutes. If you just ran `--sync`, wait up to 5 minutes or restart the MCP server to see the new key immediately.
+- **Automation limit**: if the Jira Automation rule didn't fire due to hitting the monthly limit, use `mode: "rollover"` to create epics and sync manually.
+- **Permission**: `jira_set_bucket_epic` and the `sync`/`rollover`/`fix` modes require "Administer Projects" on the LS project. The local service account has this. Lambda and agent read-only calls don't.
+- **Cache**: `jira_get_bucket_epic` caches for 5 minutes. Because `jira_rollover_sync` now runs inside the same `legacy-sports-jira` server process, a `sync`/`rollover` write invalidates that cache automatically — the next `jira_get_bucket_epic` reflects the new key immediately (no need to wait or restart the server).
