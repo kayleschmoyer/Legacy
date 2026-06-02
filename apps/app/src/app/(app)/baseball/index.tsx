@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, ImageBackground, Modal } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import {
   Button,
   H1,
@@ -24,6 +24,7 @@ export default function BaseballHome() {
   const [isLoading, setIsLoading] = useState(false);
   const inviteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userInfo = useAuthorizedUserInfo();
+  const router = useRouter();
 
   useEffect(() => {
     return () => {
@@ -129,7 +130,12 @@ export default function BaseballHome() {
               Create New League
             </Text>
           </Button>
-          <Button flex={1} backgroundColor="$orange9" borderRadius="$3">
+          <Button
+            flex={1}
+            backgroundColor="$orange9"
+            borderRadius="$3"
+            onPress={() => router.navigate('/baseball/league/join')}
+          >
             <Text color="$white" fontSize="$5" fontWeight="bold">
               Join League
             </Text>

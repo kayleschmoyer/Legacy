@@ -14,6 +14,7 @@ type RNComponents = {
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+const mockNavigate = jest.fn();
 jest.mock('expo-router', () => {
   const { Text } = jest.requireActual<RNComponents>('react-native');
   return {
@@ -28,6 +29,7 @@ jest.mock('expo-router', () => {
     }) => (
       <Text testID={`link-league-${href.params.leagueId}`}>{children}</Text>
     ),
+    useRouter: () => ({ navigate: mockNavigate }),
   };
 });
 
@@ -206,6 +208,14 @@ describe('BaseballHome', () => {
         screen.getByRole('button', { name: 'Create New League' }),
       );
       expect(screen.getByTestId('create-league-modal')).toBeTruthy();
+    });
+  });
+
+  describe('join league', () => {
+    it('navigates to the join-by-code route when Join League is pressed (LS-5180)', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByRole('button', { name: 'Join League' }));
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/join');
     });
   });
 
