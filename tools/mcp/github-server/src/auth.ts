@@ -2,14 +2,43 @@ import { execFile } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { chmod, readFile, writeFile, mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { LOGGER } from '@legacy-sports/logging/server';
 
 import { readGitRemoteUrl } from './git-config.js';
+import { getRepoRoot } from './repo-root.js';
 
-const CONFIG_DIR = join(homedir(), '.config', 'legacy-sports-github');
-const TOKEN_PATH = join(CONFIG_DIR, 'token.json');
+// Re-exported for existing consumers (create-pr.ts, rebase-pr.ts) that import
+// `getRepoRoot` from this module. The implementation lives in ./repo-root.js so
+// its `import.meta.url` usage stays out of CommonJS-compiled specs (LS-5982).
+export { getRepoRoot };
+
+/**
+ * Directory holding the cached token file.
+ *
+ * Resolved lazily (not as a module-level constant) so `isLambda()` is evaluated
+ * at call time, after the Lambda runtime has populated its environment.
+ *
+ * In Lambda the home directory (`/home/sbx_userNNNN`, from `homedir()`) is **not
+ * writable** — only the temp dir (`/tmp`) is. Writing the token cache under
+ * `homedir()` there throws `ENOENT: no such file or directory, mkdir
+ * '/home/sbx_userNNNN'` from `writeCachedToken`, which previously propagated out
+ * of `getToken`/`tryResolveToken` and masqueraded as a GitHub App token-exchange
+ * failure even though the exchange itself succeeded (LS-5982). Anchoring the
+ * cache under `tmpdir()` in Lambda keeps the `mkdir` on a writable path; warm
+ * containers reuse `/tmp` so the cache still survives across invocations.
+ */
+export function getTokenCacheDir(): string {
+  const base = isLambda() ? tmpdir() : homedir();
+  return join(base, '.config', 'legacy-sports-github');
+}
+
+/** Absolute path to the cached token file. */
+export function getTokenCachePath(): string {
+  return join(getTokenCacheDir(), 'token.json');
+}
 
 /**
  * GitHub OAuth App client ID (public, safe to commit).
@@ -44,12 +73,6 @@ export function isLambda(): boolean {
   return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
 }
 
-/** Resolve the repository root from this script's location (tools/mcp/github-server/src/). */
-export function getRepoRoot(): string {
-  const thisDir = resolve(fileURLToPath(import.meta.url), '..');
-  return resolve(thisDir, '..', '..', '..', '..');
-}
-
 // ---------------------------------------------------------------------------
 // Token resolution
 // ---------------------------------------------------------------------------
@@ -63,7 +86,7 @@ interface CachedTokenFile {
 
 async function readCachedToken(): Promise<string | null> {
   try {
-    const raw = await readFile(TOKEN_PATH, 'utf-8');
+    const raw = await readFile(getTokenCachePath(), 'utf-8');
     const data = JSON.parse(raw) as CachedTokenFile;
     if (!data.token) return null;
 
@@ -88,16 +111,17 @@ async function writeCachedToken(
   token: string,
   expiresAt?: string,
 ): Promise<void> {
-  await mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  const tokenPath = getTokenCachePath();
+  await mkdir(getTokenCacheDir(), { recursive: true, mode: 0o700 });
   const data: CachedTokenFile = {
     token,
     createdAt: new Date().toISOString(),
     ...(expiresAt ? { expiresAt } : {}),
   };
-  await writeFile(TOKEN_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  await writeFile(tokenPath, JSON.stringify(data, null, 2), 'utf-8');
   // Restrict file permissions to owner-only (no-op on Windows, but safe to call)
   if (process.platform !== 'win32') {
-    await chmod(TOKEN_PATH, 0o600);
+    await chmod(tokenPath, 0o600);
   }
 }
 
@@ -106,7 +130,7 @@ async function invalidateCachedToken(): Promise<void> {
   cachedTokenSource = null;
   try {
     const { unlink } = await import('node:fs/promises');
-    await unlink(TOKEN_PATH);
+    await unlink(getTokenCachePath());
   } catch {
     // File may not exist
   }
@@ -599,7 +623,17 @@ export async function tryResolveToken(): Promise<{
     if (appResult) {
       cachedToken = appResult.token;
       cachedTokenSource = 'github-app';
-      await writeCachedToken(appResult.token, appResult.expiresAt);
+      // Caching is a best-effort optimization — a write failure (e.g. an
+      // unwritable cache dir) must never discard a freshly-minted token, which
+      // is exactly the bug that surfaced as a phantom "token exchange failed"
+      // in Lambda (LS-5982). Mirror the netrc/gh-cli paths and swallow it.
+      await writeCachedToken(appResult.token, appResult.expiresAt).catch(
+        (cacheErr) => {
+          LOGGER.warn(
+            `Failed to cache GitHub App token to file: ${cacheErr instanceof Error ? cacheErr.message : cacheErr}`,
+          );
+        },
+      );
       return { token: appResult.token, source: 'github-app' };
     }
   } catch (err) {
@@ -706,7 +740,16 @@ export async function getToken(): Promise<string> {
     const appResult = await generateGitHubAppToken();
     if (appResult) {
       cachedToken = appResult.token;
-      await writeCachedToken(appResult.token, appResult.expiresAt);
+      // Caching is best-effort: a cache-write failure must not discard a
+      // successfully-minted token nor reach the Lambda short-circuit below as a
+      // phantom token-exchange failure (LS-5982). Mirror the netrc/gh-cli paths.
+      await writeCachedToken(appResult.token, appResult.expiresAt).catch(
+        (cacheErr) => {
+          LOGGER.warn(
+            `Failed to cache GitHub App token to file: ${cacheErr instanceof Error ? cacheErr.message : cacheErr}`,
+          );
+        },
+      );
       return appResult.token;
     }
   } catch (err) {
