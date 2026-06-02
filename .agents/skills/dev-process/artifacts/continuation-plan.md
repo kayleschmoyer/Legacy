@@ -1,12 +1,25 @@
 # Artifact: Continuation Plan
 
-A structured handoff posted as a PR comment when work on an in-flight PR transfers from one author to another (human-to-agent, agent-to-agent, agent-to-human, or self-resumption after a long gap).
+A structured handoff posted as a PR comment when work on an in-flight PR transfers from one author to another (human-to-agent, agent-to-agent, agent-to-human, or self-resumption after a long gap), **or** a same-author checkpoint posted before a long step so a reaped container can resume.
 
 ## When required
 
 - Entrypoint 10 (inherited-pr) — always.
 - Self-resumption of stalled work after >24h gap or after context loss — always.
 - Any time another author has pushed commits to a PR you are now driving.
+- **Before a long validation/build step (e.g. `make pc`) in an ephemeral or time-limited container** — any cloud agent, and native ephemeral worktree sessions at risk of ending mid-task. This is the **timeout-resilience checkpoint**: a same-author plan posted so that, if the container is reaped during validation, a fresh container resumes from the checkpoint instead of restarting from zero. See [workflow-overview Step 10b](../../workflow-overview/SKILL.md) and [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience).
+
+## Precondition: a PR must exist
+
+`continuation_post` writes a **PR comment**, so the PR has to exist before you can checkpoint. For the timeout-resilience case this is exactly why the workflow opens the PR as a **draft first** — before the long `make pc` — so the checkpoint has a durable home that survives the container. Do not defer PR creation until after validation if the container can be reaped mid-validation.
+
+## Timeout-resilience checkpoints (same-author)
+
+For the timeout case the "previous" and "resuming" author are the same identity, and the plan captures _pre-validation_ state rather than an inherited diff:
+
+- **Inherited from / Resumed by**: your own identity (note "self — timeout-resilience checkpoint").
+- **What's left**: the remaining workflow steps — run migrations, `make pc`, self-review, mark ready, drive to merge — phrased concretely enough that a cold container can execute them.
+- Re-post (`continuation_post`) after each significant step so the resume point stays current; a fresh container reads the latest via `continuation_status`.
 
 ## Path
 
@@ -85,4 +98,6 @@ Requires `GITHUB_TOKEN` for posting/fetching comments; returns formatted body fo
 
 - [Entrypoint 10: inherited-pr](../entrypoints/10-inherited-pr.md).
 - [drive-pr skill](../../drive-pr/SKILL.md) — the operational driver-agent flow.
+- [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience) — the timeout-resilience checkpoint flow.
+- [workflow-overview Step 10b](../../workflow-overview/SKILL.md) — draft-PR-first ordering in the canonical checklist.
 - [Template](../templates/continuation-plan-template.md).

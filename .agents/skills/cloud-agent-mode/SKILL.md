@@ -78,6 +78,26 @@ The "cloud agent" label covers three distinct configurations with very different
 
 Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`, `gh pr edit <PR#> --add-label "agent-in-progress"`.
 
+> **Ordering note (timeout resilience):** in a time-limited cloud container, open the **draft PR and post a continuation checkpoint _before_ Step 5 (`make pc`)**, not after Step 7. `make pc` is the longest stretch and the most likely point to be reaped; the draft-PR-first ordering below makes that reap recoverable. See [Container timeout resilience](#container-timeout-resilience).
+
+## Container timeout resilience
+
+Cloud (and native ephemeral) containers can be reaped mid-run — most often during the longest stretch of the workflow, `make pc` on a wide-blast-radius change (which runs effectively twice when the formatter auto-commits). If the only record of progress is an unpushed local commit, the reap loses the task and a fresh container restarts from zero. A transcript that simply stops mid-`make pc`, with no closing summary, is this failure — the container ended, the agent did not decide it was done.
+
+Make the kill non-fatal by establishing a **durable checkpoint before the long validation steps** (draft-PR-first ordering).
+
+**Before running `make pc`:**
+
+1. **Commit and push the branch** — `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })` (degraded mode: `git add … && git commit && git push -u origin HEAD`).
+2. **Open the PR as a draft now** — `github_create_pr({ …, draft: true })` (default CC web: `mcp__github__create_pull_request({ …, draft: true })`). A draft PR is inert: CI and review are gated on `draft == false`, so opening it early triggers nothing, but the branch + PR now survive a container kill.
+3. **Apply `agent-in-progress`** (closes the sweep race window early) and **post the continuation checkpoint** — `continuation_post({ pr: <PR#>, … })` recording done / what's left (run migrations, `make pc`, self-review, mark ready, merge) / current state. The "Resumed by" identity is yourself (a same-author timeout-resilience checkpoint). See the [continuation-plan artifact](../dev-process/artifacts/continuation-plan.md).
+
+**Then** run migrations → `make pc` → self-review. The gate that still holds is **`make pc` must pass before `github_mark_pr_ready`** — never mark a PR ready on unvalidated code. Refresh the checkpoint (`continuation_post`) after each significant step so the resume point stays current.
+
+**Resuming after a reap:** a fresh container reattaches to the branch, calls `continuation_status({ pr: <PR#> })`, and continues from "what's left" instead of restarting.
+
+> This reorders the classic "validate before opening a PR" rule: the _draft_ PR opens earlier (as a durable substrate), but no PR is ever _marked ready_ before `make pc` passes. See [workflow-overview Step 10b](../workflow-overview/SKILL.md). Distinct from [Cloud-to-Local Teleport](#cloud-to-local-teleport), which hands off on a **capability** gap (no AWS/DB/Terraform); this handles a **time** gap (container reaped before completion).
+
 ## Degraded-Mode Workflow (Claude Code on the web, no custom MCP)
 
 This is the runbook for default Claude Code on the web sessions. Three diagnostic probes (LS-4358 plus two follow-ups) mapped the actual operating envelope — what's below is confirmed facts, not aspirational guidance. The agent's reach is broader than earlier framings suggested (validation, tests, git, nx targets, and PR open-to-Cycle-1-merge all work) but has one structural hard limit: thread resolution after bot mandates is impossible without a local handoff.
