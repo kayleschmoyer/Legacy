@@ -58,7 +58,18 @@ async function setupDisclosureMocks(
     async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
 
-      if (postData.includes('startdisclosuregame')) {
+      if (postData.includes('"activedisclosuregame"')) {
+        // Resume check fired on mount (LS-4816). No in-progress game →
+        // the idle screen shows "Start Game" with no Resume CTA.
+        // Match the quoted operationName to avoid matching other payloads.
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { activeDisclosureGame: null },
+          }),
+        });
+      } else if (postData.includes('startdisclosuregame')) {
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -297,7 +308,17 @@ test.describe('Progressive Disclosure Game @minigame', () => {
       async (route) => {
         const postData = route.request().postData()?.toLowerCase() ?? '';
 
-        if (postData.includes('startdisclosuregame')) {
+        if (postData.includes('"activedisclosuregame"')) {
+          // Resume check fired on mount (LS-4816). No in-progress game.
+          // Match the quoted operationName to avoid matching other payloads.
+          void route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: { activeDisclosureGame: null },
+            }),
+          });
+        } else if (postData.includes('startdisclosuregame')) {
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
