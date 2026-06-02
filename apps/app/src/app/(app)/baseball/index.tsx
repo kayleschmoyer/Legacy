@@ -16,9 +16,19 @@ import { LOGGER } from '@legacy-sports/logging';
 import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useGetUserLeaguesQuery } from '../../../api/db/graphql.generated';
+import { useSubscription } from '../../../features/subscription/useSubscription';
+import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
+import { trackPremiumFeatureClick } from '../../../utils/analytics';
 
 const APP_BASE_URL =
   process.env.EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app';
+
+// Brand gold used for the free-tier upgrade prompt, matching the Mock Draft
+// upsell and PremiumGate (LS-5182).
+const BRAND_GOLD = '#B8962E';
+
+// Analytics label for the upgrade prompt fired from the league-cap indicator.
+const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
 
 export default function BaseballHome() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -31,7 +41,14 @@ export default function BaseballHome() {
     skip: !userInfo?.id,
   });
 
+  const { isPremium, loading: subscriptionLoading } = useSubscription();
+
   const openDraftModal = () => setModalVisible(true);
+
+  const goToUpgrade = useCallback(() => {
+    trackPremiumFeatureClick(LEAGUE_CAP_FEATURE_NAME);
+    router.navigate('subscription-settings');
+  }, [router]);
 
   const openInviteModal = () => setInviteModalVisible(true);
   const closeInviteModal = () => setInviteModalVisible(false);
@@ -84,6 +101,16 @@ export default function BaseballHome() {
   const userLeagues = data?.userLeagues;
   const leagues = userLeagues ?? [];
   const leaguesLoadFailed = !loadingLeagues && userLeagues == null;
+
+  // Free-tier league cap (LS-5182). `userLeagues` returns every non-mock league
+  // the user participates in (owned or joined) — exactly the set the server
+  // counts against FREE_TIER_LEAGUE_LIMIT when creating a league — so the count
+  // shown here matches what the backend enforces. Only meaningful for free users
+  // with a successfully loaded list; premium users have unlimited leagues.
+  const leaguesLoaded = !loadingLeagues && !leaguesLoadFailed;
+  const showLeagueCap = !subscriptionLoading && !isPremium && leaguesLoaded;
+  const atFreeLeagueLimit =
+    showLeagueCap && leagues.length >= FREE_TIER_LEAGUE_LIMIT;
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
@@ -143,11 +170,42 @@ export default function BaseballHome() {
         >
           Manage Your Leagues
         </H2>
+
+        {/* Free-tier league count + cap indicator (LS-5182). Surfacing the
+            N/3 count up front lets free users at the cap see they need to
+            upgrade before filling out the Create form, instead of only
+            learning via a GraphQL error Alert on submit. */}
+        {showLeagueCap ? (
+          <XStack
+            alignItems="center"
+            flexWrap="wrap"
+            space="$2"
+            testID="league-cap-indicator"
+          >
+            <Text color="$gray11" fontSize="$4">
+              Your leagues: {leagues.length}/{FREE_TIER_LEAGUE_LIMIT}
+            </Text>
+            {atFreeLeagueLimit ? (
+              <Text
+                color={BRAND_GOLD}
+                fontSize="$4"
+                fontWeight="bold"
+                onPress={goToUpgrade}
+                testID="league-cap-upgrade"
+              >
+                — Upgrade to add more
+              </Text>
+            ) : null}
+          </XStack>
+        ) : null}
+
         <XStack justifyContent="space-between" space="$3" width="100%">
           <Button
             flex={1}
             backgroundColor="$orange9"
             borderRadius="$3"
+            disabled={atFreeLeagueLimit}
+            opacity={atFreeLeagueLimit ? 0.5 : 1}
             onPress={openDraftModal}
           >
             <Text color="$white" fontSize="$5" fontWeight="bold">

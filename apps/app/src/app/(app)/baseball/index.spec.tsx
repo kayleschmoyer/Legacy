@@ -88,6 +88,26 @@ jest.mock('../../../api/db/graphql.generated', () => ({
     mockUseGetUserLeaguesQuery(options),
 }));
 
+// Mock subscription status — controlled per-test (LS-5182)
+interface SubscriptionResult {
+  isPremium: boolean;
+  loading: boolean;
+}
+const mockUseSubscription = jest.fn(
+  (): SubscriptionResult => ({ isPremium: false, loading: false }),
+);
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useSubscription: (): SubscriptionResult => mockUseSubscription(),
+}));
+
+// Mock analytics (LS-5182)
+const mockTrackPremiumFeatureClick = jest.fn();
+jest.mock('../../../utils/analytics', () => ({
+  trackPremiumFeatureClick: (name: string): void => {
+    mockTrackPremiumFeatureClick(name);
+  },
+}));
+
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const MOCK_LEAGUES = [
@@ -136,6 +156,7 @@ describe('BaseballHome', () => {
       data: { userLeagues: MOCK_LEAGUES },
       loading: false,
     });
+    mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
   });
 
   describe('rendering', () => {
@@ -237,6 +258,94 @@ describe('BaseballHome', () => {
         screen.getByRole('button', { name: 'Create New League' }),
       );
       expect(screen.getByTestId('create-league-modal')).toBeTruthy();
+    });
+  });
+
+  describe('free-tier league cap indicator (LS-5182)', () => {
+    const THREE_LEAGUES = [
+      MOCK_LEAGUES[0],
+      MOCK_LEAGUES[1],
+      { ...MOCK_LEAGUES[0], id: 3, name: 'Third League' },
+    ];
+
+    it('shows the N/3 count for a free user below the cap', () => {
+      // Default: free user with 2 leagues.
+      render(<BaseballHome />);
+      expect(screen.getByText('Your leagues: 2/3')).toBeTruthy();
+      // Below the cap → no upgrade prompt and the Create button stays usable.
+      expect(screen.queryByTestId('league-cap-upgrade')).toBeNull();
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Create New League' }),
+      );
+      expect(screen.getByTestId('create-league-modal')).toBeTruthy();
+    });
+
+    it('shows 3/3 with an upgrade prompt for a free user at the cap', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: { userLeagues: THREE_LEAGUES },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(screen.getByText('Your leagues: 3/3')).toBeTruthy();
+      expect(screen.getByTestId('league-cap-upgrade')).toBeTruthy();
+    });
+
+    it('disables the Create button (no modal) for a free user at the cap', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: { userLeagues: THREE_LEAGUES },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      // Pressing the disabled Create button must not open the create modal —
+      // the user learns about the cap up front, not via a submit-time Alert.
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Create New League' }),
+      );
+      expect(screen.queryByTestId('create-league-modal')).toBeNull();
+    });
+
+    it('navigates to upgrade and tracks analytics when the prompt is pressed', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: { userLeagues: THREE_LEAGUES },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('league-cap-upgrade'));
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+      expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
+        'Unlimited Leagues',
+      );
+    });
+
+    it('hides the indicator for premium users (unlimited leagues)', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true, loading: false });
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: { userLeagues: THREE_LEAGUES },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(screen.queryByText('Your leagues: 3/3')).toBeNull();
+      expect(screen.queryByTestId('league-cap-upgrade')).toBeNull();
+      // Premium users can still create leagues even past the free-tier count.
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Create New League' }),
+      );
+      expect(screen.getByTestId('create-league-modal')).toBeTruthy();
+    });
+
+    it('hides the indicator while the subscription is still loading', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false, loading: true });
+      render(<BaseballHome />);
+      expect(screen.queryByText('Your leagues: 2/3')).toBeNull();
+    });
+
+    it('hides the indicator when the leagues query failed', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: null,
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(screen.queryByText(/Your leagues:/)).toBeNull();
     });
   });
 
