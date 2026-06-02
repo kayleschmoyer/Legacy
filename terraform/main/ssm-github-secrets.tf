@@ -118,8 +118,18 @@ resource "aws_ssm_parameter" "gh_secret_stripe_annual_price_id" {
 # API keys that appear in the bundle but should not be readable without KMS.
 # The sync script reads these with --with-decryption and writes them as
 # GitHub encrypted secrets, so they never appear in Terraform plan output.
+#
+# These are gated on a non-empty value with count, mirroring the optional-secret
+# pattern in secrets.tf (discord_client_secret, mlb_data_api_key). SSM rejects an
+# empty parameter value ("Member must have length greater than or equal to 1"),
+# and unlike the public String params above these have no checked-in value in
+# infra.auto.tfvars (they're sensitive — supplied via secrets.auto.tfvars locally
+# or a TF_VAR_* env var in CI). When the value is unset the parameter is simply
+# not created, so terraform apply succeeds; the sync script already treats a
+# missing parameter as a skip. (LS-5253)
 
 resource "aws_ssm_parameter" "gh_secret_giphy_api_key" {
+  count       = var.giphy_api_key != "" ? 1 : 0
   name        = "/legacy-sports/${var.environment}/github-secrets/giphy-api-key"
   description = "Giphy API key for GIF search — VITE_GIPHY_API_KEY (web)"
   type        = "SecureString"
@@ -131,6 +141,7 @@ resource "aws_ssm_parameter" "gh_secret_giphy_api_key" {
 }
 
 resource "aws_ssm_parameter" "gh_secret_rollbar_client_access_token" {
+  count       = var.rollbar_client_access_token != "" ? 1 : 0
   name        = "/legacy-sports/${var.environment}/github-secrets/rollbar-client-access-token"
   description = "Rollbar post_client_item token for browser/mobile error reporting — VITE_ROLLBAR_ACCESS_TOKEN (web) / EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN (mobile)"
   type        = "SecureString"
@@ -154,7 +165,7 @@ output "github_secrets_ssm_parameters" {
     ga_measurement_id           = aws_ssm_parameter.gh_secret_ga_measurement_id.name
     stripe_monthly_price_id     = aws_ssm_parameter.gh_secret_stripe_monthly_price_id.name
     stripe_annual_price_id      = aws_ssm_parameter.gh_secret_stripe_annual_price_id.name
-    giphy_api_key               = aws_ssm_parameter.gh_secret_giphy_api_key.name
-    rollbar_client_access_token = aws_ssm_parameter.gh_secret_rollbar_client_access_token.name
+    giphy_api_key               = one(aws_ssm_parameter.gh_secret_giphy_api_key[*].name)
+    rollbar_client_access_token = one(aws_ssm_parameter.gh_secret_rollbar_client_access_token[*].name)
   }
 }
