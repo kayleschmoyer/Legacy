@@ -76,6 +76,9 @@ export default function AboutPage() {
   // Read build-time environment variables from centralized config
   const { appVersion, commitSha, buildDate, repoUrl } = env;
 
+  // Maps sentinel values to a friendly display string; raw sentinel kept for link-suppression logic below.
+  const display = (v: string) => (v && v !== 'unknown' ? v : '—');
+
   // Generate GitHub commit URL
   const commitUrl =
     commitSha && /^[0-9a-f]{7,40}$/i.test(commitSha)
@@ -118,7 +121,7 @@ export default function AboutPage() {
 
         <InfoRow data-testid="build-info-version">
           <Label>Version:</Label>
-          <Value>{appVersion}</Value>
+          <Value>{display(appVersion)}</Value>
         </InfoRow>
 
         <InfoRow data-testid="build-info-commit-sha">
@@ -134,13 +137,13 @@ export default function AboutPage() {
               {commitSha}
             </LinkValue>
           ) : (
-            <Value>{commitSha}</Value>
+            <Value>{display(commitSha)}</Value>
           )}
         </InfoRow>
 
         <InfoRow data-testid="build-info-build-date">
           <Label>Build Date:</Label>
-          <Value>{formattedBuildDate}</Value>
+          <Value>{display(formattedBuildDate)}</Value>
         </InfoRow>
       </InfoCard>
 
