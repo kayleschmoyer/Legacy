@@ -63,6 +63,24 @@ if (
   process.env.EXPO_PUBLIC_APP_VERSION = process.env.APP_VERSION;
 }
 
+// Mirror VITE_COMMIT_SHA → EXPO_PUBLIC_COMMIT_SHA so native builds get the
+// same commit sentinel as web (LS-5717).
+if (
+  !process.env.EXPO_PUBLIC_COMMIT_SHA?.trim() &&
+  process.env.VITE_COMMIT_SHA?.trim()
+) {
+  process.env.EXPO_PUBLIC_COMMIT_SHA = process.env.VITE_COMMIT_SHA;
+}
+
+// Mirror web build-date vars → EXPO_PUBLIC_BUILD_DATE (LS-5717).
+if (!process.env.EXPO_PUBLIC_BUILD_DATE?.trim()) {
+  const webBuildDate =
+    process.env.VITE_BUILD_TIMESTAMP ?? process.env.VITE_BUILD_DATE;
+  if (webBuildDate?.trim()) {
+    process.env.EXPO_PUBLIC_BUILD_DATE = webBuildDate;
+  }
+}
+
 // Mirror VITE_GROWTHBOOK_CLIENT_KEY → EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY so
 // mobile uses the same GrowthBook project as web without a separate .env entry.
 if (
@@ -109,6 +127,8 @@ const resolvedExtra = {
     staticConfig.extra?.googleClientId,
   graphqlHost:
     fromEnv('EXPO_PUBLIC_GRAPHQL_HOST') ?? staticConfig.extra?.graphqlHost,
+  commitSha: fromEnv('EXPO_PUBLIC_COMMIT_SHA') ?? staticConfig.extra?.commitSha,
+  buildDate: fromEnv('EXPO_PUBLIC_BUILD_DATE') ?? staticConfig.extra?.buildDate,
 };
 
 /** @type {(ctx: { config: import('@expo/config-types').ExpoConfig }) => import('@expo/config-types').ExpoConfig} */
