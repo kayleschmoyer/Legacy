@@ -2191,6 +2191,7 @@ builder.mutationField('renewLeague', (t) =>
         await requireEntitlement(
           context,
           ENTITLEMENTS.advanced_playoff_formats,
+          'Advanced playoff formats require a premium subscription.',
         );
       }
 

@@ -583,7 +583,9 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
           context,
           undefined as never,
         ),
-      ).rejects.toThrow('Advanced playoff formats');
+      ).rejects.toThrow(
+        'Advanced playoff formats require a premium subscription.',
+      );
     });
 
     it('allows a free user to renew a league with only free features', async () => {
