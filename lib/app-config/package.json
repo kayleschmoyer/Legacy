@@ -1,0 +1,17 @@
+{
+  "name": "@legacy-sports/app-config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./native": "./src/native.ts",
+    "./web": "./src/web.ts"
+  },
+  "dependencies": {
+    "tslib": "*",
+    "@legacy-sports/env-utilities": "workspace:*"
+  }
+}

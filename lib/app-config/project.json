@@ -1,0 +1,10 @@
+{
+  "name": "app-config",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/app-config/src",
+  "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:config"],
+  "targets": {
+    "typecheck": {}
+  }
+}

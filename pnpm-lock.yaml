@@ -1555,6 +1555,15 @@ importers:
         specifier: 19.2.3
         version: 19.2.3
 
+  lib/app-config:
+    dependencies:
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../env-utilities
+      tslib:
+        specifier: '*'
+        version: 2.8.1
+
   lib/aws-utils:
     dependencies:
       '@aws-sdk/client-apigatewaymanagementapi':
