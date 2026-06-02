@@ -79,8 +79,41 @@ if (
 // changes.
 const staticConfig = require('./app.json').expo;
 
+// Return the env var only when it holds a non-whitespace value, so an unset or
+// blank EXPO_PUBLIC_* falls back to the app.json placeholder instead of
+// overwriting it with `undefined`.
+const fromEnv = (name) => {
+  const value = process.env[name];
+  return value?.trim() ? value : undefined;
+};
+
+// Mirror runtime EXPO_PUBLIC_* URLs into `extra`.
+//
+// These values are read on-device through `@legacy-sports/env-utilities`
+// (`getEnvVarOptional` / `getEnvVarRequired`), which does a *dynamic*
+// `process.env[name]` lookup. `babel-preset-expo` only inlines *static*
+// `process.env.EXPO_PUBLIC_*` member expressions, so the dynamic reads resolve
+// to `undefined` in a release bundle — the env values loaded above never reach
+// the device that way, and resolution falls back to the localhost placeholder.
+// `extra`, by contrast, is embedded into the compiled manifest at prebuild time
+// and read back via `Constants.expoConfig.extra`, so it is the only reliable
+// channel for these URLs. The consumers (`mobileOAuthConfig` / `DbClient`)
+// prefer the env var, then fall back to `extra`, so this keeps `expo start`
+// working while fixing release builds (LS-6399).
+const resolvedExtra = {
+  ...staticConfig.extra,
+  oauthProxyUrl:
+    fromEnv('EXPO_PUBLIC_OAUTH_PROXY') ?? staticConfig.extra?.oauthProxyUrl,
+  googleClientId:
+    fromEnv('EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID') ??
+    staticConfig.extra?.googleClientId,
+  graphqlHost:
+    fromEnv('EXPO_PUBLIC_GRAPHQL_HOST') ?? staticConfig.extra?.graphqlHost,
+};
+
 /** @type {(ctx: { config: import('@expo/config-types').ExpoConfig }) => import('@expo/config-types').ExpoConfig} */
 module.exports = ({ config }) => ({
   ...config,
   ...staticConfig,
+  extra: resolvedExtra,
 });
