@@ -25,6 +25,10 @@ export default {
     '^@tamagui/(.*)$': '<rootDir>/src/__mocks__/tamagui.js',
     '^__PLATFORM_COMPONENTS__$':
       '<rootDir>/../../lib/shared-components/src/platform-components',
+    // Redirect the web sub-path export to the node adapter in Jest (Node env):
+    // config.web.ts uses import.meta.env which is unavailable outside Vite.
+    '^@legacy-sports/app-config/web$':
+      '<rootDir>/../../lib/app-config/src/index.ts',
     '^@legacy-sports/shared-components$':
       '<rootDir>/../../lib/shared-components/src',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',

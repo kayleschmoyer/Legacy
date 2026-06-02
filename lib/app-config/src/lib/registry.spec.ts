@@ -12,6 +12,22 @@ describe('CONFIG_KEYS registry', () => {
       'graphqlHost',
       'googleClientId',
       'appBaseUrl',
+      // Web-only keys (no mobile counterpart)
+      'environmentName',
+      'authTestMode',
+      'discordClientId',
+      'appVersion',
+      'commitSha',
+      'buildDate',
+      'branch',
+      'rollbarCaptureRate',
+      'googleAnalyticsMeasurementId',
+      'jiraProxyUrl',
+      'stripeMonthlyPriceId',
+      'stripeAnnualPriceId',
+      'vapidPublicKey',
+      'imageUploadUrl',
+      'repoUrl',
     ];
     for (const key of expected) {
       expect(Object.keys(CONFIG_KEYS)).toContain(key);

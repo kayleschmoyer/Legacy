@@ -5,6 +5,7 @@
 
 import Rollbar from 'rollbar';
 import { LOGGER } from '@legacy-sports/logging';
+import { config } from '@legacy-sports/app-config/web';
 import {
   RollbarBreadcrumb,
   RollbarConfig,
@@ -209,12 +210,9 @@ class WebRollbarImplementation implements RollbarInterface {
   }
 
   getRollbarConfigFromEnv(): RollbarConfig | null {
-    // process.env.VITE_ROLLBAR_ACCESS_TOKEN is statically replaced by Vite's
-    // `define` config at build time (vite.config.mts).  The bare
-    // ROLLBAR_ACCESS_TOKEN fallback is kept for test/SSR environments.
-    const accessToken =
-      process.env['VITE_ROLLBAR_ACCESS_TOKEN'] ||
-      process.env['ROLLBAR_ACCESS_TOKEN'];
+    // config.rollbarToken is statically inlined by @legacy-sports/app-config/web
+    // (import.meta.env.VITE_ROLLBAR_ACCESS_TOKEN) at build time.
+    const accessToken = config.rollbarToken;
 
     const environment = process.env['NODE_ENV'] || 'development';
 
@@ -225,14 +223,10 @@ class WebRollbarImplementation implements RollbarInterface {
       return null;
     }
 
-    const release =
-      process.env['VITE_COMMIT_SHA'] ||
-      process.env['VITE_APP_VERSION'] ||
-      undefined;
+    const release = config.commitSha ?? config.appVersion;
 
-    // Client-side sample rate (LS-2447). Statically replaced by Vite's
-    // `define` config at build time like the other VITE_* vars above.
-    const rawCaptureRate = process.env.VITE_ROLLBAR_CAPTURE_RATE;
+    // Client-side sample rate (LS-2447). Statically inlined via app-config.
+    const rawCaptureRate = config.rollbarCaptureRate;
     const trimmedCaptureRate = rawCaptureRate?.trim();
     let captureRate: number | undefined;
     if (trimmedCaptureRate !== undefined && trimmedCaptureRate !== '') {

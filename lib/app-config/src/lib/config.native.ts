@@ -25,6 +25,22 @@ export function buildNativeConfig(): AppConfig {
       process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID ??
       extra?.['googleClientId'],
     appBaseUrl: process.env.EXPO_PUBLIC_APP_BASE_URL ?? extra?.['appBaseUrl'],
+    // Web-only keys — not available on native
+    environmentName: undefined,
+    authTestMode: undefined,
+    discordClientId: undefined,
+    appVersion: undefined,
+    commitSha: undefined,
+    buildDate: undefined,
+    branch: undefined,
+    rollbarCaptureRate: undefined,
+    googleAnalyticsMeasurementId: undefined,
+    jiraProxyUrl: undefined,
+    stripeMonthlyPriceId: undefined,
+    stripeAnnualPriceId: undefined,
+    vapidPublicKey: undefined,
+    imageUploadUrl: undefined,
+    repoUrl: undefined,
   });
 }
 

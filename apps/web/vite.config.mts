@@ -291,37 +291,8 @@ export default defineConfig(({ mode }) => {
       'process.env.PLATFORM': JSON.stringify('web'),
       __DEV__: process.env.NODE_ENV === 'development',
 
-      // Rollbar browser-side token â€” read via process.env in rollbar.web.ts
-      'process.env.VITE_ROLLBAR_ACCESS_TOKEN': JSON.stringify(
-        env.VITE_ROLLBAR_ACCESS_TOKEN || '',
-      ),
-      // Rollbar client-side sample rate (LS-2447). Read via process.env in
-      // rollbar.web.ts getRollbarConfigFromEnv(); Vite also exposes VITE_*
-      // vars on import.meta.env for apps/web/src/config/environment.ts.
-      'process.env.VITE_ROLLBAR_CAPTURE_RATE': JSON.stringify(
-        env.VITE_ROLLBAR_CAPTURE_RATE || '',
-      ),
-      // Release info used by rollbar.web.ts getRollbarConfigFromEnv()
-      'process.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
-      'process.env.VITE_APP_VERSION': JSON.stringify(appVersion),
-
-      // Define environment variables for browser access
-      'import.meta.env.VITE_OAUTH_PROXY_URL': JSON.stringify(
-        env.VITE_OAUTH_PROXY_URL || 'http://localhost:5001',
-      ),
-      'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(
-        env.VITE_GOOGLE_CLIENT_ID || 'placeholder-google-client-id',
-      ),
-      'import.meta.env.VITE_DISCORD_CLIENT_ID': JSON.stringify(
-        env.VITE_DISCORD_CLIENT_ID || '',
-      ),
-      'import.meta.env.VITE_GRAPHQL_HOST': JSON.stringify(
-        env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
-      ),
-      'import.meta.env.VITE_WEBSOCKET_URL': JSON.stringify(
-        env.VITE_WEBSOCKET_URL || '',
-      ),
-      // Build information for About page
+      // Computed build-time values not sourced from .env files — injected via
+      // import.meta.env so @legacy-sports/app-config/web can read them statically.
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
       'import.meta.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
       'import.meta.env.VITE_BUILD_DATE': JSON.stringify(buildDate),

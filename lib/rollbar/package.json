@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "tslib": "*",
+    "@legacy-sports/app-config": "workspace:*",
     "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "rollbar": "*"

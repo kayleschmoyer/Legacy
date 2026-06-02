@@ -1627,6 +1627,9 @@ importers:
 
   lib/rollbar:
     dependencies:
+      '@legacy-sports/app-config':
+        specifier: workspace:*
+        version: link:../app-config
       '@legacy-sports/aws-utils':
         specifier: workspace:*
         version: link:../aws-utils

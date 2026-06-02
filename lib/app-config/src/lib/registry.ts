@@ -64,4 +64,80 @@ export const CONFIG_KEYS = {
     mobile: 'EXPO_PUBLIC_APP_BASE_URL',
     required: false,
   },
+  // Web-only keys below — no mobile counterpart
+  environmentName: {
+    clientSafe: true,
+    web: 'VITE_ENVIRONMENT_NAME',
+    required: false,
+  },
+  authTestMode: {
+    clientSafe: true,
+    web: 'VITE_AUTH_TEST_MODE',
+    required: false,
+  },
+  discordClientId: {
+    clientSafe: true,
+    web: 'VITE_DISCORD_CLIENT_ID',
+    required: false,
+  },
+  appVersion: {
+    clientSafe: true,
+    web: 'VITE_APP_VERSION',
+    required: false,
+  },
+  commitSha: {
+    clientSafe: true,
+    web: 'VITE_COMMIT_SHA',
+    required: false,
+  },
+  buildDate: {
+    clientSafe: true,
+    web: 'VITE_BUILD_DATE',
+    required: false,
+  },
+  branch: {
+    clientSafe: true,
+    web: 'VITE_BRANCH',
+    required: false,
+  },
+  rollbarCaptureRate: {
+    clientSafe: true,
+    web: 'VITE_ROLLBAR_CAPTURE_RATE',
+    required: false,
+  },
+  googleAnalyticsMeasurementId: {
+    clientSafe: true,
+    web: 'VITE_GA_MEASUREMENT_ID',
+    required: false,
+  },
+  jiraProxyUrl: {
+    clientSafe: true,
+    web: 'VITE_JIRA_PROXY_URL',
+    required: false,
+  },
+  stripeMonthlyPriceId: {
+    clientSafe: true,
+    web: 'VITE_STRIPE_MONTHLY_PRICE_ID',
+    required: false,
+  },
+  stripeAnnualPriceId: {
+    clientSafe: true,
+    web: 'VITE_STRIPE_ANNUAL_PRICE_ID',
+    required: false,
+  },
+  vapidPublicKey: {
+    clientSafe: true,
+    web: 'VITE_VAPID_PUBLIC_KEY',
+    required: false,
+  },
+  imageUploadUrl: {
+    clientSafe: true,
+    web: 'VITE_IMAGE_UPLOAD_URL',
+    required: false,
+  },
+  repoUrl: {
+    clientSafe: true,
+    web: 'VITE_REPO_URL',
+    required: false,
+  },
 } as const;

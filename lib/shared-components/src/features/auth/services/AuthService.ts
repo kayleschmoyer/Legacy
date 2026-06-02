@@ -34,11 +34,6 @@ const TOKEN_EXPIRY_KEY = 'ls_token_expiry';
 const ADMIN_PROFILE_KEY = 'ls_admin_profile';
 const IMPERSONATED_USER_KEY = 'ls_impersonated_user';
 
-// Type for Vite environment configuration
-interface ViteEnvironment {
-  VITE_OAUTH_PROXY_URL?: string;
-}
-
 /**
  * Thrown by `refreshJwt()` when the server returns HTTP 401 or 403, indicating
  * that the session cookie is absent, invalid, revoked, or failed CSRF
@@ -84,38 +79,11 @@ export class AuthService {
   }
 
   /**
-   * Get OAuth Proxy Lambda URL from environment with fallback
+   * Get OAuth Proxy Lambda URL — callers must pass oauthProxyUrl via OAuthConfig.
+   * Raw VITE_* / process.env reads are not permitted outside lib/app-config.
    */
   private getOAuthProxyUrl(): string {
-    // First check if it's provided in the config
-    if (this.config.oauthProxyUrl) {
-      return this.config.oauthProxyUrl;
-    }
-
-    // Check various environment variable patterns
-    if (typeof process !== 'undefined' && process.env) {
-      return (
-        process.env.VITE_OAUTH_PROXY_URL ||
-        process.env.REACT_APP_OAUTH_PROXY_URL ||
-        process.env.OAUTH_PROXY_URL ||
-        'http://localhost:5001'
-      );
-    }
-
-    // Browser environment - check for Vite environment variables
-    if (typeof window !== 'undefined') {
-      // Check if we're in a Vite environment (browser build)
-      // Use type-safe access to window environment
-      const windowWithEnv = window as typeof window & {
-        __VITE_ENV__?: ViteEnvironment;
-      };
-      const viteEnv = windowWithEnv.__VITE_ENV__;
-      if (viteEnv?.VITE_OAUTH_PROXY_URL) {
-        return viteEnv.VITE_OAUTH_PROXY_URL;
-      }
-    }
-
-    return 'http://localhost:5001';
+    return this.config.oauthProxyUrl ?? 'http://localhost:5001';
   }
 
   /**

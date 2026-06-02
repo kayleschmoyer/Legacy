@@ -13,6 +13,21 @@ export function buildNodeConfig(): AppConfig {
     graphqlHost: undefined,
     googleClientId: undefined,
     appBaseUrl: undefined,
+    environmentName: undefined,
+    authTestMode: undefined,
+    discordClientId: undefined,
+    appVersion: undefined,
+    commitSha: undefined,
+    buildDate: undefined,
+    branch: undefined,
+    rollbarCaptureRate: undefined,
+    googleAnalyticsMeasurementId: undefined,
+    jiraProxyUrl: undefined,
+    stripeMonthlyPriceId: undefined,
+    stripeAnnualPriceId: undefined,
+    vapidPublicKey: undefined,
+    imageUploadUrl: undefined,
+    repoUrl: undefined,
   });
 }
 
