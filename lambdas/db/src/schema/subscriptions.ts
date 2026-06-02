@@ -9,6 +9,7 @@ import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureWarning } from '@legacy-sports/rollbar';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { builder } from './builder';
 import {
@@ -952,6 +953,14 @@ builder.mutationField('verifyApplePurchase', (t) =>
           userId,
           err,
         });
+        captureWarning(
+          new Error('verifyApplePurchase — failed to verify JWS transaction'),
+          {
+            userId,
+            cause: err instanceof Error ? err.message : String(err),
+            operation: 'verifyApplePurchase',
+          },
+        );
         throw UserInputError(
           'Invalid JWS transaction: could not verify payload',
         );
@@ -968,6 +977,12 @@ builder.mutationField('verifyApplePurchase', (t) =>
           userId,
           bundleId,
           expectedBundleId,
+        });
+        captureWarning(new Error('verifyApplePurchase — bundle ID mismatch'), {
+          userId,
+          bundleId,
+          expectedBundleId,
+          operation: 'verifyApplePurchase',
         });
         throw new Error('Invalid transaction: bundle ID mismatch');
       }
@@ -1246,6 +1261,11 @@ builder.mutationField('verifyGooglePurchase', (t) =>
           userId,
           productId,
         });
+        captureWarning(new Error('verifyGooglePurchase — unknown productId'), {
+          userId,
+          productId,
+          operation: 'verifyGooglePurchase',
+        });
         throw new Error(`Unknown Google Play product ID: ${productId}`);
       }
 
@@ -1260,6 +1280,15 @@ builder.mutationField('verifyGooglePurchase', (t) =>
           productId,
           subscriptionState: googleSub.subscriptionState,
         });
+        captureWarning(
+          new Error('verifyGooglePurchase — subscription not active'),
+          {
+            userId,
+            productId,
+            subscriptionState: googleSub.subscriptionState,
+            operation: 'verifyGooglePurchase',
+          },
+        );
         throw UserInputError(
           `Google Play subscription is not active: ${googleSub.subscriptionState}`,
         );

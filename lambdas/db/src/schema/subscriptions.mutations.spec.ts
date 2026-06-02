@@ -22,6 +22,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
   let schema: GraphQLSchema;
   let mockFetchGoogleSubscription: jest.Mock;
   let mockIsActiveGoogleSubscription: jest.Mock;
+  let mockCaptureWarning: jest.Mock;
   let mockLogger: {
     info: jest.Mock;
     warn: jest.Mock;
@@ -39,6 +40,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
 
     mockFetchGoogleSubscription = jest.fn();
     mockIsActiveGoogleSubscription = jest.fn();
+    mockCaptureWarning = jest.fn();
     mockLogger = {
       info: jest.fn(),
       warn: jest.fn(),
@@ -47,6 +49,12 @@ describe('Google Play mutation validation (LS-5121)', () => {
     };
 
     jest.doMock('@legacy-sports/logging', () => ({ LOGGER: mockLogger }));
+
+    // LS-5206: IAP verification failures must be captured to Rollbar so the
+    // ops team has visibility into premium purchases that fail server-side.
+    jest.doMock('@legacy-sports/rollbar', () => ({
+      captureWarning: mockCaptureWarning,
+    }));
 
     jest.doMock('@legacy-sports/utils/node', () => ({
       ...jest.requireActual('@legacy-sports/utils/node'),
@@ -266,6 +274,60 @@ describe('Google Play mutation validation (LS-5121)', () => {
         'verifyGooglePurchase — subscription not active',
         expect.objectContaining({
           subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+        }),
+      );
+    });
+
+    // LS-5206: failures must be captured to Rollbar, not just logged.
+    it('captures a Rollbar warning when subscription is not active', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(false);
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          {
+            purchaseToken: 'fake-token',
+            productId: 'com.legacysports.app.premium.monthly',
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toBeDefined();
+
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'verifyGooglePurchase — subscription not active',
+        }),
+        expect.objectContaining({
+          subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+          operation: 'verifyGooglePurchase',
+        }),
+      );
+    });
+
+    // LS-5206: an unknown product ID is a verification failure ops must see.
+    it('captures a Rollbar warning when productId is unknown', async () => {
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          { purchaseToken: 'fake-token', productId: 'com.bogus.product' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toBeDefined();
+
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'verifyGooglePurchase — unknown productId',
+        }),
+        expect.objectContaining({
+          productId: 'com.bogus.product',
+          operation: 'verifyGooglePurchase',
         }),
       );
     });
@@ -547,7 +609,11 @@ describe('Google Play mutation validation (LS-5121)', () => {
       const mockDb = {
         select: () => ({
           from: () => ({
-            where: () => ({ limit: async () => rows }),
+            // getSubscriptionForUser chains .where().orderBy().limit();
+            // the mock must mirror that full chain (LS-5206).
+            where: () => ({
+              orderBy: () => ({ limit: async () => rows }),
+            }),
           }),
         }),
       };
