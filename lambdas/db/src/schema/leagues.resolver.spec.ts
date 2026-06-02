@@ -380,10 +380,9 @@ describe('League Mutations', () => {
       // Non-admin users can delete their own leagues (where they are the owner)
       const mockLeagues = [{ id: 1 }, { id: 2 }];
 
-      // Select chain: .select().from().innerJoin().where() resolves to the filtered list
+      // Non-admin path: .select().from().where() — no innerJoin (owner is always a member)
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.innerJoin.mockReturnValueOnce(mockDb);
       mockDb.where.mockResolvedValueOnce(mockLeagues);
 
       // Mock delete operations (these return mockDb for chaining)
@@ -406,6 +405,7 @@ describe('League Mutations', () => {
       expect(result).toContain(
         'Successfully deleted 2 league(s) and all associated data',
       );
+      expect(mockDb.innerJoin).not.toHaveBeenCalled();
     });
 
     it('should successfully delete all leagues when user is admin', async () => {
