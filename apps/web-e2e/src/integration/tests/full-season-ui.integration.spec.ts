@@ -351,11 +351,22 @@ test.describe
     });
 
     await test.step('Click Start Draft in the Next Step section', async () => {
-      // The "Start Draft" button is in the "Next Step" section
-      const startBtn = page.getByRole('button', {
-        name: /Start Draft/i,
-      });
-      await expect(startBtn).toBeVisible({ timeout: 15000 });
+      // LS-4944: re-open Next Step accordion (LS-4639 made the v2 Commish
+      // tab single-open, so the prior 'Draft Settings' click collapsed Next
+      // Step where Start Draft lives). Idempotent via aria-expanded. Uses
+      // stable data-testid because NextStepControl cycles button labels
+      // (Processing... / Start Draft / Starting Draft...) while its matchups
+      // query is in flight, so a role+name regex returns zero matches outside
+      // the brief 'Start Draft' window.
+      const nextStepHeader = page
+        .getByRole('button', { name: /^Next Step/i })
+        .first();
+      await expect(nextStepHeader).toBeVisible({ timeout: 15_000 });
+      if ((await nextStepHeader.getAttribute('aria-expanded')) !== 'true') {
+        await nextStepHeader.click();
+      }
+      const startBtn = page.getByTestId('start-draft-button');
+      await expect(startBtn).toBeEnabled({ timeout: 30_000 });
       await startBtn.click();
 
       // Confirmation dialog appears — confirm it
