@@ -77,7 +77,7 @@ export default function AboutPage() {
   // Generate GitHub commit URL
   const repoUrl = 'https://github.com/bkrupa/legacy-sports';
   const commitUrl =
-    commitSha && commitSha !== 'unknown' && commitSha !== 'dev'
+    commitSha && /^[0-9a-f]{7,40}$/i.test(commitSha)
       ? `${repoUrl}/commit/${commitSha}`
       : null;
 
