@@ -209,6 +209,28 @@ export function getTierLabel(tier: string): string {
   return tier === 'premium' ? 'Premium' : 'Free';
 }
 
+// LS-5204: after the Stripe checkout redirect the subscription tier only flips
+// to premium once the (asynchronous) Stripe webhook reaches our Lambda and
+// updates the DB. Cold Lambda delivery takes 5-15s, so a single 3s refetch
+// frequently lands before the webhook and leaves the buyer staring at "Free
+// Plan". Poll at 2s intervals across the full cold-delivery window instead.
+export const ACTIVATION_POLL_INTERVAL_MS = 2000;
+// 8 polls × 2s = 16s of coverage, comfortably past the documented 5-15s cold
+// webhook delivery ceiling (the old behaviour covered only 3s).
+export const ACTIVATION_MAX_POLLS = 8;
+
+// Decide whether the post-checkout activation poll should fire again. Polling
+// stops as soon as the subscription reports premium (the webhook landed) or the
+// retry budget is exhausted. Extracted as a pure function so the stop/continue
+// logic is unit-testable without driving React effects and timers.
+export function shouldContinueActivationPolling(
+  isPremium: boolean,
+  pollAttempt: number,
+  maxPolls: number = ACTIVATION_MAX_POLLS,
+): boolean {
+  return !isPremium && pollAttempt < maxPolls;
+}
+
 /* ─── Sub-Components ─── */
 
 function PastDueBanner({
@@ -257,6 +279,27 @@ function PastDueBanner({
         </CtaButton>
       </XStack>
     </SectionCard>
+  );
+}
+
+function ActivatingState() {
+  return (
+    <XStack data-testid="subscription-activating" alignItems="center" gap="$3">
+      <RefreshCw size={20} color={BRAND_GOLD} flexShrink={0} />
+      <YStack flex={1} gap="$1">
+        <Paragraph
+          size="$5"
+          fontWeight="700"
+          style={{ color: BRAND_GOLD_LIGHT } as React.CSSProperties}
+        >
+          Activating your subscription…
+        </Paragraph>
+        <Paragraph size="$3" color="$colorPress">
+          We&apos;re confirming your payment with Stripe. This usually takes a
+          few seconds.
+        </Paragraph>
+      </YStack>
+    </XStack>
   );
 }
 
@@ -523,9 +566,22 @@ const SubscriptionPage: React.FC = () => {
   const { data, loading, refetch } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
 
+  const isPremium =
+    subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isPastDue = subscription?.status === 'past_due';
+  const isCanceled = subscription?.status === 'canceled';
+  const isFree = !subscription || subscription.status === null;
+  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+
   // Track whether this page load was a successful checkout return so the
   // refetch effect below survives the searchParams change caused by navigate().
   const [checkoutJustCompleted, setCheckoutJustCompleted] = useState(false);
+
+  // LS-5204: post-checkout activation window. While `activating` is true we keep
+  // polling for the premium tier and show an "Activating…" state instead of the
+  // misleading "Free Plan" view. `pollAttempt` counts the delayed retries.
+  const [activating, setActivating] = useState(false);
+  const [pollAttempt, setPollAttempt] = useState(0);
 
   useEffect(() => {
     const checkoutStatus = searchParams.get('checkout');
@@ -551,27 +607,36 @@ const SubscriptionPage: React.FC = () => {
   }, [searchParams, navigate, ANNUAL_TOTAL, MONTHLY_PRICE]);
 
   // Separated from the searchParams effect so navigate() doesn't cancel the
-  // delayed retry: when searchParams changes, only the effect above re-runs.
+  // delayed retries: when searchParams changes, only the effect above re-runs.
+  // Open the activation window and refetch immediately on checkout return.
   useEffect(() => {
     if (!checkoutJustCompleted) return;
-    // Refetch immediately, then again after 3 s — Stripe webhooks are async so
-    // the DB may not have updated by the time the redirect lands.
+    setActivating(true);
+    setPollAttempt(0);
     void refetch();
-    const timer = setTimeout(() => void refetch(), 3000);
-    return () => clearTimeout(timer);
   }, [checkoutJustCompleted, refetch]);
+
+  // LS-5204: poll the subscription at 2s intervals until the premium tier shows
+  // up (the Stripe webhook landed) or the retry budget is exhausted. Cold Lambda
+  // webhook delivery takes 5-15s, so the previous single 3s refetch routinely
+  // resolved to "Free Plan" before the webhook arrived.
+  useEffect(() => {
+    if (!activating) return;
+    if (!shouldContinueActivationPolling(isPremium, pollAttempt)) {
+      setActivating(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void refetch();
+      setPollAttempt((attempt) => attempt + 1);
+    }, ACTIVATION_POLL_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [activating, isPremium, pollAttempt, refetch]);
 
   const [createCheckoutSession, { loading: checkoutLoading }] =
     useCreateCheckoutSessionMutation();
   const [createBillingPortalSession, { loading: portalLoading }] =
     useCreateBillingPortalSessionMutation();
-
-  const isPremium =
-    subscription?.status === 'active' || subscription?.status === 'trialing';
-  const isPastDue = subscription?.status === 'past_due';
-  const isCanceled = subscription?.status === 'canceled';
-  const isFree = !subscription || subscription.status === null;
-  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   const handleUpgrade = async () => {
     setCheckoutError(null);
@@ -703,7 +768,9 @@ const SubscriptionPage: React.FC = () => {
             </SectionHeader>
 
             <SectionBody>
-              {loading ? (
+              {activating && !isPremium ? (
+                <ActivatingState />
+              ) : loading ? (
                 <Paragraph size="$3" color="$colorPress">
                   Loading subscription details…
                 </Paragraph>
@@ -896,8 +963,8 @@ const SubscriptionPage: React.FC = () => {
             </SectionBody>
           </SectionCard>
 
-          {/* ── Upgrade Section (free users only) ── */}
-          {(isFree || isCanceled) && (
+          {/* ── Upgrade Section (free users only; hidden while activating) ── */}
+          {(isFree || isCanceled) && !activating && (
             <SectionCard style={goldCardStyle}>
               <SectionHeader
                 style={
