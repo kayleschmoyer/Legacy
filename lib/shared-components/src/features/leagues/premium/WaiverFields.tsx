@@ -42,7 +42,13 @@ export function WaiverSystemField({
       <OptionButtonGroup<WaiverType>
         value={value}
         testIDPrefix="create-league-waiver-type"
-        options={WAIVER_TYPE_OPTIONS}
+        // Proactively lock the premium FAAB option for free viewers so the gate
+        // is visible before selection (LS-5173); the onChange below still routes
+        // a locked FAAB tap to onUpgrade.
+        options={WAIVER_TYPE_OPTIONS.map((o) => ({
+          ...o,
+          locked: o.value === 'faab' && !isPremium,
+        }))}
         onChange={(v) => {
           if (v === 'faab' && !isPremium) {
             onUpgrade();

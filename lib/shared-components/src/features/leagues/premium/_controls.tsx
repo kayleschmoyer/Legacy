@@ -6,10 +6,15 @@
 
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import { Lock } from '@tamagui/lucide-icons';
+import { BRAND_GOLD } from '../../../utils/colors';
 
 interface OptionButtonGroupProps<T extends string | number> {
   value: T;
-  options: readonly (T | { value: T; label: string; disabled?: boolean })[];
+  options: readonly (
+    | T
+    | { value: T; label: string; disabled?: boolean; locked?: boolean }
+  )[];
   onChange: (v: T) => void;
   disabled?: boolean;
   /** Stretch each button to fill the row evenly. */
@@ -34,6 +39,11 @@ export function OptionButtonGroup<T extends string | number>({
         const label = typeof o === 'object' ? o.label : String(o);
         const itemDisabled = disabled || (typeof o === 'object' && o.disabled);
         const selected = value === val;
+        // A locked option is a premium-gated choice. It stays pressable (so the
+        // caller's onChange can route to an upgrade flow) but shows a proactive
+        // Lock icon + dashed gold border so free users see it is gated before
+        // they tap. Mirrors EraFilterGrid's locked treatment.
+        const locked = !selected && typeof o === 'object' && !!o.locked;
         return (
           <XStack
             key={String(val)}
@@ -44,14 +54,22 @@ export function OptionButtonGroup<T extends string | number>({
             onPress={() => !itemDisabled && onChange(val)}
             flex={wide ? 1 : undefined}
             minWidth={44}
+            gap="$1.5"
             paddingHorizontal="$3"
             paddingVertical="$2"
             alignItems="center"
             justifyContent="center"
             borderRadius="$4"
             borderWidth={selected ? 2 : 1}
+            borderStyle={locked ? 'dashed' : 'solid'}
             backgroundColor={selected ? '$brandNavyLight' : '$color2'}
-            borderColor={selected ? '$brandNavyLight' : '$borderColor'}
+            borderColor={
+              selected
+                ? '$brandNavyLight'
+                : locked
+                  ? '$brandGold'
+                  : '$borderColor'
+            }
             opacity={itemDisabled ? 0.5 : 1}
             cursor={itemDisabled ? 'default' : 'pointer'}
             hoverStyle={
@@ -64,6 +82,7 @@ export function OptionButtonGroup<T extends string | number>({
             }
             pressStyle={itemDisabled ? undefined : { scale: 0.95 }}
           >
+            {locked && <Lock size={12} color={BRAND_GOLD} />}
             <Text
               color={selected ? '$brandGold' : '$color'}
               fontWeight={selected ? '600' : '400'}

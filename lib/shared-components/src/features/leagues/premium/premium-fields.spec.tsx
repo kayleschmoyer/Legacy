@@ -111,6 +111,32 @@ describe('premium league-create fields (LS-5174)', () => {
       expect(onChange).toHaveBeenCalledWith('faab');
       expect(onUpgrade).not.toHaveBeenCalled();
     });
+
+    it('shows a proactive lock on the FAAB option for free users (LS-5173)', () => {
+      // The mocked Lock icon renders with data-testid="Lock"; WaiverSystemField
+      // renders exactly one lock — the gated FAAB option.
+      const { getByTestId } = render(
+        <WaiverSystemField
+          value="standard"
+          onChange={jest.fn()}
+          isPremium={false}
+          onUpgrade={jest.fn()}
+        />,
+      );
+      expect(getByTestId('Lock')).toBeTruthy();
+    });
+
+    it('does not lock the FAAB option for premium users (LS-5173)', () => {
+      const { queryByTestId } = render(
+        <WaiverSystemField
+          value="standard"
+          onChange={jest.fn()}
+          isPremium
+          onUpgrade={jest.fn()}
+        />,
+      );
+      expect(queryByTestId('Lock')).toBeNull();
+    });
   });
 
   describe('SalaryCapField', () => {
