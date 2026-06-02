@@ -432,6 +432,7 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
     function setupFreeUser(
       leagueOverrides: Record<string, unknown>,
       otherActiveLeagueCount = 0,
+      opts: { draftSelectionMethod?: string } = {},
     ) {
       const baseLeague = {
         id: 1,
@@ -487,6 +488,21 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
         [{ leagueCount: otherActiveLeagueCount }],
         // resolver throws before consuming further items when entitlement fails
       ];
+
+      // The selectionMethod entitlement re-check (LS-5159) reads oldDraft, which
+      // happens after the league-level re-checks. When a draft method is given,
+      // queue the intervening reads (oldTeams … oldDraft) so the resolver
+      // reaches the auction gate.
+      if (opts.draftSelectionMethod !== undefined) {
+        readQueue.push(
+          [], // oldTeams
+          [], // oldMembers
+          [], // oldPositions
+          [], // oldProfile
+          ...(baseLeague.salaryCapEnabled ? [[]] : []), // oldSalaries (if cap)
+          [{ selectionMethod: opts.draftSelectionMethod }], // oldDraft
+        );
+      }
 
       const { db, insertCalls } = makeChainableDb(readQueue);
       const context = {
@@ -587,6 +603,36 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
       ).rejects.toThrow(
         'Advanced playoff formats require a premium subscription.',
       );
+    });
+
+    it('blocks a free user renewing an auction draft league (LS-5159)', async () => {
+      const { resolve, context } = setupFreeUser({}, 0, {
+        draftSelectionMethod: 'auction',
+      });
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Auction draft mode requires a premium subscription');
+    });
+
+    it('allows a free user renewing a standard (non-auction) draft league (LS-5159)', async () => {
+      const { resolve, context } = setupFreeUser({}, 0, {
+        draftSelectionMethod: 'standard',
+      });
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).resolves.toBeDefined();
     });
 
     it('allows a free user to renew a league with only free features', async () => {

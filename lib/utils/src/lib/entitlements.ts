@@ -27,6 +27,7 @@ export const ENTITLEMENTS = {
   unlimited_leagues: 'unlimited_leagues',
   faab_waiver_type: 'faab_waiver_type',
   historical_era_filters: 'historical_era_filters',
+  auction_draft: 'auction_draft',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -54,6 +55,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.unlimited_leagues,
     ENTITLEMENTS.faab_waiver_type,
     ENTITLEMENTS.historical_era_filters,
+    ENTITLEMENTS.auction_draft,
   ],
 };
 
@@ -65,6 +67,7 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   unlimited_leagues: 'Unlimited active leagues',
   faab_waiver_type: 'FAAB waivers',
   historical_era_filters: 'Historical era filters',
+  auction_draft: 'Auction draft mode',
 };
 
 export function tierHasEntitlement(

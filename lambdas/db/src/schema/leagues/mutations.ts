@@ -291,6 +291,17 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
+      // Auction draft is a premium selection method (LS-5159). Free users
+      // previously could create auction leagues because this branch had no
+      // entitlement gate, unlike salary cap / FAAB / era filters above.
+      if (selectionMethod === 'auction') {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.auction_draft,
+          'Auction draft mode requires a premium subscription. Upgrade to unlock auction drafts.',
+        );
+      }
+
       // ── Sport-aware input validation (LS-4684 / LS-4685) ───────────────
       // The client UI varies eraFilter / playerPool / maxRosterSize by sport;
       // the server is authoritative and must reject inconsistent inputs from
@@ -2386,6 +2397,20 @@ builder.mutationField('renewLeague', (t) =>
         .where(eq(PublicSchema.drafts.leagueId, leagueId))
         .orderBy(desc(PublicSchema.drafts.id))
         .limit(1);
+
+      // Entitlement re-check for the carried-forward selection method (LS-5159).
+      // Auction draft is premium, and the new draft below inherits
+      // oldDraft.selectionMethod — a user who has since downgraded must not
+      // silently renew an auction league. Mirrors the FAAB / salary-cap / era
+      // re-checks above (LS-5127). Checked after all reads but before any
+      // writes so renewal fails cleanly with no partial state.
+      if (oldDraft?.selectionMethod === 'auction') {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.auction_draft,
+          'Auction draft mode requires a premium subscription. Upgrade to unlock auction drafts.',
+        );
+      }
 
       // -- All reads done; now write ---------------------------------------
 

@@ -1110,4 +1110,114 @@ describe('League Mutations', () => {
       ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
     });
   });
+
+  describe('createLeagueAndTeams mutation — auction entitlement gate (LS-5159)', () => {
+    const baseInput = {
+      leagueName: 'Auction League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      selectionMethod: 'auction',
+    };
+
+    it('blocks a free user from creating an auction draft league', async () => {
+      // getSubscriptionTier reads the tier via .limit(1) → free tier.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: baseInput },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Auction draft mode requires a premium subscription');
+
+      // The gate must fire before any league is created.
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a premium (admin) user to create an auction draft league', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 1,
+          name: 'Auction League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: baseInput },
+        adminContext,
+        undefined as never,
+      );
+
+      // Admins are treated as premium, so the auction gate passes and the
+      // league is created with the auction selection method.
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ selectionMethod: 'auction' }),
+      );
+    });
+
+    it('allows a free user to create a standard (non-auction) draft league', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 2,
+          name: 'Standard League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: { ...baseInput, selectionMethod: 'standard' } },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ selectionMethod: 'standard' }),
+      );
+    });
+  });
 });
