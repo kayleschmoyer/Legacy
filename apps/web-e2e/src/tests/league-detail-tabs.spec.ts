@@ -577,9 +577,10 @@ test.describe('Roster Tab – data rendering @regression', () => {
   });
 
   test('shows roster position slots for the league', async ({ page }) => {
-    // Infield section renders with our mock positions (C and 1B)
+    // RosterBoardV2 groups the league's roster positions under a
+    // "Starting Hitters" section (mock positions C and 1B are both hitters).
     await expect(
-      page.getByText('Infield', { exact: true }).first(),
+      page.getByRole('heading', { name: 'Starting Hitters' }),
     ).toBeVisible();
   });
 });

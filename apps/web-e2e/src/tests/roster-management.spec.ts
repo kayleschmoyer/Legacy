@@ -241,28 +241,23 @@ test.describe('Roster Management – layout @regression', () => {
     await expect(page.getByText('My Roster').first()).toBeVisible();
   });
 
-  test('shows Lineup quickstat', async ({ page }) => {
-    const rosterRegion = page.getByRole('region', {
-      name: /roster management/i,
-    });
-    // QuickStat labels render with CSS text-transform:uppercase; use case-insensitive regex
-    await expect(rosterRegion.getByText(/^lineup$/i).first()).toBeVisible();
+  test('shows Starting Hitters lineup section', async ({ page }) => {
+    // RosterBoardV2 renders the lineup as "Starting Hitters" / "Starting
+    // Pitchers" sections (h2 card titles); there is no separate quickstat strip.
+    await expect(
+      page.getByRole('heading', { name: 'Starting Hitters' }),
+    ).toBeVisible();
   });
 
-  test('shows Bench quickstat', async ({ page }) => {
-    const rosterRegion = page.getByRole('region', {
-      name: /roster management/i,
-    });
-    // Bench is now shown as separate Hitters / Pitchers quickstats (UI redesign)
-    await expect(rosterRegion.getByText(/^hitters$/i).first()).toBeVisible();
+  test('shows Bench section', async ({ page }) => {
+    // The bench renders as a dedicated "Bench" section in RosterBoardV2.
+    await expect(page.getByRole('heading', { name: 'Bench' })).toBeVisible();
   });
 
-  test('shows Open quickstat', async ({ page }) => {
-    const rosterRegion = page.getByRole('region', {
-      name: /roster management/i,
-    });
-    // QuickStat labels render with CSS text-transform:uppercase; use case-insensitive regex
-    await expect(rosterRegion.getByText(/^open$/i).first()).toBeVisible();
+  test('shows open lineup slots', async ({ page }) => {
+    // Positions C, CF and UTIL have no assigned player, so each empty slot
+    // renders an "Open slot" sub-label in RosterBoardV2.
+    await expect(page.getByText('Open slot').first()).toBeVisible();
   });
 });
 
@@ -289,14 +284,14 @@ test.describe('Roster Management – player data @regression', () => {
   });
 
   test('shows SP position type label', async ({ page }) => {
-    // The Starting Pitchers section contains SP slot labels; scope to avoid
-    // collisions with other "SP" text elsewhere on the page.
-    // Section title "Starting Pitchers" → data-testid="roster-section-starting-pitchers"
+    // The Starting Pitchers section contains the SP slot. Scope to that card
+    // (RosterBoardV2 Section → div.ls-card) to avoid collisions with other "SP"
+    // text elsewhere on the page.
+    const pitchersCard = page.locator('.ls-card').filter({
+      has: page.getByRole('heading', { name: 'Starting Pitchers' }),
+    });
     await expect(
-      page
-        .getByTestId('roster-section-starting-pitchers')
-        .getByText('SP')
-        .first(),
+      pitchersCard.getByText('SP', { exact: true }).first(),
     ).toBeVisible();
   });
 });
@@ -309,11 +304,10 @@ test.describe('Roster Management – bench/bullpen regions @regression', () => {
   });
 
   test('shows Bench region', async ({ page }) => {
-    // Bench is now split into "Bench Hitters" and "Bench Pitchers" panels.
-    // Scope to the hitters panel to avoid a strict-mode violation from two matches.
-    await expect(
-      page.getByRole('region', { name: /bench hitters/i }),
-    ).toBeVisible();
+    // RosterBoardV2 renders a "Bench" section split into Hitters / Pitchers
+    // sub-groups. Assert the Bench section heading plus the Hitters sub-group.
+    await expect(page.getByRole('heading', { name: 'Bench' })).toBeVisible();
+    await expect(page.getByText(/Hitters · \d+/).first()).toBeVisible();
   });
 });
 
