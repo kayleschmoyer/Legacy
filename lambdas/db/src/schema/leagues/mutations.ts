@@ -44,6 +44,7 @@ import {
   normalizeSport,
   ROSTER_RANGE_BY_SPORT,
 } from './sport-validation';
+import { generateSecureInviteCode } from './helpers';
 import { builder, type Context } from '../builder';
 import {
   adjustMatchupsForNewTotal,
@@ -2299,14 +2300,12 @@ builder.mutationField('renewLeague', (t) =>
 
       // -- All reads done; now write ---------------------------------------
 
-      // 9. Generate a unique invite code for the new league
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      // 9. Generate a unique invite code for the new league.
+      // Uses a cryptographically secure generator (crypto.randomBytes) because
+      // invite codes grant access to a league (LS-5183).
       let newInviteCode = '';
       for (let attempt = 0; attempt < 10; attempt++) {
-        let code = '';
-        for (let i = 0; i < 8; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
+        const code = generateSecureInviteCode();
         const existing = await context.db
           .select({ id: PublicSchema.leagues.id })
           .from(PublicSchema.leagues)
