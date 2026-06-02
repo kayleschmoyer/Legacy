@@ -27,7 +27,7 @@
  *     src/integration/tests/matchup-roster-editor-ui.integration.spec.ts
  */
 
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
@@ -62,6 +62,36 @@ let state: RosterEditorState;
  * ("Shin-Soo Choo"), and apostrophes ("O'Brien").
  */
 const PLAYER_NAME_RE = /^(?!Edit |Current )[A-Z][-\w.']* [A-Z][-\w.']*/;
+
+/**
+ * Wait for a specific GraphQL operation by name. The bench/assign/swap flows in
+ * MatchupRosterEditor fire multiple GraphQL POSTs per click (a network-only
+ * pre-flight matchup-status fetch, then the mutation, then a refetch). A bare
+ * url + POST predicate resolves on the FIRST POST — the pre-flight — and lets
+ * the test proceed to its API verify before the mutation has actually fired
+ * (LS-5052).
+ */
+function waitForGqlOperation(
+  page: Page,
+  operationName: string,
+  timeoutMs = 15_000,
+) {
+  return page.waitForResponse(
+    (resp) => {
+      if (!resp.url().includes('/graphql')) return false;
+      if (resp.request().method() !== 'POST') return false;
+      try {
+        const body = resp.request().postData();
+        if (!body) return false;
+        const parsed = JSON.parse(body) as { operationName?: string };
+        return parsed.operationName === operationName;
+      } catch {
+        return false;
+      }
+    },
+    { timeout: timeoutMs },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -590,13 +620,15 @@ test.describe
 
     await test.step('Click Bench to move player to bench', async () => {
       const benchBtn = page.getByRole('button', { name: /^Bench$/i }).first();
-      // Register the response promise BEFORE clicking so we don't miss the mutation request
-      // if the page is already at networkidle (which would cause a bare waitForLoadState to
-      // resolve immediately before the XHR even starts).
-      const mutationSettled = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/graphql') && resp.request().method() === 'POST',
-        { timeout: 10_000 },
+      // The bench click fires THREE GraphQL POSTs in sequence: a network-only
+      // GetMatchupById pre-flight, then UpdateMatchupPlayerPosition, then a
+      // GetMatchupPlayers refetch. Filter strictly on the mutation
+      // operationName — a generic POST predicate would resolve on the
+      // pre-flight and let the API verify run before the mutation fires
+      // (LS-5052).
+      const mutationSettled = waitForGqlOperation(
+        page,
+        'UpdateMatchupPlayerPosition',
       );
       await benchBtn.click();
       await mutationSettled;
@@ -696,12 +728,11 @@ test.describe
         .first();
       await expect(positionButtons).toBeVisible({ timeout: 5_000 });
 
-      // Register the response promise BEFORE clicking so we don't miss the mutation request
-      // if the page is already at networkidle.
-      const mutationSettled = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/graphql') && resp.request().method() === 'POST',
-        { timeout: 10_000 },
+      // Filter on the mutation operationName — see LS-5052: a generic POST
+      // predicate would resolve on the pre-flight GetMatchupById query.
+      const mutationSettled = waitForGqlOperation(
+        page,
+        'UpdateMatchupPlayerPosition',
       );
       // Click the first available position option to assign the player
       await positionButtons.click();
@@ -866,12 +897,11 @@ test.describe
         .filter({ hasText: player2Name })
         .first();
       await expect(secondPlayerRow).toBeVisible({ timeout: 5_000 });
-      // Register the response promise BEFORE clicking so we don't miss the mutation request
-      // if the page is already at networkidle.
-      const mutationSettled = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/graphql') && resp.request().method() === 'POST',
-        { timeout: 10_000 },
+      // Filter on the swap mutation operationName — see LS-5052: a generic POST
+      // predicate would resolve on the pre-flight GetMatchupById query.
+      const mutationSettled = waitForGqlOperation(
+        page,
+        'SwapMatchupPlayerPositions',
       );
       await secondPlayerRow.click();
       await mutationSettled;
