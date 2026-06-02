@@ -1,152 +1,132 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { getGameLog, getSeasonTotals } from './CareerStats';
 import * as PFRSession from './PFRSession';
 
 jest.mock('./PFRSession');
 const mockGetPlayerGameLog = jest.mocked(PFRSession.getPlayerGameLog);
 
-const player = { id: 7, pfrId: 'TestQb00' };
+// Real PFR markup: Miles Austin's 2009 gamelog in the current consolidated
+// single-table (id="stats") layout. Guards against the LS-5983 markup drift
+// where the parser looked for four removed `*_gamelogs` tables.
+const AUSTIN_2009_HTML = readFileSync(
+  join(__dirname, '__fixtures__', 'austin-mi00-gamelog-2009.html'),
+  'utf-8',
+);
+const austin = { id: 129005, pfrId: 'AustMi00' };
 
-// Fixture: passing and rushing tables each have one active game + one bye week.
-// Receiving and kicking tables are absent (verify empty arrays returned).
-const FIXTURE_HTML = `
-<html><body>
-<table id="passing_gamelogs">
-  <thead>
+// A QB page in the consolidated layout: passing + rushing column groups.
+function qbRow(
+  rk: number,
+  box: string,
+  cmp: number,
+  att: number,
+  yds: number,
+  td: number,
+): string {
+  return `
     <tr>
-      <th data-stat="ranker">Rk</th>
-      <td data-stat="game_date">Date</td>
-      <td data-stat="team">Tm</td>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th data-stat="ranker">1</th>
-      <td data-stat="game_date"><a href="/boxscores/202409080kan.htm">2024-09-08</a></td>
-      <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
-      <td data-stat="pass_cmp">28</td>
-      <td data-stat="pass_att">42</td>
-      <td data-stat="pass_yds">312</td>
-      <td data-stat="pass_td">3</td>
-      <td data-stat="pass_int">1</td>
-      <td data-stat="pass_sacked">2</td>
-      <td data-stat="pass_sacked_yds">14</td>
-      <td data-stat="pass_rating">104.2</td>
-    </tr>
-    <tr>
-      <th data-stat="ranker">9</th>
-      <td data-stat="game_date">2024-10-27</td>
-      <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
-      <td data-stat="pass_cmp"></td>
-      <td data-stat="pass_att"></td>
-      <td data-stat="pass_yds"></td>
-      <td data-stat="pass_td"></td>
-      <td data-stat="pass_int"></td>
-      <td data-stat="pass_sacked"></td>
-      <td data-stat="pass_sacked_yds"></td>
-      <td data-stat="pass_rating"></td>
-    </tr>
-  </tbody>
-  <tfoot>
-    <tr>
-      <th data-stat="ranker">1</th>
-      <td data-stat="game_date"></td>
-      <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
-      <td data-stat="game_count">16</td>
-      <td data-stat="pass_cmp">380</td>
-      <td data-stat="pass_att">560</td>
-      <td data-stat="pass_yds">4200</td>
-      <td data-stat="pass_td">32</td>
-      <td data-stat="pass_int">10</td>
-      <td data-stat="pass_rating">97.5</td>
-    </tr>
-  </tfoot>
-</table>
-<table id="rushing_gamelogs">
-  <thead>
-    <tr>
-      <th data-stat="ranker">Rk</th>
-      <td data-stat="game_date">Date</td>
-      <td data-stat="team">Tm</td>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th data-stat="ranker">1</th>
-      <td data-stat="game_date"><a href="/boxscores/202409080kan.htm">2024-09-08</a></td>
-      <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
-      <td data-stat="rush_att">5</td>
-      <td data-stat="rush_yds">32</td>
+      <th data-stat="ranker">${rk}</th>
+      <td data-stat="date"><a href="/boxscores/${box}.htm">2018-09-0${rk}</a></td>
+      <td data-stat="team_name_abbr"><a href="/teams/kan/2018.htm">KAN</a></td>
+      <td data-stat="pass_cmp">${cmp}</td>
+      <td data-stat="pass_att">${att}</td>
+      <td data-stat="pass_yds">${yds}</td>
+      <td data-stat="pass_td">${td}</td>
+      <td data-stat="pass_int">0</td>
+      <td data-stat="pass_sacked">1</td>
+      <td data-stat="pass_sacked_yds">6</td>
+      <td data-stat="pass_rating">120.0</td>
+      <td data-stat="rush_att">1</td>
+      <td data-stat="rush_yds">4</td>
       <td data-stat="rush_td">0</td>
-      <td data-stat="rush_long">12</td>
       <td data-stat="fumbles">0</td>
-    </tr>
-  </tbody>
-  <tfoot>
+    </tr>`;
+}
+const QB_HTML = `<html><body><table id="stats"><tbody>
+  ${qbRow(1, '201809090lac', 15, 27, 256, 4)}
+  ${qbRow(2, '201809230kan', 23, 28, 326, 6)}
+</tbody></table></body></html>`;
+const qb = { id: 1, pfrId: 'MahoPa00' };
+
+// A kicker page still carries a zeroed passing column group — the parser must
+// NOT treat those zero rows as passing games (value-based category guard).
+function kickerRow(rk: number, box: string, fgm: number, fga: number): string {
+  return `
     <tr>
-      <th data-stat="ranker">1</th>
-      <td data-stat="game_date"></td>
-      <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
-      <td data-stat="game_count">16</td>
-      <td data-stat="rush_att">62</td>
-      <td data-stat="rush_yds">380</td>
-      <td data-stat="rush_td">4</td>
-      <td data-stat="fumbles">2</td>
-    </tr>
-  </tfoot>
-</table>
-</body></html>
-`;
+      <th data-stat="ranker">${rk}</th>
+      <td data-stat="date"><a href="/boxscores/${box}.htm">2016-09-0${rk}</a></td>
+      <td data-stat="team_name_abbr"><a href="/teams/bal/2016.htm">BAL</a></td>
+      <td data-stat="pass_cmp">0</td>
+      <td data-stat="pass_att">0</td>
+      <td data-stat="pass_yds">0</td>
+      <td data-stat="pass_td">0</td>
+      <td data-stat="fga1">0</td>
+      <td data-stat="fgm1">0</td>
+      <td data-stat="fga2">1</td>
+      <td data-stat="fgm2">1</td>
+      <td data-stat="fga">${fga}</td>
+      <td data-stat="fgm">${fgm}</td>
+      <td data-stat="xpa">2</td>
+      <td data-stat="xpm">2</td>
+    </tr>`;
+}
+const KICKER_HTML = `<html><body><table id="stats"><tbody>
+  ${kickerRow(1, '201609110buf', 2, 2)}
+  ${kickerRow(2, '201609180cle', 3, 3)}
+</tbody></table></body></html>`;
+const kicker = { id: 2, pfrId: 'TuckJu00' };
 
-describe('CareerStats.getGameLog', () => {
+describe('CareerStats.getGameLog — consolidated id="stats" table', () => {
   beforeEach(() => {
-    mockGetPlayerGameLog.mockResolvedValue(FIXTURE_HTML);
+    mockGetPlayerGameLog.mockResolvedValue(AUSTIN_2009_HTML);
   });
 
-  it('parses passing game row and skips bye week', async () => {
-    const log = await getGameLog(player, 2024);
+  it('parses every receiving game from the real PFR fixture', async () => {
+    const log = await getGameLog(austin, 2009);
 
-    expect(log.passing).toHaveLength(1);
-    expect(log.passing[0]).toMatchObject({
-      playerId: 7,
-      season: 2024,
+    expect(log.receiving).toHaveLength(16);
+    expect(log.receiving[0]).toMatchObject({
+      playerId: 129005,
+      season: 2009,
       gameNum: 1,
-      gameIdentifier: '202409080kan',
-      cmp: 28,
-      att: 42,
-      yds: 312,
-      td: 3,
-      int: 1,
-      sacked: 2,
-      sackYds: 14,
-      rating: 104.2,
+      gameIdentifier: '200909130tam',
+      rec: 1,
+      tgt: 2,
+      yds: 42,
+      td: 1,
+    });
+    // The week-5 explosion vs KAN.
+    expect(log.receiving[4]).toMatchObject({
+      gameIdentifier: '200910110kan',
+      rec: 10,
+      yds: 250,
+      td: 2,
     });
   });
 
-  it('parses rushing game row', async () => {
-    const log = await getGameLog(player, 2024);
+  it('emits rushing rows only for games with carries', async () => {
+    const log = await getGameLog(austin, 2009);
 
-    expect(log.rushing).toHaveLength(1);
-    expect(log.rushing[0]).toMatchObject({
-      playerId: 7,
-      season: 2024,
-      gameNum: 1,
-      att: 5,
-      yds: 32,
-      td: 0,
-      fumbles: 0,
-    });
+    // Austin had exactly two carries on the season (weeks 8 and 16).
+    expect(log.rushing).toHaveLength(2);
+    expect(log.rushing.map((r) => r.gameIdentifier)).toEqual([
+      '200911010dal',
+      '200912270was',
+    ]);
+    expect(log.rushing[0]).toMatchObject({ att: 1, yds: 11 });
   });
 
-  it('returns empty arrays for missing stat tables (receiving, kicking)', async () => {
-    const log = await getGameLog(player, 2024);
+  it('returns empty arrays for categories the player did not produce in', async () => {
+    const log = await getGameLog(austin, 2009);
 
-    expect(log.receiving).toHaveLength(0);
+    expect(log.passing).toHaveLength(0);
     expect(log.kicking).toHaveLength(0);
   });
 
-  it('returns all empty arrays when HTML has no gamelog tables', async () => {
+  it('returns all empty arrays when the stats table is absent', async () => {
     mockGetPlayerGameLog.mockResolvedValue('<html><body></body></html>');
-    const log = await getGameLog(player, 2024);
+    const log = await getGameLog(austin, 2009);
 
     expect(log.passing).toHaveLength(0);
     expect(log.rushing).toHaveLength(0);
@@ -155,47 +135,111 @@ describe('CareerStats.getGameLog', () => {
   });
 });
 
-describe('CareerStats.getSeasonTotals', () => {
-  beforeEach(() => {
-    mockGetPlayerGameLog.mockResolvedValue(FIXTURE_HTML);
-  });
+describe('CareerStats.getSeasonTotals — aggregated from game rows', () => {
+  it('reproduces real receiving season totals', async () => {
+    mockGetPlayerGameLog.mockResolvedValue(AUSTIN_2009_HTML);
+    const totals = await getSeasonTotals(austin, 2009);
 
-  it('returns passing season totals from footer row', async () => {
-    const totals = await getSeasonTotals(player, 2024);
-
-    expect(totals.passing).toMatchObject({
-      playerId: 7,
-      season: 2024,
-      team: 'KAN',
+    expect(totals.receiving).toMatchObject({
+      playerId: 129005,
+      season: 2009,
+      team: 'DAL',
       g: 16,
-      cmp: 380,
-      att: 560,
-      yds: 4200,
-      td: 32,
-      int: 10,
-      rating: 97.5,
+      rec: 81,
+      tgt: 124,
+      yds: 1320,
+      td: 11,
+      fumbles: 1,
     });
   });
 
-  it('returns rushing season totals from footer row', async () => {
-    const totals = await getSeasonTotals(player, 2024);
+  it('reproduces real rushing season totals', async () => {
+    mockGetPlayerGameLog.mockResolvedValue(AUSTIN_2009_HTML);
+    const totals = await getSeasonTotals(austin, 2009);
 
     expect(totals.rushing).toMatchObject({
-      playerId: 7,
-      season: 2024,
-      team: 'KAN',
-      g: 16,
-      att: 62,
-      yds: 380,
-      td: 4,
-      fumbles: 2,
+      season: 2009,
+      team: 'DAL',
+      g: 2,
+      att: 2,
+      yds: -2,
+      td: 0,
     });
   });
 
-  it('returns null for missing stat tables (receiving, kicking)', async () => {
-    const totals = await getSeasonTotals(player, 2024);
+  it('returns null for categories with no production', async () => {
+    mockGetPlayerGameLog.mockResolvedValue(AUSTIN_2009_HTML);
+    const totals = await getSeasonTotals(austin, 2009);
 
-    expect(totals.receiving).toBeNull();
+    expect(totals.passing).toBeNull();
     expect(totals.kicking).toBeNull();
+  });
+});
+
+describe('CareerStats — passing (QB)', () => {
+  beforeEach(() => {
+    mockGetPlayerGameLog.mockResolvedValue(QB_HTML);
+  });
+
+  it('parses passing game rows', async () => {
+    const log = await getGameLog(qb, 2018);
+
+    expect(log.passing).toHaveLength(2);
+    expect(log.passing[0]).toMatchObject({
+      gameIdentifier: '201809090lac',
+      cmp: 15,
+      att: 27,
+      yds: 256,
+      td: 4,
+      sacked: 1,
+      sackYds: 6,
+      rating: 120,
+    });
+  });
+
+  it('aggregates passing season totals', async () => {
+    const totals = await getSeasonTotals(qb, 2018);
+
+    expect(totals.passing).toMatchObject({
+      g: 2,
+      cmp: 38,
+      att: 55,
+      yds: 582,
+      td: 10,
+      int: 0,
+    });
+  });
+});
+
+describe('CareerStats — kicker zeroed passing group guard', () => {
+  beforeEach(() => {
+    mockGetPlayerGameLog.mockResolvedValue(KICKER_HTML);
+  });
+
+  it('does not emit passing rows for a kicker with a zeroed passing column group', async () => {
+    const log = await getGameLog(kicker, 2016);
+
+    expect(log.passing).toHaveLength(0);
+    expect(log.kicking).toHaveLength(2);
+    expect(log.kicking[0]).toMatchObject({
+      gameIdentifier: '201609110buf',
+      fgm: 2,
+      fga: 2,
+      xpm: 2,
+      xpa: 2,
+    });
+  });
+
+  it('aggregates kicking totals and leaves passing null', async () => {
+    const totals = await getSeasonTotals(kicker, 2016);
+
+    expect(totals.passing).toBeNull();
+    expect(totals.kicking).toMatchObject({
+      g: 2,
+      fgm: 5,
+      fga: 5,
+      xpm: 4,
+      xpa: 4,
+    });
   });
 });

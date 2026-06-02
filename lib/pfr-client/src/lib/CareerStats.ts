@@ -2,10 +2,8 @@ import htmlParser from 'node-html-parser';
 import { LOGGER } from '@legacy-sports/logging';
 import { getPlayerGameLog } from './PFRSession';
 import {
-  getCellText,
   getTable,
   parseFloatCell,
-  parseFooterRow,
   parseGameIdentifier,
   parseGameNum,
   parseIntCell,
@@ -24,29 +22,56 @@ import type {
   PfrPlayer,
 } from './types';
 
-// --- Passing ---
+// PFR consolidated all offensive/kicking game logs into a single table
+// (id="stats", plus id="stats_playoffs" for postseason) where each row is one
+// game and every stat category lives side-by-side as columns keyed by their
+// `data-stat`. The column groups present depend on the player's position, and a
+// category group can be present-but-zero (e.g. a kicker's page still carries a
+// zeroed passing group), so a category row is only emitted when that category
+// actually produced in the game — see the per-row guards below.
+const GAMELOG_TABLE_ID = 'stats';
+const TEAM_STAT = 'team_name_abbr';
+const DATE_STAT = 'date';
 
-function parsePassingGameRow(
-  row: import('node-html-parser').HTMLElement,
-  player: PfrPlayer,
-): GameFootballPassing | null {
+type Row = import('node-html-parser').HTMLElement;
+
+// Common per-game fields shared by every category row. Returns null for header,
+// bye-week and "did not play" rows (no box-score link / no team).
+function parseCommon(
+  row: Row,
+): { gameNum: number; gameIdentifier: string; team: string } | null {
   const gameNum = parseGameNum(row);
   if (gameNum === null) return null;
 
-  const gameIdentifier = parseGameIdentifier(row);
+  const gameIdentifier = parseGameIdentifier(row, DATE_STAT);
   if (!gameIdentifier) return null;
 
-  // Skip bye week / non-game rows (no game_date link)
-  const team = parseTeamCell(row);
+  const team = parseTeamCell(row, TEAM_STAT);
   if (!team) return null;
+
+  return { gameNum, gameIdentifier, team };
+}
+
+// --- Passing ---
+
+function parsePassingGameRow(
+  row: Row,
+  player: PfrPlayer,
+): GameFootballPassing | null {
+  const common = parseCommon(row);
+  if (!common) return null;
+
+  // Only a row where the player actually attempted a pass is a passing game.
+  const att = parseIntCell(row, 'pass_att');
+  if (!att) return null;
 
   return {
     playerId: player.id,
     season: 0, // caller fills in
-    gameNum,
-    gameIdentifier,
+    gameNum: common.gameNum,
+    gameIdentifier: common.gameIdentifier,
     cmp: parseIntCell(row, 'pass_cmp'),
-    att: parseIntCell(row, 'pass_att'),
+    att,
     yds: parseIntCell(row, 'pass_yds'),
     td: parseIntCell(row, 'pass_td'),
     int: parseIntCell(row, 'pass_int'),
@@ -56,78 +81,28 @@ function parsePassingGameRow(
   };
 }
 
-function parsePassingSeasonRow(
-  row: import('node-html-parser').HTMLElement,
-  player: PfrPlayer,
-  season: number,
-): FootballSeasonPassing | null {
-  const team = parseTeamCell(row);
-  if (!team) return null;
-
-  const rowId = getCellText(row, 'ranker') ?? `${season}`;
-
-  return {
-    playerId: player.id,
-    season,
-    team,
-    pfrRowId: rowId,
-    g: parseIntCell(row, 'game_count'),
-    cmp: parseIntCell(row, 'pass_cmp'),
-    att: parseIntCell(row, 'pass_att'),
-    yds: parseIntCell(row, 'pass_yds'),
-    td: parseIntCell(row, 'pass_td'),
-    int: parseIntCell(row, 'pass_int'),
-    rating: parseFloatCell(row, 'pass_rating'),
-  };
-}
-
 // --- Rushing ---
 
 function parseRushingGameRow(
-  row: import('node-html-parser').HTMLElement,
+  row: Row,
   player: PfrPlayer,
 ): GameFootballRushing | null {
-  const gameNum = parseGameNum(row);
-  if (gameNum === null) return null;
+  const common = parseCommon(row);
+  if (!common) return null;
 
-  const gameIdentifier = parseGameIdentifier(row);
-  if (!gameIdentifier) return null;
-
-  const team = parseTeamCell(row);
-  if (!team) return null;
+  const att = parseIntCell(row, 'rush_att');
+  if (!att) return null;
 
   return {
     playerId: player.id,
     season: 0,
-    gameNum,
-    gameIdentifier,
-    att: parseIntCell(row, 'rush_att'),
+    gameNum: common.gameNum,
+    gameIdentifier: common.gameIdentifier,
+    att,
     yds: parseIntCell(row, 'rush_yds'),
     td: parseIntCell(row, 'rush_td'),
+    // PFR dropped the per-game long column from the consolidated gamelog table.
     lng: parseIntCell(row, 'rush_long'),
-    fumbles: parseIntCell(row, 'fumbles'),
-  };
-}
-
-function parseRushingSeasonRow(
-  row: import('node-html-parser').HTMLElement,
-  player: PfrPlayer,
-  season: number,
-): FootballSeasonRushing | null {
-  const team = parseTeamCell(row);
-  if (!team) return null;
-
-  const rowId = getCellText(row, 'ranker') ?? `${season}`;
-
-  return {
-    playerId: player.id,
-    season,
-    team,
-    pfrRowId: rowId,
-    g: parseIntCell(row, 'game_count'),
-    att: parseIntCell(row, 'rush_att'),
-    yds: parseIntCell(row, 'rush_yds'),
-    td: parseIntCell(row, 'rush_td'),
     fumbles: parseIntCell(row, 'fumbles'),
   };
 }
@@ -135,25 +110,24 @@ function parseRushingSeasonRow(
 // --- Receiving ---
 
 function parseReceivingGameRow(
-  row: import('node-html-parser').HTMLElement,
+  row: Row,
   player: PfrPlayer,
 ): GameFootballReceiving | null {
-  const gameNum = parseGameNum(row);
-  if (gameNum === null) return null;
+  const common = parseCommon(row);
+  if (!common) return null;
 
-  const gameIdentifier = parseGameIdentifier(row);
-  if (!gameIdentifier) return null;
-
-  const team = parseTeamCell(row);
-  if (!team) return null;
+  const tgt = parseIntCell(row, 'targets');
+  const rec = parseIntCell(row, 'rec');
+  // A receiving game is one where the player was targeted or made a catch.
+  if (!tgt && !rec) return null;
 
   return {
     playerId: player.id,
     season: 0,
-    gameNum,
-    gameIdentifier,
-    rec: parseIntCell(row, 'rec'),
-    tgt: parseIntCell(row, 'targets'),
+    gameNum: common.gameNum,
+    gameIdentifier: common.gameIdentifier,
+    rec,
+    tgt,
     yds: parseIntCell(row, 'rec_yds'),
     td: parseIntCell(row, 'rec_td'),
     lng: parseIntCell(row, 'rec_long'),
@@ -161,88 +135,41 @@ function parseReceivingGameRow(
   };
 }
 
-function parseReceivingSeasonRow(
-  row: import('node-html-parser').HTMLElement,
-  player: PfrPlayer,
-  season: number,
-): FootballSeasonReceiving | null {
-  const team = parseTeamCell(row);
-  if (!team) return null;
-
-  const rowId = getCellText(row, 'ranker') ?? `${season}`;
-
-  return {
-    playerId: player.id,
-    season,
-    team,
-    pfrRowId: rowId,
-    g: parseIntCell(row, 'game_count'),
-    rec: parseIntCell(row, 'rec'),
-    tgt: parseIntCell(row, 'targets'),
-    yds: parseIntCell(row, 'rec_yds'),
-    td: parseIntCell(row, 'rec_td'),
-    fumbles: parseIntCell(row, 'fumbles'),
-  };
-}
-
 // --- Kicking ---
 
 function parseKickingGameRow(
-  row: import('node-html-parser').HTMLElement,
+  row: Row,
   player: PfrPlayer,
 ): GameFootballKicking | null {
-  const gameNum = parseGameNum(row);
-  if (gameNum === null) return null;
+  const common = parseCommon(row);
+  if (!common) return null;
 
-  const gameIdentifier = parseGameIdentifier(row);
-  if (!gameIdentifier) return null;
+  const fga = parseIntCell(row, 'fga');
+  const xpa = parseIntCell(row, 'xpa');
+  // A kicking game is one with a field-goal or extra-point attempt.
+  if (!fga && !xpa) return null;
 
-  const team = parseTeamCell(row);
-  if (!team) return null;
-
+  // Distance buckets are 1..5 = 0-19, 20-29, 30-39, 40-49, 50+.
   return {
     playerId: player.id,
     season: 0,
-    gameNum,
-    gameIdentifier,
+    gameNum: common.gameNum,
+    gameIdentifier: common.gameIdentifier,
     fgm: parseIntCell(row, 'fgm'),
-    fga: parseIntCell(row, 'fga'),
-    fg019m: parseIntCell(row, 'fgm_0_19'),
-    fg019a: parseIntCell(row, 'fga_0_19'),
-    fg2029m: parseIntCell(row, 'fgm_20_29'),
-    fg2029a: parseIntCell(row, 'fga_20_29'),
-    fg3039m: parseIntCell(row, 'fgm_30_39'),
-    fg3039a: parseIntCell(row, 'fga_30_39'),
-    fg4049m: parseIntCell(row, 'fgm_40_49'),
-    fg4049a: parseIntCell(row, 'fga_40_49'),
-    fg50m: parseIntCell(row, 'fgm_50'),
-    fg50a: parseIntCell(row, 'fga_50'),
+    fga,
+    fg019m: parseIntCell(row, 'fgm1'),
+    fg019a: parseIntCell(row, 'fga1'),
+    fg2029m: parseIntCell(row, 'fgm2'),
+    fg2029a: parseIntCell(row, 'fga2'),
+    fg3039m: parseIntCell(row, 'fgm3'),
+    fg3039a: parseIntCell(row, 'fga3'),
+    fg4049m: parseIntCell(row, 'fgm4'),
+    fg4049a: parseIntCell(row, 'fga4'),
+    fg50m: parseIntCell(row, 'fgm5'),
+    fg50a: parseIntCell(row, 'fga5'),
     xpm: parseIntCell(row, 'xpm'),
-    xpa: parseIntCell(row, 'xpa'),
+    xpa,
     lng: parseIntCell(row, 'kick_long'),
-  };
-}
-
-function parseKickingSeasonRow(
-  row: import('node-html-parser').HTMLElement,
-  player: PfrPlayer,
-  season: number,
-): FootballSeasonKicking | null {
-  const team = parseTeamCell(row);
-  if (!team) return null;
-
-  const rowId = getCellText(row, 'ranker') ?? `${season}`;
-
-  return {
-    playerId: player.id,
-    season,
-    team,
-    pfrRowId: rowId,
-    g: parseIntCell(row, 'game_count'),
-    fgm: parseIntCell(row, 'fgm'),
-    fga: parseIntCell(row, 'fga'),
-    xpm: parseIntCell(row, 'xpm'),
-    xpa: parseIntCell(row, 'xpa'),
   };
 }
 
@@ -262,42 +189,216 @@ export interface SeasonTotals {
   kicking: FootballSeasonKicking | null;
 }
 
-export async function getGameLog(
+interface ParsedGamelog {
+  log: GameLog;
+  // Most recent team the player appeared for that season (empty when no games).
+  team: string;
+}
+
+const EMPTY_LOG: GameLog = {
+  passing: [],
+  rushing: [],
+  receiving: [],
+  kicking: [],
+};
+
+// Parse the consolidated gamelog table once into per-category game rows plus the
+// season's team. Both public functions build on this.
+function parseGamelogPage(
+  html: string,
   player: PfrPlayer,
   season: number,
-): Promise<GameLog> {
-  const html = await getPlayerGameLog(player.pfrId, season);
+): ParsedGamelog {
   const root = htmlParser(html, { comment: true });
+  const table = getTable(root, GAMELOG_TABLE_ID);
 
-  const passingTable = getTable(root, 'passing_gamelogs');
-  const rushingTable = getTable(root, 'rushing_gamelogs');
-  const receivingTable = getTable(root, 'receiving_gamelogs');
-  const kickingTable = getTable(root, 'kicking_gamelogs');
+  if (table === null) {
+    return { log: EMPTY_LOG, team: '' };
+  }
 
   const applySeasonAndFilter = <T extends { season: number; gameNum: number }>(
     rows: T[],
   ): T[] => rows.map((r) => ({ ...r, season })).filter((r) => r.gameNum > 0);
 
-  const passing = applySeasonAndFilter(
-    parseTableRows(passingTable, (r) => parsePassingGameRow(r, player)),
+  const log: GameLog = {
+    passing: applySeasonAndFilter(
+      parseTableRows(table, (r) => parsePassingGameRow(r, player)),
+    ),
+    rushing: applySeasonAndFilter(
+      parseTableRows(table, (r) => parseRushingGameRow(r, player)),
+    ),
+    receiving: applySeasonAndFilter(
+      parseTableRows(table, (r) => parseReceivingGameRow(r, player)),
+    ),
+    kicking: applySeasonAndFilter(
+      parseTableRows(table, (r) => parseKickingGameRow(r, player)),
+    ),
+  };
+
+  // The season team is whatever team the player last appeared for; the table's
+  // footer no longer carries it, so derive it from the game rows.
+  const teams = parseTableRows(table, (r) =>
+    parseGameNum(r) === null ? null : parseTeamCell(r, TEAM_STAT),
   );
-  const rushing = applySeasonAndFilter(
-    parseTableRows(rushingTable, (r) => parseRushingGameRow(r, player)),
-  );
-  const receiving = applySeasonAndFilter(
-    parseTableRows(receivingTable, (r) => parseReceivingGameRow(r, player)),
-  );
-  const kicking = applySeasonAndFilter(
-    parseTableRows(kickingTable, (r) => parseKickingGameRow(r, player)),
-  );
+  const team = teams.length > 0 ? teams[teams.length - 1] : '';
+
+  return { log, team };
+}
+
+export async function getGameLog(
+  player: PfrPlayer,
+  season: number,
+): Promise<GameLog> {
+  const html = await getPlayerGameLog(player.pfrId, season);
+  const { log } = parseGamelogPage(html, player, season);
 
   LOGGER.info(
     `Game log for ${player.pfrId} ${season}: ` +
-      `${passing.length} passing, ${rushing.length} rushing, ` +
-      `${receiving.length} receiving, ${kicking.length} kicking games`,
+      `${log.passing.length} passing, ${log.rushing.length} rushing, ` +
+      `${log.receiving.length} receiving, ${log.kicking.length} kicking games`,
   );
 
-  return { passing, rushing, receiving, kicking };
+  return log;
+}
+
+// The consolidated table no longer exposes a per-category season footer row, so
+// season totals are aggregated from the per-game rows (which reproduces PFR's
+// own season totals exactly).
+
+function aggregateSeasonPassing(
+  games: GameFootballPassing[],
+  player: PfrPlayer,
+  season: number,
+  team: string,
+): FootballSeasonPassing | null {
+  if (games.length === 0) return null;
+
+  let cmp = 0;
+  let att = 0;
+  let yds = 0;
+  let td = 0;
+  let int = 0;
+  for (const game of games) {
+    cmp += game.cmp ?? 0;
+    att += game.att ?? 0;
+    yds += game.yds ?? 0;
+    td += game.td ?? 0;
+    int += game.int ?? 0;
+  }
+
+  return {
+    playerId: player.id,
+    season,
+    team,
+    pfrRowId: `${season}`,
+    g: games.length,
+    cmp,
+    att,
+    yds,
+    td,
+    int,
+    // Season passer rating is recomputed downstream from the totals.
+    rating: null,
+  };
+}
+
+function aggregateSeasonRushing(
+  games: GameFootballRushing[],
+  player: PfrPlayer,
+  season: number,
+  team: string,
+): FootballSeasonRushing | null {
+  if (games.length === 0) return null;
+
+  let att = 0;
+  let yds = 0;
+  let td = 0;
+  let fumbles = 0;
+  for (const game of games) {
+    att += game.att ?? 0;
+    yds += game.yds ?? 0;
+    td += game.td ?? 0;
+    fumbles += game.fumbles ?? 0;
+  }
+
+  return {
+    playerId: player.id,
+    season,
+    team,
+    pfrRowId: `${season}`,
+    g: games.length,
+    att,
+    yds,
+    td,
+    fumbles,
+  };
+}
+
+function aggregateSeasonReceiving(
+  games: GameFootballReceiving[],
+  player: PfrPlayer,
+  season: number,
+  team: string,
+): FootballSeasonReceiving | null {
+  if (games.length === 0) return null;
+
+  let rec = 0;
+  let tgt = 0;
+  let yds = 0;
+  let td = 0;
+  let fumbles = 0;
+  for (const game of games) {
+    rec += game.rec ?? 0;
+    tgt += game.tgt ?? 0;
+    yds += game.yds ?? 0;
+    td += game.td ?? 0;
+    fumbles += game.fumbles ?? 0;
+  }
+
+  return {
+    playerId: player.id,
+    season,
+    team,
+    pfrRowId: `${season}`,
+    g: games.length,
+    rec,
+    tgt,
+    yds,
+    td,
+    fumbles,
+  };
+}
+
+function aggregateSeasonKicking(
+  games: GameFootballKicking[],
+  player: PfrPlayer,
+  season: number,
+  team: string,
+): FootballSeasonKicking | null {
+  if (games.length === 0) return null;
+
+  let fgm = 0;
+  let fga = 0;
+  let xpm = 0;
+  let xpa = 0;
+  for (const game of games) {
+    fgm += game.fgm ?? 0;
+    fga += game.fga ?? 0;
+    xpm += game.xpm ?? 0;
+    xpa += game.xpa ?? 0;
+  }
+
+  return {
+    playerId: player.id,
+    season,
+    team,
+    pfrRowId: `${season}`,
+    g: games.length,
+    fgm,
+    fga,
+    xpm,
+    xpa,
+  };
 }
 
 export async function getSeasonTotals(
@@ -305,25 +406,12 @@ export async function getSeasonTotals(
   season: number,
 ): Promise<SeasonTotals> {
   const html = await getPlayerGameLog(player.pfrId, season);
-  const root = htmlParser(html, { comment: true });
-
-  const passingTable = getTable(root, 'passing_gamelogs');
-  const rushingTable = getTable(root, 'rushing_gamelogs');
-  const receivingTable = getTable(root, 'receiving_gamelogs');
-  const kickingTable = getTable(root, 'kicking_gamelogs');
+  const { log, team } = parseGamelogPage(html, player, season);
 
   return {
-    passing: parseFooterRow(passingTable, (r) =>
-      parsePassingSeasonRow(r, player, season),
-    ),
-    rushing: parseFooterRow(rushingTable, (r) =>
-      parseRushingSeasonRow(r, player, season),
-    ),
-    receiving: parseFooterRow(receivingTable, (r) =>
-      parseReceivingSeasonRow(r, player, season),
-    ),
-    kicking: parseFooterRow(kickingTable, (r) =>
-      parseKickingSeasonRow(r, player, season),
-    ),
+    passing: aggregateSeasonPassing(log.passing, player, season, team),
+    rushing: aggregateSeasonRushing(log.rushing, player, season, team),
+    receiving: aggregateSeasonReceiving(log.receiving, player, season, team),
+    kicking: aggregateSeasonKicking(log.kicking, player, season, team),
   };
 }

@@ -139,10 +139,15 @@ export function parseFloatCell(
 // PFR box score URL pattern: /boxscores/202409080kan.htm → 202409080kan
 const GAME_ID_REGEX = /\/boxscores\/(\w+)\.htm$/;
 
-export function parseGameIdentifier(row: HTMLElement): string | null {
+// `dateStat` is the data-stat of the cell carrying the box-score link.
+// Older PFR tables used `game_date`; the current gamelog table uses `date`.
+export function parseGameIdentifier(
+  row: HTMLElement,
+  dateStat = 'game_date',
+): string | null {
   const dateCell = row
     .getElementsByTagName('td')
-    .find((c) => c.getAttribute('data-stat') === 'game_date');
+    .find((c) => c.getAttribute('data-stat') === dateStat);
   const link = dateCell?.getElementsByTagName('a')[0]?.getAttribute('href');
   const match = link?.match(GAME_ID_REGEX);
   return match ? match[1] : null;
@@ -163,10 +168,15 @@ export function parseGameNum(row: HTMLElement): number | null {
   return isNaN(n) ? null : n;
 }
 
-export function parseTeamCell(row: HTMLElement): string | null {
+// `teamStat` is the data-stat of the team cell. Older PFR tables used `team`;
+// the current gamelog table uses `team_name_abbr`.
+export function parseTeamCell(
+  row: HTMLElement,
+  teamStat = 'team',
+): string | null {
   const cell = row
     .getElementsByTagName('td')
-    .find((c) => c.getAttribute('data-stat') === 'team');
+    .find((c) => c.getAttribute('data-stat') === teamStat);
   if (!cell) return null;
   const anchor = cell.getElementsByTagName('a')[0];
   const text = (anchor?.text ?? cell.text).trim();
