@@ -70,6 +70,9 @@ const LinkValue = styled(Text, {
   },
 });
 
+const isMissing = (v: string | null | undefined): boolean =>
+  v == null || v === '' || v === 'unknown' || v === 'dev';
+
 export default function AboutPage() {
   const navigate = useNavigate();
   const isPremium = useIsPremium();
@@ -85,9 +88,10 @@ export default function AboutPage() {
       ? `${repoUrl}/commit/${commitSha}`
       : null;
 
-  // Format build date
+  // Format build date — guard with isMissing so 'dev'/'unknown' sentinels never
+  // reach new Date(); NaN check is a safety net for any other non-parseable string.
   let formattedBuildDate = buildDate;
-  if (buildDate && buildDate !== 'unknown') {
+  if (!isMissing(buildDate)) {
     const d = new Date(buildDate);
     formattedBuildDate = Number.isNaN(d.getTime())
       ? buildDate
