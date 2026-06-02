@@ -11,6 +11,7 @@ import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { env } from '../../config/environment';
 import { BRAND_GOLD_LIGHT } from '../../constants/colors';
+import { useIsPremium } from '../../hooks/useIsPremium';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -71,6 +72,7 @@ const LinkValue = styled(Text, {
 
 export default function AboutPage() {
   const navigate = useNavigate();
+  const isPremium = useIsPremium();
   // Read build-time environment variables from centralized config
   const { appVersion, commitSha, buildDate } = env;
 
@@ -198,16 +200,18 @@ export default function AboutPage() {
         </YStack>
       </InfoCard>
 
-      <InfoCard>
-        <H2 marginBottom="$2">Get Started</H2>
-        <Text color="$gray11" fontSize="$4" marginBottom="$3">
-          Ready to manage your fantasy sports league? Join Legacy Sports for
-          free.
-        </Text>
-        <Button onPress={() => navigate('/')} size="$4">
-          Get Started Free
-        </Button>
-      </InfoCard>
+      {!isPremium && (
+        <InfoCard>
+          <H2 marginBottom="$2">Get Started</H2>
+          <Text color="$gray11" fontSize="$4" marginBottom="$3">
+            Ready to manage your fantasy sports league? Join Legacy Sports for
+            free.
+          </Text>
+          <Button onPress={() => navigate('/')} size="$4">
+            Get Started Free
+          </Button>
+        </InfoCard>
+      )}
 
       <YStack marginTop="$4" alignItems="center">
         <Text color="$gray10" fontSize="$3" textAlign="center">
