@@ -519,7 +519,7 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
       leagueId: t.arg.int({ required: true }),
     },
     resolve: async (parent, args, context) => {
-      // Check if user is authenticated and has General Manager access
+      // Check if user is authenticated
       if (!context.user) {
         throw AuthenticationError(
           'Authentication required to add positions to league',
@@ -530,22 +530,30 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
       const userId = context.user.id;
 
       try {
-        // Verify user has General Manager access to this league
+        // Verify user is General Manager or commissioner of this league
         const leagueAccess = await context.db
-          .select()
+          .select({
+            permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+          })
           .from(PublicSchema.leagueMembers)
           .where(
             and(
               eq(PublicSchema.leagueMembers.leagueId, leagueId),
               eq(PublicSchema.leagueMembers.userId, userId),
-              eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
             ),
           )
           .limit(1);
 
         if (leagueAccess.length === 0) {
+          throw ForbiddenError('You are not a member of this league');
+        }
+
+        if (
+          leagueAccess[0].permissionLevel !== 'general_manager' &&
+          leagueAccess[0].permissionLevel !== 'commissioner'
+        ) {
           throw ForbiddenError(
-            'Only the league General Manager can add positions to a league',
+            'Only a general manager or commissioner can add positions to a league',
           );
         }
 
