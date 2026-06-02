@@ -361,6 +361,7 @@ export function AdminPage(): React.JSX.Element | null {
   const { data, loading, error } = useAdminGetUsersQuery({
     variables: { limit: 200, offset: 0 },
     skip: auth.user?.accessLevel !== 'admin',
+    fetchPolicy: 'no-cache',
   });
 
   if (auth.isLoading || serverUserLoading) {

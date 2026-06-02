@@ -118,6 +118,11 @@ interface AuthProviderProps {
    * makes its first request.
    */
   onUserSwitch?: () => Promise<void>;
+  /**
+   * Called synchronously during logout so callers can flush user-scoped
+   * caches (e.g. Apollo InMemoryCache) before a new session begins.
+   */
+  onLogout?: () => void;
 }
 
 // Modern authentication state management with useReducer
@@ -246,6 +251,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   children,
   config,
   onUserSwitch,
+  onLogout,
 }) => {
   const [authState, dispatchAuth] = useReducer(authReducer, initialAuthState);
   const { user, isLoading, error, isImpersonating, adminUser, token } =
@@ -718,12 +724,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     } catch {
       // Storage may be unavailable in private browsing mode — non-critical
     }
+    // Flush any caller-owned user-scoped caches (e.g. Apollo InMemoryCache)
+    // before AUTH_LOGOUT fires, so a subsequent login cannot read stale data.
+    onLogout?.();
     dispatchAuth({ type: 'AUTH_LOGOUT' });
     // Return the server logout promise so callers can optionally await full
     // completion (e.g. for testing), while client state has already cleared
     // synchronously above. requestLogout() resolves even on network failure.
     return logoutPromiseRef.current;
-  }, [authService, clearRefreshTimer]);
+  }, [authService, clearRefreshTimer, onLogout]);
 
   const clearError = useCallback(() => {
     dispatchAuth({ type: 'CLEAR_ERROR' });

@@ -230,6 +230,9 @@ try {
               onUserSwitch={async () => {
                 await apolloClient.resetStore();
               }}
+              onLogout={() => {
+                void apolloClient.clearStore();
+              }}
             >
               <EnhancedAuthGuard
                 loginTitle="Welcome to Legacy Sports!"
