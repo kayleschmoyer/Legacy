@@ -152,7 +152,7 @@ export default function AboutPage() {
 
         <InfoRow data-testid="build-info-environment">
           <Label>Environment:</Label>
-          <Value>{env.isDev ? 'development' : 'production'}</Value>
+          <Value>{env.environmentName}</Value>
         </InfoRow>
 
         {env.isDev && (

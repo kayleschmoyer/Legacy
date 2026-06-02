@@ -14,6 +14,8 @@ export interface EnvironmentConfig {
   readonly graphqlUrl: string;
   readonly websocketUrl: string;
   readonly isDev: boolean;
+  /** Resolved environment name: VITE_ENVIRONMENT_NAME if set, else 'development' or 'production'. */
+  readonly environmentName: string;
   readonly authTestMode: boolean;
   readonly baseUrl: string;
   readonly appVersion: string;
@@ -66,6 +68,9 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
       ? window.__e2eWsUrl
       : (import.meta.env.VITE_WEBSOCKET_URL as string) || '',
   isDev: import.meta.env.DEV === true,
+  environmentName:
+    (import.meta.env.VITE_ENVIRONMENT_NAME as string) ||
+    (import.meta.env.DEV === true ? 'development' : 'production'),
   authTestMode: import.meta.env.VITE_AUTH_TEST_MODE === 'true',
   baseUrl: import.meta.env.BASE_URL || '/',
   appVersion:
