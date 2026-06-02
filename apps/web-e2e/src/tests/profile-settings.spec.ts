@@ -29,6 +29,10 @@ const MOCK_USER_DATA = {
     email: 'testuser@example.com',
     avatarUrl: null,
     accessLevel: 'user',
+    subscriptionTier: null,
+    discordId: null,
+    discordUsername: null,
+    themePreference: null,
   },
 };
 
@@ -224,9 +228,17 @@ test.describe('Profile Settings Page — appearance @regression', () => {
     await page.goto('/profile/settings');
 
     await expect(page.getByText('Appearance')).toBeVisible();
-    await expect(page.getByTestId('profile-theme-light')).toBeVisible();
-    await expect(page.getByTestId('profile-theme-system')).toBeVisible();
-    await expect(page.getByTestId('profile-theme-dark')).toBeVisible();
+    // The theme options are Tamagui styled `role="radio"` buttons. Tamagui does
+    // not forward `data-testid` on these (it does forward role/aria-*), so the
+    // accessible name (aria-label="<Label> theme") is the stable locator — the
+    // same role-based approach dark-mode.spec.ts uses for the preferences chips.
+    await expect(
+      page.getByRole('radio', { name: 'Light theme' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('radio', { name: 'System theme' }),
+    ).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Dark theme' })).toBeVisible();
   });
 
   test('theme can be changed on mobile (412x784 viewport)', async ({
@@ -237,8 +249,8 @@ test.describe('Profile Settings Page — appearance @regression', () => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    const light = page.getByTestId('profile-theme-light');
-    const dark = page.getByTestId('profile-theme-dark');
+    const light = page.getByRole('radio', { name: 'Light theme' });
+    const dark = page.getByRole('radio', { name: 'Dark theme' });
 
     await expect(light).toBeVisible();
     await light.click();
@@ -255,9 +267,9 @@ test.describe('Profile Settings Page — appearance @regression', () => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    const light = page.getByTestId('profile-theme-light');
-    const system = page.getByTestId('profile-theme-system');
-    const dark = page.getByTestId('profile-theme-dark');
+    const light = page.getByRole('radio', { name: 'Light theme' });
+    const system = page.getByRole('radio', { name: 'System theme' });
+    const dark = page.getByRole('radio', { name: 'Dark theme' });
 
     // Select Light so we have a known starting point.
     await light.click();

@@ -35,6 +35,10 @@ import { deepFreeze } from '../mocks/deep-freeze';
 export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   // ── App shell (fires on every authenticated page) ─────────────────
   getunreadnotificationcount: { data: { getUnreadNotificationCount: 0 } },
+  // Mirrors the `User` GraphQL fragment (apps/web/src/api/db/users/Users.graphql).
+  // themePreference must be present so ThemeContext's ThemeServerSync (LS-4913)
+  // hydrates cleanly; null means "server has no stored preference", so it does
+  // NOT clobber the locally-selected theme that the theme specs assert on.
   getuserbyid: {
     data: {
       user: {
@@ -44,6 +48,23 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
         username: 'testuser',
         name: 'Test User',
         accessLevel: 'none',
+        avatarUrl: null,
+        subscriptionTier: null,
+        discordId: null,
+        discordUsername: null,
+        themePreference: null,
+      },
+    },
+  },
+  // ThemeServerSync best-effort pushes the user's theme choice to the server on
+  // every change (LS-4913). Without this baseline mock the hermetic API-isolation
+  // fixture flags it as an unmocked operation and fails every theme spec.
+  updateusertheme: {
+    data: {
+      updateUserTheme: {
+        __typename: 'User',
+        id: 1,
+        themePreference: null,
       },
     },
   },
