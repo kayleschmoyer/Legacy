@@ -55,6 +55,7 @@ const Value = styled(Text, {
   color: '$gray11',
   fontSize: '$4',
   fontFamily: '$mono',
+  wordBreak: 'break-all',
 });
 
 const LinkValue = styled(Text, {
