@@ -929,9 +929,14 @@ export function createServer(): McpServer {
   // --- github_mark_pr_ready ---
   server.tool(
     'github_mark_pr_ready',
-    'Convert a draft PR to ready for review. Use after validation passes to signal the PR is ready for sweep/review agents.',
+    'Convert a draft PR to ready for review and apply the bot:ready-for-review label (the Reviewer Bot trigger). Use after validation passes to signal the PR is ready for sweep/review agents. The label is applied last and is idempotent, so fix-push cycles re-trigger review without a separate label call.',
     {
       number: z.coerce.number().int().positive().describe('PR number'),
+      applyReadyLabel: coercedBoolean
+        .default(true)
+        .describe(
+          'Apply the bot:ready-for-review label after marking ready (default true). Set false only when the caller manages the label itself (e.g. a remove-then-add re-trigger).',
+        ),
     },
     async (params) => markPRReady(params),
   );

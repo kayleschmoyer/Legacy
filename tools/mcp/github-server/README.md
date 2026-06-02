@@ -20,7 +20,7 @@ Pull request and review lifecycle management via the GitHub REST and GraphQL API
 - **github_edit_pr** — Update a PR's title and/or body
 - **github_close_pr** — Close a PR without merging
 - **github_merge_pr** — Merge a PR (default: queue; or direct with --admin)
-- **github_mark_pr_ready** — Convert a draft PR to ready for review
+- **github_mark_pr_ready** — Convert a draft PR to ready for review and apply the `bot:ready-for-review` trigger label (set `applyReadyLabel: false` to skip the label)
 - **github_rebase_pr** — Rebase a PR branch onto base and force-push
 - **github_pr_commits** — List commits on a PR
 

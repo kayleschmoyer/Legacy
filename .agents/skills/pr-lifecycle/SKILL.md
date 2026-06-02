@@ -328,8 +328,8 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 # MCP (preferred) — full post-creation sequence
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, head: <branch-name>)
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])   # while still draft — MUST come before bot:ready-for-review
-github_mark_pr_ready(number: <PR#>)
-github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MUST be last label op — see note below
+github_mark_pr_ready(number: <PR#>)  # NOTE: this now applies bot:ready-for-review itself (last label op, idempotent)
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # redundant-but-harmless after github_mark_pr_ready; REQUIRED on the CC-web built-in mark-ready path (update_pull_request draft:false does NOT apply it). MUST be last label op — see note below
 mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # Claude Code built-in ONLY — NOT in legacy-sports-github; unavailable in cloud/headless; fallback: poll via github_view_pr + ci_list_runs with ScheduleWakeup
 jira_transition(key: "LS-####", status: "In Review")
 
