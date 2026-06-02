@@ -118,6 +118,53 @@ function renderJsonWithTints(value: unknown): React.ReactNode {
   return parts;
 }
 
+// ─── Quick stat card ──────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  label: string;
+  value: string;
+  accent?: string;
+}
+
+function StatCard({ label, value, accent }: StatCardProps) {
+  return (
+    <YStack
+      gap={4}
+      padding={14}
+      borderRadius={8}
+      style={{
+        background: SURFACE_CARD,
+        border: `1px solid ${OUTLINE_SUBTLE}`,
+        minWidth: 100,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: TEXT_TERTIARY,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 28,
+          lineHeight: 1,
+          color: accent ?? TEXT_PRIMARY,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </span>
+    </YStack>
+  );
+}
+
 // ─── Section / accordion ──────────────────────────────────────────────────────
 
 interface AdminSectionProps {
@@ -437,6 +484,64 @@ export function AdminPage(): React.JSX.Element | null {
             Revenue Analytics →
           </Link>
         </YStack>
+
+        {/* Quick Stats & Actions — only rendered when user data has loaded */}
+        {data && (
+          <YStack gap={12} marginBottom={24}>
+            <XStack gap={10} flexWrap="wrap">
+              <StatCard label="Total Users" value={String(allUsers.length)} />
+              <StatCard
+                label="Admins"
+                value={String(
+                  allUsers.filter((u) => u.accessLevel === 'admin').length,
+                )}
+                accent={BRAND_GOLD}
+              />
+              <StatCard
+                label="Standard"
+                value={String(
+                  allUsers.filter((u) => u.accessLevel !== 'admin').length,
+                )}
+              />
+            </XStack>
+            <XStack gap={8} flexWrap="wrap" alignItems="center">
+              <span
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: TEXT_TERTIARY,
+                  marginRight: 4,
+                }}
+              >
+                Quick Actions
+              </span>
+              <Link
+                to="/admin/revenue"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: BRAND_GOLD_LIGHT,
+                  textDecoration: 'none',
+                  background: withAlpha(BRAND_GOLD, 0.08),
+                  border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                }}
+              >
+                Revenue Analytics →
+              </Link>
+            </XStack>
+          </YStack>
+        )}
 
         {/* Users section */}
         <AdminSection
