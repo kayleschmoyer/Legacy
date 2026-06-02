@@ -121,6 +121,27 @@ async function setupGraphQL(page: import('@playwright/test').Page) {
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [MOCK_LEAGUE] } }),
       });
+    } else if (postData.includes('"getmymockdraftusage"')) {
+      // Premium user → unlimited weekly mock drafts, so the setup form
+      // renders (never the LimitReachedScreen) and no usage label is shown
+      // (LS-5178). Without this mock the query falls through to the
+      // _apiIsolation baseline, which flags it as an unmocked operation and
+      // fails every test in the suite (LS-6400).
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getMyMockDraftUsage: {
+              __typename: 'MockDraftUsage',
+              isUnlimited: true,
+              used: 0,
+              limit: 2,
+              remaining: 2,
+            },
+          },
+        }),
+      });
     } else if (postData.includes('initializemockdraft')) {
       await route.fulfill({
         status: 200,
