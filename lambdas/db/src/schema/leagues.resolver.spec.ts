@@ -418,13 +418,12 @@ describe('League Mutations', () => {
       };
 
       // Admins get all leagues without a WHERE filter on owner — the select chain
-      // goes through .innerJoin() and resolves at .where() (which receives undefined)
+      // resolves at .innerJoin() (there is no trailing .where() on the admin path).
       const mockLeagues = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.innerJoin.mockReturnValueOnce(mockDb);
-      mockDb.where.mockResolvedValueOnce(mockLeagues);
+      mockDb.innerJoin.mockResolvedValueOnce(mockLeagues);
 
       // Mock delete operations (these return mockDb for chaining)
       mockDb.delete.mockReturnValue(mockDb);

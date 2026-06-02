@@ -14,7 +14,9 @@ const config: Config = {
   // PostgreSQL operations are slower than SQLite in-memory.
   testTimeout: 30000,
 
-  transformIgnorePatterns: ['node_modules/(?!@legacy-sports)'],
+  // Transform workspace packages and jose (ESM-only build at jose@6, hoisted to
+  // root node_modules; the schema imports it via apple-jws.ts).
+  transformIgnorePatterns: ['node_modules/(?!(@legacy-sports|jose)/)'],
 
   moduleNameMapper: {
     '^@legacy-sports/analytics$': '<rootDir>/../../lib/analytics/src/index.ts',
