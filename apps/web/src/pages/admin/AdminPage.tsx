@@ -817,9 +817,11 @@ export function AdminPage(): React.JSX.Element | null {
                     paddingHorizontal={16}
                     paddingVertical={14}
                     animation="quick"
-                    style={{ background: SURFACE_CARD, flexWrap: 'wrap' }}
+                    style={{ background: SURFACE_CARD }}
                     hoverStyle={{ backgroundColor: SURFACE_HOVER }}
                     $sm={{
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
                       paddingHorizontal: 12,
                       paddingVertical: 12,
                       gap: 10,
@@ -896,93 +898,96 @@ export function AdminPage(): React.JSX.Element | null {
                       </span>
                     </YStack>
 
-                    {/* Access level badge */}
-                    <span
-                      style={{
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: 700,
-                        fontSize: 10.5,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                        padding: '3px 8px',
-                        borderRadius: 9999,
-                        flexShrink: 0,
-                        ...(isAdmin
-                          ? {
-                              color: BRAND_GOLD_LIGHT,
-                              border: `1px solid ${withAlpha(BRAND_GOLD, 0.45)}`,
-                              background: withAlpha(BRAND_GOLD, 0.1),
-                            }
-                          : {
-                              color: TEXT_MUTED,
-                              border: `1px solid ${OUTLINE_SUBTLE}`,
-                              background: SURFACE_SUBTLE,
-                            }),
-                      }}
-                    >
-                      {u.accessLevel ?? 'none'}
-                    </span>
-
-                    {/* Impersonate */}
-                    {!isYou && !isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (u.id == null) return;
-                          handleImpersonate(
-                            u.id,
-                            u.username ?? u.email ?? `user #${u.id}`,
-                          );
-                        }}
-                        disabled={impersonatingId !== null}
+                    {/* Actions row: badge + impersonate button */}
+                    <XStack alignItems="center" gap={8} flexShrink={0}>
+                      {/* Access level badge */}
+                      <span
                         style={{
-                          appearance: 'none',
                           fontFamily: FONT_DISPLAY,
                           fontWeight: 700,
-                          fontSize: 11,
-                          letterSpacing: '0.1em',
+                          fontSize: 10.5,
+                          letterSpacing: '0.12em',
                           textTransform: 'uppercase',
-                          padding: '7px 12px',
-                          borderRadius: 12,
-                          cursor:
-                            impersonatingId !== null
-                              ? 'not-allowed'
-                              : 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          transition:
-                            'all 150ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-                          whiteSpace: 'nowrap',
-                          color: WHITE,
-                          background: BRAND_NAVY,
-                          border: `1px solid ${BRAND_NAVY_LIGHT}`,
-                          boxShadow: '0 1px 2px rgba(8, 12, 20, 0.4)',
-                          opacity: impersonatingId !== null ? 0.55 : 1,
-                          minHeight: 36,
+                          padding: '3px 8px',
+                          borderRadius: 9999,
+                          flexShrink: 0,
+                          ...(isAdmin
+                            ? {
+                                color: BRAND_GOLD_LIGHT,
+                                border: `1px solid ${withAlpha(BRAND_GOLD, 0.45)}`,
+                                background: withAlpha(BRAND_GOLD, 0.1),
+                              }
+                            : {
+                                color: TEXT_MUTED,
+                                border: `1px solid ${OUTLINE_SUBTLE}`,
+                                background: SURFACE_SUBTLE,
+                              }),
                         }}
                       >
-                        {impersonatingId === u.id ? (
-                          <>
-                            <span
-                              aria-hidden
-                              style={{
-                                width: 13,
-                                height: 13,
-                                border: '1.6px solid currentColor',
-                                borderRightColor: 'transparent',
-                                borderRadius: '50%',
-                                animation: 'admin-spin 800ms linear infinite',
-                                display: 'inline-block',
-                              }}
-                            />
-                            Starting…
-                          </>
-                        ) : (
-                          <>Impersonate</>
-                        )}
-                      </button>
-                    )}
+                        {u.accessLevel ?? 'none'}
+                      </span>
+
+                      {/* Impersonate */}
+                      {!isYou && !isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (u.id == null) return;
+                            handleImpersonate(
+                              u.id,
+                              u.username ?? u.email ?? `user #${u.id}`,
+                            );
+                          }}
+                          disabled={impersonatingId !== null}
+                          style={{
+                            appearance: 'none',
+                            fontFamily: FONT_DISPLAY,
+                            fontWeight: 700,
+                            fontSize: 11,
+                            letterSpacing: '0.1em',
+                            textTransform: 'uppercase',
+                            padding: '7px 12px',
+                            borderRadius: 12,
+                            cursor:
+                              impersonatingId !== null
+                                ? 'not-allowed'
+                                : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            transition:
+                              'all 150ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+                            whiteSpace: 'nowrap',
+                            color: WHITE,
+                            background: BRAND_NAVY,
+                            border: `1px solid ${BRAND_NAVY_LIGHT}`,
+                            boxShadow: '0 1px 2px rgba(8, 12, 20, 0.4)',
+                            opacity: impersonatingId !== null ? 0.55 : 1,
+                            minHeight: 36,
+                          }}
+                        >
+                          {impersonatingId === u.id ? (
+                            <>
+                              <span
+                                aria-hidden
+                                style={{
+                                  width: 13,
+                                  height: 13,
+                                  border: '1.6px solid currentColor',
+                                  borderRightColor: 'transparent',
+                                  borderRadius: '50%',
+                                  animation: 'admin-spin 800ms linear infinite',
+                                  display: 'inline-block',
+                                }}
+                              />
+                              Starting…
+                            </>
+                          ) : (
+                            <>Impersonate</>
+                          )}
+                        </button>
+                      )}
+                    </XStack>
                   </XStack>
                 );
               })}
