@@ -184,6 +184,28 @@ resource "aws_instance" "nat_instance" {
     Name    = "${local.name_prefix}-nat-instance"
     Purpose = "Cost-effective NAT for Google API access"
   })
+
+  # Do not replace the running NAT instance just because a newer AL2023 AMI was
+  # published. `data.aws_ami.nat_instance` uses `most_recent = true`, so it
+  # resolves to the newest matching AMI on every plan; without this, each time
+  # AWS republishes the AL2023 image the `ami` attribute diffs and — because
+  # `ami` forces replacement on aws_instance — every `terraform apply` of
+  # terraform/main destroys and recreates the NAT. That tears down the instance
+  # behind the SSM port-forward target (private IP 10.0.1.158), killing any
+  # in-flight tunnel to the VPC-internal dev RDS. Combined with the frequent
+  # "Apply Lambda Infrastructure" workflow runs, this produced a ~7-minute
+  # destroy/create churn that made the documented dev-RDS SSM tunnel unusable
+  # for any sustained operation (LS-5247).
+  #
+  # The NAT is long-lived infrastructure (iptables MASQUERADE + SSM only); it
+  # does not need to chase the newest AMI on every apply. `most_recent` still
+  # selects a current, supported AL2023 image at *initial* creation, and the
+  # boot-time `dnf update -y` in user_data patches a fresh instance. OS-level
+  # AMI refresh of the live instance is a deliberate operation (taint / targeted
+  # replace) rather than an implicit side effect of an unrelated Lambda deploy.
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }
 
 # Update route table to use NAT instance instead of NAT Gateway.
