@@ -83,17 +83,20 @@ export default function AboutPage() {
       : null;
 
   // Format build date
-  const formattedBuildDate =
-    buildDate && buildDate !== 'unknown'
-      ? new Date(buildDate).toLocaleString('en-US', {
+  let formattedBuildDate = buildDate;
+  if (buildDate && buildDate !== 'unknown') {
+    const d = new Date(buildDate);
+    formattedBuildDate = Number.isNaN(d.getTime())
+      ? buildDate
+      : d.toLocaleString('en-US', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
           timeZoneName: 'short',
-        })
-      : buildDate;
+        });
+  }
 
   return (
     <Container>
