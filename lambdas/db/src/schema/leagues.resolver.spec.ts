@@ -918,6 +918,57 @@ describe('League Mutations', () => {
 
       expect(result).toEqual({ id: 1, salaryCap: 5, salaryCapEnabled: false });
     });
+
+    it('should reject faabBudgetDefault on a standard-waiver league (LS-5175)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) GM membership lookup, 2) current waiverType lookup
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'general_manager' }])
+        .mockResolvedValueOnce([{ waiverType: 'standard' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, faabBudgetDefault: 500 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('FAAB budget can only be set on leagues using FAAB');
+    });
+
+    it('should reject faabBudgetDefault on a FAAB league for a free-tier GM without the entitlement (LS-5175)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) GM membership, 2) current waiverType=faab, 3) subscription tier=free
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'general_manager' }])
+        .mockResolvedValueOnce([{ waiverType: 'faab' }])
+        .mockResolvedValueOnce([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, faabBudgetDefault: 500 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('FAAB waiver type requires a premium subscription');
+    });
   });
 
   describe('startDraft mutation', () => {

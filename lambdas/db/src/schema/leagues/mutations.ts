@@ -1760,6 +1760,40 @@ builder.mutationField('updateLeagueSettings', (t) =>
       if (faabBudgetDefault !== null && faabBudgetDefault !== undefined) {
         if (faabBudgetDefault < 1)
           throw UserInputError('FAAB budget must be at least 1');
+
+        // faabBudgetDefault only applies to FAAB-waiver leagues, which are a
+        // premium feature. Resolve the effective waiver type (the incoming
+        // change if present, otherwise the league's current value) and gate the
+        // write on the FAAB entitlement so a free-tier GM cannot set a budget on
+        // a standard-waiver league or on an already-FAAB league they no longer
+        // have the entitlement for (LS-5175). The incoming waiverType arg, when
+        // present, is already validated to 'standard' | 'faab' above; any other
+        // (DB) value normalizes to 'standard'.
+        let effectiveWaiverType: 'standard' | 'faab';
+        if (waiverType === 'standard' || waiverType === 'faab') {
+          effectiveWaiverType = waiverType;
+        } else {
+          const [currentLeague] = await context.db
+            .select({ waiverType: PublicSchema.leagues.waiverType })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .limit(1);
+          effectiveWaiverType =
+            currentLeague?.waiverType === 'faab' ? 'faab' : 'standard';
+        }
+
+        if (effectiveWaiverType !== 'faab') {
+          throw UserInputError(
+            'FAAB budget can only be set on leagues using FAAB waivers',
+          );
+        }
+
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.faab_waiver_type,
+          'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
+        );
+
         leagueUpdate.faabBudgetDefault = faabBudgetDefault;
         changeDescriptions.push(`FAAB budget default: $${faabBudgetDefault}`);
       }
