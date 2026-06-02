@@ -509,6 +509,25 @@ export function AdminPage(): React.JSX.Element | null {
           >
             Revenue Analytics →
           </Link>
+          <Link
+            to="/admin/users"
+            style={{
+              marginTop: 6,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 13,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: BRAND_GOLD_LIGHT,
+              textDecoration: 'none',
+              width: 'fit-content',
+            }}
+          >
+            User Management →
+          </Link>
         </YStack>
 
         {/* Quick Stats & Actions — only rendered when user data has loaded */}
