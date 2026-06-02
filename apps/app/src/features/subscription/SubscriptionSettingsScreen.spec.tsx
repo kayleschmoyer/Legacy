@@ -181,3 +181,48 @@ describe('SubscriptionSettingsScreen — Restore Purchases (LS-5192)', () => {
     expect(mockClearError).toHaveBeenCalled();
   });
 });
+
+describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  // The useSubscription hook only ever returns 'premium' or 'free' as the tier
+  // (see useSubscription.ts), so the plan label must render "Premium" for
+  // premium subscribers. Before the fix, 'premium' matched no switch case and
+  // fell through to the "Free" default. The "Free"/"Premium" feature-comparison
+  // column headers always render once each, so the plan label adds a second
+  // occurrence of whichever word matches the current tier.
+  it('labels a premium subscriber as Premium, not Free', () => {
+    mockUseSubscription.mockReturnValue({
+      subscription: { status: 'active' },
+      isPremium: true,
+      tier: 'premium',
+      loading: false,
+    });
+
+    render(<SubscriptionSettingsScreen />);
+
+    // Plan label "Premium" + the "Premium" feature-comparison header.
+    expect(screen.getAllByText('Premium')).toHaveLength(2);
+    // Only the "Free" feature-comparison header — the plan label is NOT "Free".
+    expect(screen.getAllByText('Free')).toHaveLength(1);
+  });
+
+  it('labels a free user as Free', () => {
+    mockUseSubscription.mockReturnValue({
+      subscription: null,
+      isPremium: false,
+      tier: 'free',
+      loading: false,
+    });
+
+    render(<SubscriptionSettingsScreen />);
+
+    // Plan label "Free" + the "Free" feature-comparison header.
+    expect(screen.getAllByText('Free')).toHaveLength(2);
+    // Only the "Premium" feature-comparison header.
+    expect(screen.getAllByText('Premium')).toHaveLength(1);
+  });
+});

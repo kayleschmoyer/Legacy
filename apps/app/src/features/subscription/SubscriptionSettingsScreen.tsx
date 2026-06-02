@@ -34,6 +34,8 @@ const BRAND_SEAM_RED = '#C41E3A';
 
 function tierLabel(tier: string | null): string {
   switch (tier) {
+    case 'premium':
+      return 'Premium';
     case 'monthly':
       return 'Premium (Monthly)';
     case 'annual':
