@@ -238,7 +238,7 @@ export default function AboutPage() {
           </LinkValue>
         </XStack>
         <Text color="$gray10" fontSize="$3" textAlign="center">
-          Built with React, TypeScript, and Tamagui
+          Built with React, TypeScript, Tamagui, Vite, Nx, and GraphQL
         </Text>
       </YStack>
     </Container>
