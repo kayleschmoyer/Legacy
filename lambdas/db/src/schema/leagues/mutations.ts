@@ -706,10 +706,17 @@ builder.mutationField('startDraft', (t) =>
 
         return result.league;
       } catch (error) {
-        LOGGER.error('Error starting draft', {
+        // Preserve GraphQL errors (e.g. ForbiddenError -> FORBIDDEN) so the
+        // client receives the intended error code instead of a generic
+        // INTERNAL_SERVER_ERROR (LS-5156). Matches the pattern used by the
+        // other mutation catch blocks in this file.
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Error starting draft', err, {
           leagueId: args.leagueId,
           userId,
-          error: error instanceof Error ? error.message : String(error),
         });
         throw new Error(
           `Failed to start draft: ${error instanceof Error ? error.message : 'Unknown error'}`,

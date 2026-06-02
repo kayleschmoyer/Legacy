@@ -990,5 +990,44 @@ describe('League Mutations', () => {
         field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
       ).rejects.not.toThrow('Only the league Commissioner can start the draft');
     });
+
+    it('should preserve a GraphQLError code thrown inside the try block instead of rewrapping it (LS-5156)', async () => {
+      // Commissioner passes the access gate; savedDraft empty so the resolver
+      // calls createDraftForLeague, which we make throw a GraphQLError.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([]);
+
+      // Resolve graphql + the mocked db-client AFTER the post-resetModules
+      // schema load so the GraphQLError instance shares the same module realm
+      // as the resolver's `instanceof GraphQLError` check, and so the mock
+      // reference matches the one the resolver imported.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require in the resolver's module realm
+      const { GraphQLError } = require('graphql');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require in the resolver's module realm
+      const { createDraftForLeague } = require('@legacy-sports/db-client');
+      (createDraftForLeague as jest.Mock).mockRejectedValueOnce(
+        new GraphQLError('Premium subscription required', {
+          extensions: { code: 'PREMIUM_REQUIRED' },
+        }),
+      );
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      // Before the fix, the catch block rewrapped this as a plain Error with
+      // no extensions.code; after the fix the original GraphQLError (and its
+      // code) is preserved.
+      await expect(
+        field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+    });
   });
 });
