@@ -145,3 +145,28 @@ mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
     teamId
   }
 }
+
+# ── Mock Draft ───────────────────────────────────────────────────────────
+# Free users get 2 mock drafts/week; the server enforces the limit in
+# initializeMockDraft and returns PremiumRequiredError when it is exceeded.
+
+mutation InitializeMockDraft(
+  $numTeams: Int!
+  $rosterSize: Int!
+  $userPickPosition: Int!
+  $pickTimeLimitSeconds: Int
+  $draftOrder: String
+  $playerPool: String
+) {
+  initializeMockDraft(
+    numTeams: $numTeams
+    rosterSize: $rosterSize
+    userPickPosition: $userPickPosition
+    pickTimeLimitSeconds: $pickTimeLimitSeconds
+    draftOrder: $draftOrder
+    playerPool: $playerPool
+  ) {
+    leagueId
+    draftId
+  }
+}

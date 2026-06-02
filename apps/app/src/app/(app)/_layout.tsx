@@ -31,6 +31,7 @@ export type AppDrawerParamList = {
   'baseball/index': undefined;
   'baseball/league/create': undefined;
   'baseball/league/join': undefined;
+  'baseball/mock-draft': undefined;
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
   'football/players': undefined;
@@ -94,6 +95,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'baseball/league/create',
     title: 'Create League',
+  },
+  {
+    route: 'baseball/mock-draft',
+    title: 'Mock Draft',
   },
   {
     route: 'football/index',
@@ -328,6 +333,10 @@ export default function Layout() {
               headerShown: true,
               headerTitle: 'Create League',
             }}
+          />
+          <Drawer.Screen
+            name="baseball/mock-draft"
+            options={{ title: 'Mock Draft' }}
           />
           <Drawer.Screen
             name="baseball/league/[leagueId]"

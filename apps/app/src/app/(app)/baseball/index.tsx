@@ -165,6 +165,18 @@ export default function BaseballHome() {
             </Text>
           </Button>
         </XStack>
+        <XStack space="$3" width="100%">
+          <Button
+            flex={1}
+            backgroundColor="$orange9"
+            borderRadius="$3"
+            onPress={() => router.navigate('/baseball/mock-draft')}
+          >
+            <Text color="$white" fontSize="$5" fontWeight="bold">
+              Mock Draft
+            </Text>
+          </Button>
+        </XStack>
 
         {/* Current Leagues Section */}
         <H2

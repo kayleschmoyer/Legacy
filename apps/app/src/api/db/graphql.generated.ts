@@ -4930,6 +4930,24 @@ export type JoinPublicLeagueMutation = {
   } | null;
 };
 
+export type InitializeMockDraftMutationVariables = Exact<{
+  numTeams: Scalars['Int']['input'];
+  rosterSize: Scalars['Int']['input'];
+  userPickPosition: Scalars['Int']['input'];
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type InitializeMockDraftMutation = {
+  __typename?: 'Mutation';
+  initializeMockDraft?: {
+    __typename?: 'MockDraftInit';
+    leagueId?: number | null;
+    draftId?: number | null;
+  } | null;
+};
+
 export type GetUserTeamIdQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -7961,6 +7979,76 @@ export type JoinPublicLeagueMutationResult =
 export type JoinPublicLeagueMutationOptions = BaseMutationOptions<
   JoinPublicLeagueMutation,
   JoinPublicLeagueMutationVariables
+>;
+export const InitializeMockDraft = gql`
+  mutation InitializeMockDraft(
+    $numTeams: Int!
+    $rosterSize: Int!
+    $userPickPosition: Int!
+    $pickTimeLimitSeconds: Int
+    $draftOrder: String
+    $playerPool: String
+  ) {
+    initializeMockDraft(
+      numTeams: $numTeams
+      rosterSize: $rosterSize
+      userPickPosition: $userPickPosition
+      pickTimeLimitSeconds: $pickTimeLimitSeconds
+      draftOrder: $draftOrder
+      playerPool: $playerPool
+    ) {
+      leagueId
+      draftId
+    }
+  }
+`;
+export type InitializeMockDraftMutationFn = MutationFunction<
+  InitializeMockDraftMutation,
+  InitializeMockDraftMutationVariables
+>;
+
+/**
+ * __useInitializeMockDraftMutation__
+ *
+ * To run a mutation, you first call `useInitializeMockDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useInitializeMockDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [initializeMockDraftMutation, { data, loading, error }] = useInitializeMockDraftMutation({
+ *   variables: {
+ *      numTeams: // value for 'numTeams'
+ *      rosterSize: // value for 'rosterSize'
+ *      userPickPosition: // value for 'userPickPosition'
+ *      pickTimeLimitSeconds: // value for 'pickTimeLimitSeconds'
+ *      draftOrder: // value for 'draftOrder'
+ *      playerPool: // value for 'playerPool'
+ *   },
+ * });
+ */
+export function useInitializeMockDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    InitializeMockDraftMutation,
+    InitializeMockDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    InitializeMockDraftMutation,
+    InitializeMockDraftMutationVariables
+  >(InitializeMockDraft, options);
+}
+export type InitializeMockDraftMutationHookResult = ReturnType<
+  typeof useInitializeMockDraftMutation
+>;
+export type InitializeMockDraftMutationResult =
+  Apollo.MutationResult<InitializeMockDraftMutation>;
+export type InitializeMockDraftMutationOptions = BaseMutationOptions<
+  InitializeMockDraftMutation,
+  InitializeMockDraftMutationVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {
