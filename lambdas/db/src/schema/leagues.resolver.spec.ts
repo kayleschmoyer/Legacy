@@ -854,6 +854,35 @@ describe('League Mutations', () => {
       ).rejects.toThrow(/Salary cap leagues requires an upgraded subscription/);
     });
 
+    it('should require advanced_playoff_formats entitlement with a descriptive message when setting a 6-team playoff format (LS-5974)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) membership lookup → commissioner, 2) subscription tier lookup → free
+      // (no entitlement). The playoffFormat block reads no "current" value, so
+      // the tier lookup is the only DB read before the gate fires.
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, playoffFormat: '6-team' } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Advanced playoff formats require a premium subscription.',
+      );
+    });
+
     it('should NOT require entitlement to change cap sub-fields when the league cap is disabled (LS-5197)', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
