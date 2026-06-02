@@ -499,6 +499,45 @@ describe('App', () => {
       // isLoading → AdminGuard returns null (no Navigate) — not redirected to home
       expect(container).not.toHaveTextContent('Home Page');
     });
+
+    it('redirects non-admin user from /admin/revenue to /', () => {
+      // Default mock has no accessLevel — AdminGuard redirects to /
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin/revenue']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      expect(container).toHaveTextContent('Home Page');
+    });
+
+    it('allows admin user to access /admin/revenue without redirecting to home', () => {
+      useAuthMock.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        isImpersonating: false,
+        user: {
+          id: 'admin-user-id',
+          username: 'adminuser',
+          email: 'admin@example.com',
+          accessLevel: 'admin',
+        },
+        logout: jest.fn(),
+      });
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin/revenue']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      // Guard passes — not redirected to home
+      expect(container).not.toHaveTextContent('Home Page');
+    });
   });
 
   describe('FootballHubPage', () => {
