@@ -34,4 +34,4 @@ export default function SeasonDraftGameScreen() {
     />
   );
 }
-export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';
