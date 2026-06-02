@@ -121,7 +121,7 @@ export default function AboutPage() {
           <Value>{appVersion}</Value>
         </InfoRow>
 
-        <InfoRow>
+        <InfoRow data-testid="build-info-commit-sha">
           <Label>Commit SHA:</Label>
           {commitUrl ? (
             <LinkValue
@@ -138,7 +138,7 @@ export default function AboutPage() {
           )}
         </InfoRow>
 
-        <InfoRow>
+        <InfoRow data-testid="build-info-build-date">
           <Label>Build Date:</Label>
           <Value>{formattedBuildDate}</Value>
         </InfoRow>
