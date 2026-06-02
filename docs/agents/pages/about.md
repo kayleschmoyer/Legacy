@@ -28,11 +28,11 @@
 
 ## Application Info Card
 
-| Field       | Value                                           |
-| ----------- | ----------------------------------------------- |
-| Environment | "development" if `env.isDev`, else "production" |
-| GraphQL API | `env.graphqlUrl`                                |
-| Base URL    | `env.baseUrl`                                   |
+| Field       | Value                                                              |
+| ----------- | ------------------------------------------------------------------ |
+| Environment | "development" if `env.isDev`, else "production"                    |
+| GraphQL API | `env.graphqlUrl` — **dev only** (hidden in production per LS-5706) |
+| Base URL    | `env.baseUrl`                                                      |
 
 ---
 

@@ -53,8 +53,10 @@ test.describe('About Page @smoke', () => {
     await expect(page.getByText('Environment:')).toBeVisible();
   });
 
-  test('displays GraphQL API label', async ({ page }) => {
-    await expect(page.getByText('GraphQL API:')).toBeVisible();
+  test('does not expose GraphQL API URL in production build', async ({
+    page,
+  }) => {
+    await expect(page.getByText('GraphQL API:')).not.toBeVisible();
   });
 
   test('shows a View on GitHub button', async ({ page }) => {

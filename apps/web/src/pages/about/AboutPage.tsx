@@ -149,10 +149,12 @@ export default function AboutPage() {
           <Value>{env.isDev ? 'development' : 'production'}</Value>
         </InfoRow>
 
-        <InfoRow>
-          <Label>GraphQL API:</Label>
-          <Value>{env.graphqlUrl}</Value>
-        </InfoRow>
+        {env.isDev && (
+          <InfoRow>
+            <Label>GraphQL API:</Label>
+            <Value>{env.graphqlUrl}</Value>
+          </InfoRow>
+        )}
 
         <InfoRow>
           <Label>Asset Base Path:</Label>
