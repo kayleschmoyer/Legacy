@@ -4345,6 +4345,7 @@ export type UpdateLeagueSettingsInput = {
   auctionBudget?: InputMaybe<Scalars['Int']['input']>;
   auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   bannerUrl?: InputMaybe<Scalars['String']['input']>;
+  faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
@@ -4364,6 +4365,7 @@ export type UpdateLeagueSettingsInput = {
   salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
+  waiverType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpsertAchievementRestrictionInput = {
@@ -4444,13 +4446,18 @@ export type UserDataExport = {
 export type UserLeagueSummary = {
   __typename?: 'UserLeagueSummary';
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
   draftMode?: Maybe<Scalars['String']['output']>;
   draftScheduledAt?: Maybe<Scalars['String']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
+  isCommissioner?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   leagueName?: Maybe<Scalars['String']['output']>;
   leaguePhase?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
+  matchupEndTime?: Maybe<Scalars['String']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
   matchupStatus?: Maybe<Scalars['String']['output']>;
   opponentScore?: Maybe<Scalars['Float']['output']>;
