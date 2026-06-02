@@ -1,4 +1,4 @@
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, countDistinct, eq, sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import {
   DEFAULT_ROSTER_POSITIONS_BY_SPORT,
@@ -230,16 +230,32 @@ export class LeagueService {
         //    The advisory lock serializes concurrent create requests for the
         //    same user so the count check and INSERT form a single critical
         //    section, eliminating the TOCTOU race (LS-5122).
+        //
+        //    The cap counts every active league the user *participates in*,
+        //    not only the ones they own. Joining leagues via leagueMembers
+        //    must count against the free-tier limit just like ownership does
+        //    (LS-5181) — otherwise a free user at the owned-league cap could
+        //    join unlimited additional leagues with no server-side awareness.
+        //    The owner is always inserted as a leagueMember, so a membership
+        //    join captures owned + joined leagues; the (leagueId, userId)
+        //    primary key on leagueMembers guarantees one row per league, but
+        //    countDistinct keeps the count correct regardless.
         if (leagueLimit !== undefined) {
           await tx.execute(
             sql`SELECT pg_advisory_xact_lock(CAST(${ownerId} AS bigint))`,
           );
           const [{ existingCount }] = await tx
-            .select({ existingCount: count() })
+            .select({
+              existingCount: countDistinct(PublicSchema.leagues.id),
+            })
             .from(PublicSchema.leagues)
+            .innerJoin(
+              PublicSchema.leagueMembers,
+              eq(PublicSchema.leagueMembers.leagueId, PublicSchema.leagues.id),
+            )
             .where(
               and(
-                eq(PublicSchema.leagues.owner, ownerId),
+                eq(PublicSchema.leagueMembers.userId, ownerId),
                 eq(PublicSchema.leagues.isMockDraft, false),
               ),
             );

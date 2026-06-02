@@ -13,7 +13,16 @@ import {
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  countDistinct,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  sql,
+} from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   DEFAULT_ROSTER_POSITIONS_BY_SPORT,
@@ -2090,13 +2099,23 @@ builder.mutationField('renewLeague', (t) =>
       // to ensure the entitlement is evaluated asynchronously before the count
       // query runs. `ne(id, leagueId)` explicitly excludes the league being
       // renewed so the 1-for-1 replacement is not counted against the limit.
+      //
+      // The cap counts every active league the renewing user *participates in*,
+      // not only the ones they own (LS-5181). A membership join against
+      // leagueMembers captures owned + joined leagues (the owner is always a
+      // member); the (leagueId, userId) primary key guarantees one row per
+      // league, and countDistinct keeps the count correct regardless.
       if (!(await hasEntitlement(context, ENTITLEMENTS.unlimited_leagues))) {
         const [{ leagueCount }] = await context.db
-          .select({ leagueCount: count() })
+          .select({ leagueCount: countDistinct(PublicSchema.leagues.id) })
           .from(PublicSchema.leagues)
+          .innerJoin(
+            PublicSchema.leagueMembers,
+            eq(PublicSchema.leagueMembers.leagueId, PublicSchema.leagues.id),
+          )
           .where(
             and(
-              eq(PublicSchema.leagues.owner, oldLeague.owner),
+              eq(PublicSchema.leagueMembers.userId, oldLeague.owner),
               eq(PublicSchema.leagues.isMockDraft, false),
               isNull(PublicSchema.leagues.frozenAt),
               ne(PublicSchema.leagues.id, leagueId), // exclude this league (being frozen)
