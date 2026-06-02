@@ -74,10 +74,9 @@ export default function AboutPage() {
   const navigate = useNavigate();
   const isPremium = useIsPremium();
   // Read build-time environment variables from centralized config
-  const { appVersion, commitSha, buildDate } = env;
+  const { appVersion, commitSha, buildDate, repoUrl } = env;
 
   // Generate GitHub commit URL
-  const repoUrl = 'https://github.com/bkrupa/legacy-sports';
   const commitUrl =
     commitSha && /^[0-9a-f]{7,40}$/i.test(commitSha)
       ? `${repoUrl}/commit/${commitSha}`

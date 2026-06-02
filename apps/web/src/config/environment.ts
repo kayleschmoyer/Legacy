@@ -35,6 +35,8 @@ export interface EnvironmentConfig {
   readonly growthbookClientKey?: string;
   /** Base URL for image upload service (VITE_IMAGE_UPLOAD_URL). */
   readonly imageUploadUrl?: string;
+  /** GitHub repository URL — overridable via VITE_REPO_URL if the org/repo is renamed. */
+  readonly repoUrl: string;
 }
 
 /**
@@ -114,6 +116,9 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   imageUploadUrl: import.meta.env['VITE_IMAGE_UPLOAD_URL'] as
     | string
     | undefined,
+  repoUrl:
+    (import.meta.env.VITE_REPO_URL as string) ||
+    'https://github.com/bkrupa/legacy-sports',
 });
 
 /**
