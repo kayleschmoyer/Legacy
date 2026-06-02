@@ -13,6 +13,7 @@ import {
   SURFACE_CARD,
   withAlpha,
 } from '../constants/colors';
+import { useStripePrices } from '../hooks/useStripePrices';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +56,9 @@ export function PremiumGate({
   children,
 }: PremiumGateProps): React.ReactNode {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  // Live monthly-equivalent price (annual total / 12). Falls back to display
+  // values from FALLBACK_ANNUAL_TOTAL_CENTS when Stripe prices are unavailable.
+  const { annualMonthlyEquivalent } = useStripePrices();
 
   useEffect(() => {
     if (!isPremium) {
@@ -166,6 +170,9 @@ export function PremiumGate({
               >
                 Upgrade to Premium
               </Button>
+              <Text fontSize="$2" color={BRAND_GOLD_LIGHT} textAlign="center">
+                From {annualMonthlyEquivalent}/mo
+              </Text>
             </YStack>
           </YStack>
         )}
