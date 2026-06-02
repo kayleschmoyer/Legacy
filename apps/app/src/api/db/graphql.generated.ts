@@ -5093,6 +5093,7 @@ export type MatchupPlayerFragment = {
   teamId?: number | null;
   positionId?: number | null;
   season?: number | null;
+  numberOfGames?: number | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -5100,6 +5101,132 @@ export type MatchupPlayerFragment = {
     lastName?: string | null;
     eligiblePositions?: Array<string> | null;
   } | null;
+  seasonBatting?: {
+    __typename?: 'SeasonBatting';
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    groundedIntoDoublePlays?: number | null;
+    hitByPitch?: number | null;
+    sacrificeHits?: number | null;
+    intentionalBaseOnBalls?: number | null;
+  } | null;
+  seasonPitching?: {
+    __typename?: 'SeasonPitching';
+    wins?: number | null;
+    losses?: number | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+    gamesFinished?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    intentionalBaseOnBalls?: number | null;
+    strikeouts?: number | null;
+    hitByPitch?: number | null;
+    battersFaced?: number | null;
+    outsRecorded?: number | null;
+  } | null;
+  seasonFielding?: {
+    __typename?: 'SeasonFielding';
+    games?: number | null;
+    inningsDefended?: number | null;
+    chances?: number | null;
+    putouts?: number | null;
+    assists?: number | null;
+    errors?: number | null;
+    doublePlays?: number | null;
+  } | null;
+  games?: Array<{
+    __typename?: 'MatchupPlayerGame';
+    id?: number | null;
+    matchupPlayerId?: number | null;
+    gameNum?: number | null;
+    gameIdentifier?: string | null;
+    gamePosition?: string | null;
+    statsLoadingStatus?: string | null;
+    pitcherStartSkipped?: boolean | null;
+    battingGame?: {
+      __typename?: 'GameBatting';
+      playerId?: number | null;
+      season?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      sacrificeFlies?: string | null;
+      intentionalBaseOnBalls?: number | null;
+    } | null;
+    pitchingGame?: {
+      __typename?: 'GamePitching';
+      playerId?: number | null;
+      season?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      wins?: number | null;
+      losses?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+    } | null;
+    fieldingGame?: {
+      __typename?: 'GameFielding';
+      playerId?: number | null;
+      season?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      position?: string | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      inningsPlayed?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+    } | null;
+  }> | null;
 };
 
 export type GetMatchupPlayersQueryVariables = Exact<{
@@ -5116,6 +5243,7 @@ export type GetMatchupPlayersQuery = {
     teamId?: number | null;
     positionId?: number | null;
     season?: number | null;
+    numberOfGames?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5123,6 +5251,132 @@ export type GetMatchupPlayersQuery = {
       lastName?: string | null;
       eligiblePositions?: Array<string> | null;
     } | null;
+    seasonBatting?: {
+      __typename?: 'SeasonBatting';
+      games?: number | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      intentionalBaseOnBalls?: number | null;
+    } | null;
+    seasonPitching?: {
+      __typename?: 'SeasonPitching';
+      wins?: number | null;
+      losses?: number | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+    } | null;
+    seasonFielding?: {
+      __typename?: 'SeasonFielding';
+      games?: number | null;
+      inningsDefended?: number | null;
+      chances?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+    } | null;
+    games?: Array<{
+      __typename?: 'MatchupPlayerGame';
+      id?: number | null;
+      matchupPlayerId?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      gamePosition?: string | null;
+      statsLoadingStatus?: string | null;
+      pitcherStartSkipped?: boolean | null;
+      battingGame?: {
+        __typename?: 'GameBatting';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        plateAppearances?: number | null;
+        atBats?: number | null;
+        runs?: number | null;
+        hits?: number | null;
+        doubles?: number | null;
+        triples?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+        stolenBases?: number | null;
+        caughtStealing?: number | null;
+        baseOnBalls?: number | null;
+        strikeouts?: number | null;
+        groundedIntoDoublePlays?: number | null;
+        hitByPitch?: number | null;
+        sacrificeHits?: number | null;
+        sacrificeFlies?: string | null;
+        intentionalBaseOnBalls?: number | null;
+      } | null;
+      pitchingGame?: {
+        __typename?: 'GamePitching';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        wins?: number | null;
+        losses?: number | null;
+        gamesStarted?: number | null;
+        gamesFinished?: number | null;
+        completeGames?: number | null;
+        shutouts?: number | null;
+        saves?: number | null;
+        inningsPitched?: number | null;
+        hits?: number | null;
+        runs?: number | null;
+        earnedRuns?: number | null;
+        homeRuns?: number | null;
+        baseOnBalls?: number | null;
+        intentionalBaseOnBalls?: number | null;
+        strikeouts?: number | null;
+        hitByPitch?: number | null;
+        battersFaced?: number | null;
+        outsRecorded?: number | null;
+      } | null;
+      fieldingGame?: {
+        __typename?: 'GameFielding';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        position?: string | null;
+        games?: number | null;
+        gamesStarted?: number | null;
+        inningsPlayed?: number | null;
+        putouts?: number | null;
+        assists?: number | null;
+        errors?: number | null;
+        doublePlays?: number | null;
+      } | null;
+    }> | null;
   }> | null;
 };
 
@@ -5141,6 +5395,7 @@ export type UpdateMatchupPlayerPositionMutation = {
     teamId?: number | null;
     positionId?: number | null;
     season?: number | null;
+    numberOfGames?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5148,6 +5403,132 @@ export type UpdateMatchupPlayerPositionMutation = {
       lastName?: string | null;
       eligiblePositions?: Array<string> | null;
     } | null;
+    seasonBatting?: {
+      __typename?: 'SeasonBatting';
+      games?: number | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      intentionalBaseOnBalls?: number | null;
+    } | null;
+    seasonPitching?: {
+      __typename?: 'SeasonPitching';
+      wins?: number | null;
+      losses?: number | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+    } | null;
+    seasonFielding?: {
+      __typename?: 'SeasonFielding';
+      games?: number | null;
+      inningsDefended?: number | null;
+      chances?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+    } | null;
+    games?: Array<{
+      __typename?: 'MatchupPlayerGame';
+      id?: number | null;
+      matchupPlayerId?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      gamePosition?: string | null;
+      statsLoadingStatus?: string | null;
+      pitcherStartSkipped?: boolean | null;
+      battingGame?: {
+        __typename?: 'GameBatting';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        plateAppearances?: number | null;
+        atBats?: number | null;
+        runs?: number | null;
+        hits?: number | null;
+        doubles?: number | null;
+        triples?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+        stolenBases?: number | null;
+        caughtStealing?: number | null;
+        baseOnBalls?: number | null;
+        strikeouts?: number | null;
+        groundedIntoDoublePlays?: number | null;
+        hitByPitch?: number | null;
+        sacrificeHits?: number | null;
+        sacrificeFlies?: string | null;
+        intentionalBaseOnBalls?: number | null;
+      } | null;
+      pitchingGame?: {
+        __typename?: 'GamePitching';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        wins?: number | null;
+        losses?: number | null;
+        gamesStarted?: number | null;
+        gamesFinished?: number | null;
+        completeGames?: number | null;
+        shutouts?: number | null;
+        saves?: number | null;
+        inningsPitched?: number | null;
+        hits?: number | null;
+        runs?: number | null;
+        earnedRuns?: number | null;
+        homeRuns?: number | null;
+        baseOnBalls?: number | null;
+        intentionalBaseOnBalls?: number | null;
+        strikeouts?: number | null;
+        hitByPitch?: number | null;
+        battersFaced?: number | null;
+        outsRecorded?: number | null;
+      } | null;
+      fieldingGame?: {
+        __typename?: 'GameFielding';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        position?: string | null;
+        games?: number | null;
+        gamesStarted?: number | null;
+        inningsPlayed?: number | null;
+        putouts?: number | null;
+        assists?: number | null;
+        errors?: number | null;
+        doublePlays?: number | null;
+      } | null;
+    }> | null;
   } | null;
 };
 
@@ -5168,6 +5549,7 @@ export type SwapMatchupPlayerPositionsMutation = {
     teamId?: number | null;
     positionId?: number | null;
     season?: number | null;
+    numberOfGames?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5175,6 +5557,132 @@ export type SwapMatchupPlayerPositionsMutation = {
       lastName?: string | null;
       eligiblePositions?: Array<string> | null;
     } | null;
+    seasonBatting?: {
+      __typename?: 'SeasonBatting';
+      games?: number | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      intentionalBaseOnBalls?: number | null;
+    } | null;
+    seasonPitching?: {
+      __typename?: 'SeasonPitching';
+      wins?: number | null;
+      losses?: number | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+    } | null;
+    seasonFielding?: {
+      __typename?: 'SeasonFielding';
+      games?: number | null;
+      inningsDefended?: number | null;
+      chances?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+    } | null;
+    games?: Array<{
+      __typename?: 'MatchupPlayerGame';
+      id?: number | null;
+      matchupPlayerId?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      gamePosition?: string | null;
+      statsLoadingStatus?: string | null;
+      pitcherStartSkipped?: boolean | null;
+      battingGame?: {
+        __typename?: 'GameBatting';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        plateAppearances?: number | null;
+        atBats?: number | null;
+        runs?: number | null;
+        hits?: number | null;
+        doubles?: number | null;
+        triples?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+        stolenBases?: number | null;
+        caughtStealing?: number | null;
+        baseOnBalls?: number | null;
+        strikeouts?: number | null;
+        groundedIntoDoublePlays?: number | null;
+        hitByPitch?: number | null;
+        sacrificeHits?: number | null;
+        sacrificeFlies?: string | null;
+        intentionalBaseOnBalls?: number | null;
+      } | null;
+      pitchingGame?: {
+        __typename?: 'GamePitching';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        wins?: number | null;
+        losses?: number | null;
+        gamesStarted?: number | null;
+        gamesFinished?: number | null;
+        completeGames?: number | null;
+        shutouts?: number | null;
+        saves?: number | null;
+        inningsPitched?: number | null;
+        hits?: number | null;
+        runs?: number | null;
+        earnedRuns?: number | null;
+        homeRuns?: number | null;
+        baseOnBalls?: number | null;
+        intentionalBaseOnBalls?: number | null;
+        strikeouts?: number | null;
+        hitByPitch?: number | null;
+        battersFaced?: number | null;
+        outsRecorded?: number | null;
+      } | null;
+      fieldingGame?: {
+        __typename?: 'GameFielding';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        position?: string | null;
+        games?: number | null;
+        gamesStarted?: number | null;
+        inningsPlayed?: number | null;
+        putouts?: number | null;
+        assists?: number | null;
+        errors?: number | null;
+        doublePlays?: number | null;
+      } | null;
+    }> | null;
   }> | null;
 };
 
@@ -6580,11 +7088,131 @@ export const MatchupPlayerFragmentDoc = gql`
     teamId
     positionId
     season
+    numberOfGames
     player {
       id
       firstName
       lastName
       eligiblePositions
+    }
+    seasonBatting {
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      groundedIntoDoublePlays
+      hitByPitch
+      sacrificeHits
+      intentionalBaseOnBalls
+    }
+    seasonPitching {
+      wins
+      losses
+      games
+      gamesStarted
+      gamesFinished
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      intentionalBaseOnBalls
+      strikeouts
+      hitByPitch
+      battersFaced
+      outsRecorded
+    }
+    seasonFielding {
+      games
+      inningsDefended
+      chances
+      putouts
+      assists
+      errors
+      doublePlays
+    }
+    games {
+      id
+      matchupPlayerId
+      gameNum
+      gameIdentifier
+      gamePosition
+      statsLoadingStatus
+      pitcherStartSkipped
+      battingGame {
+        playerId
+        season
+        gameNum
+        gameIdentifier
+        plateAppearances
+        atBats
+        runs
+        hits
+        doubles
+        triples
+        homeRuns
+        rbi
+        stolenBases
+        caughtStealing
+        baseOnBalls
+        strikeouts
+        groundedIntoDoublePlays
+        hitByPitch
+        sacrificeHits
+        sacrificeFlies
+        intentionalBaseOnBalls
+      }
+      pitchingGame {
+        playerId
+        season
+        gameNum
+        gameIdentifier
+        wins
+        losses
+        gamesStarted
+        gamesFinished
+        completeGames
+        shutouts
+        saves
+        inningsPitched
+        hits
+        runs
+        earnedRuns
+        homeRuns
+        baseOnBalls
+        intentionalBaseOnBalls
+        strikeouts
+        hitByPitch
+        battersFaced
+        outsRecorded
+      }
+      fieldingGame {
+        playerId
+        season
+        gameNum
+        gameIdentifier
+        position
+        games
+        gamesStarted
+        inningsPlayed
+        putouts
+        assists
+        errors
+        doublePlays
+      }
     }
   }
 `;

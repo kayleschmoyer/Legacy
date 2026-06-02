@@ -15,6 +15,9 @@ import {
 } from '../../../api/db/graphql.generated';
 import { MatchupRosterEditor } from '../components/MatchupRosterEditor';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
+import { MatchupWinProbabilityPanel } from '../components/MatchupWinProbabilityPanel';
+import { PremiumGate } from '../../subscription/PremiumGate';
+import { useSubscription } from '../../subscription/useSubscription';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -47,6 +50,7 @@ export default function MatchupDetailScreen() {
     skip: !leagueId,
   });
   const userTeamId = userTeamData?.userTeamId ?? null;
+  const { isPremium } = useSubscription();
 
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -149,6 +153,15 @@ export default function MatchupDetailScreen() {
                 matchup={matchup}
                 gamesRemaining={gamesRemaining}
               />
+
+              {/* Win Probability & Projections — gated behind Premium */}
+              <PremiumGate
+                isPremium={isPremium}
+                featureName="Matchup Projections"
+                featureDescription="See win probability and projected scores for every matchup based on remaining games."
+              >
+                <MatchupWinProbabilityPanel matchup={matchup} />
+              </PremiumGate>
 
               {gamesTotal > 0 && (
                 <GamesRemaining
