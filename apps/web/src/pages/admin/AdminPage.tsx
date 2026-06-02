@@ -360,7 +360,7 @@ export function AdminPage(): React.JSX.Element | null {
 
   const { data, loading, error } = useAdminGetUsersQuery({
     variables: { limit: 200, offset: 0 },
-    skip: !auth.isAuthenticated,
+    skip: auth.user?.accessLevel !== 'admin',
   });
 
   if (auth.isLoading || serverUserLoading) {
