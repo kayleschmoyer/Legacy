@@ -10,6 +10,9 @@ import {
   useUpdateNotificationPreferencesMutation,
 } from '../../../api/db/graphql.generated';
 
+const BASE_POLL_INTERVAL = 30_000;
+const MAX_POLL_INTERVAL = 300_000;
+
 /**
  * Hook for managing user notification preferences and history
  *
@@ -19,6 +22,7 @@ import {
  */
 export function useNotifications(userId: number) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pollingError, setPollingError] = useState(false);
 
   // Fetch notification preferences
   const {
@@ -39,8 +43,14 @@ export function useNotifications(userId: number) {
     skip: !userId,
   });
 
+  const pollErrorCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPollingRef = useRef(false);
+
   // Fetch unread count — polling is gated on app foreground state to avoid
-  // draining battery during background/inactive periods.
+  // draining battery during background/inactive periods. Failures back off
+  // exponentially before retrying so transient network issues don't spam
+  // requests.
   const {
     data: countData,
     refetch: refetchCount,
@@ -48,9 +58,43 @@ export function useNotifications(userId: number) {
     stopPolling,
   } = useGetUnreadNotificationCountQuery({
     skip: !userId,
+    onError: (error) => {
+      LOGGER.warn(
+        'Notification count poll failed, backing off:',
+        error as Error,
+      );
+      stopPolling();
+      isPollingRef.current = false;
+      setPollingError(true);
+
+      pollErrorCountRef.current += 1;
+      const delay = Math.min(
+        BASE_POLL_INTERVAL * 2 ** (pollErrorCountRef.current - 1),
+        MAX_POLL_INTERVAL,
+      );
+
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+      }
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        startPolling(BASE_POLL_INTERVAL);
+        isPollingRef.current = true;
+      }, delay);
+    },
   });
 
-  const isPollingRef = useRef(false);
+  // Update unread count when data changes; reset backoff state on success.
+  useEffect(() => {
+    if (
+      countData?.getUnreadNotificationCount !== undefined &&
+      countData.getUnreadNotificationCount !== null
+    ) {
+      setUnreadCount(countData.getUnreadNotificationCount);
+      pollErrorCountRef.current = 0;
+      setPollingError(false);
+    }
+  }, [countData]);
 
   useEffect(() => {
     if (!userId) {
@@ -61,17 +105,28 @@ export function useNotifications(userId: number) {
     function handleAppStateChange(nextState: AppStateStatus) {
       if (nextState === 'active') {
         if (!isPollingRef.current) {
-          startPolling(30000);
+          // Cancel any pending retry and restart fresh when returning to foreground.
+          if (retryTimerRef.current !== null) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+          }
+          pollErrorCountRef.current = 0;
+          setPollingError(false);
+          startPolling(BASE_POLL_INTERVAL);
           isPollingRef.current = true;
         }
       } else {
         stopPolling();
         isPollingRef.current = false;
+        if (retryTimerRef.current !== null) {
+          clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = null;
+        }
       }
     }
 
     // Start polling immediately (app is active when this mounts)
-    startPolling(30000);
+    startPolling(BASE_POLL_INTERVAL);
     isPollingRef.current = true;
 
     const subscription = AppState.addEventListener(
@@ -81,19 +136,13 @@ export function useNotifications(userId: number) {
     return () => {
       stopPolling();
       isPollingRef.current = false;
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       subscription.remove();
     };
   }, [userId, startPolling, stopPolling]);
-
-  // Update unread count when data changes
-  useEffect(() => {
-    if (
-      countData?.getUnreadNotificationCount !== undefined &&
-      countData.getUnreadNotificationCount !== null
-    ) {
-      setUnreadCount(countData.getUnreadNotificationCount);
-    }
-  }, [countData]);
 
   // Update notification preferences mutation
   const [updatePreferencesMutation, { loading: updatingPreferences }] =
@@ -165,6 +214,7 @@ export function useNotifications(userId: number) {
     notifications: historyData?.getNotificationHistory || [],
     unreadCount,
     loading: preferencesLoading || historyLoading,
+    pollingError,
     updatingPreferences,
     updatePreferences,
     markAsRead,
