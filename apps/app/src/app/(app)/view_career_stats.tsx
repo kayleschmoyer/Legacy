@@ -1,5 +1,12 @@
 import * as React from 'react';
-import { Button, ScrollView, Text, TextInput } from 'react-native';
+import {
+  Button,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+} from 'react-native';
 import { Row, Table } from 'react-native-table-component';
 import { LOGGER } from '@legacy-sports/logging';
 import { axiosInstance } from '../../common/utilities/axiosInstance';
@@ -43,38 +50,43 @@ export default function ViewCareerStats(): React.JSX.Element {
   };
 
   return (
-    <ScrollView>
-      <Text>Retrieve career stats for a player</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView>
+        <Text>Retrieve career stats for a player</Text>
 
-      <TextInput value={player} onChangeText={setPlayer} />
-      <Button
-        onPress={getCareerStats}
-        title={loading ? 'Loading...' : 'Get Player Data'}
-        disabled={loading}
-      />
+        <TextInput value={player} onChangeText={setPlayer} />
+        <Button
+          onPress={getCareerStats}
+          title={loading ? 'Loading...' : 'Get Player Data'}
+          disabled={loading}
+        />
 
-      {error != null && <Text style={{ color: 'red' }}>{error}</Text>}
+        {error != null && <Text style={{ color: 'red' }}>{error}</Text>}
 
-      {data?.batting ? (
-        <Table>
-          <Row data={Object.keys(data.batting)} />
-          <Row data={Object.values(data.batting)} />
-        </Table>
-      ) : null}
+        {data?.batting ? (
+          <Table>
+            <Row data={Object.keys(data.batting)} />
+            <Row data={Object.values(data.batting)} />
+          </Table>
+        ) : null}
 
-      {data?.pitching ? (
-        <Table>
-          <Row data={Object.keys(data.pitching)} />
-          <Row data={Object.values(data.pitching)} />
-        </Table>
-      ) : null}
+        {data?.pitching ? (
+          <Table>
+            <Row data={Object.keys(data.pitching)} />
+            <Row data={Object.values(data.pitching)} />
+          </Table>
+        ) : null}
 
-      {data?.fielding ? (
-        <Table>
-          <Row data={Object.keys(data.fielding)} />
-          <Row data={Object.values(data.fielding)} />
-        </Table>
-      ) : null}
-    </ScrollView>
+        {data?.fielding ? (
+          <Table>
+            <Row data={Object.keys(data.fielding)} />
+            <Row data={Object.values(data.fielding)} />
+          </Table>
+        ) : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

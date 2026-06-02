@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, SafeAreaView, TextInput } from 'react-native';
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  TextInput,
+} from 'react-native';
 import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown } from '@tamagui/lucide-icons';
 import type { NflTeam } from '@legacy-sports/shared-components';
@@ -412,171 +418,180 @@ export default function FootballPlayers(): React.JSX.Element {
         : (NFL_TEAMS[teamFilter]?.abbreviation ?? teamFilter);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
-      {/* Position filter pills */}
-      <FlatList
-        data={POSITIONS}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item}
-        renderItem={({ item: pos }) => (
-          <PositionPill
-            pos={pos}
-            selected={pos === position}
-            onPress={() => setPosition(pos)}
-          />
-        )}
-        contentContainerStyle={{
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          gap: 8,
-        }}
-        style={{ flexGrow: 0 }}
-      />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+        {/* Position filter pills */}
+        <FlatList
+          data={POSITIONS}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item}
+          renderItem={({ item: pos }) => (
+            <PositionPill
+              pos={pos}
+              selected={pos === position}
+              onPress={() => setPosition(pos)}
+            />
+          )}
+          contentContainerStyle={{
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            gap: 8,
+          }}
+          style={{ flexGrow: 0 }}
+        />
 
-      {/* Search + team filter row */}
-      <XStack
-        paddingHorizontal={12}
-        paddingBottom={10}
-        gap={8}
-        alignItems="center"
-      >
+        {/* Search + team filter row */}
         <XStack
-          flex={1}
-          backgroundColor="$glassSurface"
-          borderWidth={1}
-          borderColor="$glassBorder"
-          borderRadius="$2"
-          paddingHorizontal={10}
-          height={36}
+          paddingHorizontal={12}
+          paddingBottom={10}
+          gap={8}
           alignItems="center"
         >
-          <TextInput
-            placeholder="Search players..."
-            placeholderTextColor="#666"
-            value={searchInput}
-            onChangeText={setSearchInput}
-            style={{ flex: 1, color: '#fff', fontSize: 14, height: 36 }}
-          />
+          <XStack
+            flex={1}
+            backgroundColor="$glassSurface"
+            borderWidth={1}
+            borderColor="$glassBorder"
+            borderRadius="$2"
+            paddingHorizontal={10}
+            height={36}
+            alignItems="center"
+          >
+            <TextInput
+              placeholder="Search players..."
+              placeholderTextColor="#666"
+              value={searchInput}
+              onChangeText={setSearchInput}
+              style={{ flex: 1, color: '#fff', fontSize: 14, height: 36 }}
+            />
+          </XStack>
+
+          <Select
+            value={teamFilter}
+            onValueChange={setTeamFilter}
+            disablePreventBodyScroll
+          >
+            <Select.Trigger
+              width={130}
+              borderColor="$glassBorder"
+              backgroundColor="$glassSurface"
+              color="$color"
+              iconAfter={ChevronDown}
+              borderRadius="$2"
+              paddingHorizontal={8}
+              height={36}
+            >
+              <Select.Value
+                placeholder="All Teams"
+                color="$color"
+                fontSize={13}
+              >
+                {selectedTeamLabel}
+              </Select.Value>
+            </Select.Trigger>
+
+            <Select.Content zIndex={200000}>
+              <Select.ScrollUpButton />
+              <Select.Viewport
+                backgroundColor="$background"
+                borderColor="$glassBorder"
+                borderWidth={1}
+                borderRadius="$3"
+                minWidth={220}
+              >
+                <Select.Group>
+                  {TEAM_OPTIONS.map((opt, i) => (
+                    <Select.Item
+                      key={opt.value}
+                      index={i}
+                      value={opt.value}
+                      backgroundColor="$background"
+                      hoverStyle={{ backgroundColor: '$glassSurface' }}
+                    >
+                      <Select.ItemText color="$color" fontSize={13}>
+                        {opt.label}
+                      </Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Group>
+              </Select.Viewport>
+              <Select.ScrollDownButton />
+            </Select.Content>
+          </Select>
         </XStack>
 
-        <Select
-          value={teamFilter}
-          onValueChange={setTeamFilter}
-          disablePreventBodyScroll
-        >
-          <Select.Trigger
-            width={130}
-            borderColor="$glassBorder"
-            backgroundColor="$glassSurface"
-            color="$color"
-            iconAfter={ChevronDown}
+        {/* Error banner */}
+        {error && (
+          <YStack
+            marginHorizontal={12}
+            marginBottom={8}
+            padding={12}
             borderRadius="$2"
-            paddingHorizontal={8}
-            height={36}
+            backgroundColor="$red2"
+            borderWidth={1}
+            borderColor="$red6"
           >
-            <Select.Value placeholder="All Teams" color="$color" fontSize={13}>
-              {selectedTeamLabel}
-            </Select.Value>
-          </Select.Trigger>
+            <Text fontSize={13} color="$red10">
+              Failed to load players. Please try again.
+            </Text>
+          </YStack>
+        )}
 
-          <Select.Content zIndex={200000}>
-            <Select.ScrollUpButton />
-            <Select.Viewport
-              backgroundColor="$background"
-              borderColor="$glassBorder"
-              borderWidth={1}
-              borderRadius="$3"
-              minWidth={220}
-            >
-              <Select.Group>
-                {TEAM_OPTIONS.map((opt, i) => (
-                  <Select.Item
-                    key={opt.value}
-                    index={i}
-                    value={opt.value}
-                    backgroundColor="$background"
-                    hoverStyle={{ backgroundColor: '$glassSurface' }}
-                  >
-                    <Select.ItemText color="$color" fontSize={13}>
-                      {opt.label}
-                    </Select.ItemText>
-                  </Select.Item>
-                ))}
-              </Select.Group>
-            </Select.Viewport>
-            <Select.ScrollDownButton />
-          </Select.Content>
-        </Select>
-      </XStack>
-
-      {/* Error banner */}
-      {error && (
-        <YStack
-          marginHorizontal={12}
-          marginBottom={8}
-          padding={12}
-          borderRadius="$2"
-          backgroundColor="$red2"
-          borderWidth={1}
-          borderColor="$red6"
-        >
-          <Text fontSize={13} color="$red10">
-            Failed to load players. Please try again.
-          </Text>
-        </YStack>
-      )}
-
-      {/* Player list */}
-      {isInitialLoad || isFilterChanging ? (
-        <YStack flex={1} alignItems="center" justifyContent="center">
-          <Spinner size="large" color="$orange9" />
-        </YStack>
-      ) : (
-        <FlatList
-          data={allNodes}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => <PlayerRow player={item} />}
-          windowSize={10}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
-          ListEmptyComponent={
-            !loading ? (
-              <YStack alignItems="center" padding={40} gap="$3">
-                <Text fontSize={16} color="$gray10">
-                  No players found
-                </Text>
-                <Text fontSize={13} color="$gray9">
-                  Try adjusting your filters or search.
-                </Text>
-              </YStack>
-            ) : null
-          }
-          ListFooterComponent={
-            hasMore ? (
-              <YStack alignItems="center" paddingVertical={16}>
-                {isLoadingMore ? (
-                  <Spinner size="small" color="$orange9" />
-                ) : (
-                  <YStack
-                    paddingHorizontal={24}
-                    paddingVertical={10}
-                    borderRadius="$3"
-                    backgroundColor="$glassSurface"
-                    borderWidth={1}
-                    borderColor="$glassBorder"
-                    onPress={loadMore}
-                    pressStyle={{ opacity: 0.7 }}
-                  >
-                    <Text fontSize={14} color="$color" fontWeight="600">
-                      Load more
-                    </Text>
-                  </YStack>
-                )}
-              </YStack>
-            ) : null
-          }
-        />
-      )}
-    </SafeAreaView>
+        {/* Player list */}
+        {isInitialLoad || isFilterChanging ? (
+          <YStack flex={1} alignItems="center" justifyContent="center">
+            <Spinner size="large" color="$orange9" />
+          </YStack>
+        ) : (
+          <FlatList
+            data={allNodes}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => <PlayerRow player={item} />}
+            windowSize={10}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
+            ListEmptyComponent={
+              !loading ? (
+                <YStack alignItems="center" padding={40} gap="$3">
+                  <Text fontSize={16} color="$gray10">
+                    No players found
+                  </Text>
+                  <Text fontSize={13} color="$gray9">
+                    Try adjusting your filters or search.
+                  </Text>
+                </YStack>
+              ) : null
+            }
+            ListFooterComponent={
+              hasMore ? (
+                <YStack alignItems="center" paddingVertical={16}>
+                  {isLoadingMore ? (
+                    <Spinner size="small" color="$orange9" />
+                  ) : (
+                    <YStack
+                      paddingHorizontal={24}
+                      paddingVertical={10}
+                      borderRadius="$3"
+                      backgroundColor="$glassSurface"
+                      borderWidth={1}
+                      borderColor="$glassBorder"
+                      onPress={loadMore}
+                      pressStyle={{ opacity: 0.7 }}
+                    >
+                      <Text fontSize={14} color="$color" fontWeight="600">
+                        Load more
+                      </Text>
+                    </YStack>
+                  )}
+                </YStack>
+              ) : null
+            }
+          />
+        )}
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }

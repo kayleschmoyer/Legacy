@@ -1,5 +1,12 @@
 import * as React from 'react';
-import { Button, ScrollView, Text, TextInput } from 'react-native';
+import {
+  Button,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+} from 'react-native';
 import { Row, Table } from 'react-native-table-component';
 import { LOGGER } from '@legacy-sports/logging';
 import { axiosInstance } from '../../common/utilities/axiosInstance';
@@ -66,28 +73,33 @@ export default function ViewGameLogs(): React.JSX.Element {
   };
 
   return (
-    <ScrollView>
-      <Text>Retrieve stats for a player</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView>
+        <Text>Retrieve stats for a player</Text>
 
-      <TextInput value={player} onChangeText={setPlayer} />
-      <TextInput value={date} onChangeText={setDate} />
-      <Button
-        onPress={getGameLog}
-        title={loading ? 'Loading...' : 'Get Player Data'}
-        disabled={loading}
-      />
+        <TextInput value={player} onChangeText={setPlayer} />
+        <TextInput value={date} onChangeText={setDate} />
+        <Button
+          onPress={getGameLog}
+          title={loading ? 'Loading...' : 'Get Player Data'}
+          disabled={loading}
+        />
 
-      {error != null && <Text style={{ color: 'red' }}>{error}</Text>}
+        {error != null && <Text style={{ color: 'red' }}>{error}</Text>}
 
-      {data ? (
-        <Table>
-          <Row data={stats} />
+        {data ? (
+          <Table>
+            <Row data={stats} />
 
-          {Object.keys(data).map((gameId) => (
-            <Row key={gameId} data={stats.map((s) => data[gameId][s])} />
-          ))}
-        </Table>
-      ) : null}
-    </ScrollView>
+            {Object.keys(data).map((gameId) => (
+              <Row key={gameId} data={stats.map((s) => data[gameId][s])} />
+            ))}
+          </Table>
+        ) : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
