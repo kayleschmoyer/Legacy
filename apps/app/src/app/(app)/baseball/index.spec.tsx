@@ -1,6 +1,11 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+import { Share } from 'react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import BaseballHome from './index';
@@ -190,6 +195,30 @@ describe('BaseballHome', () => {
       expect(screen.queryByText('Fantasy Legends')).toBeNull();
       expect(screen.queryByText('Slugger League')).toBeNull();
     });
+
+    it('shows an error message when the leagues query returns no data (LS-5203)', () => {
+      // Query error / no data: userLeagues is null, not an empty array.
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: null,
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(screen.getByText('Could not retrieve leagues.')).toBeTruthy();
+    });
+
+    it('renders a non-link label for a league with no numeric id (LS-5203)', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [{ ...MOCK_LEAGUES[0], id: null, name: 'No-ID League' }],
+        },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      // Name still shows, but no Link is created for a missing id.
+      expect(screen.getByText('No-ID League')).toBeTruthy();
+      expect(screen.queryByTestId('link-league-null')).toBeNull();
+      expect(screen.queryByTestId('link-league-undefined')).toBeNull();
+    });
   });
 
   describe('user leagues query', () => {
@@ -219,49 +248,126 @@ describe('BaseballHome', () => {
     });
   });
 
-  describe('invite modal', () => {
-    let alertSpy: jest.SpyInstance;
+  describe('invite modal (LS-5203)', () => {
+    let shareSpy: jest.SpyInstance;
 
     beforeEach(() => {
-      jest.useFakeTimers();
-      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      shareSpy = jest
+        .spyOn(Share, 'share')
+        .mockResolvedValue({ action: Share.sharedAction });
     });
 
     afterEach(() => {
-      alertSpy.mockRestore();
-      jest.useRealTimers();
+      shareSpy.mockRestore();
     });
 
-    it('opens when Invite Friends is pressed', () => {
+    it('opens and lists the user leagues to invite to when Invite Friends is pressed', () => {
       render(<BaseballHome />);
       fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
-      expect(screen.getByPlaceholderText('Email or Phone Number')).toBeTruthy();
+      expect(
+        screen.getByText('Choose a league to share an invite link'),
+      ).toBeTruthy();
+      // Both leagues are offered as share targets inside the modal.
+      expect(
+        screen.getByRole('button', { name: 'Fantasy Legends' }),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: 'Slugger League' }),
+      ).toBeTruthy();
     });
 
-    it('clears the invite setTimeout on unmount to prevent memory leak (LS-5103 regression)', () => {
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
-
-      const { unmount } = render(<BaseballHome />);
-
-      // Open modal, fill in email, and start the invite send (starts 2000ms timer)
+    it('shares a real invite link via the native share sheet (no setTimeout stub)', async () => {
+      render(<BaseballHome />);
       fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Email or Phone Number'),
-        'test@example.com',
+      fireEvent.press(screen.getByRole('button', { name: 'Fantasy Legends' }));
+
+      await waitFor(() => {
+        expect(shareSpy).toHaveBeenCalledTimes(1);
+      });
+
+      const [shareArg] = shareSpy.mock.calls[0] as [
+        { message: string; title: string; url?: string },
+      ];
+      // The invite carries the league's real 8-character invite code so the
+      // recipient can join via the join-by-code flow. Derive the base URL from
+      // the same env fallback the component uses so the assertion holds even
+      // when EXPO_PUBLIC_APP_BASE_URL is set in the test environment.
+      const expectedBaseUrl =
+        process.env.EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app';
+      expect(shareArg.message).toContain('Fantasy Legends');
+      expect(shareArg.message).toContain('ABC12345');
+      expect(shareArg.url).toBe(
+        `${expectedBaseUrl}/baseball/league/join/ABC12345`,
       );
-      fireEvent.press(screen.getByRole('button', { name: 'Send Invite' }));
+      expect(shareArg.title).toBe('Join Fantasy Legends');
+    });
 
-      // Unmount before 2000ms elapses — the cleanup must cancel the timer
-      unmount();
+    it('keeps the invite modal open when the user dismisses the share sheet', async () => {
+      shareSpy.mockResolvedValue({ action: Share.dismissedAction });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Fantasy Legends' }));
 
-      expect(clearTimeoutSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(shareSpy).toHaveBeenCalledTimes(1);
+      });
 
-      // Advancing all timers must NOT trigger the success Alert, confirming
-      // the timer was cancelled and no post-unmount state update occurs.
-      jest.runAllTimers();
-      expect(alertSpy).not.toHaveBeenCalledWith('Success', expect.any(String));
+      // Nothing was shared, so the modal stays open for a retry.
+      expect(
+        screen.getByText('Choose a league to share an invite link'),
+      ).toBeTruthy();
+    });
 
-      clearTimeoutSpy.mockRestore();
+    it('shows neither the empty state nor the league list while leagues are still loading', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: null,
+        loading: true,
+      });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
+      // Avoid the misleading "no leagues" empty state before the query resolves.
+      expect(
+        screen.queryByText(
+          'Create or join a league first, then share an invite link so friends can join you.',
+        ),
+      ).toBeNull();
+      expect(
+        screen.queryByText('Choose a league to share an invite link'),
+      ).toBeNull();
+    });
+
+    it('shows an error state in the modal (not the empty state) when the leagues query failed', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: null,
+        loading: false,
+      });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
+      expect(
+        screen.getByText("We couldn't load your leagues. Please try again."),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(
+          'Create or join a league first, then share an invite link so friends can join you.',
+        ),
+      ).toBeNull();
+    });
+
+    it('shows an empty-state message when the user has no leagues to invite to', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: { userLeagues: [] },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByRole('button', { name: 'Invite Friends' }));
+      expect(
+        screen.getByText(
+          'Create or join a league first, then share an invite link so friends can join you.',
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText('Choose a league to share an invite link'),
+      ).toBeNull();
     });
   });
 });
