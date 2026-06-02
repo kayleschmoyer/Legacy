@@ -12,6 +12,7 @@ import {
   useMatchupsForLeague,
 } from '../../../../hooks/useMatchup';
 import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
+import { useIsPremium } from '../../../../hooks/useIsPremium';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
 import { DraftSettingsControl } from '../../../../components/commissioner/DraftSettingsControl';
@@ -82,6 +83,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isPremium = useIsPremium();
   const isFootball = league.sport === Sport.Football;
   const [openId, setOpenId] = useState<string>('next-step');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
           currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
+          isPremium={isPremium}
           onSuccess={(msg) => {
             onSettingsError(null);
             onSettingsSuccess(msg);

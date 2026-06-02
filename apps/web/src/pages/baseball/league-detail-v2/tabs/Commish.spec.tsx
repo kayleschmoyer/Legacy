@@ -31,6 +31,13 @@ jest.mock('../../../../hooks/useMatchup', () => ({
 jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
   useLeagueWebSocket: () => undefined,
 }));
+// LS-5205: premium status drives the PremiumGate around the playoff format
+// (6-team / 8-team) and salary cap inside LeagueSettingsControl. Mock it so the
+// tab can assert the prop is wired through without the full auth/query stack.
+let mockIsPremium = false;
+jest.mock('../../../../hooks/useIsPremium', () => ({
+  useIsPremium: () => mockIsPremium,
+}));
 jest.mock('../../../../lib/scoring', () => ({
   useLeagueScoringSettings: () => ({
     profile: null,
@@ -63,7 +70,12 @@ jest.mock('../../../../components/commissioner/DraftSettingsControl', () => ({
   DraftSettingsControl: () => <div data-testid="draft-settings-control" />,
 }));
 jest.mock('../../../../components/commissioner/LeagueSettingsControl', () => ({
-  LeagueSettingsControl: () => <div data-testid="league-settings-control" />,
+  LeagueSettingsControl: (props: any) => (
+    <div
+      data-testid="league-settings-control"
+      data-ispremium={String(props.isPremium)}
+    />
+  ),
 }));
 jest.mock('../../../../components/commissioner/LeagueDuesControl', () => ({
   LeagueDuesControl: () => <div data-testid="league-dues-control" />,
@@ -163,5 +175,31 @@ describe('CommishTab — football-awareness', () => {
     expect(
       screen.queryByText('Football Scoring Editor'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('CommishTab — premium gating (LS-5205)', () => {
+  afterEach(() => {
+    mockIsPremium = false;
+  });
+
+  it('wires isPremium=false into LeagueSettingsControl for free commissioners so the playoff-format PremiumGate stays locked', () => {
+    mockIsPremium = false;
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByText('League Settings'));
+    expect(screen.getByTestId('league-settings-control')).toHaveAttribute(
+      'data-ispremium',
+      'false',
+    );
+  });
+
+  it('wires isPremium=true into LeagueSettingsControl for premium commissioners so all playoff formats unlock', () => {
+    mockIsPremium = true;
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByText('League Settings'));
+    expect(screen.getByTestId('league-settings-control')).toHaveAttribute(
+      'data-ispremium',
+      'true',
+    );
   });
 });

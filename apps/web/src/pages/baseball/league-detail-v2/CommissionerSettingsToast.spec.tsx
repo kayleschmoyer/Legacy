@@ -112,6 +112,13 @@ jest.mock('../../../hooks/useLeagueWebSocket', () => ({
   useLeagueWebSocket: () => ({ connected: false }),
 }));
 
+// LS-5205: CommishTab now reads premium status via useIsPremium (which issues
+// an Apollo query). Mock it so this toast-focused spec doesn't need an Apollo
+// provider; premium state is irrelevant to the toast behaviour under test.
+jest.mock('../../../hooks/useIsPremium', () => ({
+  useIsPremium: () => false,
+}));
+
 jest.mock('../../../lib/scoring', () => ({
   useLeagueScoringSettings: () => ({
     profile: null,
