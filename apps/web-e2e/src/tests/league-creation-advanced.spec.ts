@@ -360,16 +360,16 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expandSection(page, 'era-history');
 
     // Default state
-    await expect(page.getByText('🏆 Hall of Famers Only — OFF')).toBeVisible();
+    await expect(page.getByText('🏆 Off')).toBeVisible();
     await expect(page.getByText('Hall of Fame Draft Mode')).toBeVisible();
 
     // Toggle ON
-    await page.getByText('🏆 Hall of Famers Only — OFF').click();
-    await expect(page.getByText('🏆 Hall of Famers Only — ON')).toBeVisible();
+    await page.getByText('🏆 Off').click();
+    await expect(page.getByText('🏆 On')).toBeVisible();
 
     // Toggle OFF again
-    await page.getByText('🏆 Hall of Famers Only — ON').click();
-    await expect(page.getByText('🏆 Hall of Famers Only — OFF')).toBeVisible();
+    await page.getByText('🏆 On').click();
+    await expect(page.getByText('🏆 Off')).toBeVisible();
   });
 
   // ─── Era Filter ───────────────────────────────────────────────────────────

@@ -298,7 +298,7 @@ test.describe('Players Directory – Stats Table view @regression', () => {
     // AC1: baseball columns AVG / HR / R / RBI / SB
     for (const label of ['Player', 'AVG', 'HR', 'R', 'RBI', 'SB']) {
       await expect(
-        table.getByRole('button', { name: new RegExp(`^${label}\b`, 'i') }),
+        table.getByRole('button', { name: new RegExp(`^${label}\\b`, 'i') }),
       ).toBeVisible();
     }
   });

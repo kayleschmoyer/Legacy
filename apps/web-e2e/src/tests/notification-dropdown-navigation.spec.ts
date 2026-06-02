@@ -74,6 +74,14 @@ async function mockDropdownNotifications(
   page: import('@playwright/test').Page,
   notifications: MockNotification[],
 ) {
+  // The HomePage (`/`) opens the first-run onboarding tutorial for a user with
+  // no leagues, whose full-screen modal overlay intermittently intercepts the
+  // notifications-trigger click (flaky under parallel load). Mark onboarding
+  // complete so the welcome modal never mounts during these navigation tests.
+  await page.addInitScript(() => {
+    window.localStorage.setItem('ls_onboarding_complete', 'true');
+  });
+
   await page.route(isGraphQLEndpoint, async (route) => {
     // Match on the exact GraphQL operationName to avoid accidental
     // substring collisions (e.g. `getNotificationHistory` matching a
@@ -121,7 +129,11 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    const trigger = page.getByTestId('notifications-trigger');
+    // The app shell renders NotificationDropdown twice (desktop + mobile nav),
+    // so the testid resolves to two elements; one is hidden by responsive CSS.
+    // Scope to the first (visible at the desktop test viewport) to avoid a
+    // strict-mode violation.
+    const trigger = page.getByTestId('notifications-trigger').first();
     await trigger.click();
 
     const item = page.getByTestId(
@@ -146,7 +158,8 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await page.getByTestId('notifications-trigger').click();
+    // See note above: dual desktop/mobile render → scope to the visible first.
+    await page.getByTestId('notifications-trigger').first().click();
 
     const item = page.getByTestId(`notification-item-${TRADE_NOTIFICATION.id}`);
     await expect(item).toBeVisible();

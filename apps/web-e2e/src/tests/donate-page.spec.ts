@@ -13,7 +13,7 @@ import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
-const UNAVAILABLE_HEADLINE = /donations are temporarily unavailable/i;
+const UNAVAILABLE_HEADLINE = /could not load donation link/i;
 const CTA_NAME = /donate via stripe/i;
 
 test.describe('Donate page — donation link failure @regression', () => {

@@ -471,7 +471,7 @@ test.describe('Player Detail Modal @regression', () => {
 
     // Key row labels in the batting card
     await expect(dialog.getByText('AVG').first()).toBeVisible();
-    await expect(dialog.getByText('Home Runs')).toBeVisible();
+    await expect(dialog.getByText('Home Runs').first()).toBeVisible();
     await expect(dialog.getByText('RBI').first()).toBeVisible();
   });
 

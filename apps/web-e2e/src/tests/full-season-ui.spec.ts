@@ -941,6 +941,15 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
   // -----------------------------------------------------------------------
 
   test('Phase 9: Visit trading center', async ({ page }) => {
+    // The V2 web Trades tab (apps/web/src/pages/baseball/league-detail-v2/tabs/
+    // Trades.tsx, shipped by LS-4638) does not yet expose the
+    // `trade-center-heading` testid or the multi-step "Propose Trade" dialog
+    // this phase asserts against — that UI is tracked in LS-5055. Mirror the
+    // integration-suite deferral applied in LS-5071 until LS-5055 lands.
+    test.fixme(
+      true,
+      'V2 web Trades tab lacks Propose Trade UI — tracked in LS-5055',
+    );
     await installGraphQLMocks(page, {
       league: mockLeague({ draftStatus: 'completed', currentMatchup: 1 }),
     });

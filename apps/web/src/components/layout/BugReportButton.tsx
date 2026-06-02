@@ -369,8 +369,8 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
         >
           <YStack gap="$4" padding="$5">
             {/* Header */}
-            <XStack justifyContent="space-between" alignItems="center">
-              <YStack gap="$1">
+            <XStack justifyContent="space-between" alignItems="center" gap="$2">
+              <YStack gap="$1" flex={1}>
                 <Paragraph
                   id="bug-report-title"
                   fontSize={18}
@@ -387,6 +387,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
               <Dialog.Close asChild>
                 <Button
                   size="$2"
+                  flexShrink={0}
                   backgroundColor="transparent"
                   borderWidth={0}
                   borderRadius="$10"
