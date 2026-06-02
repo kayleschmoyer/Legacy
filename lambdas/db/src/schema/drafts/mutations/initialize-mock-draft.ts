@@ -16,7 +16,7 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, gte } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import { builder } from '../../builder';
 import {
@@ -26,6 +26,10 @@ import {
 } from '../../graphql-errors';
 import { hasEntitlement } from '../../authorization';
 import { ENTITLEMENTS } from '../../entitlements';
+import {
+  countRecentMockDrafts,
+  MOCK_DRAFT_FREE_WEEKLY_LIMIT,
+} from '../helpers';
 
 // ── Allowed values ───────────────────────────────────────────────────────────
 
@@ -156,24 +160,17 @@ builder.mutationField('initializeMockDraft', (t) =>
         }
       }
 
-      // ── Feature gating: max 2 mock drafts/week without unlimited_mock_drafts
+      // ── Feature gating: free tier is capped at MOCK_DRAFT_FREE_WEEKLY_LIMIT
+      // mock drafts per rolling 7-day window (unlimited_mock_drafts exempts).
+      // The same count + limit is surfaced pre-submit via getMyMockDraftUsage
+      // so the UI can reflect the limit before the user hits it (LS-5178).
       if (
         !(await hasEntitlement(context, ENTITLEMENTS.unlimited_mock_drafts))
       ) {
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const [{ mockDraftCount }] = await context.db
-          .select({ mockDraftCount: count() })
-          .from(PublicSchema.leagues)
-          .where(
-            and(
-              eq(PublicSchema.leagues.owner, userId),
-              eq(PublicSchema.leagues.isMockDraft, true),
-              gte(PublicSchema.leagues.createdAt, oneWeekAgo),
-            ),
-          );
-        if (mockDraftCount >= 2) {
+        const mockDraftCount = await countRecentMockDrafts(context.db, userId);
+        if (mockDraftCount >= MOCK_DRAFT_FREE_WEEKLY_LIMIT) {
           throw PremiumRequiredError(
-            'You have reached the 2 mock drafts per week limit for your current plan. Upgrade to unlock unlimited mock drafts.',
+            `You have reached the ${MOCK_DRAFT_FREE_WEEKLY_LIMIT} mock drafts per week limit for your current plan. Upgrade to unlock unlimited mock drafts.`,
           );
         }
       }

@@ -373,3 +373,37 @@ DraftQueueEntry.implement({
     }),
   }),
 });
+
+/**
+ * MockDraftUsage — the current user's mock-draft usage against the free-tier
+ * weekly cap (LS-5178). Lets the web UI reflect the limit *before* submit
+ * instead of only surfacing it via the `PREMIUM_REQUIRED` mutation error.
+ */
+export const MockDraftUsage = builder.objectRef<{
+  used: number;
+  limit: number;
+  remaining: number;
+  isUnlimited: boolean;
+}>('MockDraftUsage');
+
+MockDraftUsage.implement({
+  description:
+    "The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit.",
+  fields: (t) => ({
+    used: t.exposeInt('used', {
+      description:
+        'Mock drafts the user has created within the trailing 7-day window.',
+    }),
+    limit: t.exposeInt('limit', {
+      description: 'Free-tier mock drafts allowed per 7-day window.',
+    }),
+    remaining: t.exposeInt('remaining', {
+      description:
+        'Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users.',
+    }),
+    isUnlimited: t.exposeBoolean('isUnlimited', {
+      description:
+        'True when the user has the unlimited_mock_drafts entitlement (cap does not apply).',
+    }),
+  }),
+});

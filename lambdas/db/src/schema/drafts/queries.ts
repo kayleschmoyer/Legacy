@@ -10,7 +10,11 @@ import {
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 
-import { getCurrentDraftPickInfo } from './helpers';
+import {
+  countRecentMockDrafts,
+  getCurrentDraftPickInfo,
+  MOCK_DRAFT_FREE_WEEKLY_LIMIT,
+} from './helpers';
 import {
   CurrentDraftPick,
   Draft,
@@ -20,11 +24,14 @@ import {
   DraftRecommendation,
   DraftTeamAutoPickStatus,
   DraftTeamOrderEntry,
+  MockDraftUsage,
 } from './types';
 import {
+  hasEntitlement,
   isCommissionerOrOwner,
   verifyLeagueMembership,
 } from '../authorization';
+import { ENTITLEMENTS } from '../entitlements';
 import { builder } from '../builder';
 import {
   AuthenticationError,
@@ -1080,6 +1087,43 @@ builder.queryField('getMyDraftQueue', (t) =>
         .orderBy(asc(PublicSchema.draftQueue.priority));
 
       return rows;
+    },
+  }),
+);
+
+/**
+ * Query: Get the current user's mock-draft usage for the week (LS-5178)
+ *
+ * Returns how many mock drafts the user has created in the trailing 7-day
+ * window relative to the free-tier weekly cap, plus whether they are exempt
+ * (unlimited_mock_drafts entitlement). The web Mock Draft page uses this to
+ * proactively show a "N/N mock drafts used this week" disabled state instead
+ * of letting the user submit only to hit a PREMIUM_REQUIRED error.
+ */
+builder.queryField('getMyMockDraftUsage', (t) =>
+  t.field({
+    type: MockDraftUsage,
+    description:
+      "Returns the current user's mock-draft usage within the trailing 7-day window relative to the free-tier weekly limit.",
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const isUnlimited = await hasEntitlement(
+        context,
+        ENTITLEMENTS.unlimited_mock_drafts,
+      );
+      const used = await countRecentMockDrafts(context.db, context.user.id);
+      const limit = MOCK_DRAFT_FREE_WEEKLY_LIMIT;
+
+      return {
+        used,
+        limit,
+        // Unlimited users are never capped, so surface full headroom.
+        remaining: isUnlimited ? limit : Math.max(0, limit - used),
+        isUnlimited,
+      };
     },
   }),
 );

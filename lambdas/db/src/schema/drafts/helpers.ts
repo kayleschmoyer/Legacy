@@ -4,9 +4,50 @@
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
-import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { ForbiddenError } from '../graphql-errors';
 import { addPlayerToRoster } from '../../services/roster-service';
+
+// ── Mock draft weekly-limit gating (LS-470 / LS-5178) ────────────────────────
+
+/**
+ * Free-tier users may start at most this many mock drafts per rolling 7-day
+ * window. Users with the `unlimited_mock_drafts` entitlement are exempt.
+ *
+ * Single source of truth shared by the `initializeMockDraft` mutation (which
+ * enforces the cap) and the `getMyMockDraftUsage` query (which surfaces the
+ * usage to the web UI so the limit is reflected *before* submit — LS-5178).
+ */
+export const MOCK_DRAFT_FREE_WEEKLY_LIMIT = 2;
+
+/** Rolling window (ms) over which mock drafts count toward the free-tier cap. */
+export const MOCK_DRAFT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Count how many mock-draft leagues the given user has created within the
+ * trailing {@link MOCK_DRAFT_WINDOW_MS}. Used both to enforce the free-tier
+ * weekly mock-draft cap and to surface remaining usage in the UI.
+ */
+export async function countRecentMockDrafts(
+  db: PublicDb,
+  userId: number,
+): Promise<number> {
+  const windowStart = new Date(Date.now() - MOCK_DRAFT_WINDOW_MS);
+  const [{ mockDraftCount }] = await db
+    .select({ mockDraftCount: count() })
+    .from(PublicSchema.leagues)
+    .where(
+      and(
+        eq(PublicSchema.leagues.owner, userId),
+        eq(PublicSchema.leagues.isMockDraft, true),
+        gte(PublicSchema.leagues.createdAt, windowStart),
+      ),
+    );
+  // Drizzle's count() can surface as a string/bigint depending on the driver;
+  // this value flows through a GraphQL Int (getMyMockDraftUsage) and into
+  // arithmetic, so coerce to a number to avoid serialization/compare surprises.
+  return Number(mockDraftCount);
+}
 
 // â”€â”€ commitDraftPick types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

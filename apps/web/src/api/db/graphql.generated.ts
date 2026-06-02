@@ -1663,6 +1663,19 @@ export type MockDraftInit = {
   leagueId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit. */
+export type MockDraftUsage = {
+  __typename?: 'MockDraftUsage';
+  /** True when the user has the unlimited_mock_drafts entitlement (cap does not apply). */
+  isUnlimited?: Maybe<Scalars['Boolean']['output']>;
+  /** Free-tier mock drafts allowed per 7-day window. */
+  limit?: Maybe<Scalars['Int']['output']>;
+  /** Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users. */
+  remaining?: Maybe<Scalars['Int']['output']>;
+  /** Mock drafts the user has created within the trailing 7-day window. */
+  used?: Maybe<Scalars['Int']['output']>;
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
@@ -2855,6 +2868,8 @@ export type Query = {
   getMyDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
   getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
+  /** Returns the current user's mock-draft usage within the trailing 7-day window relative to the free-tier weekly limit. */
+  getMyMockDraftUsage?: Maybe<MockDraftUsage>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffProjections?: Maybe<Array<PlayoffProjection>>;
@@ -7094,6 +7109,19 @@ export type InitializeMockDraftMutation = {
     __typename?: 'MockDraftInit';
     leagueId?: number | null;
     draftId?: number | null;
+  } | null;
+};
+
+export type GetMyMockDraftUsageQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetMyMockDraftUsageQuery = {
+  __typename?: 'Query';
+  getMyMockDraftUsage?: {
+    __typename?: 'MockDraftUsage';
+    used?: number | null;
+    limit?: number | null;
+    remaining?: number | null;
+    isUnlimited?: boolean | null;
   } | null;
 };
 
@@ -17885,6 +17913,94 @@ export type InitializeMockDraftMutationResult =
 export type InitializeMockDraftMutationOptions = BaseMutationOptions<
   InitializeMockDraftMutation,
   InitializeMockDraftMutationVariables
+>;
+export const GetMyMockDraftUsage = gql`
+  query GetMyMockDraftUsage {
+    getMyMockDraftUsage {
+      used
+      limit
+      remaining
+      isUnlimited
+    }
+  }
+`;
+
+/**
+ * __useGetMyMockDraftUsageQuery__
+ *
+ * To run a query within a React component, call `useGetMyMockDraftUsageQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyMockDraftUsageQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyMockDraftUsageQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyMockDraftUsageQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >(GetMyMockDraftUsage, options);
+}
+export function useGetMyMockDraftUsageLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >(GetMyMockDraftUsage, options);
+}
+export function useGetMyMockDraftUsageSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyMockDraftUsageQuery,
+        GetMyMockDraftUsageQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >(
+    GetMyMockDraftUsage,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyMockDraftUsageQuery,
+          GetMyMockDraftUsageQueryVariables
+        >,
+  );
+}
+export type GetMyMockDraftUsageQueryHookResult = ReturnType<
+  typeof useGetMyMockDraftUsageQuery
+>;
+export type GetMyMockDraftUsageLazyQueryHookResult = ReturnType<
+  typeof useGetMyMockDraftUsageLazyQuery
+>;
+export type GetMyMockDraftUsageSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyMockDraftUsageSuspenseQuery
+>;
+export type GetMyMockDraftUsageQueryResult = Apollo.QueryResult<
+  GetMyMockDraftUsageQuery,
+  GetMyMockDraftUsageQueryVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {

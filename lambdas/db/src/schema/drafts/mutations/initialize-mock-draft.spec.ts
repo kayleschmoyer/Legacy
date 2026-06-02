@@ -105,6 +105,11 @@ async function captureInitializeMockDraftResolver(): Promise<
     ENTITLEMENTS: { unlimited_mock_drafts: 'unlimited_mock_drafts' },
   }));
 
+  jest.doMock('../helpers', () => ({
+    countRecentMockDrafts: jest.fn().mockResolvedValue(0),
+    MOCK_DRAFT_FREE_WEEKLY_LIMIT: 2,
+  }));
+
   await import('./initialize-mock-draft');
   if (!capturedFn)
     throw new Error('initializeMockDraft resolver was not captured');

@@ -1884,6 +1884,31 @@ type MockDraftInit {
   leagueId: Int
 }
 
+"""
+The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit.
+"""
+type MockDraftUsage {
+  """
+  True when the user has the unlimited_mock_drafts entitlement (cap does not apply).
+  """
+  isUnlimited: Boolean
+
+  """
+  Free-tier mock drafts allowed per 7-day window.
+  """
+  limit: Int
+
+  """
+  Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users.
+  """
+  remaining: Int
+
+  """
+  Mock drafts the user has created within the trailing 7-day window.
+  """
+  used: Int
+}
+
 type Mutation {
   _placeholder: Boolean
 
@@ -3098,6 +3123,11 @@ type Query {
   Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft.
   """
   getMyDraftTeamAutoPick(draftId: Int!): Boolean
+
+  """
+  Returns the current user's mock-draft usage within the trailing 7-day window relative to the free-tier weekly limit.
+  """
+  getMyMockDraftUsage: MockDraftUsage
   getNotificationHistory(limit: Int, offset: Int): [NotificationHistoryItem!]
   getPlayoffBracket(leagueId: Int!, season: Int): PlayoffBracket
   getPlayoffProjections(

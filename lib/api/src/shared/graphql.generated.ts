@@ -1663,6 +1663,19 @@ export type MockDraftInit = {
   leagueId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit. */
+export type MockDraftUsage = {
+  __typename?: 'MockDraftUsage';
+  /** True when the user has the unlimited_mock_drafts entitlement (cap does not apply). */
+  isUnlimited?: Maybe<Scalars['Boolean']['output']>;
+  /** Free-tier mock drafts allowed per 7-day window. */
+  limit?: Maybe<Scalars['Int']['output']>;
+  /** Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users. */
+  remaining?: Maybe<Scalars['Int']['output']>;
+  /** Mock drafts the user has created within the trailing 7-day window. */
+  used?: Maybe<Scalars['Int']['output']>;
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
@@ -2855,6 +2868,8 @@ export type Query = {
   getMyDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
   getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
+  /** Returns the current user's mock-draft usage within the trailing 7-day window relative to the free-tier weekly limit. */
+  getMyMockDraftUsage?: Maybe<MockDraftUsage>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffProjections?: Maybe<Array<PlayoffProjection>>;

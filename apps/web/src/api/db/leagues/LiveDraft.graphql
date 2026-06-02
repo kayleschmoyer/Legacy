@@ -415,3 +415,14 @@ mutation InitializeMockDraft(
     draftId
   }
 }
+
+# Current user's mock-draft usage against the free-tier weekly cap (LS-5178).
+# The Mock Draft setup page uses this to reflect the limit before submit.
+query GetMyMockDraftUsage {
+  getMyMockDraftUsage {
+    used
+    limit
+    remaining
+    isUnlimited
+  }
+}
