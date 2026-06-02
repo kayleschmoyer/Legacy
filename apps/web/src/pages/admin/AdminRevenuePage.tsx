@@ -140,14 +140,16 @@ function MetricCard({
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function AdminRevenuePage(): React.JSX.Element {
+export default function AdminRevenuePage(): React.JSX.Element | null {
   const auth = useAuth();
 
   const { data, loading, error } = useAdminRevenueStatsQuery({
     skip: !auth.isAuthenticated,
   });
 
-  if (!auth.isLoading && auth.user?.accessLevel !== 'admin') {
+  if (auth.isLoading) return null;
+
+  if (auth.user?.accessLevel !== 'admin') {
     return <Navigate to="/" replace />;
   }
 
