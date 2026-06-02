@@ -117,9 +117,8 @@ export function usePushNotifications(userId: number | null | undefined) {
   useEffect(() => {
     notificationListener.current = addNotificationReceivedListener(
       (notification) => {
-        const data = notification.request.content.data as
-          | NotificationData
-          | undefined;
+        const rawData: unknown = notification.request.content.data;
+        const data = isNotificationData(rawData) ? rawData : undefined;
         LOGGER.info('Push notification received in foreground', {
           type: data?.notificationType,
         });
@@ -145,9 +144,8 @@ export function usePushNotifications(userId: number | null | undefined) {
       if (lastHandledNotificationId.current === notificationId) return;
       lastHandledNotificationId.current = notificationId;
 
-      const data = response.notification.request.content.data as
-        | NotificationData
-        | undefined;
+      const rawData: unknown = response.notification.request.content.data;
+      const data = isNotificationData(rawData) ? rawData : undefined;
       if (!data) return;
 
       LOGGER.info(`Push notification ${source}`, {
@@ -171,6 +169,16 @@ export function usePushNotifications(userId: number | null | undefined) {
       responseListener.current?.remove();
     };
   }, []);
+}
+
+function isNotificationData(value: unknown): value is NotificationData {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  if ('notificationType' in obj && typeof obj['notificationType'] !== 'string')
+    return false;
+  if ('leagueId' in obj && typeof obj['leagueId'] !== 'number') return false;
+  if ('matchupId' in obj && typeof obj['matchupId'] !== 'number') return false;
+  return true;
 }
 
 function navigateFromNotification(
