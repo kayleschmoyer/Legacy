@@ -155,7 +155,7 @@ export default function AboutPage() {
         </InfoRow>
 
         <InfoRow>
-          <Label>Base URL:</Label>
+          <Label>Asset Base Path:</Label>
           <Value>{env.baseUrl}</Value>
         </InfoRow>
       </InfoCard>
