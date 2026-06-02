@@ -24,7 +24,7 @@ Scripts in `scripts/` directory are **ONLY** for:
 
 ### 3. Development/Testing Utilities
 
-- ✅ `delete-league.ts` - Admin cleanup operations
+- ✅ `cli delete-league` command - Admin cleanup operations
 - ✅ `db-query.ps1` - Query wrapper for operations
 - ✅ One-time data fixes or imports
 
@@ -175,9 +175,11 @@ lib/db-client/
 
 scripts/
 ├── check-position-availability.sql  # ✅ Read-only query
-├── delete-league.ts                 # ✅ Data operations
 ├── db-query.ps1                     # ✅ Query wrapper
 └── [NO SCHEMA CHANGES]              # ❌ Never schema here
+
+# Destructive league deletion now lives in the CLI:
+#   apps/cli/src/commands/deleteLeague.ts  → `cli delete-league --id <id> --yes`
 ```
 
 ## 🛡️ Enforcement
@@ -289,7 +291,7 @@ Current state (as of Feb 1, 2026):
 
 - All schema changes in `lib/db-client/migrations/`
 - `check-position-availability.sql` - Read-only query ✅
-- `delete-league.ts` - Data operations only ✅
+- `cli delete-league` command - Data operations only ✅
 - `db-query.ps1` - Query wrapper ✅
 
 ### 🧹 Recently Cleaned Up

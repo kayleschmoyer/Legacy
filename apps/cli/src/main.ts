@@ -56,6 +56,7 @@ import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjust
 import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
 import { handleCleanupTestUsers } from './commands/cleanupTestUsers';
+import { handleDeleteLeague } from './commands/deleteLeague';
 import { handleReportToJiraEpic } from './commands/reportToJiraEpic';
 import { handleSeedDisclosureFacts } from './commands/seedDisclosureFacts';
 import { handleSeedStripe } from './commands/seedStripe';
@@ -846,6 +847,17 @@ export function buildProgram(): Command {
     .action(
       (options: { dryRun?: boolean; minAgeDays?: number; yes?: boolean }) =>
         handleCleanupTestUsers(options),
+    );
+
+  program
+    .command('delete-league')
+    .description(
+      'Permanently delete a league and ALL related data via CASCADE (DESTRUCTIVE)',
+    )
+    .requiredOption('--id <leagueId>', 'ID of the league to delete', Number)
+    .option('--yes', 'Skip confirmation prompt and proceed with deletion')
+    .action((options: { id?: number; yes?: boolean }) =>
+      handleDeleteLeague(options),
     );
 
   return program;

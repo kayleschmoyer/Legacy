@@ -103,9 +103,9 @@ Most user references use CASCADE or SET NULL appropriately:
 
 ## Testing
 
-### Simplified Delete Script
+### Simplified Delete Command
 
-The [delete-league.ts](../../scripts/delete-league.ts) script has been dramatically simplified from 15 manual deletion steps to a single DELETE statement:
+The [`delete-league` CLI command](../../apps/cli/src/commands/deleteLeague.ts) has been dramatically simplified from 15 manual deletion steps to a single DELETE statement:
 
 ```typescript
 // Before: 15 manual deletion steps with complex SQL
@@ -160,4 +160,4 @@ When adding new tables:
 
 - [Database Schema](./database-schema.md)
 - [Migration Policy](./migration-policy.md)
-- [Delete League Script](../../scripts/delete-league.ts)
+- [Delete League CLI command](../../apps/cli/src/commands/deleteLeague.ts)

@@ -72,7 +72,6 @@ Schema changes (ALTER TABLE, CREATE TABLE, CREATE INDEX, etc.) must NEVER be in 
 
 ### Database Operations (Data Only)
 
-- `delete-league.ts` - Admin cleanup operations
 - `db-query.ps1` - Query wrapper for ad-hoc queries
 - `check-position-availability.sql` - Analytics query
 
@@ -213,15 +212,15 @@ instead.
 
 ## 🔍 Finding the Right Tool
 
-| Task             | Tool                | Location                    |
-| ---------------- | ------------------- | --------------------------- |
-| Schema change    | Migration           | `lib/db-client/migrations/` |
-| Query database   | `db-query.ps1`      | `scripts/db-query.ps1`      |
-| Delete test data | `delete-league.ts`  | `scripts/delete-league.ts`  |
-| Deploy Lambda    | `deploy-lambda.ps1` | `scripts/deploy-lambda.ps1` |
-| Create branch    | `branch-create.ps1` | `scripts/branch-create.ps1` |
-| Sync env vars    | `sync-env.ps1`      | `scripts/sync-env.ps1`      |
-| Run migrations   | Migration runner    | `pnpm run db:up`            |
+| Task            | Tool                | Location                     |
+| --------------- | ------------------- | ---------------------------- |
+| Schema change   | Migration           | `lib/db-client/migrations/`  |
+| Query database  | `db-query.ps1`      | `scripts/db-query.ps1`       |
+| Delete a league | `cli delete-league` | `apps/cli` (`delete-league`) |
+| Deploy Lambda   | `deploy-lambda.ps1` | `scripts/deploy-lambda.ps1`  |
+| Create branch   | `branch-create.ps1` | `scripts/branch-create.ps1`  |
+| Sync env vars   | `sync-env.ps1`      | `scripts/sync-env.ps1`       |
+| Run migrations  | Migration runner    | `pnpm run db:up`             |
 
 ## 🛡️ Best Practices
 
