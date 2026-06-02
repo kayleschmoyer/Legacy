@@ -5,7 +5,7 @@ import {
   reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { and, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -693,7 +693,13 @@ builder.mutationField('setActiveLeagues', (t) =>
 // the resolver fail with INTERNAL_SERVER_ERROR whenever the deployed DB is
 // behind the bundled schema by even a single column (LS-4297). Explicit
 // projection keeps the query forward-compatible with future column additions.
-async function getSubscriptionForUser(userId: number) {
+//
+// Order by created_at DESC (with id DESC as a deterministic tiebreaker for rows
+// sharing a timestamp) so we always return the most recent subscription row. A
+// user who resubscribes after cancellation has both the old canceled row and a
+// new active row; without ordering, `.limit(1)` could return the stale canceled
+// row and leave a paying user appearing as free (LS-5201).
+export async function getSubscriptionForUser(userId: number) {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
       .select({
@@ -709,6 +715,10 @@ async function getSubscriptionForUser(userId: number) {
       })
       .from(InternalSchema.subscriptions)
       .where(eq(InternalSchema.subscriptions.userId, userId))
+      .orderBy(
+        desc(InternalSchema.subscriptions.createdAt),
+        desc(InternalSchema.subscriptions.id),
+      )
       .limit(1);
     return rows[0] ?? null;
   });

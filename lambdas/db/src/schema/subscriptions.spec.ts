@@ -37,10 +37,15 @@ jest.mock('@legacy-sports/db-client', () => ({
     subscriptions: {
       id: 'subscriptions.id',
       userId: 'subscriptions.user_id',
+      stripeCustomerId: 'subscriptions.stripe_customer_id',
       stripeSubscriptionId: 'subscriptions.stripe_subscription_id',
+      currentPeriodEnd: 'subscriptions.current_period_end',
+      cancelAtPeriodEnd: 'subscriptions.cancel_at_period_end',
+      trialEndsAt: 'subscriptions.trial_ends_at',
       gracePeriodEndsAt: 'subscriptions.grace_period_ends_at',
       status: 'subscriptions.status',
       tier: 'subscriptions.tier',
+      createdAt: 'subscriptions.created_at',
       updatedAt: 'subscriptions.updated_at',
     },
     usersInAppInternal: {
@@ -73,12 +78,20 @@ jest.mock('../apple-jws', () => ({
   decodeAndVerifyJwsTransaction: jest.fn(),
 }));
 
+// Keep drizzle-orm helpers real, but make `desc()` produce an assertable marker
+// so getSubscriptionForUser's ORDER BY arguments can be checked (LS-5201).
+jest.mock('drizzle-orm', () => ({
+  ...jest.requireActual('drizzle-orm'),
+  desc: (col: unknown) => `${String(col)}-desc`,
+}));
+
 import {
   _resetStripePricesCache,
   buildCheckoutTrialParams,
   expireSubscriptionGracePeriods,
   fetchStripePrices,
   getOrCreateStripeCustomer,
+  getSubscriptionForUser,
   shouldRedirectToBillingPortal,
 } from './subscriptions';
 
@@ -540,5 +553,58 @@ describe('buildCheckoutTrialParams', () => {
       session: {},
       subscription: {},
     });
+  });
+});
+
+describe('getSubscriptionForUser (LS-5201)', () => {
+  /**
+   * Build a DB stub recording the SELECT chain. `.where()` returns an object
+   * exposing `.orderBy()` and `.limit()` so we can assert the query is ordered
+   * before the row is taken — without ORDER BY, `.limit(1)` could return a
+   * stale canceled row after the user resubscribed.
+   */
+  function makeOrderedDb(selectRows: unknown[]) {
+    const limit = jest.fn(() => Promise.resolve(selectRows));
+    const orderBy = jest.fn(() => ({ limit }));
+    const where = jest.fn(() => ({ orderBy }));
+    const from = jest.fn(() => ({ where }));
+    const select = jest.fn(() => ({ from }));
+    return { db: { select }, select, from, where, orderBy, limit };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('orders by created_at DESC (id DESC tiebreaker) before limiting to one row', async () => {
+    const newActiveRow = { id: 2, status: 'active', tier: 'premium' };
+    const { db, orderBy, limit } = makeOrderedDb([newActiveRow]);
+    mockRunWithInternalClient.mockImplementation(
+      async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
+    );
+
+    const result = await getSubscriptionForUser(42);
+
+    // ORDER BY must be applied, and before the LIMIT.
+    expect(orderBy).toHaveBeenCalledTimes(1);
+    expect(orderBy).toHaveBeenCalledWith(
+      'subscriptions.created_at-desc',
+      'subscriptions.id-desc',
+    );
+    expect(limit).toHaveBeenCalledWith(1);
+    expect(orderBy.mock.invocationCallOrder[0]).toBeLessThan(
+      limit.mock.invocationCallOrder[0],
+    );
+    // Returns the most recent row the ordered query yields.
+    expect(result).toBe(newActiveRow);
+  });
+
+  it('returns null when the user has no subscription rows', async () => {
+    const { db } = makeOrderedDb([]);
+    mockRunWithInternalClient.mockImplementation(
+      async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
+    );
+
+    expect(await getSubscriptionForUser(99)).toBeNull();
   });
 });
