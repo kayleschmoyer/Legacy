@@ -350,14 +350,22 @@ test.describe
     });
 
     await test.step('Type new team name and save', async () => {
-      const nameInput = page.locator('input[type="text"]').first();
+      const nameInput = page.locator('#team-name-input');
       await nameInput.clear();
       await nameInput.fill(state.renamedTeamName);
 
-      // Click the Save button to submit
-      const saveBtn = page.getByRole('button', { name: /Save/i });
-      await expect(saveBtn.first()).toBeEnabled({ timeout: 3000 });
-      await saveBtn.first().click();
+      // Team.tsx renders "Save Name" (next to the input) and "Save Branding"
+      // (under the colors panel). Match the name button by exact label so the
+      // selector cannot drift onto the branding control.
+      const saveNameBtn = page.getByRole('button', { name: /Save Name/i });
+      await expect(saveNameBtn).toBeEnabled({ timeout: 3000 });
+      await saveNameBtn.click();
+
+      // Clicking Save Name opens a confirmation dialog (LS-4018) — the rename
+      // mutation only fires after the user confirms inside it.
+      const confirmDialog = page.getByTestId('rename-team-confirm');
+      await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+      await confirmDialog.getByRole('button', { name: /^Rename$/i }).click();
     });
 
     await test.step('Verify success indicator appears', async () => {
