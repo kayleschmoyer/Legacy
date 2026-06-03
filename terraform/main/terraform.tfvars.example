@@ -34,6 +34,10 @@ github_username  = "bkrupa"  # Your GitHub username/organization
 # Monitoring & Alerting
 alert_email = "" # Set to an ops e-mail to receive CloudWatch DLQ alarm notifications
 
+# Jira auto-assign: when set, jira_claim_ticket will assign claimed tickets to this
+# Jira account email. Leave empty to disable. Set via infra.auto.tfvars (non-secret).
+jira_assignee_email = ""  # e.g., "you@example.com"
+
 # Stripe Price IDs (non-sensitive — safe to check in via infra.auto.tfvars)
 # Obtain from Stripe Dashboard → Products → [your product] → Pricing → Price ID
 stripe_monthly_price_id = "price_xxxxxxxxxxxxxxxxxxxxxxxx"

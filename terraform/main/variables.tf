@@ -26,6 +26,12 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+variable "jira_assignee_email" {
+  description = "Jira account email to auto-assign tickets to when jira_claim_ticket is called. Leave empty to disable auto-assign."
+  type        = string
+  default     = ""
+}
+
 variable "availability_zones" {
   description = "Availability zones"
   type        = list(string)

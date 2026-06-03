@@ -195,6 +195,40 @@ export async function claimTicket(
       body: { transition: { id: inProgressTransition.id } },
     });
 
+    // --- Auto-assign to configured user ---
+    const assigneeEmail = process.env['JIRA_ASSIGNEE_EMAIL'];
+    if (assigneeEmail) {
+      try {
+        const userSearch = await jiraRequest<{ accountId: string }[]>({
+          method: 'GET',
+          path: '/rest/api/3/user/search',
+          query: { query: assigneeEmail, maxResults: '1' },
+        });
+        const accountId = userSearch?.[0]?.accountId;
+        if (accountId) {
+          await jiraRequest({
+            method: 'PUT',
+            path: `/rest/api/3/issue/${key}/assignee`,
+            body: { accountId },
+          });
+        } else {
+          process.stderr.write(
+            `[legacy-sports-jira] jira_claim_ticket: no Jira user found for JIRA_ASSIGNEE_EMAIL=${assigneeEmail}; skipping assignee.\n`,
+          );
+          warnings.push(
+            `Could not assign ticket: no Jira user found for email "${assigneeEmail}".`,
+          );
+        }
+      } catch (assignErr) {
+        const msg =
+          assignErr instanceof Error ? assignErr.message : String(assignErr);
+        process.stderr.write(
+          `[legacy-sports-jira] jira_claim_ticket: assignee update failed (non-fatal): ${msg}\n`,
+        );
+        warnings.push(`Assignee update failed (non-fatal): ${msg}`);
+      }
+    }
+
     return makeResult({
       action: 'PROCEED',
       claimed: true,

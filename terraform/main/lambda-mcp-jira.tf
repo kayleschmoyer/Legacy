@@ -101,6 +101,9 @@ resource "aws_lambda_function" "mcp_jira" {
       # scope check. Without this it defaults to `openid` only and the token
       # would lack the scope (LS-5151).
       MCP_OAUTH_SCOPES = "openid mcp/jira"
+      # When set, jira_claim_ticket will auto-assign the claimed ticket to this
+      # Jira user. Value is the Jira account email; leave empty to disable.
+      JIRA_ASSIGNEE_EMAIL = var.jira_assignee_email
     }
   }
 
