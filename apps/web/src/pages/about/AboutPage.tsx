@@ -12,6 +12,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { env } from '../../config/environment';
 import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 import { useIsPremium } from '../../hooks/useIsPremium';
+import { trackEvent } from '../../utils/analytics';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -177,9 +178,10 @@ export default function AboutPage() {
 
         <YStack gap="$3">
           <Button
-            onPress={() =>
-              window.open(repoUrl, '_blank', 'noopener,noreferrer')
-            }
+            onPress={() => {
+              trackEvent('about_github_click', { category: 'about' });
+              window.open(repoUrl, '_blank', 'noopener,noreferrer');
+            }}
             variant="secondary"
             size="$3"
           >
@@ -190,9 +192,10 @@ export default function AboutPage() {
           </Button>
           {commitUrl && (
             <Button
-              onPress={() =>
-                window.open(commitUrl, '_blank', 'noopener,noreferrer')
-              }
+              onPress={() => {
+                trackEvent('about_commit_click', { category: 'about' });
+                window.open(commitUrl, '_blank', 'noopener,noreferrer');
+              }}
               variant="secondary"
               size="$3"
             >
