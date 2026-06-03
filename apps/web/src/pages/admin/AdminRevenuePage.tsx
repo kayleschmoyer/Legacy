@@ -145,6 +145,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
 
   const { data, loading, error } = useAdminRevenueStatsQuery({
     skip: !auth.isAuthenticated,
+    fetchPolicy: 'no-cache',
   });
 
   if (auth.isLoading) return null;
