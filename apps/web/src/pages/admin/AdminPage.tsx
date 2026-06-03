@@ -809,12 +809,35 @@ export function AdminPage(): React.JSX.Element | null {
             </YStack>
           )}
 
+          {/* Screen-reader live region for impersonation status */}
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: 'hidden',
+              clip: 'rect(0,0,0,0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {impersonatingId !== null
+              ? `Starting impersonation of ${filteredUsers.find((u) => u.id === impersonatingId)?.username ?? filteredUsers.find((u) => u.id === impersonatingId)?.email ?? 'user'}`
+              : ''}
+          </div>
+
           {/* User list */}
           {!loading && !error && filteredUsers.length > 0 && (
             <YStack
               gap={1}
               borderRadius={8}
               overflow="hidden"
+              aria-busy={impersonatingId !== null}
               style={{
                 background: OUTLINE_SUBTLE,
                 border: `1px solid ${OUTLINE_SUBTLE}`,
@@ -962,6 +985,12 @@ export function AdminPage(): React.JSX.Element | null {
                             );
                           }}
                           disabled={impersonatingId !== null}
+                          aria-disabled={impersonatingId !== null}
+                          aria-label={
+                            impersonatingId !== null
+                              ? `Impersonate ${u.username ?? u.email ?? `user #${u.id}`} (unavailable while impersonation is in progress)`
+                              : `Impersonate ${u.username ?? u.email ?? `user #${u.id}`}`
+                          }
                           style={{
                             appearance: 'none',
                             fontFamily: FONT_DISPLAY,
