@@ -3,6 +3,7 @@ import { Linking, ScrollView } from 'react-native';
 import { Button, H1, H3, Text, XStack, YStack } from 'tamagui';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { config } from '@legacy-sports/app-config';
 
 declare const __DEV__: boolean;
 
@@ -37,27 +38,19 @@ function InfoRow({ label, value }: InfoRowProps) {
 export default function AboutScreen() {
   const router = useRouter();
 
-  // Version — prefer build-time EXPO_PUBLIC_APP_VERSION (inlined by babel),
-  // fall back to expoConfig.version, sentinel 'unknown' matches web.
+  // Version — prefer build-time value from app-config (EXPO_PUBLIC_APP_VERSION
+  // inlined by babel via the native adapter), fall back to expoConfig.version.
   const appVersion =
-    process.env.EXPO_PUBLIC_APP_VERSION ||
-    Constants.expoConfig?.version ||
-    'unknown';
+    config.appVersion || Constants.expoConfig?.version || 'unknown';
 
-  // Commit SHA — EXPO_PUBLIC_COMMIT_SHA inlined by babel; extra.commitSha for
-  // release builds that predate the static-member inline path (LS-5717).
-  const rawCommitSha =
-    process.env.EXPO_PUBLIC_COMMIT_SHA ||
-    (Constants.expoConfig?.extra?.commitSha as string | undefined) ||
-    'unknown';
+  // Commit SHA — read via native adapter (static EXPO_PUBLIC_COMMIT_SHA read
+  // inlined by babel; extra fallback for older release builds).
+  const rawCommitSha = config.commitSha || 'unknown';
 
-  // Build date — EXPO_PUBLIC_BUILD_DATE inlined by babel; extra.buildDate for
-  // release builds. Never use new Date() — that produces the device date, not
-  // the actual build timestamp (LS-5717).
-  const rawBuildDate =
-    process.env.EXPO_PUBLIC_BUILD_DATE ||
-    (Constants.expoConfig?.extra?.buildDate as string | undefined) ||
-    'unknown';
+  // Build date — read via native adapter (same inlining path as commitSha).
+  // Never use new Date() — that produces the device date, not the build
+  // timestamp (LS-5717).
+  const rawBuildDate = config.buildDate || 'unknown';
 
   const formattedBuildDate =
     rawBuildDate !== 'unknown'
@@ -71,11 +64,8 @@ export default function AboutScreen() {
         })
       : rawBuildDate;
 
-  // GraphQL host — extra.graphqlHost is embedded by app.config.js (LS-6399).
-  const graphqlHost =
-    process.env.EXPO_PUBLIC_GRAPHQL_HOST ||
-    (Constants.expoConfig?.extra?.graphqlHost as string | undefined) ||
-    'unknown';
+  // GraphQL host — read via native adapter (EXPO_PUBLIC_GRAPHQL_HOST).
+  const graphqlHost = config.graphqlHost || 'unknown';
 
   const sdkVersion = Constants.expoConfig?.sdkVersion || 'unknown';
 

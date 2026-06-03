@@ -123,8 +123,7 @@ export interface CareerStatsViewerProps {
 }
 
 function CareerStatsViewer({
-  apiEndpoint = process.env.VITE_STATS_API_URL ||
-    'http://localhost:5000/career-stats',
+  apiEndpoint = 'http://localhost:5000/career-stats',
 }: CareerStatsViewerProps) {
   const [player, setPlayer] = useState('');
   const [loading, setLoading] = useState(false);

@@ -174,10 +174,10 @@ export function useWebSocket({
   const onMessageRef = useLatestRef(onMessage);
   const onErrorRef = useLatestRef(onError);
 
-  // Get WebSocket URL from environment or passed prop.
-  // In Vite (web), callers should pass `url={import.meta.env.VITE_WEBSOCKET_URL}`.
-  // In Node/CLI contexts this falls back to process.env.VITE_WEBSOCKET_URL.
-  const wsUrl = url || process.env.VITE_WEBSOCKET_URL;
+  // Get WebSocket URL from the passed prop.
+  // Callers on web should pass `url={config.websocketUrl}` from
+  // @legacy-sports/app-config; the prop is required for the hook to connect.
+  const wsUrl = url;
 
   // Log connection parameters once on mount
   useEffect(() => {

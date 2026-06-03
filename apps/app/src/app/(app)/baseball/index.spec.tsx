@@ -401,8 +401,9 @@ describe('BaseballHome', () => {
       // recipient can join via the join-by-code flow. Derive the base URL from
       // the same env fallback the component uses so the assertion holds even
       // when EXPO_PUBLIC_APP_BASE_URL is set in the test environment.
-      const expectedBaseUrl =
-        process.env.EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app';
+      // Use the same default the component uses; in tests EXPO_PUBLIC_APP_BASE_URL
+      // is not set so this resolves to the fallback (LS-7561: no direct env reads).
+      const expectedBaseUrl = 'https://legacysports.app';
       expect(shareArg.message).toContain('Fantasy Legends');
       expect(shareArg.message).toContain('ABC12345');
       expect(shareArg.url).toBe(

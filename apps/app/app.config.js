@@ -1,6 +1,6 @@
 // Expo dynamic config (LS-4777).
 //
-// Two responsibilities:
+// Responsibilities:
 //
 //   1. Load the monorepo root `.env` so Expo and Metro can see the same
 //      ROLLBAR / EXPO_PUBLIC_* variables that the web app, scripts, and
@@ -11,12 +11,18 @@
 //      for the bundler, so EXPO_PUBLIC_* values are inlined into the JS
 //      bundle at build time.
 //
-//   2. Alias the existing client token so we don't double-provision. The
-//      web app uses VITE_ROLLBAR_ACCESS_TOKEN (post_client_item); the native
-//      app uses the same token under EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN. One
-//      Rollbar project, one client token — items remain separable in the
-//      dashboard via the rollbar SDK's `client.javascript.platform` /
-//      `platform` payload fields.
+//   2. Mirror APP_VERSION → EXPO_PUBLIC_APP_VERSION when only the bare name
+//      is set (e.g. EAS / CI sets APP_VERSION; the EXPO_PUBLIC_ prefix is
+//      required for babel-preset-expo to inline it).
+//
+// All other VITE_* → EXPO_PUBLIC_* aliasing (Rollbar, GrowthBook, Giphy,
+// commit SHA, build date) is handled by the with-expo-public-env config
+// plugin at prebuild (LS-7558, LS-7561). The legacy `resolvedExtra` URL
+// routing (oauthProxy, googleClientId, graphqlHost) has been removed — those
+// values are now read directly via static EXPO_PUBLIC_* member expressions in
+// the @legacy-sports/app-config native adapter, which falls back to
+// Constants.expoConfig.extra only for backward compat with old binaries
+// (LS-7561).
 //
 // Static fields (name, version, plugins, ios/android config) still live in
 // app.json so the CI build-validation step (.github/actions/build-validation)
@@ -49,73 +55,14 @@ if (
   process.env.EXPO_PUBLIC_APP_VERSION = process.env.APP_VERSION;
 }
 
-// Note: VITE_ROLLBAR_ACCESS_TOKEN → EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN and
-// VITE_GROWTHBOOK_CLIENT_KEY → EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY aliases are
-// now handled by the with-expo-public-env config plugin at prebuild (LS-7558).
-// For `expo start` (dev), set both the VITE_* and EXPO_PUBLIC_* vars directly
-// in the root .env if both web and native need them simultaneously.
-
-// Mirror VITE_COMMIT_SHA → EXPO_PUBLIC_COMMIT_SHA so native builds get the
-// same commit sentinel as web (LS-5717).
-if (
-  !process.env.EXPO_PUBLIC_COMMIT_SHA?.trim() &&
-  process.env.VITE_COMMIT_SHA?.trim()
-) {
-  process.env.EXPO_PUBLIC_COMMIT_SHA = process.env.VITE_COMMIT_SHA;
-}
-
-// Mirror web build-date vars → EXPO_PUBLIC_BUILD_DATE (LS-5717).
-if (!process.env.EXPO_PUBLIC_BUILD_DATE?.trim()) {
-  const webBuildDate =
-    process.env.VITE_BUILD_TIMESTAMP ?? process.env.VITE_BUILD_DATE;
-  if (webBuildDate?.trim()) {
-    process.env.EXPO_PUBLIC_BUILD_DATE = webBuildDate;
-  }
-}
-
 // Spread the static config from app.json. The `config` argument Expo passes
 // here already includes the parsed app.json contents, but reading it
 // explicitly makes the dependency obvious and survives future Expo CLI
 // changes.
 const staticConfig = require('./app.json').expo;
 
-// Return the env var only when it holds a non-whitespace value, so an unset or
-// blank EXPO_PUBLIC_* falls back to the app.json placeholder instead of
-// overwriting it with `undefined`.
-const fromEnv = (name) => {
-  const value = process.env[name];
-  return value?.trim() ? value : undefined;
-};
-
-// Mirror runtime EXPO_PUBLIC_* URLs into `extra`.
-//
-// These values are read on-device through `@legacy-sports/env-utilities`
-// (`getEnvVarOptional` / `getEnvVarRequired`), which does a *dynamic*
-// `process.env[name]` lookup. `babel-preset-expo` only inlines *static*
-// `process.env.EXPO_PUBLIC_*` member expressions, so the dynamic reads resolve
-// to `undefined` in a release bundle — the env values loaded above never reach
-// the device that way, and resolution falls back to the localhost placeholder.
-// `extra`, by contrast, is embedded into the compiled manifest at prebuild time
-// and read back via `Constants.expoConfig.extra`, so it is the only reliable
-// channel for these URLs. The consumers (`mobileOAuthConfig` / `DbClient`)
-// prefer the env var, then fall back to `extra`, so this keeps `expo start`
-// working while fixing release builds (LS-6399).
-const resolvedExtra = {
-  ...staticConfig.extra,
-  oauthProxyUrl:
-    fromEnv('EXPO_PUBLIC_OAUTH_PROXY') ?? staticConfig.extra?.oauthProxyUrl,
-  googleClientId:
-    fromEnv('EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID') ??
-    staticConfig.extra?.googleClientId,
-  graphqlHost:
-    fromEnv('EXPO_PUBLIC_GRAPHQL_HOST') ?? staticConfig.extra?.graphqlHost,
-  commitSha: fromEnv('EXPO_PUBLIC_COMMIT_SHA') ?? staticConfig.extra?.commitSha,
-  buildDate: fromEnv('EXPO_PUBLIC_BUILD_DATE') ?? staticConfig.extra?.buildDate,
-};
-
 /** @type {(ctx: { config: import('@expo/config-types').ExpoConfig }) => import('@expo/config-types').ExpoConfig} */
 module.exports = ({ config }) => ({
   ...config,
   ...staticConfig,
-  extra: resolvedExtra,
 });

@@ -29,9 +29,11 @@ export function buildNativeConfig(): AppConfig {
     environmentName: undefined,
     authTestMode: undefined,
     discordClientId: undefined,
-    appVersion: undefined,
-    commitSha: undefined,
-    buildDate: undefined,
+    // Build-metadata keys — available on native via EXPO_PUBLIC_* (inlined by
+    // babel-preset-expo) with extra fallback for backward compat (LS-7561).
+    appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? extra?.['appVersion'],
+    commitSha: process.env.EXPO_PUBLIC_COMMIT_SHA ?? extra?.['commitSha'],
+    buildDate: process.env.EXPO_PUBLIC_BUILD_DATE ?? extra?.['buildDate'],
     branch: undefined,
     rollbarCaptureRate: undefined,
     googleAnalyticsMeasurementId: undefined,

@@ -56,19 +56,8 @@ jest.mock('@legacy-sports/websocket-client', () => ({
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('useWebSocket', () => {
-  const originalEnv = process.env.VITE_WEBSOCKET_URL;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.VITE_WEBSOCKET_URL;
-  });
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.VITE_WEBSOCKET_URL = originalEnv;
-    } else {
-      delete process.env.VITE_WEBSOCKET_URL;
-    }
   });
 
   function getConstructor(): jest.Mock {
@@ -90,7 +79,7 @@ describe('useWebSocket', () => {
     expect(typeof result.current.updateContext).toBe('function');
   });
 
-  it('sets error when url is missing and env var is unset', () => {
+  it('sets error when url prop is not provided', () => {
     const { result } = renderHook(() => useWebSocket({}));
     expect(result.current.error).toBe('WebSocket URL not configured');
   });
@@ -123,14 +112,9 @@ describe('useWebSocket', () => {
     });
   });
 
-  it('falls back to VITE_WEBSOCKET_URL env var when url prop is omitted', () => {
-    process.env.VITE_WEBSOCKET_URL = 'wss://env-url.example.com';
-
+  it('does not create client when url prop is omitted (callers must pass url)', () => {
     renderHook(() => useWebSocket({ token: 'jwt-token' }));
-
-    expect(getConstructor()).toHaveBeenCalledWith(
-      expect.objectContaining({ url: 'wss://env-url.example.com' }),
-    );
+    expect(getConstructor()).not.toHaveBeenCalled();
   });
 
   // ── Auto-connect ────────────────────────────────────────────────────────

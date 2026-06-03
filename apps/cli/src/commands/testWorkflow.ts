@@ -25,10 +25,7 @@ async function connectWebSocket(
   matchupId?: number,
   viewContext: 'general' | 'league' | 'matchup' | 'roster' = 'general',
 ): Promise<WebSocketClient> {
-  const wsUrl =
-    process.env.WEBSOCKET_URL ||
-    process.env.VITE_WEBSOCKET_URL ||
-    'wss://ws.legacy-fantasy.com';
+  const wsUrl = process.env.WEBSOCKET_URL || 'wss://ws.legacy-fantasy.com';
 
   LOGGER.info(`🔌 Connecting to WebSocket: ${wsUrl}`);
 

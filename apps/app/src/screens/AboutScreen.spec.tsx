@@ -4,8 +4,6 @@ import Constants from 'expo-constants';
 import AboutScreen from './AboutScreen';
 
 // expo-constants pulls in native expo-modules-core which is unavailable in Jest.
-// Pattern mirrors mobileOAuthConfig.spec.ts: expoConfig at both default level
-// (ESM) and top level (CJS/Jest interop) so Constants.expoConfig is always defined.
 jest.mock('expo-constants', () => ({
   default: {
     expoConfig: {
@@ -27,6 +25,15 @@ jest.mock('expo-constants', () => ({
   platform: {},
 }));
 
+// Mock @legacy-sports/app-config so tests can control config values without
+// depending on the module-load-time singleton (which reads process.env once).
+const mockConfig: Record<string, string | undefined> = {};
+jest.mock('@legacy-sports/app-config', () => ({
+  get config() {
+    return mockConfig;
+  },
+}));
+
 const mockedConstants = Constants as unknown as {
   expoConfig: {
     version: string;
@@ -36,6 +43,13 @@ const mockedConstants = Constants as unknown as {
 
 function setExtra(extra: Record<string, unknown>): void {
   mockedConstants.expoConfig.extra = extra;
+}
+
+function setConfig(values: Record<string, string | undefined>): void {
+  Object.keys(mockConfig).forEach((k) => {
+    delete mockConfig[k];
+  });
+  Object.assign(mockConfig, values);
 }
 
 const mockRouterPush = jest.fn();
@@ -85,31 +99,10 @@ jest.mock('tamagui', () => {
 });
 
 describe('AboutScreen', () => {
-  const envKeys = [
-    'EXPO_PUBLIC_APP_VERSION',
-    'EXPO_PUBLIC_COMMIT_SHA',
-    'EXPO_PUBLIC_BUILD_DATE',
-    'EXPO_PUBLIC_GRAPHQL_HOST',
-  ] as const;
-  const savedEnv: Partial<Record<string, string>> = {};
-
   beforeEach(() => {
     jest.clearAllMocks();
-    envKeys.forEach((k) => {
-      savedEnv[k] = process.env[k];
-      delete process.env[k];
-    });
+    setConfig({});
     setExtra({});
-  });
-
-  afterEach(() => {
-    envKeys.forEach((k) => {
-      if (savedEnv[k] !== undefined) {
-        process.env[k] = savedEnv[k];
-      } else {
-        delete process.env[k];
-      }
-    });
   });
 
   it('shows "unknown" sentinel for commit SHA when not configured', () => {
@@ -118,8 +111,8 @@ describe('AboutScreen', () => {
     expect(screen.getAllByText('unknown').length).toBeGreaterThan(0);
   });
 
-  it('shows commit SHA from Constants.expoConfig.extra when env var is absent', () => {
-    setExtra({ commitSha: 'abc1234' });
+  it('shows commit SHA from config (native adapter, LS-7561)', () => {
+    setConfig({ commitSha: 'abc1234' });
     render(<AboutScreen />);
     expect(screen.getByText('abc1234')).toBeTruthy();
   });
@@ -136,15 +129,15 @@ describe('AboutScreen', () => {
     expect(screen.queryByText(todayString)).toBeNull();
   });
 
-  it('shows formatted build date from Constants.expoConfig.extra when env var is absent', () => {
-    setExtra({ buildDate: '2025-01-15T10:30:00.000Z' });
+  it('shows formatted build date from config (native adapter)', () => {
+    setConfig({ buildDate: '2025-01-15T10:30:00.000Z' });
     render(<AboutScreen />);
     // Formatted string includes the year at minimum
     expect(screen.getByText(/2025/)).toBeTruthy();
   });
 
-  it('shows GraphQL host from Constants.expoConfig.extra', () => {
-    setExtra({ graphqlHost: 'https://api.example.com/graphql' });
+  it('shows GraphQL host from config (native adapter)', () => {
+    setConfig({ graphqlHost: 'https://api.example.com/graphql' });
     render(<AboutScreen />);
     expect(screen.getByText('https://api.example.com/graphql')).toBeTruthy();
   });
@@ -159,7 +152,7 @@ describe('AboutScreen', () => {
     expect(screen.getByText('Get Started Free')).toBeTruthy();
   });
 
-  it('shows app version from expoConfig.version when env var is absent', () => {
+  it('shows app version from expoConfig.version when config.appVersion is absent', () => {
     render(<AboutScreen />);
     expect(screen.getByText('1.2.3')).toBeTruthy();
   });

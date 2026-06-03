@@ -190,11 +190,6 @@ export class AuthMiddleware {
    * Get GraphQL URL from environment
    */
   getGraphQLUrl(): string {
-    return (
-      process.env.VITE_GRAPHQL_HOST ||
-      process.env.VITE_GRAPHQL_URL ||
-      process.env.GRAPHQL_URL ||
-      'https://api.legacysports.dev/graphql'
-    );
+    return process.env.GRAPHQL_URL || 'https://api.legacysports.dev/graphql';
   }
 }

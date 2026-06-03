@@ -124,11 +124,7 @@ function writeDiskCache(email: string, jwt: string): void {
 }
 
 function resolveOAuthBaseUrl(): string {
-  return (
-    process.env.VITE_OAUTH_PROXY_URL ||
-    process.env.OAUTH_PROXY_URL ||
-    'https://api.legacy-fantasy.com/oauth'
-  );
+  return process.env.OAUTH_PROXY_URL || 'https://api.legacy-fantasy.com/oauth';
 }
 
 /**

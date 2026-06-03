@@ -109,6 +109,44 @@
       }
     },
     {
+      "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+      "excludedFiles": [
+        "lib/app-config/src/**",
+        "lib/app-config/plugins/**",
+        "tools/vite-configs/**",
+        "**/app.config.js"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "MemberExpression[object.object.name='process'][object.property.name='env'][property.name=/^VITE_/]",
+            "message": "Direct process.env.VITE_* reads are forbidden outside lib/app-config (LS-7561). Use config from '@legacy-sports/app-config' instead."
+          },
+          {
+            "selector": "MemberExpression[object.object.name='process'][object.property.name='env'][property.value=/^VITE_/]",
+            "message": "Direct process.env.VITE_* reads are forbidden outside lib/app-config (LS-7561). Use config from '@legacy-sports/app-config' instead."
+          },
+          {
+            "selector": "MemberExpression[object.object.name='process'][object.property.name='env'][property.name=/^EXPO_PUBLIC_/]",
+            "message": "Direct process.env.EXPO_PUBLIC_* reads are forbidden outside lib/app-config (LS-7561). Use config from '@legacy-sports/app-config' instead."
+          },
+          {
+            "selector": "MemberExpression[object.object.name='process'][object.property.name='env'][property.value=/^EXPO_PUBLIC_/]",
+            "message": "Direct process.env.EXPO_PUBLIC_* reads are forbidden outside lib/app-config (LS-7561). Use config from '@legacy-sports/app-config' instead."
+          },
+          {
+            "selector": "MemberExpression[object.object.type='MetaProperty'][object.property.name='env'][property.name=/^VITE_/]",
+            "message": "Direct import.meta.env.VITE_* reads are forbidden outside lib/app-config (LS-7561). Use config from '@legacy-sports/app-config' instead."
+          },
+          {
+            "selector": "MemberExpression[object.object.type='MetaProperty'][object.property.name='env'][property.value=/^VITE_/]",
+            "message": "Direct import.meta.env.VITE_* reads are forbidden outside lib/app-config (LS-7561). Use config from '@legacy-sports/app-config' instead."
+          }
+        ]
+      }
+    },
+    {
       "files": ["*.js", "*.jsx"],
       "extends": ["plugin:@nx/javascript"],
       "rules": {}

@@ -70,8 +70,7 @@ export interface GameLogsTableProps {
 }
 
 function GameLogsTable({
-  apiEndpoint = process.env.VITE_STATS_API_URL ||
-    'http://localhost:5000/baseball-game-logs',
+  apiEndpoint = 'http://localhost:5000/baseball-game-logs',
 }: GameLogsTableProps) {
   const [player, setPlayer] = useState('');
   const [date, setDate] = useState('');

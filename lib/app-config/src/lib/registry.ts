@@ -81,19 +81,24 @@ export const CONFIG_KEYS = {
     web: 'VITE_DISCORD_CLIENT_ID',
     required: false,
   },
+  // appVersion / commitSha / buildDate have mobile names so AboutScreen and
+  // similar screens can read them via the native adapter instead of direct env.
   appVersion: {
     clientSafe: true,
     web: 'VITE_APP_VERSION',
+    mobile: 'EXPO_PUBLIC_APP_VERSION',
     required: false,
   },
   commitSha: {
     clientSafe: true,
     web: 'VITE_COMMIT_SHA',
+    mobile: 'EXPO_PUBLIC_COMMIT_SHA',
     required: false,
   },
   buildDate: {
     clientSafe: true,
     web: 'VITE_BUILD_DATE',
+    mobile: 'EXPO_PUBLIC_BUILD_DATE',
     required: false,
   },
   branch: {
