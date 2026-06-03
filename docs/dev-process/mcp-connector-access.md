@@ -58,7 +58,13 @@ Track B uses per-user OAuth, so you need an account in the `${name_prefix}-mcp-d
 4. Enter the new developer's email address and set a temporary password, or let Cognito generate one.
 5. Click **Create user**. Cognito sends the invite email automatically.
 
-The new developer receives the invite email and sets their own permanent password on first sign-in via the Cognito hosted UI.
+The new developer receives the invite email and sets their own permanent password on first sign-in via the Cognito hosted UI. Direct them to this URL to set their password:
+
+```
+https://legacy-sports-dev-mcp.auth.us-east-1.amazoncognito.com/login?client_id=467i999ffpfja2vav4dilqk5lm&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback
+```
+
+After setting their password, the browser will redirect back to claude.ai. The password is now set and they can proceed to Step 2.
 
 > **What permissions does the new user get?**  
 > Pool membership equals full MCP access. The `mcp_connector` app client grants scopes `mcp/jira`, `mcp/github`, and `mcp/ci` — all three servers — to every user in the pool. There is no per-user scope restriction.
@@ -97,6 +103,25 @@ This is an upstream platform gap, not a server bug.
 | **Rotate or revoke the machine secret**                                                          | Affects Track A (Copilot Coding Agent only). See [`docs/authentication/mcp-machine-credential-lifecycle.md`](../authentication/mcp-machine-credential-lifecycle.md) for the revocation runbook. |
 
 Because existing tokens survive until their TTL, a freshly disabled user may continue to reach the MCP servers for a short window. If immediate revocation is needed (security incident), refer to the machine-credential lifecycle runbook for the fast-revocation procedure.
+
+---
+
+## Connection reference
+
+The values below are for the `dev` environment. They are written to `.env.local` by `node scripts/mcp-auth.mjs` and used by `scripts/mcp-mint-token.mjs` to mint tokens at every session connect.
+
+| Variable / Purpose                                     | Value                                                            |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `MCP_AUTH_COGNITO_DOMAIN`                              | `https://legacy-sports-dev-mcp.auth.us-east-1.amazoncognito.com` |
+| `MCP_MACHINE_CLIENT_ID` (Track A — machine credential) | `3u8etepo3uoqfjl1ih8mn8312j`                                     |
+| Connector client ID (Track B — claude.ai OAuth)        | `467i999ffpfja2vav4dilqk5lm`                                     |
+| `MCP_JIRA_URL`                                         | `https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com`         |
+| `MCP_GITHUB_URL`                                       | `https://lhnqee219k.execute-api.us-east-1.amazonaws.com`         |
+| `MCP_CI_URL`                                           | `https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com`         |
+
+The token endpoint is `${MCP_AUTH_COGNITO_DOMAIN}/oauth2/token`. The machine client secret (`MCP_MACHINE_CLIENT_SECRET`) is fetched from Secrets Manager by `mcp-auth.mjs` and is not listed here — see [`docs/authentication/mcp-machine-credential-lifecycle.md`](../authentication/mcp-machine-credential-lifecycle.md) for secret management.
+
+> **Track B connector registration**: when registering the three connectors in claude.ai Org Settings → Connectors, use the **connector client ID** (`467i999ffpfja2vav4dilqk5lm`), not the machine client ID. Using the wrong client ID causes a `redirect_mismatch` error during the OAuth consent flow.
 
 ---
 
