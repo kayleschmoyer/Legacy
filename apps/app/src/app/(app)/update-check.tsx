@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import React, { useCallback, useState } from 'react';
 import { Platform, ScrollView } from 'react-native';
 import {
@@ -13,6 +12,7 @@ import {
   YStack,
 } from 'tamagui';
 
+import { config } from '@legacy-sports/app-config/native';
 import {
   downloadApk,
   launchApkInstaller,
@@ -38,7 +38,7 @@ function formatBytes(bytes: number): string {
 }
 
 function getInstalledVersion(): string {
-  return Constants.expoConfig?.version ?? '0.0.0';
+  return config.appVersion ?? '0.0.0';
 }
 
 function progressPercent(written: number, expected: number): number {

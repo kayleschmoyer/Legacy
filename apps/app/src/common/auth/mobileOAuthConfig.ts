@@ -1,7 +1,5 @@
-import Constants from 'expo-constants';
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
+import { config } from '@legacy-sports/app-config/native';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
-import { EnvironmentVariable } from '../EnvironmentVariables';
 
 /**
  * The shared Web OAuth client ID for the legacy-sports Firebase project
@@ -21,20 +19,13 @@ export const DEFAULT_GOOGLE_CLIENT_ID =
  */
 export const PLACEHOLDER_GOOGLE_CLIENT_ID = 'placeholder-google-client-id';
 
-function getExpoExtraString(key: string): string | undefined {
-  const value: unknown = Constants.expoConfig?.extra?.[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
 /**
  * Resolve the Google OAuth `webClientId`, treating the `app.json` placeholder as
  * unset and falling back to the project default. This is the only place that
  * decides which client ID the mobile app signs in with — keep it that way.
  */
 export function resolveGoogleClientId(): string {
-  const configured =
-    getEnvVarOptional(EnvironmentVariable.GOOGLE_OAUTH_CLIENT_ID) ??
-    getExpoExtraString('googleClientId');
+  const configured = config.googleClientId;
   return configured && configured !== PLACEHOLDER_GOOGLE_CLIENT_ID
     ? configured
     : DEFAULT_GOOGLE_CLIENT_ID;
@@ -48,10 +39,7 @@ export function resolveGoogleClientId(): string {
 export function getMobileOAuthConfig(): OAuthConfig {
   return {
     googleClientId: resolveGoogleClientId(),
-    oauthProxyUrl:
-      getEnvVarOptional(EnvironmentVariable.OAUTH_PROXY) ??
-      getExpoExtraString('oauthProxyUrl') ??
-      'http://localhost:5001/oauth',
+    oauthProxyUrl: config.oauthProxy,
     additionalScopes: ['openid', 'profile', 'email'],
     offlineAccess: true,
   };

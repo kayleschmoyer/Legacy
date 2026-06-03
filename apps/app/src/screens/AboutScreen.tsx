@@ -3,7 +3,7 @@ import { Linking, ScrollView } from 'react-native';
 import { Button, H1, H3, Text, XStack, YStack } from 'tamagui';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { config } from '@legacy-sports/app-config';
+import { config } from '@legacy-sports/app-config/native';
 
 declare const __DEV__: boolean;
 
@@ -38,10 +38,7 @@ function InfoRow({ label, value }: InfoRowProps) {
 export default function AboutScreen() {
   const router = useRouter();
 
-  // Version — prefer build-time value from app-config (EXPO_PUBLIC_APP_VERSION
-  // inlined by babel via the native adapter), fall back to expoConfig.version.
-  const appVersion =
-    config.appVersion || Constants.expoConfig?.version || 'unknown';
+  const appVersion = config.appVersion || 'unknown';
 
   // Commit SHA — read via native adapter (static EXPO_PUBLIC_COMMIT_SHA read
   // inlined by babel; extra fallback for older release builds).

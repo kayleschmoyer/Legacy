@@ -105,10 +105,17 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
-// Mock env utilities
-const mockEnvVars: Record<string, string> = {
-  EXPO_PUBLIC_OAUTH_PROXY: 'https://oauth-proxy.example.com',
-};
+// Mock app-config/native so getMobileOAuthConfig() reads our test URL
+jest.mock('@legacy-sports/app-config/native', () => ({
+  config: {
+    oauthProxy: 'https://oauth-proxy.example.com',
+    googleClientId: 'test-google-client-id',
+    graphqlHost: 'https://test.api.example.com/graphql',
+  },
+}));
+
+// Mock env utilities (still used by AuthHooks for BYPASS_AUTH)
+const mockEnvVars: Record<string, string> = {};
 
 jest.mock('@legacy-sports/env-utilities', () => ({
   getEnvVarRequired: (key: string) => {
@@ -163,7 +170,6 @@ describe('AuthHooks', () => {
       (key) => delete mockSecureStorage[key],
     );
     // Reset env vars
-    mockEnvVars['EXPO_PUBLIC_OAUTH_PROXY'] = 'https://oauth-proxy.example.com';
     delete mockEnvVars['EXPO_PUBLIC_BYPASS_AUTH'];
   });
 

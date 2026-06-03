@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import Constants from 'expo-constants';
 import AboutScreen from './AboutScreen';
 
 // expo-constants pulls in native expo-modules-core which is unavailable in Jest.
@@ -28,22 +27,11 @@ jest.mock('expo-constants', () => ({
 // Mock @legacy-sports/app-config so tests can control config values without
 // depending on the module-load-time singleton (which reads process.env once).
 const mockConfig: Record<string, string | undefined> = {};
-jest.mock('@legacy-sports/app-config', () => ({
+jest.mock('@legacy-sports/app-config/native', () => ({
   get config() {
     return mockConfig;
   },
 }));
-
-const mockedConstants = Constants as unknown as {
-  expoConfig: {
-    version: string;
-    extra: Record<string, unknown>;
-  };
-};
-
-function setExtra(extra: Record<string, unknown>): void {
-  mockedConstants.expoConfig.extra = extra;
-}
 
 function setConfig(values: Record<string, string | undefined>): void {
   Object.keys(mockConfig).forEach((k) => {
@@ -102,7 +90,6 @@ describe('AboutScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setConfig({});
-    setExtra({});
   });
 
   it('shows "unknown" sentinel for commit SHA when not configured', () => {
@@ -152,8 +139,8 @@ describe('AboutScreen', () => {
     expect(screen.getByText('Get Started Free')).toBeTruthy();
   });
 
-  it('shows app version from expoConfig.version when config.appVersion is absent', () => {
+  it('shows "unknown" for app version when config.appVersion is absent', () => {
     render(<AboutScreen />);
-    expect(screen.getByText('1.2.3')).toBeTruthy();
+    expect(screen.getAllByText('unknown').length).toBeGreaterThan(0);
   });
 });
