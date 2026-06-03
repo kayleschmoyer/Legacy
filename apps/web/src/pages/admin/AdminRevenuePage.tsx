@@ -60,6 +60,18 @@ const ChartCard = styled(Card, {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const SR_ONLY_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  borderWidth: 0,
+};
+
 function fmt(n: number, decimals = 0): string {
   return n.toLocaleString('en-US', {
     minimumFractionDigits: decimals,
@@ -142,6 +154,10 @@ function MetricCard({
 
 export default function AdminRevenuePage(): React.JSX.Element | null {
   const auth = useAuth();
+  const [isBrowser, setIsBrowser] = React.useState(false);
+  React.useEffect(() => {
+    setIsBrowser(true);
+  }, []);
 
   const { data, loading, error } = useAdminRevenueStatsQuery({
     skip: !auth.isAuthenticated,
@@ -311,11 +327,31 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
 
               {(stats.statusBreakdown ?? []).length > 0 && (
                 <>
-                  <div
-                    role="img"
-                    aria-label={`Bar chart showing subscription status breakdown: ${(stats.statusBreakdown ?? []).map((item) => `${STATUS_LABELS[item.status ?? ''] ?? item.status}: ${item.count ?? 0}`).join(', ')}.`}
+                  <table
+                    aria-label="Subscription status breakdown"
+                    style={SR_ONLY_STYLE}
                   >
-                    <YStack style={{ height: 220 }}>
+                    <caption>Subscription Status Breakdown</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Status</th>
+                        <th scope="col">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(stats.statusBreakdown ?? []).map((item) => {
+                        const statusKey = item.status ?? '';
+                        return (
+                          <tr key={statusKey}>
+                            <td>{STATUS_LABELS[statusKey] ?? statusKey}</td>
+                            <td>{fmt(item.count ?? 0)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {isBrowser ? (
+                    <YStack aria-hidden="true" style={{ height: 220 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={(stats.statusBreakdown ?? []).map((item) => {
@@ -361,39 +397,11 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                         </BarChart>
                       </ResponsiveContainer>
                     </YStack>
-                  </div>
-                  <table
-                    style={{
-                      position: 'absolute',
-                      width: 1,
-                      height: 1,
-                      overflow: 'hidden',
-                      clip: 'rect(0, 0, 0, 0)',
-                      whiteSpace: 'nowrap',
-                      borderWidth: 0,
-                      padding: 0,
-                      margin: -1,
-                    }}
-                  >
-                    <caption>Subscription Status Breakdown</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Status</th>
-                        <th scope="col">Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(stats.statusBreakdown ?? []).map((item) => {
-                        const statusKey = item.status ?? '';
-                        return (
-                          <tr key={statusKey}>
-                            <td>{STATUS_LABELS[statusKey] ?? statusKey}</td>
-                            <td>{item.count ?? 0}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  ) : (
+                    <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                      Charts require JavaScript to display.
+                    </Paragraph>
+                  )}
                 </>
               )}
             </YStack>
@@ -418,11 +426,25 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
 
               {(stats.subscriberGrowth ?? []).length > 0 ? (
                 <>
-                  <div
-                    role="img"
-                    aria-label={`Area chart showing new premium subscriptions per month over the last 12 months: ${(stats.subscriberGrowth ?? []).map((pt) => `${pt.month ?? ''}: ${pt.newSubscribers ?? 0}`).join(', ')}.`}
-                  >
-                    <YStack style={{ height: 240 }}>
+                  <table aria-label="Subscriber growth" style={SR_ONLY_STYLE}>
+                    <caption>Subscriber Growth (last 12 months)</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Month</th>
+                        <th scope="col">New Subscribers</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(stats.subscriberGrowth ?? []).map((pt) => (
+                        <tr key={pt.month ?? ''}>
+                          <td>{pt.month ?? ''}</td>
+                          <td>{fmt(pt.newSubscribers ?? 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {isBrowser ? (
+                    <YStack aria-hidden="true" style={{ height: 240 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={(stats.subscriberGrowth ?? []).map((pt) => ({
@@ -492,36 +514,11 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                         </AreaChart>
                       </ResponsiveContainer>
                     </YStack>
-                  </div>
-                  <table
-                    style={{
-                      position: 'absolute',
-                      width: 1,
-                      height: 1,
-                      overflow: 'hidden',
-                      clip: 'rect(0, 0, 0, 0)',
-                      whiteSpace: 'nowrap',
-                      borderWidth: 0,
-                      padding: 0,
-                      margin: -1,
-                    }}
-                  >
-                    <caption>Subscriber Growth</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Month</th>
-                        <th scope="col">New Subscribers</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(stats.subscriberGrowth ?? []).map((pt) => (
-                        <tr key={pt.month ?? ''}>
-                          <td>{pt.month ?? ''}</td>
-                          <td>{pt.newSubscribers ?? 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  ) : (
+                    <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                      Charts require JavaScript to display.
+                    </Paragraph>
+                  )}
                 </>
               ) : (
                 <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
