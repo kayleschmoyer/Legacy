@@ -9,7 +9,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AdminRevenuePage from './AdminRevenuePage';
 
-type ChildrenProps = { children?: React.ReactNode };
+type ChildrenProps = { children?: React.ReactNode; [key: string]: unknown };
 
 type AuthMock = {
   isAuthenticated: boolean;
@@ -40,10 +40,16 @@ jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
 }));
 
+jest.mock('../../context/GrowthBookProvider', () => ({
+  useFeatureValue: jest.fn(() => false),
+}));
+
 jest.mock('@legacy-sports/shared-components/ui', () => ({
   Paragraph: ({ children }: ChildrenProps) => <p>{children}</p>,
   Separator: () => <hr />,
-  XStack: ({ children }: ChildrenProps) => <div>{children}</div>,
+  XStack: ({ children, ...props }: ChildrenProps) => (
+    <div {...props}>{children}</div>
+  ),
   YStack: ({ children }: ChildrenProps) => <div>{children}</div>,
 }));
 
@@ -149,6 +155,43 @@ describe('AdminRevenuePage', () => {
       screen.queryByText(/Failed to load revenue data/i),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+  });
+
+  it('renders platform chips without "Coming soon" when iap_revenue_breakdown_enabled is true', () => {
+    const { useFeatureValue } = jest.requireMock(
+      '../../context/GrowthBookProvider',
+    );
+    useFeatureValue.mockReturnValue(true);
+
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: {
+        adminRevenueStats: {
+          totalSubscribers: 100,
+          totalPremiumUsers: 80,
+          totalFreeUsers: 20,
+          conversionRate: 0.8,
+          newSubscribersThisMonth: 5,
+          totalUsers: 100,
+          statusBreakdown: [],
+          subscriberGrowth: [],
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('platform-chip-ios')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-chip-android')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/iOS IAP — Coming soon/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Android Play — Coming soon/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('iOS IAP')).toBeInTheDocument();
+    expect(screen.getByText('Android Play')).toBeInTheDocument();
   });
 
   it('renders KPIs when data is present and hides the empty state', () => {

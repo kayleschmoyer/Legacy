@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import { PageMeta } from '../../components/PageMeta';
 import { useAdminRevenueStatsQuery } from '../../api/db/graphql.generated';
+import { useFeatureValue } from '../../context/GrowthBookProvider';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -99,6 +100,11 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: BRAND_SEAM_RED,
 };
 
+const MOBILE_PLATFORMS = [
+  { key: 'ios', label: 'iOS IAP', testId: 'platform-chip-ios' },
+  { key: 'android', label: 'Android Play', testId: 'platform-chip-android' },
+] as const;
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 interface MetricCardProps {
@@ -158,6 +164,10 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
   React.useEffect(() => {
     setIsBrowser(true);
   }, []);
+  const iapRevenueEnabled = useFeatureValue(
+    'iap_revenue_breakdown_enabled',
+    false,
+  );
 
   const { data, loading, error } = useAdminRevenueStatsQuery({
     skip: !auth.isAuthenticated,
@@ -566,36 +576,27 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                     {fmt(stats.totalSubscribers ?? 0)} subscribers
                   </Paragraph>
                 </XStack>
-                <XStack
-                  gap="$2"
-                  alignItems="center"
-                  paddingHorizontal="$3"
-                  paddingVertical="$2"
-                  borderRadius="$3"
-                  style={{
-                    background: withAlpha(TEXT_MUTED, 0.1),
-                    border: `1px solid ${withAlpha(TEXT_MUTED, 0.2)}`,
-                  }}
-                >
-                  <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
-                    iOS IAP — Coming soon
-                  </Paragraph>
-                </XStack>
-                <XStack
-                  gap="$2"
-                  alignItems="center"
-                  paddingHorizontal="$3"
-                  paddingVertical="$2"
-                  borderRadius="$3"
-                  style={{
-                    background: withAlpha(TEXT_MUTED, 0.1),
-                    border: `1px solid ${withAlpha(TEXT_MUTED, 0.2)}`,
-                  }}
-                >
-                  <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
-                    Android Play — Coming soon
-                  </Paragraph>
-                </XStack>
+                {MOBILE_PLATFORMS.map((platform) => (
+                  <XStack
+                    key={platform.key}
+                    gap="$2"
+                    alignItems="center"
+                    paddingHorizontal="$3"
+                    paddingVertical="$2"
+                    borderRadius="$3"
+                    data-testid={platform.testId}
+                    style={{
+                      background: withAlpha(TEXT_MUTED, 0.1),
+                      border: `1px solid ${withAlpha(TEXT_MUTED, 0.2)}`,
+                    }}
+                  >
+                    <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                      {iapRevenueEnabled
+                        ? platform.label
+                        : `${platform.label} — Coming soon`}
+                    </Paragraph>
+                  </XStack>
+                ))}
               </XStack>
             </YStack>
           </ChartCard>
