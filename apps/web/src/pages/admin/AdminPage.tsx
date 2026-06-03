@@ -492,6 +492,7 @@ export function AdminPage(): React.JSX.Element | null {
           </p>
           <Link
             to="/admin/revenue"
+            className="adm-nav-link"
             style={{
               marginTop: 10,
               display: 'inline-flex',
@@ -511,6 +512,7 @@ export function AdminPage(): React.JSX.Element | null {
           </Link>
           <Link
             to="/admin/users"
+            className="adm-nav-link"
             style={{
               marginTop: 6,
               display: 'inline-flex',
@@ -565,6 +567,7 @@ export function AdminPage(): React.JSX.Element | null {
               </span>
               <Link
                 to="/admin/revenue"
+                className="adm-action-link"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1157,6 +1160,18 @@ export function AdminPage(): React.JSX.Element | null {
         @keyframes admin-shimmer {
           from { background-position: 200% 0; }
           to { background-position: -200% 0; }
+        }
+        .adm-nav-link:focus-visible {
+          outline: 2px solid ${BRAND_GOLD};
+          outline-offset: 2px;
+          border-radius: 2px;
+        }
+        .adm-nav-link:hover, .adm-nav-link:focus-visible {
+          text-decoration: underline;
+        }
+        .adm-action-link:focus-visible {
+          outline: 2px solid ${BRAND_GOLD};
+          outline-offset: 2px;
         }`}</style>
     </YStack>
   );
