@@ -29,6 +29,7 @@ import {
   OnThisDayFeed,
   PendingTradeOffers,
   PendingWaiverClaims,
+  StandingsTable,
   useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
@@ -36,7 +37,6 @@ import {
   StartDraftMutation,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
-  useGetLeagueTeamsLazyQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
@@ -44,8 +44,8 @@ import {
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
-import { LeagueStandings } from '../../../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
+import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
 import { LeagueDuesSetup } from '../../../../features/commissioner/LeagueDuesSetup';
 import { LeagueDuesPaymentStatus } from '../../../../features/commissioner/LeagueDuesPaymentStatus';
@@ -139,21 +139,11 @@ export default function FootballLeagueId(): React.JSX.Element {
       },
     });
 
-  const [
-    getLeagueTeams,
-    { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useGetLeagueTeamsLazyQuery();
-
-  useEffect(() => {
-    if (selectedTab === 'standings' && !isNaN(numLeagueId)) {
-      void getLeagueTeams({
-        variables: { leagueId: numLeagueId },
-        onError: (error: Error) => {
-          LOGGER.error('Error fetching league teams', error);
-        },
-      });
-    }
-  }, [selectedTab, numLeagueId, getLeagueTeams]);
+  const {
+    standings,
+    loading: standingsLoading,
+    error: standingsError,
+  } = useStandings(isNaN(numLeagueId) ? null : numLeagueId);
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -507,11 +497,15 @@ export default function FootballLeagueId(): React.JSX.Element {
         </Tabs.Content>
 
         <Tabs.Content value="standings" flex={1}>
-          <LeagueStandings
-            teams={leagueTeamsData?.leagueTeams || []}
-            loading={leagueTeamsLoading}
-            userTeamId={userTeamId}
-          />
+          <ScrollView>
+            <YStack padding="$3">
+              <StandingsTable
+                standings={standings}
+                loading={standingsLoading}
+                error={standingsError}
+              />
+            </YStack>
+          </ScrollView>
         </Tabs.Content>
 
         <Tabs.Content value="chat" flex={1}>

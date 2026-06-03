@@ -99,6 +99,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     OnThisDayFeed: () => <View testID="on-this-day-feed" />,
     PendingTradeOffers: () => <View testID="pending-trade-offers" />,
     PendingWaiverClaims: () => <View testID="pending-waiver-claims" />,
+    StandingsTable: () => <View testID="standings-table" />,
     useWebSocket: jest.fn(() => ({ connected: false })),
   };
 });
@@ -110,12 +111,14 @@ jest.mock('../../../../features/roster/LeagueRosterManagement', () => {
   };
 });
 
-jest.mock('../../../../features/roster/LeagueStandings', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
-  return {
-    LeagueStandings: () => <View testID="league-standings" />,
-  };
-});
+jest.mock('../../../../features/matchup/hooks/useStandings', () => ({
+  useStandings: jest.fn(() => ({
+    standings: [],
+    loading: false,
+    error: undefined,
+    refetch: jest.fn(),
+  })),
+}));
 
 jest.mock('../../../../features/leagues/LeagueChatTab', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
@@ -210,10 +213,6 @@ const mockGetTeamMembersQuery = jest.fn(() => ({
   data: { teamMembers: [] },
   loading: false,
 }));
-const mockGetLeagueTeamsLazyQuery = jest.fn(() => [
-  jest.fn(),
-  { data: { leagueTeams: [] }, loading: false },
-]);
 const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   jest.fn(),
   { data: { userTeamId: 10 }, loading: false },
@@ -228,8 +227,6 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
     mockGetPositionsForLeagueQuery(...args),
   useGetTeamMembersQuery: (...args: unknown[]) =>
     mockGetTeamMembersQuery(...args),
-  useGetLeagueTeamsLazyQuery: (...args: unknown[]) =>
-    mockGetLeagueTeamsLazyQuery(...args),
   useGetUserTeamIdLazyQuery: (...args: unknown[]) =>
     mockGetUserTeamIdLazyQuery(...args),
   useStartDraftMutation: (...args: unknown[]) =>
@@ -255,10 +252,6 @@ describe('FootballLeagueId', () => {
       data: { teamMembers: [] },
       loading: false,
     });
-    mockGetLeagueTeamsLazyQuery.mockReturnValue([
-      jest.fn(),
-      { data: { leagueTeams: [] }, loading: false },
-    ]);
     mockGetUserTeamIdLazyQuery.mockReturnValue([
       jest.fn(),
       { data: { userTeamId: 10 }, loading: false },
