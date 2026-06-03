@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Card, Dialog, H1, Input, Paragraph, Spinner, Text } from 'tamagui';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetAllUsersQuery,
   useGetUsersCountQuery,
@@ -34,7 +35,9 @@ const ACCESS_LEVEL_LABELS: Record<AccessLevelFilter, string> = {
 };
 
 export default function AdminUsersPage() {
-  const { user, isLoading } = useAuth();
+  const auth = useAuth();
+  const { user } = auth;
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -48,6 +51,11 @@ export default function AdminUsersPage() {
     currentLevel: string | null | undefined;
     label: string;
     isSelf: boolean;
+  } | null>(null);
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
+  const [pendingImpersonation, setPendingImpersonation] = useState<{
+    id: number;
+    label: string;
   } | null>(null);
 
   const isAdmin = user?.accessLevel === 'admin';
@@ -92,7 +100,7 @@ export default function AdminUsersPage() {
 
   const [updateUserRole, { loading: updating }] = useUpdateUserRoleMutation();
 
-  if (isLoading) {
+  if (auth.isLoading) {
     return null;
   }
 
@@ -146,6 +154,24 @@ export default function AdminUsersPage() {
       setSortDirection('asc');
     }
   }
+
+  const handleImpersonateConfirm = async () => {
+    if (!pendingImpersonation) return;
+    const { id } = pendingImpersonation;
+    setPendingImpersonation(null);
+    setImpersonatingId(id);
+    try {
+      await auth.impersonateUser(id);
+      void navigate('/');
+    } catch (err) {
+      LOGGER.error(
+        'Impersonation failed:',
+        err instanceof Error ? err : String(err),
+      );
+    } finally {
+      setImpersonatingId(null);
+    }
+  };
 
   // Build visible page numbers (at most 7: first, last, current ±1, with ellipsis)
   function getPageNumbers(): (number | '...')[] {
@@ -407,6 +433,29 @@ export default function AdminUsersPage() {
                     >
                       {isUserAdmin ? 'Revoke Admin' : 'Make Admin'}
                     </Button>
+                    {!isUserAdmin && displayId !== user.id && (
+                      <Button
+                        size="$3"
+                        onPress={() =>
+                          setPendingImpersonation({
+                            id: displayId,
+                            label:
+                              u.username ?? u.email ?? `User #${displayId}`,
+                          })
+                        }
+                        disabled={impersonatingId !== null || updating}
+                        opacity={impersonatingId !== null ? 0.55 : 1}
+                        backgroundColor={withAlpha(BRAND_NAVY, 0.08)}
+                        borderColor="$borderColor"
+                        borderWidth={1}
+                      >
+                        {impersonatingId === displayId ? (
+                          <Spinner size="small" />
+                        ) : (
+                          'Impersonate'
+                        )}
+                      </Button>
+                    )}
                   </XStack>
                 </XStack>
               </Card>
@@ -475,6 +524,64 @@ export default function AdminUsersPage() {
         </YStack>
       )}
 
+      {/* Confirmation dialog for impersonation */}
+      <Dialog
+        modal
+        open={pendingImpersonation !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingImpersonation(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="impersonate-title"
+            aria-describedby="impersonate-description"
+            animateOnly={['transform', 'opacity']}
+            animation={['quick', { opacity: { overshootClamping: true } }]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={500}
+          >
+            <Dialog.Title id="impersonate-title">
+              Impersonate {pendingImpersonation?.label}?
+            </Dialog.Title>
+            <Dialog.Description id="impersonate-description">
+              You will be signed in as this user until you sign out. Use this
+              only for debugging purposes.
+            </Dialog.Description>
+            <XStack gap="$3" justifyContent="flex-end">
+              <Button onPress={() => setPendingImpersonation(null)}>
+                Cancel
+              </Button>
+              <Button
+                theme="blue"
+                onPress={() => {
+                  void handleImpersonateConfirm();
+                }}
+                disabled={impersonatingId !== null}
+                icon={impersonatingId !== null ? <Spinner /> : undefined}
+              >
+                Impersonate
+              </Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
+
       {/* Confirmation dialog for admin role toggle */}
       <Dialog
         modal
@@ -526,7 +633,7 @@ export default function AdminUsersPage() {
                         ? 'You cannot remove your own admin access. Ask another admin to make this change if needed.'
                         : willRevoke
                           ? 'This user will lose access to admin tools.'
-                          : 'This user will gain full access to admin tools, including the ability to change other users’ roles.'}
+                          : "This user will gain full access to admin tools, including the ability to change other users' roles."}
                     </Dialog.Description>
                     <XStack gap="$3" justifyContent="flex-end">
                       <Button

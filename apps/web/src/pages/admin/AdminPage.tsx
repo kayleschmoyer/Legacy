@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog } from '@legacy-sports/shared-components';
-import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { XStack, YStack } from '@legacy-sports/shared-components/ui';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Spinner } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
@@ -33,8 +32,9 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import {
-  useAdminGetUsersQuery,
+  useGetAllUsersQuery,
   useGetUserByIdQuery,
+  useGetUsersCountQuery,
 } from '../../api/db/graphql.generated';
 
 // ─── JWT helpers ──────────────────────────────────────────────────────────────
@@ -450,14 +450,7 @@ function AdminNavHub() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminPage(): React.JSX.Element | null {
-  const navigate = useNavigate();
   const auth = useAuth();
-  const [search, setSearch] = useState('');
-  const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
-  const [pendingImpersonation, setPendingImpersonation] = useState<{
-    id: number;
-    label: string;
-  } | null>(null);
 
   // JWT decoder state
   const [jwtInput, setJwtInput] = useState('');
@@ -505,10 +498,15 @@ export function AdminPage(): React.JSX.Element | null {
     return () => window.removeEventListener('focus', handleFocus);
   }, [auth.isAuthenticated, currentUserId, refetchServerUser]);
 
-  const { data, loading, error } = useAdminGetUsersQuery({
-    variables: { limit: 200, offset: 0 },
+  const { data: countData } = useGetUsersCountQuery({
     skip: auth.user?.accessLevel !== 'admin',
-    fetchPolicy: 'no-cache',
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const { data: recentData, loading: recentLoading } = useGetAllUsersQuery({
+    variables: { limit: 5, offset: 0, orderBy: 'id', orderDirection: 'desc' },
+    skip: auth.user?.accessLevel !== 'admin',
+    fetchPolicy: 'cache-and-network',
   });
 
   if (auth.isLoading || serverUserLoading) {
@@ -528,37 +526,8 @@ export function AdminPage(): React.JSX.Element | null {
     return <Navigate to="/" replace />;
   }
 
-  const handleImpersonate = (userId: number, label: string) => {
-    setPendingImpersonation({ id: userId, label });
-  };
-
-  const handleImpersonateConfirm = async () => {
-    if (!pendingImpersonation) return;
-    const { id } = pendingImpersonation;
-    setPendingImpersonation(null);
-    setImpersonatingId(id);
-    try {
-      await auth.impersonateUser(id);
-      void navigate('/');
-    } catch (err) {
-      LOGGER.error(
-        'Impersonation failed:',
-        err instanceof Error ? err : String(err),
-      );
-    } finally {
-      setImpersonatingId(null);
-    }
-  };
-
-  const allUsers = data?.users ?? [];
-  const filteredUsers = allUsers.filter((u) => {
-    const q = search.toLowerCase();
-    return (
-      u.email?.toLowerCase().includes(q) ||
-      u.username?.toLowerCase().includes(q) ||
-      String(u.id).includes(q)
-    );
-  });
+  const totalUsers = countData?.usersCount ?? 0;
+  const recentUsers = recentData?.users ?? [];
 
   const algValue =
     jwtResult != null && typeof jwtResult.header['alg'] === 'string'
@@ -644,323 +613,119 @@ export function AdminPage(): React.JSX.Element | null {
               maxWidth: '62ch',
             }}
           >
-            Manage users and impersonate accounts for debugging.
+            Platform overview and developer tools. Manage users via{' '}
+            <Link
+              to="/admin/users"
+              style={{ color: BRAND_GOLD_LIGHT, textDecoration: 'none' }}
+            >
+              User Management
+            </Link>
+            .
           </p>
           <AdminNavHub />
         </YStack>
 
-        {/* Quick Stats & Actions — only rendered when user data has loaded */}
-        {data && (
-          <YStack gap={12} marginBottom={24}>
-            <XStack gap={10} flexWrap="wrap">
-              <StatCard label="Total Users" value={String(allUsers.length)} />
-              <StatCard
-                label="Admins"
-                value={String(
-                  allUsers.filter((u) => u.accessLevel === 'admin').length,
-                )}
-                accent={BRAND_GOLD}
-              />
-              <StatCard
-                label="Standard"
-                value={String(
-                  allUsers.filter((u) => u.accessLevel !== 'admin').length,
-                )}
-              />
-            </XStack>
-            <XStack gap={8} flexWrap="wrap" alignItems="center">
-              <span
-                style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 700,
-                  fontSize: 11,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: TEXT_TERTIARY,
-                  marginRight: 4,
-                }}
-              >
-                Quick Actions
-              </span>
-              <Link
-                to="/admin/revenue"
-                className="adm-action-link"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: BRAND_GOLD_LIGHT,
-                  textDecoration: 'none',
-                  background: withAlpha(BRAND_GOLD, 0.08),
-                  border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                }}
-              >
-                Revenue Analytics →
-              </Link>
-            </XStack>
-          </YStack>
-        )}
-
-        {/* Users section */}
-        <AdminSection
-          number="01"
-          title="Users"
-          count={data ? `${allUsers.length} TOTAL` : undefined}
-        >
-          {/* Search */}
-          <YStack position="relative" marginTop={6} marginBottom={6}>
-            <svg
-              width={18}
-              height={18}
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden
-              style={{
-                position: 'absolute',
-                left: 14,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: TEXT_TERTIARY,
-                pointerEvents: 'none',
-              }}
-            >
-              <circle
-                cx="11"
-                cy="11"
-                r="7"
-                stroke="currentColor"
-                strokeWidth={1.75}
-              />
-              <path
-                d="M20 20l-3.5-3.5"
-                stroke="currentColor"
-                strokeWidth={1.75}
-                strokeLinecap="round"
-              />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, email, or ID…"
-              aria-label="Search users"
-              style={{
-                width: '100%',
-                background: SURFACE_CARD,
-                border: `1px solid ${OUTLINE_SUBTLE}`,
-                color: TEXT_PRIMARY,
-                fontFamily: FONT_BODY,
-                fontSize: 15,
-                padding: '12px 16px 12px 42px',
-                borderRadius: 6,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+        {/* Quick Stats & Actions */}
+        <YStack gap={12} marginBottom={24}>
+          <XStack gap={10} flexWrap="wrap">
+            <StatCard
+              label="Total Users"
+              value={totalUsers > 0 ? String(totalUsers) : '—'}
             />
-          </YStack>
-
-          {/* Loading skeleton */}
-          {loading && <UsersSkeleton />}
-
-          {/* Error */}
-          {error && (
-            <XStack
-              gap={14}
-              padding={16}
-              borderRadius={16}
-              alignItems="flex-start"
+          </XStack>
+          <XStack gap={8} flexWrap="wrap" alignItems="center">
+            <span
               style={{
-                background: withAlpha(BRAND_SEAM_RED, 0.1),
-                border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.4)}`,
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: TEXT_TERTIARY,
+                marginRight: 4,
               }}
             >
-              <svg
-                width={24}
-                height={24}
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden
-                style={{ color: SCORE_LOSS, flexShrink: 0 }}
-              >
-                <path
-                  d="M12 9v4m0 4h.01M10.29 3.86l-8.07 14a2 2 0 001.71 3h16.14a2 2 0 001.71-3l-8.07-14a2 2 0 00-3.42 0z"
-                  stroke="currentColor"
-                  strokeWidth={1.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <YStack flex={1} gap={4}>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: SCORE_LOSS,
-                  }}
-                >
-                  Failed to load users
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: FONT_BODY,
-                    fontSize: 14,
-                    color: TEXT_FG2,
-                  }}
-                >
-                  <code
-                    style={{
-                      fontFamily: FONT_MONO,
-                      fontSize: 12.5,
-                      color: TEXT_MUTED,
-                      background: 'rgba(8, 12, 20, 0.4)',
-                      padding: '1px 6px',
-                      borderRadius: 4,
-                    }}
-                  >
-                    {error.message}
-                  </code>
-                </p>
-              </YStack>
-            </XStack>
-          )}
-
-          {/* Empty (no search results) */}
-          {!loading && !error && filteredUsers.length === 0 && (
-            <YStack
-              alignItems="center"
-              justifyContent="center"
-              gap={14}
-              paddingHorizontal={20}
-              paddingVertical={40}
-              borderRadius={16}
+              Quick Actions
+            </span>
+            <Link
+              to="/admin/users"
               style={{
-                background: SURFACE_CARD,
-                border: `1px dashed ${BORDER_STRONG}`,
-                textAlign: 'center',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: BRAND_GOLD_LIGHT,
+                textDecoration: 'none',
+                background: withAlpha(BRAND_GOLD, 0.08),
+                border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+                padding: '6px 12px',
+                borderRadius: 6,
               }}
             >
-              <YStack
-                width={52}
-                height={52}
-                borderRadius={9999}
-                alignItems="center"
-                justifyContent="center"
-                style={{
-                  background: SURFACE_HOVER,
-                  border: `1px solid ${BORDER_STRONG}`,
-                  color: TEXT_TERTIARY,
-                }}
-              >
-                <svg
-                  width={22}
-                  height={22}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  aria-hidden
-                >
-                  <circle
-                    cx="11"
-                    cy="11"
-                    r="7"
-                    stroke="currentColor"
-                    strokeWidth={1.75}
-                  />
-                  <path
-                    d="M20 20l-3.5-3.5"
-                    stroke="currentColor"
-                    strokeWidth={1.75}
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </YStack>
-              <h3
-                style={{
-                  margin: 0,
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 700,
-                  fontSize: 18,
-                  color: TEXT_PRIMARY,
-                }}
-              >
-                No users found
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontFamily: FONT_BODY,
-                  fontSize: 14,
-                  color: TEXT_MUTED,
-                  maxWidth: '50ch',
-                }}
-              >
-                {search ? (
-                  <>
-                    Nothing matches{' '}
-                    <span
-                      style={{
-                        fontFamily: FONT_MONO,
-                        color: BRAND_GOLD_LIGHT,
-                        background: withAlpha(BRAND_GOLD, 0.08),
-                        padding: '1px 6px',
-                        borderRadius: 4,
-                      }}
-                    >
-                      “{search}”
-                    </span>
-                    . Try a different name, email, or ID.
-                  </>
-                ) : (
-                  <>No users in the directory yet.</>
-                )}
-              </p>
-            </YStack>
-          )}
+              Manage Users →
+            </Link>
+            <Link
+              to="/admin/revenue"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: BRAND_GOLD_LIGHT,
+                textDecoration: 'none',
+                background: withAlpha(BRAND_GOLD, 0.08),
+                border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+                padding: '6px 12px',
+                borderRadius: 6,
+              }}
+            >
+              Revenue Analytics →
+            </Link>
+          </XStack>
+        </YStack>
 
-          {/* Screen-reader live region for impersonation status */}
-          <div
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
+        {/* Recent Signups section */}
+        <AdminSection number="01" title="Recent Signups" defaultOpen={true}>
+          <p
             style={{
-              position: 'absolute',
-              width: 1,
-              height: 1,
-              padding: 0,
-              margin: -1,
-              overflow: 'hidden',
-              clip: 'rect(0,0,0,0)',
-              whiteSpace: 'nowrap',
-              border: 0,
+              margin: '0 0 12px',
+              fontFamily: FONT_BODY,
+              fontSize: 14,
+              color: TEXT_MUTED,
             }}
           >
-            {impersonatingId !== null
-              ? `Starting impersonation of ${filteredUsers.find((u) => u.id === impersonatingId)?.username ?? filteredUsers.find((u) => u.id === impersonatingId)?.email ?? 'user'}`
-              : ''}
-          </div>
+            The 5 most recently registered accounts. For search, filtering, role
+            management, and impersonation, use the{' '}
+            <Link
+              to="/admin/users"
+              style={{ color: BRAND_GOLD_LIGHT, textDecoration: 'none' }}
+            >
+              User Management page
+            </Link>
+            .
+          </p>
 
-          {/* User list */}
-          {!loading && !error && filteredUsers.length > 0 && (
+          {recentLoading && <UsersSkeleton />}
+
+          {!recentLoading && recentUsers.length > 0 && (
             <YStack
               gap={1}
               borderRadius={8}
               overflow="hidden"
-              aria-busy={impersonatingId !== null}
               style={{
                 background: OUTLINE_SUBTLE,
                 border: `1px solid ${OUTLINE_SUBTLE}`,
               }}
             >
-              {filteredUsers.map((u) => {
+              {recentUsers.map((u) => {
                 const isYou = u.id === auth.user?.id;
                 const isAdmin = u.accessLevel === 'admin';
                 const initial = (u.username ?? u.email ?? '?')
@@ -982,18 +747,10 @@ export function AdminPage(): React.JSX.Element | null {
                     animation="quick"
                     style={{ background: SURFACE_CARD }}
                     hoverStyle={{ backgroundColor: SURFACE_HOVER }}
-                    $sm={{
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      gap: 10,
-                    }}
                   >
-                    {/* Avatar */}
                     <YStack
-                      width={44}
-                      height={44}
+                      width={40}
+                      height={40}
                       borderRadius={9999}
                       alignItems="center"
                       justifyContent="center"
@@ -1003,165 +760,93 @@ export function AdminPage(): React.JSX.Element | null {
                         color: isYou ? TEXT_ON_GOLD : WHITE,
                         fontFamily: FONT_DISPLAY,
                         fontWeight: 800,
-                        fontSize: 18,
+                        fontSize: 16,
                       }}
-                      $sm={{ width: 38, height: 38 }}
                     >
-                      <span style={{ fontSize: 18 }}>{initial}</span>
+                      <span>{initial}</span>
                     </YStack>
-
-                    {/* Body */}
-                    <YStack flex={1} minWidth={0} gap={4}>
-                      <XStack alignItems="center" gap={8} flexWrap="wrap">
-                        <span
-                          style={{
-                            fontFamily: FONT_BODY,
-                            fontWeight: 600,
-                            fontSize: 15,
-                            color: u.username ? TEXT_PRIMARY : TEXT_TERTIARY,
-                            fontStyle: u.username ? 'normal' : 'italic',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: '100%',
-                          }}
-                        >
-                          {u.username ?? '(no username)'}
-                        </span>
-                        {isYou && (
-                          <span
-                            style={{
-                              fontFamily: FONT_DISPLAY,
-                              fontWeight: 700,
-                              fontSize: 10.5,
-                              letterSpacing: '0.12em',
-                              textTransform: 'uppercase',
-                              padding: '3px 8px',
-                              borderRadius: 9999,
-                              color: WHITE,
-                              background: BRAND_NAVY,
-                              border: `1px solid ${BRAND_NAVY_LIGHT}`,
-                            }}
-                          >
-                            You
-                          </span>
-                        )}
-                      </XStack>
+                    <YStack flex={1} minWidth={0} gap={3}>
+                      <span
+                        style={{
+                          fontFamily: FONT_BODY,
+                          fontWeight: 600,
+                          fontSize: 14,
+                          color: u.username ? TEXT_PRIMARY : TEXT_TERTIARY,
+                          fontStyle: u.username ? 'normal' : 'italic',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {u.username ?? '(no username)'}
+                      </span>
                       <span
                         style={{
                           fontFamily: FONT_MONO,
-                          fontSize: 12.5,
-                          color: u.email ? TEXT_MUTED : TEXT_TERTIARY,
-                          whiteSpace: 'nowrap',
+                          fontSize: 12,
+                          color: TEXT_MUTED,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {u.email ?? '—'}
                       </span>
                     </YStack>
-
-                    {/* Actions row: badge + impersonate button */}
-                    <XStack alignItems="center" gap={8} flexShrink={0}>
-                      {/* Access level badge */}
-                      <span
-                        style={{
-                          fontFamily: FONT_DISPLAY,
-                          fontWeight: 700,
-                          fontSize: 10.5,
-                          letterSpacing: '0.12em',
-                          textTransform: 'uppercase',
-                          padding: '3px 8px',
-                          borderRadius: 9999,
-                          flexShrink: 0,
-                          ...(isAdmin
-                            ? {
-                                color: BRAND_GOLD_LIGHT,
-                                border: `1px solid ${withAlpha(BRAND_GOLD, 0.45)}`,
-                                background: withAlpha(BRAND_GOLD, 0.1),
-                              }
-                            : {
-                                color: TEXT_MUTED,
-                                border: `1px solid ${OUTLINE_SUBTLE}`,
-                                background: SURFACE_SUBTLE,
-                              }),
-                        }}
-                      >
-                        {u.accessLevel ?? 'none'}
-                      </span>
-
-                      {/* Impersonate */}
-                      {!isYou && !isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (u.id == null) return;
-                            handleImpersonate(
-                              u.id,
-                              u.username ?? u.email ?? `user #${u.id}`,
-                            );
-                          }}
-                          disabled={impersonatingId !== null}
-                          aria-disabled={impersonatingId !== null}
-                          aria-label={
-                            impersonatingId !== null
-                              ? `Impersonate ${u.username ?? u.email ?? `user #${u.id}`} (unavailable while impersonation is in progress)`
-                              : `Impersonate ${u.username ?? u.email ?? `user #${u.id}`}`
-                          }
-                          style={{
-                            appearance: 'none',
-                            fontFamily: FONT_DISPLAY,
-                            fontWeight: 700,
-                            fontSize: 11,
-                            letterSpacing: '0.1em',
-                            textTransform: 'uppercase',
-                            padding: '7px 12px',
-                            borderRadius: 12,
-                            cursor:
-                              impersonatingId !== null
-                                ? 'not-allowed'
-                                : 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            transition:
-                              'all 150ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-                            whiteSpace: 'nowrap',
-                            color: WHITE,
-                            background: BRAND_NAVY,
-                            border: `1px solid ${BRAND_NAVY_LIGHT}`,
-                            boxShadow: '0 1px 2px rgba(8, 12, 20, 0.4)',
-                            opacity: impersonatingId !== null ? 0.55 : 1,
-                            minHeight: 36,
-                          }}
-                        >
-                          {impersonatingId === u.id ? (
-                            <>
-                              <span
-                                aria-hidden
-                                style={{
-                                  width: 13,
-                                  height: 13,
-                                  border: '1.6px solid currentColor',
-                                  borderRightColor: 'transparent',
-                                  borderRadius: '50%',
-                                  animation: 'admin-spin 800ms linear infinite',
-                                  display: 'inline-block',
-                                }}
-                              />
-                              Starting…
-                            </>
-                          ) : (
-                            <>Impersonate</>
-                          )}
-                        </button>
-                      )}
-                    </XStack>
+                    <span
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: 700,
+                        fontSize: 10.5,
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        padding: '3px 8px',
+                        borderRadius: 9999,
+                        flexShrink: 0,
+                        ...(isAdmin
+                          ? {
+                              color: BRAND_GOLD_LIGHT,
+                              border: `1px solid ${withAlpha(BRAND_GOLD, 0.45)}`,
+                              background: withAlpha(BRAND_GOLD, 0.1),
+                            }
+                          : {
+                              color: TEXT_MUTED,
+                              border: `1px solid ${OUTLINE_SUBTLE}`,
+                              background: SURFACE_SUBTLE,
+                            }),
+                      }}
+                    >
+                      {u.accessLevel ?? 'none'}
+                    </span>
                   </XStack>
                 );
               })}
             </YStack>
           )}
+
+          <Link
+            to="/admin/users"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: BRAND_GOLD_LIGHT,
+              textDecoration: 'none',
+              background: withAlpha(BRAND_GOLD, 0.08),
+              border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+              padding: '8px 14px',
+              borderRadius: 6,
+              marginTop: 4,
+              width: 'fit-content',
+            }}
+          >
+            View All Users →
+          </Link>
         </AdminSection>
 
         {/* JWT Decoder section */}
@@ -1285,25 +970,7 @@ export function AdminPage(): React.JSX.Element | null {
         </AdminSection>
       </YStack>
 
-      <Dialog
-        open={pendingImpersonation !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingImpersonation(null);
-        }}
-        eyebrow="Admin action"
-        title="Impersonate user"
-        description={`You will be signed in as ${pendingImpersonation?.label ?? 'this user'} for up to 2 hours or until you sign out. This action is recorded in the admin audit log.`}
-        confirmLabel="Impersonate"
-        cancelLabel="Cancel"
-        onConfirm={() => {
-          void handleImpersonateConfirm();
-        }}
-        onCancel={() => setPendingImpersonation(null)}
-      />
-
-      {/* Keyframes for spinner — injected once at component scope. */}
-      <style>{`@keyframes admin-spin { to { transform: rotate(360deg); } }
-        @keyframes admin-shimmer {
+      <style>{`@keyframes admin-shimmer {
           from { background-position: 200% 0; }
           to { background-position: -200% 0; }
         }
