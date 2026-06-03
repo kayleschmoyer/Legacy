@@ -310,6 +310,143 @@ function AdminSection({
   );
 }
 
+// ─── Admin nav hub ────────────────────────────────────────────────────────────
+
+interface NavCardProps {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+}
+
+function NavCard({ to, icon, label, description }: NavCardProps) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <Link
+      to={to}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: '18px 20px',
+        borderRadius: 12,
+        background: hovered ? SURFACE_HOVER : SURFACE_CARD,
+        border: `1px solid ${hovered ? BORDER_STRONG : OUTLINE_SUBTLE}`,
+        textDecoration: 'none',
+        transition: 'background 150ms ease, border-color 150ms ease',
+        flex: '1 1 160px',
+        minWidth: 0,
+      }}
+    >
+      <span
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: withAlpha(BRAND_NAVY, 0.6),
+          border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
+          color: BRAND_GOLD_LIGHT,
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </span>
+      <span
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 15,
+          color: TEXT_PRIMARY,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 13,
+          color: TEXT_MUTED,
+          lineHeight: 1.45,
+        }}
+      >
+        {description}
+      </span>
+    </Link>
+  );
+}
+
+function AdminNavHub() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginTop: 16,
+      }}
+      aria-label="Admin navigation"
+      role="navigation"
+    >
+      <NavCard
+        to="/admin/users"
+        label="Users"
+        description="Browse, search, and manage all registered accounts."
+        icon={
+          <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            <circle
+              cx="9"
+              cy="7"
+              r="4"
+              stroke="currentColor"
+              strokeWidth={1.75}
+            />
+            <path
+              d="M2 21c0-4 3.134-7 7-7h4c3.866 0 7 3 7 7"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+            />
+          </svg>
+        }
+      />
+      <NavCard
+        to="/admin/revenue"
+        label="Revenue"
+        description="Subscription metrics, MRR, and payment analytics."
+        icon={
+          <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        }
+      />
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminPage(): React.JSX.Element | null {
@@ -509,46 +646,7 @@ export function AdminPage(): React.JSX.Element | null {
           >
             Manage users and impersonate accounts for debugging.
           </p>
-          <Link
-            to="/admin/revenue"
-            className="adm-nav-link"
-            style={{
-              marginTop: 10,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 13,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: BRAND_GOLD_LIGHT,
-              textDecoration: 'none',
-              width: 'fit-content',
-            }}
-          >
-            Revenue Analytics →
-          </Link>
-          <Link
-            to="/admin/users"
-            className="adm-nav-link"
-            style={{
-              marginTop: 6,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 13,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: BRAND_GOLD_LIGHT,
-              textDecoration: 'none',
-              width: 'fit-content',
-            }}
-          >
-            User Management →
-          </Link>
+          <AdminNavHub />
         </YStack>
 
         {/* Quick Stats & Actions — only rendered when user data has loaded */}

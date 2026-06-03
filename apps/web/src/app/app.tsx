@@ -178,6 +178,9 @@ const AdminPage = lazyWithRetry(() =>
 const AdminRevenuePage = lazyWithRetry(
   () => import('../pages/admin/AdminRevenuePage'),
 );
+const AdminUsersPage = lazyWithRetry(
+  () => import('../pages/admin/AdminUsersPage'),
+);
 const ProfileSettingsPage = lazyWithRetry(
   () => import('../pages/profile/ProfileSettingsPage'),
 );
@@ -635,6 +638,14 @@ function App() {
               element={
                 <AdminGuard>
                   <AdminRevenuePage />
+                </AdminGuard>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <AdminGuard>
+                  <AdminUsersPage />
                 </AdminGuard>
               }
             />

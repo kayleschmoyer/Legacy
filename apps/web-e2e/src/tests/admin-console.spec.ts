@@ -157,13 +157,18 @@ adminTest.describe('Admin Console — navigation @smoke', () => {
     await expect(page.getByText('Admin Console')).toBeVisible();
   });
 
-  adminTest('shows "Revenue Analytics" link', async ({ page }) => {
-    await mockAdminGraphQL(page);
-    await page.goto('/admin');
-    await page.waitForLoadState('load');
+  adminTest(
+    'shows "Revenue" nav card linking to /admin/revenue',
+    async ({ page }) => {
+      await mockAdminGraphQL(page);
+      await page.goto('/admin');
+      await page.waitForLoadState('load');
 
-    await expect(page.getByText('Revenue Analytics')).toBeVisible();
-  });
+      await expect(
+        page.getByRole('link', { name: /revenue/i }).first(),
+      ).toBeVisible();
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

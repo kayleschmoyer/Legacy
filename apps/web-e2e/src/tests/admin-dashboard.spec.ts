@@ -131,11 +131,14 @@ adminTest.describe('Admin Dashboard – page structure @smoke', () => {
     ).toBeVisible();
   });
 
-  adminTest('shows Revenue Analytics link', async ({ page }) => {
-    await expect(
-      page.getByRole('link', { name: /revenue analytics/i }),
-    ).toBeVisible();
-  });
+  adminTest(
+    'shows Revenue nav card linking to /admin/revenue',
+    async ({ page }) => {
+      await expect(
+        page.getByRole('link', { name: /revenue/i }).first(),
+      ).toBeVisible();
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
