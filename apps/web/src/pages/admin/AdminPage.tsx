@@ -350,6 +350,15 @@ export function AdminPage(): React.JSX.Element | null {
   });
 
   useEffect(() => {
+    if (currentUserId !== 0) {
+      LOGGER.error('Admin panel opened', {
+        audit: true,
+        actor: { id: currentUserId },
+      });
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
     const handleFocus = () => {
       if (auth.isAuthenticated && currentUserId !== 0) {
         void refetchServerUser();

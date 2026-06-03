@@ -81,6 +81,12 @@ builder.queryField('users', (t) =>
           : undefined,
       });
 
+      LOGGER.error('Admin user list viewed', {
+        audit: true,
+        actor: { id: Number(user.id) },
+        resultCount: users.length,
+      });
+
       return users.map((u) => ({
         id: Number(u.id),
         email: u.email,
@@ -115,12 +121,20 @@ builder.queryField('usersCount', (t) =>
         | 'admin'
         | undefined;
 
-      return dbService.users.countUsers({
+      const count = await dbService.users.countUsers({
         searchTerm: args.search || undefined,
         filters: accessLevelFilter
           ? { accessLevel: accessLevelFilter }
           : undefined,
       });
+
+      LOGGER.error('Admin user count viewed', {
+        audit: true,
+        actor: { id: Number(user.id) },
+        count,
+      });
+
+      return count;
     },
   }),
 );

@@ -432,6 +432,14 @@ builder.queryField('adminRevenueStats', (t) =>
             sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
           );
 
+        LOGGER.error('Admin revenue stats viewed', {
+          audit: true,
+          actor: { id: Number(user.id) },
+          totalUsers,
+          totalPremiumUsers,
+          totalSubscribers,
+        });
+
         return {
           totalSubscribers,
           totalPremiumUsers,
