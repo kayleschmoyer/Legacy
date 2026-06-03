@@ -16,7 +16,13 @@ permissions:
   id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
 
 concurrency:
-  group: reviewer-${{ github.event.pull_request.number }}
+  group: >-
+    reviewer-${{ github.event.pull_request.number }}-${{
+      (github.event.action == 'labeled' &&
+       github.event.label.name != 'bot:ready-for-review' &&
+       github.event.label.name != 'review-bot-degraded' &&
+       github.event.label.name != 'bot:reset-cycle-counter' &&
+       github.event.label.name != 'review-bot-override') && 'noop' || 'active' }}
   cancel-in-progress: true
 
 jobs:
