@@ -547,14 +547,14 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                 </Text>
                 ) are tracked via Google Analytics 4. View detailed feature
                 usage in the{' '}
-                <Text
-                  style={{ color: BRAND_GOLD_LIGHT, cursor: 'pointer' }}
-                  onPress={() =>
-                    window.open('https://analytics.google.com', '_blank')
-                  }
+                <a
+                  href="https://analytics.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD_LIGHT }}
                 >
                   GA4 dashboard
-                </Text>
+                </a>
                 .
               </Paragraph>
             </YStack>
