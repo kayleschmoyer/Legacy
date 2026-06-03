@@ -13,9 +13,15 @@ on:
   pull_request:
     # Include 'edited' to re-run when the PR base branch is retargeted.
     types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to check (used by recheck-conflicts-on-push)"
+        required: true
+        type: number
 
 concurrency:
-  group: check-conflicts-${{ github.event.pull_request.number }}
+  group: check-conflicts-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: true
 
 permissions:
@@ -29,6 +35,7 @@ jobs:
     timeout-minutes: 1
     steps:
       - name: Verify head SHA still matches event SHA
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -60,10 +67,35 @@ jobs:
     outputs:
       mergeable: ${{ steps.test-merge.outputs.mergeable }}
     steps:
+      - name: Resolve PR info
+        id: pr-info
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let prNumber, baseSha, headSha;
+            if (context.eventName === 'pull_request') {
+              prNumber = context.payload.pull_request.number;
+              baseSha  = context.payload.pull_request.base.sha;
+              headSha  = context.payload.pull_request.head.sha;
+            } else {
+              prNumber = Number('${{ inputs.pr_number }}');
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              baseSha = pr.base.sha;
+              headSha = pr.head.sha;
+            }
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('base_sha', baseSha);
+            core.setOutput('head_sha', headSha);
+
       - name: Checkout base branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ steps.pr-info.outputs.base_sha }}
           # Need history back to the merge base. fetch-depth: 0 is the safe
           # default; the runner's network/disk handle it fine for this repo.
           fetch-depth: 0
@@ -73,8 +105,8 @@ jobs:
 
       - name: Fetch PR head
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.pr-info.outputs.head_sha }}
         run: |
           set -eo pipefail
           # Use refs/pull/N/head so this works for both same-repo and fork PRs.
@@ -88,8 +120,8 @@ jobs:
       - name: Test merge
         id: test-merge
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          BASE_SHA: ${{ steps.pr-info.outputs.base_sha }}
         run: |
           set -eo pipefail
           # Non-interactive identity required for `git merge --no-commit --no-ff`.
@@ -117,7 +149,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const prNumber = context.payload.pull_request.number;
+            const prNumber = Number('${{ steps.pr-info.outputs.pr_number }}');
             const mergeable = process.env.MERGEABLE === 'true';
 
             const label = 'CI: Conflicts';
