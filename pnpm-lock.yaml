@@ -1341,6 +1341,9 @@ importers:
       '@aws-sdk/client-secrets-manager':
         specifier: '*'
         version: 3.1025.0
+      '@legacy-sports/app-config':
+        specifier: workspace:*
+        version: link:../../lib/app-config
       '@legacy-sports/aws-utils':
         specifier: workspace:*
         version: link:../../lib/aws-utils
@@ -1557,9 +1560,15 @@ importers:
 
   lib/app-config:
     dependencies:
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../aws-utils
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../env-utilities
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
       tslib:
         specifier: '*'
         version: 2.8.1

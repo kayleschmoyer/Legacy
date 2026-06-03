@@ -17,8 +17,8 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/env-utilities', () => ({
-  getEnvVarRequired: jest.fn().mockReturnValue('test-client-id'),
+jest.mock('@legacy-sports/app-config', () => ({
+  config: { googleClientId: 'test-client-id' },
 }));
 
 jest.mock('@legacy-sports/aws-utils', () => ({

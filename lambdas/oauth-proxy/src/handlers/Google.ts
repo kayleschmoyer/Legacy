@@ -1,4 +1,4 @@
-import { getEnvVarRequired } from '@legacy-sports/env-utilities';
+import { config } from '@legacy-sports/app-config';
 import { Credentials, OAuth2Client } from 'google-auth-library';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
@@ -9,7 +9,7 @@ import { InternalUser } from '@legacy-sports/db-client';
 import { z } from 'zod';
 import { getOrCreateUser } from './UserManager';
 import { completeDeviceFlow } from './DeviceFlow';
-import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
+import { Secret, SECRET_CONFIG } from '../util';
 import { getUserFromGoogleEmail } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
@@ -53,7 +53,10 @@ async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
 
   LOGGER.debug('Getting Google auth settings...');
 
-  const clientId = getEnvVarRequired(EnvironmentVariable.CLIENT_ID);
+  const clientId = config.googleClientId;
+  if (!clientId) {
+    throw new Error('CLIENT_ID (googleClientId) is not configured');
+  }
 
   LOGGER.debug('CLIENT_ID retrieved successfully');
   LOGGER.debug(

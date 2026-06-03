@@ -56,6 +56,7 @@ export const CONFIG_KEYS = {
     clientSafe: true,
     web: 'VITE_GOOGLE_CLIENT_ID',
     mobile: 'EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID',
+    node: 'CLIENT_ID',
     required: false,
   },
   appBaseUrl: {

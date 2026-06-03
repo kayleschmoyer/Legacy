@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "tslib": "*",
-    "@legacy-sports/env-utilities": "workspace:*"
+    "@legacy-sports/aws-utils": "workspace:*",
+    "@legacy-sports/env-utilities": "workspace:*",
+    "@legacy-sports/logging": "workspace:*"
   }
 }

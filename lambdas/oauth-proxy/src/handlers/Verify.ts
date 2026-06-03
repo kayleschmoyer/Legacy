@@ -1,12 +1,12 @@
+import { config } from '@legacy-sports/app-config';
 import { OAuth2Client } from 'google-auth-library';
 import memoizeOne from 'memoize-one';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 
 import { readSecret } from '@legacy-sports/aws-utils';
-import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import { parseEventBody } from '../util/lambda';
-import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
+import { Secret, SECRET_CONFIG } from '../util';
 
 interface GoogleAuthSettings {
   clientId: string;
@@ -33,7 +33,10 @@ async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
 
   LOGGER.debug('Getting Google auth settings...');
 
-  const clientId = getEnvVarRequired(EnvironmentVariable.CLIENT_ID);
+  const clientId = config.googleClientId;
+  if (!clientId) {
+    throw new Error('CLIENT_ID (googleClientId) is not configured');
+  }
 
   LOGGER.debug('CLIENT_ID retrieved successfully');
   LOGGER.debug(
