@@ -1,1 +1,1 @@
-export { PlayerStatsPage, PlayerDetailPage } from './PlayerStatsPage';
+export { PlayerStatsRoute, PlayerDetailPage } from './PlayerStatsPage';

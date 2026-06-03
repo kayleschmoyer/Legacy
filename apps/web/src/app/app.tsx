@@ -43,7 +43,7 @@ const BaseballScreen = lazyWithRetry(() =>
 );
 const PlayerStatsPage = lazyWithRetry(() =>
   import('../pages/players/PlayerStatsPage').then((m) => ({
-    default: m.PlayerStatsPage,
+    default: m.PlayerStatsRoute,
   })),
 );
 const PlayerDetailPage = lazyWithRetry(() =>

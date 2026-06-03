@@ -6,8 +6,8 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import {
+  PlayerStatsPage,
   type PlayerStatsViewMode,
-  PlayerStatsPage as SharedPlayerStatsPage,
 } from '@legacy-sports/shared-components/players';
 import type {
   PlayerStatsFilters,
@@ -95,7 +95,7 @@ function readStatsFormat(): 'standard' | 'expanded' {
  */
 const TOAST_DURATION_MS = 2400;
 
-export function PlayerStatsPage() {
+export function PlayerStatsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
 
@@ -368,7 +368,7 @@ export function PlayerStatsPage() {
           {liveMsg}
         </div>
       )}
-      <SharedPlayerStatsPage
+      <PlayerStatsPage
         title="MLB Player Statistics"
         initialViewMode={initialState.viewMode}
         initialFilters={initialState.filters}
