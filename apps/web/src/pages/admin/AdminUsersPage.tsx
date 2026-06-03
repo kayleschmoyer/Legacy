@@ -34,7 +34,7 @@ const ACCESS_LEVEL_LABELS: Record<AccessLevelFilter, string> = {
 };
 
 export default function AdminUsersPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -91,6 +91,10 @@ export default function AdminUsersPage() {
   });
 
   const [updateUserRole, { loading: updating }] = useUpdateUserRoleMutation();
+
+  if (isLoading) {
+    return null;
+  }
 
   // Redirect non-admins
   if (!user || !isAdmin) {
