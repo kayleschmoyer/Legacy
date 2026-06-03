@@ -1,4 +1,5 @@
-import React, { type ReactNode } from 'react';
+import React from 'react';
+import type { ComponentProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AboutPage from './AboutPage';
@@ -19,10 +20,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
     children,
     onPress,
     ...rest
-  }: {
-    children: ReactNode;
-    onPress?: () => void;
-  } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  }: ComponentProps<'button'> & { onPress?: () => void }) => (
     <button onClick={onPress} {...rest}>
       {children}
     </button>
@@ -78,6 +76,7 @@ jest.mock('../../config/environment', () => ({
     stripeMonthlyPriceId: '',
     stripeAnnualPriceId: '',
     vapidPublicKey: '',
+    repoUrl: 'https://github.com/bkrupa/legacy-sports',
   },
 }));
 
@@ -90,6 +89,10 @@ function setEnvName(name: string) {
   (env as { environmentName: string }).environmentName = name;
 }
 
+function setAppVersion(v: string) {
+  (env as { appVersion: string }).appVersion = v;
+}
+
 function renderAbout() {
   return render(
     <MemoryRouter>
@@ -97,6 +100,26 @@ function renderAbout() {
     </MemoryRouter>,
   );
 }
+
+describe('AboutPage — appVersion coercion (LS-5713)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseIsPremium.mockReturnValue(false);
+    setAppVersion('1.0.0');
+  });
+
+  it('renders the version string when appVersion is non-empty', () => {
+    setAppVersion('2.3.4');
+    renderAbout();
+    expect(screen.getByTestId('build-info-version')).toHaveTextContent('2.3.4');
+  });
+
+  it('shows "—" when appVersion is an empty string', () => {
+    setAppVersion('');
+    renderAbout();
+    expect(screen.getByTestId('build-info-version')).toHaveTextContent('—');
+  });
+});
 
 describe('AboutPage — Environment label (LS-5709)', () => {
   beforeEach(() => {
