@@ -1,12 +1,19 @@
+// Mutable extra object — tests that need to omit native-required keys can
+// temporarily reassign mockExtraData before calling buildNativeConfig().
+let mockExtraData: Record<string, string | undefined> = {
+  statsApiUrl: 'http://stats-from-extra.com',
+  rollbarToken: 'rollbar-from-extra',
+  // Native-required keys must be present in the default mock so tests
+  // that call buildNativeConfig() without setting env vars don't throw.
+  graphqlHost: 'https://api-from-extra.com/graphql',
+  oauthProxy: 'https://oauth-from-extra.com',
+  googleClientId: 'google-client-from-extra',
+};
+
 jest.mock('expo-constants', () => ({
   __esModule: true,
-  default: {
-    expoConfig: {
-      extra: {
-        statsApiUrl: 'http://stats-from-extra.com',
-        rollbarToken: 'rollbar-from-extra',
-      },
-    },
+  get default() {
+    return { expoConfig: { extra: mockExtraData } };
   },
 }));
 
@@ -14,9 +21,11 @@ import { buildNativeConfig } from './config.native';
 
 describe('native adapter', () => {
   const originalEnv = process.env;
+  const defaultMockExtra = { ...mockExtraData };
 
   afterEach(() => {
     process.env = originalEnv;
+    mockExtraData = { ...defaultMockExtra };
   });
 
   beforeEach(() => {
@@ -47,6 +56,13 @@ describe('native adapter', () => {
   it('reads googleClientId from EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID', () => {
     process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID = 'google-client-123';
     expect(buildNativeConfig().googleClientId).toBe('google-client-123');
+  });
+
+  it('reads graphqlHost from EXPO_PUBLIC_GRAPHQL_HOST', () => {
+    process.env.EXPO_PUBLIC_GRAPHQL_HOST = 'https://api.example.com/graphql';
+    expect(buildNativeConfig().graphqlHost).toBe(
+      'https://api.example.com/graphql',
+    );
   });
 
   it('falls back to Constants.expoConfig.extra when env var is absent', () => {
@@ -88,7 +104,31 @@ describe('native adapter', () => {
     expect(cfg.appBaseUrl).toBeUndefined();
   });
 
-  it('does not throw when all keys are optional and some are missing', () => {
+  it('does not throw when native-required keys are provided via extra', () => {
+    // The default mock provides graphqlHost, oauthProxy, googleClientId via extra
     expect(() => buildNativeConfig()).not.toThrow();
+  });
+
+  describe('native-required key validation (LS-7701)', () => {
+    it('throws when graphqlHost is absent from both env and extra', () => {
+      mockExtraData = {
+        oauthProxy: 'https://oauth.example.com',
+        googleClientId: 'gid',
+      };
+      expect(() => buildNativeConfig()).toThrow(
+        'required native keys are not configured',
+      );
+      expect(() => buildNativeConfig()).toThrow(/graphqlHost/);
+    });
+
+    it('lists all missing native-required keys in one error', () => {
+      mockExtraData = {};
+      expect(() => buildNativeConfig()).toThrow(
+        'required native keys are not configured',
+      );
+      expect(() => buildNativeConfig()).toThrow(/graphqlHost/);
+      expect(() => buildNativeConfig()).toThrow(/oauthProxy/);
+      expect(() => buildNativeConfig()).toThrow(/googleClientId/);
+    });
   });
 });

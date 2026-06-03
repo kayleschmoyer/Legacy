@@ -45,12 +45,14 @@ export const CONFIG_KEYS = {
     web: 'VITE_OAUTH_PROXY_URL',
     mobile: 'EXPO_PUBLIC_OAUTH_PROXY',
     required: false,
+    nativeRequired: true,
   },
   graphqlHost: {
     clientSafe: true,
     web: 'VITE_GRAPHQL_HOST',
     mobile: 'EXPO_PUBLIC_GRAPHQL_HOST',
     required: false,
+    nativeRequired: true,
   },
   googleClientId: {
     clientSafe: true,
@@ -58,6 +60,7 @@ export const CONFIG_KEYS = {
     mobile: 'EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID',
     node: 'CLIENT_ID',
     required: false,
+    nativeRequired: true,
   },
   appBaseUrl: {
     clientSafe: true,

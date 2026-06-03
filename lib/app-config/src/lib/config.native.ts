@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import type { AppConfig } from './types';
+import { CONFIG_KEYS } from './registry';
 import { validateConfig } from './validation';
 
 export function buildNativeConfig(): AppConfig {
@@ -7,7 +8,7 @@ export function buildNativeConfig(): AppConfig {
     | Record<string, string | undefined>
     | undefined;
 
-  return validateConfig({
+  const values = {
     statsApiUrl:
       process.env.EXPO_PUBLIC_STATS_API_URL ?? extra?.['statsApiUrl'],
     websocketUrl:
@@ -43,7 +44,31 @@ export function buildNativeConfig(): AppConfig {
     vapidPublicKey: undefined,
     imageUploadUrl: undefined,
     repoUrl: undefined,
-  });
+  };
+
+  // Validate native-required keys up-front so the app fails loudly at startup
+  // rather than when an individual consumer first tries to use a missing value.
+  const missingNative = (
+    Object.entries(CONFIG_KEYS) as [
+      string,
+      (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS],
+    ][]
+  )
+    .filter(
+      ([key, entry]) =>
+        'nativeRequired' in entry &&
+        entry.nativeRequired &&
+        !values[key as keyof typeof values],
+    )
+    .map(([key]) => key);
+
+  if (missingNative.length > 0) {
+    throw new Error(
+      `app-config: required native keys are not configured: ${missingNative.join(', ')}`,
+    );
+  }
+
+  return validateConfig(values);
 }
 
 export const config: AppConfig = buildNativeConfig();
