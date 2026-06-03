@@ -40,6 +40,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: "Generate App Token"
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
       - name: "Compute affected integration specs"
         id: select
         env:
@@ -65,7 +73,7 @@ jobs:
         if: steps.select.outputs.skip != 'true' && (steps.select.outputs.run_all == 'true' || steps.select.outputs.count != '0')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const result = JSON.parse(fs.readFileSync('/tmp/select.json', 'utf8'));
@@ -73,16 +81,23 @@ jobs:
             const list = result.specs
               .map((s) => `- \`${s.replace('apps/web-e2e/src/integration/tests/', '')}\``)
               .join('\n');
-            const header = result.runAll
-              ? '## Integration advisory — broad change detected\n\nThis PR changes a shared surface (backend schema, shared components, or integration helpers), so **all** integration specs are recommended:'
-              : `## Integration advisory — ${result.specs.length} spec(s) cover your change\n\nThese live-backend integration specs exercise the surfaces this PR touches:`;
+            const broadMsg =
+              '## Integration advisory — broad change detected\n\n' +
+              'This PR changes a shared surface (backend schema, shared components, or integration' +
+              ' helpers), so **all** integration specs are recommended:';
+            const scopedMsg =
+              `## Integration advisory — ${result.specs.length} spec(s) cover your change\n\n` +
+              'These live-backend integration specs exercise the surfaces this PR touches:';
+            const header = result.runAll ? broadMsg : scopedMsg;
             const body = [
               marker,
               header,
               '',
               list,
               '',
-              'To run them on this PR, add the **`run:integration`** label (it runs exactly this set and is removed automatically when done). Reviewers: treat this as a prompt to verify the affected flows before merge — these are the flows most likely to break the nightly suite.',
+              'To run them on this PR, add the **`run:integration`** label (it runs exactly this set' +
+              ' and is removed automatically when done). Reviewers: treat this as a prompt to verify' +
+              ' the affected flows before merge — these are the flows most likely to break the nightly suite.',
             ].join('\n');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
