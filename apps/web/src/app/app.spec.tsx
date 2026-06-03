@@ -119,6 +119,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
     <p {...(props as React.HTMLAttributes<HTMLParagraphElement>)}>{children}</p>
   ),
   Separator: () => <hr />,
+  UnifiedLoadingPanel: () => <div data-testid="unified-loading-panel" />,
 }));
 
 jest.mock('@legacy-sports/shared-components/sports', () => ({

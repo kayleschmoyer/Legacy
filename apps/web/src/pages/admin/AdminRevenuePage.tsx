@@ -174,8 +174,6 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
     fetchPolicy: 'no-cache',
   });
 
-  if (auth.isLoading) return null;
-
   if (auth.user?.accessLevel !== 'admin') {
     return <Navigate to="/" replace />;
   }

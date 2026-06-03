@@ -1,7 +1,12 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
+import {
+  Paragraph,
+  UnifiedLoadingPanel,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components/ui';
 import { PlayersScreen } from '@legacy-sports/shared-components/players';
 import { styled } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons';
@@ -151,7 +156,7 @@ function AdminGuard({
   children: React.ReactNode;
 }): React.ReactNode {
   const { user, isLoading } = useAuth();
-  if (isLoading) return null;
+  if (isLoading) return <UnifiedLoadingPanel fullScreen />;
   if (user?.accessLevel !== 'admin') return <Navigate to="/" replace />;
   return children;
 }
