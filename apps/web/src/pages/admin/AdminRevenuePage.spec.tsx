@@ -103,6 +103,39 @@ describe('AdminRevenuePage', () => {
     mockUseAuth.mockReturnValue(adminAuth);
   });
 
+  it('skips the query for an authenticated non-admin user (ARV-001/ARV-004)', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { accessLevel: 'user' },
+    });
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(mockUseAdminRevenueStatsQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('does not skip the query for an authenticated admin user', () => {
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(mockUseAdminRevenueStatsQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: false }),
+    );
+  });
+
   it('shows the spinner while the query is loading', () => {
     mockUseAdminRevenueStatsQuery.mockReturnValue({
       data: undefined,

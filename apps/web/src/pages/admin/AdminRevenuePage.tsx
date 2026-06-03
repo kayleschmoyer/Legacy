@@ -170,7 +170,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
   );
 
   const { data, loading, error } = useAdminRevenueStatsQuery({
-    skip: !auth.isAuthenticated,
+    skip: !auth.isAuthenticated || auth.user?.accessLevel !== 'admin',
     fetchPolicy: 'no-cache',
   });
 

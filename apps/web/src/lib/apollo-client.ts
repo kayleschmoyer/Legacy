@@ -296,6 +296,10 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
           (e.extensions?.['code'] as string | undefined) === 'PREMIUM_REQUIRED',
       );
 
+      const isForbidden = error.errors.some(
+        (e) => (e.extensions?.['code'] as string | undefined) === 'FORBIDDEN',
+      );
+
       // The server's formatError sanitizes unexpected exceptions to the raw
       // string "Internal server error" (code: INTERNAL_SERVER_ERROR). Showing
       // that string verbatim — as observed on the mobile draft route (LS-4850)
@@ -306,11 +310,15 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
         (firstError?.extensions?.['code'] as string | undefined) ===
           'INTERNAL_SERVER_ERROR' && !premiumError;
 
+      // FORBIDDEN errors must not reveal admin surface area (ARV-004): swallow
+      // the raw server message and show a generic access-denied string instead.
       dispatchApolloError(
         premiumError?.message ??
-          (isInternalServerError
-            ? 'Something went wrong on our end — please try again in a moment.'
-            : (firstError?.message ?? 'An unexpected error occurred')),
+          (isForbidden
+            ? "You don't have access to this resource."
+            : isInternalServerError
+              ? 'Something went wrong on our end — please try again in a moment.'
+              : (firstError?.message ?? 'An unexpected error occurred')),
       );
 
       const isExpectedError = error.errors.every((e) =>

@@ -489,6 +489,48 @@ describe('errorLink', () => {
     );
   });
 
+  it('dispatches a generic access-denied message for FORBIDDEN instead of the raw server message (ARV-004)', async () => {
+    const dispatchSpy = jest
+      .spyOn(window, 'dispatchEvent')
+      .mockImplementation(() => true);
+
+    const forbiddenError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          {
+            message: 'Admin access required',
+            extensions: { code: 'FORBIDDEN' },
+          },
+        ],
+      },
+      [
+        {
+          message: 'Admin access required',
+          extensions: { code: 'FORBIDDEN' },
+        },
+      ],
+    );
+
+    await runWithError(forbiddenError, {});
+
+    const apolloErrors = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'apollo:error',
+      );
+    expect(apolloErrors).toHaveLength(1);
+    expect(apolloErrors[0].detail.message).toBe(
+      "You don't have access to this resource.",
+    );
+    expect(apolloErrors[0].detail.message).not.toContain(
+      'Admin access required',
+    );
+    expect(captureError).not.toHaveBeenCalled();
+
+    dispatchSpy.mockRestore();
+  });
+
   it('dispatches a friendly message for INTERNAL_SERVER_ERROR instead of the raw "Internal server error" (LS-4850)', async () => {
     const dispatchSpy = jest
       .spyOn(window, 'dispatchEvent')
