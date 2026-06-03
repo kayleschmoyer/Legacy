@@ -41,6 +41,7 @@ import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
+import { prWhyBlocked } from './tools/pr-why-blocked.js';
 import { listPRComments } from './tools/list-pr-comments.js';
 import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
 import { listReviewComments } from './tools/list-review-comments.js';
@@ -958,6 +959,20 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => prBatchStatus(params),
+  );
+
+  // --- github_pr_why_blocked ---
+  server.tool(
+    'github_pr_why_blocked',
+    'Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Use this instead of manually cross-referencing github_view_pr + check runs + review state.',
+    {
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('PR number to diagnose'),
+    },
+    async (params) => prWhyBlocked(params),
   );
 
   // --- github_pr_dashboard ---
