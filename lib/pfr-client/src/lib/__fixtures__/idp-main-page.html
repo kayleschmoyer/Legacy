@@ -1,0 +1,172 @@
+<!--
+  Synthetic main-page fixture for an IDP defender (pfrId TestLb00).
+  The `defense` table is wrapped in an HTML comment — PFR ships the season
+  defense table inside a comment block, so this also exercises getTable()'s
+  comment extraction.
+
+  Three seasons:
+    2014 (PHI, single team) — tackles_combined present.
+    2015 (multi-team: PHI + NWE rows, then the 2TM aggregate row last; the
+          aggregate must win via map.set()).
+    2016 (NWE, single team) — tackles_combined omitted to exercise the
+          solo+ast fallback for totalTkl.
+  Plus a Career totals row (year_id="Career") that must be filtered out.
+
+  The main-page table has no unified def_td column: defensive scores live in
+  def_int_td + fumbles_rec_td, summed into defTd by the parser.
+
+  Expected parsed season totals:
+    2014: team=PHI, g=16, gs=15, soloTkl=60, astTkl=25, totalTkl=85,
+          sacks=1.5, int=3, pd=10, ff=2, fr=1, defTd=1, safeties=0
+    2015: team=2TM, g=16, gs=14, soloTkl=60, astTkl=25, totalTkl=85,
+          sacks=3, int=3, pd=12, ff=3, fr=2, defTd=2, safeties=1
+    2016: team=NWE, g=15, gs=15, soloTkl=50, astTkl=20, totalTkl=70,
+          sacks=0, int=0, pd=5, ff=1, fr=0, defTd=0, safeties=0
+-->
+<html>
+  <body>
+    <div id="content">
+      <!--
+      <table id="defense">
+        <thead>
+          <tr>
+            <th data-stat="year_id">Year</th>
+            <th data-stat="team_name_abbr">Tm</th>
+            <th data-stat="games">G</th>
+            <th data-stat="games_started">GS</th>
+            <th data-stat="def_int">Int</th>
+            <th data-stat="def_int_yds">Yds</th>
+            <th data-stat="def_int_td">TD</th>
+            <th data-stat="def_int_long">Lng</th>
+            <th data-stat="pass_defended">PD</th>
+            <th data-stat="fumbles_forced">FF</th>
+            <th data-stat="fumbles">Fmb</th>
+            <th data-stat="fumbles_rec">FR</th>
+            <th data-stat="fumbles_rec_yds">Yds</th>
+            <th data-stat="fumbles_rec_td">TD</th>
+            <th data-stat="sacks">Sk</th>
+            <th data-stat="tackles_combined">Comb</th>
+            <th data-stat="tackles_solo">Solo</th>
+            <th data-stat="tackles_assist">Ast</th>
+            <th data-stat="safety_md">Sfty</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th data-stat="year_id">2014</th>
+            <td data-stat="team_name_abbr"><a href="/teams/phi/2014.htm">PHI</a></td>
+            <td data-stat="games">16</td>
+            <td data-stat="games_started">15</td>
+            <td data-stat="def_int">3</td>
+            <td data-stat="def_int_yds">45</td>
+            <td data-stat="def_int_td">1</td>
+            <td data-stat="def_int_long">30</td>
+            <td data-stat="pass_defended">10</td>
+            <td data-stat="fumbles_forced">2</td>
+            <td data-stat="fumbles">0</td>
+            <td data-stat="fumbles_rec">1</td>
+            <td data-stat="fumbles_rec_yds">5</td>
+            <td data-stat="fumbles_rec_td">0</td>
+            <td data-stat="sacks">1.5</td>
+            <td data-stat="tackles_combined">85</td>
+            <td data-stat="tackles_solo">60</td>
+            <td data-stat="tackles_assist">25</td>
+            <td data-stat="safety_md">0</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2015</th>
+            <td data-stat="team_name_abbr"><a href="/teams/phi/2015.htm">PHI</a></td>
+            <td data-stat="games">6</td>
+            <td data-stat="games_started">5</td>
+            <td data-stat="def_int">1</td>
+            <td data-stat="def_int_yds">12</td>
+            <td data-stat="def_int_td">0</td>
+            <td data-stat="def_int_long">12</td>
+            <td data-stat="pass_defended">4</td>
+            <td data-stat="fumbles_forced">1</td>
+            <td data-stat="fumbles">0</td>
+            <td data-stat="fumbles_rec">1</td>
+            <td data-stat="fumbles_rec_yds">3</td>
+            <td data-stat="fumbles_rec_td">0</td>
+            <td data-stat="sacks">0.5</td>
+            <td data-stat="tackles_combined">30</td>
+            <td data-stat="tackles_solo">20</td>
+            <td data-stat="tackles_assist">10</td>
+            <td data-stat="safety_md">0</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2015</th>
+            <td data-stat="team_name_abbr"><a href="/teams/nwe/2015.htm">NWE</a></td>
+            <td data-stat="games">10</td>
+            <td data-stat="games_started">9</td>
+            <td data-stat="def_int">2</td>
+            <td data-stat="def_int_yds">48</td>
+            <td data-stat="def_int_td">1</td>
+            <td data-stat="def_int_long">40</td>
+            <td data-stat="pass_defended">8</td>
+            <td data-stat="fumbles_forced">2</td>
+            <td data-stat="fumbles">1</td>
+            <td data-stat="fumbles_rec">1</td>
+            <td data-stat="fumbles_rec_yds">7</td>
+            <td data-stat="fumbles_rec_td">1</td>
+            <td data-stat="sacks">2.5</td>
+            <td data-stat="tackles_combined">55</td>
+            <td data-stat="tackles_solo">40</td>
+            <td data-stat="tackles_assist">15</td>
+            <td data-stat="safety_md">1</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2015</th>
+            <td data-stat="team_name_abbr">2TM</td>
+            <td data-stat="games">16</td>
+            <td data-stat="games_started">14</td>
+            <td data-stat="def_int">3</td>
+            <td data-stat="def_int_yds">60</td>
+            <td data-stat="def_int_td">1</td>
+            <td data-stat="def_int_long">40</td>
+            <td data-stat="pass_defended">12</td>
+            <td data-stat="fumbles_forced">3</td>
+            <td data-stat="fumbles">1</td>
+            <td data-stat="fumbles_rec">2</td>
+            <td data-stat="fumbles_rec_yds">10</td>
+            <td data-stat="fumbles_rec_td">1</td>
+            <td data-stat="sacks">3.0</td>
+            <td data-stat="tackles_combined">85</td>
+            <td data-stat="tackles_solo">60</td>
+            <td data-stat="tackles_assist">25</td>
+            <td data-stat="safety_md">1</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">2016</th>
+            <td data-stat="team_name_abbr"><a href="/teams/nwe/2016.htm">NWE</a></td>
+            <td data-stat="games">15</td>
+            <td data-stat="games_started">15</td>
+            <td data-stat="def_int">0</td>
+            <td data-stat="def_int_yds">0</td>
+            <td data-stat="def_int_td">0</td>
+            <td data-stat="def_int_long">0</td>
+            <td data-stat="pass_defended">5</td>
+            <td data-stat="fumbles_forced">1</td>
+            <td data-stat="fumbles">0</td>
+            <td data-stat="fumbles_rec">0</td>
+            <td data-stat="fumbles_rec_yds">0</td>
+            <td data-stat="fumbles_rec_td">0</td>
+            <td data-stat="sacks">0.0</td>
+            <td data-stat="tackles_solo">50</td>
+            <td data-stat="tackles_assist">20</td>
+            <td data-stat="safety_md">0</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">Career</th>
+            <td data-stat="team_name_abbr"></td>
+            <td data-stat="games">47</td>
+            <td data-stat="games_started">44</td>
+            <td data-stat="tackles_solo">170</td>
+            <td data-stat="tackles_assist">70</td>
+          </tr>
+        </tbody>
+      </table>
+      -->
+    </div>
+  </body>
+</html>

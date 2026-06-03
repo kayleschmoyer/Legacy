@@ -3,17 +3,15 @@ import { loadFootballCareerStats } from './load-football-career-stats';
 
 // Mock pfr-client at the package level
 const mockCareerGetAllSeasonTotals = jest.fn();
-const mockIdpGetSeasonTotals = jest.fn();
+const mockCareerGetAllDefenseSeasonTotals = jest.fn();
 const mockTeamDefenseGetSeasonTotals = jest.fn();
 
 jest.mock('@legacy-sports/pfr-client', () => ({
   CareerStats: {
     getAllSeasonTotalsFromMainPage: (...args: unknown[]): unknown =>
       mockCareerGetAllSeasonTotals(...args),
-  },
-  IDPStats: {
-    getSeasonTotals: (...args: unknown[]): unknown =>
-      mockIdpGetSeasonTotals(...args),
+    getAllDefenseSeasonTotalsFromMainPage: (...args: unknown[]): unknown =>
+      mockCareerGetAllDefenseSeasonTotals(...args),
   },
   TeamDefense: {
     getSeasonTotals: (...args: unknown[]): unknown =>
@@ -126,7 +124,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCareerGetAllSeasonTotals.mockResolvedValue([]);
-    mockIdpGetSeasonTotals.mockResolvedValue(null);
+    mockCareerGetAllDefenseSeasonTotals.mockResolvedValue([]);
     mockTeamDefenseGetSeasonTotals.mockResolvedValue(null);
   });
 
@@ -148,10 +146,10 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       2024,
     );
     expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
-    expect(mockIdpGetSeasonTotals).not.toHaveBeenCalled();
+    expect(mockCareerGetAllDefenseSeasonTotals).not.toHaveBeenCalled();
   });
 
-  it('routes IDP player (DL) to IDPStats only', async () => {
+  it('routes IDP player (DL) to the main-page defense parser only', async () => {
     const db = makeDb({
       id: 1,
       pfrId: 'TestDl00',
@@ -163,15 +161,15 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockIdpGetSeasonTotals).toHaveBeenCalledWith(
-      { id: 1, pfrId: 'TestDl00' },
-      2024,
-    );
+    expect(mockCareerGetAllDefenseSeasonTotals).toHaveBeenCalledWith({
+      id: 1,
+      pfrId: 'TestDl00',
+    });
     expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
     expect(mockTeamDefenseGetSeasonTotals).not.toHaveBeenCalled();
   });
 
-  it('routes IDP player (LB) to IDPStats', async () => {
+  it('routes IDP player (LB) to the main-page defense parser', async () => {
     const db = makeDb({
       id: 1,
       pfrId: 'TestLb00',
@@ -183,11 +181,11 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockIdpGetSeasonTotals).toHaveBeenCalled();
+    expect(mockCareerGetAllDefenseSeasonTotals).toHaveBeenCalled();
     expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
   });
 
-  it('routes IDP player (DB) to IDPStats', async () => {
+  it('routes IDP player (DB) to the main-page defense parser', async () => {
     const db = makeDb({
       id: 1,
       pfrId: 'TestDb00',
@@ -199,8 +197,23 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     await loadFootballCareerStats(db, 1, 2024);
 
-    expect(mockIdpGetSeasonTotals).toHaveBeenCalled();
+    expect(mockCareerGetAllDefenseSeasonTotals).toHaveBeenCalled();
     expect(mockCareerGetAllSeasonTotals).not.toHaveBeenCalled();
+  });
+
+  it('fetches the IDP main page exactly once per player', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestLb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'LB',
+      sport: 'football',
+    });
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    expect(mockCareerGetAllDefenseSeasonTotals).toHaveBeenCalledTimes(1);
   });
 
   it('routes offensive player (QB) to CareerStats only', async () => {
@@ -216,7 +229,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
     await loadFootballCareerStats(db, 1, 2024);
 
     expect(mockCareerGetAllSeasonTotals).toHaveBeenCalled();
-    expect(mockIdpGetSeasonTotals).not.toHaveBeenCalled();
+    expect(mockCareerGetAllDefenseSeasonTotals).not.toHaveBeenCalled();
     expect(mockTeamDefenseGetSeasonTotals).not.toHaveBeenCalled();
   });
 
@@ -330,7 +343,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       position: 'LB',
       sport: 'football',
     });
-    mockIdpGetSeasonTotals.mockResolvedValue(IDP_SEASON);
+    mockCareerGetAllDefenseSeasonTotals.mockResolvedValue([IDP_SEASON]);
 
     const result = await loadFootballCareerStats(db, 1, 2024);
 

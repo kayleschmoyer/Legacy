@@ -1,10 +1,11 @@
-import { CareerStats, IDPStats, TeamDefense } from '@legacy-sports/pfr-client';
+import { CareerStats, TeamDefense } from '@legacy-sports/pfr-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import type {
   FootballSeasonDefense,
+  FootballSeasonDefenseIdp,
   FootballSeasonKicking,
   FootballSeasonPassing,
   FootballSeasonReceiving,
@@ -38,25 +39,6 @@ function computePasserRating(
 function sumNullable(a: number | null, b: number | null): number | null {
   if (a === null && b === null) return null;
   return (a ?? 0) + (b ?? 0);
-}
-
-// Return distinct seasons that appear in a game table for this player.
-async function knownGameSeasons(
-  db: PublicDb,
-  playerId: number,
-  table:
-    | typeof PublicSchema.gameFootballPassing
-    | typeof PublicSchema.gameFootballRushing
-    | typeof PublicSchema.gameFootballReceiving
-    | typeof PublicSchema.gameFootballKicking
-    | typeof PublicSchema.gameFootballDefense
-    | typeof PublicSchema.gameFootballDefenseIdp,
-): Promise<number[]> {
-  const rows = await db
-    .selectDistinct({ season: table.season })
-    .from(table)
-    .where(eq(table.playerId, playerId));
-  return rows.map((r) => r.season).sort((a, b) => a - b);
 }
 
 // Aggregate season passing rows into career totals.
@@ -471,65 +453,55 @@ export async function loadFootballCareerStats(
   }
 
   // --- IDP path: individual defensive players ---
+  // Fetch the player's main page once to get all defensive season totals in a
+  // single request (~57x fewer requests than the previous per-season gamelog
+  // loop). Season discovery is implicit — only seasons present on the main-page
+  // `defense` table are returned, eliminating the 1970→currentYear brute-force
+  // iteration (LS-7732, mirroring the offensive path optimised in LS-7692).
   if (position && IDP_POSITIONS.has(position)) {
-    const idpGameSeasons = await knownGameSeasons(
-      db,
-      playerId,
-      PublicSchema.gameFootballDefenseIdp,
-    );
-
-    const seasons =
-      idpGameSeasons.length > 0
-        ? idpGameSeasons
-        : (() => {
-            const start = startSeasonOverride ?? NFL_SEASON_START;
-            const arr: number[] = [];
-            for (let s = start; s <= currentYear(); s++) arr.push(s);
-            return arr;
-          })();
-
     LOGGER.info(
-      `Loading IDP career stats for player ${playerId} (${pfrId}), ` +
-        `${seasons.length} seasons`,
+      `Loading IDP career stats for player ${playerId} (${pfrId}) via main page`,
     );
 
-    for (const season of seasons) {
-      try {
-        const totals = await IDPStats.getSeasonTotals(pfrPlayer, season);
-        if (totals) {
-          await upsertSeasonDefenseIdp(db, {
-            playerId,
-            season: totals.season,
-            team: totals.team,
-            g: totals.g,
-            gs: totals.gs,
-            soloTkl: totals.soloTkl,
-            astTkl: totals.astTkl,
-            totalTkl: totals.totalTkl,
-            sacks: totals.sacks !== null ? String(totals.sacks) : null,
-            int: totals.int,
-            pd: totals.pd,
-            ff: totals.ff,
-            fr: totals.fr,
-            defTd: totals.defTd,
-            safeties: totals.safeties,
-            pfrRowId: totals.pfrRowId,
-          });
-          if (!groupsUpserted.includes('defense_idp')) {
-            groupsUpserted.push('defense_idp');
-          }
-        }
-      } catch (err) {
-        LOGGER.warn(
-          `Failed to fetch IDP season ${season} for ${pfrId}:`,
-          err instanceof Error ? err : String(err),
-        );
+    let defenseSeasons: FootballSeasonDefenseIdp[] = [];
+    try {
+      defenseSeasons =
+        await CareerStats.getAllDefenseSeasonTotalsFromMainPage(pfrPlayer);
+    } catch (err) {
+      LOGGER.warn(
+        `Failed to fetch main page for ${pfrId}:`,
+        err instanceof Error ? err : String(err),
+      );
+    }
+
+    for (const totals of defenseSeasons) {
+      await upsertSeasonDefenseIdp(db, {
+        playerId,
+        season: totals.season,
+        team: totals.team,
+        g: totals.g,
+        gs: totals.gs,
+        soloTkl: totals.soloTkl,
+        astTkl: totals.astTkl,
+        totalTkl: totals.totalTkl,
+        sacks: totals.sacks !== null ? String(totals.sacks) : null,
+        int: totals.int,
+        pd: totals.pd,
+        ff: totals.ff,
+        fr: totals.fr,
+        defTd: totals.defTd,
+        safeties: totals.safeties,
+        pfrRowId: totals.pfrRowId,
+      });
+      if (!groupsUpserted.includes('defense_idp')) {
+        groupsUpserted.push('defense_idp');
       }
     }
 
     if (groupsUpserted.length > 0) {
       LOGGER.info(
-        `Upserted football_season_defense_idp rows for IDP player ${playerId}`,
+        `Upserted football_season_defense_idp rows for IDP player ${playerId} ` +
+          `(${defenseSeasons.length} seasons)`,
       );
     } else {
       LOGGER.info(`No IDP data found for player ${playerId} (${pfrId})`);

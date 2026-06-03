@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as PFRSession from './PFRSession';
 import {
+  getAllDefenseSeasonTotalsFromMainPage,
   getAllSeasonTotalsFromMainPage,
+  parseMainPageDefenseSeasonTotals,
   parseMainPageSeasonTotals,
 } from './CareerStats';
 
@@ -16,11 +18,13 @@ const WR_HTML = fix('wr-main-page.html');
 const RB_HTML = fix('rb-main-page.html');
 const QB_HTML = fix('qb-main-page.html');
 const K_HTML = fix('k-main-page.html');
+const IDP_HTML = fix('idp-main-page.html');
 
 const wr = { id: 10, pfrId: 'AdamDa01' };
 const rb = { id: 20, pfrId: 'HenrDe00' };
 const qb = { id: 30, pfrId: 'MahoPa00' };
 const kicker = { id: 40, pfrId: 'TuckJu00' };
+const idp = { id: 50, pfrId: 'TestLb00' };
 
 describe('parseMainPageSeasonTotals — WR (receiving_and_rushing in comment)', () => {
   it('parses two seasons from comment-wrapped receiving_and_rushing table', () => {
@@ -202,5 +206,91 @@ describe('getAllSeasonTotalsFromMainPage', () => {
     expect(mockGetPlayerPage).toHaveBeenCalledWith('AdamDa01');
     expect(seasons).toHaveLength(2);
     expect(seasons[0].receiving?.season).toBe(2014);
+  });
+});
+
+describe('parseMainPageDefenseSeasonTotals — IDP (comment-wrapped defense table)', () => {
+  it('parses every non-empty defensive stat from the comment-wrapped table', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(IDP_HTML, idp);
+
+    // 2014, 2015, 2016 — the Career row is filtered out by the year guard.
+    expect(seasons.map((s) => s.season)).toEqual([2014, 2015, 2016]);
+
+    expect(seasons[0]).toMatchObject({
+      playerId: 50,
+      season: 2014,
+      team: 'PHI',
+      pfrRowId: '2014',
+      g: 16,
+      gs: 15,
+      soloTkl: 60,
+      astTkl: 25,
+      totalTkl: 85,
+      sacks: 1.5,
+      int: 3,
+      pd: 10,
+      ff: 2,
+      fr: 1,
+      // No unified def_td column: def_int_td(1) + fumbles_rec_td(0).
+      defTd: 1,
+      safeties: 0,
+    });
+  });
+
+  it('collapses a multi-team season to the aggregate 2TM row (last row wins)', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(IDP_HTML, idp);
+    const s2015 = seasons.find((s) => s.season === 2015);
+
+    expect(s2015).toMatchObject({
+      team: '2TM',
+      g: 16,
+      gs: 14,
+      soloTkl: 60,
+      astTkl: 25,
+      totalTkl: 85,
+      sacks: 3,
+      int: 3,
+      pd: 12,
+      ff: 3,
+      fr: 2,
+      // def_int_td(1) + fumbles_rec_td(1).
+      defTd: 2,
+      safeties: 1,
+    });
+  });
+
+  it('falls back to solo+ast when tackles_combined is absent', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(IDP_HTML, idp);
+    const s2016 = seasons.find((s) => s.season === 2016);
+
+    // The 2016 row omits tackles_combined → totalTkl = soloTkl + astTkl.
+    expect(s2016).toMatchObject({
+      team: 'NWE',
+      soloTkl: 50,
+      astTkl: 20,
+      totalTkl: 70,
+      sacks: 0,
+      int: 0,
+      defTd: 0,
+    });
+  });
+
+  it('returns an empty array when no defense table is present', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(
+      '<html><body></body></html>',
+      idp,
+    );
+    expect(seasons).toHaveLength(0);
+  });
+});
+
+describe('getAllDefenseSeasonTotalsFromMainPage', () => {
+  it('fetches player main page and delegates to the defense parser', async () => {
+    mockGetPlayerPage.mockResolvedValue(IDP_HTML);
+    const seasons = await getAllDefenseSeasonTotalsFromMainPage(idp);
+
+    expect(mockGetPlayerPage).toHaveBeenCalledWith('TestLb00');
+    expect(seasons).toHaveLength(3);
+    expect(seasons[0].season).toBe(2014);
   });
 });

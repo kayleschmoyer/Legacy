@@ -11,6 +11,7 @@ import {
   parseTeamCell,
 } from './HtmlParser';
 import type {
+  FootballSeasonDefenseIdp,
   FootballSeasonKicking,
   FootballSeasonPassing,
   FootballSeasonReceiving,
@@ -606,4 +607,98 @@ export async function getAllSeasonTotalsFromMainPage(
 ): Promise<SeasonTotals[]> {
   const html = await getPlayerPage(player.pfrId);
   return parseMainPageSeasonTotals(html, player);
+}
+
+// --- Main player page IDP (individual defensive player) season totals ---
+// Mirrors the offensive main-page path (above) for defenders: the player's main
+// PFR page carries a `defense` table with one row per season, so all career IDP
+// season totals come back in a single HTTP request instead of one gamelog
+// request per season (LS-7732, mirroring LS-7692).
+//
+// Stat gap vs. the per-season gamelog footer (IDPStats.getSeasonTotals): the
+// gamelog `defense_gamelogs` table exposes a unified `def_td` column, but the
+// main-page `defense` table splits defensive scores into interception-return
+// (`def_int_td`) and fumble-return (`fumbles_rec_td`) columns. We reconstruct
+// the combined `defTd` by summing the two, which reproduces the gamelog total.
+// Every other IDP field (games, tackles, sacks, INT, PD, FF, FR, safeties) has a
+// direct column on the main-page table, so no targeted gamelog fetch is needed.
+
+// Sums two nullable int cells, returning null only when both cells are absent.
+function sumIntCells(row: Row, statA: string, statB: string): number | null {
+  const a = parseIntCell(row, statA);
+  const b = parseIntCell(row, statB);
+  if (a === null && b === null) return null;
+  return (a ?? 0) + (b ?? 0);
+}
+
+function parseMainPageDefenseRow(
+  row: Row,
+  player: PfrPlayer,
+): FootballSeasonDefenseIdp | null {
+  const season = parseMainPageYear(row);
+  if (season === null) return null;
+
+  const soloTkl = parseIntCell(row, 'tackles_solo');
+  const astTkl = parseIntCell(row, 'tackles_assist');
+  // Prefer PFR's own combined column; fall back to solo+ast (matching the
+  // gamelog-footer parser in IDPStats).
+  const totalTkl =
+    parseIntCell(row, 'tackles_combined') ??
+    (soloTkl !== null && astTkl !== null ? soloTkl + astTkl : null);
+
+  return {
+    playerId: player.id,
+    season,
+    team: parseMainPageTeam(row),
+    g: parseIntCell(row, 'games'),
+    gs: parseIntCell(row, 'games_started'),
+    soloTkl,
+    astTkl,
+    totalTkl,
+    sacks: parseFloatCell(row, 'sacks'),
+    int: parseIntCell(row, 'def_int'),
+    pd: parseIntCell(row, 'pass_defended'),
+    ff: parseIntCell(row, 'fumbles_forced'),
+    fr: parseIntCell(row, 'fumbles_rec'),
+    defTd: sumIntCells(row, 'def_int_td', 'fumbles_rec_td'),
+    safeties: parseIntCell(row, 'safety_md'),
+    pfrRowId: `${season}`,
+  };
+}
+
+// Exported for unit testing against fixtures without a network call.
+export function parseMainPageDefenseSeasonTotals(
+  html: string,
+  player: PfrPlayer,
+): FootballSeasonDefenseIdp[] {
+  const root = htmlParser(html, { comment: true });
+  const table = getTable(root, 'defense');
+
+  if (table === null) {
+    LOGGER.info(`No defense table found on main page for ${player.pfrId}`);
+    return [];
+  }
+
+  // One row per season: for multi-team seasons PFR emits individual team rows
+  // first and the aggregate "2TM"/"3TM" row last, so the later map.set() wins
+  // (same convention as the offensive parser).
+  const bySeason = new Map<number, FootballSeasonDefenseIdp>();
+  parseTableRows(table, (r) => parseMainPageDefenseRow(r, player)).forEach(
+    (s) => bySeason.set(s.season, s),
+  );
+
+  const seasons = [...bySeason.values()].sort((a, b) => a.season - b.season);
+
+  LOGGER.info(
+    `Main page for ${player.pfrId}: ${seasons.length} IDP defense seasons`,
+  );
+
+  return seasons;
+}
+
+export async function getAllDefenseSeasonTotalsFromMainPage(
+  player: PfrPlayer,
+): Promise<FootballSeasonDefenseIdp[]> {
+  const html = await getPlayerPage(player.pfrId);
+  return parseMainPageDefenseSeasonTotals(html, player);
 }
