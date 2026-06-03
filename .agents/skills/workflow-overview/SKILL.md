@@ -198,12 +198,13 @@ ci-pipeline   security-scanning (conditional)
 
 **Triggers:**
 
-- `pull_request_review` submitted — any APPROVED review (bot or human codeowner); the LS-4182 idempotency guard prevents duplicate runs when CI already passed for the SHA (LS-5223)
-- `pull_request` labeled — only when the label being added is `ci:run` (one-shot bypass; label auto-removed after CI completes)
+- `pull_request` opened/synchronize/reopened — CI runs on every push so check runs land in a push-event check suite recognised by branch protection (LS-7707)
+- `pull_request_review` submitted — any APPROVED review; the `check-prior-success` idempotency guard skips re-running CI when the SHA already has passing checks from the synchronize run (LS-4182/LS-5223)
+- `pull_request` labeled — only when the label being added is `ci:run` (one-shot manual re-trigger; label auto-removed after CI completes)
 - `merge_group` — always runs CI + security
 - `workflow_dispatch` — manual with configurable security scan type
 
-**Concurrency:** `orchestrator-{PR#}` with `cancel-in-progress: false` — a human review event (which skips all jobs) must not cancel an in-progress bot-approved CI run for the same PR.
+**Concurrency:** `orchestrator-{PR#}` with `cancel-in-progress: false` — a review event (which skips all jobs when CI already passed) must not cancel an in-progress synchronize-triggered CI run for the same PR.
 
 ### CI Pipeline Stages (`ci-pipeline.yml`)
 

@@ -31,18 +31,19 @@ The Legacy Sports CI/CD system is a **visibility-first, bot-reviewed, label-merg
 
 ## CI Trigger Model
 
-CI does **not** run on every push. The pipeline runs when:
+CI runs on every push to a PR branch. The pipeline runs when:
 
-1. The Code Reviewer Bot approves a non-draft PR (`pull_request_review` event, bot is reviewer, state is approved)
+1. A commit is pushed to a PR branch (`pull_request: opened / synchronize / reopened`)
 2. The PR enters the GitHub merge group (`merge_group` event)
 3. Manual dispatch (`workflow_dispatch`)
-4. The `ci:run` label is added to the PR (one-shot bypass of the bot-review gate)
+4. The `ci:run` label is added to the PR (one-shot manual re-trigger)
+5. The Code Reviewer Bot approves a PR (`pull_request_review` event) — the idempotency guard skips re-running CI if the current SHA already has passing checks from the push-triggered run
 
-This prevents CI minutes from being consumed by work-in-progress commits.
+Review (bot) and CI run in **parallel**. Branch protection requires both before the merge queue can proceed. This model ensures check runs land in a push-event check suite that GitHub's branch protection evaluator recognises — review-triggered runs alone produce check runs that the evaluator cannot match (LS-7707).
 
 ### ci:run label
 
-`ci:run` is a **one-shot** label: adding it triggers CI immediately without waiting for a bot review approval, then the orchestrator removes it automatically after CI completes (success or failure). It exists for early validation on drafts or infra-only changes where waiting for a full review cycle is unnecessary. Re-adding the label fires CI again.
+`ci:run` is a **one-shot** label: adding it triggers CI immediately (useful to force a re-run without pushing a new commit), then the orchestrator removes it automatically after CI completes (success or failure). Re-adding the label fires CI again.
 
 ## Deployment Architecture
 

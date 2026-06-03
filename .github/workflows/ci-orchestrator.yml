@@ -4,17 +4,17 @@ name: "Legacy Sports CI Orchestrator"
 # which pipelines need to run, then dispatches reusable workflows for CI and
 # security scanning. Nightly Playwright runs live in run-playwright-tests.yml.
 #
-# Trigger design (T19): the orchestrator listens to all pull_request_review
-# submissions and uses a job-level if: guard on determine-scope to gate actual
-# CI execution. GitHub Actions does not support workflow-level if: conditions,
-# so a workflow run is created for every review event — but all CI jobs are
-# skipped unless the review is a bot approval, merge_group, or manual dispatch.
-# This is intentional: "CI does not trigger" means CI jobs do not run, not that
-# no workflow run is created.
+# Trigger design: CI runs on every push (opened/synchronize/reopened) so check
+# runs land in a push-event check suite that GitHub's branch protection evaluator
+# recognises. The bot review (pull_request_review: approved) also triggers the
+# orchestrator — the check-prior-success idempotency guard skips re-running CI
+# when the current SHA already has passing checks from the synchronize run, so
+# CI never executes twice for the same commit. Review and CI run in parallel;
+# branch protection requires both before the merge queue can proceed.
 
 on:
   pull_request:
-    types: [labeled]
+    types: [opened, synchronize, reopened, labeled]
   pull_request_review:
     types: [submitted]
   merge_group:
@@ -87,8 +87,10 @@ jobs:
       (github.event_name == 'pull_request_review' &&
        github.event.review.state == 'approved') ||
       (github.event_name == 'pull_request' &&
-       github.event.action == 'labeled' &&
-       github.event.label.name == 'ci:run')
+       (github.event.action == 'opened' ||
+        github.event.action == 'synchronize' ||
+        github.event.action == 'reopened' ||
+        (github.event.action == 'labeled' && github.event.label.name == 'ci:run')))
     outputs:
       run-security: ${{ steps.scope.outputs.run-security }}
       security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
@@ -289,14 +291,30 @@ jobs:
                   .map(cr => cr.name)
               );
 
+              // Also treat in_progress/queued checks as "already running" — if the
+              // synchronize-triggered CI run is still executing when the bot approval
+              // event fires, starting a second run causes ci-pipeline's concurrency
+              // group to cancel the first run's long-running jobs (e.g. E2E), which
+              // fails Summarize & Report and removes merge-when-ready. Skip instead.
+              const activeNames = new Set(
+                allCheckRuns
+                  .filter(cr => cr.status === 'in_progress' || cr.status === 'queued')
+                  .map(cr => cr.name)
+              );
+
               const allPassed = requiredChecks.every(name => passedNames.has(name));
+              const anyActive = requiredChecks.some(name => activeNames.has(name));
 
               if (allPassed) {
                 core.info(`All required CI checks already succeeded for SHA ${sha} — skipping CI re-run.`);
                 core.setOutput('ci-already-passed', 'true');
+              } else if (anyActive) {
+                const active = requiredChecks.filter(name => activeNames.has(name));
+                core.info(`CI already running for SHA ${sha} (${active.join(', ')}) — skipping re-run to avoid concurrent cancellation.`);
+                core.setOutput('ci-already-passed', 'true');
               } else {
-                const pending = requiredChecks.filter(name => !passedNames.has(name));
-                core.info(`CI not yet fully green. Missing or in-progress: ${pending.join(', ')}`);
+                const pending = requiredChecks.filter(name => !passedNames.has(name) && !activeNames.has(name));
+                core.info(`CI not yet started for SHA ${sha}. Missing: ${pending.join(', ')}`);
                 core.setOutput('ci-already-passed', 'false');
               }
             } catch (err) {
