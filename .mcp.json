@@ -11,14 +11,6 @@
         "tools/mcp/worktree-server/src/index.ts"
       ]
     },
-    "legacy-sports-github": {
-      "url": "${MCP_GITHUB_URL}",
-      "headersHelper": "node scripts/mcp-mint-token.mjs"
-    },
-    "legacy-sports-jira": {
-      "url": "${MCP_JIRA_URL}",
-      "headersHelper": "node scripts/mcp-mint-token.mjs"
-    },
     "legacy-sports-make": {
       "command": "node",
       "args": [
@@ -48,10 +40,6 @@
         "tsx",
         "tools/mcp/db-server/src/index.ts"
       ]
-    },
-    "legacy-sports-ci": {
-      "url": "${MCP_CI_URL}",
-      "headersHelper": "node scripts/mcp-mint-token.mjs"
     },
     "legacy-sports-ci-local": {
       "command": "node",

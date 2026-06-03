@@ -23,7 +23,7 @@ Run these checks in order. Stop at the first failure and apply the recovery step
 
 ### Check 1 — `node_modules/.bin/tsx`
 
-7 of the 10 MCP servers are stdio and launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all 7 stdio servers silently time out during startup — Claude Code surfaces no error. The remaining 3 (jira, github, ci) connect via Streamable HTTP to the MCP HTTP API Gateways at `${MCP_JIRA_URL}`, `${MCP_GITHUB_URL}`, `${MCP_CI_URL}` with a Cognito bearer token, and do not need `tsx`.
+The stdio MCP servers launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all stdio servers silently time out during startup — Claude Code surfaces no error. The three hosted servers (jira, github, ci) connect as OAuth custom remote connectors registered in claude.ai; they do not use `tsx` and are not entries in `.mcp.json`.
 
 Use `-f` (not `-x`) — pnpm stores binaries as symlinks; `-f` follows symlinks and fails for both absent files and broken symlinks, while `-x` on a broken symlink returns false but doesn't distinguish from truly absent.
 
@@ -68,21 +68,7 @@ done
 - **Any MISSING** → a server's source was removed from the working tree. Run `git status` to check
   for missing tracked files; `git checkout HEAD -- tools/mcp/<srv>/src/index.ts` to restore.
 
-### Check 5 — MCP HTTP API Gateway auth (`.env.local`)
-
-The 3 URL-based servers (jira, github, ci) connect via Streamable HTTP to the MCP HTTP API Gateways with a Cognito-issued bearer token. If `MCP_AUTH_TOKEN` is expired or the `MCP_*_URL` values are missing, the servers fail silently at request time.
-
-```bash
-for VAR in MCP_JIRA_URL MCP_GITHUB_URL MCP_CI_URL MCP_AUTH_TOKEN MCP_AUTH_EXPIRES_AT; do
-  grep -q "^${VAR}=" .env.local && echo "${VAR}: set" || echo "${VAR}: MISSING"
-done
-```
-
-- **All set + `MCP_AUTH_EXPIRES_AT` in the future** → proceed to Check 6
-- **`MCP_AUTH_TOKEN` expired** → run `node scripts/mcp-auth.mjs` to refresh.
-- **`MCP_AUTH_TOKEN` or `MCP_*_URL` missing** → run `node scripts/mcp-auth.mjs --setup` to bootstrap from scratch, then restart the session.
-
-### Check 6 — `MCP_TIMEOUT` is ≥ 10 000 ms
+### Check 5 — `MCP_TIMEOUT` is ≥ 10 000 ms
 
 All servers need at least 10 s startup headroom when `node_modules` is a symlink that must be resolved by the OS. The project default is set in `.claude/settings.json`.
 
@@ -94,6 +80,13 @@ echo "MCP_TIMEOUT: ${MCP_TIMEOUT:-unset (default applied by Claude Code)}"
   ```json
   "env": { "MCP_TIMEOUT": "10000" }
   ```
+
+### Check 5b — OAuth connectors for hosted servers
+
+The three hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) connect via OAuth custom remote connectors registered in claude.ai — they are **not** entries in `.mcp.json`. If they are absent from the deferred-tools list, do **not** run the `node_modules`/`.env.local` checklist (it does not apply). Either the Org Owner has not registered the connectors, the OAuth session needs (re-)consent, or the tools haven't loaded yet.
+
+- **Tools absent** → surface to the user: prompt them to check Org settings → Connectors in claude.ai, or re-consent via `/mcp`.
+- **Mid-session 401** → OAuth access token expired; prompt the user to re-consent via `/mcp`. Do not retry or fall back.
 
 ## Recovery Steps
 
@@ -138,47 +131,21 @@ When MCP servers are confirmed missing and recovery is not possible in the curre
 
 ## Mid-Session 401 / Token Expiry (LS-4874)
 
-> **Posture change (epic LS-5089, Track A — LS-5092).** `.mcp.json` now authenticates the 3 URL servers with a `headersHelper` command (`scripts/mcp-mint-token.mjs`) that Claude Code runs at **every (re)connect**: it performs a Cognito `client_credentials` exchange locally and emits a fresh, short-lived, per-server-scoped (`mcp/jira|github|ci`) bearer token. Because the token is re-minted per connect rather than frozen once at spawn, the **classic mid-session token-death described below no longer occurs on the machine-credential path** — the long-lived machine secret stays off the wire and the minted token is refreshed before staleness bites. The legacy static `Authorization: Bearer ${MCP_AUTH_TOKEN}` (Cognito ID token) header is still **dual-accepted server-side** during migration (legacy-path removal tracked in LS-5094), so the symptom and recovery below still apply to any session/environment that pins the old `MCP_AUTH_TOKEN` header instead of the `headersHelper`. **Claude Code web** uses neither path — it reaches these servers via OAuth custom connectors and has its own re-consent posture (see [Claude Code web OAuth connectors](#claude-code-web-oauth-connectors-ls-5089-track-b) below).
-
-The 3 URL-based servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) authenticate every request with the Cognito ID token in `MCP_AUTH_TOKEN` (~8 h TTL) **on the legacy static-header path**. When that token expires **during** an active session, the API Gateway JWT authorizer rejects subsequent requests with HTTP 401 and a body of `{"message":"Unauthorized"}`. Claude Code's MCP transport tries to parse that body as a JSON-RPC response and fails Zod validation, surfacing an error in the tool result that looks like:
+The three hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) connect via OAuth custom remote connectors. Claude Code does not auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). When the OAuth access token expires, the servers begin returning HTTP 401, which Claude Code's MCP transport may surface as a Zod validation error:
 
 ```
 HTTP 401 ... ZodError: expected string, received undefined
   at path: error / jsonrpc
 ```
 
-When you see that exact shape on **any** of the three URL servers mid-session, the diagnosis is **almost always token expiry**, not a server bug or a transient network failure.
-
 ### Recovery — agent steps
 
 1. **Stop.** Do not retry, do not fall back to `gh` / `acli` / raw `curl` — that masks the failure and produces MCP gap audit entries.
-2. **Surface the recovery prompt verbatim to the user** (the agent cannot complete this — it requires either interactive AWS SSO or a browser handshake the agent has no terminal for):
+2. **Surface the recovery prompt verbatim to the user**:
 
-   > Your `MCP_AUTH_TOKEN` has expired mid-session, so `legacy-sports-github`, `legacy-sports-jira`, and `legacy-sports-ci` are returning HTTP 401. To recover:
-   >
-   > 1. In your terminal, run `node scripts/mcp-auth.mjs` (refresh) — or `node scripts/mcp-auth.mjs --setup` if the refresh token is also gone.
-   > 2. **Restart this Claude Code session.** MCP servers read `MCP_AUTH_TOKEN` once at startup; writing a new value to `.env.local` mid-session does not propagate to the already-spawned transport.
+   > The OAuth token for the MCP connectors (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) has expired mid-session. To recover: re-consent via `/mcp` in Claude Code, then resume the session.
 
-3. **Wait for the user.** Do not proceed with implementation. A session running with these three servers down is not a valid environment for any workflow that touches GitHub, Jira, or CI.
-
-### Why the agent can't auto-recover
-
-- The URL-server transports bake in the `Authorization` header at session start and never re-read `.env.local` mid-session — there is no automated recovery tool. A new token only takes effect after a session restart.
-- AWS SSO login (`aws sso login`) is a user-only action per the credentials skill — agents must never run it.
-
-### Why we surface this as documentation rather than fixing the parser
-
-The `ZodError` originates inside Claude Code's MCP SDK (`StreamableHTTPClientTransport`), which validates every HTTP response against the JSON-RPC schema. We do not own that parser. The proper structural fix is to have our Lambdas return a well-formed JSON-RPC error envelope on auth failure (instead of API Gateway's raw `{"message":"Unauthorized"}`), which requires removing the API Gateway JWT authorizer and validating the bearer token inside each Lambda — tracked as **LS-4941**. Until that ships, recognising the symptom and prompting for re-auth is the recovery path.
-
-## Claude Code web OAuth connectors (LS-5089 Track B)
-
-In **Claude Code on the web**, the three hosted servers are not loaded from project `.mcp.json` (CC web ignores it) and not authenticated by the local `headersHelper`. They are reached as **custom remote OAuth connectors** registered in claude.ai by an Org Owner (Org settings → Connectors), which **auto-sync into Claude Code** on the same account. The Lambdas implement the MCP OAuth 2.0 Authorization spec (LS-5095), so CC web's OAuth-only connector UI is sufficient.
-
-**Diagnostic posture for CC web:**
-
-- If `mcp__legacy-sports-{jira,github,ci}__*` tools are **present**, the connector synced correctly — use them as normal.
-- If they are **absent**, do not run the `node_modules`/`.env.local` checklist above (it does not apply — CC web uses neither). Either the Owner has not registered the connectors yet, or the OAuth session needs (re-)consent. Surface this to the user; agents cannot register connectors or complete the browser consent.
-- **Mid-session 401 in CC web** is the **re-consent-on-expiry** limitation, not the local token-death failure: Claude Code does not auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). When the OAuth access token expires, prompt the user to re-consent via `/mcp`; do not retry or fall back. See `.agents/skills/cloud-agent-mode/SKILL.md` (Claude Code web custom remote connectors).
+3. **Wait for the user.** Do not proceed with implementation. A session with these three servers down is not a valid environment for any workflow that touches GitHub, Jira, or CI.
 
 ## Pre-flight Auth Check (Separate from Load Failures)
 
