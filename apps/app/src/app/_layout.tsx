@@ -17,6 +17,7 @@ import {
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
+import { config } from '@legacy-sports/app-config/native';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -27,7 +28,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const growthbook = new GrowthBook({
   apiHost: 'https://cdn.growthbook.io',
-  clientKey: process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY ?? '',
+  clientKey: config.growthbookClientKey ?? '',
   enableDevMode: isDev,
   trackingCallback: (
     experiment: { key: string },
@@ -116,7 +117,7 @@ function InnerLayout(): React.JSX.Element {
  */
 export default function Layout() {
   useEffect(() => {
-    if (!process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY) return;
+    if (!config.growthbookClientKey) return;
     growthbook.loadFeatures({ autoRefresh: true }).catch((err: unknown) => {
       LOGGER.warn(
         '[GrowthBook] Feature load failed (non-fatal):',

@@ -38,6 +38,7 @@
       }
     },
     "plugins": [
+      "../../lib/app-config/plugins/with-expo-public-env",
       "@react-native-firebase/app",
       [
         "expo-asset",

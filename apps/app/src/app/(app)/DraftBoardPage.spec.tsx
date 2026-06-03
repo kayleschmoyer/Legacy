@@ -5,6 +5,13 @@ import DraftBoardPage from './DraftBoardPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+let mockWebsocketUrl: string | undefined = undefined;
+jest.mock('@legacy-sports/app-config/native', () => ({
+  get config() {
+    return { websocketUrl: mockWebsocketUrl };
+  },
+}));
+
 const mockNavigate = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -44,31 +51,21 @@ jest.mock('@legacy-sports/logging', () => ({
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('DraftBoardPage', () => {
-  const originalWebsocketUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.EXPO_PUBLIC_WEBSOCKET_URL;
+    mockWebsocketUrl = undefined;
   });
 
-  afterEach(() => {
-    if (originalWebsocketUrl !== undefined) {
-      process.env.EXPO_PUBLIC_WEBSOCKET_URL = originalWebsocketUrl;
-    } else {
-      delete process.env.EXPO_PUBLIC_WEBSOCKET_URL;
-    }
-  });
-
-  describe('when EXPO_PUBLIC_WEBSOCKET_URL is not configured', () => {
+  describe('when websocketUrl is not configured', () => {
     it('renders an error message', () => {
       render(<DraftBoardPage />);
       expect(screen.getByText(/WebSocket URL is not configured/i)).toBeTruthy();
     });
   });
 
-  describe('when EXPO_PUBLIC_WEBSOCKET_URL is configured', () => {
+  describe('when websocketUrl is configured', () => {
     it('renders the EliteDraftBoardScreen', () => {
-      process.env.EXPO_PUBLIC_WEBSOCKET_URL = 'wss://example.com/ws';
+      mockWebsocketUrl = 'wss://example.com/ws';
       render(<DraftBoardPage />);
       expect(screen.getByTestId('elite-draft-board-screen')).toBeTruthy();
     });

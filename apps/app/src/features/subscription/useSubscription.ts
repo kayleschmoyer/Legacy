@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
+import { config } from '@legacy-sports/app-config/native';
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
@@ -43,7 +44,7 @@ export function useSubscription() {
         const token = await readKeychainValue(Secret.INTERNAL_JWT);
         if (!active || !token) return;
 
-        const wsUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL ?? '';
+        const wsUrl = config.websocketUrl ?? '';
         if (!wsUrl) return;
 
         // No leagueId: subscription updates are user-scoped, so connect with the

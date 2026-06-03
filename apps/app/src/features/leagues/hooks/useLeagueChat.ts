@@ -4,6 +4,7 @@ import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
+import { config } from '@legacy-sports/app-config/native';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import {
   GetLeagueMessages,
@@ -125,7 +126,7 @@ export function useLeagueChat(leagueId: number): {
         const token = await readKeychainValue(Secret.INTERNAL_JWT);
         if (!active || !token) return;
 
-        const wsUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL ?? '';
+        const wsUrl = config.websocketUrl ?? '';
         if (!wsUrl) return;
 
         const client = new WebSocketClient({

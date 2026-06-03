@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { GifPicker } from '@legacy-sports/shared-components';
+import { config } from '@legacy-sports/app-config/native';
 import { useLeagueChat } from './hooks/useLeagueChat';
 import { formatTime } from './formatTime';
 import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
@@ -35,7 +36,7 @@ export function LeagueChatTab({
   const [showGifPicker, setShowGifPicker] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const giphyApiKey = process.env.EXPO_PUBLIC_GIPHY_API_KEY ?? '';
+  const giphyApiKey = config.giphyApiKey ?? '';
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();

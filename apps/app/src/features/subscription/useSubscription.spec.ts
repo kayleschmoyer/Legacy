@@ -7,6 +7,13 @@ import { useSubscription } from './useSubscription';
 
 // ── Mocks (hoisted before imports) ───────────────────────────────────────────
 
+let mockWebsocketUrl: string | undefined = undefined;
+jest.mock('@legacy-sports/app-config/native', () => ({
+  get config() {
+    return { websocketUrl: mockWebsocketUrl };
+  },
+}));
+
 // At runtime Expo Metro aliases `@legacy-sports/utils` to lib/utils/src/index.ts
 // (via tsconfig paths), so ClientNotificationType resolves. Under jest the app's
 // moduleNameMapper + `native.ts` extension priority resolves the barrel to
@@ -184,12 +191,12 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
     jest.resetAllMocks();
     mockCtorOpts = null;
     mockRegisteredHandlers.clear();
-    process.env.EXPO_PUBLIC_WEBSOCKET_URL = 'wss://example.com/ws';
+    mockWebsocketUrl = 'wss://example.com/ws';
     mockReadKeychainValue.mockResolvedValue('jwt-token');
   });
 
   afterEach(() => {
-    delete process.env.EXPO_PUBLIC_WEBSOCKET_URL;
+    mockWebsocketUrl = undefined;
   });
 
   it('refetches the subscription when a SUBSCRIPTION_UPDATED notification arrives', async () => {

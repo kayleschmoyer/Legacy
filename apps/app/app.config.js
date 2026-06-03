@@ -41,20 +41,6 @@ require('dotenv').config({
   override: false,
 });
 
-// Alias the existing web client token onto the EXPO_PUBLIC_ name Expo inlines.
-// Only set when the EXPO_PUBLIC_ name is empty (or whitespace-only — a config
-// typo like `EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN= ` in a .env file would
-// otherwise leave Rollbar silently uninitialized despite VITE_ROLLBAR_ACCESS_TOKEN
-// being valid). An explicit override (EAS secret, CI env var, separate
-// mobile-only token down the road) still wins.
-if (
-  !process.env.EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN?.trim() &&
-  process.env.VITE_ROLLBAR_ACCESS_TOKEN?.trim()
-) {
-  process.env.EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN =
-    process.env.VITE_ROLLBAR_ACCESS_TOKEN;
-}
-
 // Mirror EXPO_PUBLIC_APP_VERSION from APP_VERSION when only the bare name is set.
 if (
   !process.env.EXPO_PUBLIC_APP_VERSION?.trim() &&
@@ -62,6 +48,12 @@ if (
 ) {
   process.env.EXPO_PUBLIC_APP_VERSION = process.env.APP_VERSION;
 }
+
+// Note: VITE_ROLLBAR_ACCESS_TOKEN → EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN and
+// VITE_GROWTHBOOK_CLIENT_KEY → EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY aliases are
+// now handled by the with-expo-public-env config plugin at prebuild (LS-7558).
+// For `expo start` (dev), set both the VITE_* and EXPO_PUBLIC_* vars directly
+// in the root .env if both web and native need them simultaneously.
 
 // Mirror VITE_COMMIT_SHA → EXPO_PUBLIC_COMMIT_SHA so native builds get the
 // same commit sentinel as web (LS-5717).
@@ -79,16 +71,6 @@ if (!process.env.EXPO_PUBLIC_BUILD_DATE?.trim()) {
   if (webBuildDate?.trim()) {
     process.env.EXPO_PUBLIC_BUILD_DATE = webBuildDate;
   }
-}
-
-// Mirror VITE_GROWTHBOOK_CLIENT_KEY → EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY so
-// mobile uses the same GrowthBook project as web without a separate .env entry.
-if (
-  !process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY?.trim() &&
-  process.env.VITE_GROWTHBOOK_CLIENT_KEY?.trim()
-) {
-  process.env.EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY =
-    process.env.VITE_GROWTHBOOK_CLIENT_KEY;
 }
 
 // Spread the static config from app.json. The `config` argument Expo passes

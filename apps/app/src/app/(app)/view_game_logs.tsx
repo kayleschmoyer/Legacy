@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Row, Table } from 'react-native-table-component';
 import { LOGGER } from '@legacy-sports/logging';
+import { resolveStatsApiUrl } from '@legacy-sports/app-config/native';
 import { axiosInstance } from '../../common/utilities/axiosInstance';
 import { useIsMounted } from '../../common/hooks/useIsMounted';
 
@@ -29,8 +30,7 @@ export default function ViewGameLogs(): React.JSX.Element {
     setError(null);
     axiosInstance
       .post<Record<string, Record<string, string | number>>>(
-        process.env.EXPO_PUBLIC_STATS_API_URL ||
-          'http://localhost:5000/baseball-game-logs',
+        resolveStatsApiUrl('http://localhost:5000/baseball-game-logs'),
         {
           game_date: date,
           player_id: player,

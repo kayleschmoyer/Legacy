@@ -13,6 +13,7 @@ import {
   YStack,
 } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
+import { config } from '@legacy-sports/app-config/native';
 import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useGetUserLeaguesQuery } from '../../../api/db/graphql.generated';
@@ -20,8 +21,7 @@ import { useSubscription } from '../../../features/subscription/useSubscription'
 import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
 
-const APP_BASE_URL =
-  process.env.EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app';
+const APP_BASE_URL = config.appBaseUrl ?? 'https://legacysports.app';
 
 // Brand gold used for the free-tier upgrade prompt, matching the Mock Draft
 // upsell and PremiumGate (LS-5182).

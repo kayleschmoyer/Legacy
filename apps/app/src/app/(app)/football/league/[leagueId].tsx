@@ -18,6 +18,7 @@ import {
 import { Tabs } from '@tamagui/tabs';
 import { Alert, Platform, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
+import { config } from '@legacy-sports/app-config/native';
 import {
   CommissionerAuditLog,
   CommissionerNoteControl,
@@ -187,7 +188,7 @@ export default function FootballLeagueId(): React.JSX.Element {
 
   const league = leagueData?.league;
 
-  const wsUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL;
+  const wsUrl = config.websocketUrl;
   const { connected: _wsConnected } = useWebSocket({
     url: wsUrl ?? undefined,
     token: wsToken,
@@ -203,8 +204,7 @@ export default function FootballLeagueId(): React.JSX.Element {
   });
 
   const inviteCode = league?.inviteCode ?? '';
-  const appBaseUrl =
-    process.env.EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app';
+  const appBaseUrl = config.appBaseUrl ?? 'https://legacysports.app';
   const inviteUrl = inviteCode
     ? `${appBaseUrl}/football/league/join/${inviteCode}`
     : '';

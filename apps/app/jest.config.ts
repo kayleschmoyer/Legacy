@@ -22,6 +22,10 @@ module.exports = {
       '<rootDir>/../../lib/shared-components/src/entry/$1',
     // Subpath exports need explicit entries before the general pattern because
     // the general rule maps e.g. rollbar/native → lib/rollbar/native/src (wrong).
+    '^@legacy-sports/app-config/native$':
+      '<rootDir>/../../lib/app-config/src/native',
+    '^@legacy-sports/app-config/web$': '<rootDir>/../../lib/app-config/src/web',
+    '^expo-constants$': '<rootDir>/__mocks__/expo-constants.js',
     '^@legacy-sports/rollbar/native$': '<rootDir>/../../lib/rollbar/src/native',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
   },
