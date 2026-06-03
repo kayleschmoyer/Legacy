@@ -21,6 +21,8 @@ export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
 
 export interface MinigamesHubProps {
   onNavigate: (gameId: MinigameId) => void;
+  /** Override the narrow-viewport detection — pass the result of useWindowDimensions on native. */
+  isNarrow?: boolean;
 }
 
 // Narrow-viewport breakpoint: at <=720px the hero stacks and cards become
@@ -547,8 +549,12 @@ const GameCard: React.FC<{
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
-  const isNarrow = useIsNarrow();
+export const MinigamesHub: React.FC<MinigamesHubProps> = ({
+  onNavigate,
+  isNarrow: isNarrowProp,
+}) => {
+  const isNarrowHook = useIsNarrow();
+  const isNarrow = isNarrowProp ?? isNarrowHook;
   const {
     data: sdGamesData,
     loading: sdLoading,

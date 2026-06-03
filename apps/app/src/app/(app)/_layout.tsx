@@ -40,6 +40,8 @@ export type AppDrawerParamList = {
   'football/matchup': { matchupId: string; leagueId: string };
   DraftBoardPage: { leagueId?: string } | undefined;
   'league-discovery': undefined;
+  'games/index': undefined;
+  'disclosure-game/index': undefined;
   'season-draft/index': undefined;
   'season-draft/[gameId]': { gameId: string };
   'season-draft/create': undefined;
@@ -116,6 +118,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'DraftBoardPage',
     title: 'Draft Board',
+  },
+  {
+    route: 'games/index',
+    title: 'Minigames',
   },
   {
     route: 'season-draft/index',
@@ -382,6 +388,14 @@ export default function Layout() {
           <Drawer.Screen
             name="DraftBoardPage"
             options={{ title: 'Draft Board' }}
+          />
+          <Drawer.Screen name="games/index" options={{ title: 'Minigames' }} />
+          <Drawer.Screen
+            name="disclosure-game/index"
+            options={{
+              drawerLabel: () => null,
+              title: 'Who Am I?',
+            }}
           />
           <Drawer.Screen
             name="season-draft/index"
