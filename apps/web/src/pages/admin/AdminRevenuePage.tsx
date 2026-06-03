@@ -455,7 +455,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
             </YStack>
           </ChartCard>
 
-          {/* Revenue by Platform (informational placeholder) */}
+          {/* Subscribers by Platform (revenue data pending Stripe/IAP integration) */}
           <ChartCard
             style={{
               background: SURFACE_CARD,
@@ -464,7 +464,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
           >
             <YStack gap="$2">
               <Paragraph size="$6" fontWeight="600" color="$color">
-                Revenue by Platform
+                Subscribers by Platform
               </Paragraph>
               <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
                 Platform-level revenue breakdown requires Stripe API aggregation
