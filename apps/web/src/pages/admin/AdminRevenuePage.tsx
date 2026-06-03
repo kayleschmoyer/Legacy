@@ -310,52 +310,91 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
               </XStack>
 
               {(stats.statusBreakdown ?? []).length > 0 && (
-                <YStack style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={(stats.statusBreakdown ?? []).map((item) => {
+                <>
+                  <div
+                    role="img"
+                    aria-label={`Bar chart showing subscription status breakdown: ${(stats.statusBreakdown ?? []).map((item) => `${STATUS_LABELS[item.status ?? ''] ?? item.status}: ${item.count ?? 0}`).join(', ')}.`}
+                  >
+                    <YStack style={{ height: 220 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={(stats.statusBreakdown ?? []).map((item) => {
+                            const statusKey = item.status ?? '';
+                            return {
+                              name: STATUS_LABELS[statusKey] ?? statusKey,
+                              count: item.count ?? 0,
+                            };
+                          })}
+                          margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke={withAlpha(TEXT_MUTED, 0.2)}
+                            vertical={false}
+                          />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fill: TEXT_MUTED, fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fill: TEXT_MUTED, fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: SURFACE_CARD,
+                              border: `1px solid ${OUTLINE_SUBTLE}`,
+                              borderRadius: 8,
+                              color: '#F8FAFC',
+                            }}
+                            cursor={{ fill: withAlpha(TEXT_MUTED, 0.05) }}
+                          />
+                          <Bar
+                            dataKey="count"
+                            fill={BRAND_GOLD_LIGHT}
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </YStack>
+                  </div>
+                  <table
+                    style={{
+                      position: 'absolute',
+                      width: 1,
+                      height: 1,
+                      overflow: 'hidden',
+                      clip: 'rect(0, 0, 0, 0)',
+                      whiteSpace: 'nowrap',
+                      borderWidth: 0,
+                      padding: 0,
+                      margin: -1,
+                    }}
+                  >
+                    <caption>Subscription Status Breakdown</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Status</th>
+                        <th scope="col">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(stats.statusBreakdown ?? []).map((item) => {
                         const statusKey = item.status ?? '';
-                        return {
-                          name: STATUS_LABELS[statusKey] ?? statusKey,
-                          count: item.count ?? 0,
-                        };
+                        return (
+                          <tr key={statusKey}>
+                            <td>{STATUS_LABELS[statusKey] ?? statusKey}</td>
+                            <td>{item.count ?? 0}</td>
+                          </tr>
+                        );
                       })}
-                      margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke={withAlpha(TEXT_MUTED, 0.2)}
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: SURFACE_CARD,
-                          border: `1px solid ${OUTLINE_SUBTLE}`,
-                          borderRadius: 8,
-                          color: '#F8FAFC',
-                        }}
-                        cursor={{ fill: withAlpha(TEXT_MUTED, 0.05) }}
-                      />
-                      <Bar
-                        dataKey="count"
-                        fill={BRAND_GOLD_LIGHT}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </YStack>
+                    </tbody>
+                  </table>
+                </>
               )}
             </YStack>
           </ChartCard>
@@ -378,76 +417,112 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
               </YStack>
 
               {(stats.subscriberGrowth ?? []).length > 0 ? (
-                <YStack style={{ height: 240 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={(stats.subscriberGrowth ?? []).map((pt) => ({
-                        month: pt.month ?? '',
-                        newSubscribers: pt.newSubscribers ?? 0,
-                      }))}
-                      margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="goldGrad"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
+                <>
+                  <div
+                    role="img"
+                    aria-label={`Area chart showing new premium subscriptions per month over the last 12 months: ${(stats.subscriberGrowth ?? []).map((pt) => `${pt.month ?? ''}: ${pt.newSubscribers ?? 0}`).join(', ')}.`}
+                  >
+                    <YStack style={{ height: 240 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={(stats.subscriberGrowth ?? []).map((pt) => ({
+                            month: pt.month ?? '',
+                            newSubscribers: pt.newSubscribers ?? 0,
+                          }))}
+                          margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
                         >
-                          <stop
-                            offset="5%"
-                            stopColor={BRAND_GOLD_LIGHT}
-                            stopOpacity={0.4}
+                          <defs>
+                            <linearGradient
+                              id="goldGrad"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor={BRAND_GOLD_LIGHT}
+                                stopOpacity={0.4}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor={BRAND_GOLD_LIGHT}
+                                stopOpacity={0.02}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke={withAlpha(TEXT_MUTED, 0.2)}
+                            vertical={false}
                           />
-                          <stop
-                            offset="95%"
-                            stopColor={BRAND_GOLD_LIGHT}
-                            stopOpacity={0.02}
+                          <XAxis
+                            dataKey="month"
+                            tick={{ fill: TEXT_MUTED, fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
                           />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke={withAlpha(TEXT_MUTED, 0.2)}
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fill: TEXT_MUTED, fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: SURFACE_CARD,
-                          border: `1px solid ${OUTLINE_SUBTLE}`,
-                          borderRadius: 8,
-                          color: '#F8FAFC',
-                        }}
-                        formatter={(value) => [
-                          fmt(Number(value)),
-                          'New Subscribers',
-                        ]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="newSubscribers"
-                        stroke={BRAND_GOLD_LIGHT}
-                        strokeWidth={2}
-                        fill="url(#goldGrad)"
-                        dot={{ fill: BRAND_GOLD_LIGHT, r: 3 }}
-                        activeDot={{ r: 5 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </YStack>
+                          <YAxis
+                            tick={{ fill: TEXT_MUTED, fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: SURFACE_CARD,
+                              border: `1px solid ${OUTLINE_SUBTLE}`,
+                              borderRadius: 8,
+                              color: '#F8FAFC',
+                            }}
+                            formatter={(value) => [
+                              fmt(Number(value)),
+                              'New Subscribers',
+                            ]}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="newSubscribers"
+                            stroke={BRAND_GOLD_LIGHT}
+                            strokeWidth={2}
+                            fill="url(#goldGrad)"
+                            dot={{ fill: BRAND_GOLD_LIGHT, r: 3 }}
+                            activeDot={{ r: 5 }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </YStack>
+                  </div>
+                  <table
+                    style={{
+                      position: 'absolute',
+                      width: 1,
+                      height: 1,
+                      overflow: 'hidden',
+                      clip: 'rect(0, 0, 0, 0)',
+                      whiteSpace: 'nowrap',
+                      borderWidth: 0,
+                      padding: 0,
+                      margin: -1,
+                    }}
+                  >
+                    <caption>Subscriber Growth</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Month</th>
+                        <th scope="col">New Subscribers</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(stats.subscriberGrowth ?? []).map((pt) => (
+                        <tr key={pt.month ?? ''}>
+                          <td>{pt.month ?? ''}</td>
+                          <td>{pt.newSubscribers ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               ) : (
                 <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
                   No subscription data for the last 12 months.
