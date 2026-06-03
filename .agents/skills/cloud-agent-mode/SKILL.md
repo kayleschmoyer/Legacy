@@ -62,42 +62,40 @@ The "cloud agent" label covers three distinct configurations with very different
    - `action: "STOP"` → read `reason` and halt; do not proceed
    - `action: "ALREADY_CLAIMED"` → call `github_list_prs(search: "LS-####")`; **STOP** if an open PR exists. If no PR exists, inspect the `ticket.updated` timestamp: **STOP** if within the last 60 minutes (assume another agent just claimed it); only proceed if older than 60 minutes (orphaned ticket — note it in the PR body and continue without re-transitioning)
 2. **Code**: implement the changes
-3. **Validate**: `make_run({ target: "typecheck" })`, `make_run({ target: "lint-fix" })`, `make_run({ target: "test" })`
-4. **DB**: `db_migration_status()` → `db_migrate()`
-5. **Pre-commit**: `make_run({ target: "pc" })`
-6. **Self-review (MANDATORY gate)**: `make_run({ target: "lint-review-patterns" })`, then read every changed file in full and manually check patterns **#3, #4, #7, #8, #9, #19, #20** from `../pr-lifecycle/references/common-review-patterns.md`. Also scan for dead code, unsafe casts, missing/null guards, async correctness, stale comments, misleading success logs, and missing tests for changed behavior. Produce a **Self-Review Summary** before proceeding. If you find issues, fix them, re-run Step 5, then repeat this Step 6 on the updated diff and update the **Self-Review Summary** before proceeding.
+3. **Commit and push** (establish durable branch before validation):
+   - `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })`
+   - Shell fallback: `git add <files> && git commit -m "type(scope): LS-#### msg" && git push -u origin HEAD`
+4. **Before running `make pc` (Step 6): Open draft PR + post checkpoint** — a container reaped during `make pc` cannot recover without a pushed branch and draft PR as a durable substrate:
+   - **Open draft PR**:
+     - Copilot: `github_create_pr({ title: "LS-#### type(scope): msg", body: <markdown>, draft: true })`
+     - CC web: `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })`
+   - **Apply `agent-in-progress`**: `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` — **custom `legacy-sports-github` server only** (no built-in equivalent); closes the sweep race window before validation
+   - **Post continuation checkpoint**: `continuation_post({ pr: <PR#>, ... })` recording what's left (run migrations, `make pc`, self-review, mark ready, merge) and current state. A resuming container calls `continuation_status({ pr: <PR#> })` and picks up here instead of restarting
+5. **DB**: `db_migration_status()` → `db_migrate()`
+6. **Pre-commit**: `make_run({ target: "pc" })` — the draft PR from Step 4 makes a container reap here non-fatal
+7. **Self-review (MANDATORY gate)**: `make_run({ target: "lint-review-patterns" })`, then read every changed file in full and manually check patterns **#3, #4, #7, #8, #9, #19, #20** from `../pr-lifecycle/references/common-review-patterns.md`. Also scan for dead code, unsafe casts, missing/null guards, async correctness, stale comments, misleading success logs, and missing tests for changed behavior. Produce a **Self-Review Summary** before proceeding. If you find issues, fix them, re-run Step 6, then repeat this Step 7 on the updated diff and update the **Self-Review Summary** before proceeding.
    - **Copilot Coding Agent note**: there may be no `/review` slash-command support in this environment. That does **not** waive the gate — inline the checklist from `../pr-lifecycle/references/self-review.md` yourself.
-7. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
-8. **PR**: choose the create/mark-ready path based on environment, then label:
-   - **Claude Code on the web (built-in available)**: `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })` → `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` → `mcp__github__update_pull_request({ owner, repo, pullNumber: <PR#>, draft: false })` → `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. Built-in tools authenticate via Claude's native GitHub connector so the PR is authored under the bot identity, not the user's personal token. **The built-in `update_pull_request({ draft: false })` does NOT apply the `bot:ready-for-review` trigger label** — apply it explicitly as the last label op via the custom server (no built-in equivalent exists).
-   - **Copilot Coding Agent (built-in unavailable)**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` → `github_mark_pr_ready({ number: <PR#> })`. The custom server uses the Agent Author app token provisioned by `copilot-setup-steps.yml`, which is also a bot identity (not a user PAT). **`github_mark_pr_ready` applies `bot:ready-for-review` itself** (as the last label op, idempotent), so no separate label call is needed on this path.
-   - Apply `agent-in-progress` while still a draft, before marking ready — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud). `github_manage_labels` has no built-in equivalent, so the label call is the same in both environments.
-   - **Why the trigger label matters**: `review.yml` fires the first review cycle on the `ready_for_review` event regardless of labels, but it only re-fires on a subsequent `synchronize` (fix-push) when `bot:ready-for-review` is present. Without it, a PR that hits Cycle-1 changes-requested silently stalls — no new cycle runs after you push fixes.
+8. **Mark ready** — mark the PR ready before ending the session or handing off; draft is a working state, not a stopping point:
+   - **Copilot**: `github_mark_pr_ready({ number: <PR#> })` — the custom server applies `bot:ready-for-review` automatically
+   - **CC web**: After `make pc` passes, call `mcp__github__update_pull_request({ owner, repo, pullNumber: <PR#>, draft: false })` to flip the draft flag, then call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` from the custom `legacy-sports-github` server. The built-in mark-ready flips the flag only; the `github_manage_labels` call is the step that applies the trigger label. Without it, the first review cycle fires once on `ready_for_review` but does not re-fire after fix-pushes — Cycle-1 mandates stall permanently. `github_manage_labels` has no built-in equivalent; use the custom server for this call.
+   - Refresh the continuation checkpoint after marking ready: `continuation_post({ pr: <PR#>, ... })` recording "validation passed, PR marked ready"
 9. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
 
 10. **Review lifecycle**: monitor PR → fix Copilot comments → self-review changed files → fix code → validate before every push → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)
 
 Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`, `gh pr edit <PR#> --add-label "agent-in-progress"`.
 
-> **Ordering note (timeout resilience):** in a time-limited cloud container, open the **draft PR and post a continuation checkpoint _before_ Step 5 (`make pc`)**, not after Step 7. `make pc` is the longest stretch and the most likely point to be reaped; the draft-PR-first ordering below makes that reap recoverable. See [Container timeout resilience](#container-timeout-resilience).
-
 ## Container timeout resilience
 
 Cloud (and native ephemeral) containers can be reaped mid-run — most often during the longest stretch of the workflow, `make pc` on a wide-blast-radius change (which runs effectively twice when the formatter auto-commits). If the only record of progress is an unpushed local commit, the reap loses the task and a fresh container restarts from zero. A transcript that simply stops mid-`make pc`, with no closing summary, is this failure — the container ended, the agent did not decide it was done.
 
-Make the kill non-fatal by establishing a **durable checkpoint before the long validation steps** (draft-PR-first ordering).
+**The cloud workflow above (Steps 3–4) is already ordered for timeout resilience**: commit and push happen at Step 3, and the draft PR + continuation checkpoint are created at Step 4 — both _before_ `make pc` at Step 6. Follow the numbered steps in order and a container kill during `make pc` is automatically non-fatal.
 
-**Before running `make pc`:**
+The gate that still holds: **`make pc` must pass before `github_mark_pr_ready` (Step 8)**. A draft PR existing earlier is fine — it is inert until marked ready. See the [continuation-plan artifact](../dev-process/artifacts/continuation-plan.md) for checkpoint format.
 
-1. **Commit and push the branch** — `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })` (degraded mode: `git add … && git commit && git push -u origin HEAD`).
-2. **Open the PR as a draft now** — `github_create_pr({ …, draft: true })` (default CC web: `mcp__github__create_pull_request({ …, draft: true })`). A draft PR is inert: CI and review are gated on `draft == false`, so opening it early triggers nothing, but the branch + PR now survive a container kill.
-3. **Apply `agent-in-progress`** (closes the sweep race window early) and **post the continuation checkpoint** — `continuation_post({ pr: <PR#>, … })` recording done / what's left (run migrations, `make pc`, self-review, mark ready, merge) / current state. The "Resumed by" identity is yourself (a same-author timeout-resilience checkpoint). See the [continuation-plan artifact](../dev-process/artifacts/continuation-plan.md).
+**Resuming after a reap:** a fresh container reattaches to the branch, calls `continuation_status({ pr: <PR#> })`, and continues from "what's left" in the checkpoint instead of restarting from zero.
 
-**Then** run migrations → `make pc` → self-review. The gate that still holds is **`make pc` must pass before `github_mark_pr_ready`** — never mark a PR ready on unvalidated code. Refresh the checkpoint (`continuation_post`) after each significant step so the resume point stays current.
-
-**Resuming after a reap:** a fresh container reattaches to the branch, calls `continuation_status({ pr: <PR#> })`, and continues from "what's left" instead of restarting.
-
-> This reorders the classic "validate before opening a PR" rule: the _draft_ PR opens earlier (as a durable substrate), but no PR is ever _marked ready_ before `make pc` passes. See [workflow-overview Step 10b](../workflow-overview/SKILL.md). Distinct from [Cloud-to-Local Teleport](#cloud-to-local-teleport), which hands off on a **capability** gap (no AWS/DB/Terraform); this handles a **time** gap (container reaped before completion).
+> Distinct from [Cloud-to-Local Teleport](#cloud-to-local-teleport), which hands off on a **capability** gap (no AWS/DB/Terraform); this handles a **time** gap (container reaped before completion). See also [workflow-overview Step 10b](../workflow-overview/SKILL.md) for the equivalent local pattern.
 
 ## Degraded-Mode Workflow (Claude Code on the web, no custom MCP)
 
@@ -146,7 +144,13 @@ This is the runbook for default Claude Code on the web sessions. Three diagnosti
    git commit -m "<type>(<scope>): <msg> (LS-####)"
    git push -u origin HEAD                               # sets upstream on first push
    ```
-8. **Open PR**: `mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })`. Then `mcp__github__update_pull_request({ pullNumber: N, draft: false })`. The built-in mark-ready does **not** apply the `bot:ready-for-review` trigger label and there is no built-in label tool; apply it via the custom server if loaded (`github_manage_labels({ prs: [N], add: ["bot:ready-for-review"] })`) or, failing that, `gh pr edit N --add-label "bot:ready-for-review"` (usually unavailable in CC web — if so, the first cycle still fires on `ready_for_review`, but note to the user that fix-push cycles won't re-trigger until the label is added).
+8. **Open PR and mark ready**:
+   ```
+   mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })
+   mcp__github__update_pull_request({ owner: "bkrupa", repo: "legacy-sports", pullNumber: N, draft: false })
+   github_manage_labels({ prs: [N], add: ["bot:ready-for-review"] })   ← custom server; mandatory
+   ```
+   The built-in `update_pull_request({ draft: false })` flips the draft flag only — it does not apply `bot:ready-for-review`. After calling it, call `github_manage_labels` from the custom `legacy-sports-github` server to apply the trigger label. Without this label, the first review cycle fires on `ready_for_review` but does not re-fire after fix-pushes — Cycle-1 mandates stall permanently. `github_manage_labels` has no built-in equivalent; if the custom server is unavailable, fall back to `gh pr edit N --add-label "bot:ready-for-review"` and note this to the user.
 9. **Transition Jira to In Review**: `transitionJiraIssue({ ..., transition: { id: "2" } })`.
 10. **Watch for bot review** — Claude Code surfaces review events natively, no polling needed.
     - **Cycle 1 clean (LGTM)** → merge via `mcp__github__merge_pull_request` if available, or ask the user to merge.
