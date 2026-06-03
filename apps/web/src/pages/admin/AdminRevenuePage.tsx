@@ -234,9 +234,9 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
               accent={BRAND_GOLD_LIGHT}
             />
             <MetricCard
-              label="Conversion Rate"
+              label="Premium Share"
               value={pct(stats.conversionRate ?? 0)}
-              sub="Free → Premium"
+              sub="% of all users"
               accent={BRAND_NAVY_LIGHT}
             />
             <MetricCard
