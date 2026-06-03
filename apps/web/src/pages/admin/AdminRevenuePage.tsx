@@ -359,8 +359,15 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                     </tbody>
                   </table>
                   {isBrowser ? (
-                    <YStack aria-hidden="true" style={{ height: 220 }}>
-                      <ResponsiveContainer width="100%" height="100%">
+                    <YStack
+                      aria-hidden="true"
+                      style={{ height: 220, width: '100%' }}
+                    >
+                      <ResponsiveContainer
+                        width="100%"
+                        height="100%"
+                        minWidth={100}
+                      >
                         <BarChart
                           data={(stats.statusBreakdown ?? []).map((item) => {
                             const statusKey = item.status ?? '';
@@ -452,8 +459,15 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                     </tbody>
                   </table>
                   {isBrowser ? (
-                    <YStack aria-hidden="true" style={{ height: 240 }}>
-                      <ResponsiveContainer width="100%" height="100%">
+                    <YStack
+                      aria-hidden="true"
+                      style={{ height: 240, width: '100%' }}
+                    >
+                      <ResponsiveContainer
+                        width="100%"
+                        height="100%"
+                        minWidth={100}
+                      >
                         <AreaChart
                           data={(stats.subscriberGrowth ?? []).map((pt) => ({
                             month: pt.month ?? '',
