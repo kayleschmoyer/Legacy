@@ -1175,7 +1175,7 @@ export function AdminPage(): React.JSX.Element | null {
         }}
         eyebrow="Admin action"
         title="Impersonate user"
-        description={`You are about to impersonate ${pendingImpersonation?.label ?? ''}. You will be signed in as this user until you sign out.`}
+        description={`You will be signed in as ${pendingImpersonation?.label ?? 'this user'} for up to 2 hours or until you sign out. This action is recorded in the admin audit log.`}
         confirmLabel="Impersonate"
         cancelLabel="Cancel"
         onConfirm={() => {
