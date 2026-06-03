@@ -31,6 +31,7 @@ import {
   WHITE,
   withAlpha,
 } from '../../constants/colors';
+import { Spinner } from 'tamagui';
 import {
   useAdminGetUsersQuery,
   useGetUserByIdQuery,
@@ -365,7 +366,16 @@ export function AdminPage(): React.JSX.Element | null {
   });
 
   if (auth.isLoading || serverUserLoading) {
-    return null;
+    return (
+      <YStack
+        flex={1}
+        alignItems="center"
+        justifyContent="center"
+        minHeight={200}
+      >
+        <Spinner size="large" />
+      </YStack>
+    );
   }
   const serverAccessLevel = serverUserData?.user?.accessLevel;
   if (serverAccessLevel !== 'admin') {
