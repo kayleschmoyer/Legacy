@@ -774,11 +774,36 @@ export function createServer(): McpServer {
   // --- github_clear_ci_failure_labels ---
   server.tool(
     'github_clear_ci_failure_labels',
-    'Remove all ci-failure-* labels from a PR. Use after successfully fixing and pushing a CI fix — the CI system will re-add labels if the fix did not hold. No-ops if no ci-failure-* labels are present.',
+    'Remove all ci-failure-* labels from a PR. Use after successfully fixing and pushing a CI fix — the CI system will re-add labels if the fix did not hold. No-ops if no ci-failure-* labels are present. Pass the PR number via "number" or its alias "prNumber".',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both.'),
     },
-    async (params) => clearCiFailureLabels(params),
+    async (params) => {
+      const resolvedNumber = params.number ?? params.prNumber;
+      if (!resolvedNumber) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" or "prNumber" (PR number).',
+            },
+          ],
+        };
+      }
+      return clearCiFailureLabels({ number: resolvedNumber });
+    },
   );
 
   // --- github_manage_labels ---
@@ -1274,9 +1299,20 @@ export function createServer(): McpServer {
   // --- github_retrigger_check ---
   server.tool(
     'github_retrigger_check',
-    'Re-request failed status checks on a PR. Eliminates need for empty commits to clear stale failures.',
+    'Re-request failed status checks on a PR. Eliminates need for empty commits to clear stale failures. Pass the PR number via "number" or its alias "prNumber".',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both.'),
       checkName: z
         .string()
         .trim()
@@ -1291,7 +1327,25 @@ export function createServer(): McpServer {
           'When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given.',
         ),
     },
-    async (params) => retriggerCheck(params),
+    async (params) => {
+      const resolvedNumber = params.number ?? params.prNumber;
+      if (!resolvedNumber) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" or "prNumber" (PR number).',
+            },
+          ],
+        };
+      }
+      return retriggerCheck({
+        number: resolvedNumber,
+        checkName: params.checkName,
+        allFailed: params.allFailed,
+      });
+    },
   );
 
   // --- github_get_check_runs ---

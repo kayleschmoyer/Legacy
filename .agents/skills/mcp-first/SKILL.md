@@ -122,7 +122,8 @@ Use the MCP tools below instead of `gh` CLI. These tools handle temp file body e
 | `gh pr edit --remove-label`                   | `github_manage_labels` (supports both `add` and `remove` arrays)                                                                                            |
 | `gh pr edit N --title "..."` / `--body "..."` | `github_edit_pr({ number: N, title?, body? })` — patches PR title and/or body; at least one of `title` or `body` is required                                |
 | `gh pr merge`                                 | `github_merge_pr({ number: N, ... })` — default: merge queue; use `strategy: "direct"` for admin merge; accepts `prNumber` as alias for `number`            |
-| Remove all `ci-failure-*` labels              | `github_clear_ci_failure_labels`                                                                                                                            |
+| Remove all `ci-failure-*` labels              | `github_clear_ci_failure_labels({ number: N })` — accepts `prNumber` as alias for `number`                                                                  |
+| Re-request failed status checks on a PR       | `github_retrigger_check({ number: N })` — accepts `prNumber` as alias for `number`; optional `checkName` (retriggers all matching) and `allFailed: true`    |
 | `gh api graphql` (resolve thread)             | `github_resolve_thread` / `github_resolve_threads`                                                                                                          |
 | `gh api` (review threads)                     | `github_get_review_threads` — accepts `number` or `prNumber` (alias)                                                                                        |
 | `gh api repos/.../commits/$SHA/check-runs`    | `github_get_check_runs({ prNumber: N })` — returns latest run per check name with `{name, status, conclusion, output: {title, summary}, app: {slug, name}}` |
