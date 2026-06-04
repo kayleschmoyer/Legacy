@@ -16,17 +16,14 @@ import {
   YStack,
 } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
-import { Alert, Platform, ScrollView, Share } from 'react-native';
+import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
   CommissionerAuditLog,
   CommissionerNoteControl,
   DeleteLeagueControl,
-  LeagueActivityFeed,
-  LeagueScoringSummary,
   LeagueTradeBlock,
-  OnThisDayFeed,
   PendingTradeOffers,
   PendingWaiverClaims,
   StandingsTable,
@@ -45,11 +42,11 @@ import {
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
+import { LeagueOverviewTab } from '../../../../features/leagues/LeagueOverviewTab';
 import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { LeagueHistoryTab } from '../../../../features/leagues/LeagueHistoryTab';
 import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
 import { LeagueDuesSetup } from '../../../../features/commissioner/LeagueDuesSetup';
-import { LeagueDuesPaymentStatus } from '../../../../features/commissioner/LeagueDuesPaymentStatus';
 import { SalaryCapManagementCard } from '../../../../features/commissioner/SalaryCapManagementCard';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
 import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
@@ -187,8 +184,6 @@ export default function LeagueId(): React.JSX.Element {
   // Fetch league scoring settings for commissioner scoring editor
   const {
     profile: scoringProfile,
-    settings: scoringSettings,
-    profileName: scoringProfileName,
     loading: scoringLoading,
     error: scoringError,
     refetch: refetchScoringProfile,
@@ -315,6 +310,33 @@ export default function LeagueId(): React.JSX.Element {
     [updateTeamMemberPosition, teamMembersData],
   );
 
+  const rankedStandings = useMemo(() => {
+    const formatRecord = (
+      w: number | null | undefined,
+      l: number | null | undefined,
+      t: number | null | undefined,
+    ) => {
+      const wn = w ?? 0;
+      const ln = l ?? 0;
+      const tn = t ?? 0;
+      return tn > 0 ? `${wn}-${ln}-${tn}` : `${wn}-${ln}`;
+    };
+    return standings.map((s, idx) => ({
+      rank: idx + 1,
+      teamId: s.teamId ? Number(s.teamId) : null,
+      name: s.teamName ?? 'Team',
+      record: formatRecord(s.wins, s.losses, s.ties),
+      isMine: s.teamId != null && Number(s.teamId) === userTeamId,
+    }));
+  }, [standings, userTeamId]);
+
+  const draftStatus = league?.draftStatus ?? 'pre-draft';
+  const isDrafting =
+    draftStatus === 'in-progress' || draftStatus === 'drafting';
+  const startersCount =
+    teamMembersData?.teamMembers?.filter((m) => m?.positionId != null).length ??
+    0;
+
   if (leagueLoading) {
     return <Spinner />;
   }
@@ -364,98 +386,31 @@ export default function LeagueId(): React.JSX.Element {
           )}
         </Tabs.List>
 
-        {/* Overview Tab — Activity Feed, Invite, Quick Links */}
+        {/* Overview Tab */}
         <Tabs.Content value="overview" flex={1}>
-          <ScrollView>
-            <YStack padding="$3" space="$3">
-              {/* Invite/Share */}
-              <Card backgroundColor="$blue2" borderColor="$blue6" padding="$3">
-                <YStack space="$3">
-                  <XStack justifyContent="space-between" alignItems="center">
-                    <YStack flex={1}>
-                      <Text fontSize="$4" fontWeight="600">
-                        Invite Friends
-                      </Text>
-                      <Text fontSize="$2" color="$gray11">
-                        Share your league with friends
-                      </Text>
-                    </YStack>
-                    <Button
-                      size="$3"
-                      backgroundColor="$blue9"
-                      color="white"
-                      onPress={() => void handleInviteShare()}
-                    >
-                      Share
-                    </Button>
-                  </XStack>
-
-                  {/* Invite Code Display */}
-                  {inviteCode ? (
-                    <YStack space="$2">
-                      <Text fontSize="$2" color="$gray10" fontWeight="600">
-                        INVITE CODE
-                      </Text>
-                      <Card
-                        backgroundColor="$gray2"
-                        padding="$3"
-                        bordered
-                        alignItems="center"
-                      >
-                        <Text
-                          fontSize="$6"
-                          fontWeight="800"
-                          letterSpacing={4}
-                          fontFamily="$mono"
-                        >
-                          {inviteCode}
-                        </Text>
-                      </Card>
-                    </YStack>
-                  ) : null}
-                </YStack>
-              </Card>
-
-              {/* League Dues Payment Status — visible to all members */}
-              <LeagueDuesPaymentStatus
-                leagueId={numLeagueId}
-                isCommissioner={isCommissioner}
-                onSuccess={(msg) => Alert.alert('Success', msg)}
-                onError={(err) => Alert.alert('Error', err.message)}
-              />
-
-              {/* Activity Feed */}
-              <YStack>
-                <Text fontSize="$5" fontWeight="600" marginBottom="$2">
-                  Recent Activity
-                </Text>
-                <LeagueActivityFeed leagueId={numLeagueId} limit={15} />
-              </YStack>
-
-              {/* Scoring Summary — web-only (uses <div>, CSS box-shadow, linear-gradient) */}
-              {Platform.OS === 'web' && (
-                <LeagueScoringSummary
-                  loading={scoringLoading}
-                  error={scoringError}
-                  profileName={scoringProfileName}
-                  settings={scoringSettings}
-                />
-              )}
-
-              {/* On This Day */}
-              <OnThisDayFeed
-                onPlayerPress={(playerId) =>
-                  router.push({
-                    pathname: '/PlayerDetail',
-                    params: {
-                      playerId: String(playerId),
-                      playerName: '',
-                    },
-                  })
-                }
-              />
-            </YStack>
-          </ScrollView>
+          <LeagueOverviewTab
+            league={league}
+            leagueId={numLeagueId}
+            isCommissioner={isCommissioner}
+            isDrafting={isDrafting}
+            rankedStandings={rankedStandings}
+            startersCount={startersCount}
+            inviteCode={inviteCode}
+            onJoinDraft={() =>
+              router.navigate({
+                pathname: '/DraftBoardPage' as never,
+                params: { leagueId: String(numLeagueId) },
+              } as never)
+            }
+            onViewAllStandings={() => setSelectedTab('standings')}
+            onInviteShare={() => void handleInviteShare()}
+            onPlayerPress={(playerId) =>
+              router.push({
+                pathname: '/PlayerDetail',
+                params: { playerId: String(playerId), playerName: '' },
+              })
+            }
+          />
         </Tabs.Content>
 
         <Tabs.Content value="roster" flex={1}>

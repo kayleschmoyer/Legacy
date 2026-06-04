@@ -94,6 +94,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
     DeleteLeagueControl: () => <View testID="delete-league-control" />,
     LeagueActivityFeed: () => <View testID="league-activity-feed" />,
+    LeagueDuesPaymentStatus: () => <View testID="league-dues-payment-status" />,
     LeagueScoringSummary: () => <View testID="league-scoring-summary" />,
     LeagueTradeBlock: () => <View testID="league-trade-block" />,
     OnThisDayFeed: () => <View testID="on-this-day-feed" />,
@@ -228,6 +229,7 @@ const mockStartDraftMutation = jest.fn(() => [jest.fn(), { loading: false }]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
 
 jest.mock('../../../../api/db/graphql.generated', () => ({
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useGetLeagueByIdQuery: (...args: unknown[]) =>
     mockGetLeagueByIdQuery(...args),
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>
@@ -265,6 +267,23 @@ describe('FootballLeagueId', () => {
     ]);
     mockStartDraftMutation.mockReturnValue([jest.fn(), { loading: false }]);
     mockUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+
+    jest
+      .requireMock<{
+        useAuthorizedUserInfo: jest.Mock;
+      }>('../../../../common/auth/AuthorizedUserContext')
+      .useAuthorizedUserInfo.mockReturnValue({ id: 1, isAdmin: false });
+
+    jest
+      .requireMock<{
+        useStandings: jest.Mock;
+      }>('../../../../features/matchup/hooks/useStandings')
+      .useStandings.mockReturnValue({
+        standings: [],
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      });
   });
 
   describe('loading state', () => {
@@ -355,14 +374,103 @@ describe('FootballLeagueId', () => {
   });
 
   describe('overview tab content', () => {
-    it('renders the invite share section', () => {
+    it('renders the invite share section for commissioners', () => {
+      const { useAuthorizedUserInfo } = jest.requireMock<{
+        useAuthorizedUserInfo: jest.Mock;
+      }>('../../../../common/auth/AuthorizedUserContext');
+      useAuthorizedUserInfo.mockReturnValue({ id: 99, isAdmin: false });
       render(<FootballLeagueId />);
       expect(screen.getByText('Invite Friends')).toBeTruthy();
+    });
+
+    it('does not render the invite share section for non-commissioners', () => {
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Invite Friends')).toBeNull();
     });
 
     it('renders the activity feed', () => {
       render(<FootballLeagueId />);
       expect(screen.getByTestId('league-activity-feed')).toBeTruthy();
+    });
+
+    it('renders snapshot stats section with Teams and Roster Size labels', () => {
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Teams')).toBeTruthy();
+      expect(screen.getByText('Roster Size')).toBeTruthy();
+    });
+
+    it('renders Weeks / Season label for football sport', () => {
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Weeks / Season')).toBeTruthy();
+    });
+
+    it('renders draft live banner when draft is in progress', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, draftStatus: 'in-progress' } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Draft Is Live')).toBeTruthy();
+      expect(screen.getByText('Join Draft')).toBeTruthy();
+    });
+
+    it('does not render draft banner when draft is not active', () => {
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Draft Is Live')).toBeNull();
+    });
+
+    it('renders commissioner announcement when lmNotes is set', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: { ...mockLeague, lmNotes: 'League meeting this Sunday!' },
+        },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Commissioner Announcement')).toBeTruthy();
+      expect(screen.getByText('League meeting this Sunday!')).toBeTruthy();
+    });
+
+    it('does not render commissioner announcement when lmNotes is empty', () => {
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Commissioner Announcement')).toBeNull();
+    });
+
+    it('renders quick standings when standings data is available', () => {
+      const { useStandings } = jest.requireMock<{
+        useStandings: jest.Mock;
+      }>('../../../../features/matchup/hooks/useStandings');
+      useStandings.mockReturnValue({
+        standings: [
+          {
+            teamId: 1,
+            teamName: 'Team Alpha',
+            wins: 5,
+            losses: 2,
+            ties: 0,
+            pointsFor: 420,
+          },
+          {
+            teamId: 2,
+            teamName: 'Team Beta',
+            wins: 3,
+            losses: 4,
+            ties: 0,
+            pointsFor: 310,
+          },
+        ],
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Team Alpha')).toBeTruthy();
+      expect(screen.getByText('Team Beta')).toBeTruthy();
+    });
+
+    it('does not render quick standings section when standings is empty', () => {
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('View All →')).toBeNull();
     });
   });
 });

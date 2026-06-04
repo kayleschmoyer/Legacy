@@ -4731,6 +4731,7 @@ export type LeagueFragment = {
   name?: string | null;
   owner?: number | null;
   maxRosterSize?: number | null;
+  gamesPerMatchup?: number | null;
   currentMatchup?: number | null;
   currentWeekNumber?: number | null;
   draftStatus?: string | null;
@@ -4784,6 +4785,7 @@ export type GetLeagueByIdQuery = {
     name?: string | null;
     owner?: number | null;
     maxRosterSize?: number | null;
+    gamesPerMatchup?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
@@ -4825,6 +4827,7 @@ export type CreateLeagueMutation = {
       name?: string | null;
       owner?: number | null;
       maxRosterSize?: number | null;
+      gamesPerMatchup?: number | null;
       currentMatchup?: number | null;
       currentWeekNumber?: number | null;
       draftStatus?: string | null;
@@ -4874,6 +4877,7 @@ export type GetUserLeaguesQuery = {
     name?: string | null;
     owner?: number | null;
     maxRosterSize?: number | null;
+    gamesPerMatchup?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
@@ -4918,6 +4922,7 @@ export type StartDraftMutation = {
     name?: string | null;
     owner?: number | null;
     maxRosterSize?: number | null;
+    gamesPerMatchup?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
@@ -7104,6 +7109,7 @@ export const LeagueFragmentDoc = gql`
     name
     owner
     maxRosterSize
+    gamesPerMatchup
     currentMatchup
     currentWeekNumber
     draftStatus

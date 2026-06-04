@@ -3,6 +3,7 @@ fragment League on League {
   name
   owner
   maxRosterSize
+  gamesPerMatchup
   currentMatchup
   currentWeekNumber
   draftStatus
