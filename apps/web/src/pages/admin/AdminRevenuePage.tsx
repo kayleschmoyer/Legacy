@@ -6,8 +6,8 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { Card, Spinner, Text } from 'tamagui';
-import { Navigate } from 'react-router-dom';
 import { styled } from 'tamagui';
+import { Lock } from '@tamagui/lucide-icons';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Area,
@@ -192,8 +192,39 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
 
   if (auth.isLoading || serverUserLoading) return null;
 
-  if (serverUserData?.user?.accessLevel !== 'admin') {
-    return <Navigate to="/" replace />;
+  if (auth.user?.accessLevel !== 'admin') {
+    return (
+      <PageContainer>
+        <PageMeta title="Access Restricted" description="" />
+        <Card
+          padding="$5"
+          style={{
+            background: SURFACE_PANEL,
+            borderColor: withAlpha(BRAND_SEAM_RED, 0.4),
+          }}
+        >
+          <YStack gap="$3" alignItems="center" paddingVertical="$4">
+            <Lock size={40} color={BRAND_SEAM_RED} />
+            <YStack gap="$2" alignItems="center">
+              <Paragraph
+                size="$6"
+                fontWeight="700"
+                style={{ color: BRAND_SEAM_RED }}
+              >
+                Admin Access Required
+              </Paragraph>
+              <Paragraph
+                size="$4"
+                style={{ color: TEXT_MUTED, textAlign: 'center' }}
+              >
+                This page is restricted to administrators. If you believe you
+                should have access, please contact support.
+              </Paragraph>
+            </YStack>
+          </YStack>
+        </Card>
+      </PageContainer>
+    );
   }
 
   const stats = data?.adminRevenueStats;

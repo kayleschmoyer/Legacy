@@ -638,14 +638,7 @@ function App() {
                 </AdminGuard>
               }
             />
-            <Route
-              path="/admin/revenue"
-              element={
-                <AdminGuard>
-                  <AdminRevenuePage />
-                </AdminGuard>
-              }
-            />
+            <Route path="/admin/revenue" element={<AdminRevenuePage />} />
             <Route
               path="/admin/users"
               element={

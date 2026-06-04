@@ -242,6 +242,22 @@ jest.mock('../pages/football/FootballHubPage', () => ({
   FootballHubPage: () => <div>Football Hub</div>,
 }));
 
+// Mock AdminRevenuePage — access control is now handled by the page itself (LS-5758).
+// This mock mirrors the real page's auth branch so the AdminGuard routing tests remain meaningful.
+jest.mock('../pages/admin/AdminRevenuePage', () => {
+  function MockAdminRevenuePage() {
+    const { useAuth } = jest.requireMock(
+      '@legacy-sports/shared-components/auth',
+    );
+    const { user } = useAuth();
+    if (user?.accessLevel !== 'admin') {
+      return <div>Admin Access Required</div>;
+    }
+    return <div>Admin Revenue Page</div>;
+  }
+  return MockAdminRevenuePage;
+});
+
 // Mock hooks
 jest.mock('../hooks/usePageTracking', () => ({
   usePageTracking: () => null,
@@ -501,8 +517,8 @@ describe('App', () => {
       expect(container).not.toHaveTextContent('Home Page');
     });
 
-    it('redirects non-admin user from /admin/revenue to /', () => {
-      // Default mock has no accessLevel — AdminGuard redirects to /
+    it('shows access-restricted state for non-admin user at /admin/revenue (not redirected to home)', async () => {
+      // Access control moved to page level (LS-5758): non-admin sees inline denied state instead of redirect
       const { container } = render(
         <MemoryRouter
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -511,10 +527,12 @@ describe('App', () => {
           <App />
         </MemoryRouter>,
       );
-      expect(container).toHaveTextContent('Home Page');
+      await act(() => Promise.resolve());
+      expect(container).not.toHaveTextContent('Home Page');
+      expect(container).toHaveTextContent('Admin Access Required');
     });
 
-    it('allows admin user to access /admin/revenue without redirecting to home', () => {
+    it('allows admin user to access /admin/revenue without redirecting to home', async () => {
       useAuthMock.mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
@@ -536,7 +554,8 @@ describe('App', () => {
           <App />
         </MemoryRouter>,
       );
-      // Guard passes — not redirected to home
+      await act(() => Promise.resolve());
+      // Page-level access check passes — renders revenue page, not redirected to home
       expect(container).not.toHaveTextContent('Home Page');
     });
   });

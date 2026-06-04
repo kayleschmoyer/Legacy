@@ -117,6 +117,28 @@ describe('AdminRevenuePage', () => {
     mockUseGetUserByIdQuery.mockReturnValue(adminServerUser);
   });
 
+  it('renders the access-restricted state for non-admin users', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { accessLevel: 'premium' },
+    });
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Admin Access Required')).toBeInTheDocument();
+    expect(
+      screen.getByText(/This page is restricted to administrators/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Total Subscribers')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+  });
+
   it('skips the query for an authenticated non-admin user (ARV-001/ARV-004)', () => {
     mockUseAuth.mockReturnValue({
       isAuthenticated: true,
