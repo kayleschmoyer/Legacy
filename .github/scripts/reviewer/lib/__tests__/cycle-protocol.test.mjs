@@ -8,6 +8,7 @@ import {
   filterFindingsCycle3,
   buildCycleRoleSection,
   buildAuthorResponsesSection,
+  buildAuthorResolvedTitles,
   hasCannotComplyResponse,
   collectCannotComplyResponses,
   getMalformedInlineReplies,
@@ -1317,6 +1318,504 @@ describe('hasCannotComplyResponse — mixed batch', () => {
         AUTHOR_LOGIN,
       ),
       false,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterFindingsCycle2 — resolution suppression (author FIX / JUSTIFY)
+// ---------------------------------------------------------------------------
+
+describe("filterFindingsCycle2 — suppresses FIX'd C1 findings via resolvedTitles", () => {
+  it('strips a re-raised C1 finding whose title is in resolvedTitles', () => {
+    const c1Titles = ['Unsafe type assertion'];
+    const finding = makeFinding({ title: 'Unsafe type assertion' });
+    const resolvedTitles = new Set(['unsafe type assertion']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      [finding],
+      c1Titles,
+      [],
+      resolvedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('strips a re-raised C1 finding case-insensitively', () => {
+    const c1Titles = ['SQL injection via unescaped input'];
+    const finding = makeFinding({ title: 'SQL injection via unescaped input' });
+    const resolvedTitles = new Set(['sql injection via unescaped input']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      [finding],
+      c1Titles,
+      [],
+      resolvedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('keeps a C1 finding not in resolvedTitles (author did not FIX it)', () => {
+    const c1Titles = ['Auth bypass on /admin', 'SQL injection'];
+    const findings = [
+      makeFinding({ title: 'Auth bypass on /admin' }),
+      makeFinding({ title: 'SQL injection' }),
+    ];
+    const resolvedTitles = new Set(['sql injection']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      findings,
+      c1Titles,
+      [],
+      resolvedTitles,
+    );
+    assert.strictEqual(kept.length, 1);
+    assert.strictEqual(kept[0].title, 'Auth bypass on /admin');
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('resolvedTitles takes precedence over the priorSet (FIX before C1 keep)', () => {
+    // A C1 finding that has been FIX'd should be stripped, not kept.
+    const c1Titles = ['Race condition in processor'];
+    const finding = makeFinding({ title: 'Race condition in processor' });
+    const resolvedTitles = new Set(['race condition in processor']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      [finding],
+      c1Titles,
+      [],
+      resolvedTitles,
+    );
+    assert.strictEqual(
+      kept.length,
+      0,
+      'should not keep when in resolvedTitles',
+    );
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+});
+
+describe("filterFindingsCycle2 — suppresses JUSTIFY'd C1 findings via justifiedTitles", () => {
+  it('strips a re-raised C1 finding whose title is in justifiedTitles', () => {
+    const c1Titles = ['Missing tests for GraphQL changes'];
+    const finding = makeFinding({ title: 'Missing tests for GraphQL changes' });
+    const justifiedTitles = new Set(['missing tests for graphql changes']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      [finding],
+      c1Titles,
+      [],
+      new Set(),
+      justifiedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_justified');
+  });
+
+  it('resolvedTitles wins over justifiedTitles when both contain the same title', () => {
+    const c1Titles = ['Type assertion unsafe'];
+    const finding = makeFinding({ title: 'Type assertion unsafe' });
+    const resolvedTitles = new Set(['type assertion unsafe']);
+    const justifiedTitles = new Set(['type assertion unsafe']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      [finding],
+      c1Titles,
+      [],
+      resolvedTitles,
+      justifiedTitles,
+    );
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('suppresses a non-C1 finding if its title happens to match justifiedTitles', () => {
+    const c1Titles = ['Existing C1 finding'];
+    const newFinding = makeFinding({ title: 'Brand new issue' });
+    const justifiedTitles = new Set(['brand new issue']);
+
+    const { kept, stripped } = filterFindingsCycle2(
+      [newFinding],
+      c1Titles,
+      [],
+      new Set(),
+      justifiedTitles,
+    );
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_justified');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterFindingsCycle3 — resolution suppression (author FIX)
+// ---------------------------------------------------------------------------
+
+describe("filterFindingsCycle3 — suppresses FIX'd mandate findings via resolvedTitles", () => {
+  it('strips a mandate finding whose title is in resolvedTitles', () => {
+    const mandates = ['Error handling gap in useLeagueChat'];
+    const finding = makeFinding({
+      title: 'Error handling gap in useLeagueChat',
+    });
+    const resolvedTitles = new Set(['error handling gap in useleaguechat']);
+
+    const { kept, stripped } = filterFindingsCycle3(
+      [finding],
+      mandates,
+      resolvedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('strips a mandate finding case-insensitively', () => {
+    const mandates = ['Auth bypass on /admin'];
+    const finding = makeFinding({ title: 'Auth bypass on /admin' });
+    const resolvedTitles = new Set(['auth bypass on /admin']);
+
+    const { kept, stripped } = filterFindingsCycle3(
+      [finding],
+      mandates,
+      resolvedTitles,
+    );
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('resolvedTitles takes precedence over the mandate list', () => {
+    const mandates = ['Unsafe type assertion', 'Race condition'];
+    const findings = [
+      makeFinding({ title: 'Unsafe type assertion' }),
+      makeFinding({ title: 'Race condition' }),
+    ];
+    const resolvedTitles = new Set(['unsafe type assertion']);
+
+    const { kept, stripped } = filterFindingsCycle3(
+      findings,
+      mandates,
+      resolvedTitles,
+    );
+    assert.strictEqual(kept.length, 1);
+    assert.strictEqual(kept[0].title, 'Race condition');
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('keeps mandate findings not in resolvedTitles unchanged', () => {
+    const mandates = ['Missing auth check'];
+    const finding = makeFinding({ title: 'Missing auth check' });
+
+    const { kept, stripped } = filterFindingsCycle3(
+      [finding],
+      mandates,
+      new Set(),
+    );
+    assert.strictEqual(kept.length, 1);
+    assert.strictEqual(stripped.length, 0);
+  });
+
+  it('empty resolvedTitles behaves identically to calling without the param', () => {
+    const mandates = ['Mandate A', 'Mandate B'];
+    const findings = [
+      makeFinding({ title: 'Mandate A' }),
+      makeFinding({ title: 'Off-mandate finding' }),
+    ];
+
+    const withEmpty = filterFindingsCycle3(findings, mandates, new Set());
+    const withoutParam = filterFindingsCycle3(findings, mandates);
+    assert.deepStrictEqual(withEmpty.kept.length, withoutParam.kept.length);
+    assert.deepStrictEqual(
+      withEmpty.stripped.length,
+      withoutParam.stripped.length,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAuthorResolvedTitles
+// ---------------------------------------------------------------------------
+
+const PR_SHAS = [
+  'abc1234567890abcdef1234567890abcdef123456',
+  'deadbeef1234567890abcdef1234567890abcdef',
+];
+
+describe('buildAuthorResolvedTitles — basic resolution', () => {
+  it('returns empty sets when items is empty', () => {
+    const { resolvedTitles, justifiedTitles } = buildAuthorResolvedTitles(
+      [],
+      PR_SHAS,
+    );
+    assert.strictEqual(resolvedTitles.size, 0);
+    assert.strictEqual(justifiedTitles.size, 0);
+  });
+
+  it('adds a title to resolvedTitles when FIX sha exists in PR history', () => {
+    const items = [
+      {
+        title: 'Unsafe type assertion',
+        parsed: { type: 'FIX', sha: 'abc1234' },
+      },
+    ];
+    const { resolvedTitles } = buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.ok(resolvedTitles.has('unsafe type assertion'));
+  });
+
+  it('does NOT add to resolvedTitles when FIX sha is not in PR history', () => {
+    const items = [
+      {
+        title: 'Unsafe type assertion',
+        parsed: { type: 'FIX', sha: 'aaaaaaa' },
+      },
+    ];
+    const { resolvedTitles } = buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.strictEqual(resolvedTitles.size, 0);
+  });
+
+  it('adds a title to justifiedTitles for JUSTIFY replies', () => {
+    const items = [
+      {
+        title: 'Missing tests for new component',
+        parsed: {
+          type: 'JUSTIFY',
+          rationale: 'pre-existing component has no tests; out of scope',
+        },
+      },
+    ];
+    const { justifiedTitles } = buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.ok(justifiedTitles.has('missing tests for new component'));
+  });
+
+  it('skips items with null title', () => {
+    const items = [
+      { title: null, parsed: { type: 'FIX', sha: 'abc1234' } },
+      { title: null, parsed: { type: 'JUSTIFY', rationale: 'reason' } },
+    ];
+    const { resolvedTitles, justifiedTitles } = buildAuthorResolvedTitles(
+      items,
+      PR_SHAS,
+    );
+    assert.strictEqual(resolvedTitles.size, 0);
+    assert.strictEqual(justifiedTitles.size, 0);
+  });
+
+  it('normalizes titles to lowercase', () => {
+    const items = [
+      {
+        title: 'SQL Injection Via Unescaped Input',
+        parsed: { type: 'FIX', sha: 'abc1234' },
+      },
+    ];
+    const { resolvedTitles } = buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.ok(resolvedTitles.has('sql injection via unescaped input'));
+    assert.ok(!resolvedTitles.has('SQL Injection Via Unescaped Input'));
+  });
+
+  it('handles a CANNOT-COMPLY item without adding to either set', () => {
+    const items = [
+      {
+        title: 'Generated file lint error',
+        parsed: {
+          type: 'CANNOT-COMPLY',
+          issueId: 'LS-1234',
+          reason: 'Generated file.',
+        },
+      },
+    ];
+    const { resolvedTitles, justifiedTitles } = buildAuthorResolvedTitles(
+      items,
+      PR_SHAS,
+    );
+    assert.strictEqual(resolvedTitles.size, 0);
+    assert.strictEqual(justifiedTitles.size, 0);
+  });
+
+  it('handles mixed items correctly', () => {
+    const items = [
+      {
+        title: 'Unsafe cast',
+        parsed: { type: 'FIX', sha: 'abc1234' }, // valid SHA
+      },
+      {
+        title: 'Missing tests',
+        parsed: { type: 'JUSTIFY', rationale: 'out of scope' },
+      },
+      {
+        title: 'Another issue',
+        parsed: { type: 'FIX', sha: 'aaaaaaa' }, // invalid SHA
+      },
+      {
+        title: null,
+        parsed: { type: 'FIX', sha: 'abc1234' }, // no title
+      },
+    ];
+    const { resolvedTitles, justifiedTitles } = buildAuthorResolvedTitles(
+      items,
+      PR_SHAS,
+    );
+    assert.ok(resolvedTitles.has('unsafe cast'), 'valid FIX → resolved');
+    assert.ok(
+      !resolvedTitles.has('another issue'),
+      'invalid SHA → not resolved',
+    );
+    assert.ok(justifiedTitles.has('missing tests'), 'JUSTIFY → justified');
+    assert.strictEqual(resolvedTitles.size, 1);
+    assert.strictEqual(justifiedTitles.size, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAuthorResponsesSection — items field exposure
+// ---------------------------------------------------------------------------
+
+describe('buildAuthorResponsesSection — exposes items field', () => {
+  it('returns items as empty array when no valid responses', () => {
+    const result = buildAuthorResponsesSection([], [], REVIEW_AT, BOT_LOGINS);
+    assert.ok(Array.isArray(result.items), 'items should be an array');
+    assert.strictEqual(result.items.length, 0);
+  });
+
+  it('returns items with parsed responses and titles for inline thread replies', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result.items.length, 1);
+    assert.strictEqual(result.items[0].title, 'Unused variable in handler');
+    assert.strictEqual(result.items[0].parsed.type, 'FIX');
+    assert.strictEqual(result.items[0].parsed.sha, 'abc1234');
+  });
+
+  it('returns items with null title for PR-level issue comments', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: pre-existing; out of scope',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result.items.length, 1);
+    assert.strictEqual(result.items[0].title, null);
+    assert.strictEqual(result.items[0].parsed.type, 'JUSTIFY');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildCycleRoleSection — resolvedTitles integration
+// ---------------------------------------------------------------------------
+
+describe('buildCycleRoleSection cycle 2 — resolvedTitles', () => {
+  it('lists pre-verified FIX replies when resolvedTitles is provided', () => {
+    const resolvedTitles = new Set([
+      'unsafe type assertion',
+      'missing null check',
+    ]);
+    const section = buildCycleRoleSection(
+      2,
+      ['Prior issue'],
+      [],
+      resolvedTitles,
+    );
+    assert.ok(
+      section.includes('Pre-verified FIX replies'),
+      'should mention pre-verified section',
+    );
+    assert.ok(
+      section.includes('unsafe type assertion'),
+      'should list resolved title 1',
+    );
+    assert.ok(
+      section.includes('missing null check'),
+      'should list resolved title 2',
+    );
+  });
+
+  it('omits resolved titles from the re-evaluate list', () => {
+    const resolvedTitles = new Set(['fixed issue']);
+    const priorTitles = ['Fixed issue', 'Pending issue'];
+    const section = buildCycleRoleSection(2, priorTitles, [], resolvedTitles);
+    assert.ok(
+      !section.includes('Fixed issue'),
+      'resolved title should not appear in re-evaluate list',
+    );
+    assert.ok(
+      section.includes('Pending issue'),
+      'non-resolved title should still appear',
+    );
+  });
+
+  it('omits pre-verified block when resolvedTitles is empty', () => {
+    const section = buildCycleRoleSection(2, ['Prior issue'], [], new Set());
+    assert.ok(
+      !section.includes('Pre-verified FIX replies'),
+      'no pre-verified block when no resolved titles',
+    );
+  });
+});
+
+describe('buildCycleRoleSection cycle 3 — resolvedTitles', () => {
+  it('lists pre-verified FIX replies in the resolved block', () => {
+    const resolvedTitles = new Set(['auth bypass on /admin']);
+    const section = buildCycleRoleSection(
+      3,
+      ['Auth bypass on /admin', 'Race condition'],
+      [],
+      resolvedTitles,
+    );
+    assert.ok(
+      section.includes('Pre-verified FIX replies'),
+      'should mention pre-verified section',
+    );
+    assert.ok(
+      section.includes('auth bypass on /admin'),
+      'should list the resolved mandate',
+    );
+  });
+
+  it('omits resolved mandates from the verify list', () => {
+    const resolvedTitles = new Set(['auth bypass on /admin']);
+    const section = buildCycleRoleSection(
+      3,
+      ['Auth bypass on /admin', 'Race condition'],
+      [],
+      resolvedTitles,
+    );
+    assert.ok(
+      section.includes('Race condition'),
+      'non-resolved mandate should be in verify list',
+    );
+    assert.ok(
+      !section.match(/Mandates from Cycle 2[^]*Auth bypass on \/admin/),
+      'resolved mandate should not appear in numbered verify list',
     );
   });
 });

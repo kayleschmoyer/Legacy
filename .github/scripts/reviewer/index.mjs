@@ -46,6 +46,7 @@ import {
   filterFindingsCycle2,
   filterFindingsCycle3,
   buildAuthorResponsesSection,
+  buildAuthorResolvedTitles,
   hasCannotComplyResponse,
   collectCannotComplyResponses,
   getMalformedInlineReplies,
@@ -443,6 +444,8 @@ async function main() {
   // Data already fetched by fetchPrData — no extra API calls needed.
   let authorResponsesSection = '';
   let authorFormatErrors = 0;
+  let resolvedTitles = new Set();
+  let justifiedTitles = new Set();
   if (cycle >= 2 && lastBotReview) {
     try {
       const authorResponses = buildAuthorResponsesSection(
@@ -453,6 +456,26 @@ async function main() {
       );
       authorResponsesSection = authorResponses.section;
       authorFormatErrors = authorResponses.formatErrors;
+
+      // Build sets of FIX'd/JUSTIFY'd finding titles for post-LLM validators.
+      // FIX: replies with a valid PR SHA are treated as resolved even if the LLM
+      // re-raises the finding — the author's commit is stronger evidence than the LLM.
+      const resolved = buildAuthorResolvedTitles(
+        authorResponses.items,
+        prAllCommits,
+      );
+      resolvedTitles = resolved.resolvedTitles;
+      justifiedTitles = resolved.justifiedTitles;
+      if (resolvedTitles.size > 0) {
+        process.stdout.write(
+          `[reviewer] Cycle ${cycle}: ${resolvedTitles.size} finding(s) resolved via FIX: reply — will suppress if re-raised\n`,
+        );
+      }
+      if (justifiedTitles.size > 0) {
+        process.stdout.write(
+          `[reviewer] Cycle ${cycle}: ${justifiedTitles.size} finding(s) with JUSTIFY: reply — will suppress if re-raised\n`,
+        );
+      }
       if (authorResponsesSection) {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: author response(s) found — injecting into user prompt\n`,
@@ -593,6 +616,7 @@ async function main() {
       cycle,
       priorTitles,
       postReviewCommitShas,
+      resolvedTitles,
     );
     systemPrompt = buildSystemPrompt(cycleRoleSection);
     userPrompt = buildUserPrompt(
@@ -883,6 +907,8 @@ async function main() {
       parsed.findings,
       priorTitles,
       postReviewCommitShas,
+      resolvedTitles,
+      justifiedTitles,
     );
     if (stripped.length > 0) {
       process.stdout.write(
@@ -895,6 +921,7 @@ async function main() {
     const { kept, stripped } = filterFindingsCycle3(
       parsed.findings,
       priorTitles,
+      resolvedTitles,
     );
     if (stripped.length > 0) {
       process.stdout.write(

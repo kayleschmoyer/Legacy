@@ -1,5 +1,6 @@
 import {
   parseAuthorReply,
+  isShaInPrHistory,
   FORMAT_ERROR_MESSAGE,
 } from './parse-author-response.mjs';
 
@@ -64,7 +65,7 @@ export function parseTitlesFromReviewBody(body) {
 }
 
 /**
- * @typedef {'no_title_match_no_sha' | 'no_title_match_sha_not_post_c1' | 'not_in_c2_mandate_list'} StripReason
+ * @typedef {'no_title_match_no_sha' | 'no_title_match_sha_not_post_c1' | 'not_in_c2_mandate_list' | 'author_fixed' | 'author_justified'} StripReason
  *
  * @typedef {import('./findings.mjs').Finding & { strip_reason: StripReason }} StrippedFinding
  */
@@ -75,6 +76,14 @@ export function parseTitlesFromReviewBody(body) {
  * Strips findings that are **new** (not present in Cycle 1) and do **not**
  * reference a commit the author pushed since C1's review.
  *
+ * Also strips C1 findings that the author has demonstrably resolved:
+ *   - `resolvedTitles` — findings where the author posted `FIX: <sha>` and
+ *     the SHA was verified to exist in the PR's commit history. Stripped with
+ *     reason `'author_fixed'` even if the LLM re-raised the finding.
+ *   - `justifiedTitles` — findings where the author posted `JUSTIFY: <rationale>`.
+ *     Stripped with reason `'author_justified'` if the LLM re-raises after the
+ *     prompt already instructed it to evaluate the rationale.
+ *
  * "Present in C1" = the finding's title (case-insensitive) matches a title
  * extracted from the prior bot review body.
  *
@@ -82,23 +91,51 @@ export function parseTitlesFromReviewBody(body) {
  * of 7–40 characters that prefix-matches any SHA in `postC1CommitShas`.
  *
  * Stripped findings are annotated with a `strip_reason` field:
+ *   - `'author_fixed'`                    — author posted FIX: with a valid PR SHA
+ *   - `'author_justified'`               — author posted JUSTIFY: rationale
  *   - `'no_title_match_no_sha'`           — no SHA-like string cited in body at all
  *   - `'no_title_match_sha_not_post_c1'`  — a SHA is cited but does not match any post-C1 commit
  *
  * @param {import('./findings.mjs').Finding[]} findings
- * @param {string[]} priorTitles     Titles from Cycle 1's review body
+ * @param {string[]} priorTitles      Titles from Cycle 1's review body
  * @param {string[]} postC1CommitShas Full 40-char SHAs of commits added after C1
+ * @param {Set<string>} [resolvedTitles]  Lowercase titles where author FIX'd with a valid SHA
+ * @param {Set<string>} [justifiedTitles] Lowercase titles where author posted JUSTIFY:
  * @returns {{ kept: import('./findings.mjs').Finding[], stripped: StrippedFinding[] }}
  */
-export function filterFindingsCycle2(findings, priorTitles, postC1CommitShas) {
+export function filterFindingsCycle2(
+  findings,
+  priorTitles,
+  postC1CommitShas,
+  resolvedTitles = new Set(),
+  justifiedTitles = new Set(),
+) {
   const priorSet = new Set(priorTitles.map((t) => t.toLowerCase()));
 
   const kept = [];
   const stripped = [];
 
   for (const f of findings) {
-    // Re-raised from C1 — always keep.
-    if (priorSet.has(f.title.toLowerCase())) {
+    const titleLower = f.title.toLowerCase();
+
+    // Author claimed this finding was fixed (FIX: sha, sha in PR history).
+    // Trust the FIX reply and suppress even if the LLM re-raised it.
+    if (resolvedTitles.has(titleLower)) {
+      stripped.push({ ...f, strip_reason: 'author_fixed' });
+      continue;
+    }
+
+    // Author provided a JUSTIFY rationale. Suppress if the LLM re-raises
+    // despite having the rationale in the prompt — the LLM already had a
+    // chance to evaluate it and may be pattern-matching on keywords rather
+    // than re-evaluating the current code state.
+    if (justifiedTitles.has(titleLower)) {
+      stripped.push({ ...f, strip_reason: 'author_justified' });
+      continue;
+    }
+
+    // Re-raised from C1 and not resolved/justified above — keep.
+    if (priorSet.has(titleLower)) {
       kept.push(f);
       continue;
     }
@@ -135,20 +172,41 @@ export function filterFindingsCycle2(findings, priorTitles, postC1CommitShas) {
  * Cycle 2 mandate list. Cycle 3 may only verify what was mandated in C2;
  * all other findings are invalid for this cycle.
  *
- * Stripped findings are annotated with `strip_reason: 'not_in_c2_mandate_list'`.
+ * Also strips mandate findings that the author has demonstrably resolved via
+ * `FIX: <sha>` (sha verified in PR history), annotated with `'author_fixed'`.
+ * This prevents the bot from re-flagging issues the author has already addressed
+ * when the LLM fails to recognize the fix in the diff.
+ *
+ * Stripped findings are annotated with a `strip_reason` field:
+ *   - `'author_fixed'`              — author posted FIX: with a valid PR SHA
+ *   - `'not_in_c2_mandate_list'`    — finding not in the C2 mandate list
  *
  * @param {import('./findings.mjs').Finding[]} findings
- * @param {string[]} mandateTitles Titles from Cycle 2's review body
+ * @param {string[]} mandateTitles    Titles from Cycle 2's review body
+ * @param {Set<string>} [resolvedTitles] Lowercase titles where author FIX'd with a valid SHA
  * @returns {{ kept: import('./findings.mjs').Finding[], stripped: StrippedFinding[] }}
  */
-export function filterFindingsCycle3(findings, mandateTitles) {
+export function filterFindingsCycle3(
+  findings,
+  mandateTitles,
+  resolvedTitles = new Set(),
+) {
   const mandateSet = new Set(mandateTitles.map((t) => t.toLowerCase()));
 
   const kept = [];
   const stripped = [];
 
   for (const f of findings) {
-    if (mandateSet.has(f.title.toLowerCase())) {
+    const titleLower = f.title.toLowerCase();
+
+    // Author claimed this mandate was fixed (FIX: sha, sha in PR history).
+    // Suppress even if the LLM re-raised it — trust the explicit FIX reply.
+    if (resolvedTitles.has(titleLower)) {
+      stripped.push({ ...f, strip_reason: 'author_fixed' });
+      continue;
+    }
+
+    if (mandateSet.has(titleLower)) {
       kept.push(f);
     } else {
       stripped.push({ ...f, strip_reason: 'not_in_c2_mandate_list' });
@@ -164,12 +222,14 @@ export function filterFindingsCycle3(findings, mandateTitles) {
  * @param {number} cycle
  * @param {string[]} [priorTitles] Titles from the previous cycle's review body
  * @param {string[]} [postC1CommitShas] Full 40-char SHAs of commits pushed since C1 (Cycle 2 only)
+ * @param {Set<string>} [resolvedTitles] Lowercase titles the author FIX'd with a verified SHA (C2/C3)
  * @returns {string}
  */
 export function buildCycleRoleSection(
   cycle,
   priorTitles = [],
   postC1CommitShas = [],
+  resolvedTitles = new Set(),
 ) {
   if (cycle === 1) {
     return `\
@@ -181,9 +241,19 @@ restrictions on what you may raise in this cycle.`;
   }
 
   if (cycle === 2) {
+    // Build sorted list of C1 titles that have NOT been verified as fixed,
+    // so the LLM knows which ones still need adjudication.
+    const pendingTitles = priorTitles.filter(
+      (t) => !resolvedTitles.has(t.toLowerCase()),
+    );
     const priorBlock =
-      priorTitles.length > 0
-        ? `\n\nIssues from Cycle 1 you must re-evaluate:\n${priorTitles.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+      pendingTitles.length > 0
+        ? `\n\nIssues from Cycle 1 you must re-evaluate:\n${pendingTitles.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+        : '';
+
+    const resolvedBlock =
+      resolvedTitles.size > 0
+        ? `\n\n**Pre-verified FIX replies — OMIT these findings (author committed a fix):**\n${[...resolvedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
     const shaListBlock =
@@ -197,19 +267,25 @@ restrictions on what you may raise in this cycle.`;
 You are **adjudicating Cycle 1 findings** against the current code state. \
 Re-evaluate each prior finding against the current diff **and** any author \
 replies provided below. If the issue is still present and unaddressed, re-raise \
-it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${priorBlock}
+it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${resolvedBlock}${priorBlock}
 
 **Evaluating author replies (provided as "## Author Responses" in the user prompt):**
-- \`FIX: <sha>\` — verify the fix in the diff. If the issue is resolved, omit the finding.
-- \`JUSTIFY: <rationale>\` — evaluate the justification. If it is sound and the \
-code pattern is demonstrably safe given the rationale, accept it and omit the finding. \
-If the justification is weak or the risk remains, re-raise the finding as a mandate.
+- \`FIX: <sha>\` — verify the fix exists in HEAD. **Do NOT re-raise** if the fix \
+is present in the current code, even if the original diff still shows the old \
+pattern in context lines. Check the current file content, not the diff context.
+- \`JUSTIFY: <rationale>\` — evaluate the justification carefully. \
+**Accept the justification and omit the finding** if: (a) the rationale explains \
+why the pattern is safe in this specific context, (b) the finding is correctly \
+scoped as out-of-scope for this PR (e.g. "pre-existing component has no tests; \
+adding tests is out of scope for this build-fix PR"), or (c) the risk is \
+hypothetical rather than demonstrated. Only re-raise if the justification is \
+demonstrably wrong or the risk is concrete and unmitigated.
 - No reply — treat as unaddressed; re-raise if the issue is still present in the diff.
 
 **Your instructions:**
 - **Re-raise** findings from Cycle 1 that are still present and unaddressed \
 (these become mandates the author MUST fix before Cycle 3).
-- **Accept** findings that are no longer present in the current diff or whose \
+- **Accept** findings that are no longer present in the current code or whose \
 \`JUSTIFY\` rationale is sound (omit them from your output).
 
 **⚠️ VALIDATOR-ENFORCED CONSTRAINT — mandatory for any NEW finding:**
@@ -227,20 +303,30 @@ they will be stripped before the review is posted.`;
   }
 
   if (cycle === 3) {
+    const pendingMandates = priorTitles.filter(
+      (t) => !resolvedTitles.has(t.toLowerCase()),
+    );
     const mandateBlock =
-      priorTitles.length > 0
-        ? `\n\nMandates from Cycle 2 you must verify:\n${priorTitles.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+      pendingMandates.length > 0
+        ? `\n\nMandates from Cycle 2 you must verify:\n${pendingMandates.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+        : '';
+
+    const resolvedBlock =
+      resolvedTitles.size > 0
+        ? `\n\n**Pre-verified FIX replies — these mandates are addressed (OMIT from output):**\n${[...resolvedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
     return `\
 ## Your Role This Cycle: VERIFY (Cycle 3 of 3)
 
 You are **verifying mandate compliance** — checking only whether the author \
-addressed each specific mandate issued in Cycle 2.${mandateBlock}
+addressed each specific mandate issued in Cycle 2.${resolvedBlock}${mandateBlock}
 
 **Rules — strictly enforced by the post-LLM validator:**
 - Output findings **only** for mandates that are still unaddressed.
-- If a mandate is fulfilled: do NOT include it in your output.
+- If a mandate is fulfilled: do NOT include it in your output. \
+Check the **current HEAD file content**, not diff context lines — the fix may \
+be present even if the original pattern appears in the diff as context.
 - If all mandates are fulfilled: output an empty array \`[]\`.
 - **Do NOT raise new issues** — any finding not in the Cycle 2 mandate list \
 will be automatically stripped.`;
@@ -329,7 +415,7 @@ export function getMalformedInlineReplies(
  * @param {Array<{ id: number, userLogin: string | null, body: string, createdAt: string }>} issueComments
  * @param {string} lastBotReviewAt     ISO 8601 timestamp of the last bot review; comments at or before this time are excluded from both sources
  * @param {Set<string>} botLogins      Login names that belong to the reviewer bot
- * @returns {{ section: string, formatErrors: number }}
+ * @returns {{ section: string, formatErrors: number, items: Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }> }}
  */
 export function buildAuthorResponsesSection(
   reviewComments,
@@ -377,7 +463,7 @@ export function buildAuthorResponsesSection(
     items.push({ title: null, parsed });
   }
 
-  if (items.length === 0) return { section: '', formatErrors };
+  if (items.length === 0) return { section: '', formatErrors, items };
 
   const lines = ['## Author Responses'];
   for (const { title, parsed } of items) {
@@ -392,7 +478,43 @@ export function buildAuthorResponsesSection(
     lines.push(title ? `\n**${title}**: ${responseText}` : `\n${responseText}`);
   }
 
-  return { section: lines.join('\n'), formatErrors };
+  return { section: lines.join('\n'), formatErrors, items };
+}
+
+/**
+ * Build sets of finding titles that the author has resolved or justified
+ * since the last bot review. Used by post-LLM validators to suppress
+ * re-raised findings that the author has already addressed.
+ *
+ * Only `FIX: <sha>` replies whose SHA is present in the PR's commit history
+ * are treated as resolved — a FIX citing an unknown SHA is not trusted.
+ * All `JUSTIFY: <rationale>` replies are included in `justifiedTitles`
+ * regardless of rationale content (the LLM evaluates quality in C2 ADJUDICATE;
+ * this set is used as a fallback when the LLM re-raises despite the prompt).
+ *
+ * Title matching is case-insensitive (normalized to lowercase).
+ *
+ * @param {Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }>} responseItems
+ *   The `items` field returned by `buildAuthorResponsesSection`.
+ * @param {string[]} prCommitShas  Full 40-char SHAs of all commits in the PR
+ * @returns {{ resolvedTitles: Set<string>, justifiedTitles: Set<string> }}
+ */
+export function buildAuthorResolvedTitles(responseItems, prCommitShas) {
+  const resolvedTitles = new Set();
+  const justifiedTitles = new Set();
+
+  for (const { title, parsed } of responseItems) {
+    if (!title) continue;
+    const titleLower = title.toLowerCase();
+
+    if (parsed.type === 'FIX' && isShaInPrHistory(parsed.sha, prCommitShas)) {
+      resolvedTitles.add(titleLower);
+    } else if (parsed.type === 'JUSTIFY') {
+      justifiedTitles.add(titleLower);
+    }
+  }
+
+  return { resolvedTitles, justifiedTitles };
 }
 
 /**
