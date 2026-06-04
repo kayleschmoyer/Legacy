@@ -3,11 +3,13 @@ import { SendMessageBatchCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import { PublicDb } from '@legacy-sports/db-client';
+import * as pfrClient from '@legacy-sports/pfr-client';
 import {
   buildBaseballBatchEntries,
   buildFootballBatchEntries,
   chunkIntoBatches,
   dispatchBatches,
+  handleQueuePlayers,
   parseSport,
   type SqsBatchEntry,
   upsertFootballPlayer,
@@ -20,6 +22,23 @@ jest.mock('@legacy-sports/logging', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   },
+}));
+
+// Hermetic: stub the DB connection helper to invoke the callback with a fake
+// `db` whose `execute` is a no-op, and stub the PFR scrape to return a fixed
+// roster. No network, no AWS, no DB.
+jest.mock('@legacy-sports/utils/node', () => ({
+  getDbOptions: () => ({}),
+}));
+jest.mock('@legacy-sports/db-client', () => ({
+  runWithPublicClient: jest.fn(
+    (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
+      cb({ execute: jest.fn().mockResolvedValue({ rows: [] }) }),
+  ),
+}));
+jest.mock('@legacy-sports/pfr-client', () => ({
+  getPlayersByLetter: jest.fn(),
+  mapPfrPosition: jest.fn(),
 }));
 
 describe('parseSport', () => {
@@ -188,5 +207,54 @@ describe('dispatchBatches', () => {
     const sqs = { send } as unknown as SQSClient;
     await dispatchBatches(sqs, 'https://sqs.example/queue.fifo', []);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleQueuePlayers --skip-queue (football)', () => {
+  const getPlayersByLetter = pfrClient.getPlayersByLetter as jest.Mock;
+  const mapPfrPosition = pfrClient.mapPfrPosition as jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.FOOTBALL_STATS_QUEUE_URL;
+    getPlayersByLetter.mockResolvedValue([
+      {
+        pfrId: 'AbduAm00',
+        name: 'Ameer Abdullah',
+        rawPosition: 'RB',
+        lastTeam: 'LV',
+      },
+    ]);
+    mapPfrPosition.mockReturnValue('RB');
+  });
+
+  it('upserts players without requiring the queue URL or dispatching SQS', async () => {
+    const sendSpy = jest
+      .spyOn(SQSClient.prototype, 'send')
+      .mockResolvedValue(undefined as never);
+
+    // FOOTBALL_STATS_QUEUE_URL is unset — must not throw a missing-env error.
+    await expect(
+      handleQueuePlayers({ sport: 'football', letter: 'A', skipQueue: true }),
+    ).resolves.toBeUndefined();
+
+    expect(getPlayersByLetter).toHaveBeenCalledWith('A');
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    sendSpy.mockRestore();
+  });
+
+  it('dispatches to SQS when the flag is absent', async () => {
+    process.env.FOOTBALL_STATS_QUEUE_URL = 'https://sqs.example/queue.fifo';
+    const sendSpy = jest
+      .spyOn(SQSClient.prototype, 'send')
+      .mockResolvedValue({} as never);
+
+    await handleQueuePlayers({ sport: 'football', letter: 'A' });
+
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+
+    sendSpy.mockRestore();
+    delete process.env.FOOTBALL_STATS_QUEUE_URL;
   });
 });

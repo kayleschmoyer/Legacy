@@ -56,6 +56,7 @@ export interface SqsBatchEntry {
 export interface HandleQueuePlayersArgs {
   sport: Sport;
   letter?: string;
+  skipQueue?: boolean;
 }
 
 interface EligibleFootballPlayer {
@@ -228,11 +229,10 @@ async function processFootballLetter(
   return eligible;
 }
 
-async function queueBaseballPlayers(letter?: string): Promise<void> {
-  const queueUrl = getEnvVarRequired(
-    EnvironmentVariable.SQS_LOAD_SEASON_STATS_URL,
-  );
-
+async function queueBaseballPlayers(
+  letter?: string,
+  skipQueue?: boolean,
+): Promise<void> {
   const brefIds = await runWithPublicClient(
     getDbOptions(),
     async (db: PublicDb) => {
@@ -257,6 +257,16 @@ async function queueBaseballPlayers(letter?: string): Promise<void> {
     return;
   }
 
+  if (skipQueue) {
+    LOGGER.info(
+      `Skipped SQS dispatch (--skip-queue): ${brefIds.length} baseball players`,
+    );
+    return;
+  }
+
+  const queueUrl = getEnvVarRequired(
+    EnvironmentVariable.SQS_LOAD_SEASON_STATS_URL,
+  );
   const sqs = new SQSClient({ region: REGION });
   const now = Date.now();
   const batches = chunkIntoBatches(brefIds).map((batch, idx) =>
@@ -266,10 +276,10 @@ async function queueBaseballPlayers(letter?: string): Promise<void> {
   LOGGER.info(`✅ Successfully queued all ${brefIds.length} baseball players!`);
 }
 
-async function queueFootballPlayers(letter?: string): Promise<void> {
-  const queueUrl = getEnvVarRequired(
-    EnvironmentVariable.FOOTBALL_STATS_QUEUE_URL,
-  );
+async function queueFootballPlayers(
+  letter?: string,
+  skipQueue?: boolean,
+): Promise<void> {
   const letters = letter ? [letter.toUpperCase()] : ALL_LETTERS;
 
   LOGGER.info(
@@ -295,6 +305,16 @@ async function queueFootballPlayers(letter?: string): Promise<void> {
       return;
     }
 
+    if (skipQueue) {
+      LOGGER.info(
+        `Skipped SQS dispatch (--skip-queue): upserted ${allEligible.length} players`,
+      );
+      return;
+    }
+
+    const queueUrl = getEnvVarRequired(
+      EnvironmentVariable.FOOTBALL_STATS_QUEUE_URL,
+    );
     const sqs = new SQSClient({ region: REGION });
     const now = Date.now();
     const batches = chunkIntoBatches(allEligible).map((batch, idx) =>
@@ -310,11 +330,11 @@ async function queueFootballPlayers(letter?: string): Promise<void> {
 export async function handleQueuePlayers(
   args: HandleQueuePlayersArgs,
 ): Promise<void> {
-  const { sport, letter } = args;
+  const { sport, letter, skipQueue } = args;
 
   if (sport === 'baseball') {
-    await queueBaseballPlayers(letter);
+    await queueBaseballPlayers(letter, skipQueue);
   } else {
-    await queueFootballPlayers(letter);
+    await queueFootballPlayers(letter, skipQueue);
   }
 }

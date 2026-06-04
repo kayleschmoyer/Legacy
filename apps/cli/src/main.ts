@@ -587,8 +587,16 @@ export function buildProgram(): Command {
       '--letter <letter>',
       'Process only players whose ID starts with this letter (for testing)',
     )
-    .action((options: { sport: Sport; letter?: string }) =>
-      handleQueuePlayers({ sport: options.sport, letter: options.letter }),
+    .option(
+      '--skip-queue',
+      'Upsert players to the DB without dispatching SQS stat-load jobs',
+    )
+    .action((options: { sport: Sport; letter?: string; skipQueue?: boolean }) =>
+      handleQueuePlayers({
+        sport: options.sport,
+        letter: options.letter,
+        skipQueue: options.skipQueue,
+      }),
     );
 
   program
