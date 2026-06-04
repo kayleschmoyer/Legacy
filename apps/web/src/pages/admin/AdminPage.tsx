@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { XStack, YStack } from '@legacy-sports/shared-components/ui';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Spinner } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
@@ -450,7 +450,9 @@ function AdminNavHub() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminPage(): React.JSX.Element | null {
+  const navigate = useNavigate();
   const auth = useAuth();
+  const [showAccessToast, setShowAccessToast] = useState(false);
 
   // JWT decoder state
   const [jwtInput, setJwtInput] = useState('');
@@ -510,6 +512,22 @@ export function AdminPage(): React.JSX.Element | null {
     fetchPolicy: 'cache-and-network',
   });
 
+  const serverAccessLevel = serverUserData?.user?.accessLevel;
+  const isNotAdmin =
+    !auth.isLoading && !serverUserLoading && serverAccessLevel !== 'admin';
+  const isAuthenticatedNotAdmin = isNotAdmin && auth.isAuthenticated;
+
+  useEffect(() => {
+    if (!isNotAdmin) return;
+    if (isAuthenticatedNotAdmin) {
+      setShowAccessToast(true);
+      const t = setTimeout(() => void navigate('/', { replace: true }), 2500);
+      return () => clearTimeout(t);
+    }
+    void navigate('/', { replace: true });
+    return undefined;
+  }, [isNotAdmin, isAuthenticatedNotAdmin, navigate]);
+
   if (auth.isLoading || serverUserLoading) {
     return (
       <YStack
@@ -522,9 +540,48 @@ export function AdminPage(): React.JSX.Element | null {
       </YStack>
     );
   }
-  const serverAccessLevel = serverUserData?.user?.accessLevel;
-  if (serverAccessLevel !== 'admin') {
-    return <Navigate to="/" replace />;
+
+  if (isNotAdmin) {
+    if (showAccessToast) {
+      return (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 9999,
+            maxWidth: 380,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '12px 16px',
+            borderRadius: 10,
+            background: '#1B3A5C',
+            border: '1px solid rgba(197,165,90,0.35)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            color: '#e8e0d0',
+            fontSize: 13,
+            fontWeight: 500,
+            lineHeight: 1.5,
+            animation: 'adminAccessFadeIn 0.2s ease-out',
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: 15, flexShrink: 0 }}>
+            🔒
+          </span>
+          <span>You don&apos;t have access to admin tools.</span>
+          <style>{`
+            @keyframes adminAccessFadeIn {
+              from { opacity: 0; transform: translateY(6px); }
+              to   { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+        </div>
+      );
+    }
+    return null;
   }
 
   const totalUsers = countData?.usersCount ?? 0;
