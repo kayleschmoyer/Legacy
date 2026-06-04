@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { addComment } from './tools/add-comment.js';
 import { checkBlockers } from './tools/check-blockers.js';
 import { createTicket } from './tools/create-ticket.js';
 import { editTicket } from './tools/edit-ticket.js';
@@ -216,6 +217,17 @@ server.tool(
     key: z.string().describe('Ticket key'),
   },
   async (params) => getComments(params),
+);
+
+// --- jira_add_comment ---
+server.tool(
+  'jira_add_comment',
+  'Post a comment to a Jira ticket. Use this instead of jira_edit_ticket when appending Implementation Notes or other additive content — comments do not overwrite the description and are not blocked by the destructive-overwrite permission classifier.',
+  {
+    key: z.string().describe('Ticket key (e.g. LS-1234)'),
+    body: z.string().min(1).describe('Comment body as plain text'),
+  },
+  async (params) => addComment(params),
 );
 
 // --- jira_link_issues ---

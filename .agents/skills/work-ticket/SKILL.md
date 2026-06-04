@@ -287,11 +287,11 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
     Then investigate the codebase and write code + tests.
     - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
-    - **Write implementation notes to Jira** (all tickets): after completing the implementation (before committing), append an `## Implementation Notes` section to the Jira ticket description so sweep agents have context when fixing review feedback later. First read the current description via `jira_view`, then append:
+    - **Write implementation notes to Jira** (all tickets): after completing the implementation (before committing), post an `## Implementation Notes` comment to the ticket so sweep agents have context when fixing review feedback later. Use `jira_add_comment` — it is additive and does not trigger the destructive-overwrite permission classifier (unlike `jira_edit_ticket` with a full description resend):
       ```
-      jira_edit_ticket(key: "LS-####", fields: { description: "<existing description>\n\n## Implementation Notes\n\n**Approach:** <1-2 sentences on what was done and why>\n\n**Key files changed:**\n- `path/to/file.ts` — reason\n- ...\n\n**Design decisions / constraints discovered:**\n- <any non-obvious choices, tradeoffs, or codebase constraints the agent found>\n\n**Testing:** <how correctness was verified — unit tests, manual repro, etc.>" })
+      jira_add_comment(key: "LS-####", body: "## Implementation Notes\n\n**Approach:** <1-2 sentences on what was done and why>\n\n**Key files changed:**\n- `path/to/file.ts` — reason\n- ...\n\n**Design decisions / constraints discovered:**\n- <any non-obvious choices, tradeoffs, or codebase constraints the agent found>\n\n**Testing:** <how correctness was verified — unit tests, manual repro, etc.>")
       ```
-      Preserve the original description and only append/refresh the `## Implementation Notes` section at the end. Keep notes factual and brief. Focus on information that is _not_ derivable from reading the diff: constraints, considered alternatives, and context that informs whether a review comment's suggested change is safe or problematic.
+      Keep notes factual and brief. Focus on information that is _not_ derivable from reading the diff: constraints, considered alternatives, and context that informs whether a review comment's suggested change is safe or problematic.
 
 5.  **Self-review** (MANDATORY — do not skip):
 
@@ -299,7 +299,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
     - For every AC, state the concrete evidence that proves it is satisfied — a code change at `file:line`, a test name, a screenshot, a manual repro step. "I think this is covered" is not evidence.
     - If any AC is **not** satisfied by your current diff, you are not done — return to step 4 and keep working. Do not proceed to `/review`.
     - If an AC is **genuinely impossible** to satisfy (missing data, contradictory constraints, requires access you do not have, conflicts with another AC), **stop and ask the user for help**. Do not silently drop, weaken, or reinterpret it. Surface the conflict in plain English with the AC text quoted, your specific blocker, and the option(s) you see. Wait for the user's decision before proceeding.
-    - Append the AC verification list to the ticket's `## Implementation Notes` section (the same section you wrote in step 4) under an `**Acceptance criteria verification**` sub-bullet so reviewers can see the AC → evidence mapping:
+    - Include the AC verification list in the Implementation Notes comment (posted in step 4) under an `**Acceptance criteria verification**` sub-bullet, or post it as a follow-up `jira_add_comment` call, so reviewers can see the AC → evidence mapping:
 
       ```
       **Acceptance criteria verification:**
