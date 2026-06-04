@@ -112,3 +112,7 @@ export function trackSubscriptionCancelled(tier: 'premium'): void {
 export function trackSubscriptionRenewed(tier: 'premium'): void {
   void trackEvent('subscription_renewed', { tier, category: 'monetization' });
 }
+
+export function trackMinigameTap(gameId: string): void {
+  void trackEvent('minigame_tap', { game_id: gameId, category: 'engagement' });
+}
