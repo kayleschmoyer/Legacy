@@ -463,6 +463,7 @@ export function AdminPage(): React.JSX.Element | null {
     if (!jwtInput.trim()) return;
     try {
       setJwtResult(decodeJwtParts(jwtInput));
+      setJwtInput('');
     } catch (err) {
       setJwtError(err instanceof Error ? err.message : 'Failed to decode JWT');
     }
@@ -864,11 +865,52 @@ export function AdminPage(): React.JSX.Element | null {
             decoded entirely in the browser; nothing is sent to the server.
           </p>
 
+          <XStack
+            gap={10}
+            padding={12}
+            borderRadius={8}
+            alignItems="flex-start"
+            style={{
+              background: withAlpha(BRAND_GOLD, 0.08),
+              border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
+            }}
+          >
+            <svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+              style={{ color: BRAND_GOLD, flexShrink: 0, marginTop: 2 }}
+            >
+              <path
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span
+              style={{
+                fontFamily: FONT_BODY,
+                fontSize: 13,
+                color: BRAND_GOLD,
+                lineHeight: 1.5,
+              }}
+            >
+              Tokens you paste are visible in browser memory and to any
+              installed extensions. Do not paste tokens belonging to other users
+              or customers. The input is cleared after decoding.
+            </span>
+          </XStack>
+
           <textarea
             value={jwtInput}
             onChange={(e) => setJwtInput(e.target.value)}
             placeholder="Paste JWT here…"
             aria-label="JWT input"
+            data-sentry-mask
             rows={4}
             style={{
               width: '100%',
