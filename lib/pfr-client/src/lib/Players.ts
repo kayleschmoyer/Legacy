@@ -9,6 +9,7 @@ const PFR_ID_REGEX = /\/players\/[A-Z]\/([A-Za-z0-9]+)\.htm$/;
 const POSITION_MAP: Record<string, IdpPosition> = {
   DE: 'DL',
   DT: 'DL',
+  NT: 'DL',
   ILB: 'LB',
   OLB: 'LB',
   MLB: 'LB',
@@ -46,8 +47,10 @@ export async function getPlayersByLetter(
   const html = await getPlayersList(letter);
   const root = htmlParser(html);
 
-  // PFR player list uses #div_players_ (same structure as Baseball Reference)
-  const listDiv = root.getElementById('div_players_');
+  // PFR player-index pages hold the per-letter list in #div_players. Each
+  // entry is a <p> of the form `<a>Name</a> (POS) START-END`, with active
+  // players wrapped in <b> (e.g. `<b><a>Name</a> (RB)</b> 2023-2023`).
+  const listDiv = root.getElementById('div_players');
 
   const result: PfrPlayerSummary[] = [];
 
@@ -74,20 +77,19 @@ export async function getPlayersByLetter(
     const pfrId = match[1];
     const name = anchor.text.trim();
 
-    // Position and team info follows the anchor as text, e.g.: "QB (2000-2015)"
-    // PFR also shows the position as a <em> tag or plain text after the link.
+    // Text following the anchor is `(POS) START-END`, e.g. "(OLB) 2019-2025".
+    // (The <b> wrapper on active players does not affect el.text.)
     const elText = el.text.trim();
     const afterName = elText.slice(name.length).trim();
 
-    // Extract raw position — appears as the first token, e.g. "QB (2000-2015)"
-    const positionMatch = afterName.match(/^([A-Z/]+)/);
+    // Position is the parenthesized leading token, e.g. "(OLB)" → "OLB".
+    // The [A-Z/]+ class keeps multi-position entries like "(DB/LB)" intact.
+    const positionMatch = afterName.match(/^\(([A-Z/]+)\)/);
     const rawPosition = positionMatch ? positionMatch[1] : '';
 
-    // Last team abbreviation may appear in a separate span or attribute.
-    // PFR encodes team in the entry text as "(with TEAM)" or similar.
-    // Fall back to null if not parseable — callers can fetch getPlayerInfo if needed.
-    const teamMatch = afterName.match(/\(([A-Z]{2,3})\)\s*$/);
-    const lastTeam = teamMatch ? teamMatch[1] : null;
+    // The player index carries no team — the trailing token is the year range
+    // (e.g. "2019-2025"), not a team. Callers fetch getPlayerInfo for the team.
+    const lastTeam = null;
 
     result.push({ pfrId, name, rawPosition, lastTeam });
   }
