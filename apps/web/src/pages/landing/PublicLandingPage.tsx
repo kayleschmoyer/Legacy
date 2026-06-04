@@ -14,6 +14,7 @@ import {
 } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
+import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -392,50 +393,12 @@ export function PublicLandingPage(): React.JSX.Element {
           storeCsrfToken(result.csrfToken);
         }
 
-        // Decode user and expiry from the JWT so AuthProvider can restore
+        // Write an untrusted UI-only pre-cache so AuthProvider can restore
         // the session immediately on the next page load (no loading flash).
-        try {
-          const parts = result.jwt.split('.');
-          if (parts.length === 3) {
-            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-            const paddedB64 = b64.padEnd(
-              b64.length + ((4 - (b64.length % 4)) % 4),
-              '=',
-            );
-            const payload = JSON.parse(atob(paddedB64)) as {
-              id?: number;
-              email?: string;
-              username?: string;
-              name?: string;
-              picture?: string;
-              accessLevel?: string;
-              exp?: number;
-            };
-            const userProfile = {
-              id: payload.id ?? 0,
-              email: payload.email ?? '',
-              username: payload.username ?? payload.name ?? 'Unknown',
-              picture: payload.picture,
-              accessLevel: payload.accessLevel ?? 'user',
-            };
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(
-                'ls_user_profile',
-                JSON.stringify(userProfile),
-              );
-              if (payload.exp) {
-                localStorage.setItem('ls_token_expiry', String(payload.exp));
-              }
-            }
-          }
-        } catch (err) {
-          // Best-effort — AuthProvider will restore the session from the
-          // HttpOnly cookie on next load even if this decode fails.
-          LOGGER.warn(
-            'Failed to decode Discord JWT payload for session pre-cache',
-            err instanceof Error ? err : String(err),
-          );
-        }
+        // The cache is always cleared on logout via AuthService.clearTokens()
+        // and re-verified by the background JWT refresh on every page load.
+        // See lib/session-precache.ts.
+        storeDiscordSessionPreCache(result.jwt);
 
         // Navigate to home; AuthProvider will restore the session from cache
         // and the HttpOnly JWT cookie will authenticate API requests.

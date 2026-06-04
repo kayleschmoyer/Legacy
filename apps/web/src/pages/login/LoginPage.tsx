@@ -8,6 +8,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LoginPage as AuthCard } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
+import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 import { env } from '../../config/environment';
 import {
   useGetOnThisDayQuery,
@@ -176,45 +177,12 @@ export function LoginPage(): React.JSX.Element {
 
         if (result.csrfToken) storeCsrfToken(result.csrfToken);
 
-        try {
-          const parts = result.jwt.split('.');
-          if (parts.length === 3) {
-            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-            const paddedB64 = b64.padEnd(
-              b64.length + ((4 - (b64.length % 4)) % 4),
-              '=',
-            );
-            const payload = JSON.parse(atob(paddedB64)) as {
-              id?: number;
-              email?: string;
-              username?: string;
-              name?: string;
-              picture?: string;
-              accessLevel?: string;
-              exp?: number;
-            };
-            const userProfile = {
-              id: payload.id ?? 0,
-              email: payload.email ?? '',
-              username: payload.username ?? payload.name ?? 'Unknown',
-              picture: payload.picture,
-              accessLevel: payload.accessLevel ?? 'user',
-            };
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(
-                'ls_user_profile',
-                JSON.stringify(userProfile),
-              );
-              if (payload.exp)
-                localStorage.setItem('ls_token_expiry', String(payload.exp));
-            }
-          }
-        } catch (err) {
-          LOGGER.warn(
-            'Failed to decode Discord JWT payload for session pre-cache',
-            err instanceof Error ? err : String(err),
-          );
-        }
+        // Write an untrusted UI-only pre-cache so AuthProvider can hydrate
+        // the user profile instantly on the next page load without a
+        // network round-trip.  The cache is always cleared on logout via
+        // AuthService.clearTokens() and re-verified by the background JWT
+        // refresh on every page load.  See lib/session-precache.ts.
+        storeDiscordSessionPreCache(result.jwt);
 
         window.location.replace(env.baseUrl);
       } catch (err) {
