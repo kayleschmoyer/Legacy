@@ -167,25 +167,29 @@ function mapTeam(pfrTeam: string | null): string | null {
   return pfrTeam;
 }
 
-async function upsertFootballPlayer(
+export async function upsertFootballPlayer(
   db: PublicDb,
   params: {
     firstName: string;
     lastName: string;
     pfrId: string;
     nflTeam: string | null;
+    position: Exclude<IdpPosition, null>;
   },
 ): Promise<void> {
   // bref_id is NOT NULL in the schema; football players use pfr_id as the
   // bref_id value. ON CONFLICT uses the partial unique index on pfr_id
-  // (WHERE pfr_id IS NOT NULL).
+  // (WHERE pfr_id IS NOT NULL). `position` is the player_position enum — the
+  // already-normalized mapPfrPosition output (DL/LB/DB/QB/RB/WR/TE/K), all of
+  // which are enum members. We also set it on conflict so re-running the import
+  // backfills position onto rows imported before this fix landed.
   await db.execute(sql`
     INSERT INTO public.players
-      (first_name, last_name, bref_id, pfr_id, sport, is_dst, nfl_team)
+      (first_name, last_name, bref_id, pfr_id, sport, is_dst, nfl_team, position)
     VALUES
-      (${params.firstName}, ${params.lastName}, ${params.pfrId}, ${params.pfrId}, 'football', false, ${params.nflTeam})
+      (${params.firstName}, ${params.lastName}, ${params.pfrId}, ${params.pfrId}, 'football', false, ${params.nflTeam}, ${params.position})
     ON CONFLICT (pfr_id) WHERE pfr_id IS NOT NULL
-      DO UPDATE SET nfl_team = EXCLUDED.nfl_team
+      DO UPDATE SET nfl_team = EXCLUDED.nfl_team, position = EXCLUDED.position
   `);
 }
 
@@ -212,6 +216,7 @@ async function processFootballLetter(
       lastName,
       pfrId: player.pfrId,
       nflTeam,
+      position,
     });
 
     eligible.push({ pfrId: player.pfrId, position });

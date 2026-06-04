@@ -1,5 +1,8 @@
 import { InvalidArgumentError } from 'commander';
 import { SendMessageBatchCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import type { SQL } from 'drizzle-orm';
+import { PublicDb } from '@legacy-sports/db-client';
 import {
   buildBaseballBatchEntries,
   buildFootballBatchEntries,
@@ -7,6 +10,7 @@ import {
   dispatchBatches,
   parseSport,
   type SqsBatchEntry,
+  upsertFootballPlayer,
 } from './queuePlayers';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -108,6 +112,50 @@ describe('buildFootballBatchEntries', () => {
         MessageDeduplicationId: 'McCaCh01-55-0-1',
       },
     ]);
+  });
+});
+
+describe('upsertFootballPlayer', () => {
+  // Render the parameterized SQL hermetically (no DB) by capturing the SQL
+  // object passed to db.execute and rendering it with the same PG dialect.
+  async function renderUpsertSql(
+    position: 'DL' | 'LB' | 'DB' | 'QB' | 'RB' | 'WR' | 'TE' | 'K',
+  ): Promise<{ sql: string; params: unknown[] }> {
+    let captured: SQL | undefined;
+    const db = {
+      execute: jest.fn((query: SQL) => {
+        captured = query;
+        return Promise.resolve({ rows: [] });
+      }),
+    } as unknown as PublicDb;
+
+    await upsertFootballPlayer(db, {
+      firstName: 'Khalil',
+      lastName: 'Mack',
+      pfrId: 'MackKh00',
+      nflTeam: 'LAC',
+      position,
+    });
+
+    if (!captured) throw new Error('db.execute was not called');
+    return new PgDialect().sqlToQuery(captured);
+  }
+
+  it('persists position in the INSERT column list and VALUES', async () => {
+    const { sql, params } = await renderUpsertSql('LB');
+    // Column list includes position…
+    expect(sql).toMatch(
+      /\(first_name, last_name, bref_id, pfr_id, sport, is_dst, nfl_team, position\)/,
+    );
+    // …and the normalized enum value is bound as a parameter.
+    expect(params).toContain('LB');
+  });
+
+  it('backfills position on conflict so re-import updates existing rows', async () => {
+    const { sql } = await renderUpsertSql('DB');
+    expect(sql).toMatch(/ON CONFLICT \(pfr_id\) WHERE pfr_id IS NOT NULL/);
+    expect(sql).toMatch(/DO UPDATE SET/);
+    expect(sql).toMatch(/position = EXCLUDED\.position/);
   });
 });
 
