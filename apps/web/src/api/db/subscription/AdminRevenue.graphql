@@ -1,6 +1,7 @@
 query AdminRevenueStats {
   adminRevenueStats {
     totalSubscribers
+    stripeSubscribers
     totalPremiumUsers
     totalFreeUsers
     totalUsers

@@ -80,6 +80,7 @@ export type AdminRevenueStats = {
   conversionRate?: Maybe<Scalars['Float']['output']>;
   newSubscribersThisMonth?: Maybe<Scalars['Int']['output']>;
   statusBreakdown?: Maybe<Array<SubscriptionStatusCount>>;
+  stripeSubscribers?: Maybe<Scalars['Int']['output']>;
   subscriberGrowth?: Maybe<Array<SubscriberGrowthPoint>>;
   totalFreeUsers?: Maybe<Scalars['Int']['output']>;
   totalPremiumUsers?: Maybe<Scalars['Int']['output']>;

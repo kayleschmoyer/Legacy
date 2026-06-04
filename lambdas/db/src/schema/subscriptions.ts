@@ -5,7 +5,7 @@ import {
   reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -107,6 +107,7 @@ SubscriberGrowthPointRef.implement({
 
 const AdminRevenueStatsRef = builder.objectRef<{
   totalSubscribers: number;
+  stripeSubscribers: number;
   totalPremiumUsers: number;
   totalFreeUsers: number;
   totalUsers: number;
@@ -119,6 +120,7 @@ const AdminRevenueStatsRef = builder.objectRef<{
 AdminRevenueStatsRef.implement({
   fields: (t) => ({
     totalSubscribers: t.exposeInt('totalSubscribers'),
+    stripeSubscribers: t.exposeInt('stripeSubscribers'),
     totalPremiumUsers: t.exposeInt('totalPremiumUsers'),
     totalFreeUsers: t.exposeInt('totalFreeUsers'),
     totalUsers: t.exposeInt('totalUsers'),
@@ -382,6 +384,18 @@ builder.queryField('adminRevenueStats', (t) =>
           .filter((r) => r.status === 'active' || r.status === 'trialing')
           .reduce((sum, r) => sum + r.count, 0);
 
+        // Stripe-only subscribers: active + trialing with a Stripe subscription ID
+        const [stripeSubscribersRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(InternalSchema.subscriptions)
+          .where(
+            and(
+              isNotNull(InternalSchema.subscriptions.stripeSubscriptionId),
+              sql`${InternalSchema.subscriptions.status} IN ('active', 'trialing')`,
+            ),
+          );
+        const stripeSubscribers = stripeSubscribersRow?.count ?? 0;
+
         // Premium users by subscription_tier column on users table
         const [premiumUsersRow] = await db
           .select({ count: sql<number>`count(*)::int` })
@@ -442,6 +456,7 @@ builder.queryField('adminRevenueStats', (t) =>
 
         return {
           totalSubscribers,
+          stripeSubscribers,
           totalPremiumUsers,
           totalFreeUsers,
           totalUsers,

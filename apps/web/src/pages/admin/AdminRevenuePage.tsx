@@ -585,7 +585,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                     fontWeight="700"
                     style={{ color: BRAND_GOLD_LIGHT }}
                   >
-                    {fmt(stats.totalSubscribers ?? 0)} subscribers
+                    {fmt(stats.stripeSubscribers ?? 0)} subscribers
                   </Paragraph>
                 </XStack>
                 {MOBILE_PLATFORMS.map((platform) => (
