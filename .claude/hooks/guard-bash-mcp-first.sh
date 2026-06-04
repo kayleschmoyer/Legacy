@@ -3,6 +3,11 @@
 # (ls/find/cat/head/tail/grep/rg). Always exits 0 — this is a WARNING hook,
 # not a blocker. Agents are never trapped in a retry loop.
 #
+# Compound command scanning: grep/rg are also detected when they appear as a
+# non-first subcommand (e.g. `cd dir && grep -r "pattern" .`). Piped grep
+# (`cmd | grep pattern`) is intentionally excluded — grep-as-filter has no
+# direct Grep MCP equivalent.
+#
 # Receives JSON on stdin with tool_name and tool_input.command.
 # Exit 0 = allow (command always runs). Warning is written to stdout so
 # Claude sees it in context before the tool executes.
@@ -120,7 +125,19 @@ case "$FIRST_WORD" in
     BAD="$FIRST_WORD"
     ;;
   *)
-    exit 0
+    # First word is not in the banned list. Secondary scan: detect grep/rg
+    # appearing as a non-first subcommand (e.g. `cd dir && grep -r "pattern" .`
+    # or `some_cmd; rg "foo" file`). Requires whitespace after grep/rg so that
+    # tool names containing grep/rg as a prefix (e.g. rg-plugin) are not
+    # matched. Piped grep (`cmd | grep pattern`) is excluded — grep-as-filter
+    # has no direct Grep MCP equivalent and is commonly valid in shell scripts.
+    if echo "$COMMAND" | grep -qE '(&&|\|\||;)[[:space:]]*(grep|rg)[[:space:]]'; then
+      REPLACEMENT="Grep (Grep({ pattern: \"foo\", path: \"<dir>\", glob: \"**/*.ts\", output_mode: \"content\" }))"
+      BAD=$(echo "$COMMAND" | grep -oE '(&&|\|\||;)[[:space:]]*(grep|rg)[[:space:]]' | grep -oE '(grep|rg)' | head -1)
+      BAD="${BAD:-grep}"
+    else
+      exit 0
+    fi
     ;;
 esac
 
