@@ -10,8 +10,8 @@ import {
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
-import { env } from '../../config/environment';
-import { BRAND_GOLD_LIGHT } from '../../constants/colors';
+import { env, envConfigErrors } from '../../config/environment';
+import { BRAND_GOLD_LIGHT, BRAND_SEAM_RED } from '../../constants/colors';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { trackEvent } from '../../utils/analytics';
 
@@ -175,6 +175,26 @@ export default function AboutPage() {
           <Value>{env.baseUrl}</Value>
         </InfoRow>
       </InfoCard>
+
+      {envConfigErrors.length > 0 && (
+        <InfoCard
+          data-testid="config-health-warning"
+          borderColor={BRAND_SEAM_RED}
+        >
+          <H2 marginBottom="$2" color={BRAND_SEAM_RED}>
+            Configuration Error
+          </H2>
+          <Text color="$color" fontSize="$4" marginBottom="$2">
+            This build is missing required environment variables. OAuth and
+            GraphQL will not function correctly. Check CI/CD configuration for:
+          </Text>
+          {envConfigErrors.map((key) => (
+            <InfoRow key={key}>
+              <Value fontFamily="$mono">{key}</Value>
+            </InfoRow>
+          ))}
+        </InfoCard>
+      )}
 
       <InfoCard>
         <H2 marginBottom="$2">Links</H2>

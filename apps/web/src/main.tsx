@@ -30,7 +30,7 @@ import type { OAuthConfig } from '@legacy-sports/shared-components/auth';
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import { LOGGER } from '@legacy-sports/logging';
-import { env } from './config/environment';
+import { env, envConfigErrors } from './config/environment';
 import { installConsoleErrorCapture } from './lib/consoleErrorCapture';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
@@ -43,6 +43,14 @@ import {
 } from './context/ThemeContext';
 import { GrowthBookProvider } from './context/GrowthBookProvider';
 import { LoginPage } from './pages/login/LoginPage';
+
+if (envConfigErrors.length > 0) {
+  LOGGER.error(
+    `[env-guard] Production build is misconfigured — the following VITE_* variables ` +
+      `are falling back to localhost/placeholder defaults: ${envConfigErrors.join(', ')}. ` +
+      `OAuth and GraphQL will not function. Verify CI/CD environment variable configuration.`,
+  );
+}
 
 // Initialize Rollbar for web app
 const rollbarConfig = getRollbarConfigFromEnv();

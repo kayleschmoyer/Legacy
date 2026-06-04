@@ -25,7 +25,7 @@ test.describe('About Page @smoke', () => {
 
   test('shows descriptive subtitle text', async ({ page }) => {
     await expect(
-      page.getByText(/fantasy sports management platform/i),
+      page.getByText(/build, version, and deployment details/i),
     ).toBeVisible();
   });
 

@@ -91,8 +91,8 @@ jest.mock('../../config/environment', () => ({
     stripeMonthlyPriceId: '',
     stripeAnnualPriceId: '',
     vapidPublicKey: '',
-    repoUrl: 'https://github.com/bkrupa/legacy-sports',
   },
+  envConfigErrors: [] as string[],
 }));
 
 const mockUseIsPremium = jest.fn<boolean, []>();
@@ -102,6 +102,10 @@ jest.mock('../../hooks/useIsPremium', () => ({
 
 function setEnvName(name: string) {
   (env as { environmentName: string }).environmentName = name;
+}
+
+function setConfigErrors(errors: string[]) {
+  jest.requireMock('../../config/environment').envConfigErrors = errors;
 }
 
 function setAppVersion(v: string) {
@@ -346,12 +350,12 @@ describe('AboutPage — External Links card (LS-5310)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseIsPremium.mockReturnValue(false);
     mockUseAuth.mockReturnValue({
       isAuthenticated: false,
       user: null,
       isLoading: false,
     });
+    mockUseIsPremium.mockReturnValue(false);
     windowOpenSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
     setCommitSha('abc1234');
   });
@@ -411,5 +415,47 @@ describe('AboutPage — External Links card (LS-5310)', () => {
     expect(
       screen.queryByRole('button', { name: /view current commit/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('AboutPage — config health warning (LS-7616)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseIsPremium.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    setConfigErrors([]);
+  });
+
+  it('shows no warning card when envConfigErrors is empty', () => {
+    renderAbout();
+    expect(
+      screen.queryByTestId('config-health-warning'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a warning card when required env vars are missing', () => {
+    setConfigErrors(['VITE_GRAPHQL_HOST', 'VITE_OAUTH_PROXY_URL']);
+    renderAbout();
+    expect(screen.getByTestId('config-health-warning')).toBeInTheDocument();
+  });
+
+  it('lists each missing variable name in the warning card', () => {
+    setConfigErrors(['VITE_GRAPHQL_HOST', 'VITE_GOOGLE_CLIENT_ID']);
+    renderAbout();
+    const warning = screen.getByTestId('config-health-warning');
+    expect(warning).toHaveTextContent('VITE_GRAPHQL_HOST');
+    expect(warning).toHaveTextContent('VITE_GOOGLE_CLIENT_ID');
+  });
+
+  it('shows a single missing variable correctly', () => {
+    setConfigErrors(['VITE_OAUTH_PROXY_URL']);
+    renderAbout();
+    expect(screen.getByTestId('config-health-warning')).toHaveTextContent(
+      'VITE_OAUTH_PROXY_URL',
+    );
   });
 });

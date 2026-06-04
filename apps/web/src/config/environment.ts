@@ -111,3 +111,27 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
  * Singleton instance of environment config
  */
 export const env = getEnvironmentConfig();
+
+const LOCALHOST_RE = /^https?:\/\/localhost/;
+
+/**
+ * Returns the names of VITE_* environment variables that are falling back to
+ * localhost/placeholder defaults in a non-development runtime. An empty array
+ * means the production config is healthy.
+ */
+export function getProductionConfigErrors(): readonly string[] {
+  if (env.isDev) return [];
+  const errors: string[] = [];
+  if (LOCALHOST_RE.test(env.oauthProxyUrl)) errors.push('VITE_OAUTH_PROXY_URL');
+  if (env.googleClientId.startsWith('placeholder-'))
+    errors.push('VITE_GOOGLE_CLIENT_ID');
+  if (LOCALHOST_RE.test(env.graphqlUrl)) errors.push('VITE_GRAPHQL_HOST');
+  return errors;
+}
+
+/**
+ * Config errors detected at module load time. Non-empty in production builds
+ * where required VITE_* vars fell back to localhost/placeholder defaults,
+ * meaning OAuth and GraphQL will not function correctly.
+ */
+export const envConfigErrors: readonly string[] = getProductionConfigErrors();
