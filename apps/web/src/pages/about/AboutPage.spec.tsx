@@ -68,6 +68,10 @@ jest.mock('tamagui', () => ({
 
 jest.mock('../../constants/colors', () => ({ BRAND_GOLD_LIGHT: '#c5a55a' }));
 
+jest.mock('../../utils/analytics', () => ({
+  trackEvent: jest.fn(),
+}));
+
 jest.mock('../../config/environment', () => ({
   env: {
     oauthProxyUrl: 'http://localhost:5001',
@@ -334,5 +338,78 @@ describe('AboutPage — Environment Fallback Handling (LS-5307)', () => {
     setCommitSha('unknown');
     setBuildDate('unknown');
     expect(() => renderAbout()).not.toThrow();
+  });
+});
+
+describe('AboutPage — External Links card (LS-5310)', () => {
+  let windowOpenSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseIsPremium.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    windowOpenSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    setCommitSha('abc1234');
+  });
+
+  afterEach(() => {
+    windowOpenSpy.mockRestore();
+    setCommitSha('abc123');
+  });
+
+  it('renders the View on GitHub button always', () => {
+    renderAbout();
+    expect(
+      screen.getByRole('button', { name: /view on github/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the repository URL in a new tab when View on GitHub is clicked', () => {
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: /view on github/i }));
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://github.com/bkrupa/legacy-sports',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('renders View Current Commit button when commitSha is a valid hex SHA', () => {
+    renderAbout();
+    expect(
+      screen.getByRole('button', { name: /view current commit/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the commit URL in a new tab when View Current Commit is clicked', () => {
+    renderAbout();
+    fireEvent.click(
+      screen.getByRole('button', { name: /view current commit/i }),
+    );
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://github.com/bkrupa/legacy-sports/commit/abc1234',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('hides View Current Commit button when commitSha is "unknown"', () => {
+    setCommitSha('unknown');
+    renderAbout();
+    expect(
+      screen.queryByRole('button', { name: /view current commit/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides View Current Commit button when commitSha is "dev"', () => {
+    setCommitSha('dev');
+    renderAbout();
+    expect(
+      screen.queryByRole('button', { name: /view current commit/i }),
+    ).not.toBeInTheDocument();
   });
 });
