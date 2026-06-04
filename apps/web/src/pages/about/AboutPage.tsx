@@ -83,7 +83,8 @@ export default function AboutPage() {
   const { appVersion, commitSha, buildDate, repoUrl } = env;
 
   // Maps sentinel values to a friendly display string; raw sentinel kept for link-suppression logic below.
-  const display = (v: string) => (v && v !== 'unknown' ? v : '—');
+  const display = (v: string) =>
+    v && v !== 'unknown' && v !== 'dev' ? v : '—';
 
   // Generate GitHub commit URL
   const commitUrl =

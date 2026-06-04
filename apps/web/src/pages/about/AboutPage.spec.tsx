@@ -104,6 +104,14 @@ function setAppVersion(v: string) {
   (env as { appVersion: string }).appVersion = v;
 }
 
+function setCommitSha(v: string) {
+  (env as { commitSha: string }).commitSha = v;
+}
+
+function setBuildDate(v: string) {
+  (env as { buildDate: string }).buildDate = v;
+}
+
 function renderAbout() {
   return render(
     <MemoryRouter>
@@ -261,5 +269,70 @@ describe('AboutPage — Get Started card (LS-5722)', () => {
     expect(
       screen.queryByRole('button', { name: /get started free/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('AboutPage — Environment Fallback Handling (LS-5307)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    setAppVersion('1.0.0');
+    setCommitSha('abc123');
+    setBuildDate('2026-01-01');
+  });
+
+  it('shows "—" for appVersion when it is "unknown"', () => {
+    setAppVersion('unknown');
+    renderAbout();
+    expect(screen.getByTestId('build-info-version')).toHaveTextContent('—');
+  });
+
+  it('shows "—" for commitSha when it is "unknown"', () => {
+    setCommitSha('unknown');
+    renderAbout();
+    expect(screen.getByTestId('build-info-commit-sha')).toHaveTextContent('—');
+  });
+
+  it('hides "View Current Commit" button when commitSha is "unknown"', () => {
+    setCommitSha('unknown');
+    renderAbout();
+    expect(
+      screen.queryByRole('button', { name: /view current commit/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows "—" for commitSha when it is "dev"', () => {
+    setCommitSha('dev');
+    renderAbout();
+    expect(screen.getByTestId('build-info-commit-sha')).toHaveTextContent('—');
+  });
+
+  it('hides "View Current Commit" button when commitSha is "dev"', () => {
+    setCommitSha('dev');
+    renderAbout();
+    expect(
+      screen.queryByRole('button', { name: /view current commit/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows "—" for buildDate when it is "unknown"', () => {
+    setBuildDate('unknown');
+    renderAbout();
+    expect(screen.getByTestId('build-info-build-date')).toHaveTextContent('—');
+  });
+
+  it('does not throw when all build env values are "unknown"', () => {
+    setAppVersion('unknown');
+    setCommitSha('unknown');
+    setBuildDate('unknown');
+    expect(() => renderAbout()).not.toThrow();
   });
 });
