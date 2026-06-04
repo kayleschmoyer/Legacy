@@ -1,14 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Spinner, Tabs, Text, YStack } from 'tamagui';
+import { Spinner, Text, YStack } from 'tamagui';
 import {
-  GamesRemaining,
-  MatchupNavigationControls,
+  MatchupDetailLayout,
   MatchupRecapPanel,
-  MatchupRosterComparison,
-  StandingsTable,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/matchup';
+import { MatchupRosterComparison } from '@legacy-sports/shared-components';
 import {
   MatchupStatus,
   useGetUserTeamIdQuery,
@@ -23,13 +21,8 @@ import {
   useMatchupById,
   useMatchupsForLeague,
 } from '../hooks/useMatchup';
-import { useStandings } from '../hooks/useStandings';
 import { toIntId } from '../../../common/utilities/RouteUtils';
 
-/**
- * MatchupDetailScreen - Full matchup breakdown screen
- * Shows scoreboard, standings, and detailed matchup information
- */
 export default function MatchupDetailScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -42,7 +35,6 @@ export default function MatchupDetailScreen() {
     loading: matchupLoading,
     error: matchupError,
   } = useMatchupById(matchupId);
-  const { standings, loading: standingsLoading } = useStandings(leagueId);
   const { currentWeek } = useCurrentWeek(leagueId);
   const { matchups: allMatchups } = useMatchupsForLeague(leagueId);
   const { data: userTeamData } = useGetUserTeamIdQuery({
@@ -51,8 +43,6 @@ export default function MatchupDetailScreen() {
   });
   const userTeamId = userTeamData?.userTeamId ?? null;
   const { isPremium } = useSubscription();
-
-  const [activeTab, setActiveTab] = useState('overview');
 
   const handleMatchupChange = useCallback(
     (newMatchupId: string) => {
@@ -66,7 +56,7 @@ export default function MatchupDetailScreen() {
     [router, leagueId],
   );
 
-  if (matchupLoading || standingsLoading) {
+  if (matchupLoading) {
     return (
       <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
         <Spinner size="large" />
@@ -96,6 +86,14 @@ export default function MatchupDetailScreen() {
     );
   }
 
+  if (leagueId == null) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
+        <Text color="$gray11">Invalid league</Text>
+      </YStack>
+    );
+  }
+
   const gamesTotal = matchup.gamesPerMatchup ?? 0;
   const selectedGamesCount = matchup.selectedGamesCount ?? 0;
   const gamesRemaining = Math.min(
@@ -103,153 +101,62 @@ export default function MatchupDetailScreen() {
     gamesTotal,
   );
 
+  const isUserInMatchup =
+    userTeamId != null &&
+    (matchup.team1Id === userTeamId || matchup.team2Id === userTeamId);
+
   return (
-    <YStack flex={1} backgroundColor="$background">
-      {/* Week navigation — browse matchups across weeks */}
-      {leagueId && (
-        <MatchupNavigationControls
-          currentMatchup={matchup}
-          leagueId={leagueId}
-          allMatchups={allMatchups}
-          currentLeagueWeek={currentWeek ?? undefined}
-          userTeamId={userTeamId}
-          onMatchupChange={handleMatchupChange}
-        />
-      )}
-
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        orientation="horizontal"
-        flexDirection="column"
-        flex={1}
-      >
-        <Tabs.List
-          backgroundColor="$background"
-          borderBottomWidth={1}
-          borderBottomColor="$gray6"
-        >
-          <Tabs.Tab value="overview" flex={1}>
-            <Text>Overview</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="rosters" flex={1}>
-            <Text>Rosters</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="lineup" flex={1}>
-            <Text>Lineup</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="standings" flex={1}>
-            <Text>Standings</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="details" flex={1}>
-            <Text>Details</Text>
-          </Tabs.Tab>
-        </Tabs.List>
-
-        <Tabs.Content value="overview" padding="$2">
-          <ScrollView>
-            <YStack space="$2">
-              <MatchupScoreboard
-                matchup={matchup}
-                gamesRemaining={gamesRemaining}
-              />
-
-              {/* Win Probability & Projections — gated behind Premium */}
-              <PremiumGate
-                isPremium={isPremium}
-                featureName="Matchup Projections"
-                featureDescription="See win probability and projected scores for every matchup based on remaining games."
-              >
-                <MatchupWinProbabilityPanel matchup={matchup} />
-              </PremiumGate>
-
-              {gamesTotal > 0 && (
-                <GamesRemaining
-                  gamesRemaining={gamesRemaining}
-                  totalGames={gamesTotal}
-                />
-              )}
-
-              {/* Narrative Recap — shown only for completed matchups */}
-              {matchup.status === MatchupStatus.Completed && matchupId && (
-                <MatchupRecapPanel matchupId={matchupId} />
-              )}
-            </YStack>
-          </ScrollView>
-        </Tabs.Content>
-
-        <Tabs.Content value="rosters" padding="$2">
-          <ScrollView>
-            <MatchupRosterComparison matchup={matchup} />
-          </ScrollView>
-        </Tabs.Content>
-
-        <Tabs.Content value="lineup" padding="$2">
-          <ScrollView>
-            {matchupId &&
-            leagueId &&
-            userTeamId &&
-            (matchup.team1Id === userTeamId ||
-              matchup.team2Id === userTeamId) ? (
-              <MatchupRosterEditor
-                matchupId={matchupId}
-                leagueId={leagueId}
-                userTeamId={userTeamId}
-                matchupStatus={matchup.status ?? MatchupStatus.Completed}
-                statsLoadingStatus={matchup.statsLoadingStatus}
-                locked={matchup.status === MatchupStatus.InProgress}
-              />
-            ) : (
-              <YStack padding="$4" alignItems="center">
-                <Text color="$gray10">
-                  {userTeamId &&
-                  matchup.team1Id !== userTeamId &&
-                  matchup.team2Id !== userTeamId
-                    ? 'You are not part of this matchup.'
-                    : 'Unable to load lineup editor.'}
-                </Text>
-              </YStack>
-            )}
-          </ScrollView>
-        </Tabs.Content>
-
-        <Tabs.Content value="standings" padding="$2">
-          <ScrollView>
-            <StandingsTable standings={standings} />
-          </ScrollView>
-        </Tabs.Content>
-
-        <Tabs.Content value="details" padding="$2">
-          <ScrollView>
-            <YStack space="$3" padding="$3">
-              <Text fontSize="$5" fontWeight="bold">
-                Matchup Details
-              </Text>
-
-              <YStack space="$2">
-                <Text color="$gray11">
-                  <Text fontWeight="bold">Week:</Text> {matchup.weekNumber}
-                </Text>
-                <Text color="$gray11">
-                  <Text fontWeight="bold">Status:</Text> {matchup.status}
-                </Text>
-                {matchup.startTime && (
-                  <Text color="$gray11">
-                    <Text fontWeight="bold">Start:</Text>{' '}
-                    {new Date(matchup.startTime).toLocaleString()}
-                  </Text>
-                )}
-                {matchup.endTime && (
-                  <Text color="$gray11">
-                    <Text fontWeight="bold">End:</Text>{' '}
-                    {new Date(matchup.endTime).toLocaleString()}
-                  </Text>
-                )}
-              </YStack>
-            </YStack>
-          </ScrollView>
-        </Tabs.Content>
-      </Tabs>
-    </YStack>
+    <ScrollView>
+      <MatchupDetailLayout
+        matchup={matchup}
+        leagueId={leagueId}
+        userTeamId={userTeamId}
+        allMatchups={allMatchups}
+        currentWeek={currentWeek ?? undefined}
+        onMatchupChange={handleMatchupChange}
+        scoreboard={
+          <MatchupScoreboard
+            matchup={matchup}
+            gamesRemaining={gamesRemaining}
+          />
+        }
+        winProbabilityPanel={
+          <PremiumGate
+            isPremium={isPremium}
+            featureName="Matchup Projections"
+            featureDescription="See win probability and projected scores for every matchup based on remaining games."
+          >
+            <MatchupWinProbabilityPanel matchup={matchup} />
+          </PremiumGate>
+        }
+        rosterEditor={
+          matchupId != null &&
+          leagueId != null &&
+          userTeamId != null &&
+          isUserInMatchup ? (
+            <MatchupRosterEditor
+              matchupId={matchupId}
+              leagueId={leagueId}
+              userTeamId={userTeamId}
+              matchupStatus={matchup.status ?? MatchupStatus.Completed}
+              statsLoadingStatus={matchup.statsLoadingStatus}
+              locked={matchup.status === MatchupStatus.InProgress}
+            />
+          ) : undefined
+        }
+        recapPanel={
+          matchup.status === MatchupStatus.Completed && matchupId != null ? (
+            <PremiumGate
+              isPremium={isPremium}
+              featureName="AI Matchup Recap"
+              featureDescription="Get AI-generated narrative recaps that summarize your matchup story, highlights, and standout performances."
+            >
+              <MatchupRecapPanel matchupId={matchupId} />
+            </PremiumGate>
+          ) : undefined
+        }
+        rosterComparison={<MatchupRosterComparison matchup={matchup} />}
+      />
+    </ScrollView>
   );
 }
