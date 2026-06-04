@@ -1,258 +1,31 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView } from 'react-native';
-import { H3, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
+import React from 'react';
 import { useRouter } from 'expo-router';
-import { Bell } from '@tamagui/lucide-icons';
-import { handleError } from '../../common/utilities/ErrorHandler';
-import { type NotificationHistoryItem } from '../../api/db/graphql.generated';
-import { NotificationList } from '../../features/notifications/components/NotificationList';
-import { NotificationSettings } from '../../features/notifications/components/NotificationSettings';
-import { useNotifications } from '../../features/notifications/hooks/useNotifications';
+import { NotificationsScreen } from '@legacy-sports/shared-components/notifications';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
-
-const BRAND_GOLD_LIGHT = '#C5A55A';
-
-const NOTIFICATION_FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'trade', label: 'Trades' },
-  { key: 'waiver', label: 'Waivers' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'matchup', label: 'Matchups' },
-  { key: 'league', label: 'League' },
-] as const;
-
-type FilterKey = (typeof NOTIFICATION_FILTERS)[number]['key'];
-
-function FilterChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Text
-      onPress={onPress}
-      paddingHorizontal="$3"
-      paddingVertical="$1.5"
-      borderRadius="$10"
-      backgroundColor={active ? BRAND_GOLD_LIGHT : '$gray3'}
-      color={active ? '$gray1' : '$gray11'}
-      fontSize="$2"
-      fontWeight={active ? '700' : '500'}
-      pressStyle={{ opacity: 0.7 }}
-    >
-      {label}
-    </Text>
-  );
-}
-
-function matchesFilter(
-  notification: NotificationHistoryItem,
-  filter: FilterKey,
-): boolean {
-  if (filter === 'all') return true;
-  const type = notification.notificationType?.toLowerCase() ?? '';
-  return type.includes(filter);
-}
 
 export default function NotificationsScreen(): React.JSX.Element {
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
 
-  const {
-    notifications,
-    preferences,
-    unreadCount,
-    loading,
-    markAsRead,
-    markAllAsRead,
-    updatePreferences,
-  } = useNotifications(userInfo.id);
-
-  const filteredNotifications = useMemo(
-    () => notifications.filter((n) => matchesFilter(n, activeFilter)),
-    [notifications, activeFilter],
-  );
-
-  const handleNotificationPress = (
-    notification: NotificationHistoryItem,
-  ): void => {
-    const run = async (): Promise<void> => {
-      // Mark as read on tap; await so a failure aborts navigation
-      if (!notification.read && notification.id) {
-        await markAsRead(Number(notification.id));
-      }
-
-      // Deep-link based on notification data
-      if (notification.matchupId && notification.leagueId) {
+  return (
+    <NotificationsScreen
+      userId={userInfo.id}
+      onNavigateToMatchup={(matchupId, leagueId) =>
         router.push({
           pathname: '/baseball/matchup' as never,
           params: {
-            matchupId: String(notification.matchupId),
-            leagueId: String(notification.leagueId),
+            matchupId: String(matchupId),
+            leagueId: String(leagueId),
           },
-        } as never);
-        return;
+        } as never)
       }
-
-      if (notification.leagueId) {
+      onNavigateToLeague={(leagueId) =>
         router.push({
           pathname: '/baseball/league/[leagueId]' as never,
-          params: { leagueId: String(notification.leagueId) },
-        } as never);
+          params: { leagueId: String(leagueId) },
+        } as never)
       }
-    };
-
-    run().catch(handleError);
-  };
-
-  if (loading) {
-    return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
-        <Spinner size="large" />
-        <Text marginTop="$3" color="$gray11">
-          Loading notifications...
-        </Text>
-      </YStack>
-    );
-  }
-
-  const listHeader = (
-    <YStack
-      padding="$5"
-      paddingBottom="$2"
-      gap="$5"
-      backgroundColor="$background"
-    >
-      {/* Header with unread count */}
-      <XStack alignItems="center" justifyContent="space-between">
-        <XStack alignItems="center" gap="$2">
-          <Bell size={20} color={BRAND_GOLD_LIGHT} />
-          <Text fontSize="$6" fontWeight="700" color="$color">
-            Notifications
-          </Text>
-        </XStack>
-        {unreadCount > 0 && (
-          <XStack
-            backgroundColor="$red10"
-            borderRadius="$10"
-            paddingHorizontal="$2.5"
-            paddingVertical="$1"
-            minWidth={24}
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Text
-              fontSize="$2"
-              fontWeight="700"
-              color="white"
-              textAlign="center"
-            >
-              {unreadCount}
-            </Text>
-          </XStack>
-        )}
-      </XStack>
-
-      {/* Type filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-      >
-        <XStack gap="$2">
-          {NOTIFICATION_FILTERS.map((f) => (
-            <FilterChip
-              key={f.key}
-              label={f.label}
-              active={activeFilter === f.key}
-              onPress={() => setActiveFilter(f.key)}
-            />
-          ))}
-        </XStack>
-      </ScrollView>
-
-      {/* Section header */}
-      <YStack
-        borderRadius="$6"
-        borderTopLeftRadius="$6"
-        borderTopRightRadius="$6"
-        borderWidth={1}
-        borderBottomWidth={0}
-        borderColor="$borderColor"
-        overflow="hidden"
-      >
-        <XStack
-          paddingHorizontal="$5"
-          paddingVertical="$4"
-          alignItems="center"
-          justifyContent="space-between"
-          borderBottomWidth={1}
-          borderBottomColor="$borderColor"
-        >
-          <H3 color="$color">
-            {activeFilter === 'all'
-              ? 'All Notifications'
-              : (NOTIFICATION_FILTERS.find((f) => f.key === activeFilter)
-                  ?.label ?? 'Notifications')}
-          </H3>
-          <Text fontSize="$2" color="$textMuted">
-            {filteredNotifications.length} notification
-            {filteredNotifications.length !== 1 ? 's' : ''}
-          </Text>
-        </XStack>
-      </YStack>
-    </YStack>
-  );
-
-  const listFooter = (
-    <YStack padding="$5" paddingTop="$2" gap="$5" backgroundColor="$background">
-      <Separator />
-
-      {/* Notification Settings */}
-      {preferences && (
-        <YStack
-          borderRadius="$6"
-          borderWidth={1}
-          borderColor="$borderColor"
-          overflow="hidden"
-        >
-          <XStack
-            paddingHorizontal="$5"
-            paddingVertical="$4"
-            alignItems="center"
-            gap="$3"
-            borderBottomWidth={1}
-            borderBottomColor="$borderColor"
-          >
-            <H3 color="$color">Notification Preferences</H3>
-          </XStack>
-          <YStack padding="$4">
-            <NotificationSettings
-              preferences={preferences}
-              onUpdate={updatePreferences}
-            />
-          </YStack>
-        </YStack>
-      )}
-    </YStack>
-  );
-
-  return (
-    <YStack flex={1} backgroundColor="$background">
-      <NotificationList
-        notifications={filteredNotifications}
-        onNotificationPress={handleNotificationPress}
-        onMarkAsRead={markAsRead}
-        onMarkAllRead={markAllAsRead}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-      />
-    </YStack>
+    />
   );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';
