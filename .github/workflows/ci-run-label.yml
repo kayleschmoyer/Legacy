@@ -1,0 +1,58 @@
+name: "ci:run label trigger"
+
+# Lean dispatcher: the only job of this workflow is to translate the ci:run
+# label event into a workflow_dispatch on ci-orchestrator.yml.
+#
+# Why a separate workflow instead of keeping `labeled` in ci-orchestrator.yml:
+# The orchestrator uses concurrency group orchestrator-<PR#> with
+# cancel-in-progress: false. Any labeled event (CI: Conflicts, merge-when-ready,
+# bot:ready-for-review, etc.) would enter that group, hold the pending slot, and
+# displace an in-flight synchronize run — leaving the new SHA with no check runs
+# and "Expected — Waiting for status to be reported" in the GitHub UI (LS-7752).
+#
+# By routing ci:run through workflow_dispatch, non-ci:run label events never
+# touch the orchestrator's concurrency group.
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  pull-requests: write
+  actions: write
+
+jobs:
+  dispatch:
+    name: "Dispatch CI Orchestrator for ci:run"
+    if: github.event.label.name == 'ci:run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Remove ci:run label"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'ci:run',
+              });
+              core.info('Removed ci:run label');
+            } catch (e) {
+              if (e.status === 404) {
+                core.info('ci:run label already removed');
+              } else {
+                throw e;
+              }
+            }
+
+      - name: "Dispatch ci-orchestrator.yml"
+        run: |
+          gh workflow run ci-orchestrator.yml \
+            --ref "${{ github.event.pull_request.head.ref }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
