@@ -25,6 +25,7 @@ import { usePushNotifications } from '../../features/notifications/hooks/usePush
 import { isPhysicalDevice } from '../../common/utilities/DeviceUtils';
 
 export type AppDrawerParamList = {
+  '(tabs)': undefined;
   index: undefined;
   view_game_logs: undefined;
   view_career_stats: undefined;
@@ -75,6 +76,10 @@ interface Route {
 }
 
 const ROUTES = Object.freeze<Route[]>([
+  {
+    route: '(tabs)',
+    title: 'Dashboard',
+  },
   {
     route: 'index',
     title: 'Home',
@@ -320,6 +325,13 @@ export default function Layout() {
             },
           }}
         >
+          <Drawer.Screen
+            name="(tabs)"
+            options={{
+              drawerLabel: 'Dashboard',
+              title: 'Dashboard',
+            }}
+          />
           <Drawer.Screen
             name="index"
             options={{
