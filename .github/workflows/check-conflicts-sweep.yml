@@ -1,0 +1,140 @@
+name: "Check Merge Conflicts (Base Push Sweep)"
+
+# Re-evaluates all open PRs for merge conflicts whenever main advances.
+# Complements check-conflicts.yml (which handles PR-side events: opened,
+# synchronize, etc.) by covering the case where new commits on main introduce
+# conflicts into an existing PR — an event that check-conflicts.yml never sees.
+#
+# Creates/updates the "No Merge Conflicts" check run (must match the name
+# registered as a required status check in .github/ruleset.json) for each open
+# PR's head SHA using the Checks API.
+#
+# This also serves as a recovery path when GitHub fails to deliver the
+# pull_request: opened event to check-conflicts.yml (observed on PRs where
+# only push-triggered workflows ran on open, e.g. LS-7717).
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: check-conflicts-sweep-${{ github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
+
+jobs:
+  sweep:
+    name: "Sweep PRs for Merge Conflicts"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Check all open PRs for conflicts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.sha }}
+          BASE_REF: ${{ github.ref_name }}
+        run: |
+          set -eo pipefail
+          git config user.email "ci@noreply.github.com"
+          git config user.name  "check-conflicts-sweep"
+
+          # List all open PRs targeting the branch that was just pushed.
+          # Do NOT suppress stderr or swallow exit codes — a failure here means the
+          # sweep didn't run at all, which must be surfaced rather than silently
+          # reporting "nothing to sweep."
+          if ! PR_NUMBERS=$(gh api --paginate \
+              "repos/${GH_REPO}/pulls?state=open&base=${BASE_REF}&per_page=100" \
+              --jq '.[].number'); then
+            echo "::error::Failed to list open PRs for ${BASE_REF} — check GITHUB_TOKEN permissions and API rate limits"
+            exit 1
+          fi
+
+          if [ -z "$PR_NUMBERS" ]; then
+            echo "No open PRs targeting ${BASE_REF}; nothing to sweep."
+            exit 0
+          fi
+
+          echo "Open PRs targeting ${BASE_REF}: $(echo "$PR_NUMBERS" | tr '\n' ' ')"
+
+          while IFS= read -r PR_NUM; do
+            [ -z "$PR_NUM" ] && continue
+
+            HEAD_SHA=$(gh pr view "$PR_NUM" --json headRefOid --jq .headRefOid 2>/dev/null || true)
+            if [ -z "$HEAD_SHA" ]; then
+              echo "::warning::Could not resolve head SHA for PR #${PR_NUM}; skipping"
+              continue
+            fi
+
+            echo "--- PR #${PR_NUM} (head: ${HEAD_SHA:0:7}) ---"
+            STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+            # Create in_progress check run before doing the work.
+            # Capture stdout (the run ID) separately; let stderr flow to the log.
+            # On failure, warn and fall back to a single completed POST at the end.
+            RUN_ID=""
+            if ! RUN_ID=$(printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"in_progress","started_at":"%s"}' \
+                "$HEAD_SHA" "$STARTED_AT" \
+                | gh api "repos/${GH_REPO}/check-runs" -X POST --input - --jq '.id'); then
+              echo "::warning::Failed to create in_progress check run for PR #${PR_NUM}; will POST completed run directly"
+              RUN_ID=""
+            fi
+
+            # Detach to the pushed base so each PR starts from the same base.
+            git checkout --detach "${BASE_SHA}" --quiet
+            git clean -fd --quiet 2>/dev/null || true
+
+            # Fetch the PR head via refs/pull/N/head (works for forks too).
+            if ! git fetch --no-tags origin \
+                "+refs/pull/${PR_NUM}/head:refs/remotes/origin/pr/${PR_NUM}" 2>/dev/null; then
+              echo "::warning::Could not fetch head for PR #${PR_NUM}; skipping"
+              if [ -n "$RUN_ID" ]; then
+                printf '{"status":"completed","conclusion":"neutral","completed_at":"%s","output":{"title":"Skipped","summary":"Could not fetch PR head; unable to verify merge conflicts."}}' \
+                  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                  | gh api "repos/${GH_REPO}/check-runs/${RUN_ID}" -X PATCH --input - > /dev/null \
+                  || echo "::warning::Failed to neutralize check run ${RUN_ID} for PR #${PR_NUM}"
+              fi
+              continue
+            fi
+
+            # Test merge — non-interactive, leaves workspace dirty on conflict.
+            if git merge --no-commit --no-ff "refs/remotes/origin/pr/${PR_NUM}" 2>/dev/null; then
+              CONCLUSION="success"
+              OUT_TITLE="No merge conflicts"
+              OUT_SUMMARY="No merge conflicts detected between PR #${PR_NUM} and ${BASE_REF} (base: ${BASE_SHA:0:7})."
+            else
+              CONCLUSION="failure"
+              OUT_TITLE="Merge conflicts detected"
+              OUT_SUMMARY="PR #${PR_NUM} has merge conflicts with ${BASE_REF} after ${BASE_SHA:0:7} landed. Rebase or merge ${BASE_REF} into your branch to resolve them."
+            fi
+            # Always abort/clean regardless of outcome.
+            git merge --abort 2>/dev/null || git reset --hard HEAD
+            git clean -fd --quiet 2>/dev/null || true
+
+            COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+            if [ -n "$RUN_ID" ]; then
+              printf '{"status":"completed","conclusion":"%s","completed_at":"%s","output":{"title":"%s","summary":"%s"}}' \
+                "$CONCLUSION" "$COMPLETED_AT" "$OUT_TITLE" "$OUT_SUMMARY" \
+                | gh api "repos/${GH_REPO}/check-runs/${RUN_ID}" -X PATCH --input - > /dev/null \
+                || echo "::warning::Failed to update check run ${RUN_ID} for PR #${PR_NUM}"
+            else
+              # Fallback: POST a completed run directly if the in_progress create failed.
+              printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"completed","conclusion":"%s","started_at":"%s","completed_at":"%s","output":{"title":"%s","summary":"%s"}}' \
+                "$HEAD_SHA" "$CONCLUSION" "$STARTED_AT" "$COMPLETED_AT" "$OUT_TITLE" "$OUT_SUMMARY" \
+                | gh api "repos/${GH_REPO}/check-runs" -X POST --input - > /dev/null \
+                || echo "::warning::Failed to create check run for PR #${PR_NUM}"
+            fi
+
+            echo "PR #${PR_NUM}: ${CONCLUSION}"
+          done <<< "$PR_NUMBERS"
