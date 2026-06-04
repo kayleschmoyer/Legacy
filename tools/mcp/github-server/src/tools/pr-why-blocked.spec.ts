@@ -209,6 +209,32 @@ describe('partitionChecks', () => {
     expect(result.failing).toEqual(['ci/travis']);
   });
 
+  it('excludes process-merge-queue and delayed-recheck even when failing', () => {
+    const result = partitionChecks([
+      {
+        __typename: 'CheckRun',
+        name: 'process-merge-queue',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+      },
+      {
+        __typename: 'CheckRun',
+        name: 'delayed-recheck',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+      },
+      {
+        __typename: 'CheckRun',
+        name: 'lint',
+        status: 'COMPLETED',
+        conclusion: 'SUCCESS',
+      },
+    ]);
+    expect(result.failing).toEqual([]);
+    expect(result.pending).toEqual([]);
+    expect(result.passing).toBe(1);
+  });
+
   it('mixes passing, failing, and pending correctly', () => {
     const result = partitionChecks([
       {

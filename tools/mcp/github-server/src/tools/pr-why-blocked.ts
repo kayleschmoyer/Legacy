@@ -148,6 +148,14 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
 // ── CI helpers ────────────────────────────────────────────────────────────────
 
+// Mirrors the EXCLUDED_CHECKS set in .github/scripts/merge-queue-processor.js.
+// process-merge-queue would be circular (the job is the merge queue itself).
+// delayed-recheck is a housekeeping job, not a quality gate.
+const EXCLUDED_CHECK_NAMES = new Set([
+  'process-merge-queue',
+  'delayed-recheck',
+]);
+
 const PENDING_STATUSES = new Set([
   'IN_PROGRESS',
   'QUEUED',
@@ -171,6 +179,7 @@ export function partitionChecks(
   for (const node of nodes) {
     if (node == null) continue;
     const name = node.__typename === 'CheckRun' ? node.name : node.context;
+    if (EXCLUDED_CHECK_NAMES.has(name)) continue;
     const conclusion =
       node.__typename === 'CheckRun' ? node.conclusion : node.state;
     const status = node.__typename === 'CheckRun' ? node.status : node.state;

@@ -24,7 +24,7 @@ concurrency:
 permissions:
   contents: read
   checks: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   sweep:
@@ -70,7 +70,9 @@ jobs:
           while IFS= read -r PR_NUM; do
             [ -z "$PR_NUM" ] && continue
 
-            HEAD_SHA=$(gh pr view "$PR_NUM" --json headRefOid --jq .headRefOid 2>/dev/null || true)
+            PR_JSON=$(gh pr view "$PR_NUM" --json headRefOid,labels 2>/dev/null || true)
+            HEAD_SHA=$([ -n "$PR_JSON" ] && printf '%s' "$PR_JSON" | jq -r '.headRefOid // empty' || true)
+            HAS_CONFLICT_LABEL=$([ -n "$PR_JSON" ] && printf '%s' "$PR_JSON" | jq -r 'any(.labels[]; .name == "CI: Conflicts")' || echo 'false')
             if [ -z "$HEAD_SHA" ]; then
               echo "::warning::Could not resolve head SHA for PR #${PR_NUM}; skipping"
               continue
@@ -137,4 +139,17 @@ jobs:
             fi
 
             echo "PR #${PR_NUM}: ${CONCLUSION}"
+
+            # Sync "CI: Conflicts" label to match the merge-test result.
+            # Mirrors the label management in check-conflicts.yml so agents and
+            # sweep-prs consumers see a consistent label state after main advances.
+            if [ "$CONCLUSION" = "failure" ] && [ "$HAS_CONFLICT_LABEL" != "true" ]; then
+              printf '{"labels":["CI: Conflicts"]}' \
+                | gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" -X POST --input - > /dev/null \
+                || echo "::warning::Failed to add 'CI: Conflicts' label to PR #${PR_NUM}"
+            elif [ "$CONCLUSION" = "success" ] && [ "$HAS_CONFLICT_LABEL" = "true" ]; then
+              gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels/CI%3A%20Conflicts" \
+                -X DELETE > /dev/null 2>&1 \
+                || echo "::warning::Failed to remove 'CI: Conflicts' label from PR #${PR_NUM}"
+            fi
           done <<< "$PR_NUMBERS"
