@@ -109,6 +109,8 @@ export default function AdminUsersPage() {
     return <Navigate to="/" replace />;
   }
 
+  const isImpersonating = !!auth.user?.impersonatedBy;
+
   const users = data?.users ?? [];
   const totalCount = countData?.usersCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -206,6 +208,40 @@ export default function AdminUsersPage() {
       alignSelf="center"
       width="100%"
     >
+      {/* Impersonation banner */}
+      {isImpersonating && (
+        <Card
+          padding="$4"
+          role="alert"
+          style={{
+            background: withAlpha(BRAND_SEAM_RED, 0.12),
+            border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.55)}`,
+            borderRadius: 12,
+          }}
+        >
+          <Text
+            fontWeight="700"
+            fontSize={13}
+            style={{
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: BRAND_SEAM_RED,
+              display: 'block',
+              marginBottom: 4,
+            }}
+          >
+            Impersonation Active
+          </Text>
+          <Paragraph size="$3" color="$color">
+            You are viewing admin tools as{' '}
+            <Text fontWeight="700" style={{ color: BRAND_SEAM_RED }}>
+              {auth.user?.impersonatedBy?.username ?? 'Unknown Admin'}
+            </Text>
+            . Mutating actions are disabled for this session.
+          </Paragraph>
+        </Card>
+      )}
+
       {/* Page header */}
       <YStack gap="$2">
         <H1 size="$8" color="$color">
@@ -443,8 +479,14 @@ export default function AdminUsersPage() {
                               u.username ?? u.email ?? `User #${displayId}`,
                           })
                         }
-                        disabled={impersonatingId !== null || updating}
-                        opacity={impersonatingId !== null ? 0.55 : 1}
+                        disabled={
+                          impersonatingId !== null ||
+                          updating ||
+                          isImpersonating
+                        }
+                        opacity={
+                          impersonatingId !== null || isImpersonating ? 0.55 : 1
+                        }
                         backgroundColor={withAlpha(BRAND_NAVY, 0.08)}
                         borderColor="$borderColor"
                         borderWidth={1}
@@ -572,7 +614,7 @@ export default function AdminUsersPage() {
                 onPress={() => {
                   void handleImpersonateConfirm();
                 }}
-                disabled={impersonatingId !== null}
+                disabled={impersonatingId !== null || isImpersonating}
                 icon={impersonatingId !== null ? <Spinner /> : undefined}
               >
                 Impersonate

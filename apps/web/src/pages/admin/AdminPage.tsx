@@ -584,6 +584,8 @@ export function AdminPage(): React.JSX.Element | null {
     return null;
   }
 
+  const isImpersonating = !!auth.user?.impersonatedBy;
+
   const totalUsers = countData?.usersCount ?? 0;
   const recentUsers = recentData?.users ?? [];
 
@@ -682,6 +684,77 @@ export function AdminPage(): React.JSX.Element | null {
           </p>
           <AdminNavHub />
         </YStack>
+
+        {/* Impersonation banner */}
+        {isImpersonating && (
+          <XStack
+            gap={14}
+            padding={16}
+            borderRadius={12}
+            alignItems="flex-start"
+            marginBottom={20}
+            role="alert"
+            aria-live="assertive"
+            style={{
+              background: withAlpha(BRAND_SEAM_RED, 0.12),
+              border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.55)}`,
+            }}
+          >
+            <svg
+              width={22}
+              height={22}
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+              style={{ color: SCORE_LOSS, flexShrink: 0, marginTop: 1 }}
+            >
+              <path
+                d="M12 9v4m0 4h.01M10.29 3.86l-8.07 14a2 2 0 001.71 3h16.14a2 2 0 001.71-3l-8.07-14a2 2 0 00-3.42 0z"
+                stroke="currentColor"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <YStack flex={1} gap={4}>
+              <span
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: SCORE_LOSS,
+                }}
+              >
+                Impersonation Active
+              </span>
+              <span
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 14,
+                  color: TEXT_FG2,
+                  lineHeight: 1.5,
+                }}
+              >
+                You are viewing admin tools as{' '}
+                <span
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 13,
+                    color: SCORE_LOSS,
+                    background: withAlpha(BRAND_SEAM_RED, 0.15),
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  {auth.user?.impersonatedBy?.username ?? 'Unknown Admin'}
+                </span>
+                . Mutating actions are disabled for this session.
+              </span>
+            </YStack>
+          </XStack>
+        )}
 
         {/* Quick Stats & Actions */}
         <YStack gap={12} marginBottom={24}>
@@ -991,6 +1064,7 @@ export function AdminPage(): React.JSX.Element | null {
             <button
               type="button"
               onClick={handleDecodeJwt}
+              disabled={isImpersonating}
               style={{
                 appearance: 'none',
                 fontFamily: FONT_DISPLAY,
@@ -1000,12 +1074,13 @@ export function AdminPage(): React.JSX.Element | null {
                 textTransform: 'uppercase',
                 padding: '9px 14px',
                 borderRadius: 12,
-                cursor: 'pointer',
+                cursor: isImpersonating ? 'not-allowed' : 'pointer',
                 color: WHITE,
                 background: BRAND_NAVY,
                 border: `1px solid ${BRAND_NAVY_LIGHT}`,
                 boxShadow: '0 1px 2px rgba(8, 12, 20, 0.4)',
                 minHeight: 40,
+                opacity: isImpersonating ? 0.55 : 1,
               }}
             >
               Decode
