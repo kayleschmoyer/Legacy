@@ -120,8 +120,13 @@ function MetricCard({
   sub,
   accent = BRAND_GOLD_LIGHT,
 }: MetricCardProps) {
+  const labelSlug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   return (
     <StatCard
+      data-testid={`admin-revenue-kpi-${labelSlug}`}
       style={{
         background: SURFACE_PANEL,
         borderColor: OUTLINE_SUBTLE,
@@ -181,7 +186,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
   const stats = data?.adminRevenueStats;
 
   return (
-    <PageContainer>
+    <PageContainer data-testid="admin-revenue-page">
       <PageMeta
         title="Revenue Analytics"
         description="Admin revenue and subscription metrics for Legacy Sports."
