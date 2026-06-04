@@ -1,33 +1,27 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import { LoginPage } from './LoginPage';
-import type { OAuthConfig } from '../../platform-components/types';
-
-const mockConfig: OAuthConfig = {
-  googleClientId: 'mock-client-id.apps.googleusercontent.com',
-  oauthProxyUrl: 'https://mock-oauth-proxy.example.com',
-};
 
 const meta: Meta<typeof LoginPage> = {
   title: 'Features/Auth/LoginPage',
   component: LoginPage,
   parameters: {
-    layout: 'fullscreen',
+    layout: 'centered',
     docs: {
       description: {
         component:
-          'Full OAuth login page with Google sign-in, responsive wide/mobile layouts, loading and error states, and background decorations.',
+          'Shared auth card used by both web and mobile login screens. Accepts callbacks for Google and Discord sign-in and renders the presentational card UI.',
       },
     },
   },
   tags: ['autodocs'],
   argTypes: {
-    onSuccess: { action: 'login-success' },
-    onError: { action: 'login-error' },
-    useWideLayout: { control: 'boolean' },
-    hideDecorations: { control: 'boolean' },
-    appName: { control: 'text' },
-    maxWidth: { control: { type: 'number', min: 300, max: 800, step: 50 } },
+    onGoogleSignIn: { action: 'google-sign-in' },
+    onDiscordSignIn: { action: 'discord-sign-in' },
+    isGoogleLoading: { control: 'boolean' },
+    isDiscordLoading: { control: 'boolean' },
+    isConfiguring: { control: 'boolean' },
+    errorMessage: { control: 'text' },
   },
 };
 
@@ -36,112 +30,81 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    config: mockConfig,
-    onSuccess: fn(),
-    onError: fn(),
+    onGoogleSignIn: fn(),
   },
 };
 
-export const WideLayout: Story = {
+export const WithDiscord: Story = {
   args: {
-    config: mockConfig,
-    onSuccess: fn(),
-    onError: fn(),
-    useWideLayout: true,
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
   },
   parameters: {
     docs: {
       description: {
-        story:
-          'Desktop-optimized wide layout with horizontal split between branding and login form.',
+        story: 'Both Google and Discord sign-in options visible.',
       },
     },
   },
 };
 
-export const MobileLayout: Story = {
+export const Configuring: Story = {
   args: {
-    config: mockConfig,
-    onSuccess: fn(),
-    onError: fn(),
-    useWideLayout: false,
-    maxWidth: 400,
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    isConfiguring: true,
   },
   parameters: {
-    viewport: { defaultViewport: 'mobile' },
     docs: {
       description: {
-        story:
-          'Mobile-optimized vertical layout with stacked branding and login.',
+        story: 'All buttons disabled while the OAuth provider is initialising.',
       },
     },
   },
 };
 
-export const NoDecorations: Story = {
+export const GoogleLoading: Story = {
   args: {
-    config: mockConfig,
-    onSuccess: fn(),
-    onError: fn(),
-    hideDecorations: true,
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    isGoogleLoading: true,
   },
   parameters: {
     docs: {
       description: {
         story:
-          'Clean embedded variant without background circle decorations -- suitable for embedding in other pages.',
+          'Google sign-in in progress — spinner shown, all buttons disabled.',
       },
     },
   },
 };
 
-export const CustomBranding: Story = {
+export const DiscordLoading: Story = {
   args: {
-    config: mockConfig,
-    onSuccess: fn(),
-    onError: fn(),
-    appName: 'Fantasy Baseball Pro',
-    maxWidth: 500,
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    isDiscordLoading: true,
   },
   parameters: {
     docs: {
       description: {
         story:
-          'Custom app name and card width to demonstrate branding flexibility.',
+          'Discord sign-in in progress — spinner shown, all buttons disabled.',
       },
     },
   },
 };
 
-export const WithCustomLogo: Story = {
+export const WithError: Story = {
   args: {
-    config: mockConfig,
-    onSuccess: fn(),
-    onError: fn(),
-    appName: 'Legacy Sports',
-    logo: (
-      <div
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontSize: 32,
-          fontWeight: 'bold',
-        }}
-      >
-        LS
-      </div>
-    ),
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    errorMessage: 'Sign-in failed. Please try again.',
   },
   parameters: {
     docs: {
       description: {
-        story: 'Custom logo element replacing the default circle initial.',
+        story: 'Error message shown below the buttons.',
       },
     },
   },

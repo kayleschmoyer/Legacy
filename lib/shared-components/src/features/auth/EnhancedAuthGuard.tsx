@@ -1,8 +1,102 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { Spinner, Text, YStack } from 'tamagui';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './LoginPage';
+import { OAuthProvider } from '../../platform-components';
+import { OAuthErrorCode } from '../../platform-components/types';
+import type {
+  OAuthConfig,
+  OAuthResponse,
+} from '../../platform-components/types';
+
+interface EmbeddedLoginCardProps {
+  config: OAuthConfig;
+  loginWithOAuth: (response: OAuthResponse) => Promise<void>;
+  onLoginSuccess?: () => void;
+  onLoginFailure?: (error: string) => void;
+}
+
+function EmbeddedLoginCard({
+  config,
+  loginWithOAuth,
+  onLoginSuccess,
+  onLoginFailure,
+}: EmbeddedLoginCardProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [isConfiguring, setIsConfiguring] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    const configure = async () => {
+      try {
+        await OAuthProvider.configure({
+          ...config,
+          gsi: { ...(config.gsi ?? {}), oneTap: false },
+        });
+        setIsConfigured(true);
+      } catch (error) {
+        LOGGER.warn(
+          'Failed to configure OAuth in EnhancedAuthGuard:',
+          error instanceof Error ? error : String(error),
+        );
+      } finally {
+        setIsConfiguring(false);
+      }
+    };
+    void configure();
+  }, [config]);
+
+  const handleSignIn = useCallback(async () => {
+    if (!isConfigured || isLoading || isConfiguring) return;
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const oauthResponse = await OAuthProvider.signIn();
+      await loginWithOAuth(oauthResponse);
+      onLoginSuccess?.();
+    } catch (error) {
+      const isCancelled =
+        error instanceof Error &&
+        'code' in error &&
+        (error as { code: OAuthErrorCode }).code ===
+          OAuthErrorCode.SIGN_IN_CANCELLED;
+      if (isCancelled) {
+        LOGGER.debug('Google sign-in popup closed by user');
+      } else {
+        LOGGER.warn(
+          'Authentication error in EnhancedAuthGuard:',
+          error instanceof Error ? error : String(error),
+        );
+        const msg =
+          error instanceof Error ? error.message : 'Authentication failed';
+        setErrorMessage(msg);
+        onLoginFailure?.(msg);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    isConfigured,
+    isConfiguring,
+    isLoading,
+    loginWithOAuth,
+    onLoginSuccess,
+    onLoginFailure,
+  ]);
+
+  return (
+    <LoginPage
+      onGoogleSignIn={() => {
+        void handleSignIn();
+      }}
+      isGoogleLoading={isLoading}
+      isConfiguring={isConfiguring}
+      errorMessage={errorMessage || undefined}
+    />
+  );
+}
 
 export interface EnhancedAuthGuardProps {
   /**
@@ -71,7 +165,7 @@ export function EnhancedAuthGuard({
   children,
   loadingComponent,
   loginComponent,
-  loginTitle,
+  loginTitle: _loginTitle,
   loginSubtitle: _loginSubtitle,
   testMode = false,
   onLoginSuccess,
@@ -81,7 +175,7 @@ export function EnhancedAuthGuard({
   publicPaths = [],
   publicExactPaths = [],
 }: EnhancedAuthGuardProps) {
-  const { isAuthenticated, isLoading, config, loginWithOAuth } = useAuth();
+  const { isAuthenticated, isLoading, loginWithOAuth, config } = useAuth();
 
   // Track whether the user has been authenticated at any point this session.
   // Once true, a subsequent unauthenticated state means they were just logged
@@ -147,34 +241,11 @@ export function EnhancedAuthGuard({
   if (!isAuthenticated) {
     return (
       loginComponent || (
-        <LoginPage
+        <EmbeddedLoginCard
           config={config}
           loginWithOAuth={loginWithOAuth}
-          appName={
-            loginTitle ? loginTitle.replace('Welcome to ', '') : 'Legacy Sports'
-          }
-          onSuccess={(_user: { id: number; email: string; name?: string }) => {
-            try {
-              // The authentication state should already be updated by loginWithOAuth
-              // Call the optional callback if provided
-              onLoginSuccess?.();
-            } catch (error) {
-              LOGGER.error('Authentication callback failed:', String(error));
-              const errorMessage =
-                error instanceof Error
-                  ? error.message
-                  : 'Authentication failed';
-              onLoginFailure?.(errorMessage);
-            }
-          }}
-          onError={(error: Error) => {
-            // Login failures (wrong credentials, unauthorized account) are expected
-            // user-facing conditions, not bugs — use warn to avoid Rollbar noise.
-            LOGGER.warn('Authentication Error:', error);
-            const errorMessage =
-              error instanceof Error ? error.message : 'Authentication failed';
-            onLoginFailure?.(errorMessage);
-          }}
+          onLoginSuccess={onLoginSuccess}
+          onLoginFailure={onLoginFailure}
         />
       )
     );

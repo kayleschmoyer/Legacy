@@ -78,11 +78,18 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
       const loginPath = path.join(APP_ROOT, 'app/login.tsx');
       expect(fs.existsSync(loginPath)).toBe(true);
 
-      const content = fs.readFileSync(loginPath, 'utf8');
-      expect(content).toContain('testID="login-screen"');
-      expect(content).toContain('testID="login-button"');
-      expect(content).toContain('testID="login-title"');
-      expect(content).toContain('testID="login-error"');
+      const loginContent = fs.readFileSync(loginPath, 'utf8');
+      expect(loginContent).toContain('testID="login-screen"');
+
+      // login-button / login-title / login-error live in the shared LoginPage card
+      const sharedLoginPath = path.resolve(
+        APP_ROOT,
+        '../../../lib/shared-components/src/features/auth/LoginPage.tsx',
+      );
+      const sharedContent = fs.readFileSync(sharedLoginPath, 'utf8');
+      expect(sharedContent).toContain('testID="login-button"');
+      expect(sharedContent).toContain('testID="login-title"');
+      expect(sharedContent).toContain('testID="login-error"');
     });
 
     it('should redirect unauthenticated users to login', () => {

@@ -5,6 +5,7 @@ import {
   OAuthProvider,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { LoginPage as AuthCard } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { env } from '../../config/environment';
@@ -15,40 +16,6 @@ import {
 import './LoginPage.css';
 
 /* ── Icons ── */
-
-function GoogleG() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-      <path
-        fill="#FFC107"
-        d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"
-      />
-      <path
-        fill="#FF3D00"
-        d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
-      />
-      <path
-        fill="#4CAF50"
-        d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
-      />
-      <path
-        fill="#1976D2"
-        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.2 5.2C41 35 44 30 44 24c0-1.3-.1-2.3-.4-3.5z"
-      />
-    </svg>
-  );
-}
-
-function DiscordMark() {
-  return (
-    <svg width="20" height="16" viewBox="0 0 71 55" aria-hidden="true">
-      <path
-        fill="#fff"
-        d="M60.1 4.9A58.5 58.5 0 0 0 45.4.4a.2.2 0 0 0-.2.1 40.8 40.8 0 0 0-1.8 3.7 54 54 0 0 0-16.2 0A37.5 37.5 0 0 0 25.4.5a.2.2 0 0 0-.2-.1 58.4 58.4 0 0 0-14.7 4.5.2.2 0 0 0-.1.1C1.2 18.7-1.4 32.1.1 45.3a.2.2 0 0 0 .1.2 58.9 58.9 0 0 0 17.7 9 .2.2 0 0 0 .3-.1 42 42 0 0 0 3.6-5.9.2.2 0 0 0-.1-.3 38.8 38.8 0 0 1-5.5-2.6.2.2 0 0 1 0-.4l1.1-.8a.2.2 0 0 1 .2 0 42 42 0 0 0 35.6 0 .2.2 0 0 1 .2 0l1.1.8a.2.2 0 0 1 0 .4 36.4 36.4 0 0 1-5.5 2.6.2.2 0 0 0-.1.3 47 47 0 0 0 3.6 5.9.2.2 0 0 0 .3.1 58.7 58.7 0 0 0 17.7-9 .2.2 0 0 0 .1-.2c1.8-15.3-2.3-28.6-9.8-40.3a.2.2 0 0 0-.1-.1zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.1 0-4 2.8-7.2 6.4-7.2 3.6 0 6.5 3.2 6.4 7.2 0 3.9-2.8 7.1-6.4 7.1zm23.6 0c-3.5 0-6.4-3.2-6.4-7.1 0-4 2.8-7.2 6.4-7.2 3.6 0 6.5 3.2 6.4 7.2 0 3.9-2.8 7.1-6.4 7.1z"
-      />
-    </svg>
-  );
-}
 
 function SecureIcon() {
   return (
@@ -352,16 +319,10 @@ export function LoginPage(): React.JSX.Element {
   }, [isConfigured, isConfiguring, isLoading, loginWithOAuth]);
 
   const handleDiscordSignIn = useCallback(() => {
-    // Delegate state generation and cookie binding to the backend.
-    // `/oauth/discord/authorize` sets a single-use HttpOnly state cookie
-    // and 302s to Discord.
     const oauthProxyUrl = config.oauthProxyUrl;
     if (!oauthProxyUrl) return;
     window.location.href = `${oauthProxyUrl}/discord/authorize`;
   }, [config.oauthProxyUrl]);
-
-  const googleDisabled = isLoading || isDiscordLoading || isConfiguring;
-  const discordDisabled = isLoading || isDiscordLoading;
 
   return (
     <>
@@ -483,86 +444,18 @@ export function LoginPage(): React.JSX.Element {
 
           {/* Right: Auth card */}
           <section className="ll-card-pane">
-            <div className="ll-card">
-              <div className="ll-card-head">
-                <div className="ll-eyebrow ll-eyebrow-center">Sign In</div>
-                <h2 className="ll-card-title">Step up to the plate</h2>
-                <p className="ll-card-sub">
-                  Use the account you already trust.
-                </p>
-              </div>
-
-              <div className="ll-oauth-list">
-                <button
-                  type="button"
-                  className="ll-oauth ll-oauth-google"
-                  onClick={() => {
-                    void handleSignIn();
-                  }}
-                  disabled={googleDisabled}
-                  aria-label="Continue with Google"
-                >
-                  <span className="ll-oauth-icon">
-                    <GoogleG />
-                  </span>
-                  <span className="ll-oauth-label">
-                    {isLoading
-                      ? 'Connecting to Google…'
-                      : 'Continue with Google'}
-                  </span>
-                  {(isLoading || isConfiguring) && (
-                    <span className="ll-spinner" aria-hidden="true" />
-                  )}
-                </button>
-
-                {config.discordClientId ? (
-                  <button
-                    type="button"
-                    className="ll-oauth ll-oauth-discord"
-                    onClick={handleDiscordSignIn}
-                    disabled={discordDisabled}
-                    aria-label="Continue with Discord"
-                  >
-                    <span className="ll-oauth-icon">
-                      <DiscordMark />
-                    </span>
-                    <span className="ll-oauth-label">
-                      {isDiscordLoading
-                        ? 'Connecting to Discord…'
-                        : 'Continue with Discord'}
-                    </span>
-                    {isDiscordLoading && (
-                      <span className="ll-spinner" aria-hidden="true" />
-                    )}
-                  </button>
-                ) : null}
-              </div>
-
-              {displayError ? (
-                <div className="ll-error" role="alert">
-                  {displayError}
-                </div>
-              ) : null}
-
-              <div className="ll-legal">
-                By continuing, you agree to our{' '}
-                <a href="/terms">Terms of Service</a> and{' '}
-                <a href="/privacy">Privacy Policy</a>.
-              </div>
-
-              <div className="ll-get-started-row">
-                <button
-                  type="button"
-                  className="ll-get-started"
-                  onClick={() => {
-                    void handleSignIn();
-                  }}
-                  disabled={googleDisabled}
-                >
-                  Get Started Free
-                </button>
-              </div>
-            </div>
+            <AuthCard
+              onGoogleSignIn={() => {
+                void handleSignIn();
+              }}
+              onDiscordSignIn={
+                config.discordClientId ? handleDiscordSignIn : undefined
+              }
+              isGoogleLoading={isLoading}
+              isDiscordLoading={isDiscordLoading}
+              isConfiguring={isConfiguring}
+              errorMessage={displayError || undefined}
+            />
 
             <div className="ll-card-footer">
               <div className="ll-footer-item">
