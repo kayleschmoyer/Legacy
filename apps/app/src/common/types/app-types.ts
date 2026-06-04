@@ -13,7 +13,9 @@ export type FormEventHandler = (event: {
 }) => void;
 
 // Type guards for safe property access
-export function hasValidId(obj: { id?: number | null }): obj is { id: number } {
+export function hasValidId<T extends { id?: number | null }>(
+  obj: T,
+): obj is T & { id: number } {
   return typeof obj.id === 'number' && obj.id > 0;
 }
 

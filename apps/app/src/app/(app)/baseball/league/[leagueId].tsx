@@ -4,7 +4,6 @@ import {
   useRouter,
 } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { HeaderTitleProps } from '@react-navigation/elements';
 import {
   Button,
   Card,
@@ -111,17 +110,20 @@ export default function LeagueId(): React.JSX.Element {
       },
     });
 
-  const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useGetUserTeamIdLazyQuery();
+  const [
+    getUserTeamId,
+    { data: userTeamData, loading: userTeamLoading, error: userTeamError },
+  ] = useGetUserTeamIdLazyQuery();
+
+  useEffect(() => {
+    if (userTeamError) LOGGER.error('User team ID query error:', userTeamError);
+  }, [userTeamError]);
 
   // Effect to fetch user's team ID when league ID changes
   useEffect(() => {
     if (!isNaN(numLeagueId) && userInfo?.id) {
       void getUserTeamId({
         variables: { leagueId: numLeagueId },
-        onError: (error: Error) => {
-          LOGGER.error('User team ID query error:', error);
-        },
       });
     }
   }, [numLeagueId, userInfo?.id, getUserTeamId]);
@@ -140,16 +142,21 @@ export default function LeagueId(): React.JSX.Element {
     });
   }, [rawMatchups, userTeamId]);
 
-  const { data: teamMembersData, loading: teamMembersLoading } =
-    useGetTeamMembersQuery({
-      skip: !userTeamId,
-      variables: {
-        teamId: userTeamId || 0,
-      },
-      onError: (error: Error) => {
-        LOGGER.error('Team members query error:', error);
-      },
-    });
+  const {
+    data: teamMembersData,
+    loading: teamMembersLoading,
+    error: teamMembersError,
+  } = useGetTeamMembersQuery({
+    skip: !userTeamId,
+    variables: {
+      teamId: userTeamId || 0,
+    },
+  });
+
+  useEffect(() => {
+    if (teamMembersError)
+      LOGGER.error('Team members query error:', teamMembersError);
+  }, [teamMembersError]);
 
   const {
     standings,
@@ -624,7 +631,10 @@ export default function LeagueId(): React.JSX.Element {
   );
 }
 
-export function LeagueIdHeader(_props: HeaderTitleProps): React.JSX.Element {
+export function LeagueIdHeader(_props: {
+  tintColor?: string | object | null;
+  children?: string;
+}): React.JSX.Element {
   const params = useGlobalSearchParams();
   const leagueId = params.leagueId;
 

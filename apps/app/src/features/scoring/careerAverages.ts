@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useApolloClient } from '@apollo/client';
+import { useApolloClient } from '@apollo/client/react';
 import type {
   PlayerCareerStats,
   ScoringStatRecord,
@@ -168,8 +168,10 @@ export function useCareerAverageStats(
           const next = new Map(previous);
 
           for (const { playerId, data } of results) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-            next.set(playerId, transformCareerStats(data));
+            if (data !== undefined) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+              next.set(playerId, transformCareerStats(data));
+            }
           }
           return next;
         });

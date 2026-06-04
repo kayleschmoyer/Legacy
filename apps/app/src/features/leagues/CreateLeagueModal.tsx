@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Modal, View } from 'react-native';
-import { Button, Input, Spinner, XStack, YStack } from 'tamagui';
+import { Modal } from 'react-native';
+import { Button, Input, Spinner, View, XStack, YStack } from 'tamagui';
 import { addDays } from '../../common/utilities/DateUtilities';
 import { useCreateLeagueMutation } from '../../api/db/graphql.generated';
 import { Dropdown, DropdownItem } from '../../common/components/Dropdown';
@@ -120,7 +120,21 @@ export default function CreateLeagueModal(
   };
 
   const submit = () => {
-    createLeague().catch(handleError);
+    createLeague({
+      variables: {
+        input: {
+          playerPool,
+          draftMode,
+          selectionMethod,
+          draftOrder,
+          leagueName,
+          numberOfTeams,
+          numberOfDivisions,
+          schedulingStrategy,
+          startDate: addDays(new Date(), 5).toISOString(),
+        },
+      },
+    }).catch(handleError);
   };
 
   useEffect(() => {

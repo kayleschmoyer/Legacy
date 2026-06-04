@@ -89,7 +89,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Drive React Native's color scheme so native components + useColorScheme()
     // reflect the user's explicit choice within this session.
     if (pref === 'system') {
-      Appearance.setColorScheme(null); // revert to OS
+      Appearance.setColorScheme('unspecified'); // revert to OS
     } else {
       Appearance.setColorScheme(pref);
     }

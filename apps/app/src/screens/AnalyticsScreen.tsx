@@ -94,6 +94,65 @@ interface RouteParams {
   leagueId: number;
 }
 
+// Inline types for the raw gql queries below (codegen migration pending — see file header)
+interface TeamStat {
+  teamId: number;
+  teamName: string;
+  totalPoints: number;
+  averagePoints: number;
+  matchupsPlayed: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  winPercentage: number;
+  currentStreak: string;
+  currentStreakCount: number;
+  longestWinStreak: number;
+  longestLoseStreak: number;
+}
+interface PowerRanking {
+  rank: number;
+  teamId: number;
+  teamName: string;
+  powerScore: number;
+  recentFormScore: number;
+  pointDifferential: number;
+}
+interface PlayoffProjection {
+  teamId: number;
+  teamName: string;
+  currentRecord: string;
+  playoffProbability: number;
+  projectedWins: number;
+  projectedLosses: number;
+  strengthOfSchedule: number;
+  remainingMatchups: number;
+  magicNumber: number | null;
+  eliminationNumber: number | null;
+}
+interface LeagueAnalytics {
+  leagueId: number;
+  leagueName: string;
+  currentWeek: number;
+  totalTeams: number;
+  averagePointsPerMatchup: number;
+  teamStats: TeamStat[];
+  powerRankings: PowerRanking[];
+  playoffProjections: PlayoffProjection[];
+}
+interface HeadToHeadRecord {
+  team1Id: number;
+  team1Name: string;
+  team2Id: number;
+  team2Name: string;
+  team1Wins: number;
+  team2Wins: number;
+  ties: number;
+  totalMatchups: number;
+  team1AveragePoints: number;
+  team2AveragePoints: number;
+}
+
 /**
  * AnalyticsScreen - Mobile analytics and statistics dashboard
  */
@@ -122,8 +181,11 @@ export default function AnalyticsScreen() {
     skip: !team1Id || !team2Id,
   });
 
-  const analytics = data?.getLeagueAnalytics;
-  const h2hRecord = h2hData?.getHeadToHeadRecord;
+  // Raw gql — data typed as {} by Apollo without codegen (codegen migration pending; see file header)
+  const analytics = (data as { getLeagueAnalytics?: LeagueAnalytics })
+    ?.getLeagueAnalytics;
+  const h2hRecord = (h2hData as { getHeadToHeadRecord?: HeadToHeadRecord })
+    ?.getHeadToHeadRecord;
 
   if (loading && !data) {
     return (

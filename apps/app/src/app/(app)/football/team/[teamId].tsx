@@ -136,12 +136,14 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     case 'Lineup':
       return (
         <LineupEditor
-          availableRosterSlots={rosterSlots}
+          availableRosterSlots={rosterSlots.filter(
+            (s): s is LeaguePositionFragment => s != null,
+          )}
           onPlayerAdded={isOwner ? onPlayerAdded : noOp}
           onPlayerMoved={isOwner ? onPlayerMoved : noOp}
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
           projections={{}}
-          team={team}
+          team={team.filter((m): m is TeamMemberFragment => m != null)}
           actual={{}}
         />
       );

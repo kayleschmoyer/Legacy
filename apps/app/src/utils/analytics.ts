@@ -31,7 +31,11 @@ async function trackEvent(
     await analytics().logEvent(eventName, clean);
     LOGGER.info('[Analytics] Event tracked:', eventName, clean);
   } catch (err) {
-    LOGGER.warn('[Analytics] Event failed (non-fatal):', eventName, err);
+    LOGGER.warn(
+      '[Analytics] Event failed (non-fatal):',
+      eventName,
+      err instanceof Error ? err : new Error(String(err)),
+    );
   }
 }
 
@@ -41,7 +45,10 @@ export async function setUserId(userId: string | number): Promise<void> {
     await analytics().setUserId(_userId);
     LOGGER.info('[Analytics] User ID set:', _userId);
   } catch (err) {
-    LOGGER.warn('[Analytics] setUserId failed (non-fatal):', err);
+    LOGGER.warn(
+      '[Analytics] setUserId failed (non-fatal):',
+      err instanceof Error ? err : new Error(String(err)),
+    );
   }
 }
 
@@ -57,7 +64,10 @@ export async function setUserProperties(properties: {
         properties.subscriptionTier,
       );
     } catch (err) {
-      LOGGER.warn('[Analytics] setUserProperty subscription_tier failed:', err);
+      LOGGER.warn(
+        '[Analytics] setUserProperty subscription_tier failed:',
+        err instanceof Error ? err : new Error(String(err)),
+      );
     }
   }
   if (properties.userId !== undefined) {

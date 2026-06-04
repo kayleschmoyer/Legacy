@@ -1,14 +1,9 @@
-import {
-  ApolloClient,
-  HttpLink,
-  InMemoryCache,
-  NormalizedCacheObject,
-} from '@apollo/client';
+import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
 import { config } from '@legacy-sports/app-config/native';
 import { GetUserById, UserFragment } from '../../api/db/graphql.generated';
 
 export class DbClient {
-  public readonly apolloClient: ApolloClient<NormalizedCacheObject>;
+  public readonly apolloClient: ApolloClient;
 
   constructor() {
     const graphqlHost = config.graphqlHost;
@@ -25,15 +20,13 @@ export class DbClient {
   public async getUserById(
     id: number,
   ): Promise<UserFragment | undefined | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const response = await this.apolloClient.query({
+    const response = await this.apolloClient.query<{
+      user: UserFragment | null;
+    }>({
       query: GetUserById,
-      variables: {
-        id: id,
-      },
+      variables: { id },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
-    return response.data.user;
+    return response.data?.user ?? null;
   }
 }

@@ -204,7 +204,7 @@ export function useGooglePlayBilling(): UseGooglePlayBillingResult {
     try {
       await requestPurchase({
         type: 'subs',
-        request: { google: { skus: [productId] } },
+        request: { android: { skus: [productId] } },
       });
       // The purchaseUpdatedListener handles the successful result
     } catch (err) {

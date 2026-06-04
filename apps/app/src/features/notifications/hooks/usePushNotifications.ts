@@ -26,6 +26,8 @@ setNotificationHandler({
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
     }),
 });
 
@@ -49,8 +51,8 @@ export function usePushNotifications(userId: number | null | undefined) {
   const routerRef = useRef(router);
   routerRef.current = router;
   const [registerDeviceToken] = useRegisterDeviceTokenMutation();
-  const notificationListener = useRef<EventSubscription>();
-  const responseListener = useRef<EventSubscription>();
+  const notificationListener = useRef<EventSubscription | undefined>(undefined);
+  const responseListener = useRef<EventSubscription | undefined>(undefined);
   const lastHandledNotificationId = useRef<string | null>(null);
 
   const registerToken = useCallback(async () => {

@@ -140,6 +140,13 @@
         "cwd": "apps/app"
       }
     },
+    "typecheck": {
+      "dependsOn": ["codegen"],
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json",
+        "cwd": "apps/app"
+      }
+    },
     "lint": {
       "executor": "@nx/eslint:lint",
       "outputs": ["{options.outputFile}"],

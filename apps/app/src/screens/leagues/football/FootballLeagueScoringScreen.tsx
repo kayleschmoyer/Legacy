@@ -28,10 +28,55 @@ import {
   type GetLeagueScoringProfileQuery,
   useUpdateLeagueScoringProfileMutation,
 } from '../../../api/db/graphql.generated';
+import { useKeyboardActivation } from '../../../common/hooks/useKeyboardActivation';
 
 type LeagueScoringProfile = NonNullable<
   GetLeagueScoringProfileQuery['leagueScoringProfile']
 >;
+
+interface ScoringGroupHeaderProps {
+  title: string;
+  description: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+function ScoringGroupHeader({
+  title,
+  description,
+  isExpanded,
+  onToggle,
+}: ScoringGroupHeaderProps): React.JSX.Element {
+  const keyboardProps = useKeyboardActivation(onToggle);
+  return (
+    <Pressable
+      onPress={onToggle}
+      accessibilityRole="button"
+      tabIndex={0}
+      {...keyboardProps}
+    >
+      <XStack
+        paddingHorizontal="$3"
+        paddingVertical="$3"
+        alignItems="center"
+        gap="$2"
+        backgroundColor="$backgroundHover"
+      >
+        <YStack flex={1}>
+          <Text fontSize="$4" fontWeight="700" color="$color12">
+            {title}
+          </Text>
+          <Text fontSize="$2" color="$gray9">
+            {description}
+          </Text>
+        </YStack>
+        <Text fontSize="$3" color="$gray9">
+          {isExpanded ? '▲' : '▼'}
+        </Text>
+      </XStack>
+    </Pressable>
+  );
+}
 
 interface FootballLeagueScoringScreenProps {
   readonly leagueId: number;
@@ -246,37 +291,12 @@ export function FootballLeagueScoringScreen(
               borderRadius="$4"
               overflow="hidden"
             >
-              <Pressable
-                onPress={() => toggleGroup(group)}
-                accessibilityRole="button"
-                tabIndex={0}
-                onKeyDown={(e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleGroup(group);
-                  }
-                }}
-              >
-                <XStack
-                  paddingHorizontal="$3"
-                  paddingVertical="$3"
-                  alignItems="center"
-                  gap="$2"
-                  backgroundColor="$backgroundHover"
-                >
-                  <YStack flex={1}>
-                    <Text fontSize="$4" fontWeight="700" color="$color12">
-                      {copy.title}
-                    </Text>
-                    <Text fontSize="$2" color="$gray9">
-                      {copy.description}
-                    </Text>
-                  </YStack>
-                  <Text fontSize="$3" color="$gray9">
-                    {isExpanded ? '▲' : '▼'}
-                  </Text>
-                </XStack>
-              </Pressable>
+              <ScoringGroupHeader
+                title={copy.title}
+                description={copy.description}
+                isExpanded={isExpanded}
+                onToggle={() => toggleGroup(group)}
+              />
 
               {isExpanded ? (
                 <YStack paddingBottom="$2">

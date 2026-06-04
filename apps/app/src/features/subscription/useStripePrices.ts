@@ -74,7 +74,11 @@ export function useStripePrices() {
     }
   }, [hasNullPrices]);
 
-  if (typeof monthly !== 'number' || typeof annual !== 'number') {
+  if (
+    !stripePrices ||
+    typeof monthly !== 'number' ||
+    typeof annual !== 'number'
+  ) {
     // No live price data — show hardcoded fallback display values but disable
     // checkout (null price IDs) to prevent charging a mismatched Stripe price.
     return {

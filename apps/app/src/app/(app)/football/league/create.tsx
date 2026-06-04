@@ -16,6 +16,7 @@ import { DateTimePicker } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   CreateLeagueMutation,
+  DefensiveFormat as DefensiveFormatEnum,
   Sport,
   useCreateLeagueMutation,
 } from '../../../../api/db/graphql.generated';
@@ -217,7 +218,10 @@ export function FootballLeagueCreatePage(): React.JSX.Element {
             draftOrder: formData.draftOrder,
             maxRosterSize: formData.maxRosterSize,
             startDate: (formData.draftDate ?? new Date()).toISOString(),
-            defensiveFormat: formData.defensiveFormat,
+            defensiveFormat:
+              formData.defensiveFormat === 'idp'
+                ? DefensiveFormatEnum.Idp
+                : DefensiveFormatEnum.Dst,
             scoringFormat: formData.scoringFormat,
           },
         },

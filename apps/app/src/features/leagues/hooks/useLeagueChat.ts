@@ -136,7 +136,12 @@ export function useLeagueChat(leagueId: number): {
           viewContext: 'chat',
           autoConnect: true,
           reconnect: true,
-          captureError,
+        });
+
+        client.on('error', (err: Error) => {
+          if (!active) return;
+          captureError(err);
+          setWsError(err);
         });
 
         client.on(

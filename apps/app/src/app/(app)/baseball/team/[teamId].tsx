@@ -5,12 +5,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import { applyMultiplierGroups } from '../../../../common/scoring';
-import { useGetMatchupStatsQuery } from '../../../../api/db/matchups/Matchups.generated';
 import {
   LeaguePositionFragment,
   MatchupFragment,
   TeamMemberFragment,
   useGetLeagueScoringProfileQuery,
+  useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetUserTeamIdQuery,
@@ -28,7 +28,6 @@ import { PositionSlot } from '../../../../common/models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 
-/** Shape of a single matchup player returned by GetMatchupStats (not yet in generated types). */
 interface MatchupPlayerStats {
   playerId?: number | null;
   aggregateSeasonBattingByPlayerIdAndSeason?: Record<string, number> | null;
@@ -39,15 +38,15 @@ interface MatchupPlayerStats {
   matchupPitching?: Record<string, number> | null;
 }
 
-/** Narrow the GetMatchupStats query data to its matchupPlayers array. */
 function getMatchupPlayers(data: unknown): readonly MatchupPlayerStats[] {
   if (
     data != null &&
     typeof data === 'object' &&
-    'matchupPlayers' in data &&
-    Array.isArray((data as { matchupPlayers: unknown }).matchupPlayers)
+    'getMatchupPlayers' in data &&
+    Array.isArray((data as { getMatchupPlayers: unknown }).getMatchupPlayers)
   ) {
-    return (data as { matchupPlayers: MatchupPlayerStats[] }).matchupPlayers;
+    return (data as { getMatchupPlayers: MatchupPlayerStats[] })
+      .getMatchupPlayers;
   }
   return [];
 }
@@ -160,12 +159,10 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     bannerUrl,
   } = props;
 
-  const { data: statsData, loading: loadingStats } = useGetMatchupStatsQuery({
+  const { data: statsData, loading: loadingStats } = useGetMatchupPlayersQuery({
     skip: !matchup?.id,
     variables: {
-      matchupId: matchup?.id || -1,
-      withMatchupStats: true,
-      withProjections: true,
+      matchupId: Number(matchup?.id) || -1,
     },
   }) as { data: unknown; loading: boolean };
   const stats: unknown = statsData;
@@ -508,7 +505,7 @@ export default function Team(): React.JSX.Element {
           fieldingSettings={fieldingSettings}
           pitchingSettings={pitchingSettings}
           teamId={numTeamId ?? 0}
-          leagueId={team.team.leagueId}
+          leagueId={team.team.leagueId ?? 0}
           avatarUrl={team.team.avatarUrl}
           bannerUrl={team.team.bannerUrl}
         />

@@ -61,8 +61,8 @@ interface MobileLoginContentProps {
 }
 
 const MobileLoginContent: React.FC<MobileLoginContentProps> = ({
-  config,
-  onSuccess,
+  config: _config,
+  onSuccess: _onSuccess,
   onError,
   debugInfo,
   onClearDebug,
@@ -144,10 +144,14 @@ const MobileLoginContent: React.FC<MobileLoginContentProps> = ({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LoginPage
-        config={config}
-        onSuccess={onSuccess}
-        onError={onError}
-        appName="Legacy Sports"
+        onGoogleSignIn={() => {
+          auth
+            .loginWithProvider()
+            .then(() => {
+              /* success handled by AuthProvider */
+            })
+            .catch(onError);
+        }}
         style={{ flex: 1 }}
       />
 

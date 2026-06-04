@@ -336,7 +336,7 @@ export function MatchupWinProbabilityPanel({
             // the failure so a broken projection isn't silently hidden.
             LOGGER.error(
               `Win probability projection failed for player ${player.playerId}:`,
-              err,
+              err instanceof Error ? err : new Error(String(err)),
             );
           }
         }

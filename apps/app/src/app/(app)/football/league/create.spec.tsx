@@ -77,6 +77,7 @@ const mockCreateLeagueMutate = jest.fn();
 const mockCreateLeagueState = { loading: false, error: undefined };
 jest.mock('../../../../api/db/graphql.generated', () => ({
   Sport: { Football: 'football' },
+  DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   useCreateLeagueMutation: (options?: {
     onCompleted?: (data: unknown) => void;
     onError?: (error: Error) => void;

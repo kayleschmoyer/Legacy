@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { NotificationsScreen } from '@legacy-sports/shared-components/notifications';
+import { NotificationsScreen as NotificationsScreenComponent } from '@legacy-sports/shared-components/notifications';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 
 export default function NotificationsScreen(): React.JSX.Element {
@@ -8,7 +8,7 @@ export default function NotificationsScreen(): React.JSX.Element {
   const router = useRouter();
 
   return (
-    <NotificationsScreen
+    <NotificationsScreenComponent
       userId={userInfo.id}
       onNavigateToMatchup={(matchupId, leagueId) =>
         router.push({
@@ -28,4 +28,5 @@ export default function NotificationsScreen(): React.JSX.Element {
     />
   );
 }
+
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

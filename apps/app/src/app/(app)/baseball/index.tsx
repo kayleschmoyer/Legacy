@@ -122,7 +122,7 @@ export default function BaseballHome() {
       >
         {/* Hero section */}
         <ImageBackground
-          source="baseball_banner.jpg"
+          source={{ uri: 'baseball_banner.jpg' }}
           style={{
             alignItems: 'center',
             borderRadius: 15,

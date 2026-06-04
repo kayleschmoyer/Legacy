@@ -203,7 +203,9 @@ export function LeagueCreatePage(): React.JSX.Element {
             selectionMethod: formData.selectionMethod,
             draftOrder: formData.draftOrder,
             maxRosterSize: formData.maxRosterSize,
-            startDate: formData.draftDate.toISOString().split('T')[0],
+            startDate: (formData.draftDate ?? new Date())
+              .toISOString()
+              .split('T')[0],
             eraFilter: formData.baseballEraFilter,
             ...(formData.baseballEraFilter === 'custom'
               ? {
