@@ -1,0 +1,28 @@
+query GetLeagueHistory($leagueId: Int!) {
+  getLeagueHistory(leagueId: $leagueId) {
+    leagueId
+    seasonNumber
+    name
+    frozenAt
+    leaguePhase
+    totalMatchups
+    championTeamId
+    championTeamName
+    runnerUpTeamId
+    runnerUpTeamName
+    championScore
+    runnerUpScore
+  }
+}
+
+query GetAllTimeRecords($leagueId: Int!) {
+  getAllTimeRecords(leagueId: $leagueId) {
+    recordType
+    value
+    teamName
+    teamId
+    seasonNumber
+    leagueId
+    details
+  }
+}

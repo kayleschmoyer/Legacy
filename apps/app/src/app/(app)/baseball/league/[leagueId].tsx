@@ -46,6 +46,7 @@ import {
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { useStandings } from '../../../../features/matchup/hooks/useStandings';
+import { LeagueHistoryTab } from '../../../../features/leagues/LeagueHistoryTab';
 import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
 import { LeagueDuesSetup } from '../../../../features/commissioner/LeagueDuesSetup';
 import { LeagueDuesPaymentStatus } from '../../../../features/commissioner/LeagueDuesPaymentStatus';
@@ -350,6 +351,9 @@ export default function LeagueId(): React.JSX.Element {
           <Tabs.Tab value="standings" flex={1}>
             <Text fontSize="$2">Standings</Text>
           </Tabs.Tab>
+          <Tabs.Tab value="history" flex={1}>
+            <Text fontSize="$2">History</Text>
+          </Tabs.Tab>
           <Tabs.Tab value="chat" flex={1}>
             <Text fontSize="$2">Chat</Text>
           </Tabs.Tab>
@@ -529,6 +533,10 @@ export default function LeagueId(): React.JSX.Element {
               />
             </YStack>
           </ScrollView>
+        </Tabs.Content>
+
+        <Tabs.Content value="history" flex={1}>
+          <LeagueHistoryTab leagueId={numLeagueId} />
         </Tabs.Content>
 
         <Tabs.Content value="chat" flex={1}>
