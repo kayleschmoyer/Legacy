@@ -244,7 +244,14 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            const sha = context.sha;
+            // On pull_request / pull_request_review events, context.sha (GITHUB_SHA)
+            // is the ephemeral test-merge commit (refs/pull/N/merge), NOT the PR head.
+            // CI check runs are attached to the PR head, so we must look them up by the
+            // head SHA or this guard never finds the prior-success checks and CI re-runs
+            // on every approval (LS-7736). Falls back to context.sha for events with no
+            // pull_request payload (e.g. merge_group), though this step only runs on
+            // pull_request_review.
+            const sha = context.payload.pull_request?.head?.sha ?? context.sha;
             const { owner, repo } = context.repo;
 
             // Load required CI check names dynamically from .github/ruleset.json so
