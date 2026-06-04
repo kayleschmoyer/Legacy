@@ -7,6 +7,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { env } from '../../config/environment';
@@ -76,6 +77,7 @@ const isMissing = (v: string | null | undefined): boolean =>
 
 export default function AboutPage() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const isPremium = useIsPremium();
   // Read build-time environment variables from centralized config
   const { appVersion, commitSha, buildDate, repoUrl } = env;
@@ -208,18 +210,40 @@ export default function AboutPage() {
         </YStack>
       </InfoCard>
 
-      {!isPremium && (
-        <InfoCard>
-          <H2 marginBottom="$2">Get Started</H2>
-          <Text color="$gray11" fontSize="$4" marginBottom="$3">
-            Ready to manage your fantasy sports league? Join Legacy Sports for
-            free.
-          </Text>
-          <Button onPress={() => navigate('/pricing')} size="$4">
-            Get Started Free
-          </Button>
-        </InfoCard>
-      )}
+      <InfoCard>
+        <H2 marginBottom="$2">Get Started</H2>
+        {isAuthenticated ? (
+          <>
+            <Text color="$gray11" fontSize="$4" marginBottom="$3">
+              Welcome back! Head to your dashboard to manage your leagues.
+            </Text>
+            <YStack gap="$3">
+              <Button onPress={() => navigate('/home')} size="$4">
+                Go to Dashboard
+              </Button>
+              {!isPremium && (
+                <Button
+                  onPress={() => navigate('/pricing')}
+                  variant="secondary"
+                  size="$4"
+                >
+                  Upgrade to Premium
+                </Button>
+              )}
+            </YStack>
+          </>
+        ) : (
+          <>
+            <Text color="$gray11" fontSize="$4" marginBottom="$3">
+              Ready to manage your fantasy sports league? Join Legacy Sports for
+              free.
+            </Text>
+            <Button onPress={() => navigate('/')} size="$4">
+              Get Started Free
+            </Button>
+          </>
+        )}
+      </InfoCard>
 
       <YStack marginTop="$4" alignItems="center" gap="$2">
         <Text color="$gray10" fontSize="$3" textAlign="center">

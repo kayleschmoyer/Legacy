@@ -15,6 +15,16 @@ jest.mock('react-router-dom', () => {
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 
+const mockUseAuth = jest.fn(() => ({
+  isAuthenticated: false,
+  user: null,
+  isLoading: false,
+}));
+
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 jest.mock('@legacy-sports/shared-components/ui', () => ({
   Button: ({
     children,
@@ -72,6 +82,7 @@ jest.mock('../../config/environment', () => ({
     commitSha: 'abc123',
     buildDate: '2026-01-01',
     branch: 'main',
+    repoUrl: 'https://github.com/bkrupa/legacy-sports',
     jiraProxyUrl: '',
     stripeMonthlyPriceId: '',
     stripeAnnualPriceId: '',
@@ -124,6 +135,11 @@ describe('AboutPage — appVersion coercion (LS-5713)', () => {
 describe('AboutPage — Environment label (LS-5709)', () => {
   beforeEach(() => {
     mockUseIsPremium.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
   });
 
   afterEach(() => {
@@ -162,32 +178,88 @@ describe('AboutPage — Environment label (LS-5709)', () => {
   });
 });
 
-describe('AboutPage — Get Started Free button (LS-5723)', () => {
+describe('AboutPage — Get Started card (LS-5722)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('navigates to /pricing when non-premium user clicks Get Started Free', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
     mockUseIsPremium.mockReturnValue(false);
-    render(
-      <MemoryRouter>
-        <AboutPage />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByText('Get Started Free'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
 
-  it('does not render the Get Started Free button for premium users', () => {
-    mockUseIsPremium.mockReturnValue(true);
-    render(
-      <MemoryRouter>
-        <AboutPage />
-      </MemoryRouter>,
-    );
+  it('shows Get Started Free CTA for unauthenticated users', () => {
+    renderAbout();
+    expect(
+      screen.getByRole('button', { name: /get started free/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /go to dashboard/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /upgrade to premium/i }),
+    ).not.toBeInTheDocument();
+  });
 
-    expect(screen.queryByText('Get Started Free')).not.toBeInTheDocument();
+  it('navigates to / when unauthenticated user clicks Get Started Free', () => {
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: /get started free/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/');
+  });
+
+  it('shows Go to Dashboard and Upgrade to Premium for authenticated non-premium users', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1' },
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+
+    renderAbout();
+
+    expect(
+      screen.getByRole('button', { name: /go to dashboard/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /upgrade to premium/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('navigates to /home when authenticated user clicks Go to Dashboard', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1' },
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: /go to dashboard/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/home');
+  });
+
+  it('shows only Go to Dashboard for authenticated premium users', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1' },
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(true);
+
+    renderAbout();
+
+    expect(
+      screen.getByRole('button', { name: /go to dashboard/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /upgrade to premium/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
   });
 });
