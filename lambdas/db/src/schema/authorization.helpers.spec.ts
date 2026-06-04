@@ -65,17 +65,23 @@ jest.mock('@legacy-sports/db-client', () => ({
       team1Id: 'matchups.team1_id',
       team2Id: 'matchups.team2_id',
     },
+    users: {
+      id: 'users.id',
+      accessLevel: 'users.access_level',
+    },
   },
 }));
 
 import {
   authorized,
+  checkAdminInDb,
   checkPlayersNotLocked,
   getLeagueMembership,
   getTeamMemberInfo,
   isCommissionerOrOwner,
   isTeamGeneralManager,
   type LeagueMembership,
+  requireAdmin,
   requireAuth,
   requireNotImpersonating,
   verifyCommissionerAccess,
@@ -127,6 +133,87 @@ describe('requireAuth', () => {
 });
 
 // ── requireNotImpersonating ───────────────────────────────────────────────────
+
+// ── checkAdminInDb ─────────────────────────────────────────────────────────────
+
+describe('checkAdminInDb', () => {
+  it('returns false immediately (no DB call) when JWT does not claim admin', async () => {
+    const db = makeDb([]);
+    const ctx = makeContext({ ...USER, isAdmin: false }, db);
+    const result = await checkAdminInDb(ctx);
+    expect(result).toBe(false);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('returns false when user is null', async () => {
+    const db = makeDb([]);
+    const ctx = makeContext(null, db);
+    const result = await checkAdminInDb(ctx);
+    expect(result).toBe(false);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('queries DB and returns true when DB confirms admin', async () => {
+    const db = makeDb([{ accessLevel: 'admin' }]);
+    const ctx = makeContext({ ...USER, isAdmin: true }, db);
+    const result = await checkAdminInDb(ctx);
+    expect(result).toBe(true);
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('queries DB and returns false when DB shows access has been revoked', async () => {
+    const db = makeDb([{ accessLevel: 'none' }]);
+    const ctx = makeContext({ ...USER, isAdmin: true }, db);
+    const result = await checkAdminInDb(ctx);
+    expect(result).toBe(false);
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns false when DB row is missing (user not found)', async () => {
+    const db = makeDb([]);
+    const ctx = makeContext({ ...USER, isAdmin: true }, db);
+    const result = await checkAdminInDb(ctx);
+    expect(result).toBe(false);
+  });
+});
+
+// ── requireAdmin ───────────────────────────────────────────────────────────────
+
+describe('requireAdmin', () => {
+  it('throws UNAUTHENTICATED when context.user is null', async () => {
+    const ctx = makeContext(null);
+    await expect(requireAdmin(ctx)).rejects.toMatchObject({
+      extensions: { code: 'UNAUTHENTICATED' },
+    });
+  });
+
+  it('throws FORBIDDEN immediately (no DB call) when JWT does not claim admin', async () => {
+    const db = makeDb([]);
+    const ctx = makeContext({ ...USER, isAdmin: false }, db);
+    await expect(requireAdmin(ctx)).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('throws FORBIDDEN when DB confirms access has been revoked', async () => {
+    const db = makeDb([{ accessLevel: 'none' }]);
+    const ctx = makeContext({ ...USER, isAdmin: true }, db);
+    await expect(requireAdmin(ctx)).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the user when DB confirms admin access', async () => {
+    const db = makeDb([{ accessLevel: 'admin' }]);
+    const adminUser = { ...USER, isAdmin: true };
+    const ctx = makeContext(adminUser, db);
+    const result = await requireAdmin(ctx);
+    expect(result).toEqual(adminUser);
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('requireNotImpersonating', () => {
   it('does not throw when user is not impersonating', () => {

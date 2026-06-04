@@ -57,7 +57,11 @@ import {
   PremiumRequiredError,
   UserInputError,
 } from '../graphql-errors';
-import { hasEntitlement, requireEntitlement } from '../authorization';
+import {
+  checkAdminInDb,
+  hasEntitlement,
+  requireEntitlement,
+} from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 
@@ -1275,7 +1279,8 @@ builder.mutationField('deleteLeague', (t) =>
           throw UserInputError('League not found');
         }
 
-        if (league[0].owner !== context.user.id && !context.user.isAdmin) {
+        const isAdmin = await checkAdminInDb(context);
+        if (league[0].owner !== context.user.id && !isAdmin) {
           throw ForbiddenError(
             'Only the league owner or admin can delete this league',
           );
@@ -1320,7 +1325,8 @@ builder.mutationField('deleteAllLeagues', (t) =>
         // Admins delete all leagues they are a member of (requires join).
         // Regular users own their leagues — owner is always a member — so
         // query directly on leagues.owner without the redundant member join.
-        const allLeagues = context.user.isAdmin
+        const isAdmin = await checkAdminInDb(context);
+        const allLeagues = isAdmin
           ? await context.db
               .select({ id: PublicSchema.leagues.id })
               .from(PublicSchema.leagues)

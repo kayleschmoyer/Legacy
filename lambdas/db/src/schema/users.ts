@@ -4,7 +4,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { randomBytes } from 'node:crypto';
 import { builder } from './builder';
-import { requireAuth } from './authorization';
+import { requireAdmin, requireAuth } from './authorization';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -247,9 +247,7 @@ builder.mutationField('updateUserRole', (t) =>
       accessLevel: t.arg.string({ required: true }),
     },
     resolve: async (parent, { userId, accessLevel }, context) => {
-      if (!context.user?.isAdmin) {
-        throw ForbiddenError('Admin access required to update user roles');
-      }
+      await requireAdmin(context);
       if (accessLevel !== 'none' && accessLevel !== 'admin') {
         throw new Error('accessLevel must be "none" or "admin"');
       }
@@ -473,11 +471,7 @@ builder.mutationField('cleanupLeakedTestUsers', (t) =>
       minAgeDays: t.arg.int({ required: false }),
     },
     resolve: async (parent, { dryRun, minAgeDays }, context) => {
-      if (!context.user?.isAdmin) {
-        throw ForbiddenError(
-          'Admin access required to cleanup leaked test users',
-        );
-      }
+      const adminUser = await requireAdmin(context);
 
       const ageDays = minAgeDays ?? DEFAULT_LEAKED_USER_MIN_AGE_DAYS;
       if (ageDays < 1) {
@@ -495,7 +489,7 @@ builder.mutationField('cleanupLeakedTestUsers', (t) =>
       // spot-checking are returned in the GraphQL response, not logged.
       LOGGER.error('Leaked test-user cleanup sweep', {
         audit: true,
-        actor: { id: Number(context.user.id) },
+        actor: { id: Number(adminUser.id) },
         dryRun,
         minAgeDays: ageDays,
         matched: result.matched.length,
@@ -543,9 +537,7 @@ builder.mutationField('impersonateUser', (t) =>
       userId: t.arg.int({ required: true }),
     },
     resolve: async (parent, { userId }, context) => {
-      if (!context.user?.isAdmin) {
-        throw ForbiddenError('Forbidden: admin access required');
-      }
+      const adminUser = await requireAdmin(context);
 
       const targetUser = await dbService.users.getUserById(userId);
       if (!targetUser) {
@@ -566,9 +558,9 @@ builder.mutationField('impersonateUser', (t) =>
         username: targetUser.username ?? '',
         accessLevel: targetUser.accessLevel ?? 'none',
         impersonatedBy: {
-          id: Number(context.user.id),
-          email: context.user.email,
-          username: context.user.username,
+          id: Number(adminUser.id),
+          email: adminUser.email,
+          username: adminUser.username,
         },
       };
 
@@ -587,7 +579,7 @@ builder.mutationField('impersonateUser', (t) =>
       LOGGER.error('Admin impersonation token issued', {
         audit: true,
         actor: {
-          id: Number(context.user.id),
+          id: Number(adminUser.id),
         },
         target: {
           id: Number(targetUser.id),

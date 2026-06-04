@@ -13,6 +13,7 @@ import type {
   ScoringStatDefinition,
   ScoringStatGroup,
 } from '@legacy-sports/db-client';
+import { checkAdminInDb } from './authorization';
 import { builder } from './builder';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
@@ -509,7 +510,7 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         throw new Error('At least one scoring update is required');
       }
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await ensureLeagueCommissionerAccess(
           context.db,
           args.leagueId,

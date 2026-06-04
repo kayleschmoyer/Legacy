@@ -281,6 +281,56 @@ export function requireAuth(context: Context): AuthenticatedUser {
 }
 
 /**
+ * Returns true only if the database confirms the user currently holds admin
+ * access.  Returns false immediately (no DB query) when the JWT does not claim
+ * admin — so regular users pay no extra round-trip cost.
+ *
+ * Use this for the admin-bypass pattern where admin skips a commissioner/GM
+ * check.  For mutations exclusively available to admins (no fallback), prefer
+ * {@link requireAdmin} which throws on failure.
+ */
+export async function checkAdminInDb(context: Context): Promise<boolean> {
+  if (!context.user?.isAdmin) return false;
+  const [row] = await context.db
+    .select({ accessLevel: PublicSchema.users.accessLevel })
+    .from(PublicSchema.users)
+    .where(eq(PublicSchema.users.id, context.user.id))
+    .limit(1);
+  return row?.accessLevel === 'admin';
+}
+
+/**
+ * Verifies that the requesting user currently holds admin access according to
+ * the database — not just the JWT claim, which can be stale after a revocation.
+ *
+ * Use this instead of `context.user.isAdmin` for any mutation that is
+ * exclusively available to admins (i.e. the entire operation is forbidden to
+ * non-admins, with no commissioner/GM fallback).
+ *
+ * @throws AuthenticationError when there is no authenticated user.
+ * @throws ForbiddenError when the DB confirms the user is not an admin.
+ */
+export async function requireAdmin(
+  context: Context,
+): Promise<AuthenticatedUser> {
+  const user = requireAuth(context);
+  // Fast-fail for users whose own JWT says they are not admin — avoids a DB
+  // round-trip for the overwhelmingly common non-admin case.
+  if (!user.isAdmin) {
+    throw ForbiddenError('Admin access required');
+  }
+  const [row] = await context.db
+    .select({ accessLevel: PublicSchema.users.accessLevel })
+    .from(PublicSchema.users)
+    .where(eq(PublicSchema.users.id, user.id))
+    .limit(1);
+  if (row?.accessLevel !== 'admin') {
+    throw ForbiddenError('Admin access required');
+  }
+  return user;
+}
+
+/**
  * Throws {@link ForbiddenError} when the current session is an admin
  * impersonation.  Call this before any mutation that has financial or
  * subscription consequences for the impersonated user.

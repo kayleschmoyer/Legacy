@@ -14,7 +14,12 @@ type ChildrenProps = { children?: React.ReactNode; [key: string]: unknown };
 type AuthMock = {
   isAuthenticated: boolean;
   isLoading: boolean;
-  user?: { accessLevel: string };
+  user?: { id: number; accessLevel: string };
+};
+
+type ServerUserMock = {
+  data?: { user: { accessLevel: string } | null } | undefined;
+  loading: boolean;
 };
 
 type RevenueStatsMock = {
@@ -78,9 +83,12 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 }));
 
 const mockUseAdminRevenueStatsQuery = jest.fn<RevenueStatsMock, [unknown?]>();
+const mockUseGetUserByIdQuery = jest.fn<ServerUserMock, [unknown?]>();
 jest.mock('../../api/db/graphql.generated', () => ({
   useAdminRevenueStatsQuery: (opts?: unknown): RevenueStatsMock =>
     mockUseAdminRevenueStatsQuery(opts),
+  useGetUserByIdQuery: (opts?: unknown): ServerUserMock =>
+    mockUseGetUserByIdQuery(opts),
 }));
 
 function renderPage() {
@@ -94,20 +102,30 @@ function renderPage() {
 const adminAuth = {
   isAuthenticated: true,
   isLoading: false,
-  user: { accessLevel: 'admin' },
+  user: { id: 1, accessLevel: 'admin' },
+};
+
+const adminServerUser = {
+  data: { user: { accessLevel: 'admin' } },
+  loading: false,
 };
 
 describe('AdminRevenuePage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue(adminAuth);
+    mockUseGetUserByIdQuery.mockReturnValue(adminServerUser);
   });
 
   it('skips the query for an authenticated non-admin user (ARV-001/ARV-004)', () => {
     mockUseAuth.mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
-      user: { accessLevel: 'user' },
+      user: { id: 2, accessLevel: 'user' },
+    });
+    mockUseGetUserByIdQuery.mockReturnValue({
+      data: { user: { accessLevel: 'none' } },
+      loading: false,
     });
     mockUseAdminRevenueStatsQuery.mockReturnValue({
       data: undefined,

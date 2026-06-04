@@ -14,11 +14,8 @@ import { LOGGER } from '@legacy-sports/logging';
 import { sql } from 'drizzle-orm';
 
 import { builder, type Context } from './builder';
-import {
-  AuthenticationError,
-  ForbiddenError,
-  UserInputError,
-} from './graphql-errors';
+import { requireAdmin } from './authorization';
+import { UserInputError } from './graphql-errors';
 
 // ── Response Type ────────────────────────────────────────────────────────────
 
@@ -58,23 +55,17 @@ builder.mutationField('mergeAccounts', (t) =>
       sourceUserId: t.arg.int({ required: true }),
     },
     resolve: async (_parent, args, context: Context) => {
-      if (!context.user) {
-        throw AuthenticationError();
-      }
+      // Verify admin access against the database (not just the JWT claim —
+      // a stale token could otherwise grant access after admin is revoked).
+      // The frontend is responsible for proving ownership of both accounts
+      // before calling this mutation.
+      await requireAdmin(context);
 
-      const targetUserId = context.user.id;
+      const targetUserId = context.user!.id;
       const sourceUserId = args.sourceUserId;
 
       if (targetUserId === sourceUserId) {
         throw UserInputError('Cannot merge an account with itself');
-      }
-
-      // Only admins can merge accounts (the frontend handles proving ownership
-      // of both accounts before calling this mutation with admin elevation)
-      if (!context.user.isAdmin) {
-        throw ForbiddenError(
-          'Account merging requires admin access. Use the account settings UI to initiate a merge.',
-        );
       }
 
       const tablesUpdated: string[] = [];

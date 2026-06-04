@@ -90,7 +90,12 @@ jest.mock('tamagui', () => ({
 
 const mockImpersonateUser = jest.fn();
 const mockUseAuth = jest.fn<
-  { user: { id: number; accessLevel: string }; impersonateUser: jest.Mock },
+  {
+    user: { id: number; accessLevel: string };
+    isLoading: boolean;
+    isAuthenticated: boolean;
+    impersonateUser: jest.Mock;
+  },
   []
 >();
 jest.mock('@legacy-sports/shared-components/auth', () => ({
@@ -121,10 +126,15 @@ const mockUseUpdateUserRoleMutation = jest.fn<
   [jest.Mock, { loading: boolean }],
   []
 >();
+const mockUseGetUserByIdQuery = jest.fn<
+  { data: { user: { accessLevel: string } } | undefined; loading: boolean },
+  [unknown?]
+>();
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetAllUsersQuery: (opts?: unknown) => mockUseGetAllUsersQuery(opts),
   useGetUsersCountQuery: (opts?: unknown) => mockUseGetUsersCountQuery(opts),
   useUpdateUserRoleMutation: () => mockUseUpdateUserRoleMutation(),
+  useGetUserByIdQuery: (opts?: unknown) => mockUseGetUserByIdQuery(opts),
 }));
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -148,7 +158,13 @@ function setupMocks(overrides?: { impersonateUser?: jest.Mock }) {
   mockImpersonateUser.mockReset().mockResolvedValue(undefined);
   mockUseAuth.mockReturnValue({
     user: ADMIN_USER,
+    isLoading: false,
+    isAuthenticated: true,
     impersonateUser: overrides?.impersonateUser ?? mockImpersonateUser,
+  });
+  mockUseGetUserByIdQuery.mockReturnValue({
+    data: { user: { accessLevel: 'admin' } },
+    loading: false,
   });
   mockUseGetAllUsersQuery.mockReturnValue({
     data: { users: USERS },

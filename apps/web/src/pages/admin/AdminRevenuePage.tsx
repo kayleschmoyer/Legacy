@@ -21,7 +21,10 @@ import {
   YAxis,
 } from 'recharts';
 import { PageMeta } from '../../components/PageMeta';
-import { useAdminRevenueStatsQuery } from '../../api/db/graphql.generated';
+import {
+  useAdminRevenueStatsQuery,
+  useGetUserByIdQuery,
+} from '../../api/db/graphql.generated';
 import { useFeatureValue } from '../../context/GrowthBookProvider';
 import {
   BRAND_GOLD_LIGHT,
@@ -174,12 +177,22 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
     false,
   );
 
+  const currentUserId = auth.user?.id ?? 0;
+  const { data: serverUserData, loading: serverUserLoading } =
+    useGetUserByIdQuery({
+      variables: { id: currentUserId },
+      skip: !auth.isAuthenticated || currentUserId === 0,
+      fetchPolicy: 'network-only',
+    });
+
   const { data, loading, error } = useAdminRevenueStatsQuery({
-    skip: !auth.isAuthenticated || auth.user?.accessLevel !== 'admin',
+    skip: serverUserData?.user?.accessLevel !== 'admin',
     fetchPolicy: 'no-cache',
   });
 
-  if (auth.user?.accessLevel !== 'admin') {
+  if (auth.isLoading || serverUserLoading) return null;
+
+  if (serverUserData?.user?.accessLevel !== 'admin') {
     return <Navigate to="/" replace />;
   }
 

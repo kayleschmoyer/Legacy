@@ -26,7 +26,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 
 import { builder } from './builder';
-import { verifyCommissionerAccess } from './authorization';
+import { checkAdminInDb, verifyCommissionerAccess } from './authorization';
 import { CommissionerAuditLog } from './leagues';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import { addPlayerToRoster } from '../services/roster-service';
@@ -186,7 +186,7 @@ builder.mutationField('forceAddPlayer', (t) =>
 
       const { leagueId, teamId, playerId, reason } = args.input;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -270,7 +270,7 @@ builder.mutationField('forceDropPlayer', (t) =>
 
       const { leagueId, teamId, playerId, reason } = args.input;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -356,7 +356,7 @@ builder.mutationField('editMatchupScore', (t) =>
         return { success: false, message: 'Matchup not found.' };
       }
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(
           context.db,
           matchup[0].leagueId,
@@ -459,7 +459,7 @@ builder.mutationField('swapMatchupTeams', (t) =>
         throw UserInputError('Both matchups must be from the same week.');
       }
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(
           context.db,
           m1.leagueId,
@@ -536,7 +536,7 @@ builder.mutationField('updateCommissionerNote', (t) =>
 
       const { leagueId, note } = args.input;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -586,7 +586,7 @@ builder.mutationField('setTeamLock', (t) =>
 
       const { leagueId, teamId, locked, reason } = args.input;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -656,7 +656,7 @@ builder.mutationField('bulkDropTeamPlayers', (t) =>
 
       const { leagueId, teamId, reason } = args.input;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -737,7 +737,7 @@ builder.mutationField('recalculateLeagueMatchupScores', (t) =>
 
       const { leagueId, weekNumber } = args.input;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -959,7 +959,7 @@ builder.queryField('commissionerAuditLogs', (t) =>
 
       const { leagueId, limit } = args;
 
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 

@@ -3,7 +3,11 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { builder } from './builder';
-import { requireAuth, verifyCommissionerAccess } from './authorization';
+import {
+  checkAdminInDb,
+  requireAuth,
+  verifyCommissionerAccess,
+} from './authorization';
 import { Team } from './leagues/types';
 
 const badgeService = createBadgeService(getDbOptions());
@@ -362,7 +366,7 @@ builder.mutationField('createPlayoffBracket', (t) =>
 
       // Admin users can create playoffs for any league; commissioners can only
       // create playoffs for leagues they manage.
-      if (!user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, args.leagueId, user.id);
       }
 
@@ -391,7 +395,7 @@ builder.mutationField('advancePlayoffBracket', (t) =>
     resolve: async (_parent, args, context) => {
       const user = requireAuth(context);
 
-      if (!user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         // Look up the bracket to get the league id for access verification
         const [bracketRow] = await context.db
           .select({ leagueId: PublicSchema.playoffBrackets.leagueId })
@@ -435,7 +439,7 @@ builder.mutationField('updatePlayoffMatchup', (t) =>
     resolve: async (_parent, args, context) => {
       const user = requireAuth(context);
 
-      if (!user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         // Look up the matchup → bracket to get the league id
         const [matchupRow] = await context.db
           .select({ bracketId: PublicSchema.playoffMatchups.bracketId })
@@ -522,7 +526,7 @@ builder.mutationField('awardChampionship', (t) =>
     resolve: async (_parent, args, context) => {
       const user = requireAuth(context);
 
-      if (!user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         // Look up the bracket to get the league id for access verification
         const [bracketRow] = await context.db
           .select({ leagueId: PublicSchema.playoffBrackets.leagueId })

@@ -6,6 +6,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetAllUsersQuery,
+  useGetUserByIdQuery,
   useGetUsersCountQuery,
   useUpdateUserRoleMutation,
 } from '../../api/db/graphql.generated';
@@ -36,7 +37,7 @@ const ACCESS_LEVEL_LABELS: Record<AccessLevelFilter, string> = {
 
 export default function AdminUsersPage() {
   const auth = useAuth();
-  const { user } = auth;
+  const { user, isLoading, isAuthenticated } = auth;
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -58,7 +59,15 @@ export default function AdminUsersPage() {
     label: string;
   } | null>(null);
 
-  const isAdmin = user?.accessLevel === 'admin';
+  const currentUserId = user?.id ?? 0;
+  const { data: serverUserData, loading: serverUserLoading } =
+    useGetUserByIdQuery({
+      variables: { id: currentUserId },
+      skip: !isAuthenticated || currentUserId === 0,
+      fetchPolicy: 'network-only',
+    });
+
+  const isAdmin = serverUserData?.user?.accessLevel === 'admin';
 
   // Debounce search input by 400ms; reset to page 1 on new search
   useEffect(() => {
@@ -100,11 +109,11 @@ export default function AdminUsersPage() {
 
   const [updateUserRole, { loading: updating }] = useUpdateUserRoleMutation();
 
-  if (auth.isLoading) {
+  if (isLoading || serverUserLoading) {
     return null;
   }
 
-  // Redirect non-admins
+  // Redirect non-admins — gate on server-verified access level, not JWT claim
   if (!user || !isAdmin) {
     return <Navigate to="/" replace />;
   }

@@ -20,7 +20,11 @@ import {
   MatchupStatus,
 } from './types';
 import { builder, Context } from '../builder';
-import { verifyCommissionerAccess } from '../authorization';
+import {
+  checkAdminInDb,
+  requireAdmin,
+  verifyCommissionerAccess,
+} from '../authorization';
 import { MatchupService } from '../../services/matchup-service';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
@@ -39,7 +43,7 @@ builder.mutationField('createMatchup', (t) =>
       }
 
       // Only admins and league commissioners/GMs may create matchups
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(
           context.db,
           args.input.leagueId,
@@ -102,8 +106,8 @@ builder.mutationField('updateMatchupScore', (t) =>
       }
 
       // Score updates are performed by the scoring system (admin / system requests only)
-      if (!context.isSystemRequest && !context.user.isAdmin) {
-        throw new Error(
+      if (!context.isSystemRequest && !(await checkAdminInDb(context))) {
+        throw ForbiddenError(
           'Only admins or the scoring system may update matchup scores',
         );
       }
@@ -146,8 +150,8 @@ builder.mutationField('updateMatchupStatus', (t) =>
       }
 
       // Status transitions are controlled by the system or admins only
-      if (!context.isSystemRequest && !context.user.isAdmin) {
-        throw new Error(
+      if (!context.isSystemRequest && !(await checkAdminInDb(context))) {
+        throw ForbiddenError(
           'Only admins or the scoring system may update matchup status',
         );
       }
@@ -686,7 +690,7 @@ builder.mutationField('createAllMatchups', (t) =>
       const leagueId = args.leagueId;
 
       // Verify user is commissioner, GM, or admin
-      if (!context.user.isAdmin) {
+      if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
@@ -899,12 +903,7 @@ builder.mutationField('adminRegenerateLeagueSchedule', (t) =>
       leagueId: t.arg.int({ required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) {
-        throw AuthenticationError();
-      }
-      if (!context.user.isAdmin) {
-        throw ForbiddenError('Admin access required');
-      }
+      await requireAdmin(context);
 
       const { leagueId } = args;
 
