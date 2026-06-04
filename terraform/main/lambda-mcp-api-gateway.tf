@@ -372,10 +372,13 @@ resource "aws_cognito_user_pool_client" "mcp_connector" {
     "ALLOW_USER_SRP_AUTH",
   ]
 
-  # Match mcp_cli token TTLs: 8h id/access (a leaked token expires within a
-  # workday), 30d refresh (the connector survives without re-consent).
-  access_token_validity  = 8
-  id_token_validity      = 8
+  # 24h id/access = Cognito's maximum; covers any realistic single workday
+  # without re-consent. Claude Code does not auto-refresh OAuth tokens
+  # mid-session (anthropics/claude-code#58607), so a longer TTL is the only
+  # client-side mitigation until upstream ships a fix.
+  # 30d refresh (the connector survives without re-consent across days).
+  access_token_validity  = 24
+  id_token_validity      = 24
   refresh_token_validity = 30
   token_validity_units {
     access_token  = "hours"
