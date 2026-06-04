@@ -9,6 +9,7 @@ This directory contains technical architecture documentation for the Legacy Spor
 - **[Multi-Sport Architecture](multi-sport.md)** - How baseball and football share a single data model; sport discriminator pattern; how to add a third sport
 - **[Build System](build-system.md)** - Nx monorepo, dependency management, and build workflows
 - **[Cross-Platform System](cross-platform-system.md)** - Magic strings and native module resolution
+- **[Mobile Navigation](mobile-navigation.md)** - Native app information architecture; the entity-noun tab bar and league-context model
 - **[Database Schema](database-schema.md)** - Complete database design and entity relationships
 - **[GraphQL Integration](graphql-integration.md)** - API layer design and implementation
 - **[Schema Validation](schema-validation.md)** - Drizzle ORM patterns and type safety
