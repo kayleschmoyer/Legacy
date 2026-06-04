@@ -96,6 +96,12 @@
   color: "e11d48"
   description: "CI failed due to GraphQL schema out of sync"
 
+# Applied by ci-orchestrator.yml when a self-hosted runner shuts down mid-run.
+# Cleared automatically at the start of the next CI run.
+- name: "CI: Runner Flake"
+  color: "d93f0b"
+  description: "CI cancelled due to a self-hosted runner restart — not caused by code changes"
+
 # ---------------------------------------------------------------------------
 # Security Labels
 # ---------------------------------------------------------------------------

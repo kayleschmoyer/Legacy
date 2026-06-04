@@ -194,6 +194,7 @@ ci-pipeline   security-scanning (conditional)
   remove-merge-label-on-failure (ci failure)
   restore-merge-label-on-success (ci success)
   remove-ci-run-label (always, if ci:run present)
+  report-runner-shutdown (ci-pipeline cancelled only)
 ```
 
 **Triggers:**
@@ -202,6 +203,14 @@ ci-pipeline   security-scanning (conditional)
 - `pull_request_review` submitted — any APPROVED review; the `check-prior-success` idempotency guard skips re-running CI when the SHA already has passing checks from the synchronize run (LS-4182/LS-5223)
 - `pull_request` labeled — only when the label being added is `ci:run` (one-shot manual re-trigger; label auto-removed after CI completes)
 - `merge_group` — always runs CI + security
+
+**Post-pipeline jobs** (all run on `ubuntu-latest` regardless of self-hosted runner state):
+
+- `label-pr` — applies `CI: Security` label on security failures
+- `remove-merge-label-on-failure` — removes `merge-when-ready` when CI fails
+- `restore-merge-label-on-success` — restores `merge-when-ready` when CI passes and bot approval is still active
+- `remove-ci-run-label` — removes `ci:run` one-shot trigger label after every run
+- `report-runner-shutdown` — fires only when `ci-pipeline` is cancelled; checks job logs for `"runner has received a shutdown signal"` and, if confirmed, applies the `CI: Runner Flake` label and posts a PR comment with a re-run link. The label is cleared at the start of the next CI run by a step in `determine-scope`.
 - `workflow_dispatch` — manual with configurable security scan type
 
 **Concurrency:** `orchestrator-{PR#}` with `cancel-in-progress: false` — a review event (which skips all jobs when CI already passed) must not cancel an in-progress synchronize-triggered CI run for the same PR.

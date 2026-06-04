@@ -130,6 +130,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: "🧹 Clear CI: Runner Flake label"
+        if: github.event.pull_request.number
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'CI: Runner Flake',
+              });
+              core.info('Cleared "CI: Runner Flake" label');
+            } catch (e) {
+              if (e.status === 404) {
+                core.info('"CI: Runner Flake" label not present — nothing to clear');
+              } else {
+                throw e;
+              }
+            }
+
       - name: "🧮 Set Scope Outputs"
         id: scope
         run: |
@@ -648,3 +671,126 @@ jobs:
                 throw err;
               }
             }
+
+  # ============================================================================
+  # Report runner shutdown as a PR comment
+  # ============================================================================
+  # When ci-pipeline is cancelled due to a self-hosted runner restart (rather
+  # than a deliberate user cancellation), this job posts a comment on the PR
+  # and applies the "CI: Runner Flake" label so the author knows this is
+  # infrastructure noise, not a code problem.
+  #
+  # Detection: fetches the last 8 KB of logs for each cancelled job and looks
+  # for the GitHub-emitted "runner has received a shutdown signal" message.
+  # If not found (e.g. logs unavailable), the job exits silently to avoid
+  # false-positive comments on deliberate cancellations.
+  #
+  # The "CI: Runner Flake" label is cleared by a step in determine-scope at
+  # the start of every subsequent CI run.
+  # ============================================================================
+  report-runner-shutdown:
+    name: "⚡ Report Runner Shutdown"
+    needs: [determine-scope, ci-pipeline]
+    if: >-
+      always() &&
+      needs.determine-scope.result != 'skipped' &&
+      needs.ci-pipeline.result == 'cancelled' &&
+      github.event.pull_request.number
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Detect and report runner shutdown"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.issue.number;
+            const runId = context.runId;
+            const token = process.env.GH_TOKEN;
+
+            // List all jobs for this workflow run (includes workflow_call child jobs)
+            let allJobs = [];
+            let page = 1;
+            while (true) {
+              const { data } = await github.rest.actions.listJobsForWorkflowRun({
+                owner, repo, run_id: runId, per_page: 100, page,
+              });
+              allJobs = allJobs.concat(data.jobs);
+              if (data.jobs.length < 100) break;
+              page++;
+            }
+
+            const cancelledJobs = allJobs.filter(j => j.conclusion === 'cancelled' && j.runner_name);
+            if (cancelledJobs.length === 0) {
+              core.info('No cancelled jobs with a runner name — skipping.');
+              return;
+            }
+
+            // Confirm shutdown by checking the tail of each cancelled job's log
+            // for the signature message GitHub emits on runner teardown.
+            // Fetching only the last 8 KB keeps this fast for large log files.
+            const shutdownJobs = [];
+            for (const job of cancelledJobs) {
+              try {
+                const redirectRes = await fetch(
+                  `https://api.github.com/repos/${owner}/${repo}/actions/jobs/${job.id}/logs`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'User-Agent': 'github-actions',
+                      Accept: 'application/vnd.github+json',
+                    },
+                    redirect: 'manual',
+                  }
+                );
+                const logUrl = redirectRes.headers.get('location');
+                if (!logUrl) {
+                  core.info(`No redirect URL for job "${job.name}" — skipping log check`);
+                  continue;
+                }
+                const logRes = await fetch(logUrl, { headers: { Range: 'bytes=-8192' } });
+                const logText = await logRes.text();
+                if (logText.includes('runner has received a shutdown signal')) {
+                  shutdownJobs.push(job);
+                }
+              } catch (e) {
+                core.warning(`Could not fetch logs for job "${job.name}" (${job.id}): ${e.message}`);
+              }
+            }
+
+            if (shutdownJobs.length === 0) {
+              core.info('No shutdown signal found in cancelled job logs — likely a user cancellation. Skipping.');
+              return;
+            }
+
+            const jobList = shutdownJobs.map(j => `\`${j.name}\``).join(', ');
+            const LABEL = 'CI: Runner Flake';
+
+            try {
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: prNumber, labels: [LABEL],
+              });
+              core.info(`Applied "${LABEL}" label to PR #${prNumber}`);
+            } catch (e) {
+              core.warning(`Could not apply label: ${e.message}`);
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: [
+                '⚡ **CI cancelled due to a runner restart** — this is not caused by your code.',
+                '',
+                `The following CI job(s) were interrupted when the self-hosted runner shut down: ${jobList}`,
+                '',
+                `[Re-run the failed jobs →](https://github.com/${owner}/${repo}/actions/runs/${runId})`,
+                '',
+                '---',
+                '*Automated message from CI pipeline*',
+              ].join('\n'),
+            });
+            core.info(`Posted runner shutdown comment on PR #${prNumber}`);
