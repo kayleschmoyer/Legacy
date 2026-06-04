@@ -4702,6 +4702,8 @@ export type LeagueFragment = {
   weekAdvanceStatus?: string | null;
   sport?: Sport | null;
   defensiveFormat?: DefensiveFormat | null;
+  salaryCapEnabled?: boolean | null;
+  salaryCap?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -4753,6 +4755,8 @@ export type GetLeagueByIdQuery = {
     weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4792,6 +4796,8 @@ export type CreateLeagueMutation = {
       weekAdvanceStatus?: string | null;
       sport?: Sport | null;
       defensiveFormat?: DefensiveFormat | null;
+      salaryCapEnabled?: boolean | null;
+      salaryCap?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -4839,6 +4845,8 @@ export type GetUserLeaguesQuery = {
     weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4881,6 +4889,8 @@ export type StartDraftMutation = {
     weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -7065,6 +7075,8 @@ export const LeagueFragmentDoc = gql`
     weekAdvanceStatus
     sport
     defensiveFormat
+    salaryCapEnabled
+    salaryCap
     userMembership {
       ...LeagueMember
     }

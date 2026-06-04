@@ -148,6 +148,13 @@ jest.mock('../../../../features/commissioner/LeagueDuesPaymentStatus', () => {
   };
 });
 
+jest.mock('../../../../features/commissioner/SalaryCapManagementCard', () => {
+  const { View } = jest.requireActual<RNComponents>('react-native');
+  return {
+    SalaryCapManagementCard: () => <View testID="salary-cap-management-card" />,
+  };
+});
+
 jest.mock('../../../../features/matchup/components/MatchupList', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {

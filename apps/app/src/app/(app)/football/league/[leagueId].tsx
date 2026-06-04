@@ -49,6 +49,7 @@ import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
 import { LeagueDuesSetup } from '../../../../features/commissioner/LeagueDuesSetup';
 import { LeagueDuesPaymentStatus } from '../../../../features/commissioner/LeagueDuesPaymentStatus';
+import { SalaryCapManagementCard } from '../../../../features/commissioner/SalaryCapManagementCard';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
 import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
 import { useLeagueScoringSettings } from '../../../../common/scoring';
@@ -529,6 +530,14 @@ export default function FootballLeagueId(): React.JSX.Element {
                   leagueId={numLeagueId}
                   onSuccess={(msg) => Alert.alert('Success', msg)}
                   onError={(err) => Alert.alert('Error', err.message)}
+                />
+
+                {/* Salary Cap Management (web deep link) */}
+                <SalaryCapManagementCard
+                  leagueId={numLeagueId}
+                  sport="football"
+                  salaryCapEnabled={league?.salaryCapEnabled ?? false}
+                  salaryCap={league?.salaryCap ?? null}
                 />
 
                 <Card
