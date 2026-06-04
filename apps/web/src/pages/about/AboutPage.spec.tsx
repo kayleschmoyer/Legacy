@@ -459,3 +459,94 @@ describe('AboutPage — config health warning (LS-7616)', () => {
     );
   });
 });
+
+describe('AboutPage — Get Started card (LS-5309)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+  });
+
+  it('renders the "Get Started" card heading', () => {
+    renderAbout();
+    expect(
+      screen.getByRole('heading', { name: /get started/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the marketing copy for new users', () => {
+    renderAbout();
+    expect(
+      screen.getByText(
+        /ready to manage your fantasy sports league\? join legacy sports for free\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the "Get Started Free" CTA button for unauthenticated users', () => {
+    renderAbout();
+    expect(
+      screen.getByRole('button', { name: /get started free/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('routes to "/" when "Get Started Free" is clicked', () => {
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: /get started free/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/');
+  });
+
+  it('shows "Go to Dashboard" and "Upgrade to Premium" for authenticated free users', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1' },
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+    renderAbout();
+    expect(
+      screen.getByRole('button', { name: /go to dashboard/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /upgrade to premium/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('routes to "/home" when authenticated free user clicks "Go to Dashboard"', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1' },
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: /go to dashboard/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/home');
+  });
+
+  it('shows only "Go to Dashboard" for authenticated premium users', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1' },
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(true);
+    renderAbout();
+    expect(
+      screen.getByRole('button', { name: /go to dashboard/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /upgrade to premium/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
+  });
+});
