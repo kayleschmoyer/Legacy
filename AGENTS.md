@@ -202,6 +202,8 @@ Debugging distributed system failures where test stdout is opaque (e.g. `n/a`, "
 
 **Terraform changes**: any edit under `terraform/**/*.tf` that adds or modifies a resource or data source must load **`terraform-permission-planning`** before pushing. `terraform plan` does not validate IAM; the skill enforces the predict → diff → patch → local-plan-as-CI-role loop so the apply lands in one PR instead of cycling on CI AccessDenied failures. See `.agents/skills/terraform-permission-planning/SKILL.md`.
 
+**CI / GitHub event response**: when a cloud agent session wakes on a CI check failure, workflow failure, review comment, or merge conflict event, load **`ci-event-response`** (`.agents/skills/ci-event-response/SKILL.md`) first. It has a triage table keyed by check name and event type so you reach the right action without reading multiple skills. Key facts: `No Merge Conflicts` check failures mean rebase; `bot-review` failures mean fetch review threads; status-update comments from `github-actions[bot]` are informational and usually require no action.
+
 ## MCP Servers
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over equivalent shell commands.

@@ -52,7 +52,11 @@ jobs:
                 owner,
                 repo,
                 workflow_id: 'check-conflicts.yml',
-                ref: 'main',
+                // Dispatch from the PR's head branch so the resulting check run is
+                // associated with the PR's head SHA — not main's HEAD. Without this,
+                // the failing check run is invisible to the PR's check suite and CI
+                // monitoring tools never see the conflict failure.
+                ref: pr.head.ref,
                 inputs: { pr_number: String(pr.number) },
               });
             }
