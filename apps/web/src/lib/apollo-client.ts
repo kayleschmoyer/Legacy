@@ -83,29 +83,19 @@ export function syncUserProfileFromJwt(jwt: string): void {
       (payload['name'] as string) ||
       'Unknown',
     picture: payload['picture'] as string | undefined,
-    accessLevel:
-      (payload['accessLevel'] as 'none' | 'user' | 'admin') || 'user',
+    accessLevel: (payload['accessLevel'] as 'none' | 'admin') || 'none',
   };
 
-  // Update the localStorage cache so page reloads also pick up the change
+  // Update the localStorage cache so page reloads also pick up the change.
+  // Both writes are best-effort; errors (private browsing, quota) are silently ignored.
+  const exp = payload['exp'] as number | undefined;
   try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('ls_user_profile', JSON.stringify(updatedProfile));
+    localStorage.setItem('ls_user_profile', JSON.stringify(updatedProfile));
+    if (exp) {
+      localStorage.setItem('ls_token_expiry', String(exp));
     }
   } catch {
     // Storage unavailable — the event dispatch below is the primary mechanism
-  }
-
-  // Persist the token expiry for proactive-refresh scheduling
-  const exp = payload['exp'] as number | undefined;
-  if (exp) {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('ls_token_expiry', String(exp));
-      }
-    } catch {
-      // ignore
-    }
   }
 
   // Dispatch a window event so the AuthProvider can update React state

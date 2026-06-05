@@ -28,7 +28,7 @@ const MOCK_USER_DATA = {
     username: 'testuser',
     email: 'testuser@example.com',
     avatarUrl: null,
-    accessLevel: 'user',
+    accessLevel: 'none',
   },
 };
 

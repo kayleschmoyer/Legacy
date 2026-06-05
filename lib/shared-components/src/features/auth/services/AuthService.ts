@@ -18,7 +18,7 @@ interface User {
   email: string;
   username: string;
   picture?: string;
-  accessLevel: 'none' | 'user' | 'admin';
+  accessLevel: 'none' | 'admin';
 }
 
 interface AuthTokens {
@@ -174,7 +174,7 @@ export class AuthService {
           id: number;
           email: string;
           username: string;
-          accessLevel: 'none' | 'user' | 'admin';
+          accessLevel: 'none' | 'admin';
         };
       };
 
@@ -403,7 +403,7 @@ export class AuthService {
         username?: string;
         name?: string;
         picture?: string;
-        accessLevel?: 'none' | 'user' | 'admin';
+        accessLevel?: 'none' | 'admin';
       };
 
       const user = {
@@ -411,7 +411,7 @@ export class AuthService {
         email: payload.email ?? '',
         username: payload.username ?? payload.name ?? 'Unknown',
         picture: payload.picture,
-        accessLevel: payload.accessLevel ?? 'user',
+        accessLevel: payload.accessLevel ?? 'none',
       };
 
       return user;
@@ -810,7 +810,7 @@ export class AuthService {
     id: number;
     email: string;
     username: string;
-    accessLevel: 'none' | 'user' | 'admin';
+    accessLevel: 'none' | 'admin';
   }): void {
     try {
       if (typeof localStorage !== 'undefined') {
@@ -880,7 +880,7 @@ export class AuthService {
     id: number;
     email: string;
     username: string;
-    accessLevel: 'none' | 'user' | 'admin';
+    accessLevel: 'none' | 'admin';
   }> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -909,7 +909,7 @@ export class AuthService {
         id: number;
         email: string;
         username: string;
-        accessLevel: 'none' | 'user' | 'admin';
+        accessLevel: 'none' | 'admin';
       };
     };
     return result.user;

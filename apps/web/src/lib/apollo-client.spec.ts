@@ -153,7 +153,7 @@ describe('syncUserProfileFromJwt', () => {
     window.removeEventListener('auth:token-refreshed', handler);
   });
 
-  it('defaults accessLevel to user when claim is missing', () => {
+  it('defaults accessLevel to none when claim is missing', () => {
     const token = fakeJwt({ id: 1, email: 'basic@test.com' });
 
     syncUserProfileFromJwt(token);
@@ -161,7 +161,7 @@ describe('syncUserProfileFromJwt', () => {
     const stored = JSON.parse(
       localStorage.getItem('ls_user_profile') ?? '{}',
     ) as Record<string, unknown>;
-    expect(stored['accessLevel']).toBe('user');
+    expect(stored['accessLevel']).toBe('none');
   });
 
   it('does nothing for an invalid JWT', () => {

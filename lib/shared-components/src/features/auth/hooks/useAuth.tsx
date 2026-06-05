@@ -25,7 +25,7 @@ interface User {
   email: string;
   username: string;
   picture?: string;
-  accessLevel: 'none' | 'user' | 'admin';
+  accessLevel: 'none' | 'admin';
   // Legacy compatibility
   isAdmin?: boolean;
   /** Set when this session was started via admin impersonation. */
@@ -38,7 +38,7 @@ interface JwtPayload {
   username?: string;
   name?: string;
   picture?: string;
-  accessLevel?: 'none' | 'user' | 'admin';
+  accessLevel?: 'none' | 'admin';
   impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown;
 }
@@ -272,7 +272,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         email: payload.email || '',
         username: payload.username || payload.name || 'Unknown',
         picture: payload.picture,
-        accessLevel: payload.accessLevel || ('user' as const),
+        accessLevel: payload.accessLevel || ('none' as const),
         impersonatedBy: payload.impersonatedBy,
       };
     } catch {

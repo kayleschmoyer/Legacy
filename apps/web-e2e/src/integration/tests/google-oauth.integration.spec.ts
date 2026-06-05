@@ -157,7 +157,7 @@ function makeMockJwt(): string {
       id: 1,
       email: 'test@example.com',
       username: 'testuser',
-      accessLevel: 'user',
+      accessLevel: 'none',
       // Far-future expiry so the frontend never attempts a proactive refresh.
       exp: Math.floor(Date.now() / 1000) + 3_600,
     }),

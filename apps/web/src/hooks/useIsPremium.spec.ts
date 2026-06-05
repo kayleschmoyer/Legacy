@@ -79,7 +79,7 @@ describe('useIsPremiumStatus', () => {
 
   it('returns isPremium: true for user with premium subscription tier', () => {
     useAuth.mockReturnValue({
-      user: { id: 1, accessLevel: 'user' },
+      user: { id: 1, accessLevel: 'none' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
@@ -95,7 +95,7 @@ describe('useIsPremiumStatus', () => {
 
   it('returns isPremium: false for user with free subscription tier', () => {
     useAuth.mockReturnValue({
-      user: { id: 1, accessLevel: 'user' },
+      user: { id: 1, accessLevel: 'none' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
@@ -113,7 +113,7 @@ describe('useIsPremiumStatus', () => {
     // Simulates logout-then-login: auth now shows user 2, but Apollo still
     // holds user 1's premium record while the new query is in-flight.
     useAuth.mockReturnValue({
-      user: { id: 2, accessLevel: 'user' },
+      user: { id: 2, accessLevel: 'none' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
@@ -129,7 +129,7 @@ describe('useIsPremiumStatus', () => {
 
   it('returns correct premium status once fresh data arrives for new user', () => {
     useAuth.mockReturnValue({
-      user: { id: 2, accessLevel: 'user' },
+      user: { id: 2, accessLevel: 'none' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
@@ -145,7 +145,7 @@ describe('useIsPremiumStatus', () => {
 
   it('does not poll the user query (push notifications keep it fresh)', () => {
     useAuth.mockReturnValue({
-      user: { id: 42, accessLevel: 'user' },
+      user: { id: 42, accessLevel: 'none' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
@@ -164,7 +164,7 @@ describe('useIsPremiumStatus', () => {
   it('refetches the user query on SUBSCRIPTION_UPDATED push', () => {
     const refetch = jest.fn().mockResolvedValue({});
     useAuth.mockReturnValue({
-      user: { id: 42, accessLevel: 'user' },
+      user: { id: 42, accessLevel: 'none' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
@@ -229,7 +229,7 @@ describe('useIsPremiumStatus', () => {
 
       const refetch = jest.fn().mockResolvedValue({});
       useAuth.mockReturnValue({
-        user: { id: 42, accessLevel: 'user' },
+        user: { id: 42, accessLevel: 'none' },
         isLoading: false,
       });
       useGetUserByIdQuery.mockReturnValue({
@@ -248,7 +248,7 @@ describe('useIsPremiumStatus', () => {
 
       const refetch = jest.fn().mockResolvedValue({});
       useAuth.mockReturnValue({
-        user: { id: 42, accessLevel: 'user' },
+        user: { id: 42, accessLevel: 'none' },
         isLoading: false,
       });
       useGetUserByIdQuery.mockReturnValue({

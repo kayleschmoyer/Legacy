@@ -37,7 +37,7 @@ export interface GoogleAuthExchangeResult {
     id: number;
     email: string;
     username: string;
-    accessLevel: 'none' | 'user' | 'admin';
+    accessLevel: 'none' | 'admin';
   };
 }
 

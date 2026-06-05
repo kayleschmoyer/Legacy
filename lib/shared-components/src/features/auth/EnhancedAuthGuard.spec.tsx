@@ -91,7 +91,7 @@ describe('EnhancedAuthGuard – session expiry on a public path', () => {
         id: 1,
         email: 'user@test.com',
         username: 'ActiveUser',
-        accessLevel: 'user' as const,
+        accessLevel: 'none' as const,
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
     });

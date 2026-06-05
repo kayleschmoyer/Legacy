@@ -66,7 +66,7 @@ jest.mock('../services/AuthService', () => {
           id: 99,
           email: 'impersonated@test.com',
           username: 'ImpersonatedUser',
-          accessLevel: 'user' as const,
+          accessLevel: 'none' as const,
         }),
       ),
       stopImpersonation: jest.fn(() => Promise.resolve()),
@@ -121,7 +121,7 @@ describe('AuthProvider – auth:token-refreshed event', () => {
     });
   });
 
-  it('updates from user to admin when accessLevel changes', async () => {
+  it('updates from none to admin when accessLevel changes', async () => {
     // Pre-populate localStorage with a "user" profile so the provider
     // restores it on mount (simulating an existing session)
     const MockedAuthService = jest.mocked(AuthService);
@@ -130,7 +130,7 @@ describe('AuthProvider – auth:token-refreshed event', () => {
         id: 42,
         email: 'user@test.com',
         username: 'RegularUser',
-        accessLevel: 'user',
+        accessLevel: 'none',
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),
@@ -151,7 +151,7 @@ describe('AuthProvider – auth:token-refreshed event', () => {
           id: 99,
           email: 'impersonated@test.com',
           username: 'ImpersonatedUser',
-          accessLevel: 'user' as const,
+          accessLevel: 'none' as const,
         }),
       ),
       stopImpersonation: jest.fn(() => Promise.resolve()),
@@ -171,7 +171,7 @@ describe('AuthProvider – auth:token-refreshed event', () => {
     // Initially shows the cached user profile
     await waitFor(() => {
       expect(screen.getByTestId('user-info').textContent).toBe(
-        'RegularUser|user',
+        'RegularUser|none',
       );
     });
 
@@ -218,7 +218,7 @@ describe('AuthProvider – auth:session-expired event', () => {
         id: 42,
         email: 'user@test.com',
         username: 'ActiveUser',
-        accessLevel: 'user' as const,
+        accessLevel: 'none' as const,
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),
@@ -252,7 +252,7 @@ describe('AuthProvider – auth:session-expired event', () => {
     // Wait for the cached session to restore the user
     await waitFor(() => {
       expect(screen.getByTestId('user-info').textContent).toBe(
-        'ActiveUser|user',
+        'ActiveUser|none',
       );
     });
 
@@ -283,7 +283,7 @@ describe('AuthProvider – updateUserProfile', () => {
       id: 1,
       email: 'test@test.com',
       username: 'OldName',
-      accessLevel: 'user' as const,
+      accessLevel: 'none' as const,
     };
     const mockInstance = {
       getStoredUserProfile: jest.fn(() => storedProfile),
@@ -306,7 +306,7 @@ describe('AuthProvider – updateUserProfile', () => {
           id: 99,
           email: 'impersonated@test.com',
           username: 'ImpersonatedUser',
-          accessLevel: 'user' as const,
+          accessLevel: 'none' as const,
         }),
       ),
       stopImpersonation: jest.fn(() => Promise.resolve()),
@@ -324,7 +324,7 @@ describe('AuthProvider – updateUserProfile', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('user-info').textContent).toBe('OldName|user');
+      expect(screen.getByTestId('user-info').textContent).toBe('OldName|none');
     });
 
     act(() => {
@@ -332,7 +332,7 @@ describe('AuthProvider – updateUserProfile', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('user-info').textContent).toBe('NewName|user');
+      expect(screen.getByTestId('user-info').textContent).toBe('NewName|none');
     });
 
     expect(mockInstance.storeUserProfile).toHaveBeenCalledWith(
@@ -352,7 +352,7 @@ describe('AuthProvider – updateUserProfile', () => {
       id: 5,
       email: 'target@test.com',
       username: 'TargetUser',
-      accessLevel: 'user' as const,
+      accessLevel: 'none' as const,
     };
 
     const mockInstance = {
@@ -388,7 +388,7 @@ describe('AuthProvider – updateUserProfile', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('user-info').textContent).toBe(
-        'TargetUser|user',
+        'TargetUser|none',
       );
     });
 
@@ -401,7 +401,7 @@ describe('AuthProvider – updateUserProfile', () => {
 
     // UI should update even during impersonation
     await waitFor(() => {
-      expect(screen.getByTestId('user-info').textContent).toBe('NewName|user');
+      expect(screen.getByTestId('user-info').textContent).toBe('NewName|none');
     });
 
     // But storeUserProfile should NOT have been called (impersonation guard)
@@ -425,7 +425,7 @@ describe('AuthProvider – background refresh 401 during initializeAuth', () => 
         id: 1,
         email: 'user@test.com',
         username: 'CachedUser',
-        accessLevel: 'user' as const,
+        accessLevel: 'none' as const,
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),
@@ -491,7 +491,7 @@ describe('AuthProvider – proactive refresh 401 during scheduleProactiveRefresh
         id: 1,
         email: 'user@test.com',
         username: 'CachedUser',
-        accessLevel: 'user' as const,
+        accessLevel: 'none' as const,
       })),
       getStoredTokenExpiry: jest.fn(() => expirySec),
       getStoredAdminProfile: jest.fn(() => null),
@@ -565,7 +565,7 @@ describe('AuthProvider – logout/login race conditions', () => {
         id: 1,
         email: 'user@test.com',
         username: 'CachedUser',
-        accessLevel: 'user' as const,
+        accessLevel: 'none' as const,
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),
@@ -642,7 +642,7 @@ describe('AuthProvider – logout/login race conditions', () => {
       id: 2,
       email: 'new@test.com',
       username: 'NewUser',
-      accessLevel: 'user' as const,
+      accessLevel: 'none' as const,
     };
 
     const mockInstance = {
@@ -650,7 +650,7 @@ describe('AuthProvider – logout/login race conditions', () => {
         id: 1,
         email: 'old@test.com',
         username: 'OldUser',
-        accessLevel: 'user' as const,
+        accessLevel: 'none' as const,
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),

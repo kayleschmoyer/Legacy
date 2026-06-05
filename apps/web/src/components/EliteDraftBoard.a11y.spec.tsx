@@ -25,7 +25,7 @@ jest.mock('../../../../lib/shared-components/src/features/auth', () => ({
       id: 1,
       username: 'testuser',
       email: 'test@test.com',
-      accessLevel: 'user',
+      accessLevel: 'none',
     },
     logout: jest.fn(),
   }),

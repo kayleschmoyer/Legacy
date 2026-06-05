@@ -21,7 +21,7 @@ describe('storeDiscordSessionPreCache', () => {
       id: 42,
       email: 'user@example.com',
       username: 'testuser',
-      accessLevel: 'user',
+      accessLevel: 'admin',
       exp,
     });
 
@@ -35,7 +35,7 @@ describe('storeDiscordSessionPreCache', () => {
       email: 'user@example.com',
       username: 'testuser',
       picture: undefined,
-      accessLevel: 'user',
+      accessLevel: 'admin',
     });
     expect(localStorage.getItem('ls_token_expiry')).toBe(String(exp));
   });
@@ -71,6 +71,15 @@ describe('storeDiscordSessionPreCache', () => {
     const jwt = makeJwt({ id: 7, email: '' });
     storeDiscordSessionPreCache(jwt);
     expect(localStorage.getItem('ls_user_profile')).toBeNull();
+  });
+
+  it('defaults accessLevel to none when absent from JWT', () => {
+    const jwt = makeJwt({ id: 9, email: 'x@y.com', username: 'u' });
+    storeDiscordSessionPreCache(jwt);
+    const profile = JSON.parse(
+      localStorage.getItem('ls_user_profile') ?? 'null',
+    );
+    expect(profile.accessLevel).toBe('none');
   });
 
   it('does not write ls_token_expiry when exp is absent', () => {

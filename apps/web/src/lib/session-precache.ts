@@ -61,7 +61,7 @@ export function storeDiscordSessionPreCache(jwt: string): void {
       email: payload.email,
       username: payload.username ?? payload.name ?? 'Unknown',
       picture: payload.picture,
-      accessLevel: payload.accessLevel ?? 'user',
+      accessLevel: payload.accessLevel ?? 'none',
     };
 
     localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
