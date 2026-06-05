@@ -515,6 +515,16 @@ function App() {
             {/* All routes are now authenticated by default */}
             <Route path="/" element={<NavigableHomeScreen />} />
             <Route path="/home" element={<Navigate to="/" replace />} />
+            {/* /login and /signup are unauthenticated entry points served by
+                EnhancedAuthGuard (they are not in PUBLIC_PATHS, so the guard
+                shows the sign-in / sign-up flow to signed-out visitors). An
+                already-authenticated user who navigates here — typing the URL,
+                or following a stale "Create an account" link — passes the guard
+                and reaches App instead, where these routes bounce them to home
+                so the sign-up flow is never rendered for a signed-in user
+                (LS-6690). */}
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/signup" element={<Navigate to="/" replace />} />
             <Route
               path="/football"
               element={

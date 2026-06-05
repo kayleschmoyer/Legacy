@@ -561,6 +561,39 @@ describe('App', () => {
     });
   });
 
+  describe('Auth entry-point redirects (LS-6690)', () => {
+    // An already-authenticated user who reaches /login or /signup passes the
+    // EnhancedAuthGuard and lands in App; these routes must bounce them to home
+    // rather than letting them sit on a non-matching (blank) route or see the
+    // sign-up flow. The default useAuth mock has isAuthenticated: true.
+    it('redirects an authenticated user from /signup to home', async () => {
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/signup']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      // Flush the lazy-loaded HomePage chunk (React.lazy + Suspense).
+      await act(() => Promise.resolve());
+      expect(container).toHaveTextContent('Home Page');
+    });
+
+    it('redirects an authenticated user from /login to home', async () => {
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/login']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      await act(() => Promise.resolve());
+      expect(container).toHaveTextContent('Home Page');
+    });
+  });
+
   describe('FootballHubPage', () => {
     it('should render football hub when navigating to /football', async () => {
       const { container } = render(
