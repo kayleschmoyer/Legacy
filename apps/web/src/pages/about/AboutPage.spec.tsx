@@ -72,6 +72,10 @@ jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
 }));
 
+jest.mock('../../context/GrowthBookProvider', () => ({
+  useFeatureValue: jest.fn(() => true),
+}));
+
 jest.mock('../../config/environment', () => ({
   env: {
     oauthProxyUrl: 'http://localhost:5001',
@@ -253,6 +257,56 @@ describe('AboutPage — Footer (LS-5308)', () => {
     expect(screen.getByTestId('footer-attribution')).toHaveTextContent(
       'Built with React, TypeScript, and Tamagui',
     );
+  });
+});
+
+describe('AboutPage — GitHub deep-links feature flag (LS-7617)', () => {
+  const { useFeatureValue } = jest.requireMock(
+    '../../context/GrowthBookProvider',
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseIsPremium.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    useFeatureValue.mockReturnValue(true);
+  });
+
+  it('shows the GitHub links card when about-github-deeplinks is enabled', () => {
+    renderAbout();
+    expect(screen.getByTestId('github-links-card')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /view on github/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the GitHub links card when about-github-deeplinks is disabled', () => {
+    useFeatureValue.mockReturnValue(false);
+    renderAbout();
+    expect(screen.queryByTestId('github-links-card')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /view on github/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows commit SHA as a plain value (not a link) when about-github-deeplinks is disabled', () => {
+    useFeatureValue.mockReturnValue(false);
+    renderAbout();
+    const commitRow = screen.getByTestId('build-info-commit-sha');
+    expect(commitRow).toHaveTextContent('abc123');
+    expect(commitRow.querySelector('[role="link"]')).toBeNull();
+  });
+
+  it('shows commit SHA as a clickable link when about-github-deeplinks is enabled', () => {
+    setCommitSha('abcdef1');
+    renderAbout();
+    const commitRow = screen.getByTestId('build-info-commit-sha');
+    expect(commitRow.querySelector('[role="link"]')).toBeInTheDocument();
+    setCommitSha('abc123');
   });
 });
 

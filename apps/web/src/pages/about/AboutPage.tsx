@@ -14,6 +14,7 @@ import { env, envConfigErrors } from '../../config/environment';
 import { BRAND_GOLD_LIGHT, BRAND_SEAM_RED } from '../../constants/colors';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { trackEvent } from '../../utils/analytics';
+import { useFeatureValue } from '../../context/GrowthBookProvider';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -79,6 +80,10 @@ export default function AboutPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const isPremium = useIsPremium();
+  const githubDeeplinksEnabled = useFeatureValue(
+    'about-github-deeplinks',
+    true,
+  );
   // Read build-time environment variables from centralized config
   const { appVersion, commitSha, buildDate, repoUrl } = env;
 
@@ -86,7 +91,8 @@ export default function AboutPage() {
   const display = (v: string) =>
     v && v !== 'unknown' && v !== 'dev' ? v : '—';
 
-  // Generate GitHub commit URL
+  // Hex-format guard: rejects sentinels ('unknown', 'dev') and non-SHA strings.
+  // Returns null for invalid SHAs so the link falls through to plain-text rendering.
   const commitUrl =
     commitSha && /^[0-9a-f]{7,40}$/i.test(commitSha)
       ? `${repoUrl}/commit/${commitSha}`
@@ -134,7 +140,7 @@ export default function AboutPage() {
 
         <InfoRow data-testid="build-info-commit-sha">
           <Label>Commit SHA:</Label>
-          {commitUrl ? (
+          {commitUrl && githubDeeplinksEnabled ? (
             <LinkValue
               onPress={() =>
                 window.open(commitUrl, '_blank', 'noopener,noreferrer')
@@ -196,40 +202,42 @@ export default function AboutPage() {
         </InfoCard>
       )}
 
-      <InfoCard>
-        <H2 marginBottom="$2">Links</H2>
+      {githubDeeplinksEnabled && (
+        <InfoCard data-testid="github-links-card">
+          <H2 marginBottom="$2">Links</H2>
 
-        <YStack gap="$3">
-          <Button
-            onPress={() => {
-              trackEvent('about_github_click', { category: 'about' });
-              window.open(repoUrl, '_blank', 'noopener,noreferrer');
-            }}
-            variant="secondary"
-            size="$3"
-          >
-            <span role="img" aria-label="package">
-              📦
-            </span>{' '}
-            View on GitHub
-          </Button>
-          {commitUrl && (
+          <YStack gap="$3">
             <Button
               onPress={() => {
-                trackEvent('about_commit_click', { category: 'about' });
-                window.open(commitUrl, '_blank', 'noopener,noreferrer');
+                trackEvent('about_github_click', { category: 'about' });
+                window.open(repoUrl, '_blank', 'noopener,noreferrer');
               }}
               variant="secondary"
               size="$3"
             >
-              <span role="img" aria-label="search">
-                🔍
+              <span role="img" aria-label="package">
+                📦
               </span>{' '}
-              View Current Commit
+              View on GitHub
             </Button>
-          )}
-        </YStack>
-      </InfoCard>
+            {commitUrl && (
+              <Button
+                onPress={() => {
+                  trackEvent('about_commit_click', { category: 'about' });
+                  window.open(commitUrl, '_blank', 'noopener,noreferrer');
+                }}
+                variant="secondary"
+                size="$3"
+              >
+                <span role="img" aria-label="search">
+                  🔍
+                </span>{' '}
+                View Current Commit
+              </Button>
+            )}
+          </YStack>
+        </InfoCard>
+      )}
 
       <InfoCard>
         <H2 marginBottom="$2">Get Started</H2>
