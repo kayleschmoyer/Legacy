@@ -38,14 +38,20 @@ export interface AuditSessionBashParams {
 /**
  * Ordered list of Python interpreter candidates to try.
  * If the `PYTHON` env var is set, it is used as the sole candidate.
- * Otherwise: `python3` → `python`, plus `py` on Windows (the standard launcher
- * on stock Windows installs where `python`/`python3` are not on PATH).
+ * Otherwise: `python3` → `python`, plus common absolute paths for Linux/cloud
+ * environments where the MCP server's spawned process may not inherit the full
+ * shell PATH (e.g. Claude Code web sessions on Ubuntu), plus `py` on Windows.
  */
 export function pythonInterpreterCandidates(): string[] {
   if (process.env.PYTHON) return [process.env.PYTHON];
-  const candidates = ['python3', 'python'];
-  if (process.platform === 'win32') candidates.push('py');
-  return candidates;
+  if (process.platform === 'win32') return ['python3', 'python', 'py'];
+  return [
+    'python3',
+    'python',
+    '/usr/local/bin/python3',
+    '/usr/bin/python3',
+    '/usr/bin/python',
+  ];
 }
 
 /**

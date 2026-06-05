@@ -37,9 +37,15 @@ describe('pythonInterpreterCandidates', () => {
     }
   });
 
-  it('returns python3 then python on non-Windows platforms', () => {
+  it('returns python3, python, then common absolute paths on non-Windows platforms', () => {
     setPlatform('linux');
-    expect(pythonInterpreterCandidates()).toEqual(['python3', 'python']);
+    expect(pythonInterpreterCandidates()).toEqual([
+      'python3',
+      'python',
+      '/usr/local/bin/python3',
+      '/usr/bin/python3',
+      '/usr/bin/python',
+    ]);
   });
 
   it('appends py on win32 so stock Windows installs resolve via the py launcher', () => {
