@@ -32,10 +32,8 @@ export type AppDrawerParamList = {
   'baseball/index': undefined;
   'baseball/league/create': undefined;
   'baseball/league/join': undefined;
-  'baseball/mock-draft': undefined;
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
-  'football/players': undefined;
   'football/league/create': undefined;
   'football/league/join': undefined;
   'football/matchup': { matchupId: string; leagueId: string };
@@ -49,7 +47,6 @@ export type AppDrawerParamList = {
   TradeCenterPage: undefined;
   FreeAgents: undefined;
   PlayerStats: undefined;
-  PlayerComparison: undefined;
   PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'football/league/[leagueId]': { leagueId: string };
@@ -77,10 +74,6 @@ interface Route {
 
 const ROUTES = Object.freeze<Route[]>([
   {
-    route: '(tabs)',
-    title: 'Dashboard',
-  },
-  {
     route: 'index',
     title: 'Home',
   },
@@ -97,10 +90,6 @@ const ROUTES = Object.freeze<Route[]>([
     title: 'Player Statistics',
   },
   {
-    route: 'PlayerComparison',
-    title: 'Compare Players',
-  },
-  {
     route: 'baseball/index',
     title: 'Baseball',
   },
@@ -109,16 +98,8 @@ const ROUTES = Object.freeze<Route[]>([
     title: 'Create League',
   },
   {
-    route: 'baseball/mock-draft',
-    title: 'Mock Draft',
-  },
-  {
     route: 'football/index',
     title: 'Football',
-  },
-  {
-    route: 'football/players',
-    title: 'Football Players',
   },
   {
     route: 'DraftBoardPage',
@@ -203,9 +184,7 @@ function CustomDrawerContent(props: {
   const isAdmin = currentUser?.isAdmin ?? false;
   const visibleRoutes = footballEnabled
     ? ROUTES
-    : ROUTES.filter(
-        (r) => r.route !== 'football/index' && r.route !== 'football/players',
-      );
+    : ROUTES.filter((r) => r.route !== 'football/index');
 
   const doLogout = async () => {
     // Best-effort: deactivate push token before clearing credentials
@@ -326,13 +305,6 @@ export default function Layout() {
           }}
         >
           <Drawer.Screen
-            name="(tabs)"
-            options={{
-              drawerLabel: 'Dashboard',
-              title: 'Dashboard',
-            }}
-          />
-          <Drawer.Screen
             name="index"
             options={{
               drawerLabel: 'Home',
@@ -344,10 +316,6 @@ export default function Layout() {
           <Drawer.Screen
             name="football/index"
             options={{ title: 'Football Home' }}
-          />
-          <Drawer.Screen
-            name="football/players"
-            options={{ title: 'Football Players' }}
           />
           <Drawer.Screen
             name="football/league/create"
@@ -368,10 +336,6 @@ export default function Layout() {
               headerShown: true,
               headerTitle: 'Create League',
             }}
-          />
-          <Drawer.Screen
-            name="baseball/mock-draft"
-            options={{ title: 'Mock Draft' }}
           />
           <Drawer.Screen
             name="baseball/league/[leagueId]"
@@ -435,10 +399,6 @@ export default function Layout() {
           <Drawer.Screen
             name="PlayerStats"
             options={{ title: 'Player Statistics' }}
-          />
-          <Drawer.Screen
-            name="PlayerComparison"
-            options={{ title: 'Player Comparison' }}
           />
           <Drawer.Screen
             name="PlayerDetail"
