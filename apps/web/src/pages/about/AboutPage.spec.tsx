@@ -128,6 +128,41 @@ function renderAbout() {
   );
 }
 
+describe('AboutPage — Page Header (LS-5311)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+  });
+
+  it('renders the page heading with "About Legacy Sports" text', () => {
+    renderAbout();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /about legacy sports/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the page subtitle', () => {
+    renderAbout();
+    expect(
+      screen.getByText(
+        /build, version, and deployment details for the legacy sports web app/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the info emoji with aria-hidden', () => {
+    renderAbout();
+    const emoji = document.querySelector('[aria-hidden="true"]');
+    expect(emoji).toBeInTheDocument();
+    expect(emoji).toHaveTextContent('ℹ️');
+  });
+});
+
 describe('AboutPage — appVersion coercion (LS-5713)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
