@@ -8,16 +8,6 @@
 
 import type { GraphQLSchema } from 'graphql';
 
-// jose is ESM-only (v6) and cannot be parsed by jest's CJS transform. It is
-// pulled in transitively via apple-jws.ts when the schema is imported. These
-// tests only exercise the Google Play path and never touch Apple JWS
-// verification, so mock it out (mirrors apple-jws.spec.ts).
-jest.mock('jose', () => ({
-  decodeProtectedHeader: jest.fn(),
-  importX509: jest.fn(),
-  jwtVerify: jest.fn(),
-}));
-
 describe('Google Play mutation validation (LS-5121)', () => {
   let schema: GraphQLSchema;
   let mockFetchGoogleSubscription: jest.Mock;
@@ -208,7 +198,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
       PublicDb: {},
     }));
 
-    // apple-jws imports jose (ESM-only) which Jest cannot parse.
+    // Stub apple-jws to prevent real Apple JWS crypto calls in tests.
     jest.doMock('../apple-jws', () => ({
       decodeAndVerifyJwsTransaction: jest.fn(),
     }));

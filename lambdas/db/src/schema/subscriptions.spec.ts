@@ -61,7 +61,7 @@ jest.mock('../server/stripe', () => ({
   getStripeClient: jest.fn(),
 }));
 
-// Stub out apple-jws (imports jose which is ESM-only and cannot be loaded by Jest).
+// Stub out apple-jws to prevent real Apple JWS crypto calls in tests.
 jest.mock('../apple-jws', () => ({
   decodeAndVerifyJwsTransaction: jest.fn(),
 }));
@@ -71,11 +71,6 @@ jest.mock('../server/google-play', () => ({
   fetchGoogleSubscription: jest.fn(),
   isActiveGoogleSubscription: jest.fn(),
   GOOGLE_PLAY_PACKAGE_NAME: 'com.legacySports',
-}));
-
-// Stub apple-jws — it imports jose (ESM-only) which Jest cannot parse.
-jest.mock('../apple-jws', () => ({
-  decodeAndVerifyJwsTransaction: jest.fn(),
 }));
 
 // Keep drizzle-orm helpers real, but make `desc()` produce an assertable marker
