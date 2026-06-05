@@ -71,6 +71,8 @@ const args = Object.fromEntries(
   }),
 );
 
+const noFrozenLockfile = Boolean(args['no-frozen-lockfile']);
+
 const cwd = process.cwd();
 // --worktree, or (when invoked via `make modules-link WT=…`) the make-exported
 // MODULES_POOL_WT env var. Routing WT through the environment rather than
@@ -113,7 +115,7 @@ if (isHealthy(slotNm)) {
   console.log('[ok] node_modules → pool slot (cache hit).');
 } else {
   console.log('[miss] no healthy slot for this lockfile — materialising.');
-  materialiseSlot();
+  materialiseSlot(noFrozenLockfile);
   linkWorktreeToSlot(slotNm);
   console.log('[ok] slot materialised and linked.');
 }
@@ -129,13 +131,14 @@ linkSecretEnvFiles();
 // ---------------------------------------------------------------------------
 // Materialisation (pool miss)
 // ---------------------------------------------------------------------------
-function materialiseSlot() {
+function materialiseSlot(noFrozen = false) {
   // pnpm needs to write a real node_modules in the worktree, so clear any
   // existing symlink/dir first.
   removeNodeModulesEntry(nmPath);
 
-  console.log('[install] pnpm install --frozen-lockfile (in worktree)…');
-  pnpmInstall(worktree);
+  const installFlag = noFrozen ? '--no-frozen-lockfile' : '--frozen-lockfile';
+  console.log(`[install] pnpm install ${installFlag} (in worktree)…`);
+  pnpmInstall(worktree, noFrozen);
 
   if (!isHealthy(nmPath)) {
     fail(
@@ -274,7 +277,8 @@ function isHealthy(nm) {
   }
 }
 
-function pnpmInstall(cwdDir) {
+function pnpmInstall(cwdDir, noFrozen = false) {
+  const lockfileFlag = noFrozen ? '--no-frozen-lockfile' : '--frozen-lockfile';
   const opts = {
     cwd: cwdDir,
     stdio: 'inherit',
@@ -282,9 +286,9 @@ function pnpmInstall(cwdDir) {
     windowsHide: true,
   };
   if (process.platform === 'win32') {
-    execFileSync('cmd', ['/c', 'pnpm', 'install', '--frozen-lockfile'], opts);
+    execFileSync('cmd', ['/c', 'pnpm', 'install', lockfileFlag], opts);
   } else {
-    execFileSync('pnpm', ['install', '--frozen-lockfile'], opts);
+    execFileSync('pnpm', ['install', lockfileFlag], opts);
   }
 }
 

@@ -166,9 +166,9 @@ setup-force: install-force ## Setup with force install for Windows file lock iss
 # explicitly so cmd.exe never tries to run the .ps1 directly (which would
 # open it in Notepad via file association). -NonInteractive prevents any
 # interactive prompts from PowerShell itself.
-wt-setup: ## Set up a worktree (node_modules symlink, .env, .twig). Usage: make wt-setup WT=<path>
+wt-setup: ## Set up a worktree (node_modules symlink, .env, .twig). Usage: make wt-setup WT=<path> [NOFROZEN=1]
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\setup-worktree.ps1" -WorktreePath "$(WT)"
+	@powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\setup-worktree.ps1" -WorktreePath "$(WT)"$(if $(NOFROZEN), -NoFrozenLockfile)
 	@cd "$(WT)" && $(MAKE) setup-hooks
 else
 	@echo "wt-setup is currently Windows-only. Run: make install && cp .env from main repo."

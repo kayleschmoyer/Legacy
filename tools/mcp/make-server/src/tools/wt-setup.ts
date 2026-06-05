@@ -70,12 +70,13 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
 
   try {
     // Step 1: Run make wt-setup from the main repo
-    log.push('', '$ make wt-setup WT=...');
-    const setupOutput = await runMake(
-      ['wt-setup', `WT=${worktreePath}`],
-      repoRoot,
-      300_000,
+    const wtSetupArgs = ['wt-setup', `WT=${worktreePath}`];
+    if (noFrozenLockfile) wtSetupArgs.push('NOFROZEN=1');
+    log.push(
+      '',
+      `$ make wt-setup WT=...${noFrozenLockfile ? ' NOFROZEN=1' : ''}`,
     );
+    const setupOutput = await runMake(wtSetupArgs, repoRoot, 300_000);
     log.push(setupOutput);
     log.push('Worktree setup complete.');
 

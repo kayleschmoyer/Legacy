@@ -350,6 +350,31 @@ test(
   },
 );
 
+test('--no-frozen-lockfile is accepted and does not affect hash computation', () => {
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'wt1');
+    const hashNormal = runLink([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--print-hash',
+    ]).trim();
+    const hashNoFrozen = runLink([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--no-frozen-lockfile',
+      '--print-hash',
+    ]).trim();
+    assert.equal(
+      hashNormal,
+      hashNoFrozen,
+      '--no-frozen-lockfile must not change the hash',
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('link reads worktree from MODULES_POOL_WT env (make-exported path)', () => {
   const root = freshMainRepo();
   try {

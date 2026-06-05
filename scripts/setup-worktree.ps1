@@ -30,7 +30,10 @@ param(
     [switch]$Force,
 
     [Parameter()]
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+
+    [Parameter()]
+    [switch]$NoFrozenLockfile
 )
 
 Set-StrictMode -Version Latest
@@ -131,7 +134,9 @@ else {
         Write-Skip "-Force is a no-op for the pool resolver (slots rebuild on lockfile miss)"
     }
     $linkScript = Join-Path $PSScriptRoot 'modules-pool\link.mjs'
-    & node $linkScript "--worktree=$WorktreePath" "--main-repo=$MainRepoPath"
+    $linkArgs = @("--worktree=$WorktreePath", "--main-repo=$MainRepoPath")
+    if ($NoFrozenLockfile) { $linkArgs += "--no-frozen-lockfile" }
+    & node $linkScript @linkArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Error "scripts/modules-pool/link.mjs failed (exit $LASTEXITCODE)."
         Write-Error "Directory symlinks require Windows Developer Mode: Settings > System > For Developers > Developer Mode"
