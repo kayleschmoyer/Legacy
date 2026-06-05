@@ -229,6 +229,33 @@ describe('AboutPage — Environment label (LS-5709)', () => {
   });
 });
 
+describe('AboutPage — Footer (LS-5308)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+  });
+
+  it('renders the copyright year', () => {
+    renderAbout();
+    const copyright = screen.getByTestId('footer-copyright');
+    expect(copyright).toHaveTextContent(
+      `© ${new Date().getUTCFullYear()} Legacy Sports`,
+    );
+  });
+
+  it('renders the attribution text', () => {
+    renderAbout();
+    expect(screen.getByTestId('footer-attribution')).toHaveTextContent(
+      'Built with React, TypeScript, and Tamagui',
+    );
+  });
+});
+
 describe('AboutPage — Get Started card (LS-5722)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

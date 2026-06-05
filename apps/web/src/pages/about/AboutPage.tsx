@@ -267,30 +267,21 @@ export default function AboutPage() {
       </InfoCard>
 
       <YStack marginTop="$4" alignItems="center" gap="$2">
-        <Text color="$gray10" fontSize="$3" textAlign="center">
+        <Text
+          color="$gray10"
+          fontSize="$3"
+          textAlign="center"
+          data-testid="footer-copyright"
+        >
           © {new Date().getUTCFullYear()} Legacy Sports
         </Text>
-        <XStack gap="$3" alignItems="center">
-          <LinkValue
-            onPress={() => navigate('/privacy')}
-            role="link"
-            aria-label="Privacy Policy"
-          >
-            Privacy
-          </LinkValue>
-          <Text color="$gray10" fontSize="$3">
-            ·
-          </Text>
-          <LinkValue
-            onPress={() => navigate('/terms')}
-            role="link"
-            aria-label="Terms of Service"
-          >
-            Terms
-          </LinkValue>
-        </XStack>
-        <Text color="$gray10" fontSize="$3" textAlign="center">
-          Built with React, TypeScript, Tamagui, Vite, Nx, and GraphQL
+        <Text
+          color="$gray10"
+          fontSize="$3"
+          textAlign="center"
+          data-testid="footer-attribution"
+        >
+          Built with React, TypeScript, and Tamagui
         </Text>
       </YStack>
     </Container>
