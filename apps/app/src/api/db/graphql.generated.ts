@@ -4518,6 +4518,32 @@ export type WaiverClaim = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AdminRevenueStatsQueryVariables = Exact<{ [key: string]: never }>;
+
+export type AdminRevenueStatsQuery = {
+  __typename?: 'Query';
+  adminRevenueStats?: {
+    __typename?: 'AdminRevenueStats';
+    totalSubscribers?: number | null;
+    totalPremiumUsers?: number | null;
+    totalFreeUsers?: number | null;
+    totalUsers?: number | null;
+    conversionRate?: number | null;
+    newSubscribersThisMonth?: number | null;
+    stripeSubscribers?: number | null;
+    statusBreakdown?: Array<{
+      __typename?: 'SubscriptionStatusCount';
+      status?: string | null;
+      count?: number | null;
+    }> | null;
+    subscriberGrowth?: Array<{
+      __typename?: 'SubscriberGrowthPoint';
+      month?: string | null;
+      newSubscribers?: number | null;
+    }> | null;
+  } | null;
+};
+
 export type DuesSettingsFragment = {
   __typename?: 'LeagueDuesSettings';
   id?: number | null;
@@ -7605,6 +7631,105 @@ export const UserFragmentDoc = gql`
     subscriptionTier
   }
 `;
+export const AdminRevenueStats = gql`
+  query AdminRevenueStats {
+    adminRevenueStats {
+      totalSubscribers
+      totalPremiumUsers
+      totalFreeUsers
+      totalUsers
+      conversionRate
+      newSubscribersThisMonth
+      statusBreakdown {
+        status
+        count
+      }
+      stripeSubscribers
+      subscriberGrowth {
+        month
+        newSubscribers
+      }
+    }
+  }
+`;
+
+/**
+ * __useAdminRevenueStatsQuery__
+ *
+ * To run a query within a React component, call `useAdminRevenueStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAdminRevenueStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAdminRevenueStatsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useAdminRevenueStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >(AdminRevenueStats, options);
+}
+export function useAdminRevenueStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >(AdminRevenueStats, options);
+}
+export function useAdminRevenueStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        AdminRevenueStatsQuery,
+        AdminRevenueStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >(
+    AdminRevenueStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          AdminRevenueStatsQuery,
+          AdminRevenueStatsQueryVariables
+        >,
+  );
+}
+export type AdminRevenueStatsQueryHookResult = ReturnType<
+  typeof useAdminRevenueStatsQuery
+>;
+export type AdminRevenueStatsLazyQueryHookResult = ReturnType<
+  typeof useAdminRevenueStatsLazyQuery
+>;
+export type AdminRevenueStatsSuspenseQueryHookResult = ReturnType<
+  typeof useAdminRevenueStatsSuspenseQuery
+>;
+export type AdminRevenueStatsQueryResult = Apollo.QueryResult<
+  AdminRevenueStatsQuery,
+  AdminRevenueStatsQueryVariables
+>;
 export const GetLeagueDuesSettings = gql`
   query GetLeagueDuesSettings($leagueId: Int!) {
     leagueDuesSettings(leagueId: $leagueId) {

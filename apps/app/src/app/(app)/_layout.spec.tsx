@@ -328,6 +328,10 @@ jest.mock('./update-check', () => ({
   __esModule: true,
   default: () => 'UpdateCheckScreen',
 }));
+jest.mock('./admin-revenue', () => ({
+  __esModule: true,
+  default: () => 'AdminRevenueScreen',
+}));
 jest.mock('.', () => ({ __esModule: true, default: () => 'Home' }));
 jest.mock('./baseball/league/create', () => ({
   __esModule: true,
@@ -615,7 +619,7 @@ describe('App Drawer Layout', () => {
   });
 
   describe('screen registration', () => {
-    it('registers all 32 screens in the drawer navigator', () => {
+    it('registers all 33 screens in the drawer navigator', () => {
       render(<Layout />);
 
       const expectedScreenNames = [
@@ -651,6 +655,7 @@ describe('App Drawer Layout', () => {
         'subscription-settings',
         'update-check',
         'league-discovery',
+        'admin-revenue',
       ];
 
       for (const name of expectedScreenNames) {
@@ -761,26 +766,35 @@ describe('App Drawer Layout', () => {
     });
   });
 
-  describe('admin web notice', () => {
-    it('does not show admin notice for non-admin users', () => {
+  describe('admin revenue navigation', () => {
+    it('does not show Revenue Analytics link for non-admin users', () => {
       mockUseCurrentUserInfo.mockReturnValue({
         data: { ...mockCurrentUser, isAdmin: false },
         loading: false,
       });
       render(<Layout />);
-      expect(screen.queryByTestId('drawer-admin-web-notice')).toBeNull();
+      expect(screen.queryByTestId('drawer-item-admin-revenue')).toBeNull();
     });
 
-    it('shows admin web notice for admin users', () => {
+    it('shows Revenue Analytics link for admin users', () => {
       mockUseCurrentUserInfo.mockReturnValue({
         data: { ...mockCurrentUser, isAdmin: true },
         loading: false,
       });
       render(<Layout />);
-      expect(screen.getByTestId('drawer-admin-web-notice')).toBeTruthy();
-      expect(
-        screen.getByText('Use the web dashboard for admin tools'),
-      ).toBeTruthy();
+      expect(screen.getByTestId('drawer-item-admin-revenue')).toBeTruthy();
+      expect(screen.getByText('Revenue Analytics')).toBeTruthy();
+    });
+
+    it('navigates to admin-revenue when Revenue Analytics is pressed', () => {
+      mockUseCurrentUserInfo.mockReturnValue({
+        data: { ...mockCurrentUser, isAdmin: true },
+        loading: false,
+      });
+      render(<Layout />);
+      fireEvent.press(screen.getByTestId('drawer-item-admin-revenue'));
+      expect(mockNavigate).toHaveBeenCalledWith('admin-revenue');
+      expect(mockCloseDrawer).toHaveBeenCalled();
     });
   });
 });

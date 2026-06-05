@@ -61,6 +61,7 @@ export type AppDrawerParamList = {
   notifications: undefined;
   'subscription-settings': undefined;
   'update-check': undefined;
+  'admin-revenue': undefined;
 };
 
 interface DrawerNavigationLike {
@@ -252,14 +253,15 @@ function CustomDrawerContent(props: {
         </XStack>
       ))}
       {isAdmin && (
-        <Text
-          testID="drawer-admin-web-notice"
+        <XStack
+          testID="drawer-item-admin-revenue"
           padding="$3"
-          fontSize="$3"
-          color="$gray10"
+          alignItems="center"
+          onPress={() => onItemSelect('admin-revenue')}
+          pressStyle={{ backgroundColor: '$gray3' }}
         >
-          Use the web dashboard for admin tools
-        </Text>
+          <Text fontSize="$5">Revenue Analytics</Text>
+        </XStack>
       )}
       <Separator marginVertical="$3" />
       <Text
@@ -453,6 +455,13 @@ export default function Layout() {
           <Drawer.Screen
             name="update-check"
             options={{ title: 'Check for Updates' }}
+          />
+          <Drawer.Screen
+            name="admin-revenue"
+            options={{
+              drawerLabel: () => null,
+              title: 'Revenue Analytics',
+            }}
           />
         </Drawer>
       </GestureHandlerRootView>
