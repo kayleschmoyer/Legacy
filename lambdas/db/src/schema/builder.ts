@@ -34,6 +34,12 @@ export interface Context {
   isSystemRequest: boolean;
   /** Which auth path resolved this request: 'bearer' (Authorization header), 'cookie' (HttpOnly JWT+CSRF), or null (unauthenticated/system). */
   authSource: 'bearer' | 'cookie' | null;
+  /**
+   * When an admin sends `x-ls-impersonate-tier: free`, this is set to 'free'
+   * so the admin can test free-tier gating without a free Stripe account.
+   * Only populated for admin users; ignored for all others.
+   */
+  impersonatedTier?: 'free';
 }
 
 // Define the schema builder with comprehensive types

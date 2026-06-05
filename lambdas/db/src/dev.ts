@@ -156,12 +156,21 @@ async function startServer() {
         };
       }
 
+      const impersonateTierHeader =
+        req.headers['x-ls-impersonate-tier'] ||
+        req.headers['X-Ls-Impersonate-Tier'];
+      const impersonatedTier =
+        user?.isAdmin && impersonateTierHeader === 'free'
+          ? ('free' as const)
+          : undefined;
+
       // Create a shared database connection for this request
       // This prevents each resolver from creating its own connection
       const db = await dbService.getDb();
 
       return {
         user,
+        impersonatedTier,
         loaders: createLoaders(db), // Pass shared connection to loaders
         db, // Shared connection for all resolvers in this request
       };

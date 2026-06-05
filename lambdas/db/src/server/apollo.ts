@@ -138,6 +138,14 @@ export function createApolloHandler(
           systemApiKey.length > 0 &&
           requestApiKey === systemApiKey;
 
+        const impersonateTierHeader =
+          event.headers['x-ls-impersonate-tier'] ||
+          event.headers['X-Ls-Impersonate-Tier'];
+        const impersonatedTier =
+          user?.isAdmin && impersonateTierHeader === 'free'
+            ? ('free' as const)
+            : undefined;
+
         // Create a shared database connection for this request
         // This prevents each resolver from creating its own connection
         const db = await dbService.getDb();
@@ -147,6 +155,7 @@ export function createApolloHandler(
           user,
           authSource,
           isSystemRequest,
+          impersonatedTier,
           loaders: createLoaders(db), // Pass shared connection to loaders
           db, // Shared connection for all resolvers in this request
         };

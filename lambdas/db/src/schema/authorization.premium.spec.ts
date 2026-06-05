@@ -114,6 +114,7 @@ describe('Premium authorization helpers', () => {
   function makeContext(
     user: typeof freeUser | null,
     subscriptionTierRow: string,
+    impersonatedTier?: 'free',
   ) {
     const mockDb = {
       select: jest.fn(() => ({
@@ -124,7 +125,13 @@ describe('Premium authorization helpers', () => {
         })),
       })),
     };
-    return { user, db: mockDb, loaders: {}, isSystemRequest: false };
+    return {
+      user,
+      db: mockDb,
+      loaders: {},
+      isSystemRequest: false,
+      impersonatedTier,
+    };
   }
 
   beforeEach(async () => {
@@ -177,6 +184,19 @@ describe('Premium authorization helpers', () => {
       expect(selectSpy).not.toHaveBeenCalled();
     });
 
+    it('returns "free" for admin with impersonatedTier=free', async () => {
+      const ctx = makeContext(adminUser, 'free', 'free');
+      const tier = await getSubscriptionTier(ctx as any);
+      expect(tier).toBe('free');
+    });
+
+    it('queries DB for admin with impersonatedTier=free', async () => {
+      const ctx = makeContext(adminUser, 'free', 'free');
+      const selectSpy = jest.spyOn(ctx.db, 'select');
+      await getSubscriptionTier(ctx as any);
+      expect(selectSpy).toHaveBeenCalled();
+    });
+
     it('throws AuthenticationError when user is not authenticated', async () => {
       const ctx = makeContext(null, 'free');
       await expect(getSubscriptionTier(ctx as any)).rejects.toThrow();
@@ -221,6 +241,13 @@ describe('Premium authorization helpers', () => {
       const selectSpy = jest.spyOn(ctx.db, 'select');
       await expect(requirePremium(ctx as any)).resolves.toBeUndefined();
       expect(selectSpy).not.toHaveBeenCalled();
+    });
+
+    it('throws PREMIUM_REQUIRED for admin with impersonatedTier=free', async () => {
+      const ctx = makeContext(adminUser, 'free', 'free');
+      await expect(requirePremium(ctx as any)).rejects.toMatchObject({
+        extensions: { code: 'PREMIUM_REQUIRED' },
+      });
     });
   });
 

@@ -186,8 +186,8 @@ async function resolveSubscriptionTier(
   context: Context,
 ): Promise<SubscriptionTier> {
   const user = requireAuth(context);
-  // Admins are always treated as premium regardless of DB tier
-  if (user.isAdmin) return 'premium';
+  // Admins are treated as premium unless impersonating a free tier for testing
+  if (user.isAdmin && context.impersonatedTier !== 'free') return 'premium';
   const rows = await context.db
     .select({ tier: InternalSchema.usersInAppInternal.subscriptionTier })
     .from(InternalSchema.usersInAppInternal)
@@ -209,7 +209,7 @@ export async function hasEntitlement(
   key: EntitlementKey,
 ): Promise<boolean> {
   const user = requireAuth(context);
-  if (user.isAdmin) return true;
+  if (user.isAdmin && context.impersonatedTier !== 'free') return true;
   const tier = await getSubscriptionTier(context);
   return tierHasEntitlement(tier, key);
 }
@@ -249,7 +249,7 @@ export async function requirePremium(
   featureDescription?: string,
 ): Promise<void> {
   const user = requireAuth(context);
-  if (user.isAdmin) return;
+  if (user.isAdmin && context.impersonatedTier !== 'free') return;
 
   const rows = await context.db
     .select({ tier: InternalSchema.usersInAppInternal.subscriptionTier })
