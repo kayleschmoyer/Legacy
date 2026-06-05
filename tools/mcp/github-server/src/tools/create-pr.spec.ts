@@ -79,6 +79,24 @@ describe('createPR Lambda behavior (LS-4881)', () => {
       expect(text && 'text' in text ? text.text : '').toMatch(/absolute path/);
     });
 
+    it('accepts a Windows drive-letter worktreePath without the "absolute path" error (LS-7694)', async () => {
+      // path.isAbsolute() uses POSIX rules on a Linux server and rejects D:\... paths.
+      // The tool must recognize drive-letter paths as absolute and fall through to the
+      // actionable "head must be passed explicitly" Lambda guard instead.
+      const result = await createPR({
+        title: 'LS-7694 fix(mcp): test',
+        body: 'body',
+        worktreePath:
+          'D:\\code\\legacy-sports\\.claude\\worktrees\\reverent-hoover',
+      });
+
+      expect(result.isError).toBe(true);
+      const text = result.content?.[0];
+      const message = text && 'text' in text ? text.text : '';
+      expect(message).not.toMatch(/must be an absolute path/);
+      expect(message).toMatch(/`head` must be passed explicitly/);
+    });
+
     it('returns an actionable error when `head` is not provided', async () => {
       const result = await createPR({
         title: 'LS-4881 fix(mcp): test',

@@ -68,7 +68,13 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
   // worktreePath is meaningless in Lambda (no client filesystem access), and Windows paths
   // fail Unix isAbsolute() checks even when head is already known. (LS-5217)
   if (params.worktreePath && !params.head) {
-    if (!isAbsolute(params.worktreePath)) {
+    // A Windows drive-letter path (e.g. D:\code\...) is absolute on Windows but
+    // path.isAbsolute() rejects it on a POSIX server. Detect it explicitly so we
+    // accept it as valid. (Note: win32.isAbsolute() can't be used here — it also
+    // returns true for POSIX "/foo" paths, which would skip the existence check
+    // below for legitimate POSIX paths.)
+    const isWindowsDrivePath = /^[A-Za-z]:[/\\]/.test(params.worktreePath);
+    if (!isAbsolute(params.worktreePath) && !isWindowsDrivePath) {
       return {
         isError: true,
         content: [
@@ -79,7 +85,10 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
         ],
       };
     }
-    if (!lambda) {
+    // Windows drive-letter paths cannot be accessed from a POSIX server's filesystem.
+    // Skip the existsSync check and cwd assignment in that case — the Lambda guard below
+    // will require `head` explicitly when git is unavailable on the server.
+    if (!lambda && !isWindowsDrivePath) {
       const resolved = resolve(params.worktreePath);
       if (!existsSync(resolved)) {
         return {
