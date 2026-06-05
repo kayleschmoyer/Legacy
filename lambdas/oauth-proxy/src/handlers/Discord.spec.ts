@@ -81,6 +81,7 @@ jest.mock('../util', () => ({
   DiscordEnv: {
     DISCORD_CLIENT_ID: 'DISCORD_CLIENT_ID',
     DISCORD_REDIRECT_URI: 'DISCORD_REDIRECT_URI',
+    DISCORD_NATIVE_REDIRECT_URIS: 'DISCORD_NATIVE_REDIRECT_URIS',
   },
   Secret: {
     DISCORD_CLIENT_SECRET: 'DISCORD_CLIENT_SECRET',
@@ -346,6 +347,120 @@ describe('handleDiscordAuth', () => {
       'tok-from-discord',
       'ls_oauth_state=tok-from-discord',
     );
+  });
+});
+
+describe('handleDiscordAuth — native PKCE path (LS-7765)', () => {
+  const NATIVE_REDIRECT = 'legacysports://discord-callback';
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
+    process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
+    process.env['DISCORD_NATIVE_REDIRECT_URIS'] = NATIVE_REDIRECT;
+    mockSetInitialAvatarUrl.mockResolvedValue(undefined);
+    // If the native path ever consulted the cookie state it would fail here.
+    mockVerifyOauthState.mockReturnValue(false);
+
+    fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(makeDiscordUserResponse());
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('exchanges with PKCE code_verifier + the native redirect_uri and returns a JWT (no state cookie required)', async () => {
+    mockGetUserByDiscordId.mockResolvedValue(mockUser);
+    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+
+    const result = await handleDiscordAuth(
+      makeEvent({
+        code: 'native-auth-code',
+        code_verifier: 'pkce-verifier-123',
+        redirect_uri: NATIVE_REDIRECT,
+      }),
+    );
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body) as { jwt: string }).toMatchObject({
+      jwt: 'mock-jwt',
+    });
+    // The native path must not depend on the cookie state mechanism.
+    expect(mockVerifyOauthState).not.toHaveBeenCalled();
+
+    // The token request (first fetch) must carry the PKCE verifier and the
+    // device-supplied redirect_uri (not the server's web redirect URI).
+    const calls = fetchSpy.mock.calls as [string, RequestInit][];
+    const tokenBody = calls[0][1].body as URLSearchParams;
+    expect(tokenBody.get('code_verifier')).toBe('pkce-verifier-123');
+    expect(tokenBody.get('redirect_uri')).toBe(NATIVE_REDIRECT);
+    expect(tokenBody.get('grant_type')).toBe('authorization_code');
+  });
+
+  it('rejects a redirect_uri that is not on the allow-list with 400', async () => {
+    const result = await handleDiscordAuth(
+      makeEvent({
+        code: 'native-auth-code',
+        code_verifier: 'pkce-verifier-123',
+        redirect_uri: 'evil://attacker-callback',
+      }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body) as { error: string }).toMatchObject({
+      error: 'Invalid redirect_uri',
+    });
+    // No exchange should have been attempted.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing redirect_uri with 400', async () => {
+    const result = await handleDiscordAuth(
+      makeEvent({ code: 'native-auth-code', code_verifier: 'pkce-verifier' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body) as { error: string }).toMatchObject({
+      error: 'Invalid redirect_uri',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the authorization code is missing on the native path', async () => {
+    const result = await handleDiscordAuth(
+      makeEvent({
+        code_verifier: 'pkce-verifier',
+        redirect_uri: NATIVE_REDIRECT,
+      }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body) as { error: string }).toMatchObject({
+      error: 'Missing authorization code',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('leaves the web cookie-state path unchanged (no code_verifier → verifyOauthState is used, no PKCE sent)', async () => {
+    mockVerifyOauthState.mockReturnValue(true);
+    mockGetUserByDiscordId.mockResolvedValue(mockUser);
+    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+
+    const result = await handleDiscordAuth(
+      makeEvent({ code: 'web-auth-code', state: 'good-state' }),
+    );
+
+    expect(result.statusCode).toBe(200);
+    expect(mockVerifyOauthState).toHaveBeenCalledTimes(1);
+    const calls = fetchSpy.mock.calls as [string, RequestInit][];
+    const tokenBody = calls[0][1].body as URLSearchParams;
+    expect(tokenBody.get('code_verifier')).toBeNull();
+    expect(tokenBody.get('redirect_uri')).toBe('https://example.com/callback');
   });
 });
 

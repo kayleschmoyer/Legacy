@@ -14,16 +14,17 @@ The OAuth Proxy provides secure authentication through Google OAuth and generate
 
 ## Environment Variables
 
-| Variable                          | Description                                        | Required |
-| --------------------------------- | -------------------------------------------------- | -------- |
-| `CLIENT_ID`                       | Google OAuth client ID                             | Yes      |
-| `GOOGLE_OAUTH_CLIENT_SECRET_PATH` | AWS Secrets Manager path for Google client secret  | Yes      |
-| `JWT_SECRET_KEY_PATH`             | AWS Secrets Manager path for JWT signing key       | Yes      |
-| `COOKIE_SECRET_KEY_PATH`          | AWS Secrets Manager path for cookie encryption key | Yes      |
-| `DB_CREDS_PATH`                   | AWS Secrets Manager path for database credentials  | Yes      |
-| `DB_HOST`                         | Database host endpoint                             | Yes      |
-| `NODE_ENV`                        | Environment (development/production)               | Yes      |
-| `LOG_LEVEL`                       | Logging verbosity level                            | No       |
+| Variable                          | Description                                                                                                                                                                                                             | Required |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `CLIENT_ID`                       | Google OAuth client ID                                                                                                                                                                                                  | Yes      |
+| `GOOGLE_OAUTH_CLIENT_SECRET_PATH` | AWS Secrets Manager path for Google client secret                                                                                                                                                                       | Yes      |
+| `JWT_SECRET_KEY_PATH`             | AWS Secrets Manager path for JWT signing key                                                                                                                                                                            | Yes      |
+| `COOKIE_SECRET_KEY_PATH`          | AWS Secrets Manager path for cookie encryption key                                                                                                                                                                      | Yes      |
+| `DB_CREDS_PATH`                   | AWS Secrets Manager path for database credentials                                                                                                                                                                       | Yes      |
+| `DB_HOST`                         | Database host endpoint                                                                                                                                                                                                  | Yes      |
+| `NODE_ENV`                        | Environment (development/production)                                                                                                                                                                                    | Yes      |
+| `LOG_LEVEL`                       | Logging verbosity level                                                                                                                                                                                                 | No       |
+| `DISCORD_NATIVE_REDIRECT_URIS`    | Comma-separated allow-list of native custom-scheme redirect URIs accepted on the mobile Discord PKCE flow (e.g. `legacysports://discord-callback`). A native exchange request's `redirect_uri` must match one of these. | No       |
 
 ## Logging Configuration
 

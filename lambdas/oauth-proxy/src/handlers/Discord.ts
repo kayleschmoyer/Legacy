@@ -88,6 +88,25 @@ function getDiscordRedirectUri(): string {
   return uri;
 }
 
+/**
+ * Allow-list of native custom-scheme redirect URIs permitted on the mobile
+ * PKCE path. Read from DISCORD_NATIVE_REDIRECT_URIS (comma-separated). A device
+ * supplies its own redirect_uri in the exchange request, so it must be matched
+ * against this list before being forwarded to Discord's token endpoint —
+ * otherwise an attacker could redirect the authorization code to a URI they
+ * control. Empty/unset means no native redirect URI is permitted.
+ */
+function isAllowedNativeRedirectUri(uri: string): boolean {
+  const raw = process.env[DiscordEnv.DISCORD_NATIVE_REDIRECT_URIS] ?? '';
+  const allowed = new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  return allowed.has(uri);
+}
+
 function discordAvatarUrl(userId: string, avatarHash: string | null): string {
   if (!avatarHash) {
     // Default avatar based on user ID, using BigInt to avoid precision loss
@@ -106,27 +125,52 @@ function discordAvatarUrl(userId: string, avatarHash: string | null): string {
 }
 
 /**
+ * Options for the Discord code exchange. The native (mobile) PKCE flow supplies
+ * its own `redirectUri` (matching the device's authorize request) and a
+ * `codeVerifier`; the web flow supplies neither and falls back to the
+ * server-configured redirect URI with no PKCE verifier.
+ */
+interface ExchangeOptions {
+  /** PKCE code_verifier — present only on the native path. */
+  codeVerifier?: string;
+  /** Device-supplied redirect_uri — present only on the native path. */
+  redirectUri?: string;
+}
+
+/**
  * Exchange a Discord authorization code for an access token,
  * then fetch the authenticated user's Discord profile.
+ *
+ * The client_secret is always sent server-side. On the native path a PKCE
+ * `code_verifier` is additionally included and the device-supplied redirect URI
+ * is used so it matches the value sent in the authorize request.
  */
-async function exchangeCodeForUser(code: string): Promise<DiscordUser> {
+async function exchangeCodeForUser(
+  code: string,
+  options: ExchangeOptions = {},
+): Promise<DiscordUser> {
   const clientId = getDiscordClientId();
   const clientSecret = await readSecret(
     SECRET_CONFIG[Secret.DISCORD_CLIENT_SECRET],
   );
-  const redirectUri = getDiscordRedirectUri();
+  const redirectUri = options.redirectUri ?? getDiscordRedirectUri();
+
+  const tokenParams: Record<string, string> = {
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri,
+  };
+  if (options.codeVerifier) {
+    tokenParams.code_verifier = options.codeVerifier;
+  }
 
   // Exchange code for access token
   const tokenRes = await fetch(DISCORD_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-    }),
+    body: new URLSearchParams(tokenParams),
   });
 
   if (!tokenRes.ok) {
@@ -238,69 +282,24 @@ export const handleDiscordAuthorize = (
 };
 
 /**
- * POST /oauth/discord
- * Accepts { code, state } from the frontend after Discord OAuth redirect.
- * Verifies `state` against the cookie bound at `/oauth/discord/authorize`
- * time, then exchanges the code for user info, finds or creates the user,
- * and returns the internal JWT.
+ * Shared tail of the Discord sign-in flow used by both the web (cookie-state)
+ * and native (PKCE) paths. Validates the Discord profile, finds-or-creates the
+ * user, issues the internal JWT (and auth cookies), and fires the best-effort
+ * new-user notification. Returns the success/validation response WITHOUT any
+ * state-cookie handling — callers wrap it as appropriate for their path.
  */
-export const handleDiscordAuth = async (
-  event: APIGatewayEvent,
-): Promise<APIGatewayProxyResult> => {
-  const body = JSON.parse(event.body ?? '{}') as {
-    code?: string;
-    state?: string;
-  };
-  const requestCookieHeader =
-    event.headers?.['Cookie'] ?? event.headers?.['cookie'];
-
-  // Single-use: clear the state cookie on every response.
-  const clearState = buildClearOauthStateCookie();
-
-  if (!body.code) {
-    return withClearStateCookie(
-      errorResponse(400, 'Missing authorization code'),
-      clearState,
-    );
-  }
-
-  if (!verifyOauthState(body.state, requestCookieHeader)) {
-    LOGGER.warn('Discord OAuth rejected: state mismatch');
-    return withClearStateCookie(
-      errorResponse(400, 'Invalid OAuth state — please retry sign-in'),
-      clearState,
-    );
-  }
-
-  let discordUser: DiscordUser;
-  try {
-    discordUser = await exchangeCodeForUser(body.code);
-  } catch (error) {
-    LOGGER.error(
-      'Discord OAuth exchange failed',
-      error instanceof Error ? error.message : String(error),
-    );
-    return withClearStateCookie(
-      errorResponse(401, 'Discord authentication failed'),
-      clearState,
-    );
-  }
-
+async function completeDiscordSignIn(
+  discordUser: DiscordUser,
+): Promise<APIGatewayProxyResult> {
   if (!discordUser.email) {
-    return withClearStateCookie(
-      errorResponse(
-        400,
-        'Discord account does not have a verified email address',
-      ),
-      clearState,
+    return errorResponse(
+      400,
+      'Discord account does not have a verified email address',
     );
   }
 
   if (!discordUser.verified) {
-    return withClearStateCookie(
-      errorResponse(400, 'Discord email is not verified'),
-      clearState,
-    );
+    return errorResponse(400, 'Discord email is not verified');
   }
 
   LOGGER.info('Discord OAuth user authenticated', {
@@ -394,7 +393,119 @@ export const handleDiscordAuth = async (
     await notifyNewUserSignup(email, newUserId, 'discord');
   }
 
-  return withClearStateCookie(result, clearState);
+  return result;
+}
+
+/**
+ * Native (mobile) Discord sign-in via PKCE. An in-app secure browser session
+ * (ASWebAuthenticationSession on iOS / Custom Tabs on Android) cannot replay
+ * the HttpOnly state cookie to a subsequent native fetch, so the device-
+ * generated PKCE `code_verifier` provides CSRF protection instead. The device-
+ * supplied `redirect_uri` must be on the allow-list (it has to match the value
+ * the device sent to Discord's authorize endpoint) before we forward it.
+ */
+async function handleDiscordAuthNative(body: {
+  code?: string;
+  code_verifier: string;
+  redirect_uri?: string;
+}): Promise<APIGatewayProxyResult> {
+  if (!body.code) {
+    return errorResponse(400, 'Missing authorization code');
+  }
+  if (!body.redirect_uri || !isAllowedNativeRedirectUri(body.redirect_uri)) {
+    LOGGER.warn('Discord native OAuth rejected: redirect_uri not allow-listed');
+    return errorResponse(400, 'Invalid redirect_uri');
+  }
+
+  let discordUser: DiscordUser;
+  try {
+    discordUser = await exchangeCodeForUser(body.code, {
+      codeVerifier: body.code_verifier,
+      redirectUri: body.redirect_uri,
+    });
+  } catch (error) {
+    LOGGER.error(
+      'Discord native OAuth exchange failed',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    return errorResponse(401, 'Discord authentication failed');
+  }
+
+  return completeDiscordSignIn(discordUser);
+}
+
+/**
+ * POST /oauth/discord
+ * Accepts either:
+ * - Web: { code, state } — `state` is verified against the cookie bound at
+ *   `/oauth/discord/authorize` time.
+ * - Native (mobile): { code, code_verifier, redirect_uri } — CSRF is protected
+ *   by PKCE rather than the state cookie (an in-app browser session cannot
+ *   replay the HttpOnly cookie to a native fetch).
+ *
+ * In both cases the code is exchanged for the Discord profile, the user is
+ * found or created, and the internal JWT is returned. The request shape selects
+ * the path: presence of `code_verifier` marks the native PKCE flow.
+ */
+export const handleDiscordAuth = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  const body = JSON.parse(event.body ?? '{}') as {
+    code?: string;
+    state?: string;
+    code_verifier?: string;
+    redirect_uri?: string;
+  };
+
+  // Native PKCE path — selected by the presence of a code_verifier. No state
+  // cookie is involved, so none of the cookie-clearing wrapping applies.
+  if (body.code_verifier) {
+    return handleDiscordAuthNative({
+      code: body.code,
+      code_verifier: body.code_verifier,
+      redirect_uri: body.redirect_uri,
+    });
+  }
+
+  const requestCookieHeader =
+    event.headers?.['Cookie'] ?? event.headers?.['cookie'];
+
+  // Single-use: clear the state cookie on every response.
+  const clearState = buildClearOauthStateCookie();
+
+  if (!body.code) {
+    return withClearStateCookie(
+      errorResponse(400, 'Missing authorization code'),
+      clearState,
+    );
+  }
+
+  if (!verifyOauthState(body.state, requestCookieHeader)) {
+    LOGGER.warn('Discord OAuth rejected: state mismatch');
+    return withClearStateCookie(
+      errorResponse(400, 'Invalid OAuth state — please retry sign-in'),
+      clearState,
+    );
+  }
+
+  let discordUser: DiscordUser;
+  try {
+    discordUser = await exchangeCodeForUser(body.code);
+  } catch (error) {
+    LOGGER.error(
+      'Discord OAuth exchange failed',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    return withClearStateCookie(
+      errorResponse(401, 'Discord authentication failed'),
+      clearState,
+    );
+  }
+
+  return withClearStateCookie(
+    await completeDiscordSignIn(discordUser),
+    clearState,
+  );
 };
 
 /**

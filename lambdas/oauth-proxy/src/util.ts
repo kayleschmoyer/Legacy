@@ -10,6 +10,11 @@ export enum EnvironmentVariable {
 export enum DiscordEnv {
   DISCORD_CLIENT_ID = 'DISCORD_CLIENT_ID',
   DISCORD_REDIRECT_URI = 'DISCORD_REDIRECT_URI',
+  // Comma-separated allow-list of native custom-scheme redirect URIs used by
+  // the mobile PKCE flow (e.g. `legacysports://discord-callback`). The native
+  // app supplies its redirect_uri in the exchange request; it must match one
+  // of these before we forward it to Discord's token endpoint.
+  DISCORD_NATIVE_REDIRECT_URIS = 'DISCORD_NATIVE_REDIRECT_URIS',
 }
 
 export enum Secret {
