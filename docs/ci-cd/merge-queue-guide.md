@@ -198,6 +198,15 @@ The merge queue has a 30-second debounce after CI completion before it starts pr
 1. Remove and re-add the `merge-when-ready` label
 2. Or manually trigger the workflow via the Actions UI
 
+### Green + bot-approved but stuck with a 405 ("N of 8 required status checks are expected")
+
+The queue logs `✅ ready for merge` → `🚀 Merging…` → `❌ 405 — Repository rule violations found`, yet every required check is green and `bot-review` is `success`. This is **not** a merge-queue condition failure — it is a ruleset issue. Two variants:
+
+- **Live `integration_id` drift** — re-sync the ruleset (`bash scripts/apply-ruleset.sh`).
+- **Cached per-commit merge verdict** (ruleset already clean, but specific PRs stay blocked forever) — bump the SHA: `node scripts/detect-stalled-prs.mjs --fix`, an empty commit, or a rebase. `ci:run` does **not** fix this — the SHA must change.
+
+Full diagnosis, detection signature, evidence, and dead-ends: [ci-troubleshooting-guide.md → Failure mode: "stalled" PRs](ci-troubleshooting-guide.md#failure-mode-stalled-prs--green--bot-approved-but-merge-blocked).
+
 ### Need an immediate merge
 
 Remove the label and merge manually via the GitHub UI or `gh pr merge`.
