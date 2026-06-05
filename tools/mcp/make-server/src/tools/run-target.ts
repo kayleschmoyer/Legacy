@@ -1,111 +1,15 @@
 import { execFileSync } from 'node:child_process';
 import { runMake, getRepoRoot, TimeoutError } from '../run-command.js';
 import type { ToolResult } from '../types.js';
-
-/**
- * Maximum output size in characters before truncation kicks in.
- * Set conservatively to account for JSON escaping overhead (~2x in worst case).
- */
-const MAX_OUTPUT_CHARS = 30_000;
-
-/** Targets whose output should be parsed into structured step results. */
-const STRUCTURED_TARGETS = new Set(['pc', 'pre-commit', 'full-check']);
-
-interface StepResult {
-  name: string;
-  status: 'passed' | 'failed' | 'unknown';
-}
-
-/**
- * Parse the output of multi-step targets like `make pc` into structured step results.
- * Matches the actual Makefile format: "1/9 Migration immutability check..."
- */
-function parseSteps(output: string): StepResult[] {
-  const steps: StepResult[] = [];
-
-  // Match the actual make pc step format: "N/M Step name..."
-  const stepPattern = /^(\d+)\/(\d+)\s+(.+?)\.{3}\s*$/gm;
-  let match;
-  const stepEntries: Array<{ index: number; name: string }> = [];
-
-  while ((match = stepPattern.exec(output)) !== null) {
-    stepEntries.push({
-      index: match.index,
-      name: match[3].trim(),
-    });
-  }
-
-  // For each step, check the text between it and the next step for pass/fail
-  for (let i = 0; i < stepEntries.length; i++) {
-    const start = stepEntries[i].index;
-    const end =
-      i + 1 < stepEntries.length ? stepEntries[i + 1].index : output.length;
-    const section = output.slice(start, end);
-
-    // NX's structured verdict is the authoritative signal — check it first.
-    // "NX   Successfully ran target ..." means the step passed regardless of what
-    // else appears in the output (console.error stack traces, prop warnings, etc.
-    // that may contain the word "failed" in a passing run).
-    if (/NX\s+Successfully ran target/i.test(section)) {
-      steps.push({ name: stepEntries[i].name, status: 'passed' });
-      continue;
-    }
-
-    // Use unambiguous failure signals only.
-    // Intentionally excludes bare "failed" / "ERROR" to avoid false positives
-    // from console.error output such as "Warning: Failed prop type ...".
-    const failed =
-      /NX\s+Failed tasks/i.test(section) ||
-      // Jest FAIL <file> line (file-level failure — starts at column 0)
-      /^FAIL\s+\S/m.test(section) ||
-      // TypeScript compiler errors
-      /error TS\d/i.test(section) ||
-      // Subprocess exited with a non-zero code
-      /exit code [1-9]/.test(section) ||
-      // Failure glyph used by make steps
-      /✗/.test(section) ||
-      // make itself surfaced an error
-      /^make.*Error/im.test(section);
-
-    const passed = /(?:✓|passed|succeeded|SUCCESS)/im.test(section);
-
-    steps.push({
-      name: stepEntries[i].name,
-      status: failed ? 'failed' : passed ? 'passed' : 'unknown',
-    });
-  }
-
-  return steps;
-}
-
-/**
- * Extract error lines from output — lines containing error indicators.
- */
-function extractErrors(output: string): string[] {
-  const errorLines: string[] = [];
-  const lines = output.split('\n');
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (
-      /(?:ERROR|FAIL|error\b|failed\b|✗)/i.test(line) &&
-      !/node_modules/.test(line) &&
-      !/^[\s]*at\s/.test(line)
-    ) {
-      errorLines.push(line.trim());
-      // Include next 2 lines for context
-      if (i + 1 < lines.length && lines[i + 1].trim()) {
-        errorLines.push(lines[i + 1].trim());
-      }
-      if (i + 2 < lines.length && lines[i + 2].trim()) {
-        errorLines.push(lines[i + 2].trim());
-      }
-    }
-  }
-
-  // Deduplicate and limit
-  return [...new Set(errorLines)].slice(0, 50);
-}
+import {
+  MAX_OUTPUT_CHARS,
+  STRUCTURED_TARGETS,
+  parseSteps,
+  extractErrors,
+  truncateOutput,
+  parseAndValidateVariables,
+} from './run-target-utils.js';
+import { startMakeInBackground } from './make-run-bg.js';
 
 /**
  * Parse the list of files rewritten by the formatter from a make pc error message.
@@ -135,21 +39,6 @@ function parseFormatterRewrittenFiles(output: string): string[] | null {
     files.push(trimmed);
   }
   return files.length > 0 ? files : null;
-}
-
-/**
- * Truncate output intelligently: keep the head and tail (where pass/fail lives).
- */
-function truncateOutput(output: string, maxChars: number): string {
-  if (output.length <= maxChars) return output;
-
-  const headSize = Math.floor(maxChars * 0.3);
-  const tailSize = Math.floor(maxChars * 0.7);
-  const head = output.slice(0, headSize);
-  const tail = output.slice(-tailSize);
-  const omitted = output.length - headSize - tailSize;
-
-  return `${head}\n\n... [${omitted.toLocaleString()} characters omitted] ...\n\n${tail}`;
 }
 
 /**
@@ -231,6 +120,7 @@ interface RunTargetParams {
   worktreePath?: string;
   variables?: string;
   timeoutMs?: number;
+  runInBackground?: boolean;
 }
 
 /** Return the last N lines of output for timeout partial-output fields. */
@@ -257,26 +147,23 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const workDir = worktreePath || getRepoRoot();
   const args = [target];
 
-  // Parse optional make variables (e.g., "DRYRUN=1 FORCE=1")
+  // Parse optional make variables (e.g., "DRYRUN=1 FORCE=1").
+  // parseAndValidateVariables is the security gate that blocks command injection
+  // through the variables parameter — see run-target-utils.ts.
   if (variables) {
-    const varParts = variables.split(/\s+/).filter(Boolean);
-    // Validate each variable is KEY=VALUE with safe characters only.
-    // Keys: alphanumeric + underscore. Values: alphanumeric, hyphens, underscores,
-    // dots, forward slashes, backslashes, colons (for paths like D:\...).
-    for (const part of varParts) {
-      if (!/^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_.\/\\:\-]*$/.test(part)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid variable format: "${part}". Expected KEY=VALUE where VALUE contains only alphanumeric characters, hyphens, underscores, dots, slashes, and colons.`,
-            },
-          ],
-          isError: true,
-        };
-      }
+    const validation = parseAndValidateVariables(variables);
+    if (!validation.ok) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid variable format: "${validation.invalid}". Expected KEY=VALUE where VALUE contains only alphanumeric characters, hyphens, underscores, dots, slashes, and colons.`,
+          },
+        ],
+        isError: true,
+      };
     }
-    args.push(...varParts);
+    args.push(...validation.parts);
   }
 
   // Longer timeout for heavy targets
@@ -298,6 +185,41 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const defaultTimeoutMs = heavyTargets.has(target) ? 600_000 : 300_000;
   // Caller-provided timeoutMs overrides the default; useful for make pc on a cold cache.
   const timeoutMs = params.timeoutMs ?? defaultTimeoutMs;
+
+  // Background mode: spawn the process, return a jobId immediately so the caller
+  // can poll with make_run_status / make_run_wait. Avoids the ~60s MCP client
+  // transport timeout that kills long-running synchronous tool calls in cloud sessions.
+  if (params.runInBackground) {
+    const { jobId, logPath } = startMakeInBackground(
+      args,
+      target,
+      workDir,
+      timeoutMs,
+    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              status: 'running',
+              jobId,
+              target,
+              worktreePath: workDir,
+              timeoutMs,
+              logPath,
+              message:
+                'Process started in background. ' +
+                'Use make_run_wait({ jobId }) to wait for completion (re-call if still running), ' +
+                'or make_run_status({ jobId }) for a non-blocking snapshot.',
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  }
 
   try {
     const output = await runMake(args, workDir, timeoutMs);

@@ -100,6 +100,16 @@ Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool e
 | `make codegen` | `make_run({ target: "codegen" })` |
 | `make install` | `make_run({ target: "install" })` |
 
+**Heavy targets in cloud sessions — use background execution.** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call, which kills a synchronous `make_run` for a long target (`pc`, `build-all`, `test-all`, `install`) before it can finish — regardless of `timeoutMs`. For these, pass `runInBackground: true` and poll:
+
+```
+make_run({ target: "pc", runInBackground: true })   // → { jobId, status: "running" }
+make_run_wait({ jobId })                              // blocks ≤55s; re-call if it returns status: "running"
+make_run_status({ jobId })                            // non-blocking snapshot (status + log tail)
+```
+
+`make_run_wait` returns the full structured result (with `steps[]` for `pc`/`pre-commit`/`full-check`) once the job reaches `done`/`failed`. In local sessions the synchronous form is fine; `runInBackground` is only required where the transport timeout applies.
+
 > **If you find yourself writing `make <target>` in a Bash tool call during a local session, treat this as a signal that the `legacy-sports-make` MCP server is not connected.** Check server connectivity rather than falling back silently — raw `make pc` will fail with `nx: not found` or similar PATH errors when `node_modules/.bin` is not in `$PATH`. Using `make_run` via MCP avoids this PATH resolution problem entirely. If `make pc` fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "nx" not found`, the `node_modules` symlink is broken or missing — repair it with `worktree_install_recover()` (MCP-first), **not** `node scripts/modules-pool/link.mjs` via Bash. After recovery, restart the session so the MCP servers reconnect.
 
 ## Git Operations in Worktrees

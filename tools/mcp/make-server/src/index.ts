@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { runCommand, getRepoRoot } from './run-command.js';
 import { runTarget } from './tools/run-target.js';
+import { makeRunStatus, makeRunWait } from './tools/make-run-bg.js';
 import { worktreeCreate } from './tools/worktree-create.js';
 import { wtSetup } from './tools/wt-setup.js';
 import {
@@ -52,8 +53,56 @@ server.tool(
           'Pass 900000 for make pc on a cold cache. ' +
           'On timeout, returns { timedOut: true, partialOutput } instead of throwing.',
       ),
+    runInBackground: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, spawn the make process in the background and return immediately with a { jobId }. ' +
+          'Use make_run_wait({ jobId }) to block until completion (re-call if it returns status: "running"), ' +
+          'or make_run_status({ jobId }) for a non-blocking snapshot. ' +
+          'Recommended for heavy targets (pc, build-all, test-all, install) in cloud sessions ' +
+          'where the MCP transport timeout (~60s) would kill a synchronous call.',
+      ),
   },
   async (params) => runTarget(params),
+);
+
+// --- make_run_status ---
+server.tool(
+  'make_run_status',
+  'Get the current status and output of a background make_run job started with runInBackground: true. ' +
+    'Returns instantly: { status: "running" | "done" | "failed", ... }. ' +
+    'For heavy targets (pc, pre-commit, full-check) also returns structured step results on completion.',
+  {
+    jobId: z
+      .string()
+      .describe('Job ID returned by make_run({ runInBackground: true })'),
+  },
+  (params) => makeRunStatus(params),
+);
+
+// --- make_run_wait ---
+server.tool(
+  'make_run_wait',
+  'Wait for a background make_run job to complete. ' +
+    'Blocks until the job finishes or maxWaitMs elapses (default 50000, capped at 55000 to stay under the ~60s MCP transport timeout). ' +
+    'If the job is still running when the wait expires, returns status: "running" — re-call to continue waiting. ' +
+    'On completion returns the full structured result (step results for pc/pre-commit/full-check).',
+  {
+    jobId: z
+      .string()
+      .describe('Job ID returned by make_run({ runInBackground: true })'),
+    maxWaitMs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum milliseconds to block (default: 50000, max: 55000). ' +
+          'Capped at 55000 to stay under the ~60s MCP transport timeout in cloud sessions.',
+      ),
+  },
+  async (params) => makeRunWait(params),
 );
 
 // --- make_worktree_create ---
