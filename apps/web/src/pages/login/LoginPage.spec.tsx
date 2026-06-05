@@ -242,23 +242,31 @@ describe('LoginPage handleSignIn catch block', () => {
   });
 });
 
-describe('LoginPage signup link redirect forwarding (LS-6688)', () => {
-  it('forwards a ?redirect= param onto the signup link so the deep-link target survives the login → signup handoff', () => {
-    setBrowserUrl('/login?redirect=/league/123');
-
+describe('LoginPage header signup affordance (LS-6689)', () => {
+  // LS-6689 supersedes the LS-6688 /signup redirect-forwarding behaviour: the
+  // app is OAuth-only and /signup has no route, so the header no longer links
+  // there. It now directs new users to the on-page OAuth card.
+  it('does not link to the dead /signup route', async () => {
     renderPage();
-
-    const link = screen.getByRole('link', { name: /create an account/i });
-    expect(link.getAttribute('href')).toBe('/signup?redirect=%2Fleague%2F123');
+    // Let the async OAuth configure effect settle before asserting.
+    await waitForSignInButton();
+    const deadLink = document.querySelector('a[href^="/signup"]');
+    expect(deadLink).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: /create an account/i }),
+    ).toBeNull();
   });
 
-  it('leaves the signup link as a bare /signup when no redirect param is present', () => {
-    setBrowserUrl('/login');
-
+  it('directs new users to the OAuth card on the page', async () => {
     renderPage();
-
-    const link = screen.getByRole('link', { name: /create an account/i });
-    expect(link.getAttribute('href')).toBe('/signup');
+    await waitForSignInButton();
+    // Discord is disabled in the test config, so only Google is named.
+    const signupLink = screen.getByRole('link', {
+      name: /sign up with google/i,
+    });
+    expect(signupLink.getAttribute('href')).toBe('#ll-signup-card');
+    // The anchor target (the OAuth card) exists so the in-page jump resolves.
+    expect(document.getElementById('ll-signup-card')).not.toBeNull();
   });
 });
 
