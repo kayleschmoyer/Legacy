@@ -389,6 +389,24 @@ build {
     ]
   }
 
+  # PowerShell (pwsh) — required by the custom-checks CI job to run the
+  # dependency-free PowerShell script tests (scripts/__tests__/*.test.ps1) via
+  # `pnpm run test:scripts:ps` (LS-7770). Installed from the Microsoft APT repo.
+  # The custom-checks job also has an idempotent install-if-missing fallback, so
+  # this bake-in only saves the per-run install cost on the live fleet — older
+  # AMIs without pwsh still pass via the fallback until the launch template rolls.
+  provisioner "shell" {
+    inline = [
+      "export DEBIAN_FRONTEND=noninteractive",
+      "curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb",
+      "sudo dpkg -i /tmp/packages-microsoft-prod.deb",
+      "rm -f /tmp/packages-microsoft-prod.deb",
+      "sudo apt-get update -qq",
+      "sudo apt-get install -y -qq powershell",
+      "pwsh --version",
+    ]
+  }
+
   # GitHub Actions runner dependencies (not the agent itself — the module installs that)
   provisioner "shell" {
     inline = [
@@ -726,6 +744,7 @@ build {
 
         # ----- (3) Pre-baked file-system landmarks -----
         for path in \
+          /usr/bin/pwsh \
           /opt/playwright-browsers \
           /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager \
           /opt/android-sdk/platform-tools/adb \

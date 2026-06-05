@@ -13,8 +13,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -81,16 +82,25 @@ test(
   },
 );
 
-test(
-  'completes successfully when mmdc is available',
-  { skip: !mmdcAvailable() ? 'mmdc not installed in this environment' : false },
-  () => {
-    const { code, stdout } = runScript();
+// Hermetic happy-path: point the scan at an empty directory via the
+// DIAGRAMS_SKILLS_DIR seam so the script exercises its CLI surface (exit code,
+// no-files output) without invoking `mmdc` — which needs a Puppeteer-managed
+// Chromium that is not present on CI runners. The real render integration is
+// covered by `make diagrams` locally where a browser is available; this test
+// owns the deterministic exit-0 contract.
+test('exits 0 with a no-files message when the source dir has no .mmd files', () => {
+  const emptyDir = mkdtempSync(join(tmpdir(), 'gen-diagrams-empty-'));
+  try {
+    const { code, stdout } = runScript({
+      env: { DIAGRAMS_SKILLS_DIR: emptyDir },
+    });
     assert.equal(code, 0, `expected exit 0, got ${code}\nstdout: ${stdout}`);
     assert.match(
       stdout,
-      /generated|No \.mmd files/,
-      `expected generation summary or no-files message; got: ${stdout}`,
+      /No \.mmd files found/,
+      `expected no-files message; got: ${stdout}`,
     );
-  },
-);
+  } finally {
+    rmSync(emptyDir, { recursive: true, force: true });
+  }
+});

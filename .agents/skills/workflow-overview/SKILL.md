@@ -519,6 +519,8 @@ These must pass for the merge queue to process a PR:
 | GraphQL Schema & Codegen                  | `check-schema.yml` (when GraphQL files change)               |
 | Verify All Migrations Applied             | `check-migrations-applied.yml` (when migration files change) |
 
+> The CI Pipeline `custom-checks` job also runs the repo-script unit suites — `pnpm test:scripts` (node `--test` over `scripts/__tests__/*.test.mjs`) and `pnpm test:scripts:ps` (the dependency-free PowerShell assertions). `pwsh` is baked into the runner AMI with an install-if-missing fallback in the job (LS-7770).
+
 ### Advisory Checks (Not Required by Branch Protection)
 
 These checks are not configured as _required_ branch protection rules, but they still produce GitHub check runs/commit statuses. The merge queue (`merge-queue.yml`) waits for all checks to complete and will block on any failing or pending check unless explicitly configured to ignore it, so failures here can still delay a queued merge.

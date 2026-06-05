@@ -395,6 +395,40 @@ jobs:
           }
           run_custom_checks 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
+      # PowerShell is required for the .ps1 script tests below. The self-hosted
+      # runner AMI bakes pwsh in (terraform/runners/packer/runner-ami.pkr.hcl),
+      # but this install-if-missing fallback keeps the job green on older AMIs
+      # that predate the bake-in and on the ubuntu-latest fallback runner (which
+      # already ships pwsh, so the install branch is skipped). LS-7770.
+      - name: "Ensure PowerShell"
+        run: |
+          set -o pipefail
+          ensure_pwsh() {
+            if command -v pwsh >/dev/null 2>&1; then
+              echo "pwsh already present: $(pwsh --version)"
+              return
+            fi
+            echo "pwsh not found — installing from the Microsoft APT repo"
+            export DEBIAN_FRONTEND=noninteractive
+            curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb
+            sudo dpkg -i /tmp/packages-microsoft-prod.deb
+            rm -f /tmp/packages-microsoft-prod.deb
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq powershell
+            pwsh --version
+          }
+          ensure_pwsh 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
+
+      - name: "Script Unit Tests (node)"
+        run: |
+          set -o pipefail
+          pnpm run test:scripts 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
+
+      - name: "Script Unit Tests (PowerShell)"
+        run: |
+          set -o pipefail
+          pnpm run test:scripts:ps 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
+
       - name: "Capture custom-checks failure"
         id: capture
         if: failure()

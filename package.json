@@ -90,6 +90,7 @@
     "test:apps": "nx run-many --target=test --projects=tag:scope:app",
     "test:lambdas": "nx run-many --target=test --projects=tag:scope:lambda",
     "test:scripts": "node --test scripts/__tests__/*.test.mjs",
+    "test:scripts:ps": "pwsh -NoProfile -File scripts/__tests__/jira-rollup.test.ps1",
     "lint:fix:all": "nx run-many --target=lint --all --fix",
     "lint:libs": "nx run-many --target=lint --projects=tag:scope:lib",
     "lint:apps": "nx run-many --target=lint --projects=tag:scope:app",

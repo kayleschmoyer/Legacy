@@ -13,7 +13,13 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const skillsDir = join(root, '.agents', 'skills');
+// Source directory is overridable via DIAGRAMS_SKILLS_DIR so tests can point the
+// scan at a controlled (e.g. empty) directory and exercise the CLI surface
+// without depending on a real Mermaid/Chromium render. Defaults to the canonical
+// .agents/skills tree.
+const skillsDir = process.env.DIAGRAMS_SKILLS_DIR
+  ? resolve(process.env.DIAGRAMS_SKILLS_DIR)
+  : join(root, '.agents', 'skills');
 
 /**
  * Recursively find all .mmd files under a directory.
@@ -36,7 +42,7 @@ function findMmdFiles(dir) {
 const mmdFiles = findMmdFiles(skillsDir);
 
 if (mmdFiles.length === 0) {
-  console.log('No .mmd files found under .agents/skills/');
+  console.log(`No .mmd files found under ${skillsDir}`);
   process.exit(0);
 }
 
