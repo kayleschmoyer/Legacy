@@ -59,6 +59,10 @@ const Login: React.FC = () => {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          spellCheck={false}
           borderColor="$gray8"
           borderWidth={1}
           height={40}
