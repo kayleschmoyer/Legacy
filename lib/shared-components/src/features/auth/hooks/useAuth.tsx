@@ -54,6 +54,16 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithOAuth: (oauthResponse: OAuthResponse) => Promise<void>;
   loginWithProvider: () => Promise<void>;
+  /**
+   * Hydrate the auth state from a JWT obtained out-of-band (e.g. the Discord
+   * OAuth proxy returns the signed JWT in its response body while also setting
+   * the HttpOnly auth cookie). Flips the UI to authenticated **without a full
+   * page reload**: persists the profile + expiry, dispatches AUTH_SUCCESS /
+   * TOKEN_UPDATED, and schedules the proactive refresh timer. Returns `true`
+   * when the JWT carried a real identity and the session was hydrated, `false`
+   * otherwise (the caller should fall back to a full reload).
+   */
+  hydrateSession: (jwt: string) => boolean;
   logout: () => Promise<void>;
   clearError: () => void;
   /** True when an admin is currently acting as another user. */
@@ -701,6 +711,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     [authService, scheduleProactiveRefresh],
   );
 
+  const hydrateSession = useCallback(
+    (jwt: string): boolean => {
+      const userInfo = decodeUserFromToken(jwt);
+      // Reject stubs — only hydrate when the JWT carries a real identity
+      // (mirrors the pre-cache contract in apps/web's lib/session-precache.ts).
+      if (!userInfo || !userInfo.id || !userInfo.email) return false;
+      authService.persistSession(jwt, userInfo);
+      dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+      dispatchAuth({ type: 'TOKEN_UPDATED', payload: jwt });
+      const expiry = authService.getStoredTokenExpiry();
+      if (expiry) scheduleProactiveRefresh(expiry);
+      return true;
+    },
+    [authService, decodeUserFromToken, scheduleProactiveRefresh],
+  );
+
   const logout = useCallback((): Promise<void> => {
     // Increment generation so any in-flight refreshJwt() callbacks see a stale
     // generation and skip AUTH_SUCCESS/TOKEN_UPDATED dispatches.
@@ -864,6 +890,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       login,
       loginWithOAuth,
       loginWithProvider,
+      hydrateSession,
       logout,
       clearError,
       isImpersonating,
@@ -881,6 +908,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       login,
       loginWithOAuth,
       loginWithProvider,
+      hydrateSession,
       logout,
       clearError,
       isImpersonating,

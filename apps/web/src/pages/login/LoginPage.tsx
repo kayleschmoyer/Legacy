@@ -75,7 +75,12 @@ function formatPitchingMarquee(
 
 /* ── Component ── */
 export function LoginPage(): React.JSX.Element {
-  const { config, loginWithOAuth, error: authError } = useAuth();
+  const {
+    config,
+    loginWithOAuth,
+    hydrateSession,
+    error: authError,
+  } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
@@ -209,18 +214,32 @@ export function LoginPage(): React.JSX.Element {
 
         if (result.csrfToken) storeCsrfToken(result.csrfToken);
 
-        // Write an untrusted UI-only pre-cache so AuthProvider can hydrate
-        // the user profile instantly on the next page load without a
-        // network round-trip.  The cache is always cleared on logout via
-        // AuthService.clearTokens() and re-verified by the background JWT
-        // refresh on every page load.  See lib/session-precache.ts.
-        storeDiscordSessionPreCache(result.jwt);
-
-        // Validate the redirect target before navigating. env.baseUrl is a
-        // build-time constant today, but routing it through an explicit
-        // same-origin/allowlist check ensures a poisoned config value can never
-        // turn this into an open redirect.
-        window.location.replace(getSafeRedirectTarget(env.baseUrl));
+        // Flip the auth state in-memory and SPA-navigate home instead of doing
+        // a full `window.location.replace` page reload, which would re-boot the
+        // entire app and re-fetch every cached query (~1-2s of perceived
+        // latency, LS-6693).  LoginPage renders outside the Router (it is the
+        // auth-guard's login screen), so react-router's navigate() is not
+        // available here — instead hydrateSession() updates AuthProvider in
+        // place (the guard then swaps in the authenticated app).  The callback
+        // URL is rewritten to the app root *before* that swap so the Router
+        // mounts on the home route rather than the Discord-link callback route.
+        //
+        // The redirect target is still routed through getSafeRedirectTarget so
+        // a poisoned config value can never turn this into an open redirect,
+        // whether we SPA-navigate or fall back to a full reload (LS-6691).
+        const safeTarget = getSafeRedirectTarget(env.baseUrl);
+        const hydrated = hydrateSession(result.jwt);
+        if (hydrated) {
+          window.history.replaceState(null, '', safeTarget);
+        } else {
+          // Decode failed — fall back to the pre-cache + full reload path so the
+          // session is still restored via the HttpOnly cookie on next load.
+          // The cache is always cleared on logout via AuthService.clearTokens()
+          // and re-verified by the background JWT refresh.  See
+          // lib/session-precache.ts.
+          storeDiscordSessionPreCache(result.jwt);
+          window.location.replace(safeTarget);
+        }
       } catch (err) {
         LOGGER.error(
           'Discord callback exchange failed:',

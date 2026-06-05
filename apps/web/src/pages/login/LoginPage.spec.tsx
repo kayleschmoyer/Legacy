@@ -16,6 +16,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import { OAuthProvider } from '@legacy-sports/shared-components/ui';
 import { LoginPage } from './LoginPage';
+import { storeDiscordSessionPreCache } from '../../lib/session-precache';
+
+// Shared handle so individual tests can control hydrateSession's return value.
+const mockHydrateSession = jest.fn();
 
 // ---------------------------------------------------------------------------
 // Module mocks — factories use jest.fn() inline to avoid hoisting/TDZ issues
@@ -52,12 +56,16 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({
     config: mockAuthConfig,
     loginWithOAuth: jest.fn(),
+    hydrateSession: mockHydrateSession,
     error: null,
   }),
 }));
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../lib/csrf', () => ({ storeCsrfToken: jest.fn() }));
+jest.mock('../../lib/session-precache', () => ({
+  storeDiscordSessionPreCache: jest.fn(),
+}));
 jest.mock('../../config/environment', () => ({
   env: {
     baseUrl: '/',
@@ -303,5 +311,92 @@ describe('LoginPage handleSignIn re-entrancy guard (LS-6685)', () => {
     });
 
     expect(signInSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-6693 — Discord callback redirect: in-memory hydrate instead of full reload
+// ---------------------------------------------------------------------------
+
+describe('LoginPage Discord callback redirect (LS-6693)', () => {
+  const originalFetch = global.fetch;
+  const mockedStorePreCache = jest.mocked(storeDiscordSessionPreCache);
+
+  beforeEach(() => {
+    mockHydrateSession.mockReset();
+    // Put jsdom on the Discord callback URL so the LoginPage effect fires.
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/discord/callback?code=abc&state=xyz',
+    );
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('hydrates the session in-memory and SPA-navigates home without a full reload', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(''),
+        json: () =>
+          Promise.resolve({ jwt: 'header.payload.sig', csrfToken: 'csrf-1' }),
+      }),
+    ) as unknown as typeof fetch;
+    mockHydrateSession.mockReturnValue(true);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockHydrateSession).toHaveBeenCalledWith('header.payload.sig');
+    });
+    // The callback URL is rewritten to the app root (no window.location.replace).
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/');
+    });
+    // The full-reload fallback must NOT run on the happy path.
+    expect(mockedStorePreCache).not.toHaveBeenCalled();
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it('falls back to pre-cache + full reload when the JWT cannot be hydrated', async () => {
+    const replaceLocationSpy = jest.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: {
+        pathname: '/auth/discord/callback',
+        search: '?code=abc&state=xyz',
+        replace: replaceLocationSpy,
+      },
+    });
+
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(''),
+        json: () => Promise.resolve({ jwt: 'bad.jwt' }),
+      }),
+    ) as unknown as typeof fetch;
+    mockHydrateSession.mockReturnValue(false);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockedStorePreCache).toHaveBeenCalledWith('bad.jwt');
+    });
+    expect(replaceLocationSpy).toHaveBeenCalledWith('/');
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: originalLocation,
+    });
   });
 });

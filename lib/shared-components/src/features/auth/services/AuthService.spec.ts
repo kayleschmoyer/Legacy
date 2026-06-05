@@ -99,3 +99,44 @@ describe('AuthService.refreshJwt', () => {
     expect(mockLogger.error.mock.calls).toHaveLength(0);
   });
 });
+
+describe('AuthService.persistSession', () => {
+  let service: AuthService;
+
+  /** Build a (signature-less) JWT whose payload base64url-decodes to `payload`. */
+  function makeJwt(payload: Record<string, unknown>): string {
+    const encode = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    service = new AuthService(testConfig);
+  });
+
+  it('records the in-memory JWT, token expiry, and cached profile', () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const jwt = makeJwt({ id: 7, email: 'discord@test.com', exp });
+    const user = {
+      id: 7,
+      email: 'discord@test.com',
+      username: 'DiscordUser',
+      accessLevel: 'none' as const,
+    };
+
+    service.persistSession(jwt, user);
+
+    // In-memory JWT is available to consumers (e.g. WebSocket auth).
+    expect(service.getCurrentToken()).toBe(jwt);
+    // Expiry is persisted so a later reload can schedule proactive refresh.
+    expect(service.getStoredTokenExpiry()).toBe(exp);
+    // Profile is cached so the session restores instantly on reload.
+    expect(service.getStoredUserProfile()).toEqual(user);
+  });
+});

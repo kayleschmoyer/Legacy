@@ -206,6 +206,164 @@ describe('AuthProvider – auth:token-refreshed event', () => {
   });
 });
 
+describe('AuthProvider – hydrateSession', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  /** Build a (signature-less) JWT whose payload base64url-decodes to `payload`. */
+  function makeJwt(payload: Record<string, unknown>): string {
+    const encode = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
+  }
+
+  function HydrateConsumer({
+    onReady,
+  }: {
+    onReady: (hydrate: (jwt: string) => boolean) => void;
+  }) {
+    const { user, isLoading, hydrateSession } = useAuth();
+    onReady(hydrateSession);
+    if (isLoading) return <div data-testid="loading" />;
+    if (!user) return <div data-testid="no-user" />;
+    return (
+      <div data-testid="user-info">
+        {user.username}|{user.accessLevel}
+      </div>
+    );
+  }
+
+  it('flips auth state to authenticated in-memory (no reload) from a valid JWT', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    const persistSession = jest.fn();
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => null),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      persistSession,
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      refreshJwt: jest.fn(() => Promise.resolve(null)),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    let hydrateFn!: (jwt: string) => boolean;
+    render(
+      <AuthProvider config={testConfig}>
+        <HydrateConsumer
+          onReady={(h) => {
+            hydrateFn = h;
+          }}
+        />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    const jwt = makeJwt({
+      id: 7,
+      email: 'discord@test.com',
+      username: 'DiscordUser',
+      accessLevel: 'none',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    let result: boolean | undefined;
+    act(() => {
+      result = hydrateFn(jwt);
+    });
+
+    expect(result).toBe(true);
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe(
+        'DiscordUser|none',
+      );
+    });
+    expect(persistSession).toHaveBeenCalledWith(
+      jwt,
+      expect.objectContaining({ id: 7, email: 'discord@test.com' }),
+    );
+  });
+
+  it('returns false and stays unauthenticated when the JWT lacks a real identity', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    const persistSession = jest.fn();
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => null),
+      getStoredTokenExpiry: jest.fn(() => null),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      persistSession,
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      refreshJwt: jest.fn(() => Promise.resolve(null)),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    let hydrateFn!: (jwt: string) => boolean;
+    render(
+      <AuthProvider config={testConfig}>
+        <HydrateConsumer
+          onReady={(h) => {
+            hydrateFn = h;
+          }}
+        />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    // Payload is missing both `id` and `email` → decodeUserFromToken yields a
+    // stub which hydrateSession must reject.
+    let result: boolean | undefined;
+    act(() => {
+      result = hydrateFn(makeJwt({ username: 'NoIdentity' }));
+    });
+
+    expect(result).toBe(false);
+    expect(persistSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId('no-user')).toBeTruthy();
+  });
+});
+
 describe('AuthProvider – auth:session-expired event', () => {
   beforeEach(() => {
     localStorage.clear();

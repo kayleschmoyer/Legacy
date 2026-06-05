@@ -467,6 +467,18 @@ export class AuthService {
   }
 
   /**
+   * Persist a session obtained out-of-band — e.g. the Discord OAuth proxy
+   * returns the signed JWT in its response body while also setting the HttpOnly
+   * auth cookie. Records the in-memory JWT + token expiry and caches the decoded
+   * user profile so the UI can flip to authenticated without a full page reload,
+   * and so the session is restored from cache if the page is later reloaded.
+   */
+  persistSession(jwt: string, user: User): void {
+    this.storeTokens({ jwt });
+    this.storeUserProfile(user);
+  }
+
+  /**
    * Get stored JWT token.
    *
    * On web, the JWT is in an HttpOnly cookie (not accessible to JS).
