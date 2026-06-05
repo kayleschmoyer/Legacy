@@ -4,52 +4,52 @@ These issues appear repeatedly in reviewer bot CHANGES_REQUESTED cycles. Knowing
 
 ## Pattern Summary
 
-| #   | Pattern                                                          | Fix                                                                                                   | Caught by              |
-| --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------- |
-| 1   | `jest.doMock('@legacy-sports/utils', ...)` for `getDbOptions`    | Change to `@legacy-sports/utils/node` + `...jest.requireActual(...)` spread                           | Manual                 |
-| 2   | `postData.includes('getleague')` matches `getLeagueTeams` etc.   | Use quoted `'"getleague"'` or reorder specific-first                                                  | Manual                 |
-| 3   | Header comment overclaims test coverage                          | Audit actual test names and trim header to match                                                      | Manual                 |
-| 4   | Missing UNAUTHENTICATED guard test                               | Add test calling resolver with `user: null`, assert `UNAUTHENTICATED`                                 | Manual                 |
-| 5   | `route.fallback()` leaks to real network                         | Replace with `route.fulfill({ json: { data: {} } })`                                                  | `lint-review-patterns` |
-| 6   | `LOGGER.error({ error })` — Rollbar ignores wrapped object       | Use `LOGGER.error('message', error)` with Error as direct arg                                         | `lint-review-patterns` |
-| 7   | `data: null` mock response                                       | Use `{ data: { queryName: null } }` or `{ data: { queryName: [] } }`                                  | Manual                 |
-| 8   | Wrong GraphQL field names in mocks                               | Check actual `.graphql` query files for correct field names                                           | Manual                 |
-| 9   | Test name doesn't match assertion                                | Rename test to describe what it actually asserts                                                      | Manual                 |
-| 10  | Process/scope comments (PR title, splitting)                     | Resolve thread directly — no code change needed                                                       | Manual                 |
-| 11  | Silent error swallowing in catch blocks                          | Return `{ success: false, error }` or re-throw                                                        | `lint-review-patterns` |
-| 12  | Git ref injection via args starting with `-`                     | Validate ref doesn't start with `-` before passing to git                                             | `lint-review-patterns` |
-| 13  | Missing pagination for Jira/GitHub API queries                   | Add `maxResults`/`perPage` and handle nextPage cursor                                                 | Manual                 |
-| 14  | `shell: true` with user input enables injection                  | Use array args with `shell: false`                                                                    | `lint-review-patterns` |
-| 15  | Codegen output manually edited                                   | Fix source `.graphql` or schema and run `make codegen`                                                | Manual                 |
-| 16  | PR description doesn't explain codegen diff                      | Add explanation in PR body when generated files change                                                | Manual                 |
-| 17  | MCP tools return success on partial failure                      | Set `isError: true` and report `{ total, succeeded, failed }`                                         | Manual                 |
-| 18  | Docs reference nonexistent MCP tools                             | Verify tool names exist in `tools/mcp/*/src/` before referencing                                      | Manual                 |
-| 19  | Dev/prod ternary forgets staging                                 | Use `{ dev: X, staging: Y, prod: Z }[env]`                                                            | `lint-review-patterns` |
-| 20  | Unbounded tool output                                            | Cap with `.slice(0, N)` and include `{ truncated: true, total }`                                      | `lint-review-patterns` |
-| 21  | Nullable GraphQL field in string interpolation / aria-label      | Null-check or provide fallback before interpolating                                                   | Manual                 |
-| 22  | `role="button"` without `tabIndex={0}`                           | Add `tabIndex={0}` and `onKeyDown`; prefer native `<button>`                                          | `lint-review-patterns` |
-| 23  | Collapsed content stays in accessibility tree                    | Add `aria-hidden`, `visibility: hidden`, `pointerEvents: none` when hidden                            | Manual                 |
-| 24  | `transition: 'all'` instead of specific properties               | Enumerate only the properties being transitioned                                                      | `lint-review-patterns` |
-| 25  | Inline hex literal instead of `colors.ts` constant               | Import and use named constant from `apps/web/src/constants/colors.ts`                                 | `lint-review-patterns` |
-| 26  | `throw new Error()` in GraphQL resolver for input validation     | Use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`                                   | `lint-review-patterns` |
-| 27  | `localStorage`/`sessionStorage` write without try/catch          | Wrap in try/catch — storage throws in private mode and on quota exceeded                              | `lint-review-patterns` |
-| 28  | Unsafe `as 'literal-union'` cast on unvalidated external data    | Use type guard with allowed-values array instead of bare `as` assertion                               | Manual                 |
-| 29  | ⭐ LOGGER.error/warn non-Error 2nd arg (13/100 PRs)              | Pass raw `Error` instance as 2nd arg; extra context goes in 3rd arg                                   | `lint-review-patterns` |
-| 30  | Missing/incomplete test coverage for new logic                   | Every new component/resolver/mutation/bug-fix needs a spec covering the changed behavior              | Manual                 |
-| 31  | PR description does not match diff                               | Read your diff before pushing; explain all generated-file changes                                     | Manual                 |
-| 32  | Missing range/null validation on GraphQL mutation arguments      | Guard numeric ranges, null/undefined, and enum values with `UserInputError`                           | Manual                 |
-| 33  | Loading state not reset after mutation failure                   | Use `finally { setLoading(false) }` — not only in success path                                        | Manual                 |
-| 34  | Missing authorization check (auth ≠ authz)                       | After auth check, also verify user membership/ownership of the requested resource                     | Manual                 |
-| 35  | Drizzle `integer` for BIGINT column (overflow)                   | Use `bigint('col', { mode: 'number' })` for DB BIGINT columns                                         | Manual                 |
-| 36  | Multi-column sort with single-column cursor                      | Cursor must encode all `orderBy` columns, not just `id`                                               | Manual                 |
-| 37  | Weak test assertions (`toBeDefined()` instead of value)          | Assert the concrete expected value, not just existence                                                | Manual                 |
-| 38  | Duplicate constant across packages (DRY violation)               | Define once in a shared lib; import everywhere                                                        | Manual                 |
-| 39  | ⚠️ Committed symlink / local absolute path                       | Check `file <new-file>` before staging; add to `.gitignore`                                           | Manual                 |
-| 40  | `console.*` / `process.stdout.write` in app code                 | Use `LOGGER` from `@legacy-sports/logging` (exceptions: CLI, migrations, build scripts, `scripts/`)   | ESLint                 |
-| 41  | Error message leaked to UI                                       | Show generic string to user; log real error with `LOGGER.error`                                       | Manual                 |
-| 42  | Terraform resource rename without `moved {}` block               | Add `moved { from = old.name; to = new.name }` to avoid destroy+recreate                              | Manual                 |
-| 43  | Shell variable empty after `\|\| true` pattern                   | Provide explicit fallback: `cmd \| echo "default"`                                                    | Manual                 |
-| 44  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge | Manual                 |
+| #   | Pattern                                                          | Fix                                                                                                                                                                                            | Caught by              |
+| --- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 1   | `jest.doMock('@legacy-sports/utils', ...)` for `getDbOptions`    | Change to `@legacy-sports/utils/node` + `...jest.requireActual(...)` spread                                                                                                                    | Manual                 |
+| 2   | `postData.includes('getleague')` matches `getLeagueTeams` etc.   | Use quoted `'"getleague"'` or reorder specific-first                                                                                                                                           | Manual                 |
+| 3   | Header comment overclaims test coverage                          | Audit actual test names and trim header to match                                                                                                                                               | Manual                 |
+| 4   | Missing UNAUTHENTICATED guard test (**backend resolvers only**)  | **`lambdas/`**: add test with `user: null`, assert `UNAUTHENTICATED`. **Frontend** (`apps/`, `lib/`): test `skip:` guard + graceful null-data handling — no server error code assertion needed | Manual                 |
+| 5   | `route.fallback()` leaks to real network                         | Replace with `route.fulfill({ json: { data: {} } })`                                                                                                                                           | `lint-review-patterns` |
+| 6   | `LOGGER.error({ error })` — Rollbar ignores wrapped object       | Use `LOGGER.error('message', error)` with Error as direct arg                                                                                                                                  | `lint-review-patterns` |
+| 7   | `data: null` mock response                                       | Use `{ data: { queryName: null } }` or `{ data: { queryName: [] } }`                                                                                                                           | Manual                 |
+| 8   | Wrong GraphQL field names in mocks                               | Check actual `.graphql` query files for correct field names                                                                                                                                    | Manual                 |
+| 9   | Test name doesn't match assertion                                | Rename test to describe what it actually asserts                                                                                                                                               | Manual                 |
+| 10  | Process/scope comments (PR title, splitting)                     | Resolve thread directly — no code change needed                                                                                                                                                | Manual                 |
+| 11  | Silent error swallowing in catch blocks                          | Return `{ success: false, error }` or re-throw                                                                                                                                                 | `lint-review-patterns` |
+| 12  | Git ref injection via args starting with `-`                     | Validate ref doesn't start with `-` before passing to git                                                                                                                                      | `lint-review-patterns` |
+| 13  | Missing pagination for Jira/GitHub API queries                   | Add `maxResults`/`perPage` and handle nextPage cursor                                                                                                                                          | Manual                 |
+| 14  | `shell: true` with user input enables injection                  | Use array args with `shell: false`                                                                                                                                                             | `lint-review-patterns` |
+| 15  | Codegen output manually edited                                   | Fix source `.graphql` or schema and run `make codegen`                                                                                                                                         | Manual                 |
+| 16  | PR description doesn't explain codegen diff                      | Add explanation in PR body when generated files change                                                                                                                                         | Manual                 |
+| 17  | MCP tools return success on partial failure                      | Set `isError: true` and report `{ total, succeeded, failed }`                                                                                                                                  | Manual                 |
+| 18  | Docs reference nonexistent MCP tools                             | Verify tool names exist in `tools/mcp/*/src/` before referencing                                                                                                                               | Manual                 |
+| 19  | Dev/prod ternary forgets staging                                 | Use `{ dev: X, staging: Y, prod: Z }[env]`                                                                                                                                                     | `lint-review-patterns` |
+| 20  | Unbounded tool output                                            | Cap with `.slice(0, N)` and include `{ truncated: true, total }`                                                                                                                               | `lint-review-patterns` |
+| 21  | Nullable GraphQL field in string interpolation / aria-label      | Null-check or provide fallback before interpolating                                                                                                                                            | Manual                 |
+| 22  | `role="button"` without `tabIndex={0}`                           | Add `tabIndex={0}` and `onKeyDown`; prefer native `<button>`                                                                                                                                   | `lint-review-patterns` |
+| 23  | Collapsed content stays in accessibility tree                    | Add `aria-hidden`, `visibility: hidden`, `pointerEvents: none` when hidden                                                                                                                     | Manual                 |
+| 24  | `transition: 'all'` instead of specific properties               | Enumerate only the properties being transitioned                                                                                                                                               | `lint-review-patterns` |
+| 25  | Inline hex literal instead of `colors.ts` constant               | Import and use named constant from `apps/web/src/constants/colors.ts`                                                                                                                          | `lint-review-patterns` |
+| 26  | `throw new Error()` in GraphQL resolver for input validation     | Use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`                                                                                                                            | `lint-review-patterns` |
+| 27  | `localStorage`/`sessionStorage` write without try/catch          | Wrap in try/catch — storage throws in private mode and on quota exceeded                                                                                                                       | `lint-review-patterns` |
+| 28  | Unsafe `as 'literal-union'` cast on unvalidated external data    | Use type guard with allowed-values array instead of bare `as` assertion                                                                                                                        | Manual                 |
+| 29  | ⭐ LOGGER.error/warn non-Error 2nd arg (13/100 PRs)              | Pass raw `Error` instance as 2nd arg; extra context goes in 3rd arg                                                                                                                            | `lint-review-patterns` |
+| 30  | Missing/incomplete test coverage for new logic                   | Every new component/resolver/mutation/bug-fix needs a spec covering the changed behavior                                                                                                       | Manual                 |
+| 31  | PR description does not match diff                               | Read your diff before pushing; explain all generated-file changes                                                                                                                              | Manual                 |
+| 32  | Missing range/null validation on GraphQL mutation arguments      | Guard numeric ranges, null/undefined, and enum values with `UserInputError`                                                                                                                    | Manual                 |
+| 33  | Loading state not reset after mutation failure                   | Use `finally { setLoading(false) }` — not only in success path                                                                                                                                 | Manual                 |
+| 34  | Missing authorization check (auth ≠ authz)                       | After auth check, also verify user membership/ownership of the requested resource                                                                                                              | Manual                 |
+| 35  | Drizzle `integer` for BIGINT column (overflow)                   | Use `bigint('col', { mode: 'number' })` for DB BIGINT columns                                                                                                                                  | Manual                 |
+| 36  | Multi-column sort with single-column cursor                      | Cursor must encode all `orderBy` columns, not just `id`                                                                                                                                        | Manual                 |
+| 37  | Weak test assertions (`toBeDefined()` instead of value)          | Assert the concrete expected value, not just existence                                                                                                                                         | Manual                 |
+| 38  | Duplicate constant across packages (DRY violation)               | Define once in a shared lib; import everywhere                                                                                                                                                 | Manual                 |
+| 39  | ⚠️ Committed symlink / local absolute path                       | Check `file <new-file>` before staging; add to `.gitignore`                                                                                                                                    | Manual                 |
+| 40  | `console.*` / `process.stdout.write` in app code                 | Use `LOGGER` from `@legacy-sports/logging` (exceptions: CLI, migrations, build scripts, `scripts/`)                                                                                            | ESLint                 |
+| 41  | Error message leaked to UI                                       | Show generic string to user; log real error with `LOGGER.error`                                                                                                                                | Manual                 |
+| 42  | Terraform resource rename without `moved {}` block               | Add `moved { from = old.name; to = new.name }` to avoid destroy+recreate                                                                                                                       | Manual                 |
+| 43  | Shell variable empty after `\|\| true` pattern                   | Provide explicit fallback: `cmd \| echo "default"`                                                                                                                                             | Manual                 |
+| 44  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge                                                                                          | Manual                 |
 
 ## Pattern Details
 
@@ -85,6 +85,30 @@ if (postData.includes('"getleague"')) { ... }
 const op = extractOperationName(route);
 if (op === 'GetLeague') { ... }
 ```
+
+### #4 — Missing UNAUTHENTICATED guard test (backend resolvers only)
+
+Every new resolver or mutation under `lambdas/` must have a test that calls it with `user: null` and asserts the `UNAUTHENTICATED` error code.
+
+**Scope**: applies only to `lambdas/**/*.spec.ts`. Do NOT flag frontend component tests (`apps/app/**`, `apps/web/**`, `lib/**`) — the component mock-based test infrastructure cannot assert server-level error codes. Frontend tests satisfy the requirement by testing the `skip:` guard and graceful null-data handling, not by asserting a server error code.
+
+```typescript
+// ✅ Backend (lambdas/) — required pattern
+it('throws UNAUTHENTICATED when user is null', async () => {
+  const result = await resolvers.Query.getLeague(null, { leagueId: '1' }, { user: null });
+  expect(result.extensions.code).toBe('UNAUTHENTICATED');
+});
+
+// ✅ Frontend (apps/web/, apps/app/, lib/) — satisfying pattern
+it('renders nothing when user is unauthenticated', () => {
+  mockUseCurrentUser.mockReturnValue({ user: null });
+  render(<Scoreboard leagueId="1" />);
+  // Query has skip: !user — nothing fires, component renders graceful empty state
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+});
+```
+
+Reference: LS-7762 — Pattern #4 was incorrectly firing on frontend component tests, causing 5+ bot review cycles on PR #4841.
 
 ### #5 — route.fallback() in the wrong layer
 
@@ -357,7 +381,7 @@ Sub-patterns caught repeatedly:
 
 - **New component with filtering/search/pagination logic and no spec file** — every new component that has more than simple rendering needs a spec
 - **Bug fix where tests only cover input validation, not the fixed behavior** — if the fix is "wrap in a transaction", the test must assert transactional behavior, not just that bad input rejects
-- **New mutation with no unauthenticated (`user: null`) test** — see #4 above; applies to every new resolver/mutation, not just public ones
+- **New mutation with no unauthenticated (`user: null`) test** — see #4 above; applies to every new resolver/mutation under `lambdas/`, not just public ones. Frontend component tests satisfy this differently — see #4 detail for the scoping rule.
 - **New route component with data-fetching logic and no tests** — even if the route renders a child component, the routing/loading/error states need coverage
 
 ### #31 — PR description does not match the diff

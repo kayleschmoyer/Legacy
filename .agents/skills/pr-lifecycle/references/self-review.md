@@ -54,7 +54,7 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
 7. **Check against [common review patterns](common-review-patterns.md) (judgment-requiring patterns only)** — Step 2's `make lint-review-patterns` already caught the regex-checkable patterns. Now manually check the patterns that require semantic understanding:
    - **#3**: Header comment overclaiming test coverage
-   - **#4**: Missing UNAUTHENTICATED guard test for resolvers
+   - **#4**: Missing UNAUTHENTICATED guard test — **backend resolvers only** (`lambdas/**/*.spec.ts`). Frontend component tests (`apps/`, `lib/`) satisfy this via `skip:` guard + graceful null-data handling, not a server error code assertion. See #4 detail in `common-review-patterns.md`.
    - **#7**: `data: null` mock response — Apollo expects `{ data: { queryName: ... } }`
    - **#8**: Wrong GraphQL field names in mocks (check actual `.graphql` files)
    - **#9**: Test name doesn't match assertion
