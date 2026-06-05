@@ -9,6 +9,7 @@ import { LoginPage as AuthCard } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
+import { getSafeRedirectTarget } from '../../lib/safe-redirect';
 import { env } from '../../config/environment';
 import {
   useGetOnThisDayQuery,
@@ -202,7 +203,11 @@ export function LoginPage(): React.JSX.Element {
         // refresh on every page load.  See lib/session-precache.ts.
         storeDiscordSessionPreCache(result.jwt);
 
-        window.location.replace(env.baseUrl);
+        // Validate the redirect target before navigating. env.baseUrl is a
+        // build-time constant today, but routing it through an explicit
+        // same-origin/allowlist check ensures a poisoned config value can never
+        // turn this into an open redirect.
+        window.location.replace(getSafeRedirectTarget(env.baseUrl));
       } catch (err) {
         LOGGER.error(
           'Discord callback exchange failed:',
