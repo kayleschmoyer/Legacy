@@ -83,6 +83,15 @@ function fmt(n: number, decimals = 0): string {
   });
 }
 
+function fmtCurrency(cents: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
 function pct(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
@@ -295,6 +304,22 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
         <>
           {/* KPI Row */}
           <XStack gap="$3" flexWrap="wrap">
+            {stats.mrrCents != null && (
+              <MetricCard
+                label="MRR"
+                value={fmtCurrency(stats.mrrCents)}
+                sub="Monthly Recurring Revenue"
+                accent={BRAND_GOLD_LIGHT}
+              />
+            )}
+            {stats.arrCents != null && (
+              <MetricCard
+                label="ARR"
+                value={fmtCurrency(stats.arrCents)}
+                sub="Annual Recurring Revenue"
+                accent={BRAND_GOLD_LIGHT}
+              />
+            )}
             <MetricCard
               label="Total Subscribers"
               value={fmt(stats.totalSubscribers ?? 0)}

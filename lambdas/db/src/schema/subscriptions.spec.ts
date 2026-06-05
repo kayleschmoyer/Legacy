@@ -83,6 +83,7 @@ jest.mock('drizzle-orm', () => ({
 import {
   _resetStripePricesCache,
   buildCheckoutTrialParams,
+  computeRevenueCents,
   expireSubscriptionGracePeriods,
   fetchStripePrices,
   getOrCreateStripeCustomer,
@@ -601,5 +602,25 @@ describe('getSubscriptionForUser (LS-5201)', () => {
     );
 
     expect(await getSubscriptionForUser(99)).toBeNull();
+  });
+});
+
+// ─── computeRevenueCents (LS-5766) ────────────────────────────────────────────
+
+describe('computeRevenueCents', () => {
+  it('computes MRR as subscribers × monthly price', () => {
+    const result = computeRevenueCents(100, 999);
+    expect(result.mrrCents).toBe(99900);
+  });
+
+  it('computes ARR as MRR × 12', () => {
+    const result = computeRevenueCents(100, 999);
+    expect(result.arrCents).toBe(99900 * 12);
+  });
+
+  it('returns zero for both when there are no subscribers', () => {
+    const result = computeRevenueCents(0, 999);
+    expect(result.mrrCents).toBe(0);
+    expect(result.arrCents).toBe(0);
   });
 });

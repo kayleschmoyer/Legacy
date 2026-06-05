@@ -77,7 +77,9 @@ export type ActiveDisclosureGame = {
 
 export type AdminRevenueStats = {
   __typename?: 'AdminRevenueStats';
+  arrCents?: Maybe<Scalars['Int']['output']>;
   conversionRate?: Maybe<Scalars['Float']['output']>;
+  mrrCents?: Maybe<Scalars['Int']['output']>;
   newSubscribersThisMonth?: Maybe<Scalars['Int']['output']>;
   statusBreakdown?: Maybe<Array<SubscriptionStatusCount>>;
   stripeSubscribers?: Maybe<Scalars['Int']['output']>;

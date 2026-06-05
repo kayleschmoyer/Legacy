@@ -53,7 +53,9 @@ type ActiveDisclosureGame {
 }
 
 type AdminRevenueStats {
+  arrCents: Int
   conversionRate: Float
+  mrrCents: Int
   newSubscribersThisMonth: Int
   statusBreakdown: [SubscriptionStatusCount!]
   stripeSubscribers: Int

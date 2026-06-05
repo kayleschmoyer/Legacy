@@ -113,6 +113,8 @@ const AdminRevenueStatsRef = builder.objectRef<{
   totalUsers: number;
   conversionRate: number;
   newSubscribersThisMonth: number;
+  mrrCents: number | null;
+  arrCents: number | null;
   statusBreakdown: { status: string; count: number }[];
   subscriberGrowth: { month: string; newSubscribers: number }[];
 }>('AdminRevenueStats');
@@ -126,6 +128,8 @@ AdminRevenueStatsRef.implement({
     totalUsers: t.exposeInt('totalUsers'),
     conversionRate: t.exposeFloat('conversionRate'),
     newSubscribersThisMonth: t.exposeInt('newSubscribersThisMonth'),
+    mrrCents: t.exposeInt('mrrCents', { nullable: true }),
+    arrCents: t.exposeInt('arrCents', { nullable: true }),
     statusBreakdown: t.expose('statusBreakdown', {
       type: [SubscriptionStatusCountRef],
     }),
@@ -355,6 +359,15 @@ builder.queryField('mySubscription', (t) =>
   }),
 );
 
+/** Pure helper — exported for unit testing. */
+export function computeRevenueCents(
+  totalSubscribers: number,
+  monthlyPriceCents: number,
+): { mrrCents: number; arrCents: number } {
+  const mrrCents = totalSubscribers * monthlyPriceCents;
+  return { mrrCents, arrCents: mrrCents * 12 };
+}
+
 builder.queryField('adminRevenueStats', (t) =>
   t.field({
     type: AdminRevenueStatsRef,
@@ -446,7 +459,24 @@ builder.queryField('adminRevenueStats', (t) =>
             sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
           );
 
-        LOGGER.error('Admin revenue stats viewed', {
+        // MRR/ARR: active subscribers × monthly price snapshot.
+        // Gracefully degrades to null when Stripe prices are not configured.
+        let mrrCents: number | null = null;
+        let arrCents: number | null = null;
+        try {
+          const prices = await fetchStripePrices();
+          ({ mrrCents, arrCents } = computeRevenueCents(
+            totalSubscribers,
+            prices.monthlyPriceCents,
+          ));
+        } catch (err) {
+          LOGGER.warn(
+            'adminRevenueStats: could not fetch Stripe prices; omitting mrrCents/arrCents',
+            err instanceof Error ? err : new Error(String(err)),
+          );
+        }
+
+        LOGGER.info('Admin revenue stats viewed', {
           audit: true,
           actor: { id: Number(user.id) },
           totalUsers,
@@ -462,6 +492,8 @@ builder.queryField('adminRevenueStats', (t) =>
           totalUsers,
           conversionRate,
           newSubscribersThisMonth: newThisMonthRow?.count ?? 0,
+          mrrCents,
+          arrCents,
           statusBreakdown: statusRows,
           subscriberGrowth: growthRows,
         };
