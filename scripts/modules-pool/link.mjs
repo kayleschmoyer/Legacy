@@ -120,12 +120,14 @@ if (isHealthy(slotNm)) {
   console.log('[ok] slot materialised and linked.');
 }
 
-// Link the main repo's gitignored secret env files (.env, .env.local) into the
-// worktree, mirroring the behaviour the SessionStart hook relied on before the
-// pool became the default resolver. The .env link is what lets agents run
-// integration tests (playwright.integration.config.ts loads <repo>/.env) and
-// pick up MCP_* credentials. Failures here are non-fatal: node_modules — the
-// primary mission — is already linked.
+// Link the main repo's gitignored secret env files (.env, .env.local) and the
+// certs/ directory into the worktree, mirroring the behaviour the SessionStart
+// hook relied on before the pool became the default resolver. The .env link is
+// what lets agents run integration tests (playwright.integration.config.ts loads
+// <repo>/.env) and pick up MCP_* credentials. The certs/ link is required so
+// db-client tooling (db_migration_status, db_migrate, etc.) can resolve
+// DB_CERT_PATH for SSL connections. Failures here are non-fatal: node_modules —
+// the primary mission — is already linked.
 linkSecretEnvFiles();
 
 // ---------------------------------------------------------------------------
@@ -389,16 +391,17 @@ function nonEmpty(v) {
 }
 
 // ---------------------------------------------------------------------------
-// Secret env-file linking (.env, .env.local)
+// Secret env-file / shared-dir linking (.env, .env.local, certs/)
 // ---------------------------------------------------------------------------
-// These files live only in the main repo (gitignored, contain local creds).
-// Symlinking — rather than copying — means rotations in main propagate to all
-// worktrees automatically. All failures are non-fatal.
+// These files/dirs live only in the main repo (gitignored). Symlinking —
+// rather than copying — means rotations in main propagate to all worktrees
+// automatically. All failures are non-fatal.
 function linkSecretEnvFiles() {
   console.log('');
   for (const name of ['.env', '.env.local']) {
     linkEnvFile(name);
   }
+  linkDir('certs');
 }
 
 function linkEnvFile(name) {
@@ -460,6 +463,71 @@ function linkEnvFile(name) {
       `[warn] ${name}: failed to create symlink: ${msg}` +
         (devMode
           ? '\n       File symlinks require Windows Developer Mode; ' +
+            `copy the main repo's ${name} into this worktree manually instead.`
+          : ''),
+    );
+    return;
+  }
+  console.log(`[ok] ${name}: linked → ${mainPath}`);
+}
+
+// Link a directory from the main repo into the worktree (e.g. certs/).
+// Parallel to linkEnvFile but handles directory symlinks: mklink /D on Windows,
+// plain symlinkSync on POSIX (the type argument is ignored there). Non-fatal.
+function linkDir(name) {
+  const mainPath = join(mainRepo, name);
+  const wtPath = join(worktree, name);
+
+  if (!existsSync(mainPath)) {
+    console.log(`[skip] ${name}: not present in main repo, nothing to link.`);
+    return;
+  }
+
+  if (lstatExists(wtPath)) {
+    const st = safeLstat(wtPath);
+    if (st && st.isSymbolicLink()) {
+      const target = safeRealpath(wtPath);
+      if (target && normalize(target) === normalize(mainPath)) {
+        console.log(`[ok] ${name}: symlink already points to main repo.`);
+        return;
+      }
+      console.log(`[info] ${name}: symlink points elsewhere — replacing.`);
+      try {
+        rmSync(wtPath, { force: true });
+      } catch (err) {
+        console.warn(
+          `[warn] ${name}: could not remove the existing wrong-target symlink: ${String(err.message ?? err)}\n` +
+            `       The worktree is still linked to an INCORRECT ${name}. Remove it manually ` +
+            `(rm -rf "${wtPath}") and re-run this resolver.`,
+        );
+        return;
+      }
+    } else {
+      console.log(
+        `[skip] ${name}: real directory/file present in worktree (not a symlink). ` +
+          'Delete it manually to switch to the linked copy.',
+      );
+      return;
+    }
+  }
+
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('cmd', ['/c', 'mklink', '/D', wtPath, mainPath], {
+        encoding: 'utf-8',
+        timeout: 10_000,
+        windowsHide: true,
+      });
+    } else {
+      symlinkSync(mainPath, wtPath);
+    }
+  } catch (err) {
+    const msg = String(err.message ?? err);
+    const devMode = /privilege|EPERM|1314/i.test(msg);
+    console.warn(
+      `[warn] ${name}: failed to create symlink: ${msg}` +
+        (devMode
+          ? '\n       Directory symlinks require Windows Developer Mode; ' +
             `copy the main repo's ${name} into this worktree manually instead.`
           : ''),
     );

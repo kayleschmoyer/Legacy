@@ -297,6 +297,91 @@ test(
   },
 );
 
+// --- certs/ directory symlinking (linkDir) -----------------------------------
+// link.mjs symlinks the main repo's certs/ directory into the worktree after
+// linking node_modules. This is needed so DB_CERT_PATH resolves correctly for
+// db-client SSL connections (db_migration_status, db_migrate, etc.).
+
+test(
+  'links certs/ directory from main into the worktree',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      mkdirSync(join(root, 'certs'));
+      writeFileSync(join(root, 'certs', 'us-east-1-bundle.pem'), 'CERT\n');
+      const wt = makeWorktree(root, 'certs-wt');
+      prebuildSlot(root, wt);
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+
+      const linkPath = join(wt, 'certs');
+      assert.ok(
+        lstatSync(linkPath).isSymbolicLink(),
+        'certs should be a symlink',
+      );
+      assert.equal(
+        realpathSync(linkPath),
+        realpathSync(join(root, 'certs')),
+        'certs should target the main repo copy',
+      );
+
+      // Idempotent: a second run keeps the link and does not throw.
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      assert.ok(lstatSync(join(wt, 'certs')).isSymbolicLink());
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'does not overwrite a real (non-symlink) certs/ directory already in the worktree',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      mkdirSync(join(root, 'certs'));
+      const wt = makeWorktree(root, 'realcerts-wt');
+      mkdirSync(join(wt, 'certs')); // real directory, not a symlink
+      writeFileSync(join(wt, 'certs', 'local.pem'), 'LOCAL\n');
+      prebuildSlot(root, wt);
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+
+      const wtCerts = join(wt, 'certs');
+      assert.ok(
+        !lstatSync(wtCerts).isSymbolicLink(),
+        'a real certs/ must be left as a real directory',
+      );
+      assert.ok(
+        existsSync(join(wtCerts, 'local.pem')),
+        'existing cert file must not be removed',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'certs linking is a no-op (no error) when the main repo has no certs/',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'nocerts-wt');
+      prebuildSlot(root, wt);
+
+      const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      assert.match(out, /certs: not present in main repo/);
+      assert.ok(!existsSync(join(wt, 'certs')), 'no certs/ should be created');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
 test(
   'gc prunes old orphans, keeps live + young slots, reclaims tmp',
   { skip: SYMLINK_OK ? false : 'no symlink capability' },
