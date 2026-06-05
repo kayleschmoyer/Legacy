@@ -1,6 +1,11 @@
 #!/bin/bash
-# Stop hook: remove node_modules NTFS junction from ephemeral worktree before session ends.
+# SessionEnd hook: remove node_modules NTFS junction from ephemeral worktree at session end.
 # Targets junctions specifically (created by cmd mklink /J or make_worktree_create).
+#
+# Runs on SessionEnd (not Stop) for the same reason as cleanup-worktree-symlink.sh:
+# Stop fires per-turn, so tearing down node_modules there breaks the next turn's
+# build commands. This hook already bails on symlinks (the normal case), but keeping
+# both cleanups on the same event avoids splitting teardown across hook lifecycles.
 #
 # Junctions ARE followed by recursive-delete tools (PowerShell Remove-Item, git worktree
 # remove), unlike directory symlinks which are not. This makes them dangerous when Claude

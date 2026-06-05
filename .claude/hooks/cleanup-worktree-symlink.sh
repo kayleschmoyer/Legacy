@@ -1,8 +1,14 @@
 #!/bin/bash
-# Stop hook: remove node_modules symlink from ephemeral worktree before session ends.
+# SessionEnd hook: remove node_modules symlink from ephemeral worktree at session end.
 # This is a belt-and-suspenders cleanup — the main protection is that directory
 # symlinks (mklink /D) are NOT followed by recursive-delete tools, so even if this
 # hook doesn't fire (e.g. Claude Code archive), the target is safe.
+#
+# MUST run on SessionEnd, not Stop: Stop fires after *every* assistant turn, so
+# removing node_modules there tears down the symlink mid-session. The next turn's
+# build commands (`make pc` → `pnpm exec nx ...`) then fail with "nx not found"
+# until a later SessionStart re-links it — an intermittent, hard-to-trace failure.
+# SessionEnd fires once, at true session end, so the symlink survives across turns.
 #
 # Uses `cmd //c rmdir` (non-recursive) which safely removes symlinks without
 # touching the target. Real directories are left untouched.

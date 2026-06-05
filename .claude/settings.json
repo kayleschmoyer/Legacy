@@ -89,7 +89,14 @@
           {
             "type": "command",
             "command": ".claude/hooks/check-open-pr.sh"
-          },
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
           {
             "type": "command",
             "command": ".claude/hooks/cleanup-worktree-junction.sh"

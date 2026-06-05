@@ -1,5 +1,8 @@
-# Stop hook: remove node_modules symlink from ephemeral worktree on session end.
+# SessionEnd hook: remove node_modules symlink from ephemeral worktree at session end.
 # Uses cmd rmdir (non-recursive) which removes symlinks without touching the target.
+#
+# Wire on SessionEnd, not Stop — Stop fires per-turn and tearing down node_modules
+# there breaks the next turn's build commands (nx not found) until SessionStart re-links.
 #
 # Claude Code equivalent: .claude/hooks/cleanup-worktree-symlink.sh
 
