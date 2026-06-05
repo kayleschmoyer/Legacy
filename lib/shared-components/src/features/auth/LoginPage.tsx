@@ -105,7 +105,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <Text color="#1f1f1f" fontWeight="700" fontSize={14}>
                 {isGoogleLoading
                   ? 'Connecting to Google…'
-                  : 'Continue with Google'}
+                  : isConfiguring
+                    ? 'Preparing sign-in…'
+                    : 'Continue with Google'}
               </Text>
             </XStack>
           </Button>

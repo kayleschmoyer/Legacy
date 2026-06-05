@@ -57,7 +57,8 @@ export const Configuring: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'All buttons disabled while the OAuth provider is initialising.',
+        story:
+          'OAuth provider initialising — the Google button shows a spinner and a "Preparing sign-in…" progress label so the disabled state reads as in-progress rather than broken. All buttons disabled.',
       },
     },
   },
