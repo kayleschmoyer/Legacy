@@ -74,14 +74,17 @@ These are the specific built-in tool substitutions agents should reach for autom
 
 Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For affected targets, prefer `nx_run_affected` over `pnpm exec nx affected -t <target>`. Fall back to shell commands only when the MCP server is unavailable.
 
-| Shell command                               | MCP tool (use this)                                        |
-| ------------------------------------------- | ---------------------------------------------------------- |
-| `pnpm exec nx typecheck web`                | `nx_run({ target: "typecheck", project: "web" })`          |
-| `pnpm exec nx run web:typecheck`            | `nx_run({ target: "typecheck", project: "web" })`          |
-| `pnpm exec nx test shared-components`       | `nx_run({ target: "test", project: "shared-components" })` |
-| `pnpm exec nx build api`                    | `nx_run({ target: "build", project: "api" })`              |
-| `pnpm exec nx affected -t typecheck`        | `nx_run_affected({ targets: ["typecheck"] })`              |
-| `pnpm exec nx affected -t test --base=main` | `nx_run_affected({ targets: ["test"], base: "main" })`     |
+| Shell command                                                                                                                            | MCP tool (use this)                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm exec nx typecheck web`                                                                                                             | `nx_run({ target: "typecheck", project: "web" })`                             |
+| `pnpm exec nx run web:typecheck`                                                                                                         | `nx_run({ target: "typecheck", project: "web" })`                             |
+| `pnpm exec nx test shared-components`                                                                                                    | `nx_run({ target: "test", project: "shared-components" })`                    |
+| `pnpm exec nx build api`                                                                                                                 | `nx_run({ target: "build", project: "api" })`                                 |
+| `pnpm exec nx affected -t typecheck`                                                                                                     | `nx_run_affected({ targets: ["typecheck"] })`                                 |
+| `pnpm exec nx affected -t test --base=main`                                                                                              | `nx_run_affected({ targets: ["test"], base: "main" })`                        |
+| `E2E_AUTH_MODE=ci E2E_PORT=4283 npx playwright test --config=apps/web-e2e/playwright.config.ts --project=chromium src/tests/foo.spec.ts` | `nx_run_e2e_specs({ specs: ["src/tests/foo.spec.ts"], project: "chromium" })` |
+
+**`nx_run_e2e_specs` — targeted hermetic Playwright runs (LS-5988)**: use this instead of raw `npx playwright test …` whenever the work-ticket E2E/integration spec gate requires running specific hermetic specs locally. It automatically forces `E2E_AUTH_MODE=ci` (hermetic JWT; no OAuth device-flow needed), selects a free `E2E_PORT` via port probe (avoids cross-worktree webServer collisions), and returns structured `{ success, stats, failingTests[] }`. Requires `dist/apps/web` to exist first (`nx_run({ project: "web", target: "build" })`). Spec paths are relative to `apps/web-e2e/` (e.g. `"src/tests/roster-management.spec.ts"`).
 
 > **If you find yourself writing `pnpm exec nx` in a Bash tool call during a local session, treat this as a signal that the `legacy-sports-nx` MCP server is not connected.** Check server connectivity rather than falling back silently — `nx` lives in `node_modules/.bin` and will fail with a PATH error if the symlink is missing or broken. Verify the `node_modules` symlink exists (see `.agents/skills/mcp-first/SKILL.md` — MCP Servers section), then restart the session.
 

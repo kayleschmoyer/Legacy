@@ -6,6 +6,7 @@ import { checkPackageHealth } from './tools/check-package-health.js';
 import { depGraph } from './tools/dep-graph.js';
 import { installPackage } from './tools/install-package.js';
 import { runAffected } from './tools/run-affected.js';
+import { runE2ESpecs } from './tools/run-e2e-specs.js';
 import { runTarget } from './tools/run-target.js';
 import { showProject } from './tools/show-project.js';
 import { showProjects } from './tools/show-projects.js';
@@ -194,6 +195,41 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => showProjects(params),
+);
+
+// --- nx_run_e2e_specs ---
+server.tool(
+  'nx_run_e2e_specs',
+  'Prefer this over raw `npx playwright test` shell commands. Run targeted hermetic Playwright specs locally. ' +
+    'Automatically selects a free E2E_PORT (avoids cross-worktree webServer collisions) and forces E2E_AUTH_MODE=ci ' +
+    '(hermetic JWT — no OAuth device-flow needed). ' +
+    'Requires dist/apps/web to exist — run nx_run({ project: "web", target: "build" }) first if missing. ' +
+    'Returns structured pass/fail counts and failing test details.',
+  {
+    specs: z
+      .array(z.string())
+      .min(1)
+      .describe(
+        'Spec file paths relative to apps/web-e2e/ (e.g. ["src/tests/roster-management.spec.ts", "src/tests/league-detail-tabs.spec.ts"]). Absolute paths are also accepted.',
+      ),
+    project: z
+      .string()
+      .default('chromium')
+      .describe(
+        'Playwright project/browser to run against. Allowed: chromium, firefox, webkit, Mobile Chrome, Mobile Safari (default: chromium).',
+      ),
+    grep: z
+      .string()
+      .optional()
+      .describe(
+        'Filter tests by title regex (Playwright --grep). E.g. "@critical" or "should show roster".',
+      ),
+    worktreePath: z
+      .string()
+      .optional()
+      .describe('Worktree path (default: repo root)'),
+  },
+  async (params) => runE2ESpecs(params),
 );
 
 // Start the server
