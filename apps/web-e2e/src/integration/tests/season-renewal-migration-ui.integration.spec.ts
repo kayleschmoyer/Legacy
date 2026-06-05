@@ -33,6 +33,7 @@
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { freeCommissionerLeagueSlots } from '../helpers/free-league-slots';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
@@ -77,7 +78,16 @@ test.describe
   // test body throws — Playwright still runs afterAll on test failure. Process
   // crashes are caught by global-teardown (Layer 3) and the next run's
   // pre-run sweep in global-setup (Layer 1).
+  // Clean up BOTH the original league and the renewed (season-2) league. The
+  // renewal flow creates `state.newLeagueId` as a brand-new league; leaving it
+  // behind leaked one league per run under the per-spec commissioner — which
+  // the global sweep never reaps — and eventually tripped the 3-league limit
+  // on the next run's Phase 1 (LS-7704).
+  // Delete the renewed (season-2) child BEFORE the original (season-1) parent:
+  // `deleteLeague` does not cascade the `previousLeagueId` lineage FK, so the
+  // parent cannot be removed while the child still references it (LS-7704).
   test.afterAll(async ({ apiCommissioner }) => {
+    await cleanupLeague(apiCommissioner, state.newLeagueId);
     await cleanupLeague(apiCommissioner, state.leagueId);
   });
 
@@ -90,6 +100,14 @@ test.describe
     commissionerJwt,
   }) => {
     test.setTimeout(60_000);
+
+    // Free any leftover leagues for this spec's per-spec commissioner before
+    // creating. This spec creates two leagues per run (original + renewed), so
+    // a prior run that leaked either one leaves this identity at or near the
+    // free-tier 3-league cap. The global sweep only cleans the base
+    // commissioner, never this per-spec persona, so clear the slots here so
+    // league creation below never fails with the 3-league limit (LS-7704).
+    await freeCommissionerLeagueSlots(commissionerJwt);
 
     state.leagueName = `Season Renewal E2E ${Date.now()}`;
     const result = await createLeagueViaUI(page, {

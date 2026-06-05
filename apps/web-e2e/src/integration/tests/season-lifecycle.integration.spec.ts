@@ -37,6 +37,11 @@ import { waitForAllMatchupsStatsLoaded } from '../helpers/wait-for-stats-loaded'
 
 const GAMES_PER_MATCHUP = 2;
 const TOTAL_MATCHUPS = 2;
+// Roster size used at league creation. The backend completes a draft only once
+// every roster is full — i.e. after `numTeams * MAX_ROSTER_SIZE` picks
+// (lambdas/db/.../drafts/helpers.ts: isDraftComplete). Phase 2.6 must make that
+// many picks for the draft to reach `draftStatus: 'completed'` (LS-7704).
+const MAX_ROSTER_SIZE = 15;
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests
@@ -110,7 +115,7 @@ test.describe
             leagueName: `Season Lifecycle Integration Test ${Date.now()}`,
             numberOfTeams: 3,
             numberOfDivisions: 1,
-            maxRosterSize: 15,
+            maxRosterSize: MAX_ROSTER_SIZE,
             playerPool: 'all',
           },
         },
@@ -312,8 +317,11 @@ test.describe
 
     await test.step('2.6 Make all draft picks via commissioner', async () => {
       const numTeams = state.draftTeamOrder.length;
-      // 4 rounds of picks to build a roster
-      const totalRounds = 4;
+      // The draft completes only once every roster is full. Fill all of them:
+      // numTeams * MAX_ROSTER_SIZE picks. `commissionerPick` assigns each player
+      // to whichever team is on the clock, so picking distinct available players
+      // in sequence fills every roster regardless of snake order (LS-7704).
+      const totalRounds = MAX_ROSTER_SIZE;
       let playerIdx = 0;
 
       for (let round = 0; round < totalRounds; round++) {

@@ -76,14 +76,20 @@ test.describe
     });
 
     await test.step('Batting column headers are present', async () => {
-      // Column headers from CAREER_STATS_COLUMNS
+      // High-priority column headers from CAREER_STATS_COLUMNS
+      // (lib/shared-components/.../PlayerStatsDataGrid.tsx). The grid renders
+      // OBP and SLG as separate rate columns — there is no standalone "OPS"
+      // column — so assert on the columns that actually exist (LS-7704).
       await expect(page.getByText('HR', { exact: true }).first()).toBeVisible({
         timeout: 30_000,
       });
       await expect(page.getByText('AVG', { exact: true }).first()).toBeVisible({
         timeout: 15_000,
       });
-      await expect(page.getByText('OPS', { exact: true }).first()).toBeVisible({
+      await expect(page.getByText('OBP', { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByText('SLG', { exact: true }).first()).toBeVisible({
         timeout: 15_000,
       });
     });

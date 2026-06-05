@@ -37,6 +37,41 @@ export function isTestLeague(name: string): boolean {
 }
 
 /**
+ * Enumerate the slugs of every integration spec file in `tests/`. The slug
+ * matches `specSlugFromTestInfo` (test-user-auth.ts) so it can be fed to
+ * `specUserEmail('COMMISSIONER', slug)` / `getSpecUserJwt` to address the
+ * per-spec commissioner identity each spec authenticates as.
+ *
+ * Why the sweep needs this (LS-7704): specs run as a per-spec commissioner
+ * (`commissioner-<hash>@...`, LS-4940), but the pre-run/teardown sweeps only
+ * ever resolved the *base* commissioner. Leagues leaked by a spec therefore
+ * accumulated under its per-spec identity, invisible to the sweep, until the
+ * next run tripped the free-tier 3-league limit. Enumerating the slugs lets the
+ * sweep reach those identities.
+ *
+ * Returns an empty array if the directory cannot be read (best-effort — a
+ * missing dir must never break global setup/teardown).
+ */
+export function listIntegrationSpecSlugs(
+  testsDir: string = path.resolve(__dirname, 'tests'),
+): string[] {
+  try {
+    return fs
+      .readdirSync(testsDir)
+      .filter((f) => f.endsWith('.integration.spec.ts'))
+      .map((f) =>
+        f
+          .replace(/\.integration\.spec\.ts$/, '')
+          .replace(/\.spec\.ts$/, '')
+          .replace(/[^a-z0-9-]/gi, '-')
+          .toLowerCase(),
+      );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Skip cleanup of leagues younger than this so that concurrent runs on
  * different branches don't delete each other's in-flight leagues. The shared
  * commissioner test user means every run sees every other run's leagues

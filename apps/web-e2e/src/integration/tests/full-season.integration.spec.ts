@@ -53,6 +53,13 @@ const LEAGUE_FIELDS = `
 
 const TEAM_FIELDS = `id name`;
 
+// Roster size used at league creation. The backend marks a draft `completed`
+// only after every roster is full — `numTeams * MAX_ROSTER_SIZE` picks
+// (lambdas/db/.../drafts/helpers.ts: isDraftComplete). Free-agent claims
+// (Phase 5) require `draftStatus: 'completed'`, so Phase 2 must drive the
+// draft all the way to a full roster, not just a few rounds (LS-7704).
+const MAX_ROSTER_SIZE = 15;
+
 // ---------------------------------------------------------------------------
 // Module-level state shared across serial tests in a single worker.
 // ---------------------------------------------------------------------------
@@ -115,7 +122,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
             leagueName: `Integration Season Test League ${Date.now()}`,
             numberOfTeams: 3,
             numberOfDivisions: 1,
-            maxRosterSize: 15,
+            maxRosterSize: MAX_ROSTER_SIZE,
             playerPool: 'all',
           },
         },
@@ -229,6 +236,11 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // -------------------------------------------------------------------------
 
   test('Phase 2: Draft', async ({ api, api2, apiCommissioner }) => {
+    // Driving the draft to completion fills every roster
+    // (numTeams * MAX_ROSTER_SIZE picks), so allow extra headroom over the
+    // 120s config default for the sequential picks in step 2.13 (LS-7704).
+    test.setTimeout(240_000);
+
     await test.step('2.1 Commissioner initializes draft', async () => {
       const data = await graphqlOk<{
         initializeDraft: { id: number; draftMode: string };
@@ -484,6 +496,62 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
 
       expect(state.team1Roster.length).toBeGreaterThanOrEqual(4);
       expect(state.team2Roster.length).toBeGreaterThanOrEqual(4);
+    });
+
+    await test.step('2.13 Fill remaining rosters until the draft completes', async () => {
+      // The mechanics steps above (round 1, undo/re-pick, 3 more rounds) leave
+      // the draft only partially complete. Free-agent claims (Phase 5) require
+      // draftStatus === 'completed', which the backend sets only once every
+      // roster is full. Re-fetch the current undrafted pool (so we never re-pick
+      // a player consumed above) and keep picking until the league reports
+      // 'completed'. Completion is checked after each pick so we never attempt a
+      // pick on an already-completed draft (which the backend rejects). LS-7704.
+      const freshPool = await graphqlOk<{
+        getAvailableDraftPlayers: Array<{ id: number }>;
+      }>(
+        api,
+        `query AvailablePlayers($draftId: Int!) {
+           getAvailableDraftPlayers(draftId: $draftId) { id }
+         }`,
+        { draftId: state.draftId },
+      );
+      const pool = freshPool.getAvailableDraftPlayers;
+      // Upper bound: a full draft is numTeams * MAX_ROSTER_SIZE picks total, so
+      // the remaining picks can never exceed that. Guards against an infinite
+      // loop if completion is somehow never reported.
+      const maxRemaining = state.draftTeamOrder.length * MAX_ROSTER_SIZE;
+      let draftStatus = 'in-progress';
+
+      for (
+        let i = 0;
+        i < pool.length && i < maxRemaining && draftStatus !== 'completed';
+        i++
+      ) {
+        const d = await graphqlOk<{
+          commissionerPick: { playerId: number; teamId: number };
+        }>(
+          apiCommissioner,
+          `mutation Pick($draftId: Int!, $playerId: Int!) {
+             commissionerPick(draftId: $draftId, playerId: $playerId) { playerId teamId }
+           }`,
+          { draftId: state.draftId, playerId: pool[i].id },
+        );
+        if (d.commissionerPick.teamId === state.teams[0].id) {
+          state.team1Roster.push(Number(d.commissionerPick.playerId));
+        } else if (d.commissionerPick.teamId === state.teams[1].id) {
+          state.team2Roster.push(Number(d.commissionerPick.playerId));
+        }
+
+        const r = await graphqlOk<{
+          league: { draftStatus: string };
+        }>(api, `query { league(id: ${state.leagueId}) { draftStatus } }`);
+        draftStatus = r.league.draftStatus;
+      }
+
+      expect(
+        draftStatus,
+        'Draft reached completed after filling every roster',
+      ).toBe('completed');
     });
   });
 

@@ -6,17 +6,18 @@
  * and a real browser.
  *
  * Strategy:
- *   A beforeAll phase queries the live API (using the admin JWT from the CLI
- *   auth store) to discover:
- *     - A matchup with bench players → used for roster comparison + bench toggle
- *     - A completed matchup with a narrative recap → used for recap panel
- *   When a single matchup is both completed-with-recap and has bench players,
- *   it is reused so all 5 phases hit the same matchup. The discovery loop
- *   iterates every league and every recent matchup until eligible data is
- *   found — and asserts non-empty results so the suite fails loudly if the
- *   live env has no usable data, instead of silently skipping phases. The
- *   0/0/0 stability initiative (LS-4401) treats skips as failures, so any
- *   conditional skip in this spec would defeat its purpose.
+ *   A Phase 0 test self-provisions the data every later phase needs
+ *   (provisionCompletedMatchup): it creates a two-team league and drives it to
+ *   a single completed matchup. That one completed matchup has both bench
+ *   players (rosters spill past the starting lineup) and a narrative recap
+ *   (generated synchronously and deterministically on completion — no LLM, no
+ *   queue), so all five phases reuse it. Provisioning replaced an earlier
+ *   discovery loop that depended on pre-existing leagues for the test
+ *   commissioner; the global sweep wipes those for the base commissioner, so
+ *   discovery found zero leagues and failed in setup (LS-7704). Phase 0 asserts
+ *   the provisioned matchup is non-empty and has bench players so the suite
+ *   fails loudly rather than silently skipping (LS-4401 treats skips as
+ *   failures). The provisioned league is deleted in afterAll.
  *
  *   Cross-user phases (4, 5) use the `managerPage1` browser-context fixture
  *   rather than `switchUser`. switchUser races against the background JWT
@@ -40,19 +41,17 @@
  */
 
 import { expect } from '@playwright/test';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { gqlFetch } from '../helpers/gql-fetch';
-
+import { cleanupLeague } from '../helpers/cleanup-league';
+import { provisionCompletedMatchup } from '../helpers/provision-completed-matchup';
 import { test } from '../fixtures/ui';
-import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 // ---------------------------------------------------------------------------
 // Shared state set in beforeAll and consumed by subsequent phases
 // ---------------------------------------------------------------------------
 
 interface MatchupRosterState {
+  /** The self-provisioned league (LS-7704). Cleaned up in afterAll. */
+  leagueId: number;
   /** Any matchup in an admin league — used to test roster comparison panel */
   rosterLeagueId: number;
   rosterMatchupId: number;
@@ -66,121 +65,6 @@ interface MatchupRosterState {
 let state: MatchupRosterState;
 
 // ---------------------------------------------------------------------------
-// Auth helpers (mirrors ui.ts logic — reads same CLI auth store)
-// ---------------------------------------------------------------------------
-
-interface CliAuthData {
-  tokens: Record<string, { jwt: string; expiresAt: number; email: string }>;
-  defaultUser: string;
-}
-
-/**
- * Resolve the admin JWT for live-API discovery. Returns '' only when every
- * resolution path is unavailable; beforeAll asserts the result is truthy so
- * the suite fails loudly (rather than skipping) when no credentials exist.
- *
- * Resolution order (mirrors ui.ts fixture and global-setup.ts):
- *   1. INTEGRATION_JWT env var
- *   2. ~/.legacy-sports/auth.json (local CLI session)
- *   3. getTestUserJwt(COMMISSIONER) via E2E_COMMISSIONER_EMAIL/PASSWORD (CI)
- */
-async function tryGetAuthJwt(): Promise<string> {
-  if (process.env.INTEGRATION_JWT) {
-    return process.env.INTEGRATION_JWT;
-  }
-
-  const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
-  if (fs.existsSync(authPath)) {
-    try {
-      const data = JSON.parse(
-        fs.readFileSync(authPath, 'utf-8'),
-      ) as CliAuthData;
-      const user = data.defaultUser;
-      const entry = user ? data.tokens[user] : undefined;
-      if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
-        return entry.jwt;
-      }
-    } catch {
-      // fall through to test-user auth
-    }
-  }
-
-  try {
-    return await getTestUserJwt(TEST_USERS.COMMISSIONER);
-  } catch {
-    return '';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// GraphQL helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// GraphQL query strings used only during setUp
-// ---------------------------------------------------------------------------
-
-const GET_USER_LEAGUES = `
-  query GetUserLeagues {
-    userLeagues {
-      id
-      name
-      currentMatchup
-    }
-  }
-`;
-
-const GET_MATCHUPS_FOR_LEAGUE = `
-  query GetMatchupsForLeague($leagueId: Int!) {
-    getMatchupsForLeague(leagueId: $leagueId) {
-      id
-      weekNumber
-      leagueId
-      team1Id
-      team2Id
-      status
-    }
-  }
-`;
-
-const GET_MATCHUP_HISTORY = `
-  query GetMatchupHistory($leagueId: Int!, $status: MatchupStatus, $limit: Int) {
-    getMatchupHistory(leagueId: $leagueId, status: $status, limit: $limit) {
-      id
-      weekNumber
-      leagueId
-      team1Id
-      team2Id
-      status
-    }
-  }
-`;
-
-const GET_MATCHUP_RECAP = `
-  query GetMatchupRecap($id: Int!) {
-    getMatchupById(id: $id) {
-      id
-      status
-      recap {
-        headline
-        narrative
-        highlights
-        matchupType
-      }
-    }
-  }
-`;
-
-const GET_MATCHUP_PLAYERS = `
-  query GetMatchupPlayersForBench($matchupId: Int!) {
-    getMatchupPlayers(matchupId: $matchupId) {
-      id
-      positionId
-    }
-  }
-`;
-
-// ---------------------------------------------------------------------------
 // Serial test suite
 // ---------------------------------------------------------------------------
 
@@ -192,165 +76,64 @@ test.describe
   // SETUP — query live API for matchup IDs to use in subsequent phases
   // -----------------------------------------------------------------------
 
-  test.beforeAll(async () => {
+  test.beforeAll(() => {
     state = {
+      leagueId: 0,
       rosterLeagueId: 0,
       rosterMatchupId: 0,
       hasBenchPlayers: false,
       recapLeagueId: 0,
       recapMatchupId: 0,
     };
+  });
 
-    const jwt = await tryGetAuthJwt();
-    expect(jwt, 'Resolved a JWT for matchup discovery').toBeTruthy();
+  // Clean up the self-provisioned league once every phase has run (LS-7704).
+  test.afterAll(async ({ apiCommissioner }) => {
+    await cleanupLeague(apiCommissioner, state.leagueId);
+  });
 
-    // Get all leagues the admin belongs to
-    const userLeaguesData = await gqlFetch<{
-      userLeagues: Array<{
-        id: number;
-        name: string;
-        currentMatchup?: number | null;
-      }>;
-    }>(jwt, GET_USER_LEAGUES);
-    const leagues = userLeaguesData.userLeagues ?? [];
+  // -----------------------------------------------------------------------
+  // PHASE 0 — Provision a completed matchup with a recap
+  // -----------------------------------------------------------------------
+  //
+  // This spec previously *discovered* a completed-with-recap matchup among the
+  // test commissioner's pre-existing leagues. That coupled it to live seed data
+  // the global sweep wipes for the base commissioner, so it found zero leagues
+  // and failed in setup (LS-7704). We now provision our own data: a two-team
+  // league driven to a single completed matchup. A matchup recap is generated
+  // synchronously and deterministically on completion (no LLM / queue), so the
+  // same completed matchup satisfies every phase below — roster comparison,
+  // bench toggle, recap panel, and the cross-user view.
+  test('Phase 0: Provision a completed matchup with a recap', async ({
+    commissionerJwt,
+    managerJwt1,
+  }) => {
+    test.setTimeout(300_000);
+
+    const provisioned = await provisionCompletedMatchup({
+      commissionerJwt,
+      managerJwt: managerJwt1,
+      leagueName: `Roster Recap E2E ${Date.now()}`,
+    });
+
+    state.leagueId = provisioned.leagueId;
+    state.rosterLeagueId = provisioned.leagueId;
+    state.rosterMatchupId = provisioned.matchupId;
+    state.recapLeagueId = provisioned.leagueId;
+    state.recapMatchupId = provisioned.matchupId;
+    state.hasBenchPlayers = provisioned.hasBenchPlayers;
+
+    // The provisioned matchup must satisfy the preconditions every later phase
+    // depends on — fail loudly here rather than mid-phase (LS-4401: skips are
+    // failures).
     expect(
-      leagues.length,
-      'Live env has at least one league for the test commissioner',
-    ).toBeGreaterThan(0);
-
-    async function matchupHasBench(matchupId: number): Promise<boolean> {
-      try {
-        const playersData = await gqlFetch<{
-          getMatchupPlayers: Array<{ id: number; positionId: number | null }>;
-        }>(jwt, GET_MATCHUP_PLAYERS, { matchupId });
-        return (playersData.getMatchupPlayers ?? []).some(
-          (p) => p.positionId === null,
-        );
-      } catch {
-        return false;
-      }
-    }
-
-    async function matchupHasRecap(matchupId: number): Promise<boolean> {
-      try {
-        const recapData = await gqlFetch<{
-          getMatchupById: {
-            id: number;
-            status: string;
-            recap: { headline: string } | null;
-          };
-        }>(jwt, GET_MATCHUP_RECAP, { id: matchupId });
-        return Boolean(recapData.getMatchupById?.recap?.headline);
-      } catch {
-        return false;
-      }
-    }
-
-    // ── Prefer one matchup that satisfies BOTH preconditions ─────────────
-    // Iterate every league's recent completed history and look for a matchup
-    // that has bench players AND a narrative recap. If we find one, use it
-    // for all 5 phases — the recap-only and roster-only paths still work
-    // because a single completed matchup covers both.
-    // Matchup.id is GraphQL ID (serialized as a string), so the spec coerces
-    // to Number before passing to Int! query args or storing in state.
-    outer: for (const league of leagues) {
-      let completed: Array<{
-        id: string;
-        leagueId: number;
-        status: string;
-      }> = [];
-      try {
-        const histData = await gqlFetch<{
-          getMatchupHistory: Array<{
-            id: string;
-            leagueId: number;
-            status: string;
-          }>;
-        }>(jwt, GET_MATCHUP_HISTORY, {
-          leagueId: league.id,
-          status: 'completed',
-          limit: 10,
-        });
-        completed = histData.getMatchupHistory ?? [];
-      } catch {
-        continue;
-      }
-
-      for (const m of completed) {
-        const matchupId = Number(m.id);
-        if (!(await matchupHasRecap(matchupId))) continue;
-        const hasBench = await matchupHasBench(matchupId);
-        // Always remember the first recap match in case nothing has bench
-        if (state.recapMatchupId === 0) {
-          state.recapLeagueId = league.id;
-          state.recapMatchupId = matchupId;
-        }
-        if (hasBench) {
-          state.rosterLeagueId = league.id;
-          state.rosterMatchupId = matchupId;
-          state.hasBenchPlayers = true;
-          break outer;
-        }
-      }
-    }
-
-    // ── Fallback: find any matchup with bench players for the roster phases
-    // when no completed-with-recap matchup also has bench (e.g. all completed
-    // matchups have empty rosters because games were never selected).
-    if (state.rosterMatchupId === 0) {
-      for (const league of leagues) {
-        let matchups: Array<{ id: string; weekNumber: number }> = [];
-        try {
-          const data = await gqlFetch<{
-            getMatchupsForLeague: Array<{
-              id: string;
-              weekNumber: number;
-              leagueId: number;
-              team1Id: number;
-              team2Id: number;
-              status: string;
-            }>;
-          }>(jwt, GET_MATCHUPS_FOR_LEAGUE, { leagueId: league.id });
-          matchups = data.getMatchupsForLeague ?? [];
-        } catch {
-          continue;
-        }
-
-        // Prefer the league's current matchup first (compare as numbers since
-        // currentMatchup is Int while m.id is ID).
-        const currentMatchupNum = league.currentMatchup;
-        const ordered = currentMatchupNum
-          ? [
-              ...matchups.filter((m) => Number(m.id) === currentMatchupNum),
-              ...matchups.filter((m) => Number(m.id) !== currentMatchupNum),
-            ]
-          : matchups;
-
-        for (const m of ordered) {
-          const matchupId = Number(m.id);
-          if (await matchupHasBench(matchupId)) {
-            state.rosterLeagueId = league.id;
-            state.rosterMatchupId = matchupId;
-            state.hasBenchPlayers = true;
-            break;
-          }
-        }
-        if (state.rosterMatchupId !== 0) break;
-      }
-    }
-
-    expect(
-      state.rosterMatchupId,
-      'Discovered a matchup with bench players for roster-comparison phases',
+      state.recapMatchupId,
+      'Provisioned a completed matchup for the recap/roster phases',
     ).toBeGreaterThan(0);
     expect(
       state.hasBenchPlayers,
-      'Discovered matchup has at least one bench player (positionId === null)',
+      'Provisioned matchup has at least one bench player (positionId === null)',
     ).toBe(true);
-    expect(
-      state.recapMatchupId,
-      'Discovered a completed matchup with a narrative recap',
-    ).toBeGreaterThan(0);
   });
 
   // -----------------------------------------------------------------------
