@@ -140,10 +140,14 @@ export function LoginPage(): React.JSX.Element {
     setIsDiscordLoading(true);
     setErrorMessage('');
 
-    const oauthProxyUrl = config.oauthProxyUrl ?? 'http://localhost:5001';
-
     const exchangeCode = async () => {
       try {
+        // Read the proxy URL inside the try so a synchronous fault (e.g. a
+        // getter throwing from a hot-swapped config) is still caught and the
+        // `finally` below resets the loading state — otherwise the Discord
+        // button would stay disabled forever (LS-6687).
+        const oauthProxyUrl = config.oauthProxyUrl ?? 'http://localhost:5001';
+
         const response = await fetch(`${oauthProxyUrl}/discord`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

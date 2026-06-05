@@ -45,12 +45,12 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
   },
 }));
 
+// Mutable so individual tests can supply a faulting config (e.g. a getter that
+// throws synchronously to model a hot-swapped config — see LS-6687).
+let mockAuthConfig: Record<string, unknown> = {};
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({
-    config: {
-      googleClientId: 'test-client-id',
-      oauthProxyUrl: 'http://localhost:5001',
-    },
+    config: mockAuthConfig,
     loginWithOAuth: jest.fn(),
     error: null,
   }),
@@ -104,6 +104,10 @@ let configureSpy: jest.SpyInstance;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAuthConfig = {
+    googleClientId: 'test-client-id',
+    oauthProxyUrl: 'http://localhost:5001',
+  };
   debugSpy = jest.spyOn(LOGGER, 'debug').mockImplementation(() => undefined);
   errorSpy = jest.spyOn(LOGGER, 'error').mockImplementation(() => undefined);
   signInSpy = jest.spyOn(OAuthProvider, 'signIn');
@@ -117,6 +121,57 @@ afterEach(() => {
   errorSpy.mockRestore();
   signInSpy.mockRestore();
   configureSpy.mockRestore();
+});
+
+describe('LoginPage Discord callback — synchronous config fault (LS-6687)', () => {
+  const ORIGINAL_URL = window.location.href;
+
+  afterEach(() => {
+    window.history.replaceState({}, '', ORIGINAL_URL);
+  });
+
+  it('resets the Discord loading state when reading config throws synchronously during the callback', async () => {
+    // Model a hot-swapped config: oauthProxyUrl is read safely during render
+    // (the effect's deps array and handleDiscordSignIn's deps array), but
+    // faults exactly once when the callback effect body reads it. Faulting only
+    // on that read leaves render-phase and post-error re-render reads safe.
+    let reads = 0;
+    const EFFECT_BODY_READ = 3; // reads 1 & 2 are the two deps arrays at render
+    mockAuthConfig = {
+      googleClientId: 'test-client-id',
+      discordClientId: 'test-discord-id',
+      get oauthProxyUrl(): string {
+        reads += 1;
+        if (reads === EFFECT_BODY_READ) {
+          throw new Error('config access fault');
+        }
+        return 'http://localhost:5001';
+      },
+    };
+
+    // Land on the Discord OAuth callback route with a valid code/state so the
+    // effect proceeds to setIsDiscordLoading(true) and the proxy-URL read.
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/discord/callback?code=abc&state=xyz',
+    );
+
+    renderPage();
+
+    // The Discord button must recover — never stuck in the "Connecting…" state.
+    await waitFor(() => {
+      const discordBtn = screen.getByRole('button', {
+        name: /continue with discord/i,
+      });
+      expect(discordBtn).not.toBeDisabled();
+    });
+    expect(screen.queryByText(/connecting to discord/i)).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Discord callback exchange failed:',
+      expect.any(Error),
+    );
+  });
 });
 
 describe('LoginPage handleSignIn catch block', () => {
