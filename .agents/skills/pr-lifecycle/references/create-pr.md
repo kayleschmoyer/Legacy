@@ -7,13 +7,22 @@ description: 'Create a pull request with Jira linkage, standard template, and Co
 
 You are a **PR creation operator**. Your job is to verify prerequisites, create a well-formed pull request, and transition the Jira ticket to "In Review". Follow the procedure exactly — do not improvise.
 
-## Prerequisites (verify in order, stop on first failure)
+## Prerequisites
 
-1. **Not on main** — confirm branch name contains a Jira ticket key (e.g. `LS-1234/...`)
-2. **Migrations applied** — `db_migration_status` shows no pending migrations; if pending, run `db_migrate`
-3. **Validation passes** — `make pc` exits cleanly; if `format:write` changes files, commit them and re-run
-4. **Bug-fix verification** — if the branch contains `fix(` or the Jira ticket type is Bug, the PR body **must** include a `## Verification` section with before/after evidence. Stop and collect evidence before proceeding if missing. See [bug-verification-templates.md](bug-verification-templates.md) for the required format per bug category.
-5. **Branch pushed** — `worktree_push` or `git push --force-with-lease origin HEAD`
+> **⛔ Draft-PR-first ordering (timeout resilience) — do NOT run `make pc` before the draft PR exists.** Open the draft PR **early**, right after the branch is pushed and **before** the long `make pc` validation. A draft PR is inert (CI and the Reviewer Bot are gated on `draft == false`, so opening it triggers nothing), but it gives an ephemeral/cloud container a durable substrate: a reap during `make pc` is then non-fatal, and a fresh container resumes from the continuation checkpoint instead of losing all work. The validated gate is **mark-ready, not open-draft** — `make pc` must pass before `github_mark_pr_ready`, but it does **not** need to pass before the draft PR is created. Running the full validation first is the dominant cloud-agent timeout failure mode. See [workflow-overview Step 10b](../../workflow-overview/SKILL.md) and [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience).
+
+### Gate A — before opening the draft PR (verify in order, stop on first failure)
+
+1. **Not on main** — confirm the branch name / commits / PR title carry a Jira ticket key (e.g. `LS-1234`)
+2. **Branch pushed** — `worktree_push(setUpstream: true)` or `git push --force-with-lease origin HEAD`
+
+Then create the draft PR (see [Command](#command) below) and apply `agent-in-progress` **before** running validation.
+
+### Gate B — before marking the PR ready (the validated gate)
+
+3. **Migrations applied** — `db_migration_status` shows no pending migrations; if pending, run `db_migrate`
+4. **Validation passes** — `make pc` exits cleanly; if `format:write` changes files, commit them and re-run. In cloud sessions run `make_run({ target: "pc", runInBackground: true })` + `make_run_wait` to avoid the ~60s MCP transport timeout that kills synchronous calls.
+5. **Bug-fix verification** — if the branch contains `fix(` or the Jira ticket type is Bug, the PR body **must** include a `## Verification` section with before/after evidence. Stop and collect evidence before marking ready if missing. See [bug-verification-templates.md](bug-verification-templates.md) for the required format per bug category.
 
 ## Command
 
@@ -98,6 +107,7 @@ If the branch name contains `fix(` or the Jira ticket type is Bug, use this exte
 
 1. If you used the `gh` CLI with `--body-file`, clean up the temp body file: `bash scripts/cleanup-pr-body.sh` (no-op if `.github/tmp-pr-body.md` does not exist)
 2. **Apply `agent-in-progress` label** (while still a draft): `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` — marks the PR as actively watched so sweep and review agents skip it. Applying before marking ready closes the race window. **Remove this label when you exit the task** (PR merged or session ends without completion). Shell fallback: `gh pr edit <PR#> --add-label "agent-in-progress"`
+   2a. **Now run Gate B (the validated gate) — this is where `make pc` runs, AFTER the draft PR exists**: apply migrations (prereq 3), run `make pc` to green (prereq 4), collect bug-fix verification if required (prereq 5), and complete the self-review. The draft PR + `agent-in-progress` label already exist, so a container reap during `make pc` here is non-fatal. **Do not mark ready until `make pc` is green.**
 3. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` — this fires the `ready_for_review` event that triggers the `Reviewer (W1)` workflow (Cycle 1 of the [Author Agent Contract](../SKILL.md#author-agent-contract-bot-pr-flow)). The bot's resulting `pull_request_review` event then fires the `Legacy Sports CI Orchestrator`. Shell fallback (only if MCP unavailable): `gh pr ready <PR#>`
 4. **⛔ Apply `bot:ready-for-review` label — MANDATORY and MUST BE LAST**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. Cycle 1 fires from the `ready_for_review` event on its own, but **without this label any subsequent `synchronize` event (push of additional commits before the bot has reviewed, or any later fix-push) starts no reviewer run** — `Reviewer (W1)` only honors `synchronize` while this label is present (`.github/workflows/review.yml`). Applying it at PR creation closes that gap. Per LS-4678, the reviewer **preserves the label through merge — including on APPROVED** (see `.github/scripts/reviewer/index.mjs` — `cleanupOperationalLabels(..., { preserveReadyLabel: true })`) so post-approval pushes still fire a fresh cycle and don't silently stall behind the `bot-review` ruleset gate on the new HEAD SHA. Review Label Guard (W7) acts as a belt-and-suspenders: if something external strips the label between cycles, the next push re-applies it as long as a prior bot APPROVED exists. Re-application is required only if a prior cycle was rate-limited and the label was force-removed (see [fix-reviews.md](fix-reviews.md) step 8 for the remove-then-re-add pattern that re-triggers a stalled cycle). Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`. **⛔ `bot:ready-for-review` must be the last label operation in this session.** `Reviewer (W1)` uses `concurrency.cancel-in-progress: true` — any label applied after this one queues a new workflow run that cancels the reviewer run before it can post a review, then skips itself because the new label is not a qualifying trigger. If `agent-in-progress` is missing when you reach this step, go back and apply it first (step 2), then apply `bot:ready-for-review`.
 5. **Subscribe to PR activity**: `mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)` — enables CI results, review comments, and merge events to stream back into the session automatically. **This is a Claude Code built-in tool only — it is NOT part of the `legacy-sports-github` MCP server and is unavailable in cloud/headless environments (Copilot Coding Agent, CI).** In those environments, poll for PR status using `github_view_pr` + `ci_list_runs`, scheduled with `ScheduleWakeup`. In local/web sessions where the built-in is available, skipping this step means CI failures and review comments will never reach the agent — the session goes silent and the PR stalls.
@@ -108,7 +118,7 @@ If the branch name contains `fix(` or the Jira ticket type is Bug, use this exte
 ## Guardrails
 
 - **Never** create a PR from the `main` branch
-- **Never** skip `make pc` — each CI failure costs 40-60 min
+- **Never** skip `make pc` — each CI failure costs 40-60 min. It must pass before **mark-ready** (Gate B), but run it **after** the draft PR is open, not before — see the draft-PR-first note under [Prerequisites](#prerequisites). Running `make pc` before the draft PR exists is the dominant cloud-agent timeout failure mode.
 - **Never** inline `--body` in PowerShell — always use `--body-file` or MCP tool
 - **Never** create a PR body without a `## Context` section that includes a Jira link and problem statement — Copilot reads the PR description when fixing review comments; omitting context causes repeated, misaligned fixes
 - **Never** create a bug-fix PR without a `## Verification` section — `make pc` passing does not prove the bug is fixed

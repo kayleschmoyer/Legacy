@@ -1,6 +1,6 @@
 # Gate: Pre-PR Checklist
 
-The mandatory checklist between Phase 4 (Verify) and Phase 6 (Handoff). Run this before pushing the first commit. The bot review is not a substitute — it catches mechanical issues; this catches everything else.
+The mandatory checklist between Phase 4 (Verify) and Phase 6 (Handoff). This is the **mark-ready gate** — run it before calling `github_mark_pr_ready`, not before pushing. Push the first commit and open the **draft** PR early as a durable checkpoint (so an ephemeral/cloud container reaped during `make pc` is non-fatal); a draft PR is inert until marked ready. The `make pc` check below must be green before mark-ready, but does not gate the first push or the draft-PR open — see the draft-PR-first note in [create-pr.md](../../pr-lifecycle/references/create-pr.md#prerequisites). The bot review is not a substitute — it catches mechanical issues; this catches everything else.
 
 ## Universal checks (every entrypoint, every tier)
 
