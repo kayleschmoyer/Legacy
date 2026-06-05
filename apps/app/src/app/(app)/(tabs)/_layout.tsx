@@ -1,6 +1,10 @@
 import { Tabs } from 'expo-router';
+import { useGetUnreadNotificationCountQuery } from '../../../api/db/graphql.generated';
 
 export default function TabsLayout() {
+  const { data: unreadData } = useGetUnreadNotificationCountQuery();
+  const unreadCount = unreadData?.getUnreadNotificationCount ?? 0;
+
   return (
     <Tabs
       screenOptions={{
@@ -20,7 +24,13 @@ export default function TabsLayout() {
       <Tabs.Screen name="leagues" options={{ title: 'Leagues' }} />
       <Tabs.Screen name="players" options={{ title: 'Players' }} />
       <Tabs.Screen name="games" options={{ title: 'Games' }} />
-      <Tabs.Screen name="you" options={{ title: 'You' }} />
+      <Tabs.Screen
+        name="you"
+        options={{
+          title: 'You',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+        }}
+      />
     </Tabs>
   );
 }
