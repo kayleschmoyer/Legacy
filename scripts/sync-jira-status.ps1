@@ -12,9 +12,17 @@
     Automatically update Jira tickets based on branch state
 .PARAMETER ShowAll
     Show all branches, including those without Jira tickets
+.PARAMETER Recheck
+    Ignore the done-ledger cache and re-evaluate every ticket, including those
+    already confirmed Done on a previous run. By default, tickets recorded as
+    Done in ~/.legacy-sports/jira-sync-done.json are skipped (no Jira lookup),
+    since a Done ticket is terminal and will not change.
 .EXAMPLE
     .\scripts\sync-jira-status.ps1
-    Show status of all branches with Jira tickets
+    Show status of all branches with Jira tickets (skips cached-Done tickets)
+.EXAMPLE
+    .\scripts\sync-jira-status.ps1 -Recheck
+    Re-evaluate every ticket, ignoring the done-ledger cache
 .EXAMPLE
     .\scripts\sync-jira-status.ps1 -AutoUpdate
     Automatically sync Jira statuses based on branch state
@@ -26,7 +34,8 @@
 param(
     [switch]$DryRun,
     [switch]$AutoUpdate,
-    [switch]$ShowAll
+    [switch]$ShowAll,
+    [switch]$Recheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -129,73 +138,23 @@ function Invoke-JiraTransition {
     return $true
 }
 
-# Function to get PR status for a branch
+# Function to get PR status for a branch (looked up from the pre-fetched PR map)
 function Get-PRStatus {
     param([string]$Branch)
-    
-    if (-not $ghAvailable) {
-        return @{ Exists = $false; State = "unknown"; Merged = $false }
+
+    $cleanBranch = $Branch -replace '^remotes/origin/', ''
+
+    if ($script:prMap -and $script:prMap.ContainsKey($cleanBranch)) {
+        $pr = $script:prMap[$cleanBranch]
+        return @{
+            Exists = $true
+            State  = $pr.state
+            Merged = ($pr.state -eq "MERGED" -or [bool]$pr.mergedAt)
+            Number = $pr.number
+        }
     }
-    
-    try {
-        # Clean branch name
-        $cleanBranch = $Branch -replace '^remotes/origin/', ''
-        
-        # Method 1: Try direct PR list with branch head
-        $prJson = gh pr list --head $cleanBranch --state all --json state,mergedAt,number --limit 10 2>$null
-        
-        if ($prJson) {
-            $prs = $prJson | ConvertFrom-Json
-            if ($prs -and $prs.Count -gt 0) {
-                $pr = $prs[0]
-                return @{
-                    Exists = $true
-                    State = $pr.state
-                    Merged = ($pr.state -eq "MERGED" -or $pr.mergedAt)
-                    Number = $pr.number
-                }
-            }
-        }
-        
-        # Method 2: Search all PRs and filter by branch name in search
-        $searchJson = gh pr list --search "head:$cleanBranch" --state all --json state,mergedAt,number,headRefName --limit 10 2>$null
-        
-        if ($searchJson) {
-            $prs = $searchJson | ConvertFrom-Json
-            $matchingPr = $prs | Where-Object { $_.headRefName -eq $cleanBranch } | Select-Object -First 1
-            
-            if ($matchingPr) {
-                return @{
-                    Exists = $true
-                    State = $matchingPr.state
-                    Merged = ($matchingPr.state -eq "MERGED" -or $matchingPr.mergedAt)
-                    Number = $matchingPr.number
-                }
-            }
-        }
-        
-        # Method 3: Try all recent PRs and match branch name
-        $allPrsJson = gh pr list --state all --json state,mergedAt,number,headRefName --limit 100 2>$null
-        
-        if ($allPrsJson) {
-            $allPrs = $allPrsJson | ConvertFrom-Json
-            $matchingPr = $allPrs | Where-Object { $_.headRefName -eq $cleanBranch } | Select-Object -First 1
-            
-            if ($matchingPr) {
-                return @{
-                    Exists = $true
-                    State = $matchingPr.state
-                    Merged = ($matchingPr.state -eq "MERGED" -or $matchingPr.mergedAt)
-                    Number = $matchingPr.number
-                }
-            }
-        }
-        
-        return @{ Exists = $false; State = "none"; Merged = $false }
-    } catch {
-        Write-Verbose "Error checking PR status: $($_.Exception.Message)"
-        return @{ Exists = $false; State = "unknown"; Merged = $false }
-    }
+
+    return @{ Exists = $false; State = "none"; Merged = $false }
 }
 
 # Get all branches
@@ -203,6 +162,36 @@ Write-Header "Fetching branches..."
 $branches = git branch -a | ForEach-Object { $_.Trim() -replace '^\*\s*', '' -replace '^remotes/origin/', '' } | Where-Object { $_ -notmatch '^HEAD' } | Select-Object -Unique
 
 Write-Info "Found $($branches.Count) unique branches"
+
+# Pre-fetch every PR once and index by head branch name. This single bulk query
+# replaces thousands of per-branch `gh pr list --head` calls (agent-branch ticket
+# resolution + per-ticket PR status), turning O(branches) network calls into O(1).
+# `gh pr list --limit N` paginates internally (100/page) up to N, so this is one
+# logical query. The only ceiling is N itself; if it's hit we warn loudly below
+# rather than silently truncating, and unmapped branches fall back to the
+# `git branch --merged main` check.
+$prFetchLimit = 5000
+$prMap = @{}
+if ($ghAvailable) {
+    Write-Info "Fetching all PRs in one batch (gh paginates internally; this can take a moment)..."
+    $allPrsJson = gh pr list --state all --json headRefName,title,body,number,state,mergedAt --limit $prFetchLimit 2>$null
+
+    if ($allPrsJson) {
+        $allPrs = @($allPrsJson | ConvertFrom-Json)
+        if ($allPrs.Count -ge $prFetchLimit) {
+            Write-Warning "Hit the PR fetch cap ($prFetchLimit) -- older PRs may be missing from the map; affected branches fall back to the git-merge check. Raise `$prFetchLimit if your repo has more PRs."
+        }
+        foreach ($pr in $allPrs) {
+            # Keep the first (most recent) PR per branch; gh returns newest-first.
+            if ($pr.headRefName -and -not $prMap.ContainsKey($pr.headRefName)) {
+                $prMap[$pr.headRefName] = $pr
+            }
+        }
+        Write-Success "Indexed $($prMap.Count) PR(s) by branch name"
+    } else {
+        Write-Warning "No PRs returned from gh -- PR status detection will be limited"
+    }
+}
 
 # Extract Jira ticket keys from branch names, falling back to PR title/body for
 # agent branches (claude/*) that embed no ticket key in the branch name.
@@ -226,62 +215,71 @@ foreach ($branch in $branches) {
     }
 }
 
-# For agent branches, do one targeted PR lookup per branch to extract the
-# ticket key from the PR title/body. This is O(# agent branches), not O(# PRs).
+# For agent branches, resolve the ticket key from the pre-fetched PR map
+# (title + body) instead of issuing one gh call per branch.
 if ($agentBranches.Count -gt 0 -and $ghAvailable) {
-    Write-Info "Resolving ticket keys for $($agentBranches.Count) agent branch(es) via PR lookup..."
+    Write-Info "Resolving ticket keys for $($agentBranches.Count) agent branch(es) from PR map..."
 
     foreach ($branch in $agentBranches) {
-        try {
-            $ghArgs = @("pr", "list", "--head", $branch, "--state", "all", "--json", "title,body,number,state,mergedAt", "--limit", "1")
-            $ghOutput = & gh $ghArgs 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                Write-Verbose "gh command failed for ${branch}: $($ghOutput)"
-                continue
+        if (-not $prMap.ContainsKey($branch)) {
+            if ($ShowAll) { Write-Info "Agent branch without PR: $branch" }
+            continue
+        }
+
+        $pr = $prMap[$branch]
+
+        # Extract all LS-#### keys from PR title (all matches) and body
+        # (only matches preceded by a closing keyword, matching GHA logic).
+        $titleKeys = [regex]::Matches($pr.title, 'LS-\d+', 'IgnoreCase') |
+                     ForEach-Object { $_.Value.ToUpper() }
+
+        $bodyKeys = @()
+        if ($pr.body) {
+            $bodyKeys = [regex]::Matches(
+                $pr.body,
+                '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?)\s+(LS-\d+)',
+                'IgnoreCase'
+            ) | ForEach-Object { $_.Groups[1].Value.ToUpper() }
+        }
+
+        $keys = @($titleKeys) + @($bodyKeys) | Select-Object -Unique
+
+        foreach ($ticketKey in $keys) {
+            if (-not $branchTickets.ContainsKey($ticketKey)) {
+                $branchTickets[$ticketKey] = @()
             }
-            $prJson = $ghOutput
-            if (-not $prJson) { continue }
-
-            $pr = $prJson | ConvertFrom-Json
-            if (-not $pr -or $pr.Count -eq 0) {
-                if ($ShowAll) { Write-Info "Agent branch without PR: $branch" }
-                continue
+            if ($branchTickets[$ticketKey] -notcontains $branch) {
+                $branchTickets[$ticketKey] += $branch
             }
-
-            $pr = $pr[0]
-
-            # Extract all LS-#### keys from PR title (all matches) and body
-            # (only matches preceded by a closing keyword, matching GHA logic).
-            $titleKeys = [regex]::Matches($pr.title, 'LS-\d+', 'IgnoreCase') |
-                         ForEach-Object { $_.Value.ToUpper() }
-
-            $bodyKeys = @()
-            if ($pr.body) {
-                $bodyKeys = [regex]::Matches(
-                    $pr.body,
-                    '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?)\s+(LS-\d+)',
-                    'IgnoreCase'
-                ) | ForEach-Object { $_.Groups[1].Value.ToUpper() }
-            }
-
-            $keys = @($titleKeys) + @($bodyKeys) | Select-Object -Unique
-
-            foreach ($ticketKey in $keys) {
-                if (-not $branchTickets.ContainsKey($ticketKey)) {
-                    $branchTickets[$ticketKey] = @()
-                }
-                if ($branchTickets[$ticketKey] -notcontains $branch) {
-                    $branchTickets[$ticketKey] += $branch
-                }
-                Write-Info "Agent branch $branch → $ticketKey (PR #$($pr.number))"
-            }
-        } catch {
-            Write-Verbose "PR lookup failed for ${branch}: $($_.Exception.Message)"
+            Write-Info "Agent branch $branch -> $ticketKey (PR #$($pr.number))"
         }
     }
 }
 
 Write-Success "Found $($branchTickets.Count) Jira ticket(s) across branches"
+
+# Load the done-ledger: tickets confirmed Done on a previous run. A Done ticket
+# is terminal, so we skip re-fetching it from Jira unless -Recheck is passed.
+$doneCachePath = Join-Path (Join-Path $HOME ".legacy-sports") "jira-sync-done.json"
+$doneCache = @{}
+if (Test-Path $doneCachePath) {
+    try {
+        $rawCache = Get-Content $doneCachePath -Raw -ErrorAction Stop | ConvertFrom-Json
+        foreach ($prop in $rawCache.PSObject.Properties) {
+            $doneCache[$prop.Name] = $prop.Value
+        }
+        if ($Recheck) {
+            Write-Info "Loaded $($doneCache.Count) cached Done ticket(s) -- -Recheck set, re-evaluating all"
+        } else {
+            Write-Info "Loaded $($doneCache.Count) cached Done ticket(s); these will be skipped (use -Recheck to override)"
+        }
+    } catch {
+        Write-Warning "Could not read done-ledger ($doneCachePath); ignoring it this run"
+        $doneCache = @{}
+    }
+}
+$cacheDirty = $false
+$skippedCount = 0
 
 # Check each ticket status
 Write-Header "Checking Jira ticket statuses..."
@@ -290,10 +288,19 @@ $results = @()
 
 foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
     $branchList = $branchTickets[$ticketKey]
-    
+
+    # Skip tickets already confirmed Done on a prior run (unless -Recheck).
+    if (-not $Recheck -and $doneCache.ContainsKey($ticketKey)) {
+        $skippedCount++
+        if ($ShowAll) {
+            Write-Host "`n[SKIP] $ticketKey already Done & synced ($($doneCache[$ticketKey]))" -ForegroundColor DarkGray
+        }
+        continue
+    }
+
     Write-Host "`n[TICKET] $ticketKey" -ForegroundColor Cyan
     Write-Info "Branches: $($branchList -join ', ')"
-    
+
     # Get ticket info from Jira
     try {
         $ticketOutput = acli jira workitem view $ticketKey 2>&1 | Out-String
@@ -412,6 +419,7 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
         }
         
         # Auto-update if enabled
+        $transitionOk = $false
         if ($AutoUpdate -and $shouldUpdate -and $targetStatus) {
             $transitionOk = Invoke-JiraTransition -TicketKey $ticketKey -CurrentStatus $status -TargetStatus $targetStatus -IsDryRun:$DryRun
             if (-not $transitionOk -and -not $DryRun) {
@@ -431,7 +439,16 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             Merged = if ($mergedBranches.Count -gt 0) { "Yes" } else { "No" }
             Recommendation = $recommendation
         }
-        
+
+        # Record terminal (Done) tickets in the ledger so future runs skip them.
+        # A ticket counts as Done if it was already Done, or we just transitioned
+        # it to Done. Never record during a dry run (no real state changed).
+        $reachedDone = ($status -eq "Done") -or ($targetStatus -eq "Done" -and $transitionOk)
+        if ($reachedDone -and -not $DryRun -and -not $doneCache.ContainsKey($ticketKey)) {
+            $doneCache[$ticketKey] = (Get-Date -Format "o")
+            $cacheDirty = $true
+        }
+
     } catch {
         $errorMsg = $_.Exception.Message
         Write-Error "Error processing $ticketKey - $errorMsg"
@@ -450,13 +467,30 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
 Write-Header "Summary Report"
 $results | Format-Table -AutoSize
 
+# Persist the done-ledger so the next run can skip terminal tickets.
+if ($cacheDirty) {
+    try {
+        $cacheDir = Split-Path $doneCachePath -Parent
+        if (-not (Test-Path $cacheDir)) {
+            New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+        }
+        $doneCache | ConvertTo-Json | Set-Content -Path $doneCachePath -Encoding UTF8
+        Write-Success "Done-ledger updated: $($doneCache.Count) ticket(s) at $doneCachePath"
+    } catch {
+        Write-Warning "Could not write done-ledger ($doneCachePath): $($_.Exception.Message)"
+    }
+}
+
 # Statistics
 Write-Header "Statistics"
 $totalTickets = $results.Count
 $inSync = ($results | Where-Object { $_.Recommendation -eq "[OK] In sync" }).Count
 $needsAttention = $totalTickets - $inSync
 
-Write-Info "Total tickets: $totalTickets"
+if ($skippedCount -gt 0) {
+    Write-Info "Skipped (cached Done): $skippedCount  -- run with -Recheck to re-evaluate"
+}
+Write-Info "Total tickets evaluated: $totalTickets"
 Write-Success "In sync: $inSync"
 
 if ($needsAttention -gt 0) {

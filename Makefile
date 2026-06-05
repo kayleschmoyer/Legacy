@@ -711,6 +711,14 @@ else
 	@echo "sync-worktrees-remove is Windows-only (PowerShell required)"
 endif
 
+sync-jira: ## Sync Jira ticket statuses with Git branches (DRY_RUN=1 AUTO_UPDATE=1 SHOW_ALL=1 RECHECK=1)
+	@$(call echo_blue,Syncing Jira ticket statuses...)
+ifeq ($(DETECTED_OS),Windows)
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-jira-status.ps1 $(if $(DRY_RUN),-DryRun) $(if $(AUTO_UPDATE),-AutoUpdate) $(if $(SHOW_ALL),-ShowAll) $(if $(RECHECK),-Recheck)
+else
+	@echo "sync-jira is Windows-only (PowerShell required)"
+endif
+
 worktree: ## Create a worktree and auto-add to workspace (TICKET=507 DESC=fix-scoring [PARENT=main])
 ifeq ($(DETECTED_OS),Windows)
 ifdef TICKET
