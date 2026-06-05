@@ -15,6 +15,7 @@ import {
   handleGoogleCallback,
   handleSecureGoogleAuth,
 } from './handlers/Google';
+import { handleSecureAppleAuth } from './handlers/Apple';
 import { handleLogin, handleRegister } from './handlers/Local';
 import { handleVerify } from './handlers/Verify';
 import { handleRefreshJwt } from './handlers/RefreshJwt';
@@ -240,6 +241,7 @@ const baseOAuthHandler = async (
               '/oauth/verify',
               '/oauth/google (secure flow with auto-provisioning)',
               '/oauth/google/legacy (original flow for backward compatibility)',
+              '/oauth/apple (native Sign in with Apple, secure flow)',
               '/oauth/google/authorize (OAuth initiation)',
               '/oauth/google/callback (OAuth callback)',
               '/oauth/refresh-jwt (silent JWT refresh for live sessions)',
@@ -275,6 +277,16 @@ const baseOAuthHandler = async (
         if (event.httpMethod === 'POST') {
           // Use the new secure authentication flow that checks user existence first
           const result = await handleSecureGoogleAuth(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/apple':
+      case '/dev/oauth/apple':
+        if (event.httpMethod === 'POST') {
+          // Native Sign in with Apple — verify the Apple identity token and
+          // exchange it for a Legacy Sports JWT (App Store guideline 4.8).
+          const result = await handleSecureAppleAuth(event);
           return cors(result);
         }
         break;

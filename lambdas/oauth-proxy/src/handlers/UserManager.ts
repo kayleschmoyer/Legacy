@@ -12,10 +12,17 @@ import { notifyNewUserSignup } from '../util/discord';
  * Get or create a user in the database by email
  * If the user doesn't exist, automatically creates them with default access level
  * Used by the OAuth flow to ensure all authenticated users have a database record
+ *
+ * @param email - The user's email address.
+ * @param avatarUrl - Optional avatar URL to set for users who don't have one yet.
+ * @param signupMethod - The OAuth provider the user signed up with (`'google'`
+ *   or `'apple'`); used only for the best-effort new-user Discord notification.
+ *   Defaults to `'google'`.
  */
 export async function getOrCreateUser(
   email: string,
   avatarUrl?: string,
+  signupMethod: 'google' | 'apple' = 'google',
 ): Promise<InternalUser> {
   const [localPart, domain] = email.split('@');
   const maskedLocal = localPart.length <= 1 ? '***' : `${localPart[0]}***`;
@@ -57,7 +64,7 @@ export async function getOrCreateUser(
   // Best-effort Discord notification — outside the DB try/catch so a
   // notification failure cannot re-throw and fail user signup.
   if (isNewUser) {
-    await notifyNewUserSignup(email, user.id, 'google');
+    await notifyNewUserSignup(email, user.id, signupMethod);
   }
 
   return user;

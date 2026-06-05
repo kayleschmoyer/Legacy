@@ -1,32 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Theme, YStack } from 'tamagui';
 import { LoginPage } from '@legacy-sports/shared-components';
 import { useAuthHandlers } from '../common/auth/AuthHooks';
+import { isAppleAuthAvailable } from '../common/auth/appleAuth';
 
 const Login: React.FC = () => {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
     undefined,
   );
 
-  const { googleLogin } = useAuthHandlers({
+  // Apple App Store guideline 4.8 requires "Sign in with Apple" wherever a
+  // third-party social login is offered. The native framework is only present
+  // on iOS, so gate the button on its availability.
+  useEffect(() => {
+    let active = true;
+    if (Platform.OS === 'ios') {
+      void isAppleAuthAvailable().then((available) => {
+        if (active) {
+          setAppleAvailable(available);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const { googleLogin, appleLogin } = useAuthHandlers({
     onFailure: (err) => {
-      setIsLoading(false);
+      setIsGoogleLoading(false);
+      setIsAppleLoading(false);
       setErrorMessage(err);
     },
     onSuccess: () => {
-      setIsLoading(false);
+      setIsGoogleLoading(false);
+      setIsAppleLoading(false);
       router.replace('/');
     },
   });
 
   const handleGoogleSignIn = () => {
-    setIsLoading(true);
+    setErrorMessage(undefined);
+    setIsGoogleLoading(true);
     void googleLogin();
+  };
+
+  const handleAppleSignIn = () => {
+    setErrorMessage(undefined);
+    setIsAppleLoading(true);
+    void appleLogin();
   };
 
   return (
@@ -44,7 +73,9 @@ const Login: React.FC = () => {
         >
           <LoginPage
             onGoogleSignIn={handleGoogleSignIn}
-            isGoogleLoading={isLoading}
+            onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
+            isGoogleLoading={isGoogleLoading}
+            isAppleLoading={isAppleLoading}
             errorMessage={errorMessage}
           />
         </YStack>

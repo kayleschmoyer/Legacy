@@ -3,6 +3,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'expo-router';
 import {
   buildGoogleAuthPayload,
+  exchangeAppleCode,
   exchangeGoogleCode,
   ISecureStorage,
   OAuthError,
@@ -14,11 +15,13 @@ import type { OAuthErrorCode } from '@legacy-sports/shared-components';
 import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { LOGGER } from '@legacy-sports/logging';
 import { getMobileOAuthConfig } from './mobileOAuthConfig';
+import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 
 export interface AuthHandlers {
   googleLogin: () => Promise<void>;
+  appleLogin: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -192,12 +195,58 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     }
   }, [successHandler, failureHandler]);
 
+  const appleLogin = useCallback(async () => {
+    try {
+      const { oauthProxyUrl } = getMobileOAuthConfig();
+      if (!oauthProxyUrl) {
+        throw new Error('OAuth proxy URL is not configured');
+      }
+
+      // Native Sign in with Apple (AuthenticationServices) returns an
+      // Apple-signed identity token; the oauth-proxy `/apple` endpoint verifies
+      // it and exchanges it for a Legacy Sports JWT, mirroring the Google flow.
+      const payload = await signInWithApple();
+      const result = await exchangeAppleCode(oauthProxyUrl, payload);
+
+      await storeToken({ jwt: result.jwt });
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      // A user dismissing the native sheet is not a failure to surface.
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as { code?: string }).code === APPLE_SIGN_IN_CANCELLED
+      ) {
+        LOGGER.debug('Apple sign-in cancelled by user');
+        if (onFailure) {
+          onFailure(undefined);
+        }
+        return;
+      }
+
+      LOGGER.error(
+        'Apple authentication error:',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      if (onFailure) {
+        onFailure(
+          error instanceof Error ? error.message : 'Authentication failed',
+        );
+      }
+    }
+  }, [onSuccess, onFailure]);
+
   return useMemo(() => {
     return {
       googleLogin: googleLogin,
+      appleLogin: appleLogin,
       logout: logout,
     };
-  }, [googleLogin, logout]);
+  }, [googleLogin, appleLogin, logout]);
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {

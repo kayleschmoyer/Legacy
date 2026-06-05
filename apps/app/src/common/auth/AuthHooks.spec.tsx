@@ -89,9 +89,15 @@ jest.mock('@legacy-sports/shared-components', () => {
   >(
     '../../../../../lib/shared-components/src/features/auth/services/googleAuthExchange',
   );
+  const { exchangeAppleCode } = jest.requireActual<
+    typeof import('@legacy-sports/shared-components')
+  >(
+    '../../../../../lib/shared-components/src/features/auth/services/appleAuthExchange',
+  );
   return {
     buildGoogleAuthPayload,
     exchangeGoogleCode,
+    exchangeAppleCode,
     OAuthProvider: {
       configure: (...args: unknown[]): unknown => mockConfigure(...args),
       signIn: (...args: unknown[]): unknown => mockSignIn(...args),
@@ -104,6 +110,17 @@ jest.mock('@legacy-sports/shared-components', () => {
     },
   };
 });
+
+// Mock the native Apple auth wrapper (expo-apple-authentication is unavailable
+// in Jest). `appleLogin` calls signInWithApple() and the REAL exchangeAppleCode
+// helper above, so the fetch URL/payload assertions exercise production code.
+const mockSignInWithApple = jest.fn();
+jest.mock('./appleAuth', () => ({
+  APPLE_SIGN_IN_CANCELLED: 'ERR_REQUEST_CANCELED',
+  isAppleAuthAvailable: jest.fn().mockResolvedValue(true),
+  signInWithApple: (...args: unknown[]): unknown =>
+    mockSignInWithApple(...args),
+}));
 
 // Mock app-config/native so getMobileOAuthConfig() reads our test URL
 jest.mock('@legacy-sports/app-config/native', () => ({
@@ -345,6 +362,73 @@ describe('AuthHooks', () => {
       expect(onFailure).toHaveBeenCalledWith(
         'No valid authentication code or credential received',
       );
+    });
+  });
+
+  // ── useAuthHandlers: Apple Login ──────────────────────────────────────
+
+  describe('useAuthHandlers - appleLogin', () => {
+    it('exchanges the Apple identity token for a JWT and stores it', async () => {
+      mockSignInWithApple.mockResolvedValue({
+        identityToken: 'apple-id-token',
+        fullName: 'Jane Doe',
+      });
+      mockFetch.mockResolvedValue(okJsonResponse({ jwt: TEST_JWT }));
+
+      const onSuccess = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onSuccess }));
+
+      await act(async () => {
+        await result.current.appleLogin();
+      });
+
+      // The identity token must be POSTed to the `/apple` route.
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://oauth-proxy.example.com/apple',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            identityToken: 'apple-id-token',
+            fullName: 'Jane Doe',
+          }),
+        }),
+      );
+      expect(mockSetItem).toHaveBeenCalledWith('INTERNAL_JWT', TEST_JWT);
+      expect(onSuccess).toHaveBeenCalled();
+    });
+
+    it('reports onFailure with undefined when the user cancels', async () => {
+      mockSignInWithApple.mockRejectedValue({ code: 'ERR_REQUEST_CANCELED' });
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.appleLogin();
+      });
+
+      // Cancellation clears any in-flight error state without surfacing a
+      // user-facing failure message, and no exchange/storage happens.
+      expect(onFailure).toHaveBeenCalledWith(undefined);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('reports onFailure with a message when the exchange fails', async () => {
+      mockSignInWithApple.mockResolvedValue({
+        identityToken: 'apple-id-token',
+      });
+      mockFetch.mockRejectedValue(new Error('Network Error'));
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.appleLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith('Network Error');
+      expect(mockSetItem).not.toHaveBeenCalled();
     });
   });
 

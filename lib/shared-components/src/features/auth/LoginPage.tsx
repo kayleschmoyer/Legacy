@@ -7,10 +7,17 @@ export interface LoginPageProps {
   onGoogleSignIn: () => void;
   /** Called when the user presses the Discord sign-in button; omit to hide the button */
   onDiscordSignIn?: () => void;
+  /**
+   * Called when the user presses the "Sign in with Apple" button; omit to hide
+   * the button. Required on iOS for App Store guideline 4.8 compliance.
+   */
+  onAppleSignIn?: () => void;
   /** Show spinner and disable the Google button while a Google sign-in is in flight */
   isGoogleLoading?: boolean;
   /** Show spinner and disable the Discord button while a Discord sign-in is in flight */
   isDiscordLoading?: boolean;
+  /** Show spinner and disable the Apple button while an Apple sign-in is in flight */
+  isAppleLoading?: boolean;
   /** Disable all auth buttons while the OAuth provider is initialising */
   isConfiguring?: boolean;
   /** Error text shown below the buttons */
@@ -22,14 +29,18 @@ export interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({
   onGoogleSignIn,
   onDiscordSignIn,
+  onAppleSignIn,
   isGoogleLoading = false,
   isDiscordLoading = false,
+  isAppleLoading = false,
   isConfiguring = false,
   errorMessage,
   style,
 }) => {
-  const googleDisabled = isGoogleLoading || isDiscordLoading || isConfiguring;
-  const discordDisabled = isGoogleLoading || isDiscordLoading;
+  const anyLoading = isGoogleLoading || isDiscordLoading || isAppleLoading;
+  const googleDisabled = anyLoading || isConfiguring;
+  const discordDisabled = anyLoading;
+  const appleDisabled = anyLoading || isConfiguring;
 
   return (
     <Theme name="legacy_dark">
@@ -135,6 +146,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   {isDiscordLoading
                     ? 'Connecting to Discord…'
                     : 'Continue with Discord'}
+                </Text>
+              </XStack>
+            </Button>
+          )}
+
+          {!!onAppleSignIn && (
+            <Button
+              testID="apple-login-button"
+              height={52}
+              backgroundColor="#000000"
+              borderColor="rgba(255,255,255,0.18)"
+              borderWidth={1}
+              borderRadius={12}
+              disabled={appleDisabled}
+              opacity={appleDisabled ? 0.7 : 1}
+              onPress={onAppleSignIn}
+              aria-label="Sign in with Apple"
+              pressStyle={{ backgroundColor: '#1a1a1a' }}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                {isAppleLoading ? (
+                  <Spinner size="small" color="white" />
+                ) : (
+                  <BrandIcon name="apple" size={20} decorative />
+                )}
+                <Text color="white" fontWeight="700" fontSize={14}>
+                  {isAppleLoading
+                    ? 'Connecting to Apple…'
+                    : 'Sign in with Apple'}
                 </Text>
               </XStack>
             </Button>

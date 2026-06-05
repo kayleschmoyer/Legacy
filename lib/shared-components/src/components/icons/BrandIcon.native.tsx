@@ -19,7 +19,8 @@ export type BrandIconName =
   | 'settings'
   | 'book'
   | 'google'
-  | 'discord';
+  | 'discord'
+  | 'apple';
 
 type GlyphProps = {
   color: string;
@@ -427,6 +428,20 @@ function DiscordGlyph() {
   );
 }
 
+function AppleGlyph() {
+  // Official Apple brand mark — path uses a 0–24 coordinate space scaled to the
+  // 32×32 viewBox via a wrapping G transform. Rendered white so it reads on the
+  // black "Sign in with Apple" button per Apple's Human Interface Guidelines.
+  return (
+    <G transform="scale(1.3333333)">
+      <Path
+        d="M17.05 12.04c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.9-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.79 1.3 10.34.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.27 3.15-2.53.99-1.45 1.4-2.85 1.42-2.93-.03-.01-2.72-1.04-2.75-4.13zM14.62 4.84c.72-.87 1.2-2.08 1.07-3.29-1.03.04-2.28.69-3.02 1.56-.66.77-1.24 2-1.08 3.18 1.15.09 2.32-.58 3.03-1.45z"
+        fill="#FFFFFF"
+      />
+    </G>
+  );
+}
+
 function GoogleGlyph({ strokeWidth }: Pick<GlyphProps, 'strokeWidth'>) {
   return (
     <>
@@ -534,6 +549,8 @@ function renderGlyph(
       return <GoogleGlyph strokeWidth={strokeWidth} />;
     case 'discord':
       return <DiscordGlyph />;
+    case 'apple':
+      return <AppleGlyph />;
     default:
       return null;
   }

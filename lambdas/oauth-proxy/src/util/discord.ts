@@ -45,11 +45,14 @@ const COLOR_NEW_USER = 0x57f287; // Green
 
 /**
  * Format a new-user signup event as a Discord embed.
+ *
+ * @param signupMethod - The provider the user signed up with: one of
+ *   `'local' | 'google' | 'discord' | 'apple'`.
  */
 export function formatNewUserEmbed(
   email: string,
   userId: number,
-  signupMethod: 'local' | 'google' | 'discord',
+  signupMethod: 'local' | 'google' | 'discord' | 'apple',
 ): DiscordEmbed {
   const [localPart, domain] = email.split('@');
   const maskedLocal = localPart.length <= 1 ? '***' : `${localPart[0]}***`;
@@ -74,11 +77,14 @@ export function formatNewUserEmbed(
  *
  * This is fire-and-forget: failures are logged but never thrown,
  * so they cannot block user registration.
+ *
+ * @param signupMethod - The provider the user signed up with: one of
+ *   `'local' | 'google' | 'discord' | 'apple'`.
  */
 export async function notifyNewUserSignup(
   email: string,
   userId: number,
-  signupMethod: 'local' | 'google' | 'discord',
+  signupMethod: 'local' | 'google' | 'discord' | 'apple',
 ): Promise<void> {
   if (
     !process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'] &&

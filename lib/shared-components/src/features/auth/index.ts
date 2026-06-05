@@ -14,6 +14,11 @@ export type {
   GoogleAuthPayload,
   GoogleAuthExchangeResult,
 } from './services/googleAuthExchange';
+export { exchangeAppleCode } from './services/appleAuthExchange';
+export type {
+  AppleAuthPayload,
+  AppleAuthExchangeResult,
+} from './services/appleAuthExchange';
 export * from './EnhancedAuthGuard';
 
 // Platform types (convenience re-exports)
