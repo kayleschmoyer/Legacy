@@ -84,6 +84,12 @@ function renderPage() {
   );
 }
 
+// The signup link reads the *browser* URL (window.location), not the router
+// location, so tests drive it via the history API.
+function setBrowserUrl(url: string) {
+  window.history.replaceState({}, '', url);
+}
+
 async function waitForSignInButton() {
   return waitFor(() => {
     const btn = screen.getByRole('button', { name: /continue with google/i });
@@ -121,6 +127,9 @@ afterEach(() => {
   errorSpy.mockRestore();
   signInSpy.mockRestore();
   configureSpy.mockRestore();
+  // Reset the browser URL so a forwarded ?redirect= param does not leak into
+  // subsequent tests.
+  setBrowserUrl('/login');
 });
 
 describe('LoginPage Discord callback — synchronous config fault (LS-6687)', () => {
@@ -222,5 +231,25 @@ describe('LoginPage handleSignIn catch block', () => {
       'Google sign-in popup closed by user',
     );
     expect(await screen.findByText('Network request failed')).toBeTruthy();
+  });
+});
+
+describe('LoginPage signup link redirect forwarding (LS-6688)', () => {
+  it('forwards a ?redirect= param onto the signup link so the deep-link target survives the login → signup handoff', () => {
+    setBrowserUrl('/login?redirect=/league/123');
+
+    renderPage();
+
+    const link = screen.getByRole('link', { name: /create an account/i });
+    expect(link.getAttribute('href')).toBe('/signup?redirect=%2Fleague%2F123');
+  });
+
+  it('leaves the signup link as a bare /signup when no redirect param is present', () => {
+    setBrowserUrl('/login');
+
+    renderPage();
+
+    const link = screen.getByRole('link', { name: /create an account/i });
+    expect(link.getAttribute('href')).toBe('/signup');
   });
 });

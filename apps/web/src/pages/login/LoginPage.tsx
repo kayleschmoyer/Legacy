@@ -115,6 +115,20 @@ export function LoginPage(): React.JSX.Element {
 
   const displayError = errorMessage || authError || '';
 
+  // Preserve a deep-link `redirect` target across the login → signup handoff so
+  // a user who arrived at /login?redirect=/league/123 and then chose "Create an
+  // account" still returns to /league/123 after signing up, rather than landing
+  // on /home. (LS-6688)
+  const signupHref = useMemo(() => {
+    if (typeof window === 'undefined') return '/signup';
+    const redirect = new URLSearchParams(window.location.search).get(
+      'redirect',
+    );
+    return redirect
+      ? `/signup?redirect=${encodeURIComponent(redirect)}`
+      : '/signup';
+  }, []);
+
   /* Discord callback handling */
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -318,7 +332,7 @@ export function LoginPage(): React.JSX.Element {
             <div className="ll-nav-right">
               <span className="ll-nav-meta">
                 New to Legacy?{' '}
-                <a href="/signup" className="ll-link-gold">
+                <a href={signupHref} className="ll-link-gold">
                   Create an account
                 </a>
               </span>
