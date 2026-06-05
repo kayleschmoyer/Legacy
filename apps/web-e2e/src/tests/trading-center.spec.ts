@@ -171,8 +171,29 @@ const MOCK_ACCEPTED_TRADE = {
   ],
 };
 
+const MOCK_TRADE_BLOCK_PLAYER = {
+  __typename: 'TeamMember',
+  id: 1,
+  teamId: 2,
+  playerId: 101,
+  onTradeBlock: true,
+  askingPrice: null,
+  player: { __typename: 'Player', firstName: 'Jake', lastName: 'Smith' },
+};
+
+const MOCK_OWN_TRADE_BLOCK_PLAYER = {
+  __typename: 'TeamMember',
+  id: 2,
+  teamId: 1,
+  playerId: 102,
+  onTradeBlock: true,
+  askingPrice: '2nd round pick',
+  player: { __typename: 'Player', firstName: 'Mike', lastName: 'Johnson' },
+};
+
 interface MockOpts {
   leagueTradeOffers?: object[];
+  leagueTradeBlock?: object[];
 }
 
 async function mockTradesGraphQL(
@@ -180,11 +201,23 @@ async function mockTradesGraphQL(
   opts: MockOpts = {},
 ) {
   const leagueOffers = opts.leagueTradeOffers ?? [];
+  const tradeBlock = opts.leagueTradeBlock ?? [];
+  // Pending offers (status='pending') are fetched via GetTeamTradeOffers in
+  // the shared TradingCenter; the league query is used for history only.
+  const pendingOffers = leagueOffers.filter(
+    (o: Record<string, unknown>) => o['status'] === 'pending',
+  );
 
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
-    if (postData.includes('getleaguetradeoffers')) {
+    if (postData.includes('"getteamtradeoffers"')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { teamTradeOffers: pendingOffers } }),
+      });
+    } else if (postData.includes('getleaguetradeoffers')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -230,6 +263,34 @@ async function mockTradesGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [MOCK_LEAGUE] } }),
       });
+    } else if (postData.includes('getleaguetradeblock')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTradeBlock: tradeBlock } }),
+      });
+    } else if (postData.includes('"settradeblock"')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            setTradeBlock: {
+              __typename: 'TeamMember',
+              id: 2,
+              teamId: 1,
+              playerId: 102,
+              onTradeBlock: true,
+              askingPrice: '1st round pick',
+              player: {
+                __typename: 'Player',
+                firstName: 'Mike',
+                lastName: 'Johnson',
+              },
+            },
+          },
+        }),
+      });
     } else {
       await unmockedGraphQLFallback(route);
     }
@@ -258,15 +319,15 @@ test.describe('Trades tab — sections @critical', () => {
     await page.waitForLoadState('load');
   });
 
-  test('shows "Pending Trade Offers" section heading', async ({ page }) => {
+  test('shows "Incoming Offers" section heading', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Pending Trade Offers', exact: true }),
+      page.getByText('Incoming Offers', { exact: true }),
     ).toBeVisible();
   });
 
-  test('shows "Completed Trades" section heading', async ({ page }) => {
+  test('shows "Trade History" section toggle', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Completed Trades', exact: true }),
+      page.getByText('Trade History', { exact: true }),
     ).toBeVisible();
   });
 });
@@ -302,8 +363,10 @@ test.describe('Trades tab — incoming pending trade @critical', () => {
     await page.waitForLoadState('load');
   });
 
-  test('renders an Incoming pill on the trade card', async ({ page }) => {
-    await expect(page.getByText('Incoming', { exact: true })).toBeVisible();
+  test('renders the proposing team label on the trade card', async ({
+    page,
+  }) => {
+    await expect(page.getByText('From: Beta Force')).toBeVisible();
   });
 
   test('shows player offered by the proposing team (Mike Trout)', async ({
@@ -338,8 +401,10 @@ test.describe('Trades tab — outgoing pending trade @critical', () => {
     await page.waitForLoadState('load');
   });
 
-  test('renders an Outgoing pill on the trade card', async ({ page }) => {
-    await expect(page.getByText('Outgoing', { exact: true })).toBeVisible();
+  test('renders the receiving team label on the trade card', async ({
+    page,
+  }) => {
+    await expect(page.getByText('To: Beta Force')).toBeVisible();
   });
 
   test('shows player being offered in outgoing trade (Mookie Betts)', async ({
@@ -348,8 +413,8 @@ test.describe('Trades tab — outgoing pending trade @critical', () => {
     await expect(page.getByText('Mookie Betts')).toBeVisible();
   });
 
-  test('shows Withdraw button for outgoing pending trade', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Withdraw' })).toBeVisible();
+  test('shows Cancel button for outgoing pending trade', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
 
   test('does not show Accept or Reject for outgoing trade', async ({
@@ -380,5 +445,119 @@ test.describe('Trades tab — completed history @regression', () => {
       page.getByRole('heading', { name: 'Completed Trades', exact: true }),
     ).toBeVisible();
     await expect(page.getByText('Freddie Freeman')).toBeVisible();
+  });
+});
+
+test.describe('Trades tab — trade block section @smoke', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockTradesGraphQL(page, { leagueTradeOffers: [] });
+    await page.goto('/baseball/league/1/trades');
+    await page.waitForLoadState('load');
+  });
+
+  test('renders the Trade Block section heading', async ({ page }) => {
+    await expect(
+      page.getByRole('heading', { name: 'Trade Block', exact: true }),
+    ).toBeVisible();
+  });
+
+  test('shows empty state when no players are on the trade block', async ({
+    page,
+  }) => {
+    await expect(page.getByText('No players on the trade block')).toBeVisible();
+  });
+});
+
+test.describe('Trades tab — trade block with players @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockTradesGraphQL(page, {
+      leagueTradeOffers: [],
+      leagueTradeBlock: [MOCK_TRADE_BLOCK_PLAYER, MOCK_OWN_TRADE_BLOCK_PLAYER],
+    });
+    await page.goto('/baseball/league/1/trades');
+    await page.waitForLoadState('load');
+  });
+
+  test('lists players on the trade block', async ({ page }) => {
+    await expect(page.getByText('Jake Smith')).toBeVisible();
+    await expect(page.getByText('Mike Johnson')).toBeVisible();
+  });
+
+  test('shows AVAILABLE badge for other teams players', async ({ page }) => {
+    await expect(page.getByText('AVAILABLE').first()).toBeVisible();
+  });
+
+  test('shows Remove button for own team players', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
+  });
+
+  test('shows asking price when set', async ({ page }) => {
+    await expect(page.getByText('Asking: 2nd round pick')).toBeVisible();
+  });
+});
+
+test.describe('Trades tab — trade block interactions @regression', () => {
+  test('sets an asking price via the Set Price flow', async ({ page }) => {
+    const ownPlayerNoPrice = {
+      __typename: 'TeamMember',
+      id: 2,
+      teamId: 1,
+      playerId: 102,
+      onTradeBlock: true,
+      askingPrice: null,
+      player: { __typename: 'Player', firstName: 'Mike', lastName: 'Johnson' },
+    };
+
+    await mockTradesGraphQL(page, {
+      leagueTradeOffers: [],
+      leagueTradeBlock: [ownPlayerNoPrice],
+    });
+    await page.goto('/baseball/league/1/trades');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: 'Set Price' }).click();
+    await page.getByRole('textbox').fill('1st round pick');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByText('Asking: 1st round pick')).toBeVisible();
+  });
+
+  test('removes a player from the trade block', async ({ page }) => {
+    const mutationCalls: string[] = [];
+
+    await mockTradesGraphQL(page, {
+      leagueTradeOffers: [],
+      leagueTradeBlock: [MOCK_OWN_TRADE_BLOCK_PLAYER],
+    });
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const body = route.request().postDataJSON() as {
+        operationName?: string;
+      };
+      if (body.operationName === 'SetTradeBlock') {
+        mutationCalls.push(body.operationName);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              setTradeBlock: {
+                ...MOCK_OWN_TRADE_BLOCK_PLAYER,
+                onTradeBlock: false,
+              },
+            },
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.goto('/baseball/league/1/trades');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: 'Remove' }).click();
+
+    expect(mutationCalls).toContain('SetTradeBlock');
   });
 });

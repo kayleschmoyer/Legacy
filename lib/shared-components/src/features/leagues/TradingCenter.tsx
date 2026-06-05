@@ -41,7 +41,9 @@ import {
   X,
   Zap,
 } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import { Button } from '../../Button';
+import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
 import {
   GetLeagueTradeOffers,
   type GetLeagueTradeOffersQuery,
@@ -746,6 +748,10 @@ function ProposeTradeDialog({
       });
       onSuccess();
     } catch (err) {
+      LOGGER.error('Failed to propose trade', err as Error, {
+        leagueId,
+        userTeamId,
+      });
       setErrorMsg(
         err instanceof Error ? err.message : 'Failed to propose trade.',
       );
@@ -1350,6 +1356,7 @@ export function TradingCenter({
         await fn(id);
         await handleRefetch();
       } catch (err) {
+        LOGGER.error('Trade action failed', err as Error, { tradeId: id });
         setActionError(err instanceof Error ? err.message : 'Action failed.');
       } finally {
         setActionLoading(null);
@@ -1653,6 +1660,11 @@ export function TradingCenter({
           </YStack>
         )}
       </YStack>
+
+      <Separator borderColor="$outlineSubtle" />
+
+      {/* Trade Block */}
+      <LeagueTradeBlock leagueId={leagueId} userTeamId={userTeamId} />
 
       {/* Propose trade dialog */}
       {showProposeDialog && (

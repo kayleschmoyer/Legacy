@@ -422,6 +422,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
                 league={league}
                 isMember={effIsMember}
                 myTeamId={userTeamId ?? null}
+                isCommissioner={isCommissioner}
               />
             </div>
           )}

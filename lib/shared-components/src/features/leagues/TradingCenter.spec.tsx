@@ -22,6 +22,12 @@ let mockProposerRosterReturn: {
   error?: Error;
 };
 
+let mockTradeBlockReturn: {
+  data: { leagueTradeBlock: object[] } | undefined;
+  loading: boolean;
+  error: Error | undefined;
+};
+
 const mockLoadProposerRoster = jest.fn();
 const mockRefetch = jest.fn().mockResolvedValue({});
 
@@ -43,6 +49,11 @@ jest.mock('../../api/db/graphql.generated', () => ({
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useVetoTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useProposeTradeMutation: () => [jest.fn().mockResolvedValue({})],
+  useGetLeagueTradeBlockQuery: jest.fn(() => mockTradeBlockReturn),
+  useSetTradeBlockMutation: () => [
+    jest.fn().mockResolvedValue({}),
+    { loading: false },
+  ],
   GetTeamTradeOffers: 'GetTeamTradeOffers',
   GetLeagueTradeOffers: 'GetLeagueTradeOffers',
   TradeOfferFragment: 'TradeOfferFragment',
@@ -122,10 +133,75 @@ function setProposerRoster(playerIds: number[]) {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('TradingCenter — LeagueTradeBlock integration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProposerRosterReturn = { data: undefined };
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+  });
+
+  it('renders the Trade Block section label', async () => {
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByText('Trade Block')).toBeTruthy();
+  });
+
+  it('renders trade block players when the query returns data', async () => {
+    mockTradeBlockReturn = {
+      data: {
+        leagueTradeBlock: [
+          {
+            __typename: 'TeamMember',
+            id: 1,
+            teamId: 2,
+            playerId: 101,
+            onTradeBlock: true,
+            askingPrice: null,
+            player: {
+              __typename: 'Player',
+              firstName: 'Jake',
+              lastName: 'Smith',
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+    };
+
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByText('Jake Smith')).toBeTruthy();
+  });
+
+  it('shows the empty state when trade block has no players', async () => {
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByText(/no players on the trade block/i)).toBeTruthy();
+  });
+});
+
 describe('TradingCenter — stale player detection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockProposerRosterReturn = { data: undefined };
+    mockTradeBlockReturn = {
+      data: undefined,
+      loading: false,
+      error: undefined,
+    };
   });
 
   it('does not show stale warning when offered player is still on the roster', async () => {
