@@ -165,7 +165,7 @@ function createMcpServer(): McpServer {
       key: z.string(),
       summary: z.string().optional(),
       description: z.string().optional(),
-      type: z.enum(['Task', 'Bug', 'Story']).optional(),
+      type: z.enum(['Task', 'Bug', 'Story', 'Epic']).optional(),
       sprint: z
         .string()
         .regex(/^(?:current|\d+)$/)

@@ -197,7 +197,7 @@ server.tool(
     summary: z.string().optional().describe('New summary/title'),
     description: z.string().optional().describe('New description'),
     type: z
-      .enum(['Task', 'Bug', 'Story'])
+      .enum(['Task', 'Bug', 'Story', 'Epic'])
       .optional()
       .describe('Change issue type'),
     sprint: z
