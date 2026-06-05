@@ -585,6 +585,10 @@ export function createServer(): McpServer {
                   configured: false,
                   source,
                   error: err instanceof Error ? err.message : String(err),
+                  hint:
+                    'Set AGENT_AUTHOR_APP_PRIVATE_KEY or GH_TOKEN in cloud env settings. ' +
+                    'Fallback: use mcp__github__actions_list with per_page ≤ 5 — ' +
+                    'it returns large payloads (~65 KB at per_page=3), so save to a file and extract fields with python3 or jq.',
                 },
                 null,
                 2,

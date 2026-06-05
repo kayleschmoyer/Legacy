@@ -182,8 +182,14 @@ async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
         if (err) {
           reject(
             new Error(
-              'No GITHUB_TOKEN env var and `gh auth token` failed. ' +
-                'Set GITHUB_TOKEN or run `gh auth login`.',
+              'No GitHub token available for the legacy-sports-ci-local server ' +
+                '(GH_TOKEN/GITHUB_TOKEN not set, AGENT_AUTHOR_APP_PRIVATE_KEY not configured, gh CLI auth failed). ' +
+                'Fix: set AGENT_AUTHOR_APP_PRIVATE_KEY or GH_TOKEN in cloud env settings ' +
+                '(see .agents/skills/cloud-agent-mode/SKILL.md). ' +
+                'Fallback: use the built-in mcp__github__actions_list tool to inspect workflow runs. ' +
+                'WARNING: actions_list returns enormous payloads (~400 KB at per_page=15, ~65 KB at per_page=3); ' +
+                'always save to a temp file and extract only the fields you need ' +
+                '(id, status, conclusion, head_sha, name, created_at) with python3 or jq rather than reading the full JSON inline.',
             ),
           );
           return;
