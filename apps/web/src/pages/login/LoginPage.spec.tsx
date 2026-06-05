@@ -253,3 +253,55 @@ describe('LoginPage signup link redirect forwarding (LS-6688)', () => {
     expect(link.getAttribute('href')).toBe('/signup');
   });
 });
+
+describe('LoginPage handleSignIn re-entrancy guard (LS-6685)', () => {
+  it('calls OAuthProvider.signIn only once for a synchronous double-tap', async () => {
+    // Hold the sign-in promise open so the in-flight latch stays set across both
+    // clicks — this reproduces a rapid double-tap firing two synchronous click
+    // handlers before React commits setIsLoading(true).
+    type SignInResult = Awaited<ReturnType<typeof OAuthProvider.signIn>>;
+    let resolveSignIn: (value: SignInResult) => void = () => undefined;
+    signInSpy.mockReturnValueOnce(
+      new Promise<SignInResult>((resolve) => {
+        resolveSignIn = resolve;
+      }),
+    );
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    // Two clicks dispatched within the same synchronous batch: the button's
+    // disabled attribute (driven by isLoading state) has not re-rendered yet, so
+    // only the useRef latch can prevent the second invocation.
+    act(() => {
+      fireEvent.click(btn);
+      fireEvent.click(btn);
+    });
+
+    expect(signInSpy).toHaveBeenCalledTimes(1);
+
+    // Release the pending promise so the handler settles cleanly.
+    await act(async () => {
+      resolveSignIn({});
+      await Promise.resolve();
+    });
+  });
+
+  it('allows a subsequent sign-in after the first attempt settles', async () => {
+    signInSpy.mockResolvedValueOnce({}).mockResolvedValueOnce({});
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    await act(async () => {
+      fireEvent.click(btn);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.click(btn);
+      await Promise.resolve();
+    });
+
+    expect(signInSpy).toHaveBeenCalledTimes(2);
+  });
+});

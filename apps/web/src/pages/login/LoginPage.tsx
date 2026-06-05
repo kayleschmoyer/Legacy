@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   OAuthErrorCode,
@@ -75,6 +81,13 @@ export function LoginPage(): React.JSX.Element {
   const [isConfigured, setIsConfigured] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Synchronous re-entrancy latch for handleSignIn. `isLoading` is React state
+  // and is not committed until after the current synchronous task finishes, so a
+  // rapid double-tap can fire two click handlers that both pass an `isLoading`
+  // guard before the first setIsLoading(true) commits. This ref is read and set
+  // synchronously, so the second invocation sees the latch and bails out.
+  const signInInFlightRef = useRef(false);
 
   const today = useMemo(() => new Date(), []);
   const todayMonth = today.getMonth() + 1;
@@ -279,7 +292,8 @@ export function LoginPage(): React.JSX.Element {
   }, [loginWithOAuth]);
 
   const handleSignIn = useCallback(async () => {
-    if (!isConfigured || isLoading || isConfiguring) return;
+    if (!isConfigured || isConfiguring || signInInFlightRef.current) return;
+    signInInFlightRef.current = true;
     setIsLoading(true);
     setErrorMessage('');
     try {
@@ -305,9 +319,10 @@ export function LoginPage(): React.JSX.Element {
         );
       }
     } finally {
+      signInInFlightRef.current = false;
       setIsLoading(false);
     }
-  }, [isConfigured, isConfiguring, isLoading, loginWithOAuth]);
+  }, [isConfigured, isConfiguring, loginWithOAuth]);
 
   const handleDiscordSignIn = useCallback(() => {
     const oauthProxyUrl = config.oauthProxyUrl;
