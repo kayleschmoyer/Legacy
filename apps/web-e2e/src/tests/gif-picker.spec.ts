@@ -249,6 +249,20 @@ async function mockGraphQL(
   });
 }
 
+/**
+ * A 1×1 transparent GIF, used to fulfil the thumbnail image requests the
+ * GifPicker fires against media.giphy.com after the search/trending response
+ * loads.  Without this, those <img> requests fall through to the API-isolation
+ * catch-all (HTTP 401 "Blocked by E2E API isolation"), the browser fires the
+ * <img onError> handler, and every GIF button flips to the disabled "Image
+ * unavailable" state — racing the test's "Send GIF:" assertions and flaking
+ * non-deterministically (LS-7703).
+ */
+const ONE_BY_ONE_GIF = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  'base64',
+);
+
 async function mockGiphy(
   page: import('@playwright/test').Page,
   opts: { empty?: boolean } = {},
@@ -264,6 +278,22 @@ async function mockGiphy(
             ? { data: [], meta: { status: 200 } }
             : MOCK_GIPHY_RESPONSE,
         ),
+      });
+    },
+  );
+
+  // Serve the GIF thumbnails themselves so the <img> elements load
+  // successfully and the buttons stay in their "Send GIF:" state. Tests that
+  // exercise the broken-thumbnail fallback register their own media.giphy.com
+  // route *after* this one, which takes precedence (Playwright matches routes
+  // in LIFO order).
+  await page.route(
+    (url) => url.hostname === 'media.giphy.com',
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/gif',
+        body: ONE_BY_ONE_GIF,
       });
     },
   );

@@ -282,3 +282,26 @@ export function extractOperationName(route: Route): string {
 
   return 'unknown';
 }
+
+/**
+ * Case-insensitive filter mirroring the server-side `GetAllUsers` search
+ * (by username, email, or id). Shared by the admin-console / admin-dashboard
+ * specs so the `/admin/users` search tests get realistic filtered results from
+ * their mocks instead of the full user list.
+ */
+export function filterUsers<
+  T extends {
+    id: number;
+    username?: string | null;
+    email?: string | null;
+  },
+>(users: readonly T[], search: string): T[] {
+  if (!search) return [...users];
+  const q = search.toLowerCase();
+  return users.filter(
+    (u) =>
+      u.username?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      String(u.id).includes(q),
+  );
+}

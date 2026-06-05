@@ -700,6 +700,14 @@ test.describe('ScoreboardTicker — global ticker visibility @regression', () =>
     // the tab regains visibility or focus.
     // Use a mutable flag rather than a call counter so the test is robust to
     // however many calls Apollo's cache-and-network policy makes on mount.
+    //
+    // Control the clock (LS-7703): the ticker throttles visibility/focus
+    // refetches to once per 30s. A window 'focus' event fired during page load
+    // can non-deterministically consume that throttle window before the test
+    // dispatches its own event, suppressing the refetch and leaving the ticker
+    // stuck empty. Installing a fake clock and fast-forwarding past the
+    // throttle below makes the refetch deterministic.
+    await page.clock.install();
     let returnGames = false;
     await page.route(isGraphQLEndpoint, async (route) => {
       const opName = extractOperationName(route).toLowerCase();
@@ -734,6 +742,10 @@ test.describe('ScoreboardTicker — global ticker visibility @regression', () =>
     // focus after a long idle. The ticker's focus/visibility listener should
     // refetch and pick up the new data.
     returnGames = true;
+    // Advance past the 30s refetch throttle so the dispatched visibility/focus
+    // event is guaranteed to trigger a refetch regardless of any load-time
+    // focus event that already consumed the throttle window.
+    await page.clock.fastForward(31_000);
     await page.evaluate(() => {
       document.dispatchEvent(new Event('visibilitychange'));
       window.dispatchEvent(new Event('focus'));

@@ -16,7 +16,11 @@ import {
   expect,
   test,
 } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  filterUsers,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** Non-admin user: global storageState JWT has accessLevel 'admin',
@@ -60,9 +64,36 @@ async function mockAdminGraphQL(
   opts: { usersError?: boolean } = {},
 ): Promise<void> {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    // Match on the exact operation name (not broad postData substrings,
+    // which can collide — e.g. "getuserscount" contains "getusers").
+    const op = extractOperationName(route).toLowerCase();
+    let variables: { search?: unknown } = {};
+    try {
+      variables =
+        (
+          JSON.parse(route.request().postData() ?? '') as {
+            variables?: { search?: unknown };
+          }
+        ).variables ?? {};
+    } catch {
+      variables = {};
+    }
+    const search = typeof variables.search === 'string' ? variables.search : '';
+    const matchedUsers = filterUsers(MOCK_USERS, search);
 
-    if (postData.includes('admingetusers')) {
+    if (op === 'getuserscount') {
+      // GetUsersCount feeds the "Total Users" stat / search-result count.
+      // Previously unmocked (LS-7703). Honors the search variable.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { usersCount: matchedUsers.length } }),
+      });
+    } else if (op === 'admingetusers' || op === 'getallusers') {
+      // AdminGetUsers (the users list) and GetAllUsers (the recent-users
+      // widget the redesigned AdminPage fires) share the same { users }
+      // shape. GetAllUsers was previously unmocked, falling through to the
+      // API isolation catch-all and racing the assertions (LS-7703).
       if (opts.usersError) {
         await route.fulfill({
           status: 200,
@@ -76,10 +107,10 @@ async function mockAdminGraphQL(
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ data: { users: MOCK_USERS } }),
+          body: JSON.stringify({ data: { users: matchedUsers } }),
         });
       }
-    } else if (postData.includes('"getuserbyid"')) {
+    } else if (op === 'getuserbyid') {
       // Return the admin user that matches the adminTest JWT (admin@test.com)
       await route.fulfill({
         status: 200,
@@ -97,7 +128,7 @@ async function mockAdminGraphQL(
           },
         }),
       });
-    } else if (postData.includes('impersonateuser')) {
+    } else if (op === 'impersonateuser') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -208,6 +239,26 @@ adminTest.describe('Admin Console — Users section @regression', () => {
       ).toBeVisible();
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// User management (/admin/users)
+//
+// The admin redesign (LS-5315) moved user search, role management, and
+// impersonation off /admin onto the dedicated /admin/users management page
+// (AdminUsersPage). /admin itself only shows the read-only Recent Signups
+// widget, so these tests target /admin/users where the controls now live.
+// Search is server-side: typing triggers a debounced GetAllUsers refetch with
+// a `search` variable, which the mock filters via filterUsers().
+// ---------------------------------------------------------------------------
+
+adminTest.describe('Admin Console — user management @regression', () => {
+  adminTest.beforeEach(async ({ page }) => {
+    await mockAdminGraphQL(page);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('load');
+    await expect(page.getByText('alice@example.com')).toBeVisible();
+  });
 
   adminTest(
     'shows "Impersonate" button for non-admin users',
@@ -227,30 +278,18 @@ adminTest.describe('Admin Console — Users section @regression', () => {
         page.getByText('AdminUser', { exact: true }).first(),
       ).toBeVisible();
 
-      // AdminUser is admin — no Impersonate button. Only alice and bob (non-admin) get one.
+      // AdminUser is admin (and the current user) — no Impersonate button.
+      // Only alice and bob (non-admin) get one.
       const impersonateButtons = page.getByRole('button', {
         name: /impersonate/i,
       });
       await expect(impersonateButtons).toHaveCount(2);
     },
   );
-});
 
-// ---------------------------------------------------------------------------
-// Users section — search
-// ---------------------------------------------------------------------------
-
-adminTest.describe('Admin Console — user search @regression', () => {
   adminTest('filters users by username search', async ({ page }) => {
-    await mockAdminGraphQL(page);
-    await page.goto('/admin');
-    await page.waitForLoadState('load');
-    await expect(
-      page.getByText('alice', { exact: true }).first(),
-    ).toBeVisible();
-
-    // Type "bob" in search box
-    await page.getByPlaceholder(/search by name, email, or id/i).fill('bob');
+    // Type "bob" in search box — server-side search refetches a filtered list.
+    await page.getByPlaceholder(/search by email or username/i).fill('bob');
 
     // alice should be hidden; bob should remain
     await expect(page.getByText('bob', { exact: true }).first()).toBeVisible();
@@ -260,32 +299,25 @@ adminTest.describe('Admin Console — user search @regression', () => {
   });
 
   adminTest(
-    'shows "No users found" when search matches nothing',
+    'shows empty state when search matches nothing',
     async ({ page }) => {
-      await mockAdminGraphQL(page);
-      await page.goto('/admin');
-      await page.waitForLoadState('load');
-      await expect(
-        page.getByText('alice', { exact: true }).first(),
-      ).toBeVisible();
-
       await page
-        .getByPlaceholder(/search by name, email, or id/i)
+        .getByPlaceholder(/search by email or username/i)
         .fill('zzz-no-match');
 
-      await expect(page.getByText('No users found')).toBeVisible();
+      await expect(page.getByText(/no users match your search/i)).toBeVisible();
     },
   );
 });
 
 // ---------------------------------------------------------------------------
-// Users section — error state
+// User management — error state (/admin/users)
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Admin Console — users error state @regression', () => {
   adminTest('shows error message when user query fails', async ({ page }) => {
     await mockAdminGraphQL(page, { usersError: true });
-    await page.goto('/admin');
+    await page.goto('/admin/users');
     await page.waitForLoadState('load');
 
     await expect(page.getByText(/Failed to load users/i)).toBeVisible();

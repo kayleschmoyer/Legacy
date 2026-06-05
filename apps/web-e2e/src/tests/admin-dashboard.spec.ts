@@ -18,7 +18,11 @@ import {
   createCustomAuthTest,
   expect,
 } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  filterUsers,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -67,21 +71,59 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      // Match on the exact operation name (not broad postData substrings,
+      // which can collide — e.g. "getuserscount" contains "getusers").
+      const op = extractOperationName(route).toLowerCase();
+      let variables: { search?: unknown } = {};
+      try {
+        variables =
+          (
+            JSON.parse(route.request().postData() ?? '') as {
+              variables?: { search?: unknown };
+            }
+          ).variables ?? {};
+      } catch {
+        variables = {};
+      }
+      const search =
+        typeof variables.search === 'string' ? variables.search : '';
+      const matchedUsers = filterUsers(MOCK_USERS, search);
 
-      if (
-        postData.includes('admingetusers') ||
-        postData.includes('adminusers') ||
-        postData.includes('getusers')
-      ) {
+      if (op === 'getuserbyid') {
+        // The redesigned AdminPage gates admin access on a server-side
+        // GetUserById lookup (serverUserData?.user?.accessLevel). The baseline
+        // mock returns accessLevel 'none', which trips the not-admin redirect
+        // away from /admin and races the "Admin Console" assertion. Return the
+        // admin identity matching the adminTest JWT so the page stays put.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { user: MOCK_USERS[0] } }),
+        });
+      } else if (op === 'getuserscount') {
+        // GetUsersCount feeds the "Total Users" stat / search-result count.
+        // Honor the search variable so /admin/users count reflects the
+        // filtered set.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { usersCount: matchedUsers.length } }),
+        });
+      } else if (op === 'getallusers' || op === 'admingetusers') {
+        // Both AdminGetUsers and GetAllUsers (the recent-users list on /admin
+        // and the server-side-searched list on /admin/users) resolve to the
+        // same { users } shape. GetAllUsers was previously unmocked, falling
+        // through to the API isolation catch-all (recorded as an unmocked-op
+        // test error + empty data) — the primary admin-dashboard flake source
+        // (LS-7703). matchedUsers honors the GetAllUsers `search` variable.
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            data: { users: MOCK_USERS },
+            data: { users: matchedUsers },
           }),
         });
-      } else if (postData.includes('impersonateuser')) {
+      } else if (op === 'impersonateuser') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -96,7 +138,7 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
         });
       } else {
         // Fall through to the baseline _apiIsolation fixture for ambient
-        // queries (getUnreadNotificationCount, getUserById, etc.)
+        // queries (getUnreadNotificationCount, etc.)
         await unmockedGraphQLFallback(route);
       }
     },
@@ -126,8 +168,9 @@ adminTest.describe('Admin Dashboard – page structure @smoke', () => {
   });
 
   adminTest('shows admin dashboard description', async ({ page }) => {
+    // Redesigned /admin is a dashboard; user management moved to /admin/users.
     await expect(
-      page.getByText(/manage users and impersonate accounts/i),
+      page.getByText(/platform overview and developer tools/i),
     ).toBeVisible();
   });
 
@@ -154,48 +197,52 @@ adminTest.describe('Admin Dashboard – users section @regression', () => {
     await expect(page.getByText('alice@example.com')).toBeVisible();
   });
 
-  adminTest('shows Users section with user count badge', async ({ page }) => {
-    await expect(page.getByText('Users', { exact: true })).toBeVisible();
-    // Badge shows total user count — component renders "${count} TOTAL"
-    await expect(page.getByText('3 TOTAL')).toBeVisible();
+  adminTest('shows Total Users stat with the user count', async ({ page }) => {
+    // Redesigned /admin shows a "Total Users" StatCard fed by GetUsersCount.
+    await expect(page.getByText('Total Users')).toBeVisible();
+    await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
   });
 
-  adminTest('shows user email addresses', async ({ page }) => {
+  adminTest('shows recent-signup email addresses', async ({ page }) => {
     await expect(page.getByText('alice@example.com')).toBeVisible();
     await expect(page.getByText('bob@example.com')).toBeVisible();
   });
 
-  adminTest('shows user usernames', async ({ page }) => {
+  adminTest('shows recent-signup usernames', async ({ page }) => {
     await expect(page.getByText('alice', { exact: true })).toBeVisible();
     await expect(page.getByText('bob', { exact: true })).toBeVisible();
-  });
-
-  adminTest('shows search input for filtering users', async ({ page }) => {
-    await expect(
-      page.getByPlaceholder(/search by name, email, or id/i),
-    ).toBeVisible();
   });
 });
 
 // ---------------------------------------------------------------------------
 // Tests: User search @regression
+//
+// User search lives on the dedicated /admin/users management page
+// (AdminUsersPage) after the admin redesign (LS-5315) — /admin itself only
+// shows the read-only "Recent Signups" widget. Search is server-side: typing
+// triggers a debounced GetAllUsers refetch with a `search` variable, which the
+// mock filters via filterUsers().
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Admin Dashboard – user search @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockAdminGraphQL(page);
-    await page.goto('/admin');
+    await page.goto('/admin/users');
     await page.waitForLoadState('load');
+    // Wait for the user list to render before interacting with search.
     await expect(page.getByText('alice@example.com')).toBeVisible();
+  });
+
+  adminTest('shows search input for filtering users', async ({ page }) => {
+    await expect(
+      page.getByPlaceholder(/search by email or username/i),
+    ).toBeVisible();
   });
 
   adminTest(
     'filters users by email when typing in search',
     async ({ page }) => {
-      const searchInput = page.getByPlaceholder(
-        /search by name, email, or id/i,
-      );
-      await searchInput.fill('alice');
+      await page.getByPlaceholder(/search by email or username/i).fill('alice');
 
       await expect(page.getByText('alice@example.com')).toBeVisible();
       await expect(page.getByText('bob@example.com')).not.toBeVisible();
@@ -203,19 +250,18 @@ adminTest.describe('Admin Dashboard – user search @regression', () => {
   );
 
   adminTest(
-    'shows "No users found" when search has no matches',
+    'shows empty state when search has no matches',
     async ({ page }) => {
-      const searchInput = page.getByPlaceholder(
-        /search by name, email, or id/i,
-      );
-      await searchInput.fill('nonexistentuser99999');
+      await page
+        .getByPlaceholder(/search by email or username/i)
+        .fill('nonexistentuser99999');
 
-      await expect(page.getByText(/no users found/i)).toBeVisible();
+      await expect(page.getByText(/no users match your search/i)).toBeVisible();
     },
   );
 
   adminTest('clears filter when search input is cleared', async ({ page }) => {
-    const searchInput = page.getByPlaceholder(/search by name, email, or id/i);
+    const searchInput = page.getByPlaceholder(/search by email or username/i);
     await searchInput.fill('alice');
     await expect(page.getByText('bob@example.com')).not.toBeVisible();
 
