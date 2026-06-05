@@ -149,10 +149,10 @@ jest.mock('../../../../features/commissioner/LeagueDuesPaymentStatus', () => {
   };
 });
 
-jest.mock('../../../../features/commissioner/SalaryCapManagementCard', () => {
+jest.mock('../../../../features/commissioner/CommissionerScreen', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
-    SalaryCapManagementCard: () => <View testID="salary-cap-management-card" />,
+    CommissionerScreen: () => <View testID="commissioner-screen" />,
   };
 });
 
@@ -225,7 +225,6 @@ const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   jest.fn(),
   { data: { userTeamId: 10 }, loading: false },
 ]);
-const mockStartDraftMutation = jest.fn(() => [jest.fn(), { loading: false }]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
 
 jest.mock('../../../../api/db/graphql.generated', () => ({
@@ -238,8 +237,6 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
     mockGetTeamMembersQuery(...args),
   useGetUserTeamIdLazyQuery: (...args: unknown[]) =>
     mockGetUserTeamIdLazyQuery(...args),
-  useStartDraftMutation: (...args: unknown[]) =>
-    mockStartDraftMutation(...args),
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUpdateTeamMemberPositionMutation(...args),
 }));
@@ -265,7 +262,6 @@ describe('FootballLeagueId', () => {
       jest.fn(),
       { data: { userTeamId: 10 }, loading: false },
     ]);
-    mockStartDraftMutation.mockReturnValue([jest.fn(), { loading: false }]);
     mockUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
 
     jest

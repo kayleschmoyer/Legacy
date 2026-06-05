@@ -16,8 +16,25 @@ fragment League on League {
   weekAdvanceStatus
   sport
   defensiveFormat
+  pitcherStartsPerMatchup
+  minCareerGames
+  minCareerSeasons
+  totalMatchups
+  playoffEnabled
+  playoffFormat
+  playoffMultiWeek
   salaryCapEnabled
   salaryCap
+  eraFilter
+  baseballHofOnly
+  customEraStartYear
+  customEraEndYear
+  frozenAt
+  seasonNumber
+  logoUrl
+  bannerUrl
+  primaryColor
+  secondaryColor
   userMembership {
     ...LeagueMember
   }

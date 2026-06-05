@@ -4,24 +4,12 @@ import {
   useRouter,
 } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  H3,
-  Separator,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { H3, Spinner, Text, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
-  CommissionerAuditLog,
-  CommissionerNoteControl,
-  DeleteLeagueControl,
   LeagueTradeBlock,
   PendingTradeOffers,
   PendingWaiverClaims,
@@ -30,13 +18,11 @@ import {
 } from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
-  StartDraftMutation,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
-  useStartDraftMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
@@ -44,12 +30,9 @@ import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { LeagueOverviewTab } from '../../../../features/leagues/LeagueOverviewTab';
 import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { LeagueHistoryTab } from '../../../../features/leagues/LeagueHistoryTab';
-import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
-import { LeagueDuesSetup } from '../../../../features/commissioner/LeagueDuesSetup';
-import { SalaryCapManagementCard } from '../../../../features/commissioner/SalaryCapManagementCard';
+import { CommissionerScreen } from '../../../../features/commissioner/CommissionerScreen';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
 import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
-import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
@@ -166,35 +149,11 @@ export default function LeagueId(): React.JSX.Element {
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
-  // StartDraft mutation - with refetchQueries to ensure UI updates
-  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
-    refetchQueries: ['GetLeagueById'],
-    awaitRefetchQueries: true,
-    onCompleted: (_data: StartDraftMutation) => {
-      Alert.alert(
-        'Success',
-        'Draft has been started and queued for processing!',
-      );
-    },
-    onError: (error) => {
-      LOGGER.error('Error starting draft:', error);
-      Alert.alert('Error', error.message || 'Failed to start draft');
-    },
-  });
-
   // Check if user is league owner/commissioner
   const isCommissioner = useMemo(() => {
     if (!leagueData?.league || !userInfo) return false;
     return leagueData.league.owner === userInfo.id || userInfo.isAdmin;
   }, [leagueData?.league, userInfo]);
-
-  // Fetch league scoring settings for commissioner scoring editor
-  const {
-    profile: scoringProfile,
-    loading: scoringLoading,
-    error: scoringError,
-    refetch: refetchScoringProfile,
-  } = useLeagueScoringSettings(numLeagueId);
 
   const league = leagueData?.league;
 
@@ -242,36 +201,6 @@ export default function LeagueId(): React.JSX.Element {
       );
     }
   }, [league?.name, inviteUrl]);
-
-  const handleStartDraft = useCallback(() => {
-    if (!isCommissioner) {
-      Alert.alert(
-        'Permission Denied',
-        'Only league commissioners can start drafts.',
-      );
-      return;
-    }
-
-    Alert.alert(
-      'Start Draft',
-      'Are you sure you want to start the draft? This will randomly assign players to all teams.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start Draft',
-          style: 'default',
-          onPress: () => {
-            void startDraft({
-              variables: {
-                leagueId: numLeagueId,
-                selectionMethod: 'random',
-              },
-            });
-          },
-        },
-      ],
-    );
-  }, [startDraft, numLeagueId, isCommissioner]);
 
   const handlePlayerAssign = useCallback(
     async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
@@ -507,123 +436,11 @@ export default function LeagueId(): React.JSX.Element {
 
         {isCommissioner && (
           <Tabs.Content value="commissioner" flex={1}>
-            <ScrollView>
-              <YStack padding="$4" space="$4">
-                <H3 marginBottom="$3">Commissioner Settings</H3>
-
-                {/* Commissioner Note */}
-                <CommissionerNoteControl
-                  leagueId={numLeagueId}
-                  currentNote={league?.lmNotes ?? ''}
-                  onSuccess={(msg) => Alert.alert('Success', msg)}
-                  onError={(err) => Alert.alert('Error', err.message)}
-                />
-
-                {/* League Dues */}
-                <LeagueDuesSetup
-                  leagueId={numLeagueId}
-                  onSuccess={(msg) => Alert.alert('Success', msg)}
-                  onError={(err) => Alert.alert('Error', err.message)}
-                />
-
-                {/* Salary Cap Management (web deep link) */}
-                <SalaryCapManagementCard
-                  leagueId={numLeagueId}
-                  sport="baseball"
-                  salaryCapEnabled={league?.salaryCapEnabled ?? false}
-                  salaryCap={league?.salaryCap ?? null}
-                />
-
-                {/* Draft Management */}
-                <Card
-                  backgroundColor="$blue2"
-                  borderColor="$blue6"
-                  padding="$4"
-                >
-                  <YStack space="$3">
-                    <Text fontSize="$5" fontWeight="600" color="$blue11">
-                      Draft Management
-                    </Text>
-                    <Text color="$gray11" fontSize="$3">
-                      Start a random draft to automatically assign players to
-                      all teams in the league.
-                    </Text>
-                    <XStack justifyContent="space-between" alignItems="center">
-                      <YStack flex={1}>
-                        <Text fontSize="$4" fontWeight="500">
-                          Random Draft
-                        </Text>
-                        <Text fontSize="$2" color="$gray10">
-                          Randomly assigns players to roster positions
-                        </Text>
-                      </YStack>
-                      <Button
-                        backgroundColor="$blue9"
-                        color="white"
-                        onPress={handleStartDraft}
-                        disabled={startDraftLoading}
-                        opacity={startDraftLoading ? 0.6 : 1}
-                        minWidth={120}
-                      >
-                        {startDraftLoading ? 'Starting...' : 'Start Draft'}
-                      </Button>
-                    </XStack>
-                    <Separator />
-                    <XStack justifyContent="space-between" alignItems="center">
-                      <YStack flex={1}>
-                        <Text fontSize="$4" fontWeight="500">
-                          Live Draft
-                        </Text>
-                        <Text fontSize="$2" color="$gray10">
-                          Real-time snake or linear draft with pick timer
-                        </Text>
-                      </YStack>
-                      <Button
-                        backgroundColor="$green9"
-                        color="white"
-                        onPress={() =>
-                          router.navigate({
-                            pathname: '/DraftBoardPage' as never,
-                            params: { leagueId: String(numLeagueId) },
-                          } as never)
-                        }
-                        minWidth={120}
-                      >
-                        Live Draft
-                      </Button>
-                    </XStack>
-                  </YStack>
-                </Card>
-
-                {/* Scoring Settings */}
-                <LeagueScoringEditor
-                  leagueId={numLeagueId}
-                  profile={scoringProfile}
-                  loading={scoringLoading}
-                  error={scoringError}
-                  onRefetch={async () => {
-                    await refetchScoringProfile();
-                  }}
-                />
-
-                {/* Audit Log */}
-                <CommissionerAuditLog leagueId={numLeagueId} />
-
-                {/* Danger Zone */}
-                <DeleteLeagueControl
-                  leagueId={numLeagueId}
-                  leagueName={league?.name ?? ''}
-                  onDeleted={() => {
-                    Alert.alert(
-                      'Deleted',
-                      'League has been permanently deleted.',
-                    );
-                    router.navigate('/');
-                  }}
-                  onError={(err) => Alert.alert('Error', err.message)}
-                />
-              </YStack>
-            </ScrollView>
+            <CommissionerScreen
+              leagueId={numLeagueId}
+              league={league}
+              onLeagueDeleted={() => router.navigate('/')}
+            />
           </Tabs.Content>
         )}
       </Tabs>

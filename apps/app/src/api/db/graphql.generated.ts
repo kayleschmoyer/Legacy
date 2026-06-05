@@ -4744,8 +4744,25 @@ export type LeagueFragment = {
   weekAdvanceStatus?: string | null;
   sport?: Sport | null;
   defensiveFormat?: DefensiveFormat | null;
+  pitcherStartsPerMatchup?: number | null;
+  minCareerGames?: number | null;
+  minCareerSeasons?: number | null;
+  totalMatchups?: number | null;
+  playoffEnabled?: boolean | null;
+  playoffFormat?: string | null;
+  playoffMultiWeek?: boolean | null;
   salaryCapEnabled?: boolean | null;
   salaryCap?: number | null;
+  eraFilter?: string | null;
+  baseballHofOnly?: boolean | null;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
+  frozenAt?: string | null;
+  seasonNumber?: number | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -4798,8 +4815,25 @@ export type GetLeagueByIdQuery = {
     weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    pitcherStartsPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
+    eraFilter?: string | null;
+    baseballHofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4840,8 +4874,25 @@ export type CreateLeagueMutation = {
       weekAdvanceStatus?: string | null;
       sport?: Sport | null;
       defensiveFormat?: DefensiveFormat | null;
+      pitcherStartsPerMatchup?: number | null;
+      minCareerGames?: number | null;
+      minCareerSeasons?: number | null;
+      totalMatchups?: number | null;
+      playoffEnabled?: boolean | null;
+      playoffFormat?: string | null;
+      playoffMultiWeek?: boolean | null;
       salaryCapEnabled?: boolean | null;
       salaryCap?: number | null;
+      eraFilter?: string | null;
+      baseballHofOnly?: boolean | null;
+      customEraStartYear?: number | null;
+      customEraEndYear?: number | null;
+      frozenAt?: string | null;
+      seasonNumber?: number | null;
+      logoUrl?: string | null;
+      bannerUrl?: string | null;
+      primaryColor?: string | null;
+      secondaryColor?: string | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -4890,8 +4941,25 @@ export type GetUserLeaguesQuery = {
     weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    pitcherStartsPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
+    eraFilter?: string | null;
+    baseballHofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4935,8 +5003,25 @@ export type StartDraftMutation = {
     weekAdvanceStatus?: string | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    pitcherStartsPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
+    eraFilter?: string | null;
+    baseballHofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -7122,8 +7207,25 @@ export const LeagueFragmentDoc = gql`
     weekAdvanceStatus
     sport
     defensiveFormat
+    pitcherStartsPerMatchup
+    minCareerGames
+    minCareerSeasons
+    totalMatchups
+    playoffEnabled
+    playoffFormat
+    playoffMultiWeek
     salaryCapEnabled
     salaryCap
+    eraFilter
+    baseballHofOnly
+    customEraStartYear
+    customEraEndYear
+    frozenAt
+    seasonNumber
+    logoUrl
+    bannerUrl
+    primaryColor
+    secondaryColor
     userMembership {
       ...LeagueMember
     }
