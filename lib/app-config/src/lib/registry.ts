@@ -147,6 +147,7 @@ export const CONFIG_KEYS = {
   repoUrl: {
     clientSafe: true,
     web: 'VITE_REPO_URL',
+    mobile: 'EXPO_PUBLIC_REPO_URL',
     required: false,
   },
 } as const;

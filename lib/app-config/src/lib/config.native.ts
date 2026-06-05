@@ -43,7 +43,7 @@ export function buildNativeConfig(): AppConfig {
     stripeAnnualPriceId: undefined,
     vapidPublicKey: undefined,
     imageUploadUrl: undefined,
-    repoUrl: undefined,
+    repoUrl: process.env.EXPO_PUBLIC_REPO_URL ?? extra?.['repoUrl'],
   };
 
   // Validate native-required keys up-front so the app fails loudly at startup

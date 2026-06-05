@@ -97,11 +97,27 @@ describe('native adapter', () => {
     expect(buildNativeConfig().buildDate).toBeUndefined();
   });
 
+  it('reads repoUrl from EXPO_PUBLIC_REPO_URL (LS-7590 / GAP-002)', () => {
+    process.env.EXPO_PUBLIC_REPO_URL = 'https://github.com/example/repo';
+    expect(buildNativeConfig().repoUrl).toBe('https://github.com/example/repo');
+  });
+
+  it('falls back to extra.repoUrl when EXPO_PUBLIC_REPO_URL is absent', () => {
+    mockExtraData = {
+      ...defaultMockExtra,
+      repoUrl: 'https://github.com/fallback/repo',
+    };
+    expect(buildNativeConfig().repoUrl).toBe(
+      'https://github.com/fallback/repo',
+    );
+  });
+
   it('returns undefined for keys absent from both env and extra', () => {
     const cfg = buildNativeConfig();
     expect(cfg.websocketUrl).toBeUndefined();
     expect(cfg.giphyApiKey).toBeUndefined();
     expect(cfg.appBaseUrl).toBeUndefined();
+    expect(cfg.repoUrl).toBeUndefined();
   });
 
   it('does not throw when native-required keys are provided via extra', () => {

@@ -7,8 +7,6 @@ import { config } from '@legacy-sports/app-config/native';
 
 declare const __DEV__: boolean;
 
-const REPO_URL = 'https://github.com/bkrupa/legacy-sports';
-
 interface InfoRowProps {
   label: string;
   value: string;
@@ -61,6 +59,9 @@ export default function AboutScreen() {
         })
       : rawBuildDate;
 
+  // GitHub repo URL — config-driven so the value stays in sync with web (LS-7590 / GAP-002).
+  const repoUrl = config.repoUrl ?? 'https://github.com/bkrupa/legacy-sports';
+
   // GraphQL host — read via native adapter (EXPO_PUBLIC_GRAPHQL_HOST).
   const graphqlHost = config.graphqlHost || 'unknown';
 
@@ -75,7 +76,7 @@ export default function AboutScreen() {
 
   const commitUrl =
     rawCommitSha !== 'unknown' && rawCommitSha !== 'dev'
-      ? `${REPO_URL}/commit/${rawCommitSha}`
+      ? `${repoUrl}/commit/${rawCommitSha}`
       : null;
 
   return (
@@ -148,7 +149,7 @@ export default function AboutScreen() {
           <H3 marginBottom="$2">Links</H3>
 
           <Button
-            onPress={() => void Linking.openURL(REPO_URL)}
+            onPress={() => void Linking.openURL(repoUrl)}
             variant="outlined"
             size="$3"
           >
@@ -185,7 +186,7 @@ export default function AboutScreen() {
 
         <YStack marginTop="$4" alignItems="center">
           <Text color="$gray10" fontSize="$3" textAlign="center">
-            © {new Date().getFullYear()} Legacy Sports
+            © {new Date().getUTCFullYear()} Legacy Sports
           </Text>
           <Text color="$gray10" fontSize="$3" textAlign="center" marginTop="$2">
             Fantasy sports management platform
