@@ -51,7 +51,7 @@ export async function getCheckRuns(
           content: [
             {
               type: 'text',
-              text: 'Provide either "prNumber" (PR number to auto-resolve HEAD SHA) or "sha" (commit SHA).',
+              text: 'Provide either "number"/"prNumber" (PR number to auto-resolve HEAD SHA) or "sha" (commit SHA).',
             },
           ],
         };
