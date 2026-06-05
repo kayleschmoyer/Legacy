@@ -142,6 +142,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
     },
     logout: jest.fn(),
   })),
+  consumeBillingNotice: jest.fn(() => null),
 }));
 
 // Mock analytics identify hook (requires ApolloProvider not present in tests)

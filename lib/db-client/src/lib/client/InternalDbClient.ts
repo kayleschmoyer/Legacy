@@ -59,6 +59,28 @@ export async function getUserByDiscordId(
     .then(TakeUniqueOrNull);
 }
 
+/** A single subscription row as stored in the internal schema. */
+export type InternalSubscription = typeof Schema.subscriptions.$inferSelect;
+
+/**
+ * Fetch the subscription row for a user, or null if they have none.
+ *
+ * `userId` is indexed but not unique on the subscriptions table, so this
+ * intentionally takes the first row (via LIMIT 1) rather than asserting
+ * uniqueness — mirroring SubscriptionService.getSubscriptionByUserId.
+ */
+export async function getSubscriptionByUserId(
+  db: InternalDb,
+  userId: number,
+): Promise<InternalSubscription | null> {
+  const results = await db
+    .select()
+    .from(Schema.subscriptions)
+    .where(() => eq(Schema.subscriptions.userId, userId))
+    .limit(1);
+  return results[0] ?? null;
+}
+
 export async function linkDiscordAccount(
   db: InternalDb,
   userId: number,

@@ -1,4 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { clearBillingNotice, storeBillingNotice } from './billingNotice';
 import {
   buildGoogleAuthPayload,
   exchangeGoogleCode,
@@ -299,6 +300,7 @@ export class AuthService {
       const result = (await response.json()) as {
         jwt: string;
         csrfToken?: string;
+        billingStatus?: string;
       };
 
       // Store the JWT token
@@ -308,6 +310,10 @@ export class AuthService {
       if (result.csrfToken) {
         this.storeCsrfToken(result.csrfToken);
       }
+
+      // Stash the advisory billing hint (LGN-029) for the post-login banner.
+      // Always called so a non-past-due login clears any stale notice.
+      storeBillingNotice(result.billingStatus);
 
       // Decode user info from JWT or fetch from user manager
       const user = this.getUserFromToken(result.jwt);
@@ -522,6 +528,8 @@ export class AuthService {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.removeItem('ls_csrf_token');
       }
+      // Drop any pending post-login billing notice (LGN-029) on logout.
+      clearBillingNotice();
       this.csrfTokenFallback = '';
       this.csrfStaleStorageValue = null;
     } catch (error) {

@@ -25,6 +25,7 @@ import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
 import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { PostLoginBillingBanner } from '../components/PostLoginBillingBanner';
 import { PageMeta } from '../components/PageMeta';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
@@ -476,6 +477,8 @@ function App() {
       </a>
       {/* Admin impersonation banner — shown only while impersonating */}
       <ImpersonationBanner />
+      {/* Post-login billing hint — shown once for past-due premium users (LGN-029) */}
+      <PostLoginBillingBanner />
       {/* Global toast for uncaught Apollo/GraphQL errors */}
       <ApolloErrorToast />
       <Navigation />

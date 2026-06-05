@@ -3,6 +3,8 @@ export { LoginPage } from './LoginPage';
 export { AuthProvider, useAuth, useOptionalAuth } from './hooks/useAuth';
 export type { UseAuthResult } from './hooks/useAuth';
 export { AuthService, AuthSessionExpiredError } from './services/AuthService';
+export { consumeBillingNotice } from './services/billingNotice';
+export type { BillingNoticeStatus } from './services/billingNotice';
 export {
   buildGoogleAuthPayload,
   exchangeGoogleCode,

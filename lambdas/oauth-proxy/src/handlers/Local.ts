@@ -1,6 +1,10 @@
 ﻿import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { createUser, getUserByEmail } from '@legacy-sports/db-client';
+import {
+  createUser,
+  getSubscriptionByUserId,
+  getUserByEmail,
+} from '@legacy-sports/db-client';
 import { z, ZodError } from 'zod';
 import { hashPassword, testPassword } from '../Users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
@@ -8,6 +12,7 @@ import { encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
+import { deriveBillingStatus } from '../util/billing';
 import { notifyNewUserSignup } from '../util/discord';
 
 // Minimum password length on registration. Existing accounts with shorter
@@ -72,6 +77,12 @@ export const handleLogin = async (
 
     const internalJwt = await createJwt(user);
 
+    // Advisory billing-standing hint so the client can route past-due premium
+    // users to billing after login (LGN-029). This never gates login — a
+    // missing subscription row simply degrades to 'ok'.
+    const subscription = await getSubscriptionByUserId(db, user.id);
+    const billingStatus = deriveBillingStatus(subscription?.status);
+
     const cookies = {
       [JWT_COOKIE_NAME]: internalJwt,
     };
@@ -84,6 +95,7 @@ export const handleLogin = async (
       body: JSON.stringify({
         jwt: internalJwt,
         csrfToken,
+        billingStatus,
       }),
       multiValueHeaders: {
         'Set-Cookie': [...encryptedCookies, ...authCookies],
