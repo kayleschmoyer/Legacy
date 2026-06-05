@@ -201,3 +201,57 @@ describe('buildUserPrompt — with integration results (LS-4617)', () => {
     assert.ok(result.includes('"severity"'));
   });
 });
+
+describe('buildUserPrompt — with full-file HEAD context (LS-7768)', () => {
+  const fullFileSection =
+    '## Full file contents\n\n### src/auth.ts\n```\nexport function verify() { return true; }\n```\n';
+
+  it('includes the current-HEAD file context block when provided', () => {
+    const result = buildUserPrompt(BASE_CTX, '', [], '', fullFileSection);
+    assert.ok(result.includes('BEGIN CURRENT FILE CONTENTS'));
+    assert.ok(result.includes('END CURRENT FILE CONTENTS'));
+    assert.ok(result.includes('export function verify()'));
+  });
+
+  it('instructs the model to verify findings against current content, not diff context', () => {
+    const result = buildUserPrompt(BASE_CTX, '', [], '', fullFileSection);
+    assert.ok(
+      result.includes('current HEAD content'),
+      'should reference current HEAD content',
+    );
+    assert.ok(
+      result.includes('NOT against the diff context lines'),
+      'should warn against relying on diff context lines',
+    );
+  });
+
+  it('omits the full-file block when empty string', () => {
+    const result = buildUserPrompt(BASE_CTX, '', [], '', '');
+    assert.ok(!result.includes('BEGIN CURRENT FILE CONTENTS'));
+  });
+
+  it('omits the full-file block when not provided', () => {
+    const result = buildUserPrompt(BASE_CTX);
+    assert.ok(!result.includes('BEGIN CURRENT FILE CONTENTS'));
+  });
+
+  it('positions the full-file block after the diff and before the review instruction', () => {
+    const result = buildUserPrompt(BASE_CTX, '', [], '', fullFileSection);
+    const diffEnd = result.indexOf('```\n\n<!-- BEGIN CURRENT FILE CONTENTS');
+    const reviewInstStart = result.indexOf('Review this pull request');
+    assert.ok(
+      diffEnd !== -1,
+      'full-file block must appear immediately after the closing diff fence',
+    );
+    assert.ok(
+      reviewInstStart > diffEnd,
+      'review instruction must appear after the full-file block',
+    );
+  });
+
+  it('still includes JSON output instructions when the full-file block is present', () => {
+    const result = buildUserPrompt(BASE_CTX, '', [], '', fullFileSection);
+    assert.ok(result.includes('{"findings":[]}'));
+    assert.ok(result.includes('"severity"'));
+  });
+});

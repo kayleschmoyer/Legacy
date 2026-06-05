@@ -42,11 +42,37 @@ describe('parseAuthorReply — FIX token', () => {
     assert.strictEqual(parseAuthorReply('FIX:   ').type, 'MALFORMED');
   });
 
-  it('rejects FIX: with multiple tokens on the first line', () => {
+  it('tolerates trailing prose after the SHA on the first line (LS-7768)', () => {
+    // Previously rejected as MALFORMED; now the first hex token is taken as the
+    // SHA and trailing words are ignored, so a valid fix is not forced to burn
+    // a review cycle on a format error.
+    assert.deepStrictEqual(
+      parseAuthorReply('FIX: abc1234 fixed the broken loop'),
+      { type: 'FIX', sha: 'abc1234' },
+    );
+  });
+
+  it('tolerates trailing prose after a full 40-char SHA', () => {
+    const sha = 'a'.repeat(40);
+    assert.deepStrictEqual(
+      parseAuthorReply(`FIX: ${sha} done in this commit`),
+      {
+        type: 'FIX',
+        sha,
+      },
+    );
+  });
+
+  it('rejects FIX: when the first token is not a hex SHA', () => {
+    // "see" is non-hex → no commit can be verified → MALFORMED.
     assert.strictEqual(
-      parseAuthorReply('FIX: abc1234 def5678').type,
+      parseAuthorReply('FIX: see the commit below').type,
       'MALFORMED',
     );
+  });
+
+  it('rejects FIX: when the SHA token is shorter than 7 hex chars', () => {
+    assert.strictEqual(parseAuthorReply('FIX: abc12').type, 'MALFORMED');
   });
 });
 

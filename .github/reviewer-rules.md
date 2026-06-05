@@ -60,6 +60,7 @@ Focus your review budget on high-impact issues. If you must limit comments, prio
 - **Hypothetical future issues**: "if you ever need to X" — review the code that exists, not code that might exist
 - **Single-use abstractions**: don't suggest extracting a helper for code used once
 - **Agent-facing docs**: `.agents/**`, `SKILL.md`, and `AGENTS.md` should be reviewed for accuracy, not prose style; other documentation files remain in scope for normal review
+- **Missing automated tests / Playwright evidence for non-executable artifacts**: do NOT demand unit tests, integration tests, or Playwright evidence for changes that only touch non-executable files — `*.md` (including `SKILL.md`), other documentation, design-bundle assets under `docs/design/**`, image/SVG assets, or pure data/config files (`*.json`, `*.csv`) with no runtime code path. There is nothing executable to test, and `lint-skills.js` / schema validation already gate the relevant artifacts. A "behavioral change requires a test" finding on a markdown or docs-only change is a false positive (it caused `review-bot-override` merges). Reserve test-coverage findings for changes that add or alter **executable code** (`.ts`/`.tsx`/`.js`/`.mjs` runtime logic). When a CI run link (e.g. a `run-playwright-tests.yml` run on the branch, or the green `e2e` check) is cited in the PR body or surfaced in the prompt, treat it as valid evidence rather than re-demanding a local run.
 - **Patterns with an intent comment**: if the flagged line (or an adjacent comment block within 3 lines) contains an inline comment that explicitly signals the pattern is intentional — e.g. one containing `intentional:`, `by design:`, `expected behavior:`, or `// intentional: <reason>` — treat that as documented intent. Confidence for that finding cannot exceed 0.5, which puts it below the 0.7 drop threshold; discard it in the self-critique pass. Do not flag the absence of such a comment; only honor its presence when it exists.
 
 ## Project Context
@@ -69,7 +70,7 @@ This is an **Nx monorepo** with:
 - **Stack**: React Native (Expo), Next.js, AWS Lambda, GraphQL (Apollo), PostgreSQL (Drizzle ORM)
 - **Package manager**: pnpm (enforced via corepack)
 - **Commit format**: `type(scope): message` (conventional commits)
-- **Logging**: `LOGGER` from `@legacy-sports/logging` — `console.*` is banned (ESLint enforced)
+- **Logging**: `LOGGER` from `@legacy-sports/logging` — `console.*` is banned **in application/library source** (ESLint enforced). It is **explicitly exempt** in build/operational contexts (see the console exemption list under "Frequently Missed Project-Specific Patterns → Logging") — never flag `console.*` there.
 - **Lint suppression**: `@ts-ignore` and `eslint-disable` are banned — fix root causes
 - **GraphQL**: prefer `.graphql` files + codegen over inline `gql` template literals
 - **E2E tests** (`apps/web-e2e/src/tests/`): hermetic — `route.fulfill()` only, never `route.continue()` (no backend in CI). Tests under `apps/web-e2e/src/integration/tests/` are a separate live-backend suite — direct API calls are expected there and are not violations.
@@ -79,6 +80,15 @@ This is an **Nx monorepo** with:
 These patterns appear in the majority of reviews that touch their respective areas. **Scan for every one that is relevant to the diff before submitting.**
 
 ### Logging
+
+- **`console.*` exemption list — do NOT flag `console.*` in these locations.** The `no-console` ESLint rule is disabled (via `.eslintrc` overrides or because the file runs outside the workspace dependency graph) in the following contexts, which print user-facing or build-time output that must be copy-paste-clean. Flagging `console.*` here is a false positive (it caused multiple `review-bot-override` merges):
+  - Standalone `.mjs`/`.cjs` build & operational scripts: the top-level `scripts/` directory, `.github/scripts/**`, and `scripts/**` build tooling — these run via `node` before (or outside) `node_modules`/the TS build, and frequently cannot import `@legacy-sports/logging` at all.
+  - Inline `actions/github-script` blocks inside `.github/workflows/**` YAML — the GitHub Actions runner has no access to `LOGGER`; `console.*` is the only logging primitive available.
+  - CLI entrypoints and DB tooling: `apps/cli/**`, `lib/db-client/src/cli/**`, `lib/db-client/src/scripts/**`.
+  - Database migration files and other build-time scripts.
+  - The logging library itself: `lib/logging/**`.
+
+  Before raising a `console.*` finding, confirm the file is **application or library runtime source** and not one of the above. When in doubt, check for an `.eslintrc*` override with `"no-console": "off"` in the file's directory or an ancestor — its presence means the usage is sanctioned. Do NOT suggest "replace with LOGGER" for any exempt file.
 
 - **`LOGGER.error` signature**: pass the `Error` instance as the first non-message argument — `LOGGER.error('message', err)` or `LOGGER.error('message', err, { …context })`. Wrapping it in a plain object (`LOGGER.error('message', { error })`) relies on Rollbar heuristics to extract the stack trace and will silently fail when `error` is not an `Error` instance. Treat `{ error }` wrapping as a `high` finding.
 

@@ -22,6 +22,10 @@ const CONFIG_FILES = [
   '.eslintrc.cjs',
 ];
 
+// ESLint override filenames searched for in each changed source file's directory
+// ancestry (LS-7768) so the reviewer can detect local `no-console: off` overrides.
+const ESLINTRC_FILES = ['.eslintrc.json', '.eslintrc.cjs', '.eslintrc.js'];
+
 // Matches static import/export/require with relative specifiers
 const IMPORT_RE = /(?:^|\s)(?:import|export)\s[^'"]*['"](\.[^'"]+)['"]/gm;
 const REQUIRE_RE = /require\s*\(\s*['"](\.[^'"]+)['"]\s*\)/gm;
@@ -64,21 +68,67 @@ export async function fetchContext({
   return { fullFiles, importFiles, testFiles, configFiles, jiraTicket };
 }
 
+// Matches the `diff --git a/<old> b/<new>` header line git emits per file.
+const DIFF_FILE_RE = /^diff --git a\/(.+?) b\/(.+)$/gm;
+
+/**
+ * Extract the repo-relative paths of files changed in a unified diff.
+ *
+ * Returns the post-image (`b/`) path for each file so renames and edits resolve
+ * to the current HEAD path. Deletions (whose post-image is `/dev/null`) are
+ * skipped — there is no current content to fetch.
+ *
+ * @param {string} diff  Unified diff from `gh pr diff`
+ * @returns {string[]}    Deduplicated current-HEAD file paths
+ */
+export function parseChangedFilePaths(diff) {
+  if (!diff) return [];
+  const files = new Set();
+  for (const m of diff.matchAll(DIFF_FILE_RE)) {
+    const newPath = m[2];
+    if (newPath && newPath !== 'dev/null' && newPath !== '/dev/null') {
+      files.add(newPath);
+    }
+  }
+  return [...files];
+}
+
 /**
  * Format a ReviewContext into a string suitable for inclusion in an LLM prompt.
  *
+ * Sections are emitted in priority order (full files → imports → tests → config
+ * → Jira). When `maxBytes` is provided, files are added until the budget would
+ * be exceeded; the remainder is dropped with a truncation note so a large PR
+ * cannot blow the prompt size (LS-7768).
+ *
  * @param {ReviewContext} ctx
+ * @param {{ maxBytes?: number }} [opts]
  * @returns {string}
  */
-export function formatContextForPrompt(ctx) {
+export function formatContextForPrompt(ctx, { maxBytes = Infinity } = {}) {
   const sections = [];
+  let used = 0;
+  let truncated = false;
 
   const formatSection = (label, files) => {
+    if (truncated) return;
     const entries = Object.entries(files);
     if (entries.length === 0) return;
-    sections.push(`## ${label}\n`);
+    let headerAdded = false;
     for (const [path, content] of entries) {
-      sections.push(`### ${path}\n\`\`\`\n${content}\n\`\`\`\n`);
+      const block = `### ${path}\n\`\`\`\n${content}\n\`\`\`\n`;
+      const header = headerAdded ? '' : `## ${label}\n`;
+      if (used + header.length + block.length > maxBytes) {
+        truncated = true;
+        break;
+      }
+      if (!headerAdded) {
+        sections.push(`## ${label}\n`);
+        used += header.length;
+        headerAdded = true;
+      }
+      sections.push(block);
+      used += block.length;
     }
   };
 
@@ -87,8 +137,20 @@ export function formatContextForPrompt(ctx) {
   formatSection('Test files', ctx.testFiles);
   formatSection('Configuration files', ctx.configFiles);
 
-  if (ctx.jiraTicket) {
-    sections.push(`## Linked Jira ticket\n\n${ctx.jiraTicket}\n`);
+  if (!truncated && ctx.jiraTicket) {
+    const block = `## Linked Jira ticket\n\n${ctx.jiraTicket}\n`;
+    if (used + block.length <= maxBytes) {
+      sections.push(block);
+      used += block.length;
+    } else {
+      truncated = true;
+    }
+  }
+
+  if (truncated) {
+    sections.push(
+      '_Additional file context omitted to stay within the size budget._\n',
+    );
   }
 
   return sections.join('\n');
@@ -212,24 +274,63 @@ async function fetchTestFiles(files) {
 }
 
 /**
- * Fetch relevant config files when build/type-touching changes are present.
+ * Fetch relevant config files for the review.
+ *
+ * Two sources are merged:
+ *   1. Per-directory ESLint overrides — for every changed *source* file, walk
+ *      its directory chain to the repo root and collect any `.eslintrc*` found.
+ *      This surfaces local `no-console: off` (and similar) overrides — e.g. the
+ *      `apps/web-e2e` integration suite, `apps/cli`, and `lib/db-client` CLI
+ *      packages — so the reviewer can confirm a `console.*` usage is sanctioned
+ *      rather than flagging it as a false positive (LS-7768).
+ *   2. Root build/type config files (tsconfig, nx.json, etc.) — only when the
+ *      PR touches build/type-relevant extensions.
+ *
  * @param {string[]} files
  * @returns {Promise<Record<string, string>>}
  */
 async function fetchConfigFiles(files) {
-  const hasBuildChanges = files.some((f) => BUILD_TYPE_EXTS.has(extname(f)));
-  if (!hasBuildChanges) return {};
-
   const results = {};
+
+  // 1. Per-directory ESLint overrides along each source file's ancestry.
+  const eslintDirs = new Set();
+  for (const file of files) {
+    if (!SOURCE_EXT_RE.test(file)) continue;
+    let dir = dirname(file);
+    while (dir && dir !== '.' && dir !== '/' && !eslintDirs.has(dir)) {
+      eslintDirs.add(dir);
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
   await Promise.all(
-    CONFIG_FILES.map(async (cfg) => {
-      try {
-        results[cfg] = await readFile(cfg, 'utf8');
-      } catch {
-        // Config file absent
+    [...eslintDirs].map(async (dir) => {
+      for (const name of ESLINTRC_FILES) {
+        const path = join(dir, name);
+        try {
+          results[path] = await readFile(path, 'utf8');
+          break; // one eslintrc per directory is enough
+        } catch {
+          // No eslintrc of this name in this directory
+        }
       }
     }),
   );
+
+  // 2. Root build/type config files, only for build/type-touching changes.
+  const hasBuildChanges = files.some((f) => BUILD_TYPE_EXTS.has(extname(f)));
+  if (hasBuildChanges) {
+    await Promise.all(
+      CONFIG_FILES.map(async (cfg) => {
+        try {
+          results[cfg] = await readFile(cfg, 'utf8');
+        } catch {
+          // Config file absent
+        }
+      }),
+    );
+  }
   return results;
 }
 

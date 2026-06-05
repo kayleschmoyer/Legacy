@@ -1821,6 +1821,96 @@ describe('buildCycleRoleSection cycle 3 — resolvedTitles', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildCycleRoleSection — justifiedTitles integration (LS-7768)
+// ---------------------------------------------------------------------------
+
+describe('buildCycleRoleSection cycle 2 — justifiedTitles', () => {
+  it('lists JUSTIFY replies in a do-not-re-raise block', () => {
+    const justifiedTitles = new Set(['console.log in integration spec']);
+    const section = buildCycleRoleSection(
+      2,
+      ['Prior issue'],
+      [],
+      new Set(),
+      justifiedTitles,
+    );
+    assert.ok(
+      section.includes(
+        'do NOT re-raise unless the justification is demonstrably wrong',
+      ),
+      'should include the do-not-re-raise directive',
+    );
+    assert.ok(
+      section.includes('console.log in integration spec'),
+      'should list the justified title',
+    );
+  });
+
+  it('omits justified titles from the re-evaluate list', () => {
+    const justifiedTitles = new Set(['justified issue']);
+    const priorTitles = ['Justified issue', 'Pending issue'];
+    const section = buildCycleRoleSection(
+      2,
+      priorTitles,
+      [],
+      new Set(),
+      justifiedTitles,
+    );
+    assert.ok(
+      !section.match(
+        /Issues from Cycle 1 you must re-evaluate[^]*Justified issue/,
+      ),
+      'justified title should not appear in re-evaluate list',
+    );
+    assert.ok(
+      section.includes('Pending issue'),
+      'non-justified title should still appear',
+    );
+  });
+
+  it('omits the justified block when justifiedTitles is empty', () => {
+    const section = buildCycleRoleSection(
+      2,
+      ['Prior issue'],
+      [],
+      new Set(),
+      new Set(),
+    );
+    assert.ok(
+      !section.includes(
+        'do NOT re-raise unless the justification is demonstrably wrong',
+      ),
+      'no justified block when no justified titles',
+    );
+  });
+});
+
+describe('buildCycleRoleSection cycle 3 — justifiedTitles', () => {
+  it('marks justified findings as non-mandates and omits them from the verify list', () => {
+    const justifiedTitles = new Set(['flaky timing assumption']);
+    const section = buildCycleRoleSection(
+      3,
+      ['Flaky timing assumption', 'Race condition'],
+      [],
+      new Set(),
+      justifiedTitles,
+    );
+    assert.ok(
+      section.includes('they are NOT mandates'),
+      'should mark justified findings as non-mandates',
+    );
+    assert.ok(
+      section.includes('Race condition'),
+      'non-justified mandate should remain in verify list',
+    );
+    assert.ok(
+      !section.match(/Mandates from Cycle 2[^]*Flaky timing assumption/),
+      'justified finding should not appear in numbered verify list',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getMalformedInlineReplies
 // ---------------------------------------------------------------------------
 

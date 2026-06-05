@@ -8,6 +8,8 @@ export const FORMAT_ERROR_MESSAGE =
  * Recognized tokens (all case-sensitive; leading/trailing whitespace on the
  * full body is trimmed before matching):
  *   FIX: <sha>                   – author fixed the issue at the cited commit
+ *                                  (<sha> = 7–40 hex chars; trailing prose on the
+ *                                   same line after the SHA is tolerated)
  *   JUSTIFY: <rationale>         – author explains why issue should be dismissed
  *   CANNOT-COMPLY: <id>\n<reason> – author claims compliance is impossible (Cycle 3+)
  *
@@ -29,8 +31,13 @@ export function parseAuthorReply(body) {
 
   const firstLine = trimmed.split('\n')[0];
 
-  // FIX: <sha>  — sha must be a single non-whitespace token on the first line.
-  const fixMatch = firstLine.match(/^FIX:\s+(\S+)$/);
+  // FIX: <sha>  — sha is a 7–40 char hex commit SHA (full or abbreviated).
+  // Trailing prose on the same line is tolerated (e.g. "FIX: a1b2c3d done in
+  // this commit") so an otherwise-valid reply is not rejected as MALFORMED and
+  // forced to burn a review cycle (LS-7768). The SHA must be the first token and
+  // be followed by whitespace or end-of-line; a non-hex first token (e.g.
+  // "FIX: see below") is still MALFORMED because no commit can be verified.
+  const fixMatch = firstLine.match(/^FIX:\s+([0-9a-fA-F]{7,40})(?:\s|$)/);
   if (fixMatch) {
     return { type: 'FIX', sha: fixMatch[1] };
   }

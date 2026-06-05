@@ -58,6 +58,16 @@ import {
   extractIntegrationResults,
   formatIntegrationResultsSection,
 } from './lib/integration-results.mjs';
+import {
+  fetchContext,
+  formatContextForPrompt,
+  parseChangedFilePaths,
+} from './lib/context.mjs';
+
+// Cap on the current-HEAD file context injected into the review prompt (LS-7768).
+// Keeps a large PR from blowing the prompt size; the diff is always included in
+// full regardless of this budget.
+const FULL_FILE_CONTEXT_MAX_BYTES = 48_000;
 
 const STRIP_LOG_MAX_FINDINGS = 3;
 const STRIP_LOG_MAX_TITLE_LEN = 60;
@@ -609,6 +619,33 @@ async function main() {
   const integrationResultsSection =
     formatIntegrationResultsSection(integrationResults);
 
+  // Fetch the current HEAD content of changed files (plus their imports, test
+  // counterparts, and eslintrc overrides) so the LLM evaluates findings against
+  // present file state, not just diff context lines (LS-7768). Non-fatal —
+  // proceed with the diff alone on any error.
+  let fullFileContextSection = '';
+  try {
+    const changedFiles = parseChangedFilePaths(ctx.diff);
+    if (changedFiles.length > 0) {
+      const reviewCtx = await fetchContext({
+        changedFiles,
+        prBody: ctx.body ?? '',
+      });
+      fullFileContextSection = formatContextForPrompt(reviewCtx, {
+        maxBytes: FULL_FILE_CONTEXT_MAX_BYTES,
+      });
+      if (fullFileContextSection) {
+        process.stdout.write(
+          `[reviewer] Full-file context: injected current HEAD content for ${changedFiles.length} changed file(s)\n`,
+        );
+      }
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Full-file context fetch failed (non-fatal): ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+
   // Build prompts — fail open on infra errors (e.g. missing reviewer-rules.md)
   let systemPrompt, userPrompt;
   try {
@@ -617,6 +654,7 @@ async function main() {
       priorTitles,
       postReviewCommitShas,
       resolvedTitles,
+      justifiedTitles,
     );
     systemPrompt = buildSystemPrompt(cycleRoleSection);
     userPrompt = buildUserPrompt(
@@ -624,6 +662,7 @@ async function main() {
       authorResponsesSection,
       existingCrossReferences,
       integrationResultsSection,
+      fullFileContextSection,
     );
   } catch (err) {
     process.stderr.write(

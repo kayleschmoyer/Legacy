@@ -223,6 +223,9 @@ export function filterFindingsCycle3(
  * @param {string[]} [priorTitles] Titles from the previous cycle's review body
  * @param {string[]} [postC1CommitShas] Full 40-char SHAs of commits pushed since C1 (Cycle 2 only)
  * @param {Set<string>} [resolvedTitles] Lowercase titles the author FIX'd with a verified SHA (C2/C3)
+ * @param {Set<string>} [justifiedTitles] Lowercase titles the author posted a JUSTIFY: reply for (C2/C3).
+ *   These are excluded from the "re-evaluate"/"verify" lists and explicitly marked do-not-re-raise so a
+ *   sound justification does not get re-raised and burn a review cycle toward the arbitration limit (LS-7768).
  * @returns {string}
  */
 export function buildCycleRoleSection(
@@ -230,6 +233,7 @@ export function buildCycleRoleSection(
   priorTitles = [],
   postC1CommitShas = [],
   resolvedTitles = new Set(),
+  justifiedTitles = new Set(),
 ) {
   if (cycle === 1) {
     return `\
@@ -241,10 +245,14 @@ restrictions on what you may raise in this cycle.`;
   }
 
   if (cycle === 2) {
-    // Build sorted list of C1 titles that have NOT been verified as fixed,
-    // so the LLM knows which ones still need adjudication.
+    // Build sorted list of C1 titles that have NOT been verified as fixed and
+    // were NOT justified by the author, so the LLM only re-adjudicates titles
+    // that still genuinely need it. Justified titles are handled by their own
+    // do-not-re-raise block below (LS-7768).
     const pendingTitles = priorTitles.filter(
-      (t) => !resolvedTitles.has(t.toLowerCase()),
+      (t) =>
+        !resolvedTitles.has(t.toLowerCase()) &&
+        !justifiedTitles.has(t.toLowerCase()),
     );
     const priorBlock =
       pendingTitles.length > 0
@@ -254,6 +262,11 @@ restrictions on what you may raise in this cycle.`;
     const resolvedBlock =
       resolvedTitles.size > 0
         ? `\n\n**Pre-verified FIX replies — OMIT these findings (author committed a fix):**\n${[...resolvedTitles].map((t) => `  - ${t}`).join('\n')}`
+        : '';
+
+    const justifiedBlock =
+      justifiedTitles.size > 0
+        ? `\n\n**Author posted a JUSTIFY: reply for these findings — do NOT re-raise unless the justification is demonstrably wrong.** Re-raising a sound justification wastes a review cycle toward the arbitration limit; the validator will strip it regardless:\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
     const shaListBlock =
@@ -267,7 +280,7 @@ restrictions on what you may raise in this cycle.`;
 You are **adjudicating Cycle 1 findings** against the current code state. \
 Re-evaluate each prior finding against the current diff **and** any author \
 replies provided below. If the issue is still present and unaddressed, re-raise \
-it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${resolvedBlock}${priorBlock}
+it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${resolvedBlock}${justifiedBlock}${priorBlock}
 
 **Evaluating author replies (provided as "## Author Responses" in the user prompt):**
 - \`FIX: <sha>\` — verify the fix exists in HEAD. **Do NOT re-raise** if the fix \
@@ -304,7 +317,9 @@ they will be stripped before the review is posted.`;
 
   if (cycle === 3) {
     const pendingMandates = priorTitles.filter(
-      (t) => !resolvedTitles.has(t.toLowerCase()),
+      (t) =>
+        !resolvedTitles.has(t.toLowerCase()) &&
+        !justifiedTitles.has(t.toLowerCase()),
     );
     const mandateBlock =
       pendingMandates.length > 0
@@ -316,11 +331,16 @@ they will be stripped before the review is posted.`;
         ? `\n\n**Pre-verified FIX replies — these mandates are addressed (OMIT from output):**\n${[...resolvedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
+    const justifiedBlock =
+      justifiedTitles.size > 0
+        ? `\n\n**Author posted a JUSTIFY: reply for these findings — they are NOT mandates; OMIT from output unless the justification is demonstrably wrong:**\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
+        : '';
+
     return `\
 ## Your Role This Cycle: VERIFY (Cycle 3 of 3)
 
 You are **verifying mandate compliance** — checking only whether the author \
-addressed each specific mandate issued in Cycle 2.${resolvedBlock}${mandateBlock}
+addressed each specific mandate issued in Cycle 2.${resolvedBlock}${justifiedBlock}${mandateBlock}
 
 **Rules — strictly enforced by the post-LLM validator:**
 - Output findings **only** for mandates that are still unaddressed.
