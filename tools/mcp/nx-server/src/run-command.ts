@@ -2,25 +2,12 @@ import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { escapeCmdShellArg } from './cmd-escape.js';
+
 const COMMAND_TIMEOUT = 120_000;
 
 /** Known npm-wrapper `.cmd` scripts that require `shell: true` on Windows. */
 const NPM_WRAPPER_COMMANDS = new Set(['pnpm', 'npm', 'npx', 'yarn']);
-
-/**
- * Escape cmd.exe shell metacharacters in a single argument.
- *
- * When `shell: true` is used on Windows, Node.js joins all args into a single
- * string passed to `cmd.exe /d /s /c "..."`. In that context `|`, `<`, and `>`
- * are interpreted as pipe/redirect operators even when they appear inside what
- * look like quoted substrings. Prefixing them with `^` (cmd.exe's escape
- * character) causes them to be treated as literals by cmd.exe.
- *
- * Only applied when `needsShell` is true (Windows + npm wrapper commands).
- */
-function escapeCmdShellArg(arg: string): string {
-  return arg.replace(/[|<>]/g, '^$&');
-}
 
 /**
  * Resolve a command name to its platform-specific executable.

@@ -22,13 +22,14 @@ const ALLOWED_TARGETS = new Set([
  * Shell metacharacters that must not appear in passthrough args.
  *
  * On Windows, pnpm is a `.cmd` batch script that requires `shell: true`
- * (cmd.exe). `runCommand` in run-command.ts automatically escapes `|`, `<`,
- * and `>` via `escapeCmdShellArg` so they reach the child process as literals.
- * The remaining characters below are blocked entirely because they have no
- * legitimate use in nx target args and cannot be safely escaped.
+ * (cmd.exe). `runCommand` in run-command.ts wraps args containing `|`, `<`,
+ * and `>` in double-quotes via `escapeCmdShellArg` so cmd.exe treats them as
+ * literals. The remaining characters below are blocked entirely because they
+ * have no legitimate use in nx target args and cannot be safely escaped.
  *
  * Pipe `|` is intentionally NOT blocked — it is a valid Jest
- * `--testPathPatterns` alternation operator and is handled by `escapeCmdShellArg`.
+ * `--testPathPatterns` alternation operator and is double-quote-wrapped by
+ * `escapeCmdShellArg` before the command reaches cmd.exe.
  */
 const SHELL_METACHAR_REGEX = /[;&`$(){}]/;
 
@@ -41,6 +42,57 @@ interface RunTargetParams {
   args?: string | string[];
   env?: Record<string, string>;
   worktreePath?: string;
+}
+
+/**
+ * On Windows, multiple space-separated values after --testPathPatterns break
+ * the cmd.exe invocation because each token becomes a separate shell word and
+ * the pipe used for Jest regex alternation is interpreted by cmd.exe before
+ * `escapeCmdShellArg` can wrap it. Coalesce trailing non-flag values into a
+ * single pipe-separated token so the whole value is double-quoted as one unit.
+ *
+ * e.g. ["--testPathPatterns", "FileA", "FileB"] → ["--testPathPatterns", "FileA|FileB"]
+ * e.g. ["--testPathPatterns=FileA", "FileB"]    → ["--testPathPatterns=FileA|FileB"]
+ *
+ * Exported for unit testing.
+ */
+export function coalesceWindowsTestPathPatterns(tokens: string[]): string[] {
+  const result = [...tokens];
+
+  // Bare form: --testPathPatterns value1 value2 ...
+  const patternsIdx = result.findIndex((t) => t === '--testPathPatterns');
+  if (patternsIdx !== -1 && patternsIdx + 2 < result.length) {
+    const valueTokens: string[] = [];
+    let i = patternsIdx + 1;
+    while (i < result.length && !result[i].startsWith('-')) {
+      valueTokens.push(result[i]);
+      i++;
+    }
+    if (valueTokens.length > 1) {
+      result.splice(patternsIdx + 1, valueTokens.length, valueTokens.join('|'));
+    }
+  }
+
+  // Equals form: --testPathPatterns=value1 value2 ...
+  const eqIdx = result.findIndex((t) => t.startsWith('--testPathPatterns='));
+  if (eqIdx !== -1) {
+    const valueTokens: string[] = [];
+    let i = eqIdx + 1;
+    while (i < result.length && !result[i].startsWith('-')) {
+      valueTokens.push(result[i]);
+      i++;
+    }
+    if (valueTokens.length > 0) {
+      const base = result[eqIdx];
+      result.splice(
+        eqIdx,
+        1 + valueTokens.length,
+        `${base}|${valueTokens.join('|')}`,
+      );
+    }
+  }
+
+  return result;
 }
 
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
@@ -85,7 +137,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       }
 
       // Translate deprecated Jest flags to current equivalents
-      const translated = tokens.map((t) =>
+      let translated = tokens.map((t) =>
         t.startsWith('--testPathPattern=')
           ? t.replace('--testPathPattern=', '--testPathPatterns=')
           : t === '--testPathPattern'
@@ -93,50 +145,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             : t,
       );
 
-      // On Windows, multiple space-separated values after --testPathPatterns break
-      // the cmd.exe invocation. Coalesce them into a single pipe-separated regex
-      // (Jest OR alternation) so the value arrives as one shell token.
-      // e.g. ["--testPathPatterns", "FileA", "FileB"] → ["--testPathPatterns", "FileA|FileB"]
-      // e.g. ["--testPathPatterns=FileA", "FileB"] → ["--testPathPatterns=FileA|FileB"]
+      // On Windows, coalesce multiple --testPathPatterns values into a single
+      // pipe-separated token before escapeCmdShellArg double-quotes the value.
       if (process.platform === 'win32') {
-        const patternsIdx = translated.findIndex(
-          (t) => t === '--testPathPatterns',
-        );
-        if (patternsIdx !== -1 && patternsIdx + 2 < translated.length) {
-          const valueTokens: string[] = [];
-          let i = patternsIdx + 1;
-          while (i < translated.length && !translated[i].startsWith('-')) {
-            valueTokens.push(translated[i]);
-            i++;
-          }
-          if (valueTokens.length > 1) {
-            translated.splice(
-              patternsIdx + 1,
-              valueTokens.length,
-              valueTokens.join('|'),
-            );
-          }
-        }
-        // Handle equals form: --testPathPatterns=FileA with FileB as next token
-        const eqIdx = translated.findIndex((t) =>
-          t.startsWith('--testPathPatterns='),
-        );
-        if (eqIdx !== -1) {
-          const valueTokens: string[] = [];
-          let i = eqIdx + 1;
-          while (i < translated.length && !translated[i].startsWith('-')) {
-            valueTokens.push(translated[i]);
-            i++;
-          }
-          if (valueTokens.length > 0) {
-            const base = translated[eqIdx];
-            translated.splice(
-              eqIdx,
-              1 + valueTokens.length,
-              `${base}|${valueTokens.join('|')}`,
-            );
-          }
-        }
+        translated = coalesceWindowsTestPathPatterns(translated);
       }
 
       // When running specific tests via --testPathPatterns, automatically add
