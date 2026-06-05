@@ -52,6 +52,8 @@ CI does **not** run on every push. If CI hasn't started, ensure:
 - Your PR is not a draft (`Mark as ready for review`)
 - The Code Reviewer Bot has been invited to review (it triggers automatically on non-draft, non-fork PRs)
 
+> **Not actually a "CI isn't running" problem?** If `gh pr checks` shows every required check **passing** but the PR still won't merge (`BLOCKED`, merge queue logs a 405 / "N of 8 required status checks are expected"), CI already ran — the blocker is ruleset `integration_id` drift, not a missing CI run. See [Merge blocked: "N of 8 required status checks are expected"](#merge-blocked-n-of-8-required-status-checks-are-expected-405-despite-all-checks-green) under Merge Queue Issues. Adding `ci:run` is only a stopgap that busts GitHub's cached verdict; the durable fix is re-syncing the ruleset.
+
 ## Debugging by Failure Type
 
 ### `CI: Formatting`
@@ -204,12 +206,55 @@ See [merge-queue-guide.md](merge-queue-guide.md) for the full merge queue refere
 
 **Common blockers:**
 
-| Symptom                        | Cause                     | Fix                                        |
-| ------------------------------ | ------------------------- | ------------------------------------------ |
-| PR not merging after CI passes | 30 s debounce             | Wait 60 s; check merge queue workflow run  |
-| "Unresolved review threads"    | Human or bot threads open | Resolve all threads in Files Changed tab   |
-| "Status checks failing"        | CI or bot-review failure  | Fix the failing check                      |
-| Queue appears stuck            | Race condition            | Remove and re-add `merge-when-ready` label |
+| Symptom                                | Cause                          | Fix                                                                                          |
+| -------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| PR not merging after CI passes         | 30 s debounce                  | Wait 60 s; check merge queue workflow run                                                    |
+| "Unresolved review threads"            | Human or bot threads open      | Resolve all threads in Files Changed tab                                                     |
+| "Status checks failing"                | CI or bot-review failure       | Fix the failing check                                                                        |
+| Queue appears stuck                    | Race condition                 | Remove and re-add `merge-when-ready` label                                                   |
+| Green checks but `N of 8 expected` 405 | Ruleset `integration_id` drift | Re-sync ruleset (`bash scripts/apply-ruleset.sh`); nudge stuck PRs with `ci:run` — see below |
+
+### Merge blocked: "N of 8 required status checks are expected" (405) despite all checks green
+
+**Symptom.** The merge queue logs `✅ PR #NNNN is ready for merge` → `🚀 Merging…` → `❌ GitHub merge API 405 — Repository rule violations found` / `N of 8 required status checks are expected`. Meanwhile `gh pr checks NNNN` shows **every required check passing**, no jobs are queued or running, and `mergeStateStatus` is `BLOCKED`. The PR sits forever; nothing re-triggers it because the SHA never changes.
+
+**Root cause — ruleset `integration_id` drift.** The live "Protect Main" ruleset (`id 1524440`) has `integration_id=15368` (the GitHub Actions app) pinned on the 5 `🚀 CI Pipeline / *` required contexts. GitHub's **merge-time** evaluator cannot reliably match an integration-bound context against the proposed merge commit, so it reports those contexts as `expected` (unsatisfied) and rejects `PUT /merge` with a 405 — even though the check runs are green. The **Checks API** (what `gh pr checks` and the merge queue's own validator read) matches by _name_ and ignores the binding, which is why everything _looks_ ready. The "`N of 8`" count equals exactly the number of integration-pinned contexts (5).
+
+This is a **regression of LS-4345/LS-4925**: LS-4345 pinned `integration_id` to harden matching, it caused 405s on ~74 % of merges, and LS-4925 removed it from the committed `.github/ruleset.json`. The bug recurs whenever the **live** ruleset drifts back (e.g. a GitHub-UI edit re-adds the binding). `check-ruleset.yml` only _warns_ on drift — it does not block or self-heal.
+
+**Diagnose.** Confirm the binding is present on the live ruleset:
+
+```bash
+gh api repos/bkrupa/legacy-sports/rulesets/1524440 \
+  -q '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[] | "\(.context) integration_id=\(.integration_id)"'
+```
+
+If any `🚀 CI Pipeline / *` context shows `integration_id=15368` (the others should be `null`), this is the bug.
+
+**Fix (two steps).**
+
+1. **Re-sync the ruleset** (requires repo admin). This strips `integration_id` to match the committed `.github/ruleset.json`:
+
+   ```bash
+   bash scripts/apply-ruleset.sh          # DRYRUN=1 to preview first
+   ```
+
+   Re-run the diagnose command — all 8 contexts should now show `integration_id=None`.
+
+2. **Bust the cached verdict on already-stuck PRs.** GitHub caches the per-commit merge verdict and only recomputes it when a **fresh check event** lands on the SHA. PRs whose green checks predate the ruleset fix keep the stale "expected" verdict, so re-running the merge queue alone still 405s. Force a fresh check event by adding the `ci:run` label, which re-runs CI on the same HEAD and triggers re-evaluation under the corrected rule:
+
+   ```bash
+   gh pr edit NNNN --add-label ci:run     # or github_manage_labels(prs:[...], add:["ci:run"])
+   ```
+
+   Once CI completes, the merge queue picks the PR up on its next trigger and merges. **New PRs opened after the ruleset fix do not need this** — they are evaluated fresh under the correct rule.
+
+**Stable identifiers (do not change across re-applies):**
+
+- `integration_id=15368` — GitHub Actions' **global** app ID. Constant across all of GitHub; the only value that should ever appear here, and after LS-4925 it should appear **nowhere**.
+- ruleset `id=1524440` — this repo's "Protect Main" ruleset. `apply-ruleset.sh` matches by name and `PUT`s in place (never creates a duplicate), so the ID is stable.
+
+**`apply-ruleset.sh` is idempotent.** It updates in place (no duplicate rulesets), the committed `ruleset.json` has no `_staged` rules (so the staged-merge branch appends nothing and cannot accumulate), and payload generation is deterministic. Re-running converges to the same state and no-ops once the live ruleset already matches the committed config — making it safe to run repeatedly or on a schedule.
 
 ## Deployment Issues
 

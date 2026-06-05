@@ -1,11 +1,32 @@
 #!/usr/bin/env bash
 # apply-ruleset.sh — Idempotently apply the branch protection ruleset to the repository.
 #
-# Usage:
-#   ./scripts/apply-ruleset.sh                # apply ruleset
-#   DRYRUN=1 ./scripts/apply-ruleset.sh       # dry-run: show what would be sent without applying
+# Usage (Windows PowerShell: prefix with `bash`, no `.\` — `.\scripts\apply-ruleset.sh`
+# makes Windows open the file by association instead of executing it):
+#   bash scripts/apply-ruleset.sh             # apply ruleset
+#   DRYRUN=1 bash scripts/apply-ruleset.sh    # dry-run: show what would be sent without applying
 #
 # Requires: gh CLI authenticated with admin permissions on the repository.
+#
+# WHY THIS EXISTS / WHEN TO RUN IT
+#   The live "Protect Main" ruleset can drift from this committed config (e.g. a
+#   GitHub-UI edit re-adds `integration_id` on the CI Pipeline required checks —
+#   the LS-4345/LS-4925 regression). When that happens, PRs with fully-green
+#   checks fail to merge with a 405 "N of 8 required status checks are expected",
+#   because GitHub's merge-time evaluator can't match integration-bound contexts.
+#   Re-running this script re-syncs the live ruleset to `.github/ruleset.json`
+#   (which has no integration_id) and clears the condition for NEW PRs. Already-
+#   stuck PRs additionally need a fresh check event (add the `ci:run` label) to
+#   bust GitHub's cached per-commit merge verdict. Full runbook:
+#   docs/ci-cd/ci-troubleshooting-guide.md → "Merge blocked: N of 8 ... expected".
+#
+# IDEMPOTENCY (safe to run repeatedly / on a schedule)
+#   - Matches the ruleset by name ("Protect Main") and PUTs in place — never
+#     creates a duplicate; the ruleset id (1524440) is stable across re-applies.
+#   - `.github/ruleset.json` has no `_staged` rules, so the staged-merge below
+#     appends nothing and cannot accumulate rules on repeat runs.
+#   - Payload generation is deterministic; once the live ruleset matches the
+#     committed config, a re-apply is a no-op.
 
 set -euo pipefail
 

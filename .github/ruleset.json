@@ -53,7 +53,7 @@
             "context": "Verify All Migrations Applied"
           },
           {
-            "_comment": "ESLint job in ci-pipeline.yml, surfaced as a composite check via workflow_call from ci-orchestrator.yml. Context name = outer job display name + ' / ' + inner job name. integration_id was pinned to 15368 (GitHub Actions) by LS-4345 to harden ruleset matching, but the push-time evaluator failed to reliably match the integration-bound contexts against the proposed merge commit, returning 'N of 8 required status checks are expected' and causing PUT /merge to 405 on ~74% of attempts. LS-4925 removed integration_id; contexts match by name from GitHub Actions and merges go through.",
+            "_comment": "ESLint job in ci-pipeline.yml, surfaced as a composite check via workflow_call from ci-orchestrator.yml. Context name = outer job display name + ' / ' + inner job name. DO NOT re-add integration_id: it was pinned to 15368 (GitHub Actions) by LS-4345 to harden ruleset matching, but the push-time evaluator failed to reliably match the integration-bound contexts against the proposed merge commit, returning 'N of 8 required status checks are expected' and causing PUT /merge to 405 on ~74% of attempts. LS-4925 removed integration_id; contexts match by name from GitHub Actions and merges go through. RECURRENCE: if the LIVE ruleset drifts back (e.g. a UI edit re-pins integration_id) and green PRs start 405-ing, re-sync with `bash scripts/apply-ruleset.sh` (idempotent) and nudge stuck PRs with the `ci:run` label. Runbook: docs/ci-cd/ci-troubleshooting-guide.md → 'Merge blocked: N of 8 required status checks are expected'.",
             "_calledWorkflow": true,
             "context": "🚀 CI Pipeline / lint"
           },
