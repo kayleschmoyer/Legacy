@@ -1,5 +1,11 @@
 import { claimTicket } from './claim-ticket';
 
+// claim-ticket.ts logs assignee warnings/errors via LOGGER. Mock the server
+// logging module so tests stay hermetic and don't pull the real logging chain.
+jest.mock('@legacy-sports/logging/server', () => ({
+  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
 jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
@@ -58,6 +64,9 @@ beforeEach(() => {
   // 3. GET /transitions  → available transitions
   mockJiraRequest.mockImplementation(
     (opts: { method: string; path: string }) => {
+      if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
+        return Promise.resolve({ accountId: 'service-account' });
+      }
       if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
         return Promise.resolve(makeTransitions());
       }
@@ -73,19 +82,74 @@ beforeEach(() => {
 });
 
 describe('claimTicket — auto-assign behaviour', () => {
-  it('does not call the assignee endpoint when JIRA_ASSIGNEE_EMAIL is not set', async () => {
+  it('assigns to the service account (self) when no assignee email is configured', async () => {
     const result = await claimTicket({ key: 'LS-1' });
     const data = parse(result);
 
     expect(data['action']).toBe('PROCEED');
     expect(data['claimed']).toBe(true);
 
-    const putCalls = (
+    // No user search should happen — we go straight to /myself.
+    const userSearchCalls = (
       mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(([opts]) => opts.path === '/rest/api/3/user/search');
+    expect(userSearchCalls).toHaveLength(0);
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
     ).filter(
       ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
     );
-    expect(putCalls).toHaveLength(0);
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0][0].body).toEqual({ accountId: 'service-account' });
+    expect((data['warnings'] as string[]).length).toBe(0);
+  });
+
+  it('assigns to the explicit assignee param, overriding the env var', async () => {
+    process.env['JIRA_ASSIGNEE_EMAIL'] = 'env-default@example.com';
+
+    mockJiraRequest.mockImplementation(
+      (opts: {
+        method: string;
+        path: string;
+        query?: Record<string, string>;
+      }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          // Echo back a distinct accountId so we can assert which email won.
+          const q = opts.query?.['query'];
+          return Promise.resolve([{ accountId: `id-for-${q}` }]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await claimTicket({
+      key: 'LS-1',
+      assignee: 'override@example.com',
+    });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0][0].body).toEqual({
+      accountId: 'id-for-override@example.com',
+    });
     expect((data['warnings'] as string[]).length).toBe(0);
   });
 

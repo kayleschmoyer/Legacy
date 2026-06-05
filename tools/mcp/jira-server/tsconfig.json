@@ -12,6 +12,11 @@
     "paths": {
       "@legacy-sports/mcp-bearer-auth": [
         "../../../lib/mcp-bearer-auth/src/index.ts"
+      ],
+      "@legacy-sports/logging": ["../../../lib/logging/src/index.ts"],
+      "@legacy-sports/logging/server": ["../../../lib/logging/src/server.ts"],
+      "@legacy-sports/env-utilities": [
+        "../../../lib/env-utilities/src/index.ts"
       ]
     }
   },

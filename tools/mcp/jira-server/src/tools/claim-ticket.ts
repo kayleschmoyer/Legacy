@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging/server';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
@@ -6,6 +7,12 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface ClaimTicketParams {
   key: string;
+  /**
+   * Email of the user to assign the ticket to. Overrides the
+   * `JIRA_ASSIGNEE_EMAIL` env var. When neither is provided, the ticket is
+   * assigned to the authenticated service account.
+   */
+  assignee?: string;
 }
 
 interface JiraIssueLink {
@@ -47,7 +54,7 @@ interface JiraIssueResponse {
 export async function claimTicket(
   params: ClaimTicketParams,
 ): Promise<CallToolResult> {
-  const { key } = params;
+  const { key, assignee } = params;
 
   try {
     // Fetch ticket details, child status counts, and available transitions concurrently
@@ -195,38 +202,54 @@ export async function claimTicket(
       body: { transition: { id: inProgressTransition.id } },
     });
 
-    // --- Auto-assign to configured user ---
-    const assigneeEmail = process.env['JIRA_ASSIGNEE_EMAIL'];
-    if (assigneeEmail) {
-      try {
+    // --- Assign the ticket ---
+    // Precedence: explicit `assignee` param > JIRA_ASSIGNEE_EMAIL env var >
+    // the authenticated service account (self).
+    const assigneeEmail = assignee ?? process.env['JIRA_ASSIGNEE_EMAIL'];
+    try {
+      let accountId: string | undefined;
+
+      if (assigneeEmail) {
         const userSearch = await jiraRequest<{ accountId: string }[]>({
           method: 'GET',
           path: '/rest/api/3/user/search',
           query: { query: assigneeEmail, maxResults: '1' },
         });
-        const accountId = userSearch?.[0]?.accountId;
-        if (accountId) {
-          await jiraRequest({
-            method: 'PUT',
-            path: `/rest/api/3/issue/${key}/assignee`,
-            body: { accountId },
-          });
-        } else {
-          process.stderr.write(
-            `[legacy-sports-jira] jira_claim_ticket: no Jira user found for JIRA_ASSIGNEE_EMAIL=${assigneeEmail}; skipping assignee.\n`,
+        accountId = userSearch?.[0]?.accountId;
+        if (!accountId) {
+          LOGGER.warn(
+            'jira_claim_ticket: no Jira user found for assignee; skipping assignee',
+            { assigneeEmail, key },
           );
           warnings.push(
             `Could not assign ticket: no Jira user found for email "${assigneeEmail}".`,
           );
         }
-      } catch (assignErr) {
-        const msg =
-          assignErr instanceof Error ? assignErr.message : String(assignErr);
-        process.stderr.write(
-          `[legacy-sports-jira] jira_claim_ticket: assignee update failed (non-fatal): ${msg}\n`,
-        );
-        warnings.push(`Assignee update failed (non-fatal): ${msg}`);
+      } else {
+        // No email configured — default to the authenticated service account.
+        const self = await jiraRequest<{ accountId: string }>({
+          method: 'GET',
+          path: '/rest/api/3/myself',
+        });
+        accountId = self?.accountId;
       }
+
+      if (accountId) {
+        await jiraRequest({
+          method: 'PUT',
+          path: `/rest/api/3/issue/${key}/assignee`,
+          body: { accountId },
+        });
+      }
+    } catch (assignErr) {
+      const msg =
+        assignErr instanceof Error ? assignErr.message : String(assignErr);
+      LOGGER.error(
+        'jira_claim_ticket: assignee update failed (non-fatal)',
+        assignErr instanceof Error ? assignErr : new Error(msg),
+        { key },
+      );
+      warnings.push(`Assignee update failed (non-fatal): ${msg}`);
     }
 
     return makeResult({
