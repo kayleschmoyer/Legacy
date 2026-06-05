@@ -22,14 +22,14 @@ type FreeAgentPlayer = NonNullable<
 
 const POSITIONS = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'SP', 'RP'];
 
-function LeagueFreeAgents({
+export function LeagueFreeAgents({
   leagueId,
   leagueName,
   onBack,
 }: {
   leagueId: number;
   leagueName: string;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -288,18 +288,24 @@ function LeagueFreeAgents({
 
   return (
     <YStack flex={1}>
-      <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
-        <Text
-          onPress={onBack}
-          color="$blue10"
-          fontSize="$4"
-          pressStyle={{ opacity: 0.7 }}
-          accessibilityRole="button"
-          accessibilityLabel={`Back to ${leagueName}`}
-        >
-          <ChevronLeft size={16} color="$blue10" /> {leagueName}
-        </Text>
-      </XStack>
+      {onBack != null && (
+        <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
+          <Text
+            onPress={onBack}
+            tabIndex={0}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') onBack?.();
+            }}
+            color="$blue10"
+            fontSize="$4"
+            pressStyle={{ opacity: 0.7 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Back to ${leagueName}`}
+          >
+            <ChevronLeft size={16} color="$blue10" /> {leagueName}
+          </Text>
+        </XStack>
+      )}
 
       {/* Search */}
       <XStack padding="$3" paddingTop="$1" gap="$2" alignItems="center">

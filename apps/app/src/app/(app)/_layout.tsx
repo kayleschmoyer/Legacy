@@ -10,6 +10,7 @@ import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 
 import { LeagueIdHeader } from './baseball/league/[leagueId]';
 import { FootballLeagueIdHeader } from './football/league/[leagueId]';
+import { LeagueContextHeader } from './league/[leagueId]';
 import { TeamIdHeader } from './baseball/team/[teamId]';
 import { FootballTeamHeader } from './football/team/[teamId]';
 import {
@@ -48,6 +49,7 @@ export type AppDrawerParamList = {
   FreeAgents: undefined;
   PlayerStats: undefined;
   PlayerDetail: { playerId: string; playerName: string };
+  'league/[leagueId]': { leagueId: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'football/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
@@ -337,6 +339,13 @@ export default function Layout() {
               drawerLabel: () => null,
               headerShown: true,
               headerTitle: 'Create League',
+            }}
+          />
+          <Drawer.Screen
+            name="league/[leagueId]"
+            options={{
+              drawerLabel: () => null,
+              headerTitle: LeagueContextHeader,
             }}
           />
           <Drawer.Screen
