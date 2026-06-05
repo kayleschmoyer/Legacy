@@ -318,7 +318,31 @@ export const handleDiscordAuth = async (
 
     if (!user) {
       // Fall back to email-based lookup
-      user = await getUserByEmail(db, email);
+      const emailMatch = await getUserByEmail(db, email);
+
+      // Security (LS-6695): refuse to silently take over an existing account.
+      // If the email matches a user who registered with a password
+      // (i.e. via /oauth/register) and has no Discord account linked yet,
+      // auto-linking here would let any Discord account whose verified email
+      // collides with that local-auth account sign in as them ("OAuth-to-
+      // existing-account takeover via verified-email match"). Require an
+      // explicit, authenticated account-link step (/oauth/discord/link)
+      // instead of auto-linking on a bare email match.
+      if (emailMatch && emailMatch.passwordHash && !emailMatch.discordId) {
+        LOGGER.warn(
+          'Discord OAuth blocked: email matches a password-protected account with no Discord linkage',
+          {
+            discordId: discordUser.id,
+            existingUserId: emailMatch.id,
+          },
+        );
+        return errorResponse(
+          409,
+          'An account with this email already exists. Sign in with your password, then link Discord from your account settings.',
+        );
+      }
+
+      user = emailMatch;
     }
 
     if (!user) {

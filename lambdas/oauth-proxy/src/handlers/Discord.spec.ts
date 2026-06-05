@@ -129,6 +129,7 @@ const mockUser = {
   discordId: 'discord-123',
   discordUsername: 'DiscordUser',
   discordAvatar: null,
+  themePreference: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -242,6 +243,61 @@ describe('handleDiscordAuth', () => {
 
     expect(result.statusCode).toBe(200);
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
+  });
+
+  it('blocks auto-link (409) when the email matches a password-protected account with no Discord linkage (LS-6695)', async () => {
+    mockGetUserByDiscordId.mockResolvedValue(null);
+    // Existing local-auth account (registered via /oauth/register): has a
+    // passwordHash and no Discord account linked yet.
+    mockGetUserByEmail.mockResolvedValue({
+      ...mockUser,
+      id: 7,
+      passwordHash: 'hashed-password',
+      discordId: null,
+    });
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(409);
+    expect(JSON.parse(result.body) as { error: string }).toMatchObject({
+      error:
+        'An account with this email already exists. Sign in with your password, then link Discord from your account settings.',
+    });
+    // Must NOT silently link or issue a session as the matched account.
+    expect(mockLinkDiscordAccount).not.toHaveBeenCalled();
+    expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
+  });
+
+  it('still links when the email matches an OAuth-only account with no passwordHash (LS-6695 non-regression)', async () => {
+    mockGetUserByDiscordId.mockResolvedValue(null);
+    // Email match with no passwordHash (e.g. provisioned via another OAuth
+    // provider) — safe to auto-link as before.
+    mockGetUserByEmail.mockResolvedValue({
+      ...mockUser,
+      passwordHash: null,
+      discordId: null,
+    });
+    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockLinkDiscordAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs in a password-protected account found by Discord ID without blocking (LS-6695 non-regression)', async () => {
+    // Already-linked account: found by Discord ID, so the email fallback and
+    // its takeover guard are never reached even though a passwordHash exists.
+    mockGetUserByDiscordId.mockResolvedValue({
+      ...mockUser,
+      passwordHash: 'hashed-password',
+    });
+    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockGetUserByEmail).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the OAuth state does not match the cookie', async () => {
