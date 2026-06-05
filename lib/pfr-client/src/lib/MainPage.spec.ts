@@ -19,6 +19,7 @@ const RB_HTML = fix('rb-main-page.html');
 const QB_HTML = fix('qb-main-page.html');
 const K_HTML = fix('k-main-page.html');
 const IDP_HTML = fix('idp-main-page.html');
+const IDP_MISSED_SEASON_HTML = fix('idp-main-page-missed-season.html');
 
 const wr = { id: 10, pfrId: 'AdamDa01' };
 const rb = { id: 20, pfrId: 'HenrDe00' };
@@ -281,6 +282,33 @@ describe('parseMainPageDefenseSeasonTotals — IDP (comment-wrapped defense tabl
       idp,
     );
     expect(seasons).toHaveLength(0);
+  });
+
+  // LS-7755: PFR renders a "missed season" as a note row whose team cell holds
+  // free text ("Did not play - Injured (knee)") with every stat blank. The
+  // parser must skip it — otherwise the note lands in `team`, the blank-stat
+  // upsert fails, and the player's entire batch of valid seasons is dropped.
+  it('skips a "Did not play" note row interleaved among real seasons', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(
+      IDP_MISSED_SEASON_HTML,
+      idp,
+    );
+
+    // Only the two real seasons survive; the 1975 note row is skipped.
+    expect(seasons.map((s) => s.season)).toEqual([1974, 1976]);
+    // No row carries the note text in `team`, and every surviving row reports
+    // games played.
+    for (const s of seasons) {
+      expect(s.team).not.toMatch(/did not play/i);
+      expect(s.g).not.toBeNull();
+    }
+    expect(seasons[0]).toMatchObject({
+      season: 1974,
+      team: 'NYG',
+      g: 14,
+      totalTkl: 70,
+      sacks: 3,
+    });
   });
 });
 

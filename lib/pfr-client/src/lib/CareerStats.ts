@@ -638,6 +638,19 @@ function parseMainPageDefenseRow(
   const season = parseMainPageYear(row);
   if (season === null) return null;
 
+  // PFR renders "missed season" rows (e.g. team cell = "Did not play - Injured
+  // (knee)", "Suspended", "Retired") with the note text in the team column and
+  // every stat cell blank. Unlike the offensive/kicking/skill parsers — which
+  // only emit a record once a category actually produced — the defense record
+  // is built from the year alone, so without this guard the note text lands in
+  // `team`, every stat is blank, and the upsert fails. Because one bad row fails
+  // the player's whole batch, the entire player loads zero defensive seasons
+  // (LS-7755). A real defensive season always reports games played, so a row
+  // with no games is a non-stat note row and is skipped — this is resilient to
+  // the exact note wording.
+  const g = parseIntCell(row, 'games');
+  if (g === null) return null;
+
   const soloTkl = parseIntCell(row, 'tackles_solo');
   const astTkl = parseIntCell(row, 'tackles_assist');
   // Prefer PFR's own combined column; fall back to solo+ast (matching the
@@ -650,7 +663,7 @@ function parseMainPageDefenseRow(
     playerId: player.id,
     season,
     team: parseMainPageTeam(row),
-    g: parseIntCell(row, 'games'),
+    g,
     gs: parseIntCell(row, 'games_started'),
     soloTkl,
     astTkl,

@@ -1,0 +1,108 @@
+<!--
+  Synthetic main-page fixture for an IDP defender with a "missed season" note
+  row (regression fixture for LS-7755, modeled on pfrId AndeDi00).
+
+  PFR renders seasons the player did not play as a note row: the year is present
+  but the team cell holds free text like "Did not play - Injured (knee)" and
+  every stat cell is blank. The defense parser must SKIP such rows — before the
+  fix it mapped the note text into `team` with blank stats, failing the upsert
+  and dropping the player's entire batch of valid seasons.
+
+  Rows (note interleaved between two real seasons):
+    1974 (NYG, real season) — parsed.
+    1975 (Did not play - Injured (knee), blank stats) — skipped.
+    1976 (NYG, real season) — parsed.
+  Plus a Career totals row (year_id="Career") filtered out by the year guard.
+
+  Expected parsed season totals: [1974, 1976] only.
+-->
+<html>
+  <body>
+    <div id="content">
+      <!--
+      <table id="defense">
+        <thead>
+          <tr>
+            <th data-stat="year_id">Year</th>
+            <th data-stat="team_name_abbr">Tm</th>
+            <th data-stat="games">G</th>
+            <th data-stat="games_started">GS</th>
+            <th data-stat="def_int">Int</th>
+            <th data-stat="def_int_td">TD</th>
+            <th data-stat="pass_defended">PD</th>
+            <th data-stat="fumbles_forced">FF</th>
+            <th data-stat="fumbles_rec">FR</th>
+            <th data-stat="fumbles_rec_td">TD</th>
+            <th data-stat="sacks">Sk</th>
+            <th data-stat="tackles_combined">Comb</th>
+            <th data-stat="tackles_solo">Solo</th>
+            <th data-stat="tackles_assist">Ast</th>
+            <th data-stat="safety_md">Sfty</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th data-stat="year_id">1974</th>
+            <td data-stat="team_name_abbr"><a href="/teams/nyg/1974.htm">NYG</a></td>
+            <td data-stat="games">14</td>
+            <td data-stat="games_started">12</td>
+            <td data-stat="def_int">2</td>
+            <td data-stat="def_int_td">0</td>
+            <td data-stat="pass_defended">6</td>
+            <td data-stat="fumbles_forced">1</td>
+            <td data-stat="fumbles_rec">1</td>
+            <td data-stat="fumbles_rec_td">0</td>
+            <td data-stat="sacks">3.0</td>
+            <td data-stat="tackles_combined">70</td>
+            <td data-stat="tackles_solo">55</td>
+            <td data-stat="tackles_assist">15</td>
+            <td data-stat="safety_md">0</td>
+          </tr>
+          <tr class="partial_table">
+            <th data-stat="year_id">1975</th>
+            <td data-stat="team_name_abbr">Did not play - Injured (knee)</td>
+            <td data-stat="games"></td>
+            <td data-stat="games_started"></td>
+            <td data-stat="def_int"></td>
+            <td data-stat="def_int_td"></td>
+            <td data-stat="pass_defended"></td>
+            <td data-stat="fumbles_forced"></td>
+            <td data-stat="fumbles_rec"></td>
+            <td data-stat="fumbles_rec_td"></td>
+            <td data-stat="sacks"></td>
+            <td data-stat="tackles_combined"></td>
+            <td data-stat="tackles_solo"></td>
+            <td data-stat="tackles_assist"></td>
+            <td data-stat="safety_md"></td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">1976</th>
+            <td data-stat="team_name_abbr"><a href="/teams/nyg/1976.htm">NYG</a></td>
+            <td data-stat="games">13</td>
+            <td data-stat="games_started">13</td>
+            <td data-stat="def_int">1</td>
+            <td data-stat="def_int_td">1</td>
+            <td data-stat="pass_defended">4</td>
+            <td data-stat="fumbles_forced">0</td>
+            <td data-stat="fumbles_rec">2</td>
+            <td data-stat="fumbles_rec_td">0</td>
+            <td data-stat="sacks">1.0</td>
+            <td data-stat="tackles_combined">62</td>
+            <td data-stat="tackles_solo">48</td>
+            <td data-stat="tackles_assist">14</td>
+            <td data-stat="safety_md">0</td>
+          </tr>
+          <tr>
+            <th data-stat="year_id">Career</th>
+            <td data-stat="team_name_abbr"></td>
+            <td data-stat="games">27</td>
+            <td data-stat="games_started">25</td>
+            <td data-stat="tackles_solo">103</td>
+            <td data-stat="tackles_assist">29</td>
+          </tr>
+        </tbody>
+      </table>
+      -->
+    </div>
+  </body>
+</html>
