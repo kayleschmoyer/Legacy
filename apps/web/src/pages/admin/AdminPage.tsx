@@ -535,6 +535,7 @@ export function AdminPage(): React.JSX.Element | null {
         alignItems="center"
         justifyContent="center"
         minHeight={200}
+        data-testid="admin-auth-loading"
       >
         <Spinner size="large" />
       </YStack>
