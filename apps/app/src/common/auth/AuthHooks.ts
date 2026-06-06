@@ -18,6 +18,7 @@ import { getMobileOAuthConfig } from './mobileOAuthConfig';
 import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
+import { clearApolloCache } from '../ApolloClientContext';
 
 export interface AuthHandlers {
   googleLogin: () => Promise<void>;
@@ -185,6 +186,14 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 
     // Clear all secrets
     await resetToken();
+
+    // Clear the Apollo cache so stale data from this user doesn't appear
+    // after a subsequent login (e.g., notification badge count)
+    try {
+      await clearApolloCache();
+    } catch (error) {
+      LOGGER.warn('Error clearing Apollo cache on logout:', String(error));
+    }
 
     router.replace('/');
   }, [router]);
