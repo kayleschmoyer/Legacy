@@ -4,7 +4,7 @@
     "legacy-sports-ci": {
       "type": "http",
       "url": "${env:MCP_CI_URL}",
-      "headers": { "Authorization": "Bearer ${env:MCP_CI_BEARER}" }
+      "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
     "legacy-sports-ci-local": {
       "type": "stdio",
@@ -35,7 +35,7 @@
     "legacy-sports-jira": {
       "type": "http",
       "url": "${env:MCP_JIRA_URL}",
-      "headers": { "Authorization": "Bearer ${env:MCP_JIRA_BEARER}" }
+      "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
     "worktree": {
       "type": "stdio",
@@ -66,7 +66,7 @@
     "legacy-sports-github": {
       "type": "http",
       "url": "${env:MCP_GITHUB_URL}",
-      "headers": { "Authorization": "Bearer ${env:MCP_GITHUB_BEARER}" }
+      "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
     "legacy-sports-nx": {
       "type": "stdio",
