@@ -20,6 +20,9 @@ import {
 } from '../../api/db/graphql.generated';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 
+const MESSAGE_MAX_LENGTH = 2000;
+const MESSAGE_WARN_THRESHOLD = MESSAGE_MAX_LENGTH - 100;
+
 function ConversationThread({
   otherUserId,
   otherRecipientName,
@@ -175,17 +178,21 @@ function ConversationThread({
 
         {/* Input */}
         <YStack borderTopWidth={1} borderTopColor="$borderColor">
-          {messageText.length > 1900 && (
+          {messageText.length > MESSAGE_WARN_THRESHOLD && (
             <Text
               fontSize="$1"
-              color={messageText.length >= 2000 ? '$red10' : '$orange10'}
+              color={
+                messageText.length >= MESSAGE_MAX_LENGTH
+                  ? '$red10'
+                  : '$orange10'
+              }
               textAlign="right"
               paddingHorizontal="$3"
               paddingTop="$1"
             >
-              {messageText.length >= 2000
+              {messageText.length >= MESSAGE_MAX_LENGTH
                 ? 'Character limit reached'
-                : `${2000 - messageText.length} characters remaining`}
+                : `${MESSAGE_MAX_LENGTH - messageText.length} characters remaining`}
             </Text>
           )}
           <XStack padding="$3" gap="$2" alignItems="center">
@@ -197,7 +204,7 @@ function ConversationThread({
               onChangeText={setMessageText}
               onSubmitEditing={handleSend}
               returnKeyType="send"
-              maxLength={2000}
+              maxLength={MESSAGE_MAX_LENGTH}
             />
             <Button
               size="$3"
