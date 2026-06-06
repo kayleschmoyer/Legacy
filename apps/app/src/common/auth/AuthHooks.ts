@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'expo-router';
 import {
@@ -47,13 +47,30 @@ export enum Secret {
   INTERNAL_JWT = 'INTERNAL_JWT',
 }
 
-let KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+type AuthStateSubscriber = () => void;
+const authStateSubscribers = new Set<AuthStateSubscriber>();
+
+function notifyAuthStateSubscribers(): void {
+  for (const subscriber of authStateSubscribers) {
+    subscriber();
+  }
+}
 
 // Use platform-specific secure storage from platform-components
 const secureStorage: ISecureStorage = SecureStorageProvider;
 
 function useLastUpdateTime(): number {
-  return KEYCHAIN_LAST_UPDATE;
+  const [updateTime, setUpdateTime] = useState(Date.now);
+
+  useEffect(() => {
+    const notify = (): void => setUpdateTime(Date.now());
+    authStateSubscribers.add(notify);
+    return () => {
+      authStateSubscribers.delete(notify);
+    };
+  }, []);
+
+  return updateTime;
 }
 
 export async function readKeychainValue(
@@ -75,10 +92,13 @@ export async function getJwt(): Promise<LegacySportsJwt | null> {
 async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
   try {
     await secureStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
-    // Trigger the react update
-    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+    // Notify all subscribed hooks so they re-fetch the auth state
+    notifyAuthStateSubscribers();
   } catch (error) {
-    LOGGER.error('Error storing token:', String(error));
+    LOGGER.error(
+      'Error storing token:',
+      error instanceof Error ? error : new Error(String(error)),
+    );
     throw error;
   }
 }
@@ -96,10 +116,13 @@ async function resetToken(): Promise<void> {
       }
     }
 
-    // Trigger the react update
-    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+    // Notify all subscribed hooks so they re-fetch the auth state
+    notifyAuthStateSubscribers();
   } catch (error) {
-    LOGGER.error('Error resetting tokens:', String(error));
+    LOGGER.error(
+      'Error resetting tokens:',
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 }
 
