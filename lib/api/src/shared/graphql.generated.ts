@@ -2805,7 +2805,7 @@ export type Query = {
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
   /** Return the caller's currently-active disclosure game session, or null if none exists. Includes the text of every clue revealed so far so the client can resume the game in-place. */
   activeDisclosureGame?: Maybe<ActiveDisclosureGame>;
-  /** Admin-only aggregate revenue and subscription metrics. */
+  /** Admin-only aggregate revenue and subscription metrics. Results are cached server-side for 5 minutes (LS-5751). */
   adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
