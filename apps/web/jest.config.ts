@@ -31,6 +31,8 @@ export default {
       '<rootDir>/../../lib/app-config/src/index.ts',
     '^@legacy-sports/shared-components$':
       '<rootDir>/../../lib/shared-components/src',
+    '^@legacy-sports/shared-components/analytics$':
+      '<rootDir>/../../lib/shared-components/src/entry/analytics.ts',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/utils$': '<rootDir>/../../lib/utils/src',
     '^@legacy-sports/utils/node$': '<rootDir>/../../lib/utils/src/node.ts',

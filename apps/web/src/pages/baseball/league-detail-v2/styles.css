@@ -582,6 +582,10 @@
   gap: 2px;
   min-width: max-content;
 }
+.ls-tabbar-tabs {
+  display: flex;
+  gap: 2px;
+}
 .ls-tabbar button {
   background: transparent;
   border: 0;

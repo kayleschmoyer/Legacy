@@ -33,12 +33,14 @@ const TABS: readonly TabDef[] = [
 export const TabBar: React.FC<{
   active: TabId;
   onChange: (t: TabId) => void;
+  onAnalyticsNavigate?: () => void;
   isMember: boolean;
   isCommissioner: boolean;
   pendingTradeCount?: number;
 }> = ({
   active,
   onChange,
+  onAnalyticsNavigate,
   isMember,
   isCommissioner,
   pendingTradeCount = 0,
@@ -47,26 +49,33 @@ export const TabBar: React.FC<{
     (t) => (!t.memberOnly || isMember) && (!t.commishOnly || isCommissioner),
   );
   return (
-    <nav className="ls-tabbar" role="tablist" aria-label="League sections">
+    <nav className="ls-tabbar" aria-label="League sections">
       <div className="ls-tabbar-inner">
-        {visible.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={active === t.id}
-            aria-controls={`panel-${t.id}`}
-            tabIndex={active === t.id ? 0 : -1}
-            className={active === t.id ? 'on' : ''}
-            onClick={() => onChange(t.id)}
-          >
-            {t.label}
-            {t.id === 'trades' && pendingTradeCount > 0 ? (
-              <span className="count">{pendingTradeCount}</span>
-            ) : null}
+        <div className="ls-tabbar-tabs" role="tablist">
+          {visible.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              aria-selected={active === t.id}
+              aria-controls={`panel-${t.id}`}
+              tabIndex={active === t.id ? 0 : -1}
+              className={active === t.id ? 'on' : ''}
+              onClick={() => onChange(t.id)}
+            >
+              {t.label}
+              {t.id === 'trades' && pendingTradeCount > 0 ? (
+                <span className="count">{pendingTradeCount}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+        {onAnalyticsNavigate ? (
+          <button type="button" onClick={onAnalyticsNavigate}>
+            Analytics
           </button>
-        ))}
+        ) : null}
       </div>
     </nav>
   );

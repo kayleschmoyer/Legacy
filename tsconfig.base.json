@@ -44,6 +44,9 @@
       "@legacy-sports/shared-components": [
         "lib/shared-components/src/index.ts"
       ],
+      "@legacy-sports/shared-components/analytics": [
+        "lib/shared-components/src/entry/analytics.ts"
+      ],
       "@legacy-sports/shared-components/auth": [
         "lib/shared-components/src/entry/auth.ts"
       ],

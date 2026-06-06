@@ -204,6 +204,9 @@ const PreferencesPage = lazyWithRetry(
 const NotificationsPage = lazyWithRetry(
   () => import('../pages/notifications/NotificationsPage'),
 );
+const AnalyticsPage = lazyWithRetry(
+  () => import('../pages/analytics/AnalyticsPage'),
+);
 const ScoreboardPage = lazyWithRetry(() =>
   import('../pages/scoreboard/ScoreboardPage').then((m) => ({
     default: m.ScoreboardPage,
@@ -671,6 +674,10 @@ function App() {
             />
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route
+              path="/leagues/:leagueId/analytics"
+              element={<AnalyticsPage />}
+            />
             <Route path="/scoreboard" element={<ScoreboardPage />} />
             <Route path="/standings" element={<StandingsRedirectPage />} />
             <Route path="/games" element={<MinigamesHubPage />} />

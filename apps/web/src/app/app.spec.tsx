@@ -199,6 +199,9 @@ jest.mock('../pages/management/ManagementPage', () => () => (
 ));
 
 jest.mock('../pages/home/HomePage', () => () => <div>Home Page</div>);
+jest.mock('../pages/analytics/AnalyticsPage', () => () => (
+  <div>Analytics Page</div>
+));
 
 // Mock draft components
 jest.mock('../components/EliteDraftBoard', () => ({
@@ -558,6 +561,23 @@ describe('App', () => {
       await act(() => Promise.resolve());
       // Page-level access check passes — renders revenue page, not redirected to home
       expect(container).not.toHaveTextContent('Home Page');
+    });
+  });
+
+  describe('League analytics route', () => {
+    it('renders the analytics page at /leagues/:leagueId/analytics', async () => {
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/leagues/42/analytics']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+
+      await act(() => Promise.resolve());
+
+      expect(container).toHaveTextContent('Analytics Page');
     });
   });
 

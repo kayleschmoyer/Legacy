@@ -345,6 +345,9 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           <TabBar
             active={tab}
             onChange={setTab}
+            onAnalyticsNavigate={() =>
+              navigate(`/leagues/${leagueId}/analytics`)
+            }
             isMember={effIsMember}
             isCommissioner={effIsCommish}
           />
