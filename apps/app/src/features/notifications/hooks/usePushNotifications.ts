@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import {
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
@@ -90,7 +91,16 @@ export function usePushNotifications(userId: number | null | undefined) {
     }
 
     try {
-      const tokenData = await getExpoPushTokenAsync();
+      // Pass projectId when available (required for valid tokens on EAS builds
+      // and Expo SDK 54+; optional on development builds without EAS setup).
+      const easProjectId = (
+        Constants.expoConfig?.extra as
+          | { eas?: { projectId?: string } }
+          | undefined
+      )?.eas?.projectId;
+      const tokenData = await getExpoPushTokenAsync(
+        easProjectId != null ? { projectId: easProjectId } : undefined,
+      );
       const token = tokenData.data;
       LOGGER.info('Registering Expo push token', { platform: Platform.OS });
 
