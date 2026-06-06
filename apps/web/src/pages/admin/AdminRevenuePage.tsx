@@ -9,6 +9,7 @@ import { Card, Spinner, Text } from 'tamagui';
 import { styled } from 'tamagui';
 import { Lock } from '@tamagui/lucide-icons';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { captureError } from '@legacy-sports/rollbar/web';
 import {
   Area,
   AreaChart,
@@ -198,6 +199,18 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
     skip: serverUserData?.user?.accessLevel !== 'admin',
     fetchPolicy: 'no-cache',
   });
+
+  // Tag admin revenue query failures as an admin surface so they are
+  // distinguishable from ordinary user errors in the error tracker (LS-5752).
+  React.useEffect(() => {
+    if (error != null) {
+      captureError(error, {
+        is_admin_surface: true,
+        surface: 'admin_revenue',
+        query: 'adminRevenueStats',
+      });
+    }
+  }, [error]);
 
   if (auth.isLoading || serverUserLoading) return null;
 

@@ -49,6 +49,13 @@ jest.mock('../../context/GrowthBookProvider', () => ({
   useFeatureValue: jest.fn(() => false),
 }));
 
+const mockCaptureError = jest.fn();
+jest.mock('@legacy-sports/rollbar/web', () => ({
+  captureError: (...args: unknown[]): void => {
+    mockCaptureError(...args);
+  },
+}));
+
 jest.mock('@legacy-sports/shared-components/ui', () => ({
   Paragraph: ({ children }: ChildrenProps) => <p>{children}</p>,
   Separator: () => <hr />,
@@ -209,6 +216,37 @@ describe('AdminRevenuePage', () => {
     expect(
       screen.queryByText(/No revenue data available/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('captures revenue query errors with an admin-surface tag (LS-5752)', () => {
+    const queryError = new Error('revenue query failed');
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: queryError,
+    });
+
+    renderPage();
+
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      queryError,
+      expect.objectContaining({
+        is_admin_surface: true,
+        surface: 'admin_revenue',
+      }),
+    );
+  });
+
+  it('does not capture an error when the query succeeds (LS-5752)', () => {
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: { adminRevenueStats: null },
+      loading: false,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
   it('shows the empty-state explanation when the query returns null without error', () => {
