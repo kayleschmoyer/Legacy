@@ -18,6 +18,7 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
+import Login from './login';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -95,8 +96,7 @@ function InnerLayout(): React.JSX.Element {
     <AuthProvider config={authConfig}>
       <EnhancedAuthGuard
         currentPath={pathname}
-        loginTitle="Welcome to Legacy Sports!"
-        loginSubtitle="Sign in to access your fantasy leagues and stats"
+        loginComponent={<Login />}
         testMode={isDev} // Enable test mode in development
         onLoginSuccess={() => {
           LOGGER.info('Mobile app login successful!');
