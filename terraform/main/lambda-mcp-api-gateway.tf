@@ -212,12 +212,17 @@ resource "aws_cognito_user_pool_client" "mcp_cli" {
     aws_cognito_resource_server.mcp.scope_identifiers,
   )
 
-  # Claude Code CLI listens on a fixed port (57329); VS Code Agent mode
-  # uses a random port on 127.0.0.1. Cognito applies RFC 8252 §7.3
-  # loopback rules: registering "http://127.0.0.1" (no port) allows any
-  # port variant, so both clients resolve to one entry.
-  callback_urls = ["http://localhost:57329", "http://127.0.0.1"]
-  logout_urls   = ["http://localhost:57329", "http://127.0.0.1"]
+  # Cognito matches redirect URIs by EXACT string — it does NOT apply the
+  # RFC 8252 §7.3 loopback rule that ignores the port, so every callback must
+  # be registered verbatim (scheme + host + port + path, including any
+  # trailing slash):
+  #   - Claude Code CLI listens on fixed loopback port 57329 (no trailing slash).
+  #   - VS Code Agent mode listens on fixed loopback port 33418 and sends a
+  #     trailing-slash redirect_uri: http://127.0.0.1:33418/
+  # If VS Code's loopback port ever changes, update the entry below to the
+  # exact redirect_uri shown in the /oauth2/authorize URL.
+  callback_urls = ["http://localhost:57329", "http://127.0.0.1:33418/"]
+  logout_urls   = ["http://localhost:57329", "http://127.0.0.1:33418/"]
 
   # Static "COGNITO" when no SAML metadata URL is configured; when set,
   # appends the SAML provider name so the hosted UI shows both options.
