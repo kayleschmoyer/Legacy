@@ -198,31 +198,18 @@ resource "aws_cognito_user_pool_client" "mcp_cli" {
 
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_flows_user_pool_client = true
-  # `openid` plus all resource-server scopes so VS Code Agent mode can
-  # request `mcp/github`, `mcp/jira`, and `mcp/ci` — VS Code reads the
-  # server's OAuth metadata and requests the scope the server advertises.
-  # The `email` and `profile` scopes were tried initially but caused
-  # Cognito's /oauth2/authorize endpoint to redirect to
+  # Just `openid` — the JWT idToken is all API Gateway's JWT authorizer
+  # needs (it validates iss/aud/exp/sig, not custom claims). The `email`
+  # and `profile` scopes were tried initially but caused Cognito's
+  # /oauth2/authorize endpoint to redirect to
   # /error?error=Required+parameters+missing — empirically `scope=openid`
   # alone returns the expected 302 to /login. If we ever need profile
   # claims in tokens, revisit and add the necessary read_attributes /
   # standard-attribute schema entries to make those scopes acceptable.
-  allowed_oauth_scopes = concat(
-    ["openid"],
-    aws_cognito_resource_server.mcp.scope_identifiers,
-  )
+  allowed_oauth_scopes = ["openid"]
 
-  # Cognito matches redirect URIs by EXACT string — it does NOT apply the
-  # RFC 8252 §7.3 loopback rule that ignores the port, so every callback must
-  # be registered verbatim (scheme + host + port + path, including any
-  # trailing slash):
-  #   - Claude Code CLI listens on fixed loopback port 57329 (no trailing slash).
-  #   - VS Code Agent mode listens on fixed loopback port 33418 and sends a
-  #     trailing-slash redirect_uri: http://127.0.0.1:33418/
-  # If VS Code's loopback port ever changes, update the entry below to the
-  # exact redirect_uri shown in the /oauth2/authorize URL.
-  callback_urls = ["http://localhost:57329", "http://127.0.0.1:33418/"]
-  logout_urls   = ["http://localhost:57329", "http://127.0.0.1:33418/"]
+  callback_urls = ["http://localhost:57329"]
+  logout_urls   = ["http://localhost:57329"]
 
   # Static "COGNITO" when no SAML metadata URL is configured; when set,
   # appends the SAML provider name so the hosted UI shows both options.
@@ -365,12 +352,23 @@ resource "aws_cognito_user_pool_client" "mcp_connector" {
     aws_cognito_resource_server.mcp.scope_identifiers,
   )
 
-  # The redirect URI claude.ai uses for custom remote MCP connectors.
-  # ⚠ Cognito matches callback URLs EXACTLY. This value must be confirmed
-  # against the claude.ai connector dialog before the owner registers the
-  # connector (LS-5152) — it may be a claude.com variant. If consent fails with
-  # redirect_mismatch, correct this URL and re-apply.
-  callback_urls = ["https://claude.ai/api/mcp/auth_callback"]
+  # Redirect URIs for this public PKCE client. Cognito matches callback URLs
+  # EXACTLY (scheme + host + port + path, including any trailing slash) — it
+  # does NOT apply the RFC 8252 loopback rule that ignores the port, so each
+  # consumer's redirect_uri must be registered verbatim:
+  #   - claude.ai custom remote MCP connector (LS-5152). ⚠ Confirm against the
+  #     claude.ai connector dialog before the owner registers the connector —
+  #     it may be a claude.com variant. If consent fails with redirect_mismatch,
+  #     correct this URL and re-apply.
+  #   - VS Code Agent mode reuses this client id (see .vscode/mcp.json) and
+  #     drives the same authorization-code + PKCE flow over a fixed loopback
+  #     port (33418), sending a trailing-slash redirect_uri. If VS Code's port
+  #     ever changes, update the entry below to the exact redirect_uri shown in
+  #     the /oauth2/authorize URL.
+  callback_urls = [
+    "https://claude.ai/api/mcp/auth_callback",
+    "http://127.0.0.1:33418/",
+  ]
 
   # Static "COGNITO" when no SAML metadata URL is configured; appends the SAML
   # provider name when set. See locals.mcp_supported_identity_providers.
