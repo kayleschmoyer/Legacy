@@ -198,18 +198,26 @@ resource "aws_cognito_user_pool_client" "mcp_cli" {
 
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_flows_user_pool_client = true
-  # Just `openid` — the JWT idToken is all API Gateway's JWT authorizer
-  # needs (it validates iss/aud/exp/sig, not custom claims). The `email`
-  # and `profile` scopes were tried initially but caused Cognito's
-  # /oauth2/authorize endpoint to redirect to
+  # `openid` plus all resource-server scopes so VS Code Agent mode can
+  # request `mcp/github`, `mcp/jira`, and `mcp/ci` — VS Code reads the
+  # server's OAuth metadata and requests the scope the server advertises.
+  # The `email` and `profile` scopes were tried initially but caused
+  # Cognito's /oauth2/authorize endpoint to redirect to
   # /error?error=Required+parameters+missing — empirically `scope=openid`
   # alone returns the expected 302 to /login. If we ever need profile
   # claims in tokens, revisit and add the necessary read_attributes /
   # standard-attribute schema entries to make those scopes acceptable.
-  allowed_oauth_scopes = ["openid"]
+  allowed_oauth_scopes = concat(
+    ["openid"],
+    aws_cognito_resource_server.mcp.scope_identifiers,
+  )
 
-  callback_urls = ["http://localhost:57329"]
-  logout_urls   = ["http://localhost:57329"]
+  # Claude Code CLI listens on a fixed port (57329); VS Code Agent mode
+  # uses a random port on 127.0.0.1. Cognito applies RFC 8252 §7.3
+  # loopback rules: registering "http://127.0.0.1" (no port) allows any
+  # port variant, so both clients resolve to one entry.
+  callback_urls = ["http://localhost:57329", "http://127.0.0.1"]
+  logout_urls   = ["http://localhost:57329", "http://127.0.0.1"]
 
   # Static "COGNITO" when no SAML metadata URL is configured; when set,
   # appends the SAML provider name so the hosted UI shows both options.
