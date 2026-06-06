@@ -3,7 +3,7 @@
   "servers": {
     "legacy-sports-ci": {
       "type": "http",
-      "url": "${env:MCP_CI_URL}",
+      "url": "https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com",
       "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
     "legacy-sports-ci-local": {
@@ -34,7 +34,7 @@
     },
     "legacy-sports-jira": {
       "type": "http",
-      "url": "${env:MCP_JIRA_URL}",
+      "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com",
       "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
     "worktree": {
@@ -65,7 +65,7 @@
     },
     "legacy-sports-github": {
       "type": "http",
-      "url": "${env:MCP_GITHUB_URL}",
+      "url": "https://lhnqee219k.execute-api.us-east-1.amazonaws.com",
       "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
     "legacy-sports-nx": {
