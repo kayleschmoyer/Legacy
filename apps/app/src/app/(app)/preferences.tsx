@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOGGER } from '@legacy-sports/logging';
 import React, {
   useCallback,
@@ -6,8 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { ScrollView } from 'react-native';
-import { secureStorage } from '@legacy-sports/shared-components';
+import { Platform, ScrollView } from 'react-native';
 import {
   Button,
   H1,
@@ -49,13 +49,27 @@ const DEFAULT_PREFS: UserPreferences = {
   enableAnimations: true,
 };
 
-/* ─── Storage helpers (Expo SecureStore on native / sessionStorage on web) ─── */
+/* ─── Storage helpers (AsyncStorage on native / sessionStorage on web) ─── */
+
+function loadWebPrefs(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  return sessionStorage.getItem(STORAGE_KEY);
+}
+
+function saveWebPrefs(prefs: UserPreferences): void {
+  if (typeof sessionStorage === 'undefined') {
+    LOGGER.warn('sessionStorage not available on web platform');
+    return;
+  }
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+}
 
 async function loadPrefsAsync(): Promise<UserPreferences> {
   try {
-    // hasItem() triggers lazy initialization of SecureStore on native
-    await secureStorage.hasItem(STORAGE_KEY);
-    const raw = await secureStorage.getItem(STORAGE_KEY);
+    const raw =
+      Platform.OS === 'web'
+        ? loadWebPrefs()
+        : await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFS;
     return {
       ...DEFAULT_PREFS,
@@ -69,7 +83,17 @@ async function loadPrefsAsync(): Promise<UserPreferences> {
 }
 
 function savePrefsAsync(prefs: UserPreferences): void {
-  secureStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)).catch((error) => {
+  if (Platform.OS === 'web') {
+    try {
+      saveWebPrefs(prefs);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      LOGGER.error('Failed to save user preferences', err);
+    }
+    return;
+  }
+
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)).catch((error) => {
     const err = error instanceof Error ? error : new Error(String(error));
     LOGGER.error('Failed to save user preferences', err);
   });

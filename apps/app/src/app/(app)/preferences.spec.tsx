@@ -30,9 +30,11 @@ const AUTHORIZED_CONTEXT =
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockSetThemePreference = jest.fn();
-const mockHasItem = jest.fn();
-const mockGetItem = jest.fn();
-const mockSetItem = jest.fn();
+const mockSecureHasItem = jest.fn();
+const mockSecureGetItem = jest.fn();
+const mockSecureSetItem = jest.fn();
+const mockAsyncStorageGetItem = jest.fn();
+const mockAsyncStorageSetItem = jest.fn();
 const mockEnableDeviceLogging = jest.fn();
 const mockDisableDeviceLogging = jest.fn();
 const mockShareCurrentLogFile = jest.fn();
@@ -68,9 +70,17 @@ jest.mock('@legacy-sports/logging', () => ({
 
 jest.mock('@legacy-sports/shared-components', () => ({
   secureStorage: {
-    hasItem: (...args: unknown[]): unknown => mockHasItem(...args),
-    getItem: (...args: unknown[]): unknown => mockGetItem(...args),
-    setItem: (...args: unknown[]): unknown => mockSetItem(...args),
+    hasItem: (...args: unknown[]): unknown => mockSecureHasItem(...args),
+    getItem: (...args: unknown[]): unknown => mockSecureGetItem(...args),
+    setItem: (...args: unknown[]): unknown => mockSecureSetItem(...args),
+  },
+}));
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: (...args: unknown[]): unknown => mockAsyncStorageGetItem(...args),
+    setItem: (...args: unknown[]): unknown => mockAsyncStorageSetItem(...args),
   },
 }));
 
@@ -179,9 +189,17 @@ jest.mock('tamagui', () => {
 describe('PreferencesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHasItem.mockResolvedValue(false);
-    mockGetItem.mockResolvedValue(null);
-    mockSetItem.mockResolvedValue(undefined);
+    global.requestAnimationFrame = ((
+      callback: FrameRequestCallback,
+    ): number => {
+      callback(0);
+      return 0;
+    }) as typeof requestAnimationFrame;
+    mockSecureHasItem.mockResolvedValue(false);
+    mockSecureGetItem.mockResolvedValue(null);
+    mockSecureSetItem.mockResolvedValue(undefined);
+    mockAsyncStorageGetItem.mockResolvedValue(null);
+    mockAsyncStorageSetItem.mockResolvedValue(undefined);
     mockEnableDeviceLogging.mockResolvedValue(undefined);
     mockShareCurrentLogFile.mockResolvedValue(undefined);
   });
@@ -243,46 +261,53 @@ describe('PreferencesScreen', () => {
   });
 
   describe('storage', () => {
-    it('calls secureStorage.hasItem on mount to initialise the store', async () => {
+    it('calls AsyncStorage.getItem on mount to load persisted preferences', async () => {
       renderWithUser(false);
       await waitFor(() => {
-        expect(mockHasItem).toHaveBeenCalledWith('ls_user_preferences');
-      });
-    });
-
-    it('calls secureStorage.getItem to load persisted preferences', async () => {
-      renderWithUser(false);
-      await waitFor(() => {
-        expect(mockGetItem).toHaveBeenCalledWith('ls_user_preferences');
+        expect(mockAsyncStorageGetItem).toHaveBeenCalledWith(
+          'ls_user_preferences',
+        );
       });
     });
 
     it('merges stored preferences with defaults when persisted data exists', async () => {
-      mockGetItem.mockResolvedValueOnce(
+      mockAsyncStorageGetItem.mockResolvedValueOnce(
         JSON.stringify({ defaultSport: 'football', statsFormat: 'expanded' }),
       );
       renderWithUser(false);
       await waitFor(() => {
-        expect(mockGetItem).toHaveBeenCalledWith('ls_user_preferences');
+        expect(mockAsyncStorageGetItem).toHaveBeenCalledWith(
+          'ls_user_preferences',
+        );
       });
 
-      // Trigger a preference change that causes secureStorage.setItem to be called
       fireEvent.press(screen.getByText('Light'));
 
       await waitFor(() => {
-        expect(mockSetItem).toHaveBeenCalled();
+        expect(mockAsyncStorageSetItem).toHaveBeenCalled();
       });
 
-      // Assert that the saved preferences include the previously stored values,
-      // verifying that they were merged with any defaults.
-      const lastCall = mockSetItem.mock.calls[
-        mockSetItem.mock.calls.length - 1
+      const lastCall = mockAsyncStorageSetItem.mock.calls[
+        mockAsyncStorageSetItem.mock.calls.length - 1
       ] as [string, string];
       const savedPrefs = JSON.parse(lastCall[1]) as Record<string, unknown>;
 
       expect(savedPrefs).toMatchObject({
         defaultSport: 'football',
         statsFormat: 'expanded',
+      });
+    });
+
+    it('saves updated preferences through AsyncStorage', async () => {
+      renderWithUser(false);
+
+      fireEvent.press(screen.getByText('Expanded'));
+
+      await waitFor(() => {
+        expect(mockAsyncStorageSetItem).toHaveBeenCalledWith(
+          'ls_user_preferences',
+          expect.any(String),
+        );
       });
     });
   });
@@ -302,21 +327,24 @@ describe('PreferencesScreen', () => {
     });
 
     it('persists enable_device_logs=true and enables logging when toggled on', async () => {
-      mockHasItem.mockResolvedValue(false);
-      mockGetItem.mockResolvedValue(null);
+      mockSecureHasItem.mockResolvedValue(false);
+      mockSecureGetItem.mockResolvedValue(null);
 
       renderWithUser(true);
 
       // Wait for the hook's initial load to complete.
       await waitFor(() => {
-        expect(mockHasItem).toHaveBeenCalledWith('enable_device_logs');
+        expect(mockSecureHasItem).toHaveBeenCalledWith('enable_device_logs');
       });
 
       // Switches in render order: [enableAnimations, showSeasonTotals, writeLogsToDevice].
       fireEvent.press(screen.getByTestId('device-logs-toggle'));
 
       await waitFor(() => {
-        expect(mockSetItem).toHaveBeenCalledWith('enable_device_logs', 'true');
+        expect(mockSecureSetItem).toHaveBeenCalledWith(
+          'enable_device_logs',
+          'true',
+        );
       });
       await waitFor(() => {
         expect(mockEnableDeviceLogging).toHaveBeenCalled();
@@ -324,8 +352,8 @@ describe('PreferencesScreen', () => {
     });
 
     it('persists enable_device_logs=false and disables logging when toggled off', async () => {
-      mockHasItem.mockResolvedValue(true);
-      mockGetItem.mockImplementation((key: string) =>
+      mockSecureHasItem.mockResolvedValue(true);
+      mockSecureGetItem.mockImplementation((key: string) =>
         Promise.resolve(key === 'enable_device_logs' ? 'true' : null),
       );
 
@@ -339,14 +367,17 @@ describe('PreferencesScreen', () => {
       fireEvent.press(screen.getByTestId('device-logs-toggle'));
 
       await waitFor(() => {
-        expect(mockSetItem).toHaveBeenCalledWith('enable_device_logs', 'false');
+        expect(mockSecureSetItem).toHaveBeenCalledWith(
+          'enable_device_logs',
+          'false',
+        );
       });
       expect(mockDisableDeviceLogging).toHaveBeenCalled();
     });
 
     it('invokes shareCurrentLogFile when the Share log file button is pressed', async () => {
-      mockHasItem.mockResolvedValue(true);
-      mockGetItem.mockImplementation((key: string) =>
+      mockSecureHasItem.mockResolvedValue(true);
+      mockSecureGetItem.mockImplementation((key: string) =>
         Promise.resolve(key === 'enable_device_logs' ? 'true' : null),
       );
 
