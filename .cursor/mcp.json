@@ -1,0 +1,97 @@
+{
+  "mcpServers": {
+    "legacy-sports-ci": {
+      "url": "https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com"
+    },
+    "legacy-sports-jira": {
+      "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com"
+    },
+    "legacy-sports-github": {
+      "url": "https://lhnqee219k.execute-api.us-east-1.amazonaws.com"
+    },
+    "legacy-sports-ci-local": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/ci-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
+    "legacy-sports-db": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/db-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
+    "worktree": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/worktree-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
+    "legacy-sports-aws": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/aws-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
+    "legacy-sports-nx": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/nx-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
+    "legacy-sports-make": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/make-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
+    "legacy-sports-browser": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/browser-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    }
+  }
+}
