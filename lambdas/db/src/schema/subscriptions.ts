@@ -368,136 +368,207 @@ export function computeRevenueCents(
   return { mrrCents, arrCents: mrrCents * 12 };
 }
 
+/** Shape returned by `adminRevenueStats`, cached server-side (LS-5751). */
+type AdminRevenueStatsResult = {
+  totalSubscribers: number;
+  stripeSubscribers: number;
+  totalPremiumUsers: number;
+  totalFreeUsers: number;
+  totalUsers: number;
+  conversionRate: number;
+  newSubscribersThisMonth: number;
+  mrrCents: number | null;
+  arrCents: number | null;
+  statusBreakdown: { status: string; count: number }[];
+  subscriberGrowth: { month: string; newSubscribers: number }[];
+};
+
+/**
+ * In-memory TTL cache for admin revenue stats (LS-5751). The aggregate is the
+ * same for every admin, so a single cached value is shared across all callers.
+ * Stores the in-flight Promise (not the resolved value) so concurrent requests
+ * on cold start or TTL expiry share one DB round-trip instead of each firing
+ * the full 5+ query aggregate. Auditing stays per-request in the resolver — the
+ * cache only short-circuits the expensive DB work, never the audit log.
+ */
+let cachedRevenueStats: Promise<AdminRevenueStatsResult> | null = null;
+let cachedRevenueStatsExpiresAt = 0;
+const REVENUE_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Run the full revenue aggregate against the DB. Exported for unit testing. */
+export async function computeAdminRevenueStats(): Promise<AdminRevenueStatsResult> {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    // Status breakdown — count subscriptions by status
+    const statusRows = await db
+      .select({
+        status: InternalSchema.subscriptions.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(InternalSchema.subscriptions)
+      .groupBy(InternalSchema.subscriptions.status);
+
+    // Total platform users
+    const [totalUsersRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(InternalSchema.usersInAppInternal);
+    const totalUsers = totalUsersRow?.count ?? 0;
+
+    // Premium tier count (active + trialing subscriptions)
+    const totalSubscribers = statusRows
+      .filter((r) => r.status === 'active' || r.status === 'trialing')
+      .reduce((sum, r) => sum + r.count, 0);
+
+    // Stripe-only subscribers: active + trialing with a Stripe subscription ID
+    const [stripeSubscribersRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(InternalSchema.subscriptions)
+      .where(
+        and(
+          isNotNull(InternalSchema.subscriptions.stripeSubscriptionId),
+          sql`${InternalSchema.subscriptions.status} IN ('active', 'trialing')`,
+        ),
+      );
+    const stripeSubscribers = stripeSubscribersRow?.count ?? 0;
+
+    // Premium users by subscription_tier column on users table
+    const [premiumUsersRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(InternalSchema.usersInAppInternal)
+      .where(
+        sql`${InternalSchema.usersInAppInternal.subscriptionTier} = 'premium'`,
+      );
+    const totalPremiumUsers = premiumUsersRow?.count ?? 0;
+    const totalFreeUsers = Math.max(0, totalUsers - totalPremiumUsers);
+    const conversionRate = totalUsers > 0 ? totalPremiumUsers / totalUsers : 0;
+
+    // New premium subscriptions this month
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [newThisMonthRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(InternalSchema.subscriptions)
+      .where(
+        and(
+          gte(InternalSchema.subscriptions.createdAt, startOfMonth),
+          sql`${InternalSchema.subscriptions.tier} = 'premium'`,
+        ),
+      );
+
+    // Monthly subscriber growth — last 12 months
+    const twelveMonthsAgo = new Date(now);
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+    const growthRows = await db
+      .select({
+        month: sql<string>`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
+        newSubscribers: sql<number>`count(*)::int`,
+      })
+      .from(InternalSchema.subscriptions)
+      .where(
+        and(
+          gte(InternalSchema.subscriptions.createdAt, twelveMonthsAgo),
+          sql`${InternalSchema.subscriptions.tier} = 'premium'`,
+        ),
+      )
+      .groupBy(
+        sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
+      )
+      .orderBy(
+        sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
+      );
+
+    // MRR/ARR: active subscribers × monthly price snapshot.
+    // Gracefully degrades to null when Stripe prices are not configured.
+    let mrrCents: number | null = null;
+    let arrCents: number | null = null;
+    try {
+      const prices = await fetchStripePrices();
+      ({ mrrCents, arrCents } = computeRevenueCents(
+        totalSubscribers,
+        prices.monthlyPriceCents,
+      ));
+    } catch (err) {
+      LOGGER.warn(
+        'adminRevenueStats: could not fetch Stripe prices; omitting mrrCents/arrCents',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+
+    LOGGER.info('Admin revenue stats computed', {
+      totalUsers,
+      totalPremiumUsers,
+      totalSubscribers,
+    });
+
+    return {
+      totalSubscribers,
+      stripeSubscribers,
+      totalPremiumUsers,
+      totalFreeUsers,
+      totalUsers,
+      conversionRate,
+      newSubscribersThisMonth: newThisMonthRow?.count ?? 0,
+      mrrCents,
+      arrCents,
+      statusBreakdown: statusRows,
+      subscriberGrowth: growthRows,
+    };
+  });
+}
+
+/**
+ * Return admin revenue stats, served from an in-memory TTL cache (LS-5751).
+ * Within the TTL window repeated admin page loads reuse the cached aggregate
+ * rather than re-running the full DB query set on every visit.
+ */
+export async function getCachedAdminRevenueStats(): Promise<AdminRevenueStatsResult> {
+  const now = Date.now();
+  if (cachedRevenueStats && now < cachedRevenueStatsExpiresAt) {
+    return cachedRevenueStats;
+  }
+
+  // Assign the promise synchronously before any await so every concurrent
+  // caller that passes the TTL check above shares this single in-flight compute.
+  cachedRevenueStatsExpiresAt = now + REVENUE_STATS_CACHE_TTL_MS;
+  const promise = computeAdminRevenueStats();
+  cachedRevenueStats = promise;
+  promise.catch(() => {
+    cachedRevenueStats = null;
+    cachedRevenueStatsExpiresAt = 0;
+  });
+  return promise;
+}
+
+/** Reset the revenue stats cache. Exposed for unit tests only. */
+export function _resetAdminRevenueStatsCache(): void {
+  cachedRevenueStats = null;
+  cachedRevenueStatsExpiresAt = 0;
+}
+
 builder.queryField('adminRevenueStats', (t) =>
   t.field({
     type: AdminRevenueStatsRef,
-    description: 'Admin-only aggregate revenue and subscription metrics.',
+    description:
+      'Admin-only aggregate revenue and subscription metrics. ' +
+      'Results are cached server-side for 5 minutes (LS-5751).',
     resolve: async (_parent, _args, context) => {
       const user = requireAuth(context);
       if (!user.isAdmin) throw ForbiddenError('Admin access required');
 
-      return runWithInternalClient(getDbOptions(), async (db) => {
-        // Status breakdown — count subscriptions by status
-        const statusRows = await db
-          .select({
-            status: InternalSchema.subscriptions.status,
-            count: sql<number>`count(*)::int`,
-          })
-          .from(InternalSchema.subscriptions)
-          .groupBy(InternalSchema.subscriptions.status);
+      const stats = await getCachedAdminRevenueStats();
 
-        // Total platform users
-        const [totalUsersRow] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(InternalSchema.usersInAppInternal);
-        const totalUsers = totalUsersRow?.count ?? 0;
-
-        // Premium tier count (active + trialing subscriptions)
-        const totalSubscribers = statusRows
-          .filter((r) => r.status === 'active' || r.status === 'trialing')
-          .reduce((sum, r) => sum + r.count, 0);
-
-        // Stripe-only subscribers: active + trialing with a Stripe subscription ID
-        const [stripeSubscribersRow] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(InternalSchema.subscriptions)
-          .where(
-            and(
-              isNotNull(InternalSchema.subscriptions.stripeSubscriptionId),
-              sql`${InternalSchema.subscriptions.status} IN ('active', 'trialing')`,
-            ),
-          );
-        const stripeSubscribers = stripeSubscribersRow?.count ?? 0;
-
-        // Premium users by subscription_tier column on users table
-        const [premiumUsersRow] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(InternalSchema.usersInAppInternal)
-          .where(
-            sql`${InternalSchema.usersInAppInternal.subscriptionTier} = 'premium'`,
-          );
-        const totalPremiumUsers = premiumUsersRow?.count ?? 0;
-        const totalFreeUsers = Math.max(0, totalUsers - totalPremiumUsers);
-        const conversionRate =
-          totalUsers > 0 ? totalPremiumUsers / totalUsers : 0;
-
-        // New premium subscriptions this month
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const [newThisMonthRow] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(InternalSchema.subscriptions)
-          .where(
-            and(
-              gte(InternalSchema.subscriptions.createdAt, startOfMonth),
-              sql`${InternalSchema.subscriptions.tier} = 'premium'`,
-            ),
-          );
-
-        // Monthly subscriber growth — last 12 months
-        const twelveMonthsAgo = new Date(now);
-        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
-        twelveMonthsAgo.setDate(1);
-        twelveMonthsAgo.setHours(0, 0, 0, 0);
-
-        const growthRows = await db
-          .select({
-            month: sql<string>`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
-            newSubscribers: sql<number>`count(*)::int`,
-          })
-          .from(InternalSchema.subscriptions)
-          .where(
-            and(
-              gte(InternalSchema.subscriptions.createdAt, twelveMonthsAgo),
-              sql`${InternalSchema.subscriptions.tier} = 'premium'`,
-            ),
-          )
-          .groupBy(
-            sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
-          )
-          .orderBy(
-            sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
-          );
-
-        // MRR/ARR: active subscribers × monthly price snapshot.
-        // Gracefully degrades to null when Stripe prices are not configured.
-        let mrrCents: number | null = null;
-        let arrCents: number | null = null;
-        try {
-          const prices = await fetchStripePrices();
-          ({ mrrCents, arrCents } = computeRevenueCents(
-            totalSubscribers,
-            prices.monthlyPriceCents,
-          ));
-        } catch (err) {
-          LOGGER.warn(
-            'adminRevenueStats: could not fetch Stripe prices; omitting mrrCents/arrCents',
-            err instanceof Error ? err : new Error(String(err)),
-          );
-        }
-
-        LOGGER.info('Admin revenue stats viewed', {
-          audit: true,
-          actor: { id: Number(user.id) },
-          totalUsers,
-          totalPremiumUsers,
-          totalSubscribers,
-        });
-
-        return {
-          totalSubscribers,
-          stripeSubscribers,
-          totalPremiumUsers,
-          totalFreeUsers,
-          totalUsers,
-          conversionRate,
-          newSubscribersThisMonth: newThisMonthRow?.count ?? 0,
-          mrrCents,
-          arrCents,
-          statusBreakdown: statusRows,
-          subscriberGrowth: growthRows,
-        };
+      // Audit log fires per admin view, independent of the cache.
+      LOGGER.info('Admin revenue stats viewed', {
+        audit: true,
+        actor: { id: Number(user.id) },
+        totalUsers: stats.totalUsers,
+        totalPremiumUsers: stats.totalPremiumUsers,
+        totalSubscribers: stats.totalSubscribers,
       });
+
+      return stats;
     },
   }),
 );

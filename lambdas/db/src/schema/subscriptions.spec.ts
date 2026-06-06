@@ -81,11 +81,13 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 import {
+  _resetAdminRevenueStatsCache,
   _resetStripePricesCache,
   buildCheckoutTrialParams,
   computeRevenueCents,
   expireSubscriptionGracePeriods,
   fetchStripePrices,
+  getCachedAdminRevenueStats,
   getOrCreateStripeCustomer,
   getSubscriptionForUser,
   shouldRedirectToBillingPortal,
@@ -622,5 +624,85 @@ describe('computeRevenueCents', () => {
     const result = computeRevenueCents(0, 999);
     expect(result.mrrCents).toBe(0);
     expect(result.arrCents).toBe(0);
+  });
+});
+
+// ─── getCachedAdminRevenueStats (LS-5751) ─────────────────────────────────────
+
+describe('getCachedAdminRevenueStats', () => {
+  const fakeStats = {
+    totalSubscribers: 10,
+    stripeSubscribers: 8,
+    totalPremiumUsers: 12,
+    totalFreeUsers: 88,
+    totalUsers: 100,
+    conversionRate: 0.12,
+    newSubscribersThisMonth: 3,
+    mrrCents: null,
+    arrCents: null,
+    statusBreakdown: [],
+    subscriberGrowth: [],
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    _resetAdminRevenueStatsCache();
+  });
+
+  afterEach(() => {
+    _resetAdminRevenueStatsCache();
+  });
+
+  it('runs the DB aggregate only once within the TTL window', async () => {
+    mockRunWithInternalClient.mockResolvedValue(fakeStats);
+
+    const first = await getCachedAdminRevenueStats();
+    const second = await getCachedAdminRevenueStats();
+
+    expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(fakeStats);
+    expect(second).toEqual(fakeStats);
+  });
+
+  it('deduplicates concurrent callers onto a single in-flight compute', async () => {
+    mockRunWithInternalClient.mockResolvedValue(fakeStats);
+
+    const results = await Promise.all([
+      getCachedAdminRevenueStats(),
+      getCachedAdminRevenueStats(),
+      getCachedAdminRevenueStats(),
+    ]);
+
+    expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+    for (const r of results) {
+      expect(r).toEqual(fakeStats);
+    }
+  });
+
+  it('recomputes after the cache is reset', async () => {
+    mockRunWithInternalClient.mockResolvedValue(fakeStats);
+
+    await getCachedAdminRevenueStats();
+    _resetAdminRevenueStatsCache();
+    await getCachedAdminRevenueStats();
+
+    expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the cache on failure so the next call retries', async () => {
+    mockRunWithInternalClient
+      .mockRejectedValueOnce(new Error('DB unavailable'))
+      .mockResolvedValueOnce(fakeStats);
+
+    await expect(getCachedAdminRevenueStats()).rejects.toThrow(
+      'DB unavailable',
+    );
+
+    // Allow the .catch handler to clear the cache.
+    await Promise.resolve();
+
+    const result = await getCachedAdminRevenueStats();
+    expect(result).toEqual(fakeStats);
+    expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
   });
 });
