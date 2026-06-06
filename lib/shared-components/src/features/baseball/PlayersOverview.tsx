@@ -59,7 +59,7 @@ function PlayersOverview({
   );
 
   return (
-    <YStack flex={1} backgroundColor="lightcyan" style={containerStyle}>
+    <YStack flex={1} backgroundColor="$background" style={containerStyle}>
       <XStack
         borderTopColor="$gray8"
         borderTopWidth={1}
