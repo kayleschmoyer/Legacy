@@ -15,14 +15,18 @@ import { withDbClient } from '../util/db';
 import { deriveBillingStatus } from '../util/billing';
 import { notifyNewUserSignup } from '../util/discord';
 
-// Minimum password length on registration. Existing accounts with shorter
-// passwords can still log in (LoginRequestSchema deliberately stays at min(1))
-// because rejecting them at the schema layer would lock real users out.
+// Minimum password length on registration. New accounts must meet this bar.
 export const MIN_PASSWORD_LENGTH = 12;
+
+// Minimum password length accepted on login. Kept below MIN_PASSWORD_LENGTH so
+// legacy accounts created before the 12-char rule can still authenticate, but
+// raised above 1 so obviously-noise inputs (empty strings, single keystrokes)
+// are rejected at the schema layer before touching the database (LGN-021).
+export const MIN_LOGIN_PASSWORD_LENGTH = 8;
 
 const LoginRequestSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z.string().min(MIN_LOGIN_PASSWORD_LENGTH),
 });
 
 const RegisterRequestSchema = z.object({

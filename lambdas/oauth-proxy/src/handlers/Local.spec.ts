@@ -98,6 +98,29 @@ describe('handleLogin', () => {
     expect(result.statusCode).toBe(400);
   });
 
+  it('returns 400 for a password shorter than the login minimum', async () => {
+    const result = await handleLogin(
+      makeEvent({ email: 'test@example.com', password: 'short' }),
+    );
+    expect(result.statusCode).toBe(400);
+  });
+
+  it('accepts a password at the login minimum length', async () => {
+    mockGetUserByEmail.mockResolvedValue({
+      id: 7,
+      email: 'test@example.com',
+      passwordHash: 'stored-hash',
+    } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
+    mockTestPassword.mockResolvedValue(true);
+    mockGetSubscriptionByUserId.mockResolvedValue(null);
+
+    const result = await handleLogin(
+      makeEvent({ email: 'test@example.com', password: '12345678' }),
+    );
+
+    expect(result.statusCode).toBe(200);
+  });
+
   it('returns 400 for non-string fields', async () => {
     const result = await handleLogin(
       makeEvent({ email: 123, password: 'password123' }),
