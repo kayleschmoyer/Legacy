@@ -20,6 +20,7 @@
     "./players": "./src/entry/players.ts",
     "./roster": "./src/entry/roster.ts",
     "./season-draft": "./src/entry/season-draft.ts",
+    "./baseball": "./src/entry/baseball.ts",
     "./football": "./src/entry/football.ts",
     "./sports": "./src/entry/sports.ts",
     "./stats": "./src/entry/stats.ts",

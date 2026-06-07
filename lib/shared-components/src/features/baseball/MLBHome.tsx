@@ -1,55 +1,776 @@
 import React from 'react';
-import { Platform } from 'react-native';
-import { Text, YStack } from 'tamagui';
+import {
+  Button,
+  H1,
+  H2,
+  H3,
+  Input,
+  Paragraph,
+  ScrollView,
+  Separator,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import {
+  CreateLeagueDialog,
+  type QuickCreateLeagueInput,
+} from './CreateLeagueDialog';
+import {
+  AMBER_LIGHT,
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  GREEN,
+  INJURY_OUT,
+  SLATE_400,
+  withAlpha,
+  YELLOW,
+} from '../../utils/colors';
 
-export interface MLBHomeProps {
-  /**
-   * Title text for the MLB home screen
-   * @default 'MLB Players'
-   */
-  title?: string;
-  /**
-   * Subtitle text for the MLB home screen
-   */
-  subtitle?: string;
-  /**
-   * Additional content to render below the title
-   */
-  children?: React.ReactNode;
+export interface MLBHomeLeague {
+  id: number | string;
+  name?: string | null;
+  draftStatus?: string | null;
+  currentWeekNumber?: number | null;
+  weekAdvanceStatus?: string | null;
+  maxRosterSize?: number | null;
 }
 
-function MLBHome({ title = 'MLB Players', subtitle, children }: MLBHomeProps) {
-  return (
-    <YStack
-      flex={1}
-      padding="$5"
-      backgroundColor="$gray1"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Text
-        fontSize={Platform.OS === 'web' ? '$9' : '$8'}
-        fontWeight="bold"
-        color="$gray12"
-        textAlign="center"
-        marginBottom="$4"
+/**
+ * Free-tier league-cap context. Supplied only by platforms that gate league
+ * creation (mobile, LS-5182); when omitted the cap UI is hidden and the create
+ * action is always enabled.
+ */
+export interface MLBHomeLeagueCap {
+  count: number;
+  limit: number;
+  atLimit: boolean;
+  onUpgrade: () => void;
+}
+
+export interface MLBHomeProps {
+  leagues?: MLBHomeLeague[];
+  /** Show the full-screen loading spinner (initial league fetch). */
+  loading?: boolean;
+  /** The leagues query failed — show the error notice, not the empty state. */
+  error?: boolean;
+  /** Display name shown in the hero ("Welcome back, …"). */
+  userName?: string;
+  /** When false, render the sign-in notice. Defaults to true. */
+  isAuthenticated?: boolean;
+  /**
+   * Create a league from the quick-create dialog. Resolving closes the dialog;
+   * rejecting surfaces the error inline. This is the only data-bound callback —
+   * the component itself performs no fetching (LS-7716, AC1).
+   */
+  onCreateLeague: (input: QuickCreateLeagueInput) => Promise<void>;
+  onJoinLeague: () => void;
+  onMockDraft?: () => void;
+  onViewLeague: (leagueId: number | string) => void;
+  /** Retry the leagues query from the error notice. */
+  onRetry?: () => void;
+  /** Navigate to sign-in from the unauthenticated notice. */
+  onSignIn?: () => void;
+  /** When provided, renders an "Invite Friends" action (mobile, LS-5203). */
+  onInviteFriends?: () => void;
+  /** When provided, the dialog shows an "Advanced settings" link. */
+  onAdvancedCreate?: (leagueName: string) => void;
+  /** Free-tier league-cap context (mobile, LS-5182). */
+  leagueCap?: MLBHomeLeagueCap;
+}
+
+interface LeagueBadge {
+  label: string;
+  bg: string;
+  border: string;
+  text: string;
+}
+
+/** Map a draft status to a display badge. Ported from web BaseballLandingPage. */
+function getLeagueBadge(
+  draftStatus?: string | null,
+  weekNumber?: number | null,
+): LeagueBadge {
+  switch (draftStatus) {
+    case 'in-progress':
+      return {
+        label: 'Drafting',
+        bg: withAlpha(BRAND_NAVY, 0.18),
+        border: withAlpha(BRAND_NAVY, 0.45),
+        text: BRAND_GOLD_LIGHT,
+      };
+    case 'completed':
+      return {
+        label: weekNumber ? `Week ${weekNumber}` : 'In Season',
+        bg: withAlpha(GREEN, 0.14),
+        border: withAlpha(GREEN, 0.36),
+        text: '$green11',
+      };
+    case 'queued':
+    case 'not-started':
+      return {
+        label: 'Draft Scheduled',
+        bg: withAlpha(AMBER_LIGHT, 0.12),
+        border: withAlpha(AMBER_LIGHT, 0.3),
+        text: '$orange11',
+      };
+    default:
+      return {
+        label: draftStatus
+          ? draftStatus
+              .replace('-', ' ')
+              .replace(/\b\w/g, (l) => l.toUpperCase())
+          : 'Unknown',
+        bg: withAlpha(SLATE_400, 0.12),
+        border: withAlpha(SLATE_400, 0.3),
+        text: '$gray11',
+      };
+  }
+}
+
+/**
+ * Shared, presentational baseball home (LS-7716). Mirrors the `NFLHome` pattern:
+ * leagues array + callbacks, no data fetching. Consumed by the web
+ * `BaseballScreen` wrapper and the mobile `baseball/index` wrapper.
+ */
+export function MLBHome({
+  leagues = [],
+  loading = false,
+  error = false,
+  userName = 'Manager',
+  isAuthenticated = true,
+  onCreateLeague,
+  onJoinLeague,
+  onMockDraft,
+  onViewLeague,
+  onRetry,
+  onSignIn,
+  onInviteFriends,
+  onAdvancedCreate,
+  leagueCap,
+}: MLBHomeProps) {
+  const [showCreateDialog, setShowCreateDialog] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+
+  const leaguesCount = leagues.length;
+  const hasLeagues = leaguesCount > 0;
+  const currentYear = new Date().getFullYear();
+
+  const averageRosterSize =
+    leaguesCount > 0
+      ? Math.round(
+          leagues.reduce((total, l) => total + (l.maxRosterSize || 0), 0) /
+            leaguesCount,
+        )
+      : 0;
+  const currentWeek =
+    leagues.reduce(
+      (maxWeek, l) =>
+        l.currentWeekNumber && l.currentWeekNumber > maxWeek
+          ? l.currentWeekNumber
+          : maxWeek,
+      1,
+    ) || 1;
+  const safeCurrentWeek = currentWeek > 0 ? currentWeek : 1;
+
+  const heroSubtitleCopy = hasLeagues
+    ? `You're managing ${leaguesCount} league${
+        leaguesCount === 1 ? '' : 's'
+      }. Keep building momentum with streamlined tools and insights.`
+    : 'Launch your first fantasy baseball league in minutes and lead your team from draft day to the trophy presentation.';
+
+  const quickWins = hasLeagues
+    ? [
+        `Monitor week ${safeCurrentWeek} matchups and finalize starters.`,
+        `Average rosters hold ${averageRosterSize} players — adjust slots as needed.`,
+        'Share invite codes to bring new managers into the action.',
+      ]
+    : [
+        'Decide how many teams you want in your new league.',
+        'Lock in a draft date that fits every manager.',
+        'Use invite codes to bring your league together in seconds.',
+      ];
+
+  const filteredLeagues = leagues.filter((l) =>
+    (l?.name || '').toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  const atCap = !!leagueCap?.atLimit;
+
+  const handleCreatePress = () => {
+    if (atCap) return;
+    setShowCreateDialog(true);
+  };
+
+  if (loading) {
+    return (
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={320}
+        aria-label="Baseball fantasy landing page"
       >
-        {title}
-      </Text>
-      {subtitle && (
-        <Text
-          fontSize={Platform.OS === 'web' ? '$5' : '$4'}
-          color="$gray10"
-          textAlign="center"
-          marginBottom="$6"
-        >
-          {subtitle}
-        </Text>
-      )}
-      {children}
-    </YStack>
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
+      </YStack>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack
+        backgroundColor="$background"
+        flexGrow={1}
+        padding="$5"
+        gap="$6"
+        aria-label="Baseball fantasy landing page"
+      >
+        {/* Hero — compact for returning managers, full for first-timers */}
+        {hasLeagues ? (
+          <XStack
+            backgroundColor="$glassSurface"
+            borderRadius="$7"
+            borderWidth={1}
+            borderColor="$glassBorder"
+            padding="$5"
+            alignItems="center"
+            justifyContent="space-between"
+            flexWrap="wrap"
+            gap="$4"
+          >
+            <YStack gap="$1" flex={1} minWidth={200}>
+              <H2 color="$color" fontSize="$8" fontWeight="800">
+                Baseball Fantasy
+              </H2>
+              <Paragraph color="$glassTextSubdued" fontSize="$3">
+                Welcome back, {userName}
+              </Paragraph>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              <Button
+                backgroundColor={BRAND_NAVY_LIGHT}
+                borderRadius="$5"
+                disabled={atCap}
+                opacity={atCap ? 0.5 : 1}
+                onPress={handleCreatePress}
+                accessibilityLabel="Create a new baseball league"
+              >
+                <Text color="$color1" fontWeight="700">
+                  + Create
+                </Text>
+              </Button>
+              <Button
+                backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+                borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                borderWidth={1}
+                borderRadius="$5"
+                onPress={onJoinLeague}
+                accessibilityLabel="Join an existing baseball league"
+              >
+                <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                  Join
+                </Text>
+              </Button>
+              {onMockDraft ? (
+                <Button
+                  backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                  borderWidth={1}
+                  borderRadius="$5"
+                  onPress={onMockDraft}
+                  accessibilityLabel="Practice with a mock draft simulator"
+                >
+                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                    Mock Draft
+                  </Text>
+                </Button>
+              ) : null}
+            </XStack>
+          </XStack>
+        ) : (
+          <XStack
+            backgroundColor="$glassSurface"
+            borderRadius="$8"
+            borderWidth={1}
+            borderColor="$glassBorder"
+            padding="$7"
+            gap="$6"
+            flexWrap="wrap"
+          >
+            <YStack flex={1} minWidth={280} gap="$4">
+              <XStack
+                alignSelf="flex-start"
+                backgroundColor="$surfaceInteractive"
+                borderRadius="$10"
+                borderWidth={1}
+                borderColor="$accentMuted"
+                paddingHorizontal="$4"
+                paddingVertical="$1.5"
+              >
+                <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+                  {currentYear} Season Hub
+                </Text>
+              </XStack>
+              <H1 color="$color" fontSize="$12" fontWeight="800">
+                Baseball Fantasy
+              </H1>
+              <Paragraph color="$glassTextSubdued" fontSize="$5">
+                {`Welcome back, ${userName}. ${heroSubtitleCopy}`}
+              </Paragraph>
+              <XStack gap="$3" flexWrap="wrap" marginTop="$2">
+                <Button
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  borderRadius="$6"
+                  disabled={atCap}
+                  opacity={atCap ? 0.5 : 1}
+                  onPress={handleCreatePress}
+                  accessibilityLabel="Create a new baseball league"
+                >
+                  <Text color="$color1" fontWeight="700">
+                    Create League
+                  </Text>
+                </Button>
+                <Button
+                  backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                  borderWidth={1}
+                  borderRadius="$6"
+                  onPress={onJoinLeague}
+                  accessibilityLabel="Join an existing baseball league"
+                >
+                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                    Join League
+                  </Text>
+                </Button>
+                {onMockDraft ? (
+                  <Button
+                    backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                    borderWidth={1}
+                    borderRadius="$6"
+                    onPress={onMockDraft}
+                    accessibilityLabel="Practice with a mock draft simulator"
+                  >
+                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                      Mock Draft
+                    </Text>
+                  </Button>
+                ) : null}
+              </XStack>
+              <Paragraph fontSize="$3" color="$glassTextMuted" maxWidth={440}>
+                Draft-ready controls, transparent roster limits, and secure
+                invitations built for competitive fantasy managers.
+              </Paragraph>
+            </YStack>
+
+            <YStack width="100%" maxWidth={380} gap="$4">
+              <YStack
+                backgroundColor="$glassSurfaceLight"
+                borderRadius="$7"
+                padding="$6"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                gap="$4"
+              >
+                <YStack gap="$1">
+                  <Paragraph
+                    fontSize="$3"
+                    color="$glassTextMuted"
+                    textTransform="uppercase"
+                    letterSpacing={1}
+                  >
+                    Getting Started
+                  </Paragraph>
+                  <H3 fontSize="$7" color="$color">
+                    Build your first roster
+                  </H3>
+                </YStack>
+                <Separator backgroundColor="$glassBorder" />
+                <Paragraph fontSize="$3" color="$glassTextSubdued">
+                  Create or join a league to start tracking your season — weekly
+                  matchups, roster stats, and draft countdowns will appear here.
+                </Paragraph>
+              </YStack>
+
+              <YStack
+                backgroundColor="$glassSurfaceLight"
+                borderRadius="$7"
+                padding="$5"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                gap="$3"
+              >
+                <Paragraph
+                  fontSize="$3"
+                  color="$glassTextMuted"
+                  textTransform="uppercase"
+                  letterSpacing={1}
+                >
+                  Quick Wins
+                </Paragraph>
+                <Paragraph fontSize="$4" color="$color">
+                  Make sure your league is ready before first pitch.
+                </Paragraph>
+                {quickWins.map((item, index) => (
+                  <XStack key={index} alignItems="center" gap="$3">
+                    <YStack
+                      width={10}
+                      height={10}
+                      borderRadius={9999}
+                      backgroundColor={BRAND_NAVY_LIGHT}
+                    />
+                    <Paragraph fontSize="$3" color="$glassTextSubdued" flex={1}>
+                      {item}
+                    </Paragraph>
+                  </XStack>
+                ))}
+              </YStack>
+            </YStack>
+          </XStack>
+        )}
+
+        {/* Error notice */}
+        {error ? (
+          <YStack
+            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.08)}
+            borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
+            borderWidth={1}
+            borderRadius="$6"
+            padding="$5"
+            gap="$3"
+            role="alert"
+          >
+            <Paragraph fontSize="$4" color="$red10" fontWeight="600">
+              Could not load your leagues
+            </Paragraph>
+            <Paragraph fontSize="$3" color="$glassTextSubdued">
+              There was a problem fetching your league data. You can still
+              create or join a league below.
+            </Paragraph>
+            {onRetry ? (
+              <Button
+                alignSelf="flex-start"
+                backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                borderWidth={1}
+                onPress={onRetry}
+                accessibilityLabel="Retry loading leagues"
+              >
+                <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                  Retry
+                </Text>
+              </Button>
+            ) : null}
+          </YStack>
+        ) : null}
+
+        {/* Unauthenticated notice */}
+        {!isAuthenticated ? (
+          <YStack
+            backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+            borderColor={withAlpha(BRAND_NAVY, 0.35)}
+            borderWidth={1}
+            borderRadius="$6"
+            padding="$5"
+            gap="$3"
+          >
+            <Paragraph fontSize="$4" color={BRAND_GOLD_LIGHT} fontWeight="600">
+              Sign in to manage your fantasy baseball leagues
+            </Paragraph>
+            <Paragraph fontSize="$3" color={BRAND_GOLD_LIGHT}>
+              Authentication is required to access drafts, invite codes, and
+              lineup management.
+            </Paragraph>
+            {onSignIn ? (
+              <Button
+                alignSelf="flex-start"
+                backgroundColor={BRAND_NAVY_LIGHT}
+                onPress={onSignIn}
+                accessibilityLabel="Get started free"
+              >
+                <Text color="$color1" fontWeight="700">
+                  Get Started Free
+                </Text>
+              </Button>
+            ) : null}
+          </YStack>
+        ) : null}
+
+        {/* Free-tier league-cap indicator + invite (mobile extras) */}
+        {leagueCap ? (
+          <XStack alignItems="center" flexWrap="wrap" gap="$2">
+            <Text color="$gray11" fontSize="$4">
+              Your leagues: {leagueCap.count}/{leagueCap.limit}
+            </Text>
+            {leagueCap.atLimit ? (
+              <Text
+                color={BRAND_GOLD}
+                fontSize="$4"
+                fontWeight="bold"
+                onPress={leagueCap.onUpgrade}
+                accessibilityLabel="Upgrade to add more leagues"
+              >
+                — Upgrade to add more
+              </Text>
+            ) : null}
+          </XStack>
+        ) : null}
+
+        {onInviteFriends ? (
+          <Button
+            backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+            borderColor={withAlpha(BRAND_NAVY, 0.42)}
+            borderWidth={1}
+            borderRadius="$5"
+            alignSelf="flex-start"
+            onPress={onInviteFriends}
+            accessibilityLabel="Invite friends to a league"
+          >
+            <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+              Invite Friends
+            </Text>
+          </Button>
+        ) : null}
+
+        {/* Your leagues */}
+        <YStack gap="$4">
+          <XStack
+            justifyContent="space-between"
+            alignItems="flex-end"
+            flexWrap="wrap"
+            gap="$3"
+          >
+            <YStack gap="$1">
+              <H2 color="$color" fontSize="$8" fontWeight="700">
+                Your Leagues
+              </H2>
+              <Paragraph fontSize="$3" color="$glassTextMuted">
+                {hasLeagues
+                  ? 'Select a league to review rosters, matchups, and draft plans.'
+                  : 'Create or join a league to unlock your personalized season dashboard.'}
+              </Paragraph>
+            </YStack>
+            {hasLeagues ? (
+              <XStack
+                alignItems="center"
+                backgroundColor="$glassSurface"
+                borderRadius="$5"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                paddingHorizontal="$3"
+                width="100%"
+                maxWidth={340}
+              >
+                <Input
+                  size="$4"
+                  placeholder="Search leagues..."
+                  value={search}
+                  onChangeText={setSearch}
+                  backgroundColor="transparent"
+                  borderWidth={0}
+                  flex={1}
+                  accessibilityLabel="Search leagues"
+                  aria-label="Search leagues"
+                />
+              </XStack>
+            ) : null}
+          </XStack>
+
+          {error ? null : filteredLeagues.length > 0 ? (
+            <YStack gap="$3" testID="leagues-grid">
+              {filteredLeagues.map((league) => {
+                const badge = getLeagueBadge(
+                  league.draftStatus,
+                  league.currentWeekNumber,
+                );
+                return (
+                  <XStack
+                    key={league.id}
+                    backgroundColor="$glassSurface"
+                    borderRadius="$6"
+                    borderWidth={1}
+                    borderColor="$glassBorder"
+                    padding="$4"
+                    paddingHorizontal="$5"
+                    alignItems="center"
+                    gap="$4"
+                    flexWrap="wrap"
+                    cursor="pointer"
+                    pressStyle={{ scale: 0.995 }}
+                    onPress={() => onViewLeague(league.id)}
+                    accessibilityLabel={`View ${league.name || 'league'}`}
+                    role="link"
+                  >
+                    <YStack gap="$1" flex={1} minWidth={160}>
+                      <H3 fontSize="$6" fontWeight="700" color="$color">
+                        {league.name || 'Unnamed League'}
+                      </H3>
+                      <Paragraph fontSize="$2" color="$textMuted">
+                        {league.maxRosterSize
+                          ? `${league.maxRosterSize}-slot roster`
+                          : 'Season dashboard'}
+                      </Paragraph>
+                    </YStack>
+
+                    <XStack alignItems="center" gap="$3" flexWrap="wrap">
+                      <XStack
+                        backgroundColor={badge.bg}
+                        borderColor={badge.border}
+                        borderWidth={1}
+                        borderRadius="$5"
+                        paddingHorizontal="$3"
+                        paddingVertical="$1"
+                      >
+                        <Text
+                          fontSize={11}
+                          fontWeight="700"
+                          color={badge.text}
+                          textTransform="uppercase"
+                          letterSpacing={0.5}
+                        >
+                          {badge.label}
+                        </Text>
+                      </XStack>
+                      {league.weekAdvanceStatus === 'processing' ||
+                      league.weekAdvanceStatus === 'queued' ? (
+                        <XStack
+                          backgroundColor={withAlpha(YELLOW, 0.12)}
+                          borderColor={withAlpha(YELLOW, 0.35)}
+                          borderWidth={1}
+                          borderRadius="$5"
+                          paddingHorizontal="$3"
+                          paddingVertical="$1"
+                        >
+                          <Text
+                            fontSize={11}
+                            fontWeight="600"
+                            color="$yellow10"
+                          >
+                            Advancing
+                          </Text>
+                        </XStack>
+                      ) : league.weekAdvanceStatus === 'failed' ? (
+                        <XStack
+                          backgroundColor={withAlpha(INJURY_OUT, 0.12)}
+                          borderColor={withAlpha(INJURY_OUT, 0.35)}
+                          borderWidth={1}
+                          borderRadius="$5"
+                          paddingHorizontal="$3"
+                          paddingVertical="$1"
+                        >
+                          <Text fontSize={11} fontWeight="600" color="$red10">
+                            Advance failed
+                          </Text>
+                        </XStack>
+                      ) : null}
+                    </XStack>
+
+                    <Button
+                      backgroundColor={withAlpha(BRAND_NAVY, 0.16)}
+                      borderColor={withAlpha(BRAND_NAVY, 0.45)}
+                      borderWidth={1}
+                      borderRadius="$5"
+                      onPress={() => onViewLeague(league.id)}
+                      accessibilityLabel={`View ${league.name || 'league'}`}
+                    >
+                      <Text
+                        fontWeight="700"
+                        color={BRAND_GOLD_LIGHT}
+                        fontSize="$2"
+                      >
+                        View
+                      </Text>
+                    </Button>
+                  </XStack>
+                );
+              })}
+            </YStack>
+          ) : (
+            <YStack
+              alignItems="center"
+              justifyContent="center"
+              backgroundColor="$glassSurface"
+              borderRadius="$7"
+              borderWidth={1}
+              borderColor="$glassBorder"
+              padding="$10"
+              gap="$5"
+              minHeight={280}
+            >
+              {search.trim() ? (
+                <>
+                  <H2 fontSize="$8" fontWeight="700" color="$color">
+                    No leagues match your search
+                  </H2>
+                  <Paragraph
+                    fontSize="$4"
+                    color="$glassTextMuted"
+                    maxWidth={440}
+                    textAlign="center"
+                  >
+                    Try a different search term or clear the search field.
+                  </Paragraph>
+                </>
+              ) : (
+                <>
+                  <H2 fontSize="$8" fontWeight="700" color="$color">
+                    No leagues yet
+                  </H2>
+                  <Paragraph
+                    fontSize="$4"
+                    color="$glassTextMuted"
+                    maxWidth={440}
+                    textAlign="center"
+                  >
+                    Build a private competition or join friends to unlock live
+                    matchups, draft tools, and performance tracking.
+                  </Paragraph>
+                  <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+                    <Button
+                      backgroundColor={BRAND_NAVY_LIGHT}
+                      borderRadius="$6"
+                      disabled={atCap}
+                      opacity={atCap ? 0.5 : 1}
+                      onPress={handleCreatePress}
+                      accessibilityLabel="Create your first baseball league"
+                    >
+                      <Text color="$color1" fontWeight="700">
+                        Create your first league
+                      </Text>
+                    </Button>
+                    <Button
+                      backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                      borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                      borderWidth={1}
+                      borderRadius="$6"
+                      onPress={onJoinLeague}
+                      accessibilityLabel="Join a baseball league with a code"
+                    >
+                      <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                        Join with a code
+                      </Text>
+                    </Button>
+                  </XStack>
+                </>
+              )}
+            </YStack>
+          )}
+        </YStack>
+      </YStack>
+
+      <CreateLeagueDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSubmit={onCreateLeague}
+        onAdvanced={onAdvancedCreate}
+      />
+    </ScrollView>
   );
 }
 
-export { MLBHome };
 export default MLBHome;

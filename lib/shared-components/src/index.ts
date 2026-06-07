@@ -136,6 +136,19 @@ export * from './features/shared/FilterOptions';
 // Baseball components
 export * from './features/baseball/PlayersOverview';
 export * from './features/baseball/MLBHome';
+// Re-export the create-league dialog + its types from the root. The numeric
+// form-default constants (DEFAULT_NUM_TEAMS, etc.) are intentionally NOT
+// re-exported here to avoid colliding with same-named exports elsewhere in the
+// barrel; import them from '@legacy-sports/shared-components/baseball' instead.
+export {
+  CreateLeagueDialog,
+  type CreateLeagueDialogProps,
+  type QuickCreateLeagueInput,
+  type PlayerPool,
+  type DraftMode,
+  type SelectionMethod,
+  type DraftOrder,
+} from './features/baseball/CreateLeagueDialog';
 
 // Roster management
 export * from './features/roster/rosterUtils';
