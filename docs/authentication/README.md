@@ -20,6 +20,12 @@ This directory contains all authentication-related documentation for the Legacy 
 
 - **[Invite Code Implementation](INVITE_CODE_IMPLEMENTATION.md)** - Invite-based registration system
 
+### Discord Account Linking
+
+The web app supports linking a Discord account from Profile Settings. The OAuth callback is handled by `apps/web/src/pages/auth/DiscordCallbackPage.tsx`.
+
+**Security note (LS-2549):** The oauth-proxy returns a deliberately vague 409 ("Could not link Discord account") when a Discord account is already linked to a _different_ Legacy Sports user. This message is intentionally generic to prevent account enumeration — the server must not reveal whether the Discord ID belongs to another account. The constant `DISCORD_ALREADY_LINKED_MESSAGE` in `DiscordCallbackPage.tsx` must stay in sync with the server's message; **do not make the server message more specific.**
+
 ## 🎯 Quick Start
 
 ### Setting Up OAuth

@@ -4,6 +4,7 @@ import { Paragraph, YStack } from '@legacy-sports/shared-components/ui';
 import { Spinner } from 'tamagui';
 import { AuthService, useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
+import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 
 /**
  * Handles the Discord OAuth callback for authenticated users linking their
@@ -17,8 +18,23 @@ import { LOGGER } from '@legacy-sports/logging';
  * 3. This page forwards code+state to the backend; the backend verifies
  *    state against the cookie (single-use), then links the account.
  * 4. On success: redirects to /profile/settings
- * 5. On error: shows error with a link back to profile settings
+ * 5. On error: shows error with a link back to profile settings, an actionable
+ *    next step for the already-linked case, and a "Contact support" affordance
+ *    so the user never hits a dead end (LS-6659).
  */
+
+/** Address used for the "Contact support" affordance on the error state. */
+const SUPPORT_EMAIL = 'support@legacysports.com';
+
+/**
+ * The oauth-proxy Discord handler returns this intentionally-vague 409 when the
+ * Discord account is already linked to a *different* Legacy Sports user. The
+ * message is kept generic on the server to prevent account enumeration
+ * (LS-2549), so we cannot make the server message more specific. Instead we
+ * detect it here and surface an actionable next step (LS-6659).
+ */
+const DISCORD_ALREADY_LINKED_MESSAGE = 'Could not link Discord account';
+
 export function DiscordCallbackPage(): React.JSX.Element {
   const { config } = useAuth();
   const navigate = useNavigate();
@@ -52,7 +68,10 @@ export function DiscordCallbackPage(): React.JSX.Element {
         LOGGER.info('Discord account linked successfully');
         navigate('/profile/settings?discord_linked=1', { replace: true });
       } catch (err) {
-        LOGGER.error('Discord link failed:', String(err));
+        LOGGER.error(
+          'Discord link failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
         setErrorMessage(
           err instanceof Error
             ? err.message
@@ -65,6 +84,12 @@ export function DiscordCallbackPage(): React.JSX.Element {
   }, [authService, navigate]);
 
   if (errorMessage) {
+    const isAlreadyLinkedConflict =
+      errorMessage === DISCORD_ALREADY_LINKED_MESSAGE;
+    const displayMessage = isAlreadyLinkedConflict
+      ? 'This Discord account can’t be linked to your profile.'
+      : errorMessage;
+
     return (
       <YStack
         flex={1}
@@ -74,8 +99,15 @@ export function DiscordCallbackPage(): React.JSX.Element {
         padding="$6"
       >
         <Paragraph size="$5" color="$brandSeamRed" textAlign="center">
-          {errorMessage}
+          {displayMessage}
         </Paragraph>
+        {isAlreadyLinkedConflict ? (
+          <Paragraph size="$4" color="$colorPress" textAlign="center">
+            It may already be connected to another Legacy Sports account. Try
+            signing in with that Discord account in a fresh browser session, or
+            contact support below.
+          </Paragraph>
+        ) : null}
         <Paragraph
           size="$4"
           color="$brandGoldLight"
@@ -84,6 +116,18 @@ export function DiscordCallbackPage(): React.JSX.Element {
         >
           Back to Profile Settings
         </Paragraph>
+        <a
+          href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+            'Discord account linking issue',
+          )}`}
+          style={{
+            color: BRAND_GOLD_LIGHT,
+            fontSize: 15,
+            textDecorationLine: 'underline',
+          }}
+        >
+          Need help? Contact support
+        </a>
       </YStack>
     );
   }
