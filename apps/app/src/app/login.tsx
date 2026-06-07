@@ -8,6 +8,7 @@ import { useAuthHandlers } from '../common/auth/AuthHooks';
 import { isAppleAuthAvailable } from '../common/auth/appleAuth';
 import { resolvePostLoginDestination } from '../common/auth/postLoginDestination';
 import { getLastVisitedLeague } from '../common/utilities/lastVisitedLeague';
+import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 
 const Login: React.FC = () => {
   const router = useRouter();
@@ -16,10 +17,15 @@ const Login: React.FC = () => {
   const pathname = usePathname();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
     undefined,
   );
+
+  // Discord login is gated on a configured client ID, mirroring the web app.
+  // The config is static at module load, so resolve availability once.
+  const discordAvailable = !!getMobileOAuthConfig().discordClientId;
 
   // Apple App Store guideline 4.8 requires "Sign in with Apple" wherever a
   // third-party social login is offered. The native framework is only present
@@ -62,15 +68,17 @@ const Login: React.FC = () => {
     router.replace('/');
   }, [router, pathname]);
 
-  const { googleLogin, appleLogin } = useAuthHandlers({
+  const { googleLogin, appleLogin, discordLogin } = useAuthHandlers({
     onFailure: (err) => {
       setIsGoogleLoading(false);
       setIsAppleLoading(false);
+      setIsDiscordLoading(false);
       setErrorMessage(err);
     },
     onSuccess: () => {
       setIsGoogleLoading(false);
       setIsAppleLoading(false);
+      setIsDiscordLoading(false);
       void redirectAfterLogin();
     },
   });
@@ -85,6 +93,12 @@ const Login: React.FC = () => {
     setErrorMessage(undefined);
     setIsAppleLoading(true);
     void appleLogin();
+  };
+
+  const handleDiscordSignIn = () => {
+    setErrorMessage(undefined);
+    setIsDiscordLoading(true);
+    void discordLogin();
   };
 
   return (
@@ -103,8 +117,10 @@ const Login: React.FC = () => {
         <LoginPage
           onGoogleSignIn={handleGoogleSignIn}
           onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
+          onDiscordSignIn={discordAvailable ? handleDiscordSignIn : undefined}
           isGoogleLoading={isGoogleLoading}
           isAppleLoading={isAppleLoading}
+          isDiscordLoading={isDiscordLoading}
           errorMessage={errorMessage}
         />
       </YStack>

@@ -57,4 +57,15 @@ describe('mobileOAuthConfig', () => {
       expect(resolveGoogleClientId()).toBe(DEFAULT_GOOGLE_CLIENT_ID);
     });
   });
+
+  describe('getMobileOAuthConfig discordClientId', () => {
+    it('forwards config.discordClientId when set (enables the Discord button)', () => {
+      setConfig({ discordClientId: 'discord-app-id' });
+      expect(getMobileOAuthConfig().discordClientId).toBe('discord-app-id');
+    });
+
+    it('returns undefined when discordClientId is not set (button hidden)', () => {
+      expect(getMobileOAuthConfig().discordClientId).toBeUndefined();
+    });
+  });
 });

@@ -94,10 +94,16 @@ jest.mock('@legacy-sports/shared-components', () => {
   >(
     '../../../../../lib/shared-components/src/features/auth/services/appleAuthExchange',
   );
+  const { exchangeDiscordCode } = jest.requireActual<
+    typeof import('@legacy-sports/shared-components')
+  >(
+    '../../../../../lib/shared-components/src/features/auth/services/discordAuthExchange',
+  );
   return {
     buildGoogleAuthPayload,
     exchangeGoogleCode,
     exchangeAppleCode,
+    exchangeDiscordCode,
     OAuthProvider: {
       configure: (...args: unknown[]): unknown => mockConfigure(...args),
       signIn: (...args: unknown[]): unknown => mockSignIn(...args),
@@ -122,13 +128,41 @@ jest.mock('./appleAuth', () => ({
     mockSignInWithApple(...args),
 }));
 
-// Mock app-config/native so getMobileOAuthConfig() reads our test URL
+// Mock the native Discord browser/PKCE wrapper (expo-web-browser / expo-crypto
+// are unavailable in Jest). `discordLogin` calls signInWithDiscord() and the
+// REAL exchangeDiscordCode helper above, so the fetch URL/payload assertions
+// exercise production code.
+const mockSignInWithDiscord = jest.fn();
+jest.mock('./discordAuth', () => ({
+  DISCORD_SIGN_IN_CANCELLED: 'DISCORD_SIGN_IN_CANCELLED',
+  signInWithDiscord: (...args: unknown[]): unknown =>
+    mockSignInWithDiscord(...args),
+}));
+
+// Mock app-config/native so the DbClient (graphqlHost) and any direct config
+// reads resolve during module init.
 jest.mock('@legacy-sports/app-config/native', () => ({
   config: {
     oauthProxy: 'https://oauth-proxy.example.com',
     googleClientId: 'test-google-client-id',
+    discordClientId: 'test-discord-client-id',
     graphqlHost: 'https://test.api.example.com/graphql',
   },
+}));
+
+// Mock the OAuth config resolver so individual tests can drop oauthProxyUrl /
+// discordClientId to exercise the "not configured" branches of discordLogin.
+const mockGetMobileOAuthConfig = jest.fn();
+const DEFAULT_MOBILE_OAUTH_CONFIG = {
+  oauthProxyUrl: 'https://oauth-proxy.example.com',
+  googleClientId: 'test-google-client-id',
+  discordClientId: 'test-discord-client-id',
+  additionalScopes: ['openid', 'profile', 'email'],
+  offlineAccess: true,
+};
+jest.mock('./mobileOAuthConfig', () => ({
+  getMobileOAuthConfig: (...args: unknown[]): unknown =>
+    mockGetMobileOAuthConfig(...args),
 }));
 
 // Mock env utilities (still used by AuthHooks for BYPASS_AUTH)
@@ -170,6 +204,9 @@ const TEST_JWT = createFakeJwt(TEST_USER);
 describe('AuthHooks', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockGetMobileOAuthConfig.mockReturnValue({
+      ...DEFAULT_MOBILE_OAUTH_CONFIG,
+    });
     // Re-establish default mock implementations after resetAllMocks
     mockGetItem.mockImplementation((key: string) =>
       Promise.resolve(mockSecureStorage[key] ?? null),
@@ -428,6 +465,125 @@ describe('AuthHooks', () => {
       });
 
       expect(onFailure).toHaveBeenCalledWith('Network Error');
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── useAuthHandlers: Discord Login ────────────────────────────────────
+
+  describe('useAuthHandlers - discordLogin', () => {
+    it('exchanges the PKCE code for a JWT and stores it', async () => {
+      mockSignInWithDiscord.mockResolvedValue({
+        code: 'discord-code',
+        codeVerifier: 'verifier-abc',
+        redirectUri: 'legacysports://auth/discord/callback',
+      });
+      mockFetch.mockResolvedValue(okJsonResponse({ jwt: TEST_JWT }));
+
+      const onSuccess = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onSuccess }));
+
+      await act(async () => {
+        await result.current.discordLogin();
+      });
+
+      // The PKCE payload must be POSTed to the `/discord` route.
+      expect(mockSignInWithDiscord).toHaveBeenCalledWith(
+        'test-discord-client-id',
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://oauth-proxy.example.com/discord',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            code: 'discord-code',
+            code_verifier: 'verifier-abc',
+            redirect_uri: 'legacysports://auth/discord/callback',
+          }),
+        }),
+      );
+      expect(mockSetItem).toHaveBeenCalledWith('INTERNAL_JWT', TEST_JWT);
+      expect(onSuccess).toHaveBeenCalled();
+    });
+
+    it('reports onFailure with undefined when the user cancels', async () => {
+      mockSignInWithDiscord.mockRejectedValue({
+        code: 'DISCORD_SIGN_IN_CANCELLED',
+        message: 'Discord sign-in was cancelled.',
+      });
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.discordLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(undefined);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('reports onFailure with a message when the exchange fails', async () => {
+      mockSignInWithDiscord.mockResolvedValue({
+        code: 'discord-code',
+        codeVerifier: 'verifier-abc',
+        redirectUri: 'legacysports://auth/discord/callback',
+      });
+      mockFetch.mockRejectedValue(new Error('Network Error'));
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.discordLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith('Network Error');
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('fails without opening the browser when the OAuth proxy URL is not configured', async () => {
+      mockGetMobileOAuthConfig.mockReturnValue({
+        ...DEFAULT_MOBILE_OAUTH_CONFIG,
+        oauthProxyUrl: undefined,
+      });
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.discordLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(
+        'OAuth proxy URL is not configured',
+      );
+      expect(mockSignInWithDiscord).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('fails without opening the browser when the Discord client ID is an empty string', async () => {
+      // A falsy client ID (unset or empty string) disables the flow — the same
+      // gate that hides the button in login.tsx.
+      mockGetMobileOAuthConfig.mockReturnValue({
+        ...DEFAULT_MOBILE_OAUTH_CONFIG,
+        discordClientId: '',
+      });
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.discordLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(
+        'Discord client ID is not configured',
+      );
+      expect(mockSignInWithDiscord).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockSetItem).not.toHaveBeenCalled();
     });
   });

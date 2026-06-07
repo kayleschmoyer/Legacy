@@ -19,6 +19,11 @@ export type {
   AppleAuthPayload,
   AppleAuthExchangeResult,
 } from './services/appleAuthExchange';
+export { exchangeDiscordCode } from './services/discordAuthExchange';
+export type {
+  DiscordAuthPayload,
+  DiscordAuthExchangeResult,
+} from './services/discordAuthExchange';
 export * from './EnhancedAuthGuard';
 
 // Platform types (convenience re-exports)

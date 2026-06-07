@@ -68,6 +68,12 @@ export const CONFIG_KEYS = {
     mobile: 'EXPO_PUBLIC_APP_BASE_URL',
     required: false,
   },
+  discordClientId: {
+    clientSafe: true,
+    web: 'VITE_DISCORD_CLIENT_ID',
+    mobile: 'EXPO_PUBLIC_DISCORD_CLIENT_ID',
+    required: false,
+  },
   // Web-only keys below — no mobile counterpart
   environmentName: {
     clientSafe: true,
@@ -77,11 +83,6 @@ export const CONFIG_KEYS = {
   authTestMode: {
     clientSafe: true,
     web: 'VITE_AUTH_TEST_MODE',
-    required: false,
-  },
-  discordClientId: {
-    clientSafe: true,
-    web: 'VITE_DISCORD_CLIENT_ID',
     required: false,
   },
   // appVersion / commitSha / buildDate have mobile names so AboutScreen and

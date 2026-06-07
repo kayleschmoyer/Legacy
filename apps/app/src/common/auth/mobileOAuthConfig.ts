@@ -39,6 +39,9 @@ export function resolveGoogleClientId(): string {
 export function getMobileOAuthConfig(): OAuthConfig {
   return {
     googleClientId: resolveGoogleClientId(),
+    // Discord is optional — when unset the login screen hides the Discord
+    // button, mirroring the web app's `config.discordClientId` gating.
+    discordClientId: config.discordClientId,
     oauthProxyUrl: config.oauthProxy,
     additionalScopes: ['openid', 'profile', 'email'],
     offlineAccess: true,

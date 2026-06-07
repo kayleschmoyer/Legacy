@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import {
   buildGoogleAuthPayload,
   exchangeAppleCode,
+  exchangeDiscordCode,
   exchangeGoogleCode,
   ISecureStorage,
   OAuthError,
@@ -16,6 +17,7 @@ import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { LOGGER } from '@legacy-sports/logging';
 import { getMobileOAuthConfig } from './mobileOAuthConfig';
 import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
+import { DISCORD_SIGN_IN_CANCELLED, signInWithDiscord } from './discordAuth';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 import { clearApolloCache } from '../ApolloClientContext';
@@ -23,6 +25,7 @@ import { clearApolloCache } from '../ApolloClientContext';
 export interface AuthHandlers {
   googleLogin: () => Promise<void>;
   appleLogin: () => Promise<void>;
+  discordLogin: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -272,13 +275,71 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     }
   }, [onSuccess, onFailure]);
 
+  const discordLogin = useCallback(async () => {
+    try {
+      const { oauthProxyUrl, discordClientId } = getMobileOAuthConfig();
+      // Reject blank/whitespace-only config as well as undefined — a present-but-
+      // empty env var would otherwise pass a bare truthiness check and start the
+      // flow with an invalid value.
+      if (!oauthProxyUrl?.trim()) {
+        throw new Error('OAuth proxy URL is not configured');
+      }
+      if (!discordClientId?.trim()) {
+        throw new Error('Discord client ID is not configured');
+      }
+
+      // Open the system browser, run the PKCE authorization, and exchange the
+      // returned code with the oauth-proxy native path. Mirrors the Apple flow:
+      // the shared `exchangeDiscordCode` helper is the single transport so web
+      // and mobile cannot drift.
+      const { code, codeVerifier, redirectUri } =
+        await signInWithDiscord(discordClientId);
+      const result = await exchangeDiscordCode(oauthProxyUrl, {
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: redirectUri,
+      });
+
+      await storeToken({ jwt: result.jwt });
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      // A user dismissing the in-app browser is not a failure to surface.
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as { code?: string }).code === DISCORD_SIGN_IN_CANCELLED
+      ) {
+        LOGGER.debug('Discord sign-in cancelled by user');
+        if (onFailure) {
+          onFailure(undefined);
+        }
+        return;
+      }
+
+      LOGGER.error(
+        'Discord authentication error:',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      if (onFailure) {
+        onFailure(
+          error instanceof Error ? error.message : 'Authentication failed',
+        );
+      }
+    }
+  }, [onSuccess, onFailure]);
+
   return useMemo(() => {
     return {
       googleLogin: googleLogin,
       appleLogin: appleLogin,
+      discordLogin: discordLogin,
       logout: logout,
     };
-  }, [googleLogin, appleLogin, logout]);
+  }, [googleLogin, appleLogin, discordLogin, logout]);
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
