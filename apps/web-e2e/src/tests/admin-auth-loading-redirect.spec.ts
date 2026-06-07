@@ -31,7 +31,28 @@ const nonAdminTest = createCustomAuthTest('nonadmin@example.com', 'none');
 async function mockAdminGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const opName = extractOperationName(route).toLowerCase();
-    if (opName === 'admingetusers') {
+    if (opName === 'getuserbyid') {
+      // The redesigned AdminPage gates admin access on a server-side
+      // GetUserById lookup (serverUserData?.user?.accessLevel). Return the
+      // admin identity matching the adminTest JWT so the not-admin redirect
+      // does not fire and the admin lands on /admin.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            user: {
+              __typename: 'User',
+              id: 1,
+              email: 'admin@test.com',
+              username: 'admin',
+              name: 'admin',
+              accessLevel: 'admin',
+            },
+          },
+        }),
+      });
+    } else if (opName === 'admingetusers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

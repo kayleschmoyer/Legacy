@@ -321,9 +321,12 @@ interface NavCardProps {
 
 function NavCard({ to, icon, label, description }: NavCardProps) {
   const [hovered, setHovered] = React.useState(false);
+  const descriptionId = `nav-card-desc-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return (
     <Link
       to={to}
+      aria-label={label}
+      aria-describedby={descriptionId}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -368,6 +371,7 @@ function NavCard({ to, icon, label, description }: NavCardProps) {
         {label}
       </span>
       <span
+        id={descriptionId}
         style={{
           fontFamily: FONT_BODY,
           fontSize: 13,
