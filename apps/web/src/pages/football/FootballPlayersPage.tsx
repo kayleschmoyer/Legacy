@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Search } from '@tamagui/lucide-icons';
+import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
 import type { FootballPlayer } from '../../api/db/graphql.generated';
 import { useFootballPlayersQuery } from '../../api/db/graphql.generated';
-import { FootballPlayerCard } from '../../components/football/FootballPlayerCard';
 import type { FootballPosition } from '../../components/football/FootballPositionFilter';
 import { FootballPositionFilter } from '../../components/football/FootballPositionFilter';
 import type { TeamFilter } from '../../components/football/FootballTeamFilter';
@@ -32,6 +33,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export function FootballPlayersPage() {
+  const navigate = useNavigate();
   const [position, setPosition] = useState<FootballPosition>('All');
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
@@ -234,7 +236,13 @@ export function FootballPlayersPage() {
           >
             {(allNodes ?? []).map((player) =>
               player?.id != null ? (
-                <FootballPlayerCard key={player.id} player={player} />
+                <FootballPlayerCard
+                  key={player.id}
+                  player={player}
+                  onNavigateToPlayer={(playerId) =>
+                    navigate(`/football/players/${playerId}`)
+                  }
+                />
               ) : null,
             )}
           </YStack>

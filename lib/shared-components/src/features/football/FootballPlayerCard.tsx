@@ -1,8 +1,6 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { styled, Text, XStack, YStack } from 'tamagui';
-import { NFL_TEAMS } from '@legacy-sports/shared-components';
-import type { FootballPlayersQuery } from '../../api/db/graphql.generated';
+import { Text, XStack, YStack } from 'tamagui';
+import { NFL_TEAMS } from '../../constants/nflTeams';
 import {
   BRAND_NAVY,
   OUTLINE_SUBTLE,
@@ -17,14 +15,59 @@ import {
   TEXT_MUTED,
   TEXT_PRIMARY,
   withAlpha,
-} from '../../constants/colors';
-import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
+} from '../../utils/colors';
+import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
 
-export type FootballPlayerNode = NonNullable<
-  NonNullable<
-    NonNullable<FootballPlayersQuery['footballPlayers']>['nodes']
-  >[number]
->;
+/**
+ * Portable shape for a football player rendered by {@link FootballPlayerCard}.
+ *
+ * Mirrors the subset of the `FootballPlayer` GraphQL type the card actually
+ * reads, so the component does not depend on any app-specific generated types.
+ * Both web and mobile pass their query results directly — the generated
+ * `FootballPlayer` node is structurally assignable to this interface.
+ */
+export interface FootballPlayerCardStats {
+  passing?: {
+    yds?: number | null;
+    td?: number | null;
+    int?: number | null;
+    rating?: number | null;
+  } | null;
+  rushing?: {
+    yds?: number | null;
+    td?: number | null;
+  } | null;
+  receiving?: {
+    rec?: number | null;
+    yds?: number | null;
+    td?: number | null;
+  } | null;
+  kicking?: {
+    fgm?: number | null;
+    fga?: number | null;
+  } | null;
+  defense?: {
+    sacks?: number | null;
+    int?: number | null;
+    ptsAllowedPerG?: number | null;
+  } | null;
+  idp?: {
+    soloTkl?: number | null;
+    sacks?: number | null;
+    int?: number | null;
+    ff?: number | null;
+  } | null;
+}
+
+export interface FootballPlayerCardPlayer {
+  id: number;
+  firstName?: string | null;
+  lastName?: string | null;
+  position?: string | null;
+  nflTeam?: string | null;
+  isDst?: boolean | null;
+  careerStats?: FootballPlayerCardStats | null;
+}
 
 const POSITION_COLORS: Record<string, string> = {
   QB: POS_QB,
@@ -41,18 +84,6 @@ const POSITION_COLORS: Record<string, string> = {
 function getPositionColor(pos: string | null | undefined): string {
   return (pos && POSITION_COLORS[pos]) ?? BRAND_NAVY;
 }
-
-const CardContainer = styled(YStack, {
-  backgroundColor: SURFACE_CARD,
-  borderWidth: 1,
-  borderColor: OUTLINE_SUBTLE,
-  borderRadius: 10,
-  overflow: 'hidden',
-  cursor: 'pointer',
-  pressStyle: { opacity: 0.85, scale: 0.99 },
-  hoverStyle: { borderColor: BRAND_NAVY, backgroundColor: SURFACE_PANEL },
-  animation: 'quick',
-});
 
 function TeamBadge({
   teamAbbr,
@@ -144,7 +175,7 @@ function fmtFloat(n: number | null | undefined, decimals = 1): string {
   return n.toFixed(decimals);
 }
 
-function OffenseStats({ player }: { player: FootballPlayerNode }) {
+function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
   const stats = player.careerStats;
   const pos = player.position;
 
@@ -207,7 +238,7 @@ function OffenseStats({ player }: { player: FootballPlayerNode }) {
   );
 }
 
-function DstStats({ player }: { player: FootballPlayerNode }) {
+function DstStats({ player }: { player: FootballPlayerCardPlayer }) {
   const d = player.careerStats?.defense;
   if (!d) {
     return (
@@ -225,7 +256,7 @@ function DstStats({ player }: { player: FootballPlayerNode }) {
   );
 }
 
-function IdpStats({ player }: { player: FootballPlayerNode }) {
+function IdpStats({ player }: { player: FootballPlayerCardPlayer }) {
   const idp = player.careerStats?.idp;
   if (!idp) {
     return (
@@ -244,22 +275,40 @@ function IdpStats({ player }: { player: FootballPlayerNode }) {
   );
 }
 
-interface Props {
-  player: FootballPlayerNode;
-  onAddToRoster?: (player: FootballPlayerNode) => void;
+export interface FootballPlayerCardProps {
+  player: FootballPlayerCardPlayer;
+  /**
+   * Called when the card is pressed to navigate to the player's detail view.
+   * Apps supply their own navigation (e.g. react-router on web, expo-router on
+   * mobile); the card stays platform-agnostic.
+   */
+  onNavigateToPlayer?: (playerId: string) => void;
+  onAddToRoster?: (player: FootballPlayerCardPlayer) => void;
 }
 
-export function FootballPlayerCard({ player, onAddToRoster }: Props) {
-  const navigate = useNavigate();
+export function FootballPlayerCard({
+  player,
+  onNavigateToPlayer,
+  onAddToRoster,
+}: FootballPlayerCardProps) {
   const pos = player.position;
   const isDst = player.isDst ?? false;
   const isIdp = pos === 'DL' || pos === 'LB' || pos === 'DB';
   const teamData = player.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
 
   return (
-    <CardContainer
+    <YStack
+      backgroundColor={SURFACE_CARD}
+      borderWidth={1}
+      borderColor={OUTLINE_SUBTLE}
+      borderRadius={10}
+      overflow="hidden"
+      cursor="pointer"
+      pressStyle={{ opacity: 0.85, scale: 0.99 }}
+      hoverStyle={{ borderColor: BRAND_NAVY, backgroundColor: SURFACE_PANEL }}
+      animation="quick"
       onPress={() =>
-        player.id != null && navigate(`/football/players/${player.id}`)
+        player.id != null && onNavigateToPlayer?.(String(player.id))
       }
       padding={14}
       gap={10}
@@ -326,6 +375,6 @@ export function FootballPlayerCard({ player, onAddToRoster }: Props) {
           </YStack>
         </XStack>
       )}
-    </CardContainer>
+    </YStack>
   );
 }
