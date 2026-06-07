@@ -1,4 +1,5 @@
 import { APIGatewayEvent } from 'aws-lambda';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   createUser,
   getUserByDiscordId,
@@ -8,6 +9,7 @@ import {
   setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
 import {
+  checkDiscordRedirectUriConfig,
   handleDiscordAuth,
   handleDiscordAuthorize,
   handleDiscordLink,
@@ -82,6 +84,8 @@ jest.mock('../util', () => ({
     DISCORD_CLIENT_ID: 'DISCORD_CLIENT_ID',
     DISCORD_REDIRECT_URI: 'DISCORD_REDIRECT_URI',
     DISCORD_NATIVE_REDIRECT_URIS: 'DISCORD_NATIVE_REDIRECT_URIS',
+    DISCORD_REDIRECT_URI_ALLOWED_ORIGINS:
+      'DISCORD_REDIRECT_URI_ALLOWED_ORIGINS',
   },
   Secret: {
     DISCORD_CLIENT_SECRET: 'DISCORD_CLIENT_SECRET',
@@ -543,5 +547,125 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
 
     expect(result.statusCode).toBe(200);
     expect(mockLinkDiscordAccount).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DISCORD_REDIRECT_URI allow-list self-check (LGN-015 / LS-6670)', () => {
+  const mockLogger = LOGGER as unknown as {
+    error: jest.Mock<void, [string, unknown]>;
+    warn: jest.Mock<void, [string]>;
+  };
+  const ALLOWED_ORIGIN = 'https://legacy-fantasy.com';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env['DISCORD_REDIRECT_URI'];
+    delete process.env['DISCORD_REDIRECT_URI_ALLOWED_ORIGINS'];
+  });
+
+  afterEach(() => {
+    delete process.env['DISCORD_REDIRECT_URI'];
+    delete process.env['DISCORD_REDIRECT_URI_ALLOWED_ORIGINS'];
+  });
+
+  describe('checkDiscordRedirectUriConfig', () => {
+    it('logs nothing when DISCORD_REDIRECT_URI is unset (Discord login disabled)', () => {
+      checkDiscordRedirectUriConfig();
+
+      expect(mockLogger.error).not.toHaveBeenCalled();
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('logs an error when DISCORD_REDIRECT_URI is not a valid URL', () => {
+      process.env['DISCORD_REDIRECT_URI'] = 'not a url';
+
+      checkDiscordRedirectUriConfig();
+
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      const loggedError = mockLogger.error.mock.calls[0][1] as Error;
+      expect(loggedError.message).toMatch(/not a valid URL/);
+    });
+
+    it('logs an error when DISCORD_REDIRECT_URI is not https', () => {
+      process.env['DISCORD_REDIRECT_URI'] =
+        'http://legacy-fantasy.com/callback';
+
+      checkDiscordRedirectUriConfig();
+
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      const loggedError = mockLogger.error.mock.calls[0][1] as Error;
+      expect(loggedError.message).toMatch(/https/);
+    });
+
+    it('logs an error when the redirect URI origin is not allow-listed', () => {
+      process.env['DISCORD_REDIRECT_URI'] = 'https://evil.example.com/callback';
+      process.env['DISCORD_REDIRECT_URI_ALLOWED_ORIGINS'] = ALLOWED_ORIGIN;
+
+      checkDiscordRedirectUriConfig();
+
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      const loggedError = mockLogger.error.mock.calls[0][1] as Error;
+      expect(loggedError.message).toMatch(/not allow-listed/);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('passes silently when the origin is on the allow-list', () => {
+      process.env['DISCORD_REDIRECT_URI'] =
+        'https://legacy-fantasy.com/auth/discord/callback';
+      process.env['DISCORD_REDIRECT_URI_ALLOWED_ORIGINS'] = ALLOWED_ORIGIN;
+
+      checkDiscordRedirectUriConfig();
+
+      expect(mockLogger.error).not.toHaveBeenCalled();
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('warns (but does not error) when no allow-list is configured', () => {
+      process.env['DISCORD_REDIRECT_URI'] =
+        'https://legacy-fantasy.com/auth/discord/callback';
+
+      checkDiscordRedirectUriConfig();
+
+      expect(mockLogger.error).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn.mock.calls[0][0]).toMatch(
+        /DISCORD_REDIRECT_URI_ALLOWED_ORIGINS/,
+      );
+    });
+  });
+
+  describe('request-path enforcement (getDiscordRedirectUri)', () => {
+    beforeEach(() => {
+      process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
+    });
+
+    it('handleDiscordAuthorize throws a specific error on a non-https redirect URI', () => {
+      process.env['DISCORD_REDIRECT_URI'] =
+        'http://legacy-fantasy.com/callback';
+
+      expect(() => handleDiscordAuthorize(makeEvent({}))).toThrow(/https/);
+    });
+
+    it('the web exchange fails (401) with a specific logged error when the origin is not allow-listed', async () => {
+      process.env['DISCORD_REDIRECT_URI'] = 'https://evil.example.com/callback';
+      process.env['DISCORD_REDIRECT_URI_ALLOWED_ORIGINS'] = ALLOWED_ORIGIN;
+      mockVerifyOauthState.mockReturnValue(true);
+
+      const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+      const result = await handleDiscordAuth(
+        makeEvent({ code: 'auth-code', state: 'good-state' }),
+      );
+
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body) as { error: string }).toMatchObject({
+        error: 'Discord authentication failed',
+      });
+      // The misconfiguration must short-circuit before any Discord call.
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
   });
 });

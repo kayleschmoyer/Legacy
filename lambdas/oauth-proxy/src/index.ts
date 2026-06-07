@@ -27,6 +27,7 @@ import {
   handleDeviceVerify,
 } from './handlers/DeviceFlow';
 import {
+  checkDiscordRedirectUriConfig,
   handleDiscordAuth,
   handleDiscordAuthorize,
   handleDiscordLink,
@@ -50,6 +51,10 @@ const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
+
+// Startup self-check: surface a misconfigured Discord redirect URI at cold
+// start (LGN-015 / LS-6670) instead of as a generic exchange failure later.
+checkDiscordRedirectUriConfig();
 
 /**
  * Origins permitted to make cross-origin requests.

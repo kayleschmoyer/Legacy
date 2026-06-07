@@ -82,10 +82,93 @@ function getDiscordClientId(): string {
   return clientId;
 }
 
+/**
+ * Allow-list of https origins permitted for the web DISCORD_REDIRECT_URI. Read
+ * from DISCORD_REDIRECT_URI_ALLOWED_ORIGINS (comma-separated). Empty/unset means
+ * "no origin allow-list configured" — the redirect URI is still required to be a
+ * valid https URL, but its origin is not constrained, so deployments that have
+ * not set the variable keep working (defense-in-depth degrades gracefully).
+ */
+function getRedirectUriAllowedOrigins(): Set<string> {
+  const raw =
+    process.env[DiscordEnv.DISCORD_REDIRECT_URI_ALLOWED_ORIGINS] ?? '';
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Validate the web DISCORD_REDIRECT_URI: it must be a well-formed https URL,
+ * and — when DISCORD_REDIRECT_URI_ALLOWED_ORIGINS is configured — its origin
+ * must be on that allow-list. Discord itself validates redirect_uri against the
+ * registered app config; catching a rotated/typo'd value here is defense in
+ * depth that surfaces the misconfiguration as a specific error in our logs
+ * instead of a generic Discord token-exchange failure (LGN-015 / LS-6670).
+ * Returns the validated URI.
+ */
+function validateDiscordRedirectUri(uri: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(uri);
+  } catch {
+    throw new Error('DISCORD_REDIRECT_URI is not a valid URL');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('DISCORD_REDIRECT_URI must use the https scheme');
+  }
+  const allowed = getRedirectUriAllowedOrigins();
+  if (allowed.size > 0 && !allowed.has(parsed.origin)) {
+    throw new Error(
+      `DISCORD_REDIRECT_URI origin "${parsed.origin}" is not allow-listed`,
+    );
+  }
+  return uri;
+}
+
 function getDiscordRedirectUri(): string {
   const uri = process.env[DiscordEnv.DISCORD_REDIRECT_URI];
   if (!uri) throw new Error('DISCORD_REDIRECT_URI not configured');
-  return uri;
+  return validateDiscordRedirectUri(uri);
+}
+
+/**
+ * Cold-start self-check for the web Discord redirect URI. Logs a clear,
+ * actionable message if DISCORD_REDIRECT_URI is set but malformed, non-https,
+ * or not allow-listed, so an incorrectly rotated value is caught at deploy time
+ * in our logs rather than surfacing later only as a generic Discord
+ * token-exchange failure for end users (LGN-015 / LS-6670).
+ *
+ * Discord login is optional (omit DISCORD_REDIRECT_URI to disable it), so an
+ * unset value is not an error here. This never throws — a misconfiguration must
+ * not take down the whole Lambda (including the health/version routes); the
+ * per-request accessor (getDiscordRedirectUri) still fails the affected Discord
+ * requests with the same specific error.
+ */
+export function checkDiscordRedirectUriConfig(): void {
+  const uri = process.env[DiscordEnv.DISCORD_REDIRECT_URI];
+  if (!uri) return; // Discord login disabled — nothing to validate.
+
+  try {
+    validateDiscordRedirectUri(uri);
+  } catch (error) {
+    LOGGER.error(
+      'DISCORD_REDIRECT_URI failed startup validation — Discord login will fail until this is corrected',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    return;
+  }
+
+  if (getRedirectUriAllowedOrigins().size === 0) {
+    LOGGER.warn(
+      'DISCORD_REDIRECT_URI is set but DISCORD_REDIRECT_URI_ALLOWED_ORIGINS is ' +
+        'not configured — the origin allow-list check is disabled (only https ' +
+        'is enforced). Set DISCORD_REDIRECT_URI_ALLOWED_ORIGINS for full ' +
+        'defense-in-depth.',
+    );
+  }
 }
 
 /**

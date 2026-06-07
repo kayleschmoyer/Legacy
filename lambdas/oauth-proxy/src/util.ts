@@ -15,6 +15,13 @@ export enum DiscordEnv {
   // app supplies its redirect_uri in the exchange request; it must match one
   // of these before we forward it to Discord's token endpoint.
   DISCORD_NATIVE_REDIRECT_URIS = 'DISCORD_NATIVE_REDIRECT_URIS',
+  // Comma-separated allow-list of https origins permitted for the web
+  // DISCORD_REDIRECT_URI (e.g. `https://legacy-fantasy.com`). Used as a
+  // defense-in-depth startup self-check so an incorrectly rotated redirect URI
+  // is surfaced as a specific error rather than a generic Discord token-exchange
+  // failure (LGN-015). Optional: when unset the redirect URI is still required
+  // to be a valid https URL, but its origin is not constrained.
+  DISCORD_REDIRECT_URI_ALLOWED_ORIGINS = 'DISCORD_REDIRECT_URI_ALLOWED_ORIGINS',
 }
 
 export enum Secret {
