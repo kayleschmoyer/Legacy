@@ -13,6 +13,13 @@ export {
 export type { StatColumn, PlayersStatsTableProps } from './PlayersStatsTable';
 export { PlayersTable } from './PlayersTable';
 
+// Player comparison (shared, cross-platform — LS-7804)
+export {
+  PlayerComparison,
+  PLAYER_COMPARISON_FEATURE_DESCRIPTION,
+} from './PlayerComparison';
+export type { PlayerComparisonProps } from './PlayerComparison';
+
 // Advanced player statistics components
 export { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 export { PitchingStatsDataGrid } from './PitchingStatsDataGrid';

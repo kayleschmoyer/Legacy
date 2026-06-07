@@ -5545,6 +5545,76 @@ export type FootballPlayerSeasonStatsFragment = {
   }> | null;
 };
 
+export type GetAllPlayerSeasonStatsQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type GetAllPlayerSeasonStatsQuery = {
+  __typename?: 'Query';
+  player?: {
+    __typename?: 'Player';
+    eligiblePositions?: Array<string> | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
+  playerSeasonBatting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  }> | null;
+  playerSeasonPitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    gamesStarted?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    earnedRunAverage?: string | null;
+    whip?: number | null;
+  }> | null;
+  playerSeasonFielding?: Array<{
+    __typename?: 'SeasonFielding';
+    season?: number | null;
+    team?: string | null;
+    position?: string | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+    inningsDefended?: number | null;
+    putouts?: number | null;
+    assists?: number | null;
+    errors?: number | null;
+    doublePlays?: number | null;
+    fieldingPercentage?: number | null;
+  }> | null;
+};
+
 export type GetAllPlayersQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -11583,6 +11653,151 @@ export type CreateSeasonDraftGameMutationResult =
 export type CreateSeasonDraftGameMutationOptions = BaseMutationOptions<
   CreateSeasonDraftGameMutation,
   CreateSeasonDraftGameMutationVariables
+>;
+export const GetAllPlayerSeasonStats = gql`
+  query GetAllPlayerSeasonStats($playerId: Int!) {
+    player(id: $playerId) {
+      eligiblePositions
+      firstName
+      lastName
+    }
+    playerSeasonBatting(playerId: $playerId) {
+      season
+      team
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    playerSeasonPitching(playerId: $playerId) {
+      season
+      team
+      games
+      wins
+      losses
+      gamesStarted
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      strikeouts
+      earnedRunAverage
+      whip
+    }
+    playerSeasonFielding(playerId: $playerId) {
+      season
+      team
+      position
+      games
+      gamesStarted
+      inningsDefended
+      putouts
+      assists
+      errors
+      doublePlays
+      fieldingPercentage
+    }
+  }
+`;
+
+/**
+ * __useGetAllPlayerSeasonStatsQuery__
+ *
+ * To run a query within a React component, call `useGetAllPlayerSeasonStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAllPlayerSeasonStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAllPlayerSeasonStatsQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useGetAllPlayerSeasonStatsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  > &
+    (
+      | { variables: GetAllPlayerSeasonStatsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >(GetAllPlayerSeasonStats, options);
+}
+export function useGetAllPlayerSeasonStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >(GetAllPlayerSeasonStats, options);
+}
+export function useGetAllPlayerSeasonStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllPlayerSeasonStatsQuery,
+        GetAllPlayerSeasonStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >(
+    GetAllPlayerSeasonStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAllPlayerSeasonStatsQuery,
+          GetAllPlayerSeasonStatsQueryVariables
+        >,
+  );
+}
+export type GetAllPlayerSeasonStatsQueryHookResult = ReturnType<
+  typeof useGetAllPlayerSeasonStatsQuery
+>;
+export type GetAllPlayerSeasonStatsLazyQueryHookResult = ReturnType<
+  typeof useGetAllPlayerSeasonStatsLazyQuery
+>;
+export type GetAllPlayerSeasonStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetAllPlayerSeasonStatsSuspenseQuery
+>;
+export type GetAllPlayerSeasonStatsQueryResult = Apollo.QueryResult<
+  GetAllPlayerSeasonStatsQuery,
+  GetAllPlayerSeasonStatsQueryVariables
 >;
 export const GetAllPlayers = gql`
   query GetAllPlayers(
