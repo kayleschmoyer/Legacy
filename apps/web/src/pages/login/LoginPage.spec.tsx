@@ -409,3 +409,92 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// LGN-012 / LS-6667 — full-screen "Signing in with Discord…" progress screen
+// ---------------------------------------------------------------------------
+
+describe('LoginPage Discord callback progress screen (LS-6667)', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    mockAuthConfig = {
+      googleClientId: 'test-client-id',
+      discordClientId: 'test-discord-id',
+      oauthProxyUrl: 'http://localhost:5001',
+    };
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/discord/callback?code=abc&state=xyz',
+    );
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('shows the progress screen and hides the OAuth buttons during the exchange', async () => {
+    // A never-resolving fetch keeps the callback in-flight so the progress UI
+    // (rendered before the exchange settles) can be asserted.
+    global.fetch = jest.fn(
+      () => new Promise(() => undefined),
+    ) as unknown as typeof fetch;
+
+    renderPage();
+
+    // Dedicated progress indicator is shown immediately — no login-form flash.
+    expect(screen.getByText(/signing in with discord/i)).toBeTruthy();
+    // Neither OAuth button (nor the rest of the login form) is rendered.
+    expect(
+      screen.queryByRole('button', { name: /continue with google/i }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /continue with discord/i }),
+    ).toBeNull();
+
+    // Flush the always-mounted Google-configure effect so its state update
+    // lands inside act() (the progress screen never awaits it).
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
+  it('does not render the progress screen when the callback carries an OAuth error', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/discord/callback?error=access_denied',
+    );
+
+    renderPage();
+
+    // The error path falls straight through to the login form so the user sees
+    // the message and can retry — the progress screen must not appear.
+    await waitForSignInButton();
+    expect(screen.queryByText(/signing in with discord/i)).toBeNull();
+    expect(
+      await screen.findByText(/discord sign-in was cancelled or denied/i),
+    ).toBeTruthy();
+  });
+
+  it('falls back to the login form with an error when the code exchange fails', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve('{"message":"bad code"}'),
+        json: () => Promise.resolve({ message: 'bad code' }),
+      }),
+    ) as unknown as typeof fetch;
+
+    renderPage();
+
+    // After the failed exchange the progress screen is replaced by the form
+    // (Google button present) and the error banner is shown.
+    await waitForSignInButton();
+    expect(screen.queryByText(/signing in with discord/i)).toBeNull();
+    expect(await screen.findByText('bad code')).toBeTruthy();
+  });
+});

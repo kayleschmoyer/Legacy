@@ -486,6 +486,82 @@
   }
 }
 
+/* ── Discord callback progress (LGN-012 / LS-6667) ── */
+.ll-callback {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 32px 96px;
+}
+.ll-callback-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+  max-width: 420px;
+}
+.ll-callback-badge {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.ll-callback-disc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #5865f2;
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+.ll-callback-disc svg {
+  width: 28px;
+  height: 28px;
+}
+.ll-callback-spinner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(88, 101, 242, 0.22);
+  border-top-color: var(--brand-gold);
+  animation: ll-spin 0.9s linear infinite;
+}
+.ll-callback-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 32px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--fg1-strong);
+  margin: 0;
+}
+.ll-callback-sub {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fg3);
+  margin: 0;
+}
+/* Opacity-only fallback so reduced-motion users still get a "working" cue
+   without the rotating spinner (no positional movement). */
+@keyframes ll-callback-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* Legal */
 .ll-legal {
   margin-top: 22px;
@@ -779,6 +855,9 @@
 @media (prefers-reduced-motion: reduce) {
   .ll-root .ll-spinner {
     animation-duration: 2s;
+  }
+  .ll-root .ll-callback-spinner {
+    animation: ll-callback-pulse 1.6s ease-in-out infinite;
   }
   .ll-root *,
   .ll-root *::before,
