@@ -10,15 +10,17 @@ const meta: Meta<typeof LoginPage> = {
     docs: {
       description: {
         component:
-          'Shared auth card used by both web and mobile login screens. Accepts callbacks for Google and Discord sign-in and renders the presentational card UI.',
+          'Shared auth card used by both web and mobile login screens. Accepts callbacks for Google and Discord sign-in and renders the presentational card UI. When onEmailPasswordSignIn is provided (web only), an email + password form renders above the OAuth buttons (LGN-017).',
       },
     },
   },
   tags: ['autodocs'],
   argTypes: {
     onGoogleSignIn: { action: 'google-sign-in' },
+    onEmailPasswordSignIn: { action: 'email-password-sign-in' },
     onDiscordSignIn: { action: 'discord-sign-in' },
     onDismissError: { action: 'dismiss-error' },
+    isEmailPasswordLoading: { control: 'boolean' },
     isGoogleLoading: { control: 'boolean' },
     isDiscordLoading: { control: 'boolean' },
     isConfiguring: { control: 'boolean' },
@@ -44,6 +46,39 @@ export const WithDiscord: Story = {
     docs: {
       description: {
         story: 'Both Google and Discord sign-in options visible.',
+      },
+    },
+  },
+};
+
+export const WithEmailPassword: Story = {
+  args: {
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    onEmailPasswordSignIn: fn(),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Email + password form (LGN-017) rendered above the OAuth buttons. The form surfaces the existing /oauth/login endpoint in the UI so human users are not limited to OAuth-only sign-in.',
+      },
+    },
+  },
+};
+
+export const EmailPasswordLoading: Story = {
+  args: {
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    onEmailPasswordSignIn: fn(),
+    isEmailPasswordLoading: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Email/password sign-in in progress — the Sign In button shows a spinner and all auth options are disabled.',
       },
     },
   },

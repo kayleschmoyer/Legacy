@@ -86,12 +86,14 @@ function formatPitchingMarquee(
 export function LoginPage(): React.JSX.Element {
   const {
     config,
+    login,
     loginWithOAuth,
     hydrateSession,
     error: authError,
     clearError,
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   // Synchronously detect the Discord OAuth callback on the very first render so
   // we can show a dedicated full-screen "Signing in with Discord…" progress
@@ -121,6 +123,12 @@ export function LoginPage(): React.JSX.Element {
   // guard before the first setIsLoading(true) commits. This ref is read and set
   // synchronously, so the second invocation sees the latch and bails out.
   const signInInFlightRef = useRef(false);
+  // Same synchronous re-entrancy latch for the email/password Sign In button —
+  // `isEmailLoading` is React state and is not committed until the current
+  // synchronous task finishes, so a rapid double-submit could fire two login()
+  // calls before the first setIsEmailLoading(true) commits. This ref guards the
+  // window the state flag cannot (mirrors signInInFlightRef for the Google path).
+  const emailSignInInFlightRef = useRef(false);
 
   const today = useMemo(() => new Date(), []);
   const todayMonth = today.getMonth() + 1;
@@ -373,6 +381,37 @@ export function LoginPage(): React.JSX.Element {
     }
   }, [isConfigured, isConfiguring, loginWithOAuth]);
 
+  // Email/password sign-in (LGN-017). The full chain already exists end-to-end
+  // (useAuth().login → AuthService.authenticateWithEmail → POST /oauth/login);
+  // this only surfaces it in the UI. On success, login() flips the auth state
+  // and the auth guard swaps in the authenticated app — no navigation needed
+  // here, mirroring the Google handleSignIn path.
+  const handleEmailPasswordSignIn = useCallback(
+    async (email: string, password: string) => {
+      if (isEmailLoading || emailSignInInFlightRef.current) return;
+      emailSignInInFlightRef.current = true;
+      setIsEmailLoading(true);
+      setErrorMessage('');
+      try {
+        await login(email, password);
+      } catch (error) {
+        LOGGER.error(
+          'Email/password sign-in failed on login page:',
+          error instanceof Error ? error : String(error),
+        );
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Sign-in failed. Please try again.',
+        );
+      } finally {
+        emailSignInInFlightRef.current = false;
+        setIsEmailLoading(false);
+      }
+    },
+    [isEmailLoading, login],
+  );
+
   const handleDiscordSignIn = useCallback(() => {
     const oauthProxyUrl = config.oauthProxyUrl;
     if (!oauthProxyUrl) return;
@@ -562,9 +601,13 @@ export function LoginPage(): React.JSX.Element {
               onGoogleSignIn={() => {
                 void handleSignIn();
               }}
+              onEmailPasswordSignIn={(email, password) => {
+                void handleEmailPasswordSignIn(email, password);
+              }}
               onDiscordSignIn={
                 config.discordClientId ? handleDiscordSignIn : undefined
               }
+              isEmailPasswordLoading={isEmailLoading}
               isGoogleLoading={isLoading}
               isDiscordLoading={isDiscordLoading}
               isConfiguring={isConfiguring}

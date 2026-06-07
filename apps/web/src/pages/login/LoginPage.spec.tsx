@@ -20,6 +20,8 @@ import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 
 // Shared handle so individual tests can control hydrateSession's return value.
 const mockHydrateSession = jest.fn();
+// Shared handle for the email/password login path (LGN-017).
+const mockLogin = jest.fn();
 
 // ---------------------------------------------------------------------------
 // Module mocks — factories use jest.fn() inline to avoid hoisting/TDZ issues
@@ -55,6 +57,7 @@ let mockAuthConfig: Record<string, unknown> = {};
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({
     config: mockAuthConfig,
+    login: mockLogin,
     loginWithOAuth: jest.fn(),
     hydrateSession: mockHydrateSession,
     error: null,
@@ -119,6 +122,7 @@ let configureSpy: jest.SpyInstance;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockLogin.mockResolvedValue(undefined);
   mockAuthConfig = {
     googleClientId: 'test-client-id',
     oauthProxyUrl: 'http://localhost:5001',
@@ -240,6 +244,27 @@ describe('LoginPage handleSignIn catch block', () => {
       'Google sign-in popup closed by user',
     );
     expect(await screen.findByText('Network request failed')).toBeTruthy();
+  });
+});
+
+describe('LoginPage email/password form (LGN-017)', () => {
+  // This suite renders the real shared AuthCard (tamagui), so it asserts the
+  // form is wired into the page (presence) rather than driving the inputs —
+  // tamagui's controlled <input> does not pick up fireEvent.change values in
+  // jsdom. The form-interaction logic (submit, trim, Enter, disabled-until-
+  // filled) is covered in the shared-components LoginPage spec (which mocks
+  // tamagui), and the web handler → useAuth().login wiring + error handling is
+  // covered in LoginPage.email-password.spec.tsx (which mocks the AuthCard).
+  it('renders the email/password form on the login page', async () => {
+    renderPage();
+    // Let the OAuth configure effect settle so the card is interactive.
+    await waitForSignInButton();
+
+    expect(screen.getByPlaceholderText('you@example.com')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Enter your password')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /sign in with email and password/i }),
+    ).toBeTruthy();
   });
 });
 

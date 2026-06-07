@@ -1,5 +1,14 @@
 import React from 'react';
-import { Button, Card, Spinner, Text, Theme, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  Card,
+  Input,
+  Spinner,
+  Text,
+  Theme,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { BrandIcon } from '../../components/icons';
 
 /**
@@ -12,6 +21,13 @@ const ERROR_AUTO_DISMISS_MS = 8000;
 export interface LoginPageProps {
   /** Called when the user presses the Google sign-in button */
   onGoogleSignIn: () => void;
+  /**
+   * Called with the entered credentials when the user submits the
+   * email/password form. Omit to hide the form entirely (e.g. mobile, which is
+   * OAuth-only). When provided, an email + password form with a "Sign In"
+   * button renders above the OAuth buttons (LGN-017).
+   */
+  onEmailPasswordSignIn?: (email: string, password: string) => void;
   /** Called when the user presses the Discord sign-in button; omit to hide the button */
   onDiscordSignIn?: () => void;
   /**
@@ -19,6 +35,8 @@ export interface LoginPageProps {
    * the button. Required on iOS for App Store guideline 4.8 compliance.
    */
   onAppleSignIn?: () => void;
+  /** Show spinner and disable the Sign In button while an email/password sign-in is in flight */
+  isEmailPasswordLoading?: boolean;
   /** Show spinner and disable the Google button while a Google sign-in is in flight */
   isGoogleLoading?: boolean;
   /** Show spinner and disable the Discord button while a Discord sign-in is in flight */
@@ -41,8 +59,10 @@ export interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   onGoogleSignIn,
+  onEmailPasswordSignIn,
   onDiscordSignIn,
   onAppleSignIn,
+  isEmailPasswordLoading = false,
   isGoogleLoading = false,
   isDiscordLoading = false,
   isAppleLoading = false,
@@ -51,10 +71,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onDismissError,
   style,
 }) => {
-  const anyLoading = isGoogleLoading || isDiscordLoading || isAppleLoading;
+  const anyLoading =
+    isEmailPasswordLoading ||
+    isGoogleLoading ||
+    isDiscordLoading ||
+    isAppleLoading;
   const googleDisabled = anyLoading || isConfiguring;
   const discordDisabled = anyLoading;
   const appleDisabled = anyLoading || isConfiguring;
+
+  // Email/password form state. Lives in the card so consumers only wire a
+  // single onEmailPasswordSignIn(email, password) callback (mirrors the OAuth
+  // button props). The form renders only when that callback is provided.
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+
+  const emailPasswordSubmittable =
+    email.trim().length > 0 && password.length > 0;
+  const emailPasswordDisabled = anyLoading || !emailPasswordSubmittable;
+
+  const handleEmailPasswordSubmit = React.useCallback(() => {
+    if (!onEmailPasswordSignIn) return;
+    const trimmedEmail = email.trim();
+    // Guard against empty submissions and double-submits while a sign-in is in
+    // flight — Enter-to-submit can fire while the button is already disabled.
+    if (anyLoading || !trimmedEmail || !password) return;
+    onEmailPasswordSignIn(trimmedEmail, password);
+  }, [anyLoading, email, password, onEmailPasswordSignIn]);
 
   // Keep the latest dismiss callback in a ref so the auto-dismiss effect only
   // depends on the error text. Consumers commonly pass an inline arrow whose
@@ -123,6 +166,115 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             Use the account you already trust.
           </Text>
         </YStack>
+
+        {/* Email/password form (LGN-017) — only when a handler is provided */}
+        {!!onEmailPasswordSignIn && (
+          <YStack gap="$3" marginBottom="$4">
+            <YStack gap="$2">
+              <Text
+                fontWeight="700"
+                fontSize={10}
+                letterSpacing={0.16}
+                textTransform="uppercase"
+                color="#9caac5"
+              >
+                Email
+              </Text>
+              <Input
+                testID="login-email-input"
+                aria-label="Email"
+                value={email}
+                onChangeText={setEmail}
+                onSubmitEditing={handleEmailPasswordSubmit}
+                disabled={anyLoading}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                placeholder="you@example.com"
+                placeholderTextColor="#6c80ba"
+                height={48}
+                backgroundColor="#0D1526"
+                borderColor="rgba(255,255,255,0.12)"
+                borderWidth={1}
+                borderRadius={12}
+                color="#ffffff"
+                fontSize={14}
+              />
+            </YStack>
+
+            <YStack gap="$2">
+              <Text
+                fontWeight="700"
+                fontSize={10}
+                letterSpacing={0.16}
+                textTransform="uppercase"
+                color="#9caac5"
+              >
+                Password
+              </Text>
+              <Input
+                testID="login-password-input"
+                aria-label="Password"
+                value={password}
+                onChangeText={setPassword}
+                onSubmitEditing={handleEmailPasswordSubmit}
+                disabled={anyLoading}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                placeholder="Enter your password"
+                placeholderTextColor="#6c80ba"
+                height={48}
+                backgroundColor="#0D1526"
+                borderColor="rgba(255,255,255,0.12)"
+                borderWidth={1}
+                borderRadius={12}
+                color="#ffffff"
+                fontSize={14}
+              />
+            </YStack>
+
+            <Button
+              testID="login-email-password-submit"
+              height={52}
+              backgroundColor="#1B3A5C"
+              borderColor="#274d77"
+              borderWidth={1}
+              borderRadius={12}
+              disabled={emailPasswordDisabled}
+              opacity={emailPasswordDisabled ? 0.7 : 1}
+              onPress={handleEmailPasswordSubmit}
+              aria-label="Sign in with email and password"
+              pressStyle={{ backgroundColor: '#16314e' }}
+            >
+              <XStack alignItems="center" justifyContent="center" gap="$3">
+                {isEmailPasswordLoading && (
+                  <Spinner size="small" color="white" />
+                )}
+                <Text color="white" fontWeight="700" fontSize={14}>
+                  {isEmailPasswordLoading ? 'Signing in…' : 'Sign In'}
+                </Text>
+              </XStack>
+            </Button>
+
+            {/* Divider between the form and the OAuth buttons */}
+            <XStack alignItems="center" gap="$3" marginTop="$2">
+              <YStack flex={1} height={1} backgroundColor="#1f2d48" />
+              <Text
+                fontSize={11}
+                letterSpacing={0.12}
+                textTransform="uppercase"
+                color="#6c80ba"
+              >
+                or continue with
+              </Text>
+              <YStack flex={1} height={1} backgroundColor="#1f2d48" />
+            </XStack>
+          </YStack>
+        )}
 
         {/* OAuth buttons */}
         <YStack gap="$3">

@@ -16,6 +16,16 @@ type ButtonProps = Children & {
   ['aria-label']?: string;
 };
 type ViewProps = Children & { testID?: string };
+type InputProps = {
+  value?: string;
+  onChangeText?: (text: string) => void;
+  onSubmitEditing?: () => void;
+  disabled?: boolean;
+  testID?: string;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+  ['aria-label']?: string;
+};
 
 jest.mock('tamagui', () => {
   const PassThrough = ({ children }: Children) => <div>{children}</div>;
@@ -39,6 +49,29 @@ jest.mock('tamagui', () => {
       {children}
     </button>
   );
+  const Input = ({
+    value,
+    onChangeText,
+    onSubmitEditing,
+    disabled,
+    testID,
+    placeholder,
+    secureTextEntry,
+    'aria-label': ariaLabel,
+  }: InputProps) => (
+    <input
+      data-testid={testID}
+      aria-label={ariaLabel}
+      placeholder={placeholder}
+      disabled={!!disabled}
+      type={secureTextEntry ? 'password' : 'text'}
+      value={value ?? ''}
+      onChange={(e) => onChangeText?.(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSubmitEditing?.();
+      }}
+    />
+  );
   return {
     Theme: PassThrough,
     Card: View,
@@ -47,12 +80,129 @@ jest.mock('tamagui', () => {
     Text: ({ children }: Children) => <span>{children}</span>,
     Spinner: () => <span>spinner</span>,
     Button,
+    Input,
   };
 });
 
 jest.mock('../../components/icons', () => ({
   BrandIcon: ({ name }: { name: string }) => <span data-icon={name} />,
 }));
+
+describe('LoginPage email/password form (LGN-017)', () => {
+  it('renders the email/password form when onEmailPasswordSignIn is provided', () => {
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('login-email-input')).toBeTruthy();
+    expect(screen.getByTestId('login-password-input')).toBeTruthy();
+    expect(screen.getByTestId('login-email-password-submit')).toBeTruthy();
+  });
+
+  it('does not render the form when onEmailPasswordSignIn is omitted', () => {
+    render(<LoginPage onGoogleSignIn={jest.fn()} />);
+
+    expect(screen.queryByTestId('login-email-input')).toBeNull();
+    expect(screen.queryByTestId('login-password-input')).toBeNull();
+    expect(screen.queryByTestId('login-email-password-submit')).toBeNull();
+  });
+
+  it('disables the submit button until both fields are filled', () => {
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+      />,
+    );
+
+    const submit = screen.getByTestId('login-email-password-submit');
+    expect(submit.disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId('login-email-input'), {
+      target: { value: 'mgr@test.ls' },
+    });
+    expect(submit.disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId('login-password-input'), {
+      target: { value: 'secret-pass' },
+    });
+    expect(submit.disabled).toBe(false);
+  });
+
+  it('calls onEmailPasswordSignIn with the trimmed email and password on submit', () => {
+    const onEmailPasswordSignIn = jest.fn();
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={onEmailPasswordSignIn}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('login-email-input'), {
+      target: { value: '  mgr@test.ls  ' },
+    });
+    fireEvent.change(screen.getByTestId('login-password-input'), {
+      target: { value: 'secret-pass' },
+    });
+    fireEvent.click(screen.getByTestId('login-email-password-submit'));
+
+    expect(onEmailPasswordSignIn).toHaveBeenCalledTimes(1);
+    expect(onEmailPasswordSignIn).toHaveBeenCalledWith(
+      'mgr@test.ls',
+      'secret-pass',
+    );
+  });
+
+  it('submits when Enter is pressed in the password field', () => {
+    const onEmailPasswordSignIn = jest.fn();
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={onEmailPasswordSignIn}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('login-email-input'), {
+      target: { value: 'mgr@test.ls' },
+    });
+    fireEvent.change(screen.getByTestId('login-password-input'), {
+      target: { value: 'secret-pass' },
+    });
+    fireEvent.keyDown(screen.getByTestId('login-password-input'), {
+      key: 'Enter',
+    });
+
+    expect(onEmailPasswordSignIn).toHaveBeenCalledWith(
+      'mgr@test.ls',
+      'secret-pass',
+    );
+  });
+
+  it('does not submit when the email is only whitespace', () => {
+    const onEmailPasswordSignIn = jest.fn();
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={onEmailPasswordSignIn}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('login-email-input'), {
+      target: { value: '   ' },
+    });
+    fireEvent.change(screen.getByTestId('login-password-input'), {
+      target: { value: 'secret-pass' },
+    });
+    fireEvent.keyDown(screen.getByTestId('login-password-input'), {
+      key: 'Enter',
+    });
+
+    expect(onEmailPasswordSignIn).not.toHaveBeenCalled();
+  });
+});
 
 describe('LoginPage error banner (LGN-027)', () => {
   it('shows a dismiss control that clears the error when onDismissError is provided', () => {
