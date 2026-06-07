@@ -5108,6 +5108,19 @@ export type InitializeMockDraftMutation = {
   } | null;
 };
 
+export type GetMyMockDraftUsageQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetMyMockDraftUsageQuery = {
+  __typename?: 'Query';
+  getMyMockDraftUsage?: {
+    __typename?: 'MockDraftUsage';
+    used?: number | null;
+    limit?: number | null;
+    remaining?: number | null;
+    isUnlimited?: boolean | null;
+  } | null;
+};
+
 export type GetUserTeamIdQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -9112,6 +9125,94 @@ export type InitializeMockDraftMutationResult =
 export type InitializeMockDraftMutationOptions = BaseMutationOptions<
   InitializeMockDraftMutation,
   InitializeMockDraftMutationVariables
+>;
+export const GetMyMockDraftUsage = gql`
+  query GetMyMockDraftUsage {
+    getMyMockDraftUsage {
+      used
+      limit
+      remaining
+      isUnlimited
+    }
+  }
+`;
+
+/**
+ * __useGetMyMockDraftUsageQuery__
+ *
+ * To run a query within a React component, call `useGetMyMockDraftUsageQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyMockDraftUsageQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyMockDraftUsageQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyMockDraftUsageQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >(GetMyMockDraftUsage, options);
+}
+export function useGetMyMockDraftUsageLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >(GetMyMockDraftUsage, options);
+}
+export function useGetMyMockDraftUsageSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyMockDraftUsageQuery,
+        GetMyMockDraftUsageQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyMockDraftUsageQuery,
+    GetMyMockDraftUsageQueryVariables
+  >(
+    GetMyMockDraftUsage,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyMockDraftUsageQuery,
+          GetMyMockDraftUsageQueryVariables
+        >,
+  );
+}
+export type GetMyMockDraftUsageQueryHookResult = ReturnType<
+  typeof useGetMyMockDraftUsageQuery
+>;
+export type GetMyMockDraftUsageLazyQueryHookResult = ReturnType<
+  typeof useGetMyMockDraftUsageLazyQuery
+>;
+export type GetMyMockDraftUsageSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyMockDraftUsageSuspenseQuery
+>;
+export type GetMyMockDraftUsageQueryResult = Apollo.QueryResult<
+  GetMyMockDraftUsageQuery,
+  GetMyMockDraftUsageQueryVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {

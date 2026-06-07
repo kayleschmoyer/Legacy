@@ -43,14 +43,29 @@ jest.mock('../../../utils/analytics', () => ({
   },
 }));
 
-// GraphQL mutation
+// GrowthBook football-mock-players flag — controlled per-test
+const mockUseFeatureIsOn = jest.fn((): boolean => false);
+jest.mock('@growthbook/growthbook-react', () => ({
+  useFeatureIsOn: (): boolean => mockUseFeatureIsOn(),
+}));
+
+// GraphQL mutation + usage query
 const mockInitMutate = jest.fn();
 let mockInitState: { loading: boolean; error?: { message: string } } = {
   loading: false,
   error: undefined,
 };
+interface MockDraftUsage {
+  used: number;
+  limit: number;
+  remaining: number;
+  isUnlimited: boolean;
+}
+let mockUsageData: { getMyMockDraftUsage: MockDraftUsage | null } | undefined =
+  undefined;
 jest.mock('../../../api/db/graphql.generated', () => ({
   useInitializeMockDraftMutation: () => [mockInitMutate, mockInitState],
+  useGetMyMockDraftUsageQuery: () => ({ data: mockUsageData }),
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -59,6 +74,8 @@ describe('MockDraftPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockInitState = { loading: false, error: undefined };
+    mockUsageData = undefined;
+    mockUseFeatureIsOn.mockReturnValue(false);
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
     mockInitMutate.mockResolvedValue({
       data: { initializeMockDraft: { leagueId: 42, draftId: 7 } },
@@ -176,6 +193,51 @@ describe('MockDraftPage', () => {
       };
       render(<MockDraftPage />);
       expect(screen.getByText(/2 mock drafts per week limit/)).toBeTruthy();
+    });
+  });
+
+  describe('football mock option', () => {
+    it('offers the football sport option when the flag is on', () => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+      render(<MockDraftPage />);
+      expect(screen.getByText('🏈 Football')).toBeTruthy();
+      expect(screen.getByText('⚾ Baseball')).toBeTruthy();
+    });
+
+    it('hides the football sport option when the flag is off', () => {
+      mockUseFeatureIsOn.mockReturnValue(false);
+      render(<MockDraftPage />);
+      expect(screen.queryByText('🏈 Football')).toBeNull();
+    });
+  });
+
+  describe('weekly usage label', () => {
+    it('shows the free-tier usage label from the usage query', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 1,
+          limit: 2,
+          remaining: 1,
+          isUnlimited: false,
+        },
+      };
+      render(<MockDraftPage />);
+      expect(
+        screen.getByText('1 of 2 free mock drafts used this week'),
+      ).toBeTruthy();
+    });
+
+    it('omits the usage label for unlimited users', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 5,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: true,
+        },
+      };
+      render(<MockDraftPage />);
+      expect(screen.queryByText(/free mock drafts used this week/)).toBeNull();
     });
   });
 

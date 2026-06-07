@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
+import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { Button, H1, ScrollView, Text, YStack } from 'tamagui';
 import {
   type MockDraftSettings,
   MockDraftSetup,
 } from '@legacy-sports/shared-components/draft';
-import { useInitializeMockDraftMutation } from '../../../api/db/graphql.generated';
+import {
+  useGetMyMockDraftUsageQuery,
+  useInitializeMockDraftMutation,
+} from '../../../api/db/graphql.generated';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
 
 const BRAND_GOLD = '#B8962E';
+
+/**
+ * GrowthBook flag key that gates the football sport option (ADR 0011 §4,
+ * LS-4666). Mirrors web's `FOOTBALL_MOCK_PLAYERS_FLAG`; when off, only
+ * baseball is offered.
+ */
+const FOOTBALL_MOCK_PLAYERS_FLAG = 'football-mock-players';
 
 // Pick-time limit mirrors the web Mock Draft Simulator (90s per pick).
 const PICK_TIME_LIMIT_SECONDS = 90;
@@ -73,13 +84,32 @@ function PremiumUpsell(): React.JSX.Element {
 export function MockDraftPage(): React.JSX.Element {
   const router = useRouter();
   const { isPremium, loading: subscriptionLoading } = useSubscription();
+  const footballMockEnabled = useFeatureIsOn(FOOTBALL_MOCK_PLAYERS_FLAG);
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
   const [missingLeagueIdError, setMissingLeagueIdError] = useState<
     string | null
   >(null);
 
+  // Weekly free-tier usage, mirroring web's usage label. `cache-and-network`
+  // keeps the count fresh when the user returns to start another draft.
+  const { data: usageData } = useGetMyMockDraftUsageQuery({
+    fetchPolicy: 'cache-and-network',
+  });
+  const usage = usageData?.getMyMockDraftUsage;
+  const usageLabel =
+    usage != null &&
+    usage.isUnlimited !== true &&
+    usage.used != null &&
+    usage.limit != null
+      ? `${usage.used} of ${usage.limit} free mock drafts used this week`
+      : undefined;
+
   const handleStart = async (settings: MockDraftSettings) => {
+    // Football mock draft is preview-only until the sport-aware engine ships
+    // (LS-4657 → LS-4665); the shared form keeps Start disabled, but guard here
+    // too so the mutation is never fired for football.
+    if (settings.sport === 'football') return;
     setMissingLeagueIdError(null);
     const result = await initializeMockDraft({
       variables: {
@@ -130,6 +160,8 @@ export function MockDraftPage(): React.JSX.Element {
           onCancel={() => router.navigate('/baseball')}
           loading={loading}
           error={errorMessage}
+          footballMockEnabled={footballMockEnabled}
+          usageLabel={usageLabel}
           header={showUpsell ? <PremiumUpsell /> : null}
         />
 

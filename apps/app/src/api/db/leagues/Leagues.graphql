@@ -190,3 +190,12 @@ mutation InitializeMockDraft(
     draftId
   }
 }
+
+query GetMyMockDraftUsage {
+  getMyMockDraftUsage {
+    used
+    limit
+    remaining
+    isUnlimited
+  }
+}
