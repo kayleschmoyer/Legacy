@@ -314,20 +314,6 @@ unauthTest.describe(
     );
 
     unauthTest(
-      '"Get Started Free" CTA is visible and interactive on /games/season-draft/create for unauthenticated users',
-      async ({ page }) => {
-        await page.goto('/games/season-draft/create');
-        await page.waitForLoadState('load');
-
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-      },
-    );
-
-    unauthTest(
       '"Continue with Discord" button is visible on /games/season-draft/create when unauthenticated',
       async ({ page }) => {
         await page.goto('/games/season-draft/create');
@@ -356,8 +342,11 @@ unauthTest.describe(
 // ---------------------------------------------------------------------------
 // LS-3540 / LS-3541 / LS-3489: /games/season-draft is a protected route.
 // Unauthenticated users visiting it are intercepted by EnhancedAuthGuard and
-// shown PublicLandingPage with the "Continue with Google" and "Continue with
-// Discord" sign-in CTAs and a "Get Started Free" CTA lower down. An automated
+// shown the auth-guard login card with the "Continue with Google" and
+// "Continue with Discord" sign-in CTAs. (The ambiguous "Get Started Free"
+// label that silently selected Google — OBD-002 / LS-6915 — was reworked into
+// these explicit buttons; the stale "Get Started Free" cases were removed in
+// LS-7785.) An automated
 // audit crawler reported this as a 404 (evidence shows the landing page content
 // — "Build Your Dynasty" — instead of the expected season-draft lobby) and a
 // CSS-selector parse error when trying to click "Continue with Google" via
@@ -402,44 +391,6 @@ unauthTest.describe(
         // regression coverage for the original crawler failure where the
         // invalid `(button:visible, [role="button"]:visible)` selector was used.
         await googleBtn.click();
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA is visible and interactive on /games/season-draft for unauthenticated users',
-      async ({ page }) => {
-        await page.goto('/games/season-draft');
-        await page.waitForLoadState('load');
-
-        // The auth guard shows the PublicLandingPage on /games/season-draft
-        // for unauthenticated users. The CTA (aria-label="Get started free")
-        // must be present and enabled so visitors can initiate sign-up from
-        // /games/season-draft. No .first() — the landing page exposes a single
-        // "Get started free" CTA, so Playwright strictness will catch
-        // accidental duplicates.
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA on /games/season-draft is clickable via getByRole (LS-3490)',
-      async ({ page }) => {
-        await page.goto('/games/season-draft');
-        await page.waitForLoadState('load');
-
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-        // Regression for LS-3490: confirm the click resolves without the
-        // CSS selector parse error caused by the broken crawler selector
-        // `(button:visible, [role="button"]:visible)`.
-        await getStartedBtn.click();
       },
     );
 

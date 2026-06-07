@@ -114,20 +114,23 @@ unauthTest.describe('Public Landing Page accessibility @regression', () => {
     },
   );
 
-  // LS-3471: a functional scanner reported that clicking the "Get Started
-  // Free" CTA on "/" produced no action. Root cause was the scanner's own
-  // invalid selector `(button:visible, [role="button"]:visible)` failing to
-  // parse — the button itself is wired to handleSignIn. Lock in that the CTA
-  // is reachable via a valid accessible-name locator and is clickable.
+  // LS-3471 / LS-7785: a functional scanner reported that clicking the
+  // unauthenticated sign-in CTA on "/" produced no action. Root cause was the
+  // scanner's own invalid selector `(button:visible, [role="button"]:visible)`
+  // failing to parse — the button itself is wired to handleSignIn. The CTA has
+  // since been reworked from the ambiguous "Get Started Free" label (which
+  // silently selected Google — OBD-002 / LS-6915) to the explicit "Continue
+  // with Google" button rendered by the auth-guard login card. Lock in that the
+  // CTA is reachable via a valid accessible-name locator and is clickable.
   unauthTest(
-    '"Get Started Free" CTA on / is reachable and clickable (LS-3471)',
+    '"Continue with Google" CTA on / is reachable and clickable (LS-3471, LS-7785)',
     async ({ page }) => {
-      const getStartedBtn = page
-        .getByRole('button', { name: /get started free/i })
+      const googleBtn = page
+        .getByRole('button', { name: /continue with google/i })
         .first();
-      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-      await expect(getStartedBtn).toBeEnabled();
-      await getStartedBtn.click();
+      await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+      await expect(googleBtn).toBeEnabled();
+      await googleBtn.click();
     },
   );
 });

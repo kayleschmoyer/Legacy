@@ -391,11 +391,14 @@ test.describe('Mock Draft Simulator @regression', () => {
 // LS-3485: /baseball/mock-draft is a protected route. Unauthenticated users
 // visiting /baseball/mock-draft are intercepted by EnhancedAuthGuard and shown
 // PublicLandingPage with the "Build Your Dynasty" headline, "Season 2026"
-// badge, and "Continue with Google" / "Continue with Discord" / "Get Started
-// Free" CTAs. The original automated scanner tried to locate the button with
-// the invalid CSS selector `(button:visible, [role="button"]:visible)`, which
-// throws a parse error. These tests lock in the expected unauthenticated
-// rendering and confirm every CTA is reachable via getByRole.
+// badge, and "Continue with Google" / "Continue with Discord" sign-in CTAs.
+// (The ambiguous "Get Started Free" label that silently selected Google —
+// OBD-002 / LS-6915 — was reworked into these explicit buttons; the stale
+// "Get Started Free" cases were removed in LS-7785.) The original automated
+// scanner tried to locate the button with the invalid CSS selector
+// `(button:visible, [role="button"]:visible)`, which throws a parse error.
+// These tests lock in the expected unauthenticated rendering and confirm every
+// CTA is reachable via getByRole.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
@@ -463,30 +466,6 @@ unauthTest.describe(
         await expect(discordBtn).toBeVisible({ timeout: 15_000 });
         await expect(discordBtn).toBeEnabled();
         await discordBtn.click({ noWaitAfter: true });
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA on /baseball/mock-draft is visible when unauthenticated (LS-3485)',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('button', { name: /get started free/i }),
-        ).toBeVisible({ timeout: 15_000 });
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA on /baseball/mock-draft is clickable via getByRole (LS-3485)',
-      async ({ page }) => {
-        // Regression for LS-3485: confirm the click resolves without the
-        // CSS selector parse error caused by the broken crawler selector
-        // `(button:visible, [role="button"]:visible)`.
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-        await getStartedBtn.click();
       },
     );
   },

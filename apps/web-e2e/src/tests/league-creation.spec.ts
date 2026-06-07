@@ -428,56 +428,17 @@ test.describe('League Creation @critical', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Unauthenticated visitor regression (LS-3477)
+// Unauthenticated visitor regression (LS-3477 → LS-7785)
 //
 // /baseball/league/create is a protected route. Unauthenticated visitors are
-// intercepted by EnhancedAuthGuard and shown the PublicLandingPage with a
-// "Get Started Free" CTA. An automated audit crawler reported that clicking
-// this CTA had no visible effect — the evidence shows a CSS-selector parse
-// error from the invalid `(button:visible, [role="button"]:visible)` selector.
-// These tests use getByRole (accessible name) to lock in that the CTA is
-// present, enabled, and clickable for unauthenticated visitors.
+// intercepted by EnhancedAuthGuard and shown the auth-guard login card. The
+// original LS-3477 tests asserted a "Get Started Free" CTA, but that ambiguous
+// label (which silently selected Google — OBD-002 / LS-6915) was reworked into
+// the explicit "Continue with Google" / "Continue with Discord" sign-in buttons.
+// Those buttons are already covered by the LS-3475 describe below on this exact
+// route, so the stale "Get Started Free" cases were removed in LS-7785 rather
+// than duplicated.
 // ─────────────────────────────────────────────────────────────────────────────
-
-unauthTest.describe(
-  'League Create — unauthenticated visitor @regression',
-  () => {
-    unauthTest(
-      '"Get Started Free" CTA is visible and interactive on /baseball/league/create for unauthenticated users',
-      async ({ page }) => {
-        await page.goto('/baseball/league/create');
-        await page.waitForLoadState('load');
-
-        // The auth guard shows the PublicLandingPage for unauthenticated users.
-        // The CTA must be present and enabled so visitors can initiate sign-up
-        // from this protected route.
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA on /baseball/league/create is clickable via getByRole (LS-3477)',
-      async ({ page }) => {
-        await page.goto('/baseball/league/create');
-        await page.waitForLoadState('load');
-
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-        // Regression for LS-3477: confirm the click resolves without the
-        // CSS selector parse error caused by the broken crawler selector
-        // `(button:visible, [role="button"]:visible)`.
-        await getStartedBtn.click();
-      },
-    );
-  },
-);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unauthenticated visitor regression (LS-3475)
