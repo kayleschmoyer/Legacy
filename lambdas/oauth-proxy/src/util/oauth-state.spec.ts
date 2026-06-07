@@ -5,6 +5,8 @@ import {
   encodeOauthState,
   generateOauthState,
   OAUTH_STATE_COOKIE,
+  OAUTH_STATE_COOKIE_LINK,
+  OAUTH_STATE_COOKIE_LOGIN,
   parseOauthStateFromCookies,
   verifyOauthState,
 } from './oauth-state';
@@ -157,6 +159,63 @@ describe('oauth-state', () => {
 
     it('returns true when token matches cookie', () => {
       expect(verifyOauthState('abc123', cookieFor('abc123'))).toBe(true);
+    });
+  });
+
+  // LS-6661: the Discord sign-in and account-link flows share one authorize
+  // endpoint but must bind to separate state cookies so concurrent tabs don't
+  // clobber each other. The helpers accept a flow-specific cookie name.
+  describe('flow-specific cookie names (LS-6661)', () => {
+    it('exposes distinct login and link cookie names', () => {
+      expect(OAUTH_STATE_COOKIE_LOGIN).toBe('ls_oauth_state_login');
+      expect(OAUTH_STATE_COOKIE_LINK).toBe('ls_oauth_state_link');
+      expect(OAUTH_STATE_COOKIE_LOGIN).not.toBe(OAUTH_STATE_COOKIE_LINK);
+    });
+
+    it('buildOauthStateCookie uses the provided cookie name', () => {
+      expect(buildOauthStateCookie('tok', OAUTH_STATE_COOKIE_LINK)).toContain(
+        'ls_oauth_state_link=tok',
+      );
+      expect(buildOauthStateCookie('tok', OAUTH_STATE_COOKIE_LOGIN)).toContain(
+        'ls_oauth_state_login=tok',
+      );
+    });
+
+    it('buildClearOauthStateCookie clears the named cookie only', () => {
+      const cleared = buildClearOauthStateCookie(OAUTH_STATE_COOKIE_LINK);
+      expect(cleared).toContain('ls_oauth_state_link=');
+      expect(cleared).toContain('Max-Age=0');
+    });
+
+    it('parseOauthStateFromCookies reads the named cookie, ignoring the other flow', () => {
+      const header =
+        'ls_oauth_state_login=logintok; ls_oauth_state_link=linktok';
+      expect(parseOauthStateFromCookies(header, OAUTH_STATE_COOKIE_LOGIN)).toBe(
+        'logintok',
+      );
+      expect(parseOauthStateFromCookies(header, OAUTH_STATE_COOKIE_LINK)).toBe(
+        'linktok',
+      );
+      // The legacy shared name is absent in this header.
+      expect(parseOauthStateFromCookies(header, OAUTH_STATE_COOKIE)).toBeNull();
+    });
+
+    it('verifyOauthState matches against the named cookie only (no cross-flow match)', () => {
+      const header =
+        'ls_oauth_state_login=logintok; ls_oauth_state_link=linktok';
+      expect(
+        verifyOauthState('logintok', header, OAUTH_STATE_COOKIE_LOGIN),
+      ).toBe(true);
+      expect(verifyOauthState('linktok', header, OAUTH_STATE_COOKIE_LINK)).toBe(
+        true,
+      );
+      // A login token must not validate against the link cookie and vice versa.
+      expect(
+        verifyOauthState('logintok', header, OAUTH_STATE_COOKIE_LINK),
+      ).toBe(false);
+      expect(
+        verifyOauthState('linktok', header, OAUTH_STATE_COOKIE_LOGIN),
+      ).toBe(false);
     });
   });
 });

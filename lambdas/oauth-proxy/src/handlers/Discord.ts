@@ -29,6 +29,8 @@ import {
   buildClearOauthStateCookie,
   buildOauthStateCookie,
   generateOauthState,
+  OAUTH_STATE_COOKIE_LINK,
+  OAUTH_STATE_COOKIE_LOGIN,
   verifyOauthState,
 } from '../util/oauth-state';
 import { withDbClient } from '../util/db';
@@ -332,14 +334,25 @@ function requireCsrf(event: APIGatewayEvent): APIGatewayProxyResult | null {
  *
  * Query string:
  * - `link=1` (optional): the caller is the account-link flow rather than
- *   sign-in. Currently informational; the same Discord client is used.
+ *   sign-in. This selects which flow-specific state cookie is set
+ *   (`ls_oauth_state_link` vs `ls_oauth_state_login`) so a sign-in tab and a
+ *   link tab open at the same time do not clobber each other's state (LS-6661).
  */
 export const handleDiscordAuthorize = (
-  _event: APIGatewayEvent,
+  event: APIGatewayEvent,
 ): APIGatewayProxyResult => {
   const clientId = getDiscordClientId();
   const redirectUri = getDiscordRedirectUri();
   const state = generateOauthState();
+
+  // The link flow and the sign-in flow share this authorize endpoint but post
+  // their callbacks to different handlers. Bind each to its own state cookie so
+  // concurrent tabs don't overwrite one another (last-write-wins → "Invalid
+  // OAuth state" on the first callback). `link=1` selects the link flow.
+  const isLink = event.queryStringParameters?.['link'] === '1';
+  const stateCookieName = isLink
+    ? OAUTH_STATE_COOKIE_LINK
+    : OAUTH_STATE_COOKIE_LOGIN;
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -352,13 +365,15 @@ export const handleDiscordAuthorize = (
 
   const authorizeUrl = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
 
-  LOGGER.debug('Redirecting to Discord OAuth (state bound to browser)');
+  LOGGER.debug('Redirecting to Discord OAuth (state bound to browser)', {
+    flow: isLink ? 'link' : 'login',
+  });
 
   return {
     statusCode: 302,
     headers: { Location: authorizeUrl },
     multiValueHeaders: {
-      'Set-Cookie': [buildOauthStateCookie(state)],
+      'Set-Cookie': [buildOauthStateCookie(state, stateCookieName)],
     },
     body: '',
   };
@@ -553,8 +568,10 @@ export const handleDiscordAuth = async (
   const requestCookieHeader =
     event.headers?.['Cookie'] ?? event.headers?.['cookie'];
 
-  // Single-use: clear the state cookie on every response.
-  const clearState = buildClearOauthStateCookie();
+  // Single-use: clear the login state cookie on every response. Scoped to the
+  // login flow's cookie so a concurrent link tab's state cookie is untouched
+  // (LS-6661).
+  const clearState = buildClearOauthStateCookie(OAUTH_STATE_COOKIE_LOGIN);
 
   if (!body.code) {
     return withClearStateCookie(
@@ -563,7 +580,9 @@ export const handleDiscordAuth = async (
     );
   }
 
-  if (!verifyOauthState(body.state, requestCookieHeader)) {
+  if (
+    !verifyOauthState(body.state, requestCookieHeader, OAUTH_STATE_COOKIE_LOGIN)
+  ) {
     LOGGER.warn('Discord OAuth rejected: state mismatch');
     return withClearStateCookie(
       errorResponse(400, 'Invalid OAuth state — please retry sign-in'),
@@ -615,7 +634,9 @@ export const handleDiscordLink = async (
   };
   const requestCookieHeader =
     event.headers?.['Cookie'] ?? event.headers?.['cookie'];
-  const clearState = buildClearOauthStateCookie();
+  // Scoped to the link flow's cookie so a concurrent sign-in tab's state
+  // cookie is untouched (LS-6661).
+  const clearState = buildClearOauthStateCookie(OAUTH_STATE_COOKIE_LINK);
 
   if (!body.code) {
     return withClearStateCookie(
@@ -624,7 +645,9 @@ export const handleDiscordLink = async (
     );
   }
 
-  if (!verifyOauthState(body.state, requestCookieHeader)) {
+  if (
+    !verifyOauthState(body.state, requestCookieHeader, OAUTH_STATE_COOKIE_LINK)
+  ) {
     LOGGER.warn('Discord link rejected: state mismatch');
     return withClearStateCookie(
       errorResponse(400, 'Invalid OAuth state — please retry linking'),

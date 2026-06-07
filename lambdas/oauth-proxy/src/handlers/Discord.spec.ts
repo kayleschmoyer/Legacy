@@ -67,12 +67,18 @@ jest.mock('../util/jwt-cookie', () => ({
 }));
 
 jest.mock('../util/oauth-state', () => ({
-  buildOauthStateCookie: jest.fn().mockReturnValue('ls_oauth_state=stub'),
-  buildClearOauthStateCookie: jest
-    .fn()
-    .mockReturnValue('ls_oauth_state=; Max-Age=0'),
+  // Reflect the flow-specific cookie name (2nd/1st arg) in the returned
+  // Set-Cookie so tests can assert each flow scopes to its own cookie.
+  buildOauthStateCookie: jest.fn(
+    (_token: string, name = 'ls_oauth_state') => `${name}=stub`,
+  ),
+  buildClearOauthStateCookie: jest.fn(
+    (name = 'ls_oauth_state') => `${name}=; Max-Age=0`,
+  ),
   generateOauthState: jest.fn().mockReturnValue('mock-state-token'),
   verifyOauthState: jest.fn(),
+  OAUTH_STATE_COOKIE_LOGIN: 'ls_oauth_state_login',
+  OAUTH_STATE_COOKIE_LINK: 'ls_oauth_state_link',
 }));
 
 jest.mock('../util/discord', () => ({
@@ -329,8 +335,12 @@ describe('handleDiscordAuth', () => {
 
     expect(result.statusCode).toBe(200);
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    // Clears the login-flow cookie specifically — a concurrent link tab's
+    // cookie must be left untouched (LS-6661).
     expect(setCookies).toEqual(
-      expect.arrayContaining([expect.stringContaining('ls_oauth_state=')]),
+      expect.arrayContaining([
+        expect.stringContaining('ls_oauth_state_login='),
+      ]),
     );
     // Specifically the clearing cookie (Max-Age=0)
     expect((setCookies as string[]).some((c) => c.includes('Max-Age=0'))).toBe(
@@ -338,18 +348,20 @@ describe('handleDiscordAuth', () => {
     );
   });
 
-  it('passes state to verifyOauthState along with the request Cookie header', async () => {
+  it('verifies and clears only the login-flow state cookie (LS-6661)', async () => {
     mockGetUserByDiscordId.mockResolvedValue(mockUser);
     mockLinkDiscordAccount.mockResolvedValue(mockUser);
 
     const event = makeEvent({ code: 'auth-code', state: 'tok-from-discord' });
-    event.headers = { Cookie: 'ls_oauth_state=tok-from-discord' };
+    event.headers = { Cookie: 'ls_oauth_state_login=tok-from-discord' };
 
     await handleDiscordAuth(event);
 
+    // Verifies against the login cookie name (3rd arg), not the shared/link one.
     expect(mockVerifyOauthState).toHaveBeenCalledWith(
       'tok-from-discord',
-      'ls_oauth_state=tok-from-discord',
+      'ls_oauth_state_login=tok-from-discord',
+      'ls_oauth_state_login',
     );
   });
 });
@@ -475,7 +487,7 @@ describe('handleDiscordAuthorize', () => {
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
   });
 
-  it('302s to Discord with the generated state and sets the state cookie', () => {
+  it('302s to Discord with the generated state and sets the login-flow state cookie by default', () => {
     const event = makeEvent({});
 
     const result = handleDiscordAuthorize(event);
@@ -492,8 +504,28 @@ describe('handleDiscordAuthorize', () => {
     );
     expect(location).toContain('scope=identify+email');
 
+    // Default (no link=1) binds the sign-in flow cookie (LS-6661).
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
-    expect(setCookies).toEqual(expect.arrayContaining(['ls_oauth_state=stub']));
+    expect(setCookies).toEqual(
+      expect.arrayContaining(['ls_oauth_state_login=stub']),
+    );
+  });
+
+  it('sets the link-flow state cookie when link=1 is present (LS-6661)', () => {
+    const event = makeEvent({});
+    event.queryStringParameters = { link: '1' };
+
+    const result = handleDiscordAuthorize(event);
+
+    expect(result.statusCode).toBe(302);
+    const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    expect(setCookies).toEqual(
+      expect.arrayContaining(['ls_oauth_state_link=stub']),
+    );
+    // Must NOT also set the login cookie — that would reintroduce the collision.
+    expect(setCookies).not.toEqual(
+      expect.arrayContaining(['ls_oauth_state_login=stub']),
+    );
   });
 });
 
@@ -547,6 +579,35 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
 
     expect(result.statusCode).toBe(200);
     expect(mockLinkDiscordAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('verifies and clears only the link-flow state cookie (LS-6661)', async () => {
+    mockVerifyOauthState.mockReturnValue(true);
+    mockGetUserByDiscordId.mockResolvedValue(null);
+    mockGetUserById.mockResolvedValue({ ...mockUser, id: 42, discordId: null });
+    mockLinkDiscordAccount.mockResolvedValue({ ...mockUser, id: 42 });
+
+    const event = makeEvent({ code: 'auth-code', state: 'link-tok' });
+    event.headers = {
+      Cookie: 'ls_oauth_state_link=link-tok',
+      'x-csrf-token': 'csrf',
+    };
+
+    const result = await handleDiscordLink(event);
+
+    expect(result.statusCode).toBe(200);
+    // Verifies against the link cookie name (3rd arg), not the shared/login one.
+    expect(mockVerifyOauthState).toHaveBeenCalledWith(
+      'link-tok',
+      'ls_oauth_state_link=link-tok',
+      'ls_oauth_state_link',
+    );
+    // Clears the link-flow cookie specifically — a concurrent sign-in tab's
+    // cookie must be left untouched.
+    const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    expect(setCookies).toEqual(
+      expect.arrayContaining([expect.stringContaining('ls_oauth_state_link=')]),
+    );
   });
 });
 

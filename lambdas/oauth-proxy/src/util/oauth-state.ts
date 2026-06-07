@@ -4,8 +4,29 @@ import { randomBytes, timingSafeEqual } from 'crypto';
  * Cookie that stores the OAuth CSRF state token. Bound to the browser
  * that initiated the flow; verified on the callback (or token POST) to
  * prevent OAuth login CSRF / session-fixation.
+ *
+ * This is the default/shared name. Flows that can run concurrently in
+ * separate browser tabs against the same authorize endpoint must use a
+ * flow-specific name so their state cookies do not clobber each other —
+ * see {@link OAUTH_STATE_COOKIE_LOGIN} / {@link OAUTH_STATE_COOKIE_LINK}.
  */
 export const OAUTH_STATE_COOKIE = 'ls_oauth_state';
+
+/**
+ * Flow-specific state cookie for the Discord *sign-in* flow
+ * (`/oauth/discord/authorize` without `link=1` → `/oauth/discord`).
+ * Distinct from {@link OAUTH_STATE_COOKIE_LINK} so a sign-in tab and a
+ * link tab open at the same time do not overwrite each other's state
+ * (LS-6661).
+ */
+export const OAUTH_STATE_COOKIE_LOGIN = 'ls_oauth_state_login';
+
+/**
+ * Flow-specific state cookie for the Discord *account-link* flow
+ * (`/oauth/discord/authorize?link=1` → `/oauth/discord/link`). Distinct
+ * from {@link OAUTH_STATE_COOKIE_LOGIN} (LS-6661).
+ */
+export const OAUTH_STATE_COOKIE_LINK = 'ls_oauth_state_link';
 
 /** 10 minutes — matches typical OAuth authorize-to-callback budget. */
 export const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
@@ -71,25 +92,39 @@ function stateCookieAttrs(): string {
 /**
  * Build the Set-Cookie value that pins the CSRF state token to the initiating
  * browser. HttpOnly so JS cannot read it (defense in depth against XSS).
+ *
+ * `cookieName` defaults to the shared {@link OAUTH_STATE_COOKIE}; pass a
+ * flow-specific name (e.g. {@link OAUTH_STATE_COOKIE_LOGIN}) when the flow can
+ * run concurrently with another in a separate tab.
  */
-export function buildOauthStateCookie(csrfToken: string): string {
-  return `${OAUTH_STATE_COOKIE}=${csrfToken}; HttpOnly; ${stateCookieAttrs()}; Max-Age=${OAUTH_STATE_MAX_AGE_SECONDS}`;
+export function buildOauthStateCookie(
+  csrfToken: string,
+  cookieName: string = OAUTH_STATE_COOKIE,
+): string {
+  return `${cookieName}=${csrfToken}; HttpOnly; ${stateCookieAttrs()}; Max-Age=${OAUTH_STATE_MAX_AGE_SECONDS}`;
 }
 
 /**
  * Build the Set-Cookie value that clears the state cookie. Emitted on both
  * success and failure of the callback so the token is single-use.
+ *
+ * `cookieName` must match the name used when the cookie was set.
  */
-export function buildClearOauthStateCookie(): string {
-  return `${OAUTH_STATE_COOKIE}=; HttpOnly; ${stateCookieAttrs()}; Max-Age=0`;
+export function buildClearOauthStateCookie(
+  cookieName: string = OAUTH_STATE_COOKIE,
+): string {
+  return `${cookieName}=; HttpOnly; ${stateCookieAttrs()}; Max-Age=0`;
 }
 
 /**
  * Read the CSRF state value out of the request Cookie header.
  * Returns null if the cookie is absent.
+ *
+ * `cookieName` must match the name used when the cookie was set.
  */
 export function parseOauthStateFromCookies(
   cookieHeader: string | undefined,
+  cookieName: string = OAUTH_STATE_COOKIE,
 ): string | null {
   if (!cookieHeader) return null;
   const parts = cookieHeader.split(';');
@@ -98,7 +133,7 @@ export function parseOauthStateFromCookies(
     const eq = trimmed.indexOf('=');
     if (eq === -1) continue;
     const name = trimmed.slice(0, eq);
-    if (name !== OAUTH_STATE_COOKIE) continue;
+    if (name !== cookieName) continue;
     const value = trimmed.slice(eq + 1);
     return value || null;
   }
@@ -108,13 +143,17 @@ export function parseOauthStateFromCookies(
 /**
  * Constant-time compare of the received CSRF token against the cookie value.
  * Returns true only when both are non-empty and equal.
+ *
+ * `cookieName` selects which state cookie to verify against — pass the
+ * flow-specific name so concurrent flows verify their own binding.
  */
 export function verifyOauthState(
   receivedCsrfToken: string | undefined | null,
   cookieHeader: string | undefined,
+  cookieName: string = OAUTH_STATE_COOKIE,
 ): boolean {
   if (!receivedCsrfToken) return false;
-  const cookieValue = parseOauthStateFromCookies(cookieHeader);
+  const cookieValue = parseOauthStateFromCookies(cookieHeader, cookieName);
   if (!cookieValue) return false;
   if (receivedCsrfToken.length !== cookieValue.length) return false;
   try {
