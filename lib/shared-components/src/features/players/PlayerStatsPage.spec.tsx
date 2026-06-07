@@ -1,6 +1,7 @@
 import {
   type ClearFiltersSetters,
   createClearFiltersHandler,
+  stepValue,
 } from './PlayerStatsPage';
 
 // Unit tests for the EmptyCard "Clear all filters" reset path introduced in
@@ -107,5 +108,37 @@ describe('createClearFiltersHandler (LS-4613)', () => {
     expect(first.calls.setSearch).toEqual(['']);
 
     expect(applyFilters).toHaveBeenCalledTimes(2);
+  });
+});
+
+// stepValue powers the native −/+ range stepper (LS-7806). It must snap to the
+// step grid, clamp to range, and stay free of floating-point drift on
+// fractional steps so the committed filter values match the web slider exactly.
+describe('stepValue (LS-7806)', () => {
+  it('increments by a whole step within range', () => {
+    expect(stepValue(10, 1, 0, 75, 1)).toBe(11);
+  });
+
+  it('decrements by a whole step within range', () => {
+    expect(stepValue(10, -1, 0, 75, 1)).toBe(9);
+  });
+
+  it('clamps to the maximum', () => {
+    expect(stepValue(75, 1, 0, 75, 1)).toBe(75);
+  });
+
+  it('clamps to the minimum', () => {
+    expect(stepValue(0, -1, 0, 75, 1)).toBe(0);
+  });
+
+  it('snaps fractional batting-average steps without floating drift', () => {
+    // 0.005 increments are the classic float-drift case (0.1 + 0.2 !== 0.3).
+    expect(stepValue(0.295, 0.005, 0, 0.43, 0.005)).toBe(0.3);
+    expect(stepValue(0.3, -0.005, 0, 0.43, 0.005)).toBe(0.295);
+  });
+
+  it('snaps ERA steps and clamps to the off-sentinel maximum', () => {
+    expect(stepValue(4.95, 0.05, 0.5, 5, 0.05)).toBe(5);
+    expect(stepValue(0.5, -0.05, 0.5, 5, 0.05)).toBe(0.5);
   });
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, TextInput } from 'react-native';
+import { Modal, Pressable, ScrollView, TextInput } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 import { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
@@ -157,6 +157,27 @@ export function createClearFiltersHandler(
     applyFilters();
     onClearFilters?.();
   };
+}
+
+/**
+ * Advances a numeric range value by `delta` steps, snapping to the `step` grid
+ * and clamping to `[min, max]`. Snapping avoids floating-point drift on
+ * fractional steps (e.g. batting-average 0.005 increments). Extracted as a pure
+ * function so the native stepper's arithmetic is unit-testable without mounting
+ * the page (LS-7806).
+ */
+export function stepValue(
+  value: number,
+  delta: number,
+  min: number,
+  max: number,
+  step: number,
+): number {
+  const next = value + delta;
+  const snapped = Math.round(next / step) * step;
+  const clamped = Math.min(max, Math.max(min, snapped));
+  // Re-snap after clamping so min/max that aren't on the step grid stay exact.
+  return Number(clamped.toFixed(6));
 }
 
 export interface PlayerStatsPageProps {
@@ -859,7 +880,17 @@ export function PlayerStatsPage({
                   </option>
                 ))}
               </select>
-            ) : null}
+            ) : (
+              <NativeSelect
+                label="Position"
+                value={position}
+                options={POSITIONS}
+                onChange={(next) => {
+                  setPosition(next);
+                  setAppliedFilters((cur) => ({ ...cur, position: next }));
+                }}
+              />
+            )}
             {Platform.OS === 'web' && (
               <Text
                 style={{
@@ -917,7 +948,17 @@ export function PlayerStatsPage({
                   </option>
                 ))}
               </select>
-            ) : null}
+            ) : (
+              <NativeSelect
+                label="Team"
+                value={team}
+                options={MLB_TEAMS}
+                onChange={(next) => {
+                  setTeam(next);
+                  setAppliedFilters((cur) => ({ ...cur, team: next }));
+                }}
+              />
+            )}
             {Platform.OS === 'web' && (
               <Text
                 style={{
@@ -975,7 +1016,18 @@ export function PlayerStatsPage({
                   </option>
                 ))}
               </select>
-            ) : null}
+            ) : (
+              <NativeSelect
+                label="Rows"
+                value={String(pageSize)}
+                options={['10', '25', '50', '100']}
+                onChange={(next) => {
+                  const n = Number(next);
+                  setPageSize(n);
+                  setAppliedFilters((cur) => ({ ...cur, pageSize: n }));
+                }}
+              />
+            )}
             {Platform.OS === 'web' && (
               <Text
                 style={{
@@ -1594,7 +1646,17 @@ function StatSlider({
           onTouchEnd={onCommit}
           onKeyUp={onCommit}
         />
-      ) : null}
+      ) : (
+        <NativeRangeStepper
+          label={label}
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={onChange}
+          onCommit={onCommit}
+        />
+      )}
       <XStack justifyContent="space-between">
         <Text
           style={{
@@ -1616,5 +1678,267 @@ function StatSlider({
         </Text>
       </XStack>
     </YStack>
+  );
+}
+
+// ── Native filter controls ─────────────────────────────────────────────────────
+// Web renders inline `<select>` / range `<input>`; these are the cross-platform
+// equivalents rendered under `Platform.OS !== 'web'` so native reaches filter
+// parity without forking the page or pulling in a slider/picker dependency.
+
+interface NativeSelectProps {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
+}
+
+/**
+ * Native (iOS/Android) replacement for the web `<select>`. Shows the current
+ * value with a chevron and opens a bottom-sheet option list on tap. The parent
+ * field already renders the `{label}` caption, so this only owns the value and
+ * the picker (LS-7806).
+ */
+function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${value}`}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          minHeight: 24,
+        }}
+      >
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            fontFamily: FONT_BODY,
+            fontSize: 14,
+            color: TEXT_PRIMARY,
+          }}
+        >
+          {value}
+        </Text>
+        <Text style={{ color: FG3, fontSize: 12 }}>▾</Text>
+      </Pressable>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={close}
+      >
+        <Pressable
+          onPress={close}
+          accessibilityRole="button"
+          accessibilityLabel={`Close ${label} picker`}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          {/* Inner Pressable absorbs taps so a tap on the sheet doesn't dismiss it. */}
+          <Pressable
+            onPress={() => {
+              /* absorb tap — keep the sheet open */
+            }}
+            style={{
+              backgroundColor: SURFACE_PANEL,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              borderWidth: 1,
+              borderColor: STATS_BORDER,
+              paddingTop: 16,
+              paddingBottom: 28,
+              maxHeight: '60%',
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: '700',
+                fontSize: 11,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: BRAND_GOLD_LIGHT,
+                paddingHorizontal: 20,
+                paddingBottom: 8,
+              }}
+            >
+              {label}
+            </Text>
+            <ScrollView>
+              {options.map((opt) => {
+                const selected = opt === value;
+                return (
+                  <Pressable
+                    key={opt}
+                    onPress={() => {
+                      if (opt !== value) onChange(opt);
+                      close();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 20,
+                      paddingVertical: 14,
+                      minHeight: 48,
+                      backgroundColor: selected
+                        ? withAlpha(BRAND_NAVY, 0.35)
+                        : 'transparent',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: FONT_BODY,
+                        fontSize: 16,
+                        fontWeight: selected ? '700' : '400',
+                        color: selected ? BRAND_GOLD_LIGHT : TEXT_PRIMARY,
+                      }}
+                    >
+                      {opt}
+                    </Text>
+                    {selected ? (
+                      <Text style={{ color: BRAND_GOLD_LIGHT, fontSize: 16 }}>
+                        ✓
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+interface NativeRangeStepperProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  onCommit: () => void;
+}
+
+/**
+ * Native replacement for the web range `<input>`. React Native ships no slider
+ * primitive and this library deliberately avoids a slider dependency, so the
+ * value (rendered by the parent {@link StatSlider}) is adjusted via −/+ stepper
+ * buttons. Each press snaps to the step grid, clamps to range, and commits the
+ * applied-filter snapshot (LS-7806).
+ */
+function NativeRangeStepper({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  onCommit,
+}: NativeRangeStepperProps) {
+  const apply = useCallback(
+    (delta: number) => {
+      const next = stepValue(value, delta, min, max, step);
+      if (next !== value) {
+        onChange(next);
+        onCommit();
+      }
+    },
+    [value, min, max, step, onChange, onCommit],
+  );
+
+  const pct = Math.round(((value - min) / (max - min)) * 100);
+
+  return (
+    <XStack style={{ gap: 12, alignItems: 'center' }}>
+      <StepperButton
+        label="−"
+        accessibilityLabel={`Decrease ${label}`}
+        disabled={value <= min}
+        onPress={() => apply(-step)}
+      />
+      <YStack
+        style={{
+          flex: 1,
+          height: 4,
+          borderRadius: 9999,
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          overflow: 'hidden',
+        }}
+      >
+        <YStack
+          style={{ width: `${pct}%`, height: 4, backgroundColor: BRAND_GOLD }}
+        />
+      </YStack>
+      <StepperButton
+        label="+"
+        accessibilityLabel={`Increase ${label}`}
+        disabled={value >= max}
+        onPress={() => apply(step)}
+      />
+    </XStack>
+  );
+}
+
+interface StepperButtonProps {
+  label: string;
+  accessibilityLabel: string;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+function StepperButton({
+  label,
+  accessibilityLabel,
+  disabled,
+  onPress,
+}: StepperButtonProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: OUTLINE_DEFAULT,
+        backgroundColor: SURFACE_CARD,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '800',
+          fontSize: 22,
+          lineHeight: 24,
+          color: TEXT_PRIMARY,
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
