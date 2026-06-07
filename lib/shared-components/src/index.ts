@@ -230,7 +230,7 @@ export type { TabsProps, TabItem as TabsItem } from './components/Tabs';
 export { Select } from './components/Select';
 export type { SelectProps, SelectOption } from './components/Select';
 export { LeagueCard } from './components/LeagueCard';
-export type { LeagueCardProps } from './components/LeagueCard';
+export type { LeagueCardProps, League } from './components/LeagueCard';
 export { NotificationBell } from './components/NotificationBell';
 export type {
   NotificationBellProps,

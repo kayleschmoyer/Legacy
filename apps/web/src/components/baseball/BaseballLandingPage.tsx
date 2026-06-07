@@ -22,7 +22,7 @@ import {
   H2 as TH2,
   Paragraph as TParagraph,
 } from 'tamagui';
-import type { League } from './LeagueCard';
+import type { League } from '@legacy-sports/shared-components';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { PageMeta } from '../PageMeta';
 import {

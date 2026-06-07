@@ -1,11 +1,10 @@
 /**
  * Shared draft-status formatting and colour utilities.
  *
- * Extracted from:
- *  - apps/web/src/components/baseball/LeagueCard.tsx
- *  - apps/web/src/components/baseball/LeagueDetailPage.tsx
- *
- * Both web and mobile should import these instead of defining local copies.
+ * Originally extracted from the web LeagueCard fork — now the canonical
+ * shared component at ./components/LeagueCard.tsx — and consumed broadly
+ * across web and shared-components. Both web and mobile import these
+ * instead of defining local copies.
  */
 
 // ── Display Formatting ──────────────────────────────────────────────────────

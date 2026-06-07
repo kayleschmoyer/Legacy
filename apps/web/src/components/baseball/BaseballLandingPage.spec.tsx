@@ -118,13 +118,6 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// Mock LeagueCard to a simple div for predictability
-jest.mock('./LeagueCard', () => ({
-  LeagueCard: ({ league }: any) => (
-    <div data-testid="league-card">{league.name}</div>
-  ),
-}));
-
 // Mock GraphQL generated hooks (path from src/components/baseball to src/api/db)
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetUserLeaguesQuery: jest.fn(() => ({
