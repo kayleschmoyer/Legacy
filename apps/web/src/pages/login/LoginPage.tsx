@@ -101,6 +101,46 @@ function formatPitchingMarquee(
   return { name: lastName.toUpperCase(), score, stat: parts.join(' · ') };
 }
 
+/**
+ * Translate an OAuth sign-in rejection into user-facing copy.
+ *
+ * Rejections from the Google Identity Services SDK (`OAuthProvider.signIn()`)
+ * always carry a typed `OAuthErrorCode`, and their raw `error.message` values
+ * read like developer diagnostics that can leak implementation details (e.g.
+ * "NETWORK_ERROR: Failed to fetch from accounts.google.com"). For those we
+ * switch on the code and return humanized copy — the raw SDK string is never
+ * surfaced (LS-6683).
+ *
+ * Failures *without* an OAuth code are not SDK rejections: they come from the
+ * downstream backend exchange (`loginWithOAuth` → the oauth-proxy) and already
+ * carry intentional, user-facing copy ("Access denied: …", "Secure OAuth
+ * failed: 504"). Those messages are preserved; only typed SDK codes are
+ * rewritten. A generic line is used only when no usable message exists.
+ */
+function humanizeOAuthError(error: unknown): string {
+  const code =
+    error instanceof Error && 'code' in error
+      ? (error as { code?: OAuthErrorCode }).code
+      : undefined;
+
+  switch (code) {
+    case OAuthErrorCode.NETWORK_ERROR:
+      return 'Could not reach Google — please check your connection and try again.';
+    case OAuthErrorCode.CONFIGURATION_ERROR:
+      return 'Sign-in is temporarily unavailable. Please try again in a moment.';
+    case OAuthErrorCode.PLAY_SERVICES_NOT_AVAILABLE:
+      return 'Google sign-in is unavailable on this device.';
+    case OAuthErrorCode.IN_PROGRESS:
+      return 'A sign-in is already in progress. Please wait a moment and try again.';
+    case OAuthErrorCode.UNKNOWN_ERROR:
+      return 'Sign-in failed. Please try again.';
+    default:
+      return error instanceof Error && error.message
+        ? error.message
+        : 'Sign-in failed. Please try again.';
+  }
+}
+
 /* ── Component ── */
 export function LoginPage(): React.JSX.Element {
   const {
@@ -367,11 +407,7 @@ export function LoginPage(): React.JSX.Element {
           'One Tap authentication failed on login page:',
           error instanceof Error ? error : new Error(String(error)),
         );
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Sign-in failed. Please try again.',
-        );
+        setErrorMessage(humanizeOAuthError(error));
       } finally {
         setIsLoading(false);
       }
@@ -407,13 +443,9 @@ export function LoginPage(): React.JSX.Element {
       } else {
         LOGGER.error(
           'Sign-in failed on login page:',
-          error instanceof Error ? error : String(error),
+          error instanceof Error ? error : new Error(String(error)),
         );
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Sign-in failed. Please try again.',
-        );
+        setErrorMessage(humanizeOAuthError(error));
       }
     } finally {
       signInInFlightRef.current = false;

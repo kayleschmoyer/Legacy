@@ -222,9 +222,15 @@ describe('LoginPage handleSignIn catch block', () => {
     expect(screen.queryByText(/sign-in failed/i)).toBeNull();
   });
 
-  it('logs an error and shows a message for non-cancellation failures', async () => {
-    const authError = new Error('Network request failed');
-    signInSpy.mockRejectedValueOnce(authError);
+  it('humanizes a coded OAuth SDK failure and never leaks the raw SDK message (LS-6683)', async () => {
+    // Google SDK rejections always carry a typed OAuthErrorCode; their raw
+    // message can leak internals, so a coded failure maps to humanized copy and
+    // the raw SDK string must never reach the DOM.
+    const sdkError = Object.assign(
+      new Error('UNKNOWN_ERROR: idpiframe_initialization_failed'),
+      { code: 'UNKNOWN_ERROR' },
+    );
+    signInSpy.mockRejectedValueOnce(sdkError);
 
     renderPage();
     const btn = await waitForSignInButton();
@@ -237,13 +243,67 @@ describe('LoginPage handleSignIn catch block', () => {
       // Error instance is passed directly so Rollbar can extract the stack trace.
       expect(errorSpy).toHaveBeenCalledWith(
         'Sign-in failed on login page:',
-        authError,
+        sdkError,
       );
     });
     expect(debugSpy).not.toHaveBeenCalledWith(
       'Google sign-in popup closed by user',
     );
-    expect(await screen.findByText('Network request failed')).toBeTruthy();
+    // Humanized copy is shown; the raw SDK string is not leaked.
+    expect(
+      await screen.findByText('Sign-in failed. Please try again.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/idpiframe_initialization_failed/)).toBeNull();
+  });
+
+  it('maps a NETWORK_ERROR code to humanized connection copy (LS-6683)', async () => {
+    // Model an SDK rejection whose raw message leaks internals — the typed code
+    // drives humanized copy and the raw string never reaches the DOM.
+    const networkError = Object.assign(
+      new Error('NETWORK_ERROR: Failed to fetch from accounts.google.com'),
+      { code: 'NETWORK_ERROR' },
+    );
+    signInSpy.mockRejectedValueOnce(networkError);
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    act(() => {
+      fireEvent.click(btn);
+    });
+
+    expect(
+      await screen.findByText(
+        'Could not reach Google — please check your connection and try again.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/Failed to fetch from accounts\.google\.com/),
+    ).toBeNull();
+  });
+
+  it('preserves a user-facing backend error message that carries no OAuth code (LS-6683)', async () => {
+    // Failures from the downstream oauth-proxy exchange (surfaced via
+    // loginWithOAuth) carry no OAuthErrorCode and have intentional, user-facing
+    // copy. These must be shown verbatim, not rewritten — e.g. the access-denied
+    // and "Secure OAuth failed: <status>" messages the login E2E suite asserts.
+    const backendError = new Error(
+      'Access denied: Your account is not authorized to access this application.',
+    );
+    signInSpy.mockRejectedValueOnce(backendError);
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    act(() => {
+      fireEvent.click(btn);
+    });
+
+    expect(
+      await screen.findByText(
+        'Access denied: Your account is not authorized to access this application.',
+      ),
+    ).toBeTruthy();
   });
 });
 
