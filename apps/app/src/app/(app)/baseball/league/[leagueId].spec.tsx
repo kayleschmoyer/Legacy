@@ -176,8 +176,8 @@ jest.mock('../../../../features/matchup/hooks/useMatchup', () => ({
 jest.mock('../../../../common/scoring', () => ({
   useLeagueScoringSettings: jest.fn(() => ({
     profile: null,
-    settings: null,
-    profileName: null,
+    settings: { batting: {}, fielding: {}, pitching: {} },
+    profileName: 'Default',
     loading: false,
     error: undefined,
     refetch: jest.fn(),
@@ -339,6 +339,11 @@ describe('BaseballLeagueId', () => {
     it('renders Chat tab', () => {
       render(<BaseballLeagueId />);
       expect(screen.getByText('Chat')).toBeTruthy();
+    });
+
+    it('renders the shared scoring summary in the Overview tab', () => {
+      render(<BaseballLeagueId />);
+      expect(screen.getByTestId('league-scoring-summary')).toBeTruthy();
     });
   });
 

@@ -33,6 +33,7 @@ import { LeagueHistoryTab } from '../../../../features/leagues/LeagueHistoryTab'
 import { CommissionerScreen } from '../../../../features/commissioner/CommissionerScreen';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
 import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
+import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
@@ -146,6 +147,10 @@ export default function LeagueId(): React.JSX.Element {
     loading: standingsLoading,
     error: standingsError,
   } = useStandings(isNaN(numLeagueId) ? null : numLeagueId);
+
+  const scoring = useLeagueScoringSettings(
+    isNaN(numLeagueId) ? undefined : numLeagueId,
+  );
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -332,6 +337,10 @@ export default function LeagueId(): React.JSX.Element {
             rankedStandings={rankedStandings}
             startersCount={startersCount}
             inviteCode={inviteCode}
+            scoringLoading={scoring.loading}
+            scoringError={scoring.error ?? null}
+            scoringProfileName={scoring.profileName}
+            scoringSettings={scoring.settings}
             onJoinDraft={() =>
               router.navigate({
                 pathname: '/DraftBoardPage' as never,

@@ -3,9 +3,11 @@ import { Alert, ScrollView } from 'react-native';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import {
   LeagueActivityFeed,
+  LeagueScoringSummary,
   OnThisDayFeed,
 } from '@legacy-sports/shared-components';
 import { LeagueDuesPaymentStatus } from '../commissioner/LeagueDuesPaymentStatus';
+import type { ScoringSettings } from '../../common/scoring';
 import { Sport } from '../../api/db/graphql.generated';
 
 interface RankedStanding {
@@ -33,6 +35,16 @@ interface LeagueOverviewTabProps {
   rankedStandings: RankedStanding[];
   startersCount: number;
   inviteCode: string;
+  /**
+   * Scoring profile state from `useLeagueScoringSettings`. When provided, the
+   * shared {@link LeagueScoringSummary} is rendered at parity with web v2.
+   * Baseball only — the summary is a baseball-specific (batting/fielding/
+   * pitching) view, so the football screen does not pass these props.
+   */
+  scoringLoading?: boolean;
+  scoringError?: Error | null;
+  scoringProfileName?: string;
+  scoringSettings?: ScoringSettings;
   onJoinDraft: () => void;
   onViewAllStandings: () => void;
   onInviteShare: () => void;
@@ -47,6 +59,10 @@ export function LeagueOverviewTab({
   rankedStandings,
   startersCount,
   inviteCode,
+  scoringLoading,
+  scoringError,
+  scoringProfileName,
+  scoringSettings,
   onJoinDraft,
   onViewAllStandings,
   onInviteShare,
@@ -213,6 +229,30 @@ export function LeagueOverviewTab({
             ) : null}
           </YStack>
         ) : null}
+
+        {/* Scoring Summary — parity with web v2 Overview. Baseball only; the
+            football screen omits the (baseball-specific) scoring props. */}
+        {scoringSettings ? (
+          <YStack space="$2">
+            <Text fontSize="$5" fontWeight="600">
+              Scoring Rules
+            </Text>
+            <LeagueScoringSummary
+              loading={scoringLoading ?? false}
+              error={scoringError ?? null}
+              profileName={scoringProfileName ?? 'Default'}
+              settings={scoringSettings}
+            />
+          </YStack>
+        ) : null}
+
+        {/* League Chat is intentionally retained as its own native full-screen
+            tab rather than embedded here. The native LeagueChatTab is a
+            KeyboardAvoidingView with its own ScrollView and a sticky composer
+            (a different contract from web's embeddable chat variant); nesting
+            it inside this Overview ScrollView would break message scrolling and
+            keyboard handling. Web embeds chat because it has no separate tab;
+            native already exposes Chat from the league tab bar. (LS-7812) */}
 
         {/* League Dues Payment Status */}
         <LeagueDuesPaymentStatus
