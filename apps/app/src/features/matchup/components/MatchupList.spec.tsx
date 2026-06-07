@@ -15,6 +15,13 @@ type RNComponents = {
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+jest.mock('@tamagui/lucide-icons', () => ({
+  Activity: () => null,
+  CheckCircle: () => null,
+  Clock: () => null,
+  XCircle: () => null,
+}));
+
 jest.mock('tamagui', () => {
   const { View, Text: RNText } =
     jest.requireActual<RNComponents>('react-native');

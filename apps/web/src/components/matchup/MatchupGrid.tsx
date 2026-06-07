@@ -2,7 +2,10 @@ import React from 'react';
 import { Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, Calendar, Swords } from '@tamagui/lucide-icons';
 import { MatchupCard } from '@legacy-sports/shared-components/matchup';
-import { type MatchupFragment } from '../../api/db/graphql.generated';
+import {
+  type MatchupFragment,
+  useGetLeagueTeamsQuery,
+} from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -69,6 +72,21 @@ export function MatchupGrid({
   onMatchupPress,
   weekNumber,
 }: MatchupGridProps) {
+  // Resolve team logos for the league so the shared MatchupCard can render
+  // them via its cross-platform `team{1,2}LogoUrl` slots (LS-7800). All
+  // matchups in a grid belong to the same league.
+  const leagueId = matchups[0]?.leagueId ?? 0;
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId },
+    skip: !leagueId,
+  });
+  const logoByTeamId = new Map<number, string>();
+  for (const team of teamsData?.leagueTeams ?? []) {
+    if (team.id != null && team.logoUrl) {
+      logoByTeamId.set(team.id, team.logoUrl);
+    }
+  }
+
   if (loading) {
     return (
       <GridContainer>
@@ -182,6 +200,16 @@ export function MatchupGrid({
                 matchup={matchup}
                 onPress={() => onMatchupPress?.(matchup)}
                 showWeek={!weekNumber}
+                team1LogoUrl={
+                  matchup.team1Id != null
+                    ? logoByTeamId.get(matchup.team1Id)
+                    : undefined
+                }
+                team2LogoUrl={
+                  matchup.team2Id != null
+                    ? logoByTeamId.get(matchup.team2Id)
+                    : undefined
+                }
               />
             </YStack>
           ))}

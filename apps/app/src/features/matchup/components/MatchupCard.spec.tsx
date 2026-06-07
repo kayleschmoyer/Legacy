@@ -14,6 +14,13 @@ jest.mock(
     ).tamaguiMocks,
 );
 
+jest.mock('@tamagui/lucide-icons', () => ({
+  Activity: () => null,
+  CheckCircle: () => null,
+  Clock: () => null,
+  XCircle: () => null,
+}));
+
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const createMatchup = (
@@ -89,9 +96,17 @@ describe('MatchupCard', () => {
     expect(dashes.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('displays VS separator', () => {
-    render(<MatchupCard matchup={createMatchup()} />);
-    expect(screen.getByText('VS')).toBeTruthy();
+  it('renders provided team names from the fragment', () => {
+    render(
+      <MatchupCard
+        matchup={createMatchup({
+          team1: { __typename: 'Team', id: 1, name: 'Sluggers' },
+          team2: { __typename: 'Team', id: 2, name: 'Aces' },
+        })}
+      />,
+    );
+    expect(screen.getByText('Sluggers')).toBeTruthy();
+    expect(screen.getByText('Aces')).toBeTruthy();
   });
 
   it('shows "Live" for in-progress matchups', () => {

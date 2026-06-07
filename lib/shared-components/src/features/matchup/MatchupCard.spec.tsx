@@ -78,9 +78,34 @@ describe('MatchupCard', () => {
     expect(dashes.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('displays VS separator', () => {
-    render(<MatchupCard matchup={createMatchup()} />);
-    expect(screen.getByText('VS')).toBeTruthy();
+  it('renders provided team names from the fragment', () => {
+    render(
+      <MatchupCard
+        matchup={createMatchup({
+          team1: { __typename: 'Team', id: 1, name: 'Sluggers' },
+          team2: { __typename: 'Team', id: 2, name: 'Aces' },
+        })}
+      />,
+    );
+    expect(screen.getByText('Sluggers')).toBeTruthy();
+    expect(screen.getByText('Aces')).toBeTruthy();
+  });
+
+  it('renders team logos when logo URLs are supplied', () => {
+    render(
+      <MatchupCard
+        matchup={createMatchup({
+          team1: { __typename: 'Team', id: 1, name: 'Sluggers' },
+          team2: { __typename: 'Team', id: 2, name: 'Aces' },
+        })}
+        team1LogoUrl="https://cdn.example.com/team1.png"
+        team2LogoUrl="https://cdn.example.com/team2.png"
+      />,
+    );
+    const logos = screen.getAllByRole('img');
+    const sources = logos.map((img) => img.getAttribute('src'));
+    expect(sources).toContain('https://cdn.example.com/team1.png');
+    expect(sources).toContain('https://cdn.example.com/team2.png');
   });
 
   it('shows "Live" for in-progress matchups', () => {
