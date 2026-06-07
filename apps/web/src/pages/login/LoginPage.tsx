@@ -562,6 +562,23 @@ export function LoginPage(): React.JSX.Element {
               onDismissError={handleDismissError}
             />
 
+            {/* LGN-024: account-recovery affordance. The app is OAuth-only
+                (Google/Discord) — there are no passwords and therefore no
+                password-reset flow, which makes a literal "Forgot password?"
+                link a dead end. Mirroring the OAuth-only signup adaptation
+                (LS-6689), users who cannot get in are given a real recovery
+                path — a support contact — using the same mailto convention the
+                homepage error state uses. */}
+            <p className="ll-card-recovery">
+              Trouble signing in?{' '}
+              <a
+                className="ll-link-gold"
+                href="mailto:support@legacysports.com?subject=Trouble%20signing%20in"
+              >
+                Get help accessing your account
+              </a>
+            </p>
+
             <div className="ll-card-footer">
               <div className="ll-footer-item">
                 <SecureIcon />

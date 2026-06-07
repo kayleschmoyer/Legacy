@@ -271,6 +271,33 @@ describe('LoginPage header signup affordance (LS-6689)', () => {
   });
 });
 
+describe('LoginPage account-recovery affordance (LGN-024)', () => {
+  // The app is OAuth-only (no passwords), so there is no password-reset flow to
+  // link to. Rather than a dead "Forgot password?" link, the login screen must
+  // still offer a real recovery path — a support contact — so users who cannot
+  // sign in are not stranded (cf. LS-6689, which removed the dead /signup link
+  // for the same OAuth-only reason).
+  it('renders a recovery link to support, not a dead password-reset route', async () => {
+    renderPage();
+    await waitForSignInButton();
+
+    const recoveryLink = screen.getByRole('link', {
+      name: /get help accessing your account/i,
+    });
+    expect(recoveryLink.getAttribute('href')).toMatch(
+      /^mailto:support@legacysports\.com/,
+    );
+    // The surrounding prompt frames it as a recovery affordance.
+    expect(recoveryLink.parentElement?.textContent).toMatch(
+      /trouble signing in\?/i,
+    );
+
+    // No dead password-reset affordance is introduced.
+    expect(document.querySelector('a[href^="/forgot"]')).toBeNull();
+    expect(document.querySelector('a[href^="/reset"]')).toBeNull();
+  });
+});
+
 describe('LoginPage handleSignIn re-entrancy guard (LS-6685)', () => {
   it('calls OAuthProvider.signIn only once for a synchronous double-tap', async () => {
     // Hold the sign-in promise open so the in-flight latch stays set across both
