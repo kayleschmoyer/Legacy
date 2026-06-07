@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
+  MatchupScoreboardHero,
+  type MatchupScoreboardHeroTeam,
+} from '@legacy-sports/shared-components/matchup';
+import {
   type LeagueFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
@@ -18,175 +22,7 @@ import { computeMatchupScores } from '../../../../features/matchup/MatchupScoreb
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../../lib/scoring/mapGraphQLToScoringFormat';
 import { I } from '../Icons';
-import { colorFromString, initialsFromName, Section } from '../Shared';
-
-interface MatchupTeamSide {
-  id?: number | null;
-  name?: string | null;
-  primaryColor?: string | null;
-  score?: number | null;
-  projectedScore?: number | null;
-  record?: string | null;
-}
-
-const STATUS_CHIP: Record<
-  MatchupStatus | 'unknown',
-  { cls: string; label: string; pulse: boolean }
-> = {
-  [MatchupStatus.InProgress]: {
-    cls: 'ls-chip-live',
-    label: 'Live',
-    pulse: true,
-  },
-  [MatchupStatus.Scheduled]: {
-    cls: 'ls-chip-pre',
-    label: 'Scheduled',
-    pulse: false,
-  },
-  [MatchupStatus.Completed]: {
-    cls: 'ls-chip-final',
-    label: 'Final',
-    pulse: false,
-  },
-  [MatchupStatus.Cancelled]: {
-    cls: 'ls-chip-final',
-    label: 'Cancelled',
-    pulse: false,
-  },
-  unknown: { cls: 'ls-chip-final', label: 'Status unknown', pulse: false },
-};
-
-// Pace-target tint for the team scoreboard score: green when the team is
-// outperforming its projected per-game pace by >10%, red when underperforming
-// by >10%, neutral otherwise. Mirrors paceColorStyle in Shared.tsx.
-const teamScorePaceStyle = (
-  actual: number,
-  proj: number | null | undefined,
-  gamesPlayed: number,
-  totalGames: number,
-): React.CSSProperties | undefined => {
-  if (proj == null || totalGames <= 0 || gamesPlayed <= 0) return undefined;
-  const target = proj * (gamesPlayed / totalGames);
-  if (target <= 0) return undefined;
-  const ratio = actual / target;
-  if (ratio > 1.1) return { color: 'var(--success-fg)' };
-  if (ratio < 0.9) return { color: 'var(--danger-fg)' };
-  return undefined;
-};
-
-const ScoreboardHero: React.FC<{
-  weekNumber?: number | null;
-  totalMatchups?: number | null;
-  status?: MatchupStatus | null;
-  team1: MatchupTeamSide;
-  team2: MatchupTeamSide;
-  gamesPlayed: number;
-  totalGames: number;
-  onTeam: (teamId: number) => void;
-}> = ({
-  weekNumber,
-  totalMatchups,
-  status,
-  team1,
-  team2,
-  gamesPlayed,
-  totalGames,
-  onTeam,
-}) => {
-  const score1 = team1.score ?? 0;
-  const score2 = team2.score ?? 0;
-  const team1Leading = score1 >= score2;
-  const chip = STATUS_CHIP[status ?? 'unknown'] ?? STATUS_CHIP.unknown;
-  const score1Pace = teamScorePaceStyle(
-    score1,
-    team1.projectedScore,
-    gamesPlayed,
-    totalGames,
-  );
-  const score2Pace = teamScorePaceStyle(
-    score2,
-    team2.projectedScore,
-    gamesPlayed,
-    totalGames,
-  );
-  return (
-    <div
-      className="ls-scoreboard-hero"
-      role="region"
-      aria-label={`Week ${weekNumber ?? 1} scoreboard`}
-    >
-      <div className="top-band">
-        <div className="band-left">
-          <span className={`ls-chip ${chip.cls}`}>
-            {chip.pulse ? <span className="ls-dot ls-pulse" /> : null}
-            {chip.label} · Week {weekNumber ?? '—'}
-          </span>
-          <span className="meta">
-            Head-to-Head · Matchup {weekNumber ?? '?'}
-            {totalMatchups ? `/${totalMatchups}` : ''}
-          </span>
-        </div>
-      </div>
-      <div className="body">
-        <div className={`side ${team1Leading ? 'leading' : ''}`}>
-          <div
-            className={`ls-avatar lg ${colorFromString(team1.name)}`}
-            style={
-              team1.primaryColor
-                ? { background: team1.primaryColor }
-                : undefined
-            }
-            onClick={() => team1.id != null && onTeam(team1.id)}
-          >
-            {initialsFromName(team1.name)}
-          </div>
-          <div
-            className="name"
-            onClick={() => team1.id != null && onTeam(team1.id)}
-            style={team1.id != null ? { cursor: 'pointer' } : undefined}
-          >
-            {team1.name ?? 'Team 1'}
-          </div>
-          <div className="record mono">{team1.record ?? '—'}</div>
-          <div className="score-huge" style={score1Pace}>
-            {score1.toFixed(2)}
-          </div>
-          {team1.projectedScore != null ? (
-            <div className="proj">{team1.projectedScore.toFixed(2)} proj</div>
-          ) : null}
-        </div>
-        <div className="vs-big">VS</div>
-        <div className={`side ${!team1Leading ? 'leading' : ''}`}>
-          <div
-            className={`ls-avatar lg ${colorFromString(team2.name)}`}
-            style={
-              team2.primaryColor
-                ? { background: team2.primaryColor }
-                : undefined
-            }
-            onClick={() => team2.id != null && onTeam(team2.id)}
-          >
-            {initialsFromName(team2.name)}
-          </div>
-          <div
-            className="name"
-            onClick={() => team2.id != null && onTeam(team2.id)}
-            style={team2.id != null ? { cursor: 'pointer' } : undefined}
-          >
-            {team2.name ?? 'Team 2'}
-          </div>
-          <div className="record mono">{team2.record ?? '—'}</div>
-          <div className="score-huge" style={score2Pace}>
-            {score2.toFixed(2)}
-          </div>
-          {team2.projectedScore != null ? (
-            <div className="proj">{team2.projectedScore.toFixed(2)} proj</div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-};
+import { Section } from '../Shared';
 
 export interface MatchupTabProps {
   league: LeagueFragment;
@@ -278,7 +114,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     [matchup, playersData, playersError, scoringSettings, seasonStatsMap],
   );
 
-  const team1Side: MatchupTeamSide = matchup
+  const team1Side: MatchupScoreboardHeroTeam = matchup
     ? {
         id: matchup.team1Id ?? null,
         name: matchup.team1?.name ?? 'Team 1',
@@ -286,7 +122,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         projectedScore: computed.team1Projected,
       }
     : { name: 'Team 1' };
-  const team2Side: MatchupTeamSide = matchup
+  const team2Side: MatchupScoreboardHeroTeam = matchup
     ? {
         id: matchup.team2Id ?? null,
         name: matchup.team2?.name ?? 'Team 2',
@@ -336,7 +172,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         </span>
       </div>
 
-      <ScoreboardHero
+      <MatchupScoreboardHero
         weekNumber={week}
         totalMatchups={league.totalMatchups}
         status={matchup?.status ?? null}
@@ -344,7 +180,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         team2={team2Side}
         gamesPlayed={gamesPlayed}
         totalGames={totalGames}
-        onTeam={onTeam}
+        onTeamPress={onTeam}
       />
 
       {!isFootball && totalGames > 0 ? (

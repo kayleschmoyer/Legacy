@@ -1,151 +1,117 @@
-import React from 'react';
-import { Card, H3, H5, Separator, Text, XStack, YStack } from 'tamagui';
+import React, { useMemo } from 'react';
+import { type SeasonStats } from '@legacy-sports/scoring';
+import { MatchupScoreboardHero } from '@legacy-sports/shared-components/matchup';
 import {
   type MatchupFragment,
-  MatchupStatus,
+  type MatchupPlayerFragment,
+  useGetLeagueTeamsQuery,
+  useGetMatchupPlayersQuery,
 } from '../../../api/db/graphql.generated';
+import { useLeagueScoringSettings } from '../../../common/scoring';
+import { mapMatchupPlayerToSeasonStats } from '../../../common/scoring/mapGraphQLToScoringFormat';
+import { computeMatchupScores } from '../computeMatchupScores';
 
 export interface MatchupScoreboardProps {
   matchup: MatchupFragment | null | undefined;
+  /** League id used to resolve team names and scoring settings. */
+  leagueId: number | null | undefined;
   gamesRemaining?: number;
+  /** When provided, team avatars/names become pressable to view that team. */
+  onTeamPress?: (teamId: number) => void;
 }
 
 /**
- * MatchupScoreboard - Large scoreboard-style display of a matchup
- * Shows live scores and games remaining counter
+ * MatchupScoreboard — native data-fetching wrapper around the shared
+ * `MatchupScoreboardHero` presentational component.
+ *
+ * Owns the GraphQL query layer (matchup players, league teams, scoring
+ * settings) and the score/projection computation, then hands the
+ * already-computed values to the shared hero so web and mobile render the same
+ * rich scoreboard: projected scores, status chip, pace-coloured scores and a
+ * games-progress summary (LS-7815). Mirrors web's `MatchupScoreboard` wrapper.
  */
 export function MatchupScoreboard({
   matchup,
+  leagueId,
   gamesRemaining = 0,
+  onTeamPress,
 }: MatchupScoreboardProps) {
-  if (!matchup) {
+  const matchupIdNum = matchup?.id ? parseInt(matchup.id, 10) : 0;
+
+  const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
+    variables: { matchupId: matchupIdNum },
+    skip: !matchupIdNum,
+    errorPolicy: 'all',
+  });
+
+  const { settings: scoringSettings } = useLeagueScoringSettings(
+    leagueId ?? undefined,
+  );
+
+  const seasonStatsMap = useMemo(() => {
+    const map = new Map<number, SeasonStats>();
+    playersData?.getMatchupPlayers?.forEach((mp: MatchupPlayerFragment) => {
+      const stats = mapMatchupPlayerToSeasonStats(mp);
+      if (stats) map.set(stats.playerId, stats);
+    });
+    return map;
+  }, [playersData]);
+
+  const { team1Score, team2Score, team1Projected, team2Projected } = useMemo(
+    () =>
+      computeMatchupScores({
+        matchup,
+        players: playersData?.getMatchupPlayers,
+        hasPlayersError: playersError != null,
+        scoringSettings,
+        seasonStatsMap,
+      }),
+    [matchup, playersData, playersError, scoringSettings, seasonStatsMap],
+  );
+
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId: leagueId ?? 0 },
+    skip: !leagueId,
+  });
+
+  const team1Name = useMemo(() => {
+    if (!matchup?.team1Id || !teamsData?.leagueTeams) return 'Team 1';
     return (
-      <Card elevate size="$4" bordered margin="$2">
-        <Card.Header padded>
-          <Text color="$gray11">No active matchup</Text>
-        </Card.Header>
-      </Card>
+      teamsData.leagueTeams.find((t) => t.id === matchup.team1Id)?.name ??
+      'Team 1'
     );
-  }
+  }, [matchup?.team1Id, teamsData]);
 
-  const { weekNumber, team1Score, team2Score, status, gamesPerMatchup } =
-    matchup;
+  const team2Name = useMemo(() => {
+    if (!matchup?.team2Id || !teamsData?.leagueTeams) return 'Team 2';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team2Id)?.name ??
+      'Team 2'
+    );
+  }, [matchup?.team2Id, teamsData]);
 
-  const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
-  const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);
-  const isTied = team1Score === team2Score;
-
-  const getStatusBadgeColor = () => {
-    if (status === MatchupStatus.InProgress) return '$green10';
-    if (status === MatchupStatus.Completed) return '$blue10';
-    return '$gray10';
-  };
+  const totalGames = matchup?.gamesPerMatchup ?? 0;
+  const gamesPlayed = Math.max(0, totalGames - gamesRemaining);
 
   return (
-    <Card elevate size="$5" bordered margin="$2" backgroundColor="$background">
-      {/* Header with Week and Status */}
-      <Card.Header padded>
-        <XStack justifyContent="space-between" alignItems="center">
-          <H5 color="$gray11">Week {weekNumber}</H5>
-          <XStack space="$2" alignItems="center">
-            {status === MatchupStatus.InProgress && gamesRemaining > 0 && (
-              <Text fontSize="$3" color="$orange10">
-                {gamesRemaining} games remaining
-              </Text>
-            )}
-            <Text
-              fontSize="$3"
-              color={getStatusBadgeColor()}
-              fontWeight="bold"
-              paddingHorizontal="$3"
-              paddingVertical="$1"
-              backgroundColor="$backgroundPress"
-              borderRadius="$2"
-            >
-              {status === MatchupStatus.InProgress
-                ? 'LIVE'
-                : status?.toUpperCase()}
-            </Text>
-          </XStack>
-        </XStack>
-      </Card.Header>
-
-      <Separator />
-
-      {/* Scoreboard */}
-      <YStack padding="$4" space="$3">
-        {/* Team 1 */}
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          paddingVertical="$3"
-          paddingHorizontal="$4"
-          backgroundColor={team1Leading ? '$blue3' : '$background'}
-          borderRadius="$3"
-          borderWidth={team1Leading ? 2 : 0}
-          borderColor={team1Leading ? '$blue8' : 'transparent'}
-        >
-          <YStack flex={1}>
-            <H3>Team 1</H3>
-            {team1Leading && !isTied && (
-              <Text fontSize="$2" color="$green10">
-                Leading
-              </Text>
-            )}
-          </YStack>
-          <H3
-            fontSize="$9"
-            fontWeight="900"
-            color={team1Leading ? '$blue11' : '$gray11'}
-          >
-            {team1Score?.toFixed(2) ?? '0.00'}
-          </H3>
-        </XStack>
-
-        {/* Team 2 */}
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          paddingVertical="$3"
-          paddingHorizontal="$4"
-          backgroundColor={team2Leading ? '$blue3' : '$background'}
-          borderRadius="$3"
-          borderWidth={team2Leading ? 2 : 0}
-          borderColor={team2Leading ? '$blue8' : 'transparent'}
-        >
-          <YStack flex={1}>
-            <H3>Team 2</H3>
-            {team2Leading && !isTied && (
-              <Text fontSize="$2" color="$green10">
-                Leading
-              </Text>
-            )}
-          </YStack>
-          <H3
-            fontSize="$9"
-            fontWeight="900"
-            color={team2Leading ? '$blue11' : '$gray11'}
-          >
-            {team2Score?.toFixed(2) ?? '0.00'}
-          </H3>
-        </XStack>
-
-        {/* Tie indicator */}
-        {isTied && team1Score !== null && (
-          <Text textAlign="center" color="$orange10" fontWeight="bold">
-            TIED
-          </Text>
-        )}
-
-        {/* Games info */}
-        {gamesPerMatchup && (
-          <Text fontSize="$2" color="$gray11" textAlign="center">
-            {gamesPerMatchup} game matchup
-            {gamesRemaining > 0 &&
-              ` • ${gamesPerMatchup - gamesRemaining} games completed`}
-          </Text>
-        )}
-      </YStack>
-    </Card>
+    <MatchupScoreboardHero
+      weekNumber={matchup?.weekNumber}
+      status={matchup?.status}
+      team1={{
+        id: matchup?.team1Id ?? null,
+        name: team1Name,
+        score: team1Score,
+        projectedScore: team1Projected,
+      }}
+      team2={{
+        id: matchup?.team2Id ?? null,
+        name: team2Name,
+        score: team2Score,
+        projectedScore: team2Projected,
+      }}
+      gamesPlayed={gamesPlayed}
+      totalGames={totalGames}
+      onTeamPress={onTeamPress}
+    />
   );
 }

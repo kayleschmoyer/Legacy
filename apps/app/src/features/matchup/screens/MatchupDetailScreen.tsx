@@ -117,6 +117,7 @@ export default function MatchupDetailScreen() {
         scoreboard={
           <MatchupScoreboard
             matchup={matchup}
+            leagueId={leagueId}
             gamesRemaining={gamesRemaining}
           />
         }
@@ -155,7 +156,9 @@ export default function MatchupDetailScreen() {
             </PremiumGate>
           ) : undefined
         }
-        rosterComparison={<MatchupRosterComparison matchup={matchup} />}
+        rosterComparison={
+          <MatchupRosterComparison matchup={matchup} userTeamId={userTeamId} />
+        }
       />
     </ScrollView>
   );
