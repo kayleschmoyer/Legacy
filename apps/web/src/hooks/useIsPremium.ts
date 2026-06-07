@@ -103,7 +103,15 @@ export function useIsPremiumStatus(): {
   const isLoading = authLoading || userLoading || !dataIsForCurrentUser;
 
   if (isLoading) return { isPremium: false, isLoading };
-  if (user?.accessLevel === 'admin') return { isPremium: true, isLoading };
+  // Source the admin→premium shortcut from the server response, NOT the
+  // client-side `user.accessLevel`. The auth-state accessLevel is hydrated from
+  // localStorage (`ls_user_profile`), which is written from a JWT whose
+  // signature is never verified in the browser — a forged `accessLevel: 'admin'`
+  // claim could otherwise unlock premium UI for a free user (LGN-013). The
+  // `GetUserById` response reads accessLevel from the DB and is already guarded
+  // by `dataIsForCurrentUser`, mirroring the trusted pattern in AdminUsersPage.
+  if (data?.user?.accessLevel === 'admin')
+    return { isPremium: true, isLoading };
   return {
     isPremium: data?.user?.subscriptionTier === 'premium',
     isLoading,

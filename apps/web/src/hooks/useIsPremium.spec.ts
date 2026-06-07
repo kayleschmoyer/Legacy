@@ -61,19 +61,39 @@ describe('useIsPremiumStatus', () => {
     expect(result.current.isLoading).toBe(true);
   });
 
-  it('returns isPremium: true for admin regardless of subscription tier', () => {
+  it('returns isPremium: true for a server-reported admin regardless of subscription tier', () => {
     useAuth.mockReturnValue({
       user: { id: 1, accessLevel: 'admin' },
       isLoading: false,
     });
     useGetUserByIdQuery.mockReturnValue({
-      data: { user: { subscriptionTier: 'free' } },
+      data: { user: { accessLevel: 'admin', subscriptionTier: 'free' } },
       loading: false,
     });
 
     const { result } = renderHook(() => useIsPremiumStatus());
 
     expect(result.current.isPremium).toBe(true);
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it('ignores a forged client-side admin claim when the server does not report admin (LGN-013)', () => {
+    // The auth-state `accessLevel` is hydrated from localStorage, written from
+    // an unverified JWT. A forged `accessLevel: 'admin'` must NOT grant premium
+    // when the server-authoritative GetUserById response says the user is a
+    // non-admin on the free tier.
+    useAuth.mockReturnValue({
+      user: { id: 1, accessLevel: 'admin' },
+      isLoading: false,
+    });
+    useGetUserByIdQuery.mockReturnValue({
+      data: { user: { id: 1, accessLevel: 'none', subscriptionTier: 'free' } },
+      loading: false,
+    });
+
+    const { result } = renderHook(() => useIsPremiumStatus());
+
+    expect(result.current.isPremium).toBe(false);
     expect(result.current.isLoading).toBe(false);
   });
 
