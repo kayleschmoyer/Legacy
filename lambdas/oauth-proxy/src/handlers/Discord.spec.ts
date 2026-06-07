@@ -504,6 +504,11 @@ describe('handleDiscordAuthorize', () => {
     );
     expect(location).toContain('scope=identify+email');
 
+    // LS-6669: must NOT force re-consent — omitting `prompt` lets Discord skip
+    // the authorize screen for returning users (it only re-prompts on a new
+    // authorization or scope change).
+    expect(location).not.toContain('prompt=');
+
     // Default (no link=1) binds the sign-in flow cookie (LS-6661).
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
     expect(setCookies).toEqual(

@@ -354,13 +354,17 @@ export const handleDiscordAuthorize = (
     ? OAUTH_STATE_COOKIE_LINK
     : OAUTH_STATE_COOKIE_LOGIN;
 
+  // Omit `prompt` so Discord only shows the authorize screen when it is
+  // actually needed (first authorization or a scope change). Forcing
+  // `prompt=consent` re-prompted returning users on every login (LS-6669);
+  // `prompt=none` is wrong here because it errors when consent is genuinely
+  // required, breaking first-time sign-in.
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'identify email',
     state,
-    prompt: 'consent',
   });
 
   const authorizeUrl = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
