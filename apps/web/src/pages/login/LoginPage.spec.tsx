@@ -616,3 +616,56 @@ describe('LoginPage Discord callback progress screen (LS-6667)', () => {
     expect(await screen.findByText('bad code')).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-6664 — Discord callback ?error= mapping: access_denied (genuine
+// cancellation) vs every other OAuth error code (Discord-side / request faults).
+// ---------------------------------------------------------------------------
+
+describe('LoginPage Discord callback error mapping (LS-6664)', () => {
+  afterEach(() => {
+    window.history.replaceState({}, '', '/login');
+  });
+
+  it('shows the cancellation copy for access_denied', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/discord/callback?error=access_denied',
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByText('Discord sign-in was cancelled or denied.'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('Discord is having trouble. Please try again.'),
+    ).toBeNull();
+  });
+
+  it.each([
+    'invalid_request',
+    'server_error',
+    'temporarily_unavailable',
+    'some_unrecognized_value',
+  ])(
+    'shows a neutral message (not blaming the user) for error=%s',
+    async (errorCode) => {
+      window.history.replaceState(
+        {},
+        '',
+        `/auth/discord/callback?error=${errorCode}`,
+      );
+
+      renderPage();
+
+      expect(
+        await screen.findByText('Discord is having trouble. Please try again.'),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText('Discord sign-in was cancelled or denied.'),
+      ).toBeNull();
+    },
+  );
+});

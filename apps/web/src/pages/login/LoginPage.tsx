@@ -208,7 +208,16 @@ export function LoginPage(): React.JSX.Element {
     const error = params.get('error');
 
     if (error) {
-      setErrorMessage('Discord sign-in was cancelled or denied.');
+      // Only Discord's `access_denied` is a genuine user cancellation or denial
+      // of consent. The other OAuth error codes (invalid_request, server_error,
+      // temporarily_unavailable, and any unrecognized value) are Discord-side or
+      // request faults — surface a neutral "try again" message instead of
+      // blaming the user for them (LS-6664).
+      setErrorMessage(
+        error === 'access_denied'
+          ? 'Discord sign-in was cancelled or denied.'
+          : 'Discord is having trouble. Please try again.',
+      );
       return;
     }
 
