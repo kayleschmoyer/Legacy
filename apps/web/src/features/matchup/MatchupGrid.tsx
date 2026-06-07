@@ -1,7 +1,7 @@
 import React from 'react';
 import { Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, Calendar, Swords } from '@tamagui/lucide-icons';
-import { MatchupCard } from './MatchupCard';
+import { MatchupCard } from '@legacy-sports/shared-components/matchup';
 import { type MatchupFragment } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,

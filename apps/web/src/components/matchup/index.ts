@@ -1,5 +1,5 @@
-export { MatchupCard } from './MatchupCard';
-export type { MatchupCardProps } from './MatchupCard';
+export { MatchupCard } from '@legacy-sports/shared-components/matchup';
+export type { MatchupCardProps } from '@legacy-sports/shared-components/matchup';
 
 export { MatchupScoreboard } from './MatchupScoreboard';
 export type { MatchupScoreboardProps } from './MatchupScoreboard';

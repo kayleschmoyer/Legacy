@@ -1,4 +1,4 @@
-export { MatchupCard } from './MatchupCard';
+export { MatchupCard } from '@legacy-sports/shared-components/matchup';
 export { MatchupGrid } from './MatchupGrid';
 export { MatchupScoreboard } from './MatchupScoreboard';
 export { MatchupRosterComparison } from './MatchupRosterComparison';
