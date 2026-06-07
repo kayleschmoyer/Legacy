@@ -161,6 +161,8 @@ export * from './hooks/useWebSocket';
 export * from './utils/styles';
 
 // Shared UI components (cross-platform)
+export * from './components/StatCard';
+export * from './components/StatTable';
 export * from './components/StatusBadge';
 export * from './components/EmptyState';
 export * from './components/ErrorState';

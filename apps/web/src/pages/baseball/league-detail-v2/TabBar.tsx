@@ -51,7 +51,11 @@ export const TabBar: React.FC<{
   return (
     <nav className="ls-tabbar" aria-label="League sections">
       <div className="ls-tabbar-inner">
-        <div className="ls-tabbar-tabs" role="tablist">
+        <div
+          className="ls-tabbar-tabs"
+          role="tablist"
+          aria-label="League sections"
+        >
           {visible.map((t) => (
             <button
               key={t.id}

@@ -5,7 +5,7 @@ import {
   BRAND_NAVY_LIGHT,
   WHITE,
   withAlpha,
-} from '../constants/colors';
+} from '../utils/colors';
 
 // ---------------------------------------------------------------------------
 // Types
