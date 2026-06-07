@@ -364,7 +364,11 @@ describe('AuthHooks', () => {
         await result.current.googleLogin();
       });
 
-      expect(onFailure).toHaveBeenCalledWith('Network Error');
+      // Unexpected exchange failures surface a generic message to the UI; the
+      // raw error is logged internally rather than forwarded (LS-6657).
+      expect(onFailure).toHaveBeenCalledWith(
+        'Authentication failed. Please try again.',
+      );
     });
 
     it('handles OAuthError objects from provider', async () => {
@@ -394,10 +398,11 @@ describe('AuthHooks', () => {
         await result.current.googleLogin();
       });
 
-      // The shared payload builder throws before any network call is made.
+      // The shared payload builder throws before any network call is made; the
+      // thrown (non-OAuthError) message is replaced with a generic one (LS-6657).
       expect(mockFetch).not.toHaveBeenCalled();
       expect(onFailure).toHaveBeenCalledWith(
-        'No valid authentication code or credential received',
+        'Authentication failed. Please try again.',
       );
     });
   });
@@ -464,7 +469,10 @@ describe('AuthHooks', () => {
         await result.current.appleLogin();
       });
 
-      expect(onFailure).toHaveBeenCalledWith('Network Error');
+      // Generic UI message for an unexpected exchange failure (LS-6657).
+      expect(onFailure).toHaveBeenCalledWith(
+        'Authentication failed. Please try again.',
+      );
       expect(mockSetItem).not.toHaveBeenCalled();
     });
   });

@@ -130,6 +130,13 @@ async function resetToken(): Promise<void> {
   }
 }
 
+// Surfaced to the UI for unexpected (non-OAuthError) sign-in failures. An
+// arbitrary error here — from a third-party library, the network stack, or the
+// OAuth proxy — can carry internal details (paths, stack traces) in its
+// `message`, so we never forward raw `error.message` to the client. The full
+// error is always logged internally via LOGGER before this is shown (LS-6657).
+const GENERIC_AUTH_ERROR = 'Authentication failed. Please try again.';
+
 function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   const router = useRouter();
   const onSuccess = callbacks?.onSuccess;
@@ -157,11 +164,10 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
           onSuccess();
         }
       } catch (error) {
+        // Log full detail internally, surface only a generic message to the UI.
         LOGGER.error('Authentication success handler error:', String(error));
         if (onFailure) {
-          onFailure(
-            error instanceof Error ? error.message : 'Authentication failed',
-          );
+          onFailure(GENERIC_AUTH_ERROR);
         }
       }
     },
@@ -172,7 +178,11 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     (error: OAuthError) => {
       LOGGER.warn('OAuth authentication failed:', error);
       if (onFailure) {
-        onFailure(error.message || 'Authentication failed');
+        // OAuthError messages are structured, provider-supplied, user-facing
+        // strings (e.g. "User cancelled the sign-in flow"), so they are safe to
+        // surface directly. Unexpected (non-OAuthError) failures are mapped to
+        // GENERIC_AUTH_ERROR before reaching here (see googleLogin) (LS-6657).
+        onFailure(error.message || GENERIC_AUTH_ERROR);
       }
     },
     [onFailure],
@@ -216,13 +226,12 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       ) {
         failureHandler(error as OAuthError);
       } else {
-        // Create a proper OAuthError
+        // Unexpected, non-OAuthError failure: surface a generic message to the
+        // UI while preserving the original error on `originalError` (logged by
+        // failureHandler) so no detail is lost internally (LS-6657).
         const oauthError: OAuthError = {
           code: 'UNKNOWN_ERROR' as OAuthErrorCode,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Unknown authentication error',
+          message: GENERIC_AUTH_ERROR,
           originalError: error,
         };
         failureHandler(oauthError);
@@ -268,9 +277,8 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         error instanceof Error ? error : new Error(String(error)),
       );
       if (onFailure) {
-        onFailure(
-          error instanceof Error ? error.message : 'Authentication failed',
-        );
+        // Generic UI message; the full error is logged above (LS-6657).
+        onFailure(GENERIC_AUTH_ERROR);
       }
     }
   }, [onSuccess, onFailure]);
