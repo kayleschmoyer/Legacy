@@ -249,12 +249,9 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/trades');
 
-    // V2 wraps LeagueTradeBlock in a <Section title="Trade Block">, which
-    // renders an <h3>; the inner LeagueTradeBlock card also renders the text
-    // "Trade Block". Target the section heading specifically.
-    await expect(
-      page.getByRole('heading', { name: 'Trade Block', exact: true }),
-    ).toBeVisible();
+    // The shared TradingCenter renders LeagueTradeBlock, whose title is a
+    // styled Text node (not a semantic heading). Match on the exact text.
+    await expect(page.getByText('Trade Block', { exact: true })).toBeVisible();
   });
 
   test('should show empty state when no players on trade block', async ({

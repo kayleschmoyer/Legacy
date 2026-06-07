@@ -201,7 +201,9 @@ async function mockTradesGraphQL(
   opts: MockOpts = {},
 ) {
   const leagueOffers = opts.leagueTradeOffers ?? [];
-  const tradeBlock = opts.leagueTradeBlock ?? [];
+  // Mutable copy so the SetTradeBlock mutation handler can mirror changes
+  // back into the list that GetLeagueTradeBlock refetches.
+  let tradeBlock: object[] = [...(opts.leagueTradeBlock ?? [])];
   // Pending offers (status='pending') are fetched via GetTeamTradeOffers in
   // the shared TradingCenter; the league query is used for history only.
   const pendingOffers = leagueOffers.filter(
@@ -222,6 +224,54 @@ async function mockTradesGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTradeOffers: leagueOffers } }),
+      });
+      // NOTE: GetLeagueTradeBlock / SetTradeBlock must be matched *before* the
+      // generic `getleague` branch below — "getleaguetradeblock" contains the
+      // substring "getleague", so the league-detail branch would otherwise
+      // swallow the trade-block request and the block would render empty.
+    } else if (postData.includes('getleaguetradeblock')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTradeBlock: tradeBlock } }),
+      });
+    } else if (postData.includes('"settradeblock"')) {
+      // Stateful mutation: mirror the change into `tradeBlock` so the
+      // refetched GetLeagueTradeBlock reflects the new asking price / removal.
+      const vars =
+        (
+          route.request().postDataJSON() as {
+            variables?: Record<string, unknown>;
+          }
+        ).variables ?? {};
+      const memberId = vars['teamMemberId'] as number | undefined;
+      const onBlock = (vars['onTradeBlock'] as boolean | undefined) ?? true;
+      const askingPrice =
+        (vars['askingPrice'] as string | null | undefined) ?? null;
+      let updated: Record<string, unknown> | null = null;
+      tradeBlock = tradeBlock
+        .map((m) => {
+          const member = m as Record<string, unknown>;
+          if (member['id'] === memberId) {
+            updated = { ...member, onTradeBlock: onBlock, askingPrice };
+            return updated;
+          }
+          return member;
+        })
+        .filter((m) => m['onTradeBlock'] !== false);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            setTradeBlock: updated ?? {
+              __typename: 'TeamMember',
+              id: memberId ?? 0,
+              onTradeBlock: onBlock,
+              askingPrice,
+            },
+          },
+        }),
       });
     } else if (postData.includes('getleagueteams')) {
       await route.fulfill({
@@ -262,34 +312,6 @@ async function mockTradesGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [MOCK_LEAGUE] } }),
-      });
-    } else if (postData.includes('getleaguetradeblock')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { leagueTradeBlock: tradeBlock } }),
-      });
-    } else if (postData.includes('"settradeblock"')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            setTradeBlock: {
-              __typename: 'TeamMember',
-              id: 2,
-              teamId: 1,
-              playerId: 102,
-              onTradeBlock: true,
-              askingPrice: '1st round pick',
-              player: {
-                __typename: 'Player',
-                firstName: 'Mike',
-                lastName: 'Johnson',
-              },
-            },
-          },
-        }),
       });
     } else {
       await unmockedGraphQLFallback(route);
@@ -342,15 +364,19 @@ test.describe('Trades tab — empty state @regression', () => {
   test('shows empty pending message when there are no pending offers', async ({
     page,
   }) => {
-    await expect(page.getByText('No pending trade offers')).toBeVisible();
+    await expect(
+      page.getByText('No incoming trade offers', { exact: false }),
+    ).toBeVisible();
   });
 
   test('shows empty completed message when there are no accepted trades', async ({
     page,
   }) => {
-    await expect(
-      page.getByRole('heading', { name: 'No completed trades', exact: true }),
-    ).toBeVisible();
+    // Completed trades live behind the collapsible "Trade History" toggle,
+    // which is collapsed by default in the shared TradingCenter. Expand it
+    // to reveal the empty-history message.
+    await page.getByRole('button', { name: /Trade History/ }).click();
+    await expect(page.getByText('No trade history yet.')).toBeVisible();
   });
 });
 
@@ -438,12 +464,12 @@ test.describe('Trades tab — completed history @regression', () => {
     await page.waitForLoadState('load');
   });
 
-  test('shows accepted trade in the Completed Trades section', async ({
+  test('shows accepted trade in the Trade History section', async ({
     page,
   }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Completed Trades', exact: true }),
-    ).toBeVisible();
+    // Completed (non-pending) trades render under the collapsible "Trade
+    // History" toggle. Expanding it fires the GetLeagueTradeOffers query.
+    await page.getByRole('button', { name: /Trade History/ }).click();
     await expect(page.getByText('Freddie Freeman')).toBeVisible();
   });
 });
@@ -456,9 +482,9 @@ test.describe('Trades tab — trade block section @smoke', () => {
   });
 
   test('renders the Trade Block section heading', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Trade Block', exact: true }),
-    ).toBeVisible();
+    // LeagueTradeBlock renders its title as a styled Text node (not a
+    // semantic heading), so match on the exact text.
+    await expect(page.getByText('Trade Block', { exact: true })).toBeVisible();
   });
 
   test('shows empty state when no players are on the trade block', async ({
