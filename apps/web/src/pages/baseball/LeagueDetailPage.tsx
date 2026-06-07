@@ -58,7 +58,10 @@ import {
   AwardVotingPanel,
   LeagueScoringSummary,
 } from '@legacy-sports/shared-components/leagues';
-import { MatchupNavigationControls } from '@legacy-sports/shared-components/matchup';
+import {
+  MatchupNavigationControls,
+  PlayoffBracket,
+} from '@legacy-sports/shared-components/matchup';
 import {
   PendingTradeOffers,
   PendingWaiverClaims,
@@ -109,7 +112,6 @@ import {
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
 import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagement';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
-import { PlayoffBracketDisplay } from '../../components/matchup/PlayoffBracketDisplay';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import { CommissionerAnnouncementsPanel } from '../../features/baseball/CommissionerAnnouncementsPanel';
 import { LeagueFreeAgents } from '../../features/baseball/LeagueFreeAgents';
@@ -4300,9 +4302,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                       <Spinner size="small" />
                     </XStack>
                   ) : bracketData?.getPlayoffBracket ? (
-                    <PlayoffBracketDisplay
-                      bracket={bracketData.getPlayoffBracket}
-                    />
+                    <PlayoffBracket bracket={bracketData.getPlayoffBracket} />
                   ) : null}
                 </>
               )}

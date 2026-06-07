@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import { StandingsTable } from '@legacy-sports/shared-components';
-import { PlayoffBracketDisplay } from './PlayoffBracketDisplay';
+import {
+  PlayoffBracket,
+  StandingsTable,
+} from '@legacy-sports/shared-components';
 import { useStandings } from '../../hooks/useStandings';
 import { useGetPlayoffBracketQuery } from '../../api/db/graphql.generated';
 
@@ -101,7 +103,7 @@ export function StandingsPage() {
               <Spinner size="small" color="$blue10" />
             </XStack>
           ) : bracketData?.getPlayoffBracket ? (
-            <PlayoffBracketDisplay bracket={bracketData.getPlayoffBracket} />
+            <PlayoffBracket bracket={bracketData.getPlayoffBracket} />
           ) : null}
         </>
       )}

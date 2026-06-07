@@ -7903,6 +7903,143 @@ export type PlayerFragment = {
   } | null;
 };
 
+export type PlayoffBracketFragment = {
+  __typename?: 'PlayoffBracket';
+  id?: string | null;
+  leagueId?: number | null;
+  season?: number | null;
+  format?: string | null;
+  startWeek?: number | null;
+  endWeek?: number | null;
+  championTeamId?: number | null;
+  status?: PlayoffMatchupStatus | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  championTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  matchups?: Array<{
+    __typename?: 'PlayoffMatchup';
+    id?: string | null;
+    bracketId?: number | null;
+    round?: PlayoffRound | null;
+    matchupNumber?: number | null;
+    highSeedTeamId?: number | null;
+    lowSeedTeamId?: number | null;
+    winnerTeamId?: number | null;
+    highSeedScore?: number | null;
+    lowSeedScore?: number | null;
+    weekNumber?: number | null;
+    status?: PlayoffMatchupStatus | null;
+    isMultiWeek?: boolean | null;
+    highSeedTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    lowSeedTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    winnerTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type PlayoffMatchupFragment = {
+  __typename?: 'PlayoffMatchup';
+  id?: string | null;
+  bracketId?: number | null;
+  round?: PlayoffRound | null;
+  matchupNumber?: number | null;
+  highSeedTeamId?: number | null;
+  lowSeedTeamId?: number | null;
+  winnerTeamId?: number | null;
+  highSeedScore?: number | null;
+  lowSeedScore?: number | null;
+  weekNumber?: number | null;
+  status?: PlayoffMatchupStatus | null;
+  isMultiWeek?: boolean | null;
+  highSeedTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  lowSeedTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  winnerTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type GetPlayoffBracketQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetPlayoffBracketQuery = {
+  __typename?: 'Query';
+  getPlayoffBracket?: {
+    __typename?: 'PlayoffBracket';
+    id?: string | null;
+    leagueId?: number | null;
+    season?: number | null;
+    format?: string | null;
+    startWeek?: number | null;
+    endWeek?: number | null;
+    championTeamId?: number | null;
+    status?: PlayoffMatchupStatus | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    championTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    matchups?: Array<{
+      __typename?: 'PlayoffMatchup';
+      id?: string | null;
+      bracketId?: number | null;
+      round?: PlayoffRound | null;
+      matchupNumber?: number | null;
+      highSeedTeamId?: number | null;
+      lowSeedTeamId?: number | null;
+      winnerTeamId?: number | null;
+      highSeedScore?: number | null;
+      lowSeedScore?: number | null;
+      weekNumber?: number | null;
+      status?: PlayoffMatchupStatus | null;
+      isMultiWeek?: boolean | null;
+      highSeedTeam?: {
+        __typename?: 'Team';
+        id?: number | null;
+        name?: string | null;
+      } | null;
+      lowSeedTeam?: {
+        __typename?: 'Team';
+        id?: number | null;
+        name?: string | null;
+      } | null;
+      winnerTeam?: {
+        __typename?: 'Team';
+        id?: number | null;
+        name?: string | null;
+      } | null;
+    }> | null;
+  } | null;
+};
+
 export type ProcessWaiverClaimsMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -9855,6 +9992,56 @@ export const PlayerFragmentDoc = gql`
       stolenBases
     }
   }
+`;
+export const PlayoffMatchupFragmentDoc = gql`
+  fragment PlayoffMatchup on PlayoffMatchup {
+    id
+    bracketId
+    round
+    matchupNumber
+    highSeedTeamId
+    lowSeedTeamId
+    winnerTeamId
+    highSeedScore
+    lowSeedScore
+    weekNumber
+    status
+    isMultiWeek
+    highSeedTeam {
+      id
+      name
+    }
+    lowSeedTeam {
+      id
+      name
+    }
+    winnerTeam {
+      id
+      name
+    }
+  }
+`;
+export const PlayoffBracketFragmentDoc = gql`
+  fragment PlayoffBracket on PlayoffBracket {
+    id
+    leagueId
+    season
+    format
+    startWeek
+    endWeek
+    championTeamId
+    status
+    createdAt
+    updatedAt
+    championTeam {
+      id
+      name
+    }
+    matchups {
+      ...PlayoffMatchup
+    }
+  }
+  ${PlayoffMatchupFragmentDoc}
 `;
 export const LeagueSeasonAwardFragmentDoc = gql`
   fragment LeagueSeasonAward on LeagueSeasonAward {
@@ -17908,6 +18095,98 @@ export type GetOnThisDayEventsSuspenseQueryHookResult = ReturnType<
 export type GetOnThisDayEventsQueryResult = Apollo.QueryResult<
   GetOnThisDayEventsQuery,
   GetOnThisDayEventsQueryVariables
+>;
+export const GetPlayoffBracket = gql`
+  query GetPlayoffBracket($leagueId: Int!, $season: Int) {
+    getPlayoffBracket(leagueId: $leagueId, season: $season) {
+      ...PlayoffBracket
+    }
+  }
+  ${PlayoffBracketFragmentDoc}
+`;
+
+/**
+ * __useGetPlayoffBracketQuery__
+ *
+ * To run a query within a React component, call `useGetPlayoffBracketQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayoffBracketQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayoffBracketQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      season: // value for 'season'
+ *   },
+ * });
+ */
+export function useGetPlayoffBracketQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  > &
+    (
+      | { variables: GetPlayoffBracketQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >(GetPlayoffBracket, options);
+}
+export function useGetPlayoffBracketLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >(GetPlayoffBracket, options);
+}
+export function useGetPlayoffBracketSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayoffBracketQuery,
+        GetPlayoffBracketQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >(
+    GetPlayoffBracket,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayoffBracketQuery,
+          GetPlayoffBracketQueryVariables
+        >,
+  );
+}
+export type GetPlayoffBracketQueryHookResult = ReturnType<
+  typeof useGetPlayoffBracketQuery
+>;
+export type GetPlayoffBracketLazyQueryHookResult = ReturnType<
+  typeof useGetPlayoffBracketLazyQuery
+>;
+export type GetPlayoffBracketSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayoffBracketSuspenseQuery
+>;
+export type GetPlayoffBracketQueryResult = Apollo.QueryResult<
+  GetPlayoffBracketQuery,
+  GetPlayoffBracketQueryVariables
 >;
 export const ProcessWaiverClaims = gql`
   mutation ProcessWaiverClaims($leagueId: Int!) {

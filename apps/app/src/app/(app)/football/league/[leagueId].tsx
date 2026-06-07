@@ -18,8 +18,10 @@ import { config } from '@legacy-sports/app-config/native';
 import {
   PendingTradeOfferBanner,
   PendingWaiverClaims,
+  PlayoffBracket,
   StandingsTable,
   TradingCenter,
+  usePlayoffBracket,
   useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
@@ -139,6 +141,10 @@ export default function FootballLeagueId(): React.JSX.Element {
     loading: standingsLoading,
     error: standingsError,
   } = useStandings(isNaN(numLeagueId) ? null : numLeagueId);
+
+  const { bracket: playoffBracket } = usePlayoffBracket(
+    isNaN(numLeagueId) ? null : numLeagueId,
+  );
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -429,12 +435,15 @@ export default function FootballLeagueId(): React.JSX.Element {
 
         <Tabs.Content value="standings" flex={1}>
           <ScrollView>
-            <YStack padding="$3">
+            <YStack padding="$3" space="$4">
               <StandingsTable
                 standings={standings}
                 loading={standingsLoading}
                 error={standingsError}
               />
+              {playoffBracket ? (
+                <PlayoffBracket bracket={playoffBracket} />
+              ) : null}
             </YStack>
           </ScrollView>
         </Tabs.Content>

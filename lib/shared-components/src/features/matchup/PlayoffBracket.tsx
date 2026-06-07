@@ -1,22 +1,59 @@
 import React from 'react';
-import { Card, H3, H4, Separator, Text, XStack, YStack } from 'tamagui';
+import { useWindowDimensions } from 'react-native';
+import {
+  Card,
+  H3,
+  H4,
+  ScrollView,
+  Separator,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
 import {
-  GetPlayoffBracketQuery,
   PlayoffMatchupStatus,
   PlayoffRound,
 } from '../../api/db/graphql.generated';
-import {
-  BRAND_GOLD,
-  BRAND_NAVY_LIGHT,
-  withAlpha,
-} from '../../constants/colors';
+import { BRAND_GOLD, BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
-type Bracket = NonNullable<GetPlayoffBracketQuery['getPlayoffBracket']>;
-type PlayoffMatchup = NonNullable<Bracket['matchups']>[number];
+/**
+ * Minimal team reference needed to render a bracket slot. Kept structural
+ * (not the generated `Team` type) so both web and native query results — which
+ * carry their own per-app generated enum/object types — assign cleanly.
+ */
+export interface PlayoffBracketTeamRef {
+  name?: string | null;
+}
 
-interface PlayoffBracketDisplayProps {
-  bracket: Bracket;
+/** Single playoff matchup, injected via props. */
+export interface PlayoffBracketMatchupData {
+  id?: string | number | null;
+  round?: PlayoffRound | string | null;
+  matchupNumber?: number | null;
+  weekNumber?: number | null;
+  isMultiWeek?: boolean | null;
+  status?: PlayoffMatchupStatus | string | null;
+  highSeedTeamId?: number | null;
+  lowSeedTeamId?: number | null;
+  winnerTeamId?: number | null;
+  highSeedScore?: number | null;
+  lowSeedScore?: number | null;
+  highSeedTeam?: PlayoffBracketTeamRef | null;
+  lowSeedTeam?: PlayoffBracketTeamRef | null;
+}
+
+/** Bracket seeding + results, injected via props. */
+export interface PlayoffBracketData {
+  season?: number | null;
+  format?: string | null;
+  status?: PlayoffMatchupStatus | string | null;
+  championTeam?: PlayoffBracketTeamRef | null;
+  matchups?: readonly PlayoffBracketMatchupData[] | null;
+}
+
+export interface PlayoffBracketProps {
+  bracket: PlayoffBracketData;
 }
 
 const ROUND_LABELS: Record<string, string> = {
@@ -25,7 +62,7 @@ const ROUND_LABELS: Record<string, string> = {
   finals: 'Championship',
 };
 
-function MatchupCard({ matchup }: { matchup: PlayoffMatchup }) {
+function MatchupCard({ matchup }: { matchup: PlayoffBracketMatchupData }) {
   const isComplete = matchup.status === PlayoffMatchupStatus.Completed;
   const isInProgress = matchup.status === PlayoffMatchupStatus.InProgress;
 
@@ -155,23 +192,64 @@ function MatchupCard({ matchup }: { matchup: PlayoffMatchup }) {
   );
 }
 
+interface RoundGroup {
+  round: string;
+  label: string;
+  matchups: PlayoffBracketMatchupData[];
+}
+
+function RoundColumn({
+  group,
+  fullWidth,
+}: {
+  group: RoundGroup;
+  fullWidth: boolean;
+}) {
+  return (
+    <YStack
+      gap="$3"
+      flex={fullWidth ? undefined : 1}
+      width={fullWidth ? '100%' : undefined}
+      minWidth={fullWidth ? undefined : 220}
+    >
+      <H4
+        margin={0}
+        fontSize="$3"
+        color="$gray11"
+        textTransform="uppercase"
+        letterSpacing={1}
+      >
+        {group.label}
+      </H4>
+      <YStack gap="$2">
+        {group.matchups.map((matchup, index) => (
+          <MatchupCard key={matchup.id ?? index} matchup={matchup} />
+        ))}
+      </YStack>
+    </YStack>
+  );
+}
+
 /**
- * PlayoffBracketDisplay - Shows a playoff bracket with round-by-round matchups.
+ * PlayoffBracket - cross-platform playoff bracket visualization.
  *
- * Groups matchups by round and displays them in columns from left to right.
- * Completed matchups show final scores and highlight the winner.
+ * Groups matchups by round in tournament order. On wide viewports the rounds
+ * render as left-to-right columns inside a horizontal scroll container; on
+ * narrow viewports they stack vertically. Completed matchups show final scores
+ * and highlight the winner. Seeding/results are injected via the `bracket` prop.
  */
-export function PlayoffBracketDisplay({ bracket }: PlayoffBracketDisplayProps) {
+export function PlayoffBracket({ bracket }: PlayoffBracketProps) {
+  const { width } = useWindowDimensions();
   const matchups = bracket.matchups ?? [];
 
-  // Group matchups by round in tournament order
+  // Group matchups by round in tournament order.
   const roundOrder: PlayoffRound[] = [
     PlayoffRound.Wildcard,
     PlayoffRound.Semifinals,
     PlayoffRound.Finals,
   ];
 
-  const rounds = roundOrder
+  const rounds: RoundGroup[] = roundOrder
     .map((round) => ({
       round,
       label: ROUND_LABELS[round] ?? round,
@@ -183,6 +261,11 @@ export function PlayoffBracketDisplay({ bracket }: PlayoffBracketDisplayProps) {
 
   const isComplete = bracket.status === PlayoffMatchupStatus.Completed;
   const champion = bracket.championTeam;
+
+  // Wide viewports lay the rounds out horizontally (scrollable on overflow);
+  // narrow viewports stack them vertically. 660px mirrors Tamagui's `gtSm`
+  // breakpoint so the switch lines up with the rest of the app's responsive UI.
+  const isWide = width >= 660;
 
   return (
     <Card
@@ -214,26 +297,25 @@ export function PlayoffBracketDisplay({ bracket }: PlayoffBracketDisplayProps) {
         </XStack>
 
         {/* Bracket rounds */}
-        <XStack gap="$4" flexWrap="wrap" alignItems="flex-start">
-          {rounds.map(({ round, label, matchups: roundMatchups }) => (
-            <YStack key={round} gap="$3" flex={1} minWidth={220}>
-              <H4
-                margin={0}
-                fontSize="$3"
-                color="$gray11"
-                textTransform="uppercase"
-                letterSpacing={1}
-              >
-                {label}
-              </H4>
-              <YStack gap="$2">
-                {roundMatchups.map((matchup) => (
-                  <MatchupCard key={matchup.id} matchup={matchup} />
-                ))}
-              </YStack>
-            </YStack>
-          ))}
-        </XStack>
+        {isWide ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap="$4" alignItems="flex-start">
+              {rounds.map((group) => (
+                <RoundColumn
+                  key={group.round}
+                  group={group}
+                  fullWidth={false}
+                />
+              ))}
+            </XStack>
+          </ScrollView>
+        ) : (
+          <YStack gap="$4">
+            {rounds.map((group) => (
+              <RoundColumn key={group.round} group={group} fullWidth />
+            ))}
+          </YStack>
+        )}
       </YStack>
     </Card>
   );

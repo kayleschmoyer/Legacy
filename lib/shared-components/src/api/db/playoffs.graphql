@@ -1,0 +1,52 @@
+fragment PlayoffBracket on PlayoffBracket {
+  id
+  leagueId
+  season
+  format
+  startWeek
+  endWeek
+  championTeamId
+  status
+  createdAt
+  updatedAt
+  championTeam {
+    id
+    name
+  }
+  matchups {
+    ...PlayoffMatchup
+  }
+}
+
+fragment PlayoffMatchup on PlayoffMatchup {
+  id
+  bracketId
+  round
+  matchupNumber
+  highSeedTeamId
+  lowSeedTeamId
+  winnerTeamId
+  highSeedScore
+  lowSeedScore
+  weekNumber
+  status
+  isMultiWeek
+  highSeedTeam {
+    id
+    name
+  }
+  lowSeedTeam {
+    id
+    name
+  }
+  winnerTeam {
+    id
+    name
+  }
+}
+
+query GetPlayoffBracket($leagueId: Int!, $season: Int) {
+  getPlayoffBracket(leagueId: $leagueId, season: $season) {
+    ...PlayoffBracket
+  }
+}

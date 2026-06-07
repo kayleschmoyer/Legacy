@@ -98,8 +98,14 @@ jest.mock('@legacy-sports/shared-components', () => {
     OnThisDayFeed: () => <View testID="on-this-day-feed" />,
     PendingTradeOfferBanner: () => <View testID="pending-trade-offer-banner" />,
     PendingWaiverClaims: () => <View testID="pending-waiver-claims" />,
+    PlayoffBracket: () => <View testID="playoff-bracket" />,
     StandingsTable: () => <View testID="standings-table" />,
     TradingCenter: () => <View testID="trading-center" />,
+    usePlayoffBracket: jest.fn(() => ({
+      bracket: null,
+      loading: false,
+      error: undefined,
+    })),
     useWebSocket: jest.fn(() => ({ connected: false })),
   };
 });
