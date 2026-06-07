@@ -214,7 +214,6 @@ export function MLBHome({
         alignItems="center"
         justifyContent="center"
         minHeight={320}
-        aria-label="Baseball fantasy landing page"
       >
         <Spinner size="large" color={BRAND_NAVY_LIGHT} />
       </YStack>
@@ -226,9 +225,13 @@ export function MLBHome({
       <YStack
         backgroundColor="$background"
         flexGrow={1}
-        padding="$5"
+        paddingHorizontal="$4"
+        paddingVertical="$5"
         gap="$6"
-        aria-label="Baseball fantasy landing page"
+        // Mobile-first padding: tighter on phones, roomier once the viewport
+        // can afford it. Restores the responsive padding the web-only
+        // BaseballLandingPage had before the LS-7716 extraction (LS-7799).
+        $gtSm={{ paddingHorizontal: '$6', paddingVertical: '$7' }}
       >
         {/* Hero — compact for returning managers, full for first-timers */}
         {hasLeagues ? (
@@ -237,11 +240,18 @@ export function MLBHome({
             borderRadius="$7"
             borderWidth={1}
             borderColor="$glassBorder"
-            padding="$5"
-            alignItems="center"
-            justifyContent="space-between"
-            flexWrap="wrap"
+            flexDirection="column"
+            alignItems="flex-start"
+            padding="$4"
             gap="$4"
+            // Compact returning-user hero: stacks on phones, reflows to a
+            // side-by-side banner on wider viewports (LS-7799).
+            $gtSm={{ padding: '$5' }}
+            $gtMd={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
           >
             <YStack gap="$1" flex={1} minWidth={200}>
               <H2 color="$color" fontSize="$8" fontWeight="800">
@@ -298,9 +308,14 @@ export function MLBHome({
             borderRadius="$8"
             borderWidth={1}
             borderColor="$glassBorder"
-            padding="$7"
+            flexDirection="column"
+            padding="$6"
             gap="$6"
-            flexWrap="wrap"
+            // First-timer hero: stacked copy + side panel on phones, reflows to
+            // side-by-side on desktop, with padding scaling up by tier. Mirrors
+            // the deleted web BaseballLandingPage hero breakpoints (LS-7799).
+            $gtSm={{ padding: '$7' }}
+            $gtMd={{ flexDirection: 'row', padding: '$9' }}
           >
             <YStack flex={1} minWidth={280} gap="$4">
               <XStack
@@ -316,10 +331,19 @@ export function MLBHome({
                   {currentYear} Season Hub
                 </Text>
               </XStack>
-              <H1 color="$color" fontSize="$12" fontWeight="800">
+              <H1
+                color="$color"
+                fontSize="$10"
+                fontWeight="800"
+                $gtSm={{ fontSize: '$12' }}
+              >
                 Baseball Fantasy
               </H1>
-              <Paragraph color="$glassTextSubdued" fontSize="$5">
+              <Paragraph
+                color="$glassTextSubdued"
+                fontSize="$4"
+                $gtSm={{ fontSize: '$5' }}
+              >
                 {`Welcome back, ${userName}. ${heroSubtitleCopy}`}
               </Paragraph>
               <XStack gap="$3" flexWrap="wrap" marginTop="$2">
@@ -540,10 +564,17 @@ export function MLBHome({
         {/* Your leagues */}
         <YStack gap="$4">
           <XStack
-            justifyContent="space-between"
-            alignItems="flex-end"
-            flexWrap="wrap"
+            flexDirection="column"
+            alignItems="flex-start"
             gap="$3"
+            // Section header stacks title over the search box on phones and
+            // reflows to a single row with the search pinned right on desktop
+            // (LS-7799).
+            $gtMd={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+            }}
           >
             <YStack gap="$1">
               <H2 color="$color" fontSize="$8" fontWeight="700">
@@ -597,14 +628,18 @@ export function MLBHome({
                     borderColor="$glassBorder"
                     padding="$4"
                     paddingHorizontal="$5"
-                    alignItems="center"
+                    flexDirection="column"
+                    alignItems="flex-start"
                     gap="$4"
-                    flexWrap="wrap"
                     cursor="pointer"
                     pressStyle={{ scale: 0.995 }}
                     onPress={() => onViewLeague(league.id)}
                     accessibilityLabel={`View ${league.name || 'league'}`}
                     role="link"
+                    // League rows stack their name/badges/action vertically on
+                    // phones and lay out in a single centered row on desktop
+                    // (LS-7799).
+                    $gtSm={{ flexDirection: 'row', alignItems: 'center' }}
                   >
                     <YStack gap="$1" flex={1} minWidth={160}>
                       <H3 fontSize="$6" fontWeight="700" color="$color">
