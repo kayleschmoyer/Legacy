@@ -7,6 +7,11 @@ import {
 import { handleLogin, handleRegister } from './Local';
 import { notifyNewUserSignup } from '../util/discord';
 import { hashPassword, testPassword } from '../Users';
+import {
+  clearFailedLogins,
+  isLoginLocked,
+  recordFailedLogin,
+} from '../util/login-throttle';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -56,6 +61,14 @@ jest.mock('../Users', () => ({
   testPassword: jest.fn(),
 }));
 
+jest.mock('../util/login-throttle', () => ({
+  isLoginLocked: jest
+    .fn()
+    .mockResolvedValue({ locked: false, retryAfterSeconds: 0 }),
+  recordFailedLogin: jest.fn().mockResolvedValue(undefined),
+  clearFailedLogins: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockGetUserByEmail = getUserByEmail as jest.MockedFunction<
   typeof getUserByEmail
 >;
@@ -72,6 +85,15 @@ const mockHashPassword = hashPassword as jest.MockedFunction<
 >;
 const mockTestPassword = testPassword as jest.MockedFunction<
   typeof testPassword
+>;
+const mockIsLoginLocked = isLoginLocked as jest.MockedFunction<
+  typeof isLoginLocked
+>;
+const mockRecordFailedLogin = recordFailedLogin as jest.MockedFunction<
+  typeof recordFailedLogin
+>;
+const mockClearFailedLogins = clearFailedLogins as jest.MockedFunction<
+  typeof clearFailedLogins
 >;
 
 function makeEvent(body: unknown): APIGatewayEvent {
@@ -193,6 +215,74 @@ describe('handleLogin', () => {
 
       expect(result.statusCode).toBe(401);
       expect(mockGetSubscriptionByUserId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('per-email lockout (LGN-020 / LS-6675)', () => {
+    const validBody = { email: 'victim@example.com', password: 'correct-pass' };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('returns 429 with Retry-After and skips the DB when the email is locked', async () => {
+      mockIsLoginLocked.mockResolvedValueOnce({
+        locked: true,
+        retryAfterSeconds: 300,
+      });
+
+      const result = await handleLogin(makeEvent(validBody));
+
+      expect(result.statusCode).toBe(429);
+      expect(result.headers?.['Retry-After']).toBe('300');
+      expect((JSON.parse(result.body) as { error: string }).error).toBe(
+        'rate_limited',
+      );
+      // Locked emails never reach the credential check.
+      expect(mockGetUserByEmail).not.toHaveBeenCalled();
+      expect(mockRecordFailedLogin).not.toHaveBeenCalled();
+    });
+
+    it('records a failed attempt when the password is wrong', async () => {
+      mockGetUserByEmail.mockResolvedValue({
+        id: 7,
+        email: validBody.email,
+        passwordHash: 'stored-hash',
+      } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
+      mockTestPassword.mockResolvedValue(false);
+
+      const result = await handleLogin(makeEvent(validBody));
+
+      expect(result.statusCode).toBe(401);
+      expect(mockRecordFailedLogin).toHaveBeenCalledWith(validBody.email);
+      expect(mockClearFailedLogins).not.toHaveBeenCalled();
+    });
+
+    it('records a failed attempt when the account does not exist', async () => {
+      mockGetUserByEmail.mockResolvedValue(
+        null as unknown as Awaited<ReturnType<typeof getUserByEmail>>,
+      );
+
+      const result = await handleLogin(makeEvent(validBody));
+
+      expect(result.statusCode).toBe(401);
+      expect(mockRecordFailedLogin).toHaveBeenCalledWith(validBody.email);
+    });
+
+    it('clears the counter on a successful login', async () => {
+      mockGetUserByEmail.mockResolvedValue({
+        id: 7,
+        email: validBody.email,
+        passwordHash: 'stored-hash',
+      } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
+      mockTestPassword.mockResolvedValue(true);
+      mockGetSubscriptionByUserId.mockResolvedValue(null);
+
+      const result = await handleLogin(makeEvent(validBody));
+
+      expect(result.statusCode).toBe(200);
+      expect(mockClearFailedLogins).toHaveBeenCalledWith(validBody.email);
+      expect(mockRecordFailedLogin).not.toHaveBeenCalled();
     });
   });
 });

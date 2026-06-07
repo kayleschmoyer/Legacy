@@ -135,10 +135,35 @@ resource "aws_dynamodb_table" "oauth_device_flows" {
   tags = local.common_tags
 }
 
-# IAM policy granting the OAuth Lambda read/write access to the device-flow table
+# DynamoDB table for per-email failed-login throttling (LGN-020 / LS-6675).
+# The in-Lambda IP limiter is per-instance and per-IP only; this table tracks
+# failed attempts by target email shared across all warm containers, so a
+# credential-stuffing campaign against a single email is locked out regardless
+# of source IP. Rows self-expire via TTL.
+resource "aws_dynamodb_table" "oauth_login_throttle" {
+  name         = "${local.name_prefix}-oauth-login-throttle"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "emailHash"
+
+  attribute {
+    name = "emailHash"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = local.common_tags
+}
+
+# IAM policy granting the OAuth Lambda read/write access to the device-flow and
+# login-throttle tables
 resource "aws_iam_policy" "oauth_proxy_lambda_dynamodb" {
   name        = "${local.name_prefix}-oauth-proxy-lambda-dynamodb"
-  description = "IAM policy for OAuth Lambda to access the device-flow DynamoDB table"
+  description = "IAM policy for OAuth Lambda to access the device-flow and login-throttle DynamoDB tables"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -154,7 +179,8 @@ resource "aws_iam_policy" "oauth_proxy_lambda_dynamodb" {
         ]
         Resource = [
           aws_dynamodb_table.oauth_device_flows.arn,
-          "${aws_dynamodb_table.oauth_device_flows.arn}/index/*"
+          "${aws_dynamodb_table.oauth_device_flows.arn}/index/*",
+          aws_dynamodb_table.oauth_login_throttle.arn
         ]
       }
     ]
@@ -239,6 +265,9 @@ resource "aws_lambda_function" "oauth_proxy" {
 
       # Device-flow DynamoDB table
       DEVICE_FLOW_TABLE_NAME = aws_dynamodb_table.oauth_device_flows.name
+
+      # Per-email login-throttle DynamoDB table (LGN-020 / LS-6675)
+      LOGIN_THROTTLE_TABLE_NAME = aws_dynamodb_table.oauth_login_throttle.name
 
       # Discord new-user signup notification webhook (fetched from Secrets Manager at cold start)
       DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME = aws_secretsmanager_secret.discord_user_signup_webhook_url.name

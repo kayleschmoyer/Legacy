@@ -14,6 +14,11 @@ import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 import { deriveBillingStatus } from '../util/billing';
 import { notifyNewUserSignup } from '../util/discord';
+import {
+  clearFailedLogins,
+  isLoginLocked,
+  recordFailedLogin,
+} from '../util/login-throttle';
 
 // Minimum password length on registration. New accounts must meet this bar.
 export const MIN_PASSWORD_LENGTH = 12;
@@ -65,19 +70,46 @@ export const handleLogin = async (
     return errorResponse(400, 'Invalid request body');
   }
 
+  // Per-email lockout (LGN-020 / LS-6675). The IP limiter in util/rate-limit.ts
+  // is per-instance and per-IP only, so credential-stuffing against a single
+  // email from many IPs slips past it. This counter is keyed by the target
+  // email and shared across containers, so a locked email stays locked
+  // regardless of source IP. Fail-open: a storage outage degrades to allow.
+  const lock = await isLoginLocked(email);
+  if (lock.locked) {
+    LOGGER.warn('Login locked: too many failed attempts for target email', {
+      retryAfterSeconds: lock.retryAfterSeconds,
+    });
+    return {
+      statusCode: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(lock.retryAfterSeconds),
+      },
+      body: JSON.stringify({
+        error: 'rate_limited',
+        message: 'Too many failed login attempts. Please try again later.',
+      }),
+    };
+  }
+
   LOGGER.debug('Initialize database.');
   return await withDbClient(async (db) => {
     const user = await getUserByEmail(db, email);
 
     if (!user?.passwordHash) {
+      await recordFailedLogin(email);
       return errorResponse(401, 'Invalid credentials');
     }
 
     const isCorrect = await testPassword(password, user.passwordHash);
 
     if (!isCorrect) {
+      await recordFailedLogin(email);
       return errorResponse(401, 'Invalid credentials');
     }
+
+    await clearFailedLogins(email);
 
     const internalJwt = await createJwt(user);
 
