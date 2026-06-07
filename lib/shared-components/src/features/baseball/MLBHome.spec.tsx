@@ -219,4 +219,20 @@ describe('MLBHome', () => {
       screen.getByText(/Sign in to manage your fantasy baseball leagues/i),
     ).toBeInTheDocument();
   });
+
+  it('does not render a Live Scores button when onScoreboard is omitted', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    expect(screen.queryByText('Live Scores')).not.toBeInTheDocument();
+  });
+
+  it('renders a Live Scores button and calls onScoreboard when provided', () => {
+    const onScoreboard = jest.fn();
+    render(
+      <MLBHome {...baseProps} leagues={LEAGUES} onScoreboard={onScoreboard} />,
+    );
+    const btn = screen.getByText('Live Scores');
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onScoreboard).toHaveBeenCalledTimes(1);
+  });
 });

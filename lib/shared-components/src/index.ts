@@ -195,6 +195,9 @@ export * from './components/UnifiedLoadingPanel';
 // Scoreboard primitives (cross-platform)
 export * from './components/scoreboard';
 
+// Scoreboard page-level container + helpers (cross-platform, LS-7803)
+export * from './features/scoreboard';
+
 // Design-system primitives & composites (LS-4146 — Claude Design handoff).
 // Explicit re-exports avoid name collisions with existing legacy exports
 // (e.g. Layout's Separator, navigation's TabItem, features/matchup's

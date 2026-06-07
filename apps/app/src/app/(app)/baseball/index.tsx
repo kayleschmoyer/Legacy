@@ -161,6 +161,7 @@ export default function BaseballHome() {
         onCreateLeague={handleCreateLeague}
         onJoinLeague={() => router.navigate('/baseball/league/join')}
         onMockDraft={() => router.navigate('/baseball/mock-draft')}
+        onScoreboard={() => router.navigate('/baseball/scoreboard')}
         onViewLeague={(id) =>
           router.push({
             pathname: '/baseball/league/[leagueId]',

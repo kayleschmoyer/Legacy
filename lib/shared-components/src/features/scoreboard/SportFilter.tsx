@@ -5,18 +5,19 @@
  * scoreboard wires in without a header redesign; `disabledSports` lets the
  * caller render any sport as not-yet-selectable when its backend is offline.
  *
- * Implements the WAI-ARIA radiogroup pattern:
- *   - The container has `role="radiogroup"` and owns a keyboard handler that
- *     moves selection via ArrowLeft / ArrowRight / Home / End.
- *   - Each option has `role="radio"`. Only the currently selected option is
- *     in the tab order (`tabIndex={0}`); the others are `tabIndex={-1}` and
- *     reachable via arrow keys, per the standard pattern.
- *   - Disabled options are skipped during arrow navigation but remain visible.
+ * Cross-platform (tamagui): renders real `<button>` radios on web and
+ * Pressable rows on native. Implements the WAI-ARIA radiogroup pattern on web:
+ *   - The container has `role="radiogroup"` and a keyboard handler that moves
+ *     selection via ArrowLeft / ArrowRight / Home / End.
+ *   - Each option has `role="radio"`. Only the selected option is in the tab
+ *     order (`tabIndex={0}`); the others are `tabIndex={-1}` and reachable via
+ *     arrow keys. Disabled options are skipped during arrow navigation.
+ * The keyboard handler is a no-op on native (no DOM key events fire there).
  */
 import React, { useCallback, useRef } from 'react';
 import { Text, XStack } from 'tamagui';
-import { FONT_DISPLAY } from '../../constants/typography';
-import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
+import { SportGlyph } from './SportGlyph';
+import { FONT_DISPLAY } from '../../utils/typography';
 
 export type SportKey = 'all' | 'mlb' | 'nfl';
 
@@ -35,8 +36,8 @@ interface Option {
 
 const OPTIONS: Option[] = [
   { key: 'all', label: 'All', glyph: null },
-  { key: 'mlb', label: 'MLB', glyph: <BaseballIcon size={14} /> },
-  { key: 'nfl', label: 'NFL', glyph: <FootballIcon size={14} /> },
+  { key: 'mlb', label: 'MLB', glyph: <SportGlyph sport="mlb" size={14} /> },
+  { key: 'nfl', label: 'NFL', glyph: <SportGlyph sport="nfl" size={14} /> },
 ];
 
 export function SportFilter({
@@ -44,6 +45,7 @@ export function SportFilter({
   onChange,
   disabledSports = [],
 }: SportFilterProps) {
+  // Web-only roving focus targets; harmless and unused on native.
   const buttonRefs = useRef<Record<SportKey, HTMLButtonElement | null>>({
     all: null,
     mlb: null,
@@ -152,16 +154,16 @@ function SportButton({
   return (
     <XStack
       tag="button"
-      type="button"
       role="radio"
       ref={buttonRef as never}
       data-testid={`scoreboard-sport-${sportKey}`}
       aria-checked={active}
       aria-disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: active, disabled }}
       disabled={disabled}
       // Roving tabindex: only the selected radio is in the tab order.
       tabIndex={active ? 0 : -1}
-      title={disabled ? `${label} scoreboard coming soon` : undefined}
       onPress={onPress}
       alignItems="center"
       gap="$2"

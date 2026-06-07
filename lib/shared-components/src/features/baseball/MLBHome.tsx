@@ -70,6 +70,8 @@ export interface MLBHomeProps {
   onCreateLeague: (input: QuickCreateLeagueInput) => Promise<void>;
   onJoinLeague: () => void;
   onMockDraft?: () => void;
+  /** When provided, renders a "Live Scores" action linking to the scoreboard. */
+  onScoreboard?: () => void;
   onViewLeague: (leagueId: number | string) => void;
   /** Retry the leagues query from the error notice. */
   onRetry?: () => void;
@@ -146,6 +148,7 @@ export function MLBHome({
   onCreateLeague,
   onJoinLeague,
   onMockDraft,
+  onScoreboard,
   onViewLeague,
   onRetry,
   onSignIn,
@@ -300,6 +303,20 @@ export function MLBHome({
                   </Text>
                 </Button>
               ) : null}
+              {onScoreboard ? (
+                <Button
+                  backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                  borderWidth={1}
+                  borderRadius="$5"
+                  onPress={onScoreboard}
+                  accessibilityLabel="View the live scoreboard"
+                >
+                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                    Live Scores
+                  </Text>
+                </Button>
+              ) : null}
             </XStack>
           </XStack>
         ) : (
@@ -382,6 +399,20 @@ export function MLBHome({
                   >
                     <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                       Mock Draft
+                    </Text>
+                  </Button>
+                ) : null}
+                {onScoreboard ? (
+                  <Button
+                    backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                    borderWidth={1}
+                    borderRadius="$6"
+                    onPress={onScoreboard}
+                    accessibilityLabel="View the live scoreboard"
+                  >
+                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                      Live Scores
                     </Text>
                   </Button>
                 ) : null}

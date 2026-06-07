@@ -19,6 +19,7 @@
     "./notifications": "./src/entry/notifications.ts",
     "./players": "./src/entry/players.ts",
     "./roster": "./src/entry/roster.ts",
+    "./scoreboard": "./src/entry/scoreboard.ts",
     "./season-draft": "./src/entry/season-draft.ts",
     "./baseball": "./src/entry/baseball.ts",
     "./football": "./src/entry/football.ts",

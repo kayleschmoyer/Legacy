@@ -1,0 +1,30 @@
+query GetScoreboard($date: String) {
+  scoreboard(date: $date) {
+    date
+    lastUpdated
+    games {
+      gamePk
+      status
+      startTime
+      inning
+      inningHalf
+      outs
+      homeTeam {
+        teamName
+        abbreviation
+        runs
+        hits
+        errors
+        linescoreInnings
+      }
+      awayTeam {
+        teamName
+        abbreviation
+        runs
+        hits
+        errors
+        linescoreInnings
+      }
+    }
+  }
+}

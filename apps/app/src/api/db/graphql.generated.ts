@@ -6417,6 +6417,46 @@ export type PlayerFragment = {
   brefId?: string | null;
 };
 
+export type GetScoreboardQueryVariables = Exact<{
+  date?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetScoreboardQuery = {
+  __typename?: 'Query';
+  scoreboard?: {
+    __typename?: 'Scoreboard';
+    date?: string | null;
+    lastUpdated?: string | null;
+    games?: Array<{
+      __typename?: 'ScoreboardGame';
+      gamePk: number;
+      status: string;
+      startTime?: string | null;
+      inning?: number | null;
+      inningHalf?: string | null;
+      outs?: number | null;
+      homeTeam: {
+        __typename?: 'ScoreboardTeam';
+        teamName: string;
+        abbreviation: string;
+        runs: number;
+        hits: number;
+        errors: number;
+        linescoreInnings?: Array<number> | null;
+      };
+      awayTeam: {
+        __typename?: 'ScoreboardTeam';
+        teamName: string;
+        abbreviation: string;
+        runs: number;
+        hits: number;
+        errors: number;
+        linescoreInnings?: Array<number> | null;
+      };
+    }> | null;
+  } | null;
+};
+
 export type GetLeagueScoringProfileQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -11514,6 +11554,117 @@ export type ClaimFreeAgentMutationResult =
 export type ClaimFreeAgentMutationOptions = BaseMutationOptions<
   ClaimFreeAgentMutation,
   ClaimFreeAgentMutationVariables
+>;
+export const GetScoreboard = gql`
+  query GetScoreboard($date: String) {
+    scoreboard(date: $date) {
+      date
+      lastUpdated
+      games {
+        gamePk
+        status
+        startTime
+        inning
+        inningHalf
+        outs
+        homeTeam {
+          teamName
+          abbreviation
+          runs
+          hits
+          errors
+          linescoreInnings
+        }
+        awayTeam {
+          teamName
+          abbreviation
+          runs
+          hits
+          errors
+          linescoreInnings
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetScoreboardQuery__
+ *
+ * To run a query within a React component, call `useGetScoreboardQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetScoreboardQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetScoreboardQuery({
+ *   variables: {
+ *      date: // value for 'date'
+ *   },
+ * });
+ */
+export function useGetScoreboardQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetScoreboardQuery,
+    GetScoreboardQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetScoreboardQuery, GetScoreboardQueryVariables>(
+    GetScoreboard,
+    options,
+  );
+}
+export function useGetScoreboardLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetScoreboardQuery,
+    GetScoreboardQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetScoreboardQuery, GetScoreboardQueryVariables>(
+    GetScoreboard,
+    options,
+  );
+}
+export function useGetScoreboardSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetScoreboardQuery,
+        GetScoreboardQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetScoreboardQuery,
+    GetScoreboardQueryVariables
+  >(
+    GetScoreboard,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetScoreboardQuery,
+          GetScoreboardQueryVariables
+        >,
+  );
+}
+export type GetScoreboardQueryHookResult = ReturnType<
+  typeof useGetScoreboardQuery
+>;
+export type GetScoreboardLazyQueryHookResult = ReturnType<
+  typeof useGetScoreboardLazyQuery
+>;
+export type GetScoreboardSuspenseQueryHookResult = ReturnType<
+  typeof useGetScoreboardSuspenseQuery
+>;
+export type GetScoreboardQueryResult = Apollo.QueryResult<
+  GetScoreboardQuery,
+  GetScoreboardQueryVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {

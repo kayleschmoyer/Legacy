@@ -609,7 +609,7 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
   }) => {
     await page.goto('/football');
     await expect(
-      page.locator('[aria-label="Football fantasy landing page"]'),
+      page.locator('[aria-label="Football fantasy landing page"]').first(),
     ).toBeVisible({ timeout: 10000 });
 
     await page.goto('/baseball');

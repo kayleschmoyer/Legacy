@@ -58,6 +58,12 @@ export default function Layout() {
             options={{ title: 'Football Home' }}
           />
 
+          {/* Live scoreboard */}
+          <Stack.Screen
+            name="baseball/scoreboard"
+            options={{ title: 'MLB Scoreboard' }}
+          />
+
           {/* League onboarding */}
           <Stack.Screen
             name="baseball/league/create"
