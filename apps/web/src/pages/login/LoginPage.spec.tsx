@@ -360,6 +360,8 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
 
   beforeEach(() => {
     mockHydrateSession.mockReset();
+    // Clear any came-from entry so it cannot leak between tests (LGN-037).
+    sessionStorage.clear();
     // Put jsdom on the Discord callback URL so the LoginPage effect fires.
     window.history.replaceState(
       {},
@@ -396,6 +398,35 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
     });
     // The full-reload fallback must NOT run on the happy path.
     expect(mockedStorePreCache).not.toHaveBeenCalled();
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it('returns the user to their stored came-from deep link (LGN-037)', async () => {
+    // Simulate the path captured before the Discord round-trip.
+    sessionStorage.setItem('ls_login_came_from', '/league/123?tab=roster');
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(''),
+        json: () =>
+          Promise.resolve({ jwt: 'header.payload.sig', csrfToken: 'csrf-1' }),
+      }),
+    ) as unknown as typeof fetch;
+    mockHydrateSession.mockReturnValue(true);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        null,
+        '',
+        '/league/123?tab=roster',
+      );
+    });
+    // The came-from entry is single-use: it must be cleared after consumption.
+    expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
 
     replaceStateSpy.mockRestore();
   });

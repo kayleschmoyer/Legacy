@@ -16,6 +16,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 import { getSafeRedirectTarget } from '../../lib/safe-redirect';
+import { consumeCameFrom, storeCameFrom } from '../../lib/came-from';
 import { env } from '../../config/environment';
 import {
   useGetOnThisDayQuery,
@@ -245,10 +246,15 @@ export function LoginPage(): React.JSX.Element {
         // URL is rewritten to the app root *before* that swap so the Router
         // mounts on the home route rather than the Discord-link callback route.
         //
-        // The redirect target is still routed through getSafeRedirectTarget so
-        // a poisoned config value can never turn this into an open redirect,
-        // whether we SPA-navigate or fall back to a full reload (LS-6691).
-        const safeTarget = getSafeRedirectTarget(env.baseUrl);
+        // Restore the page the user deep-linked into before being sent through
+        // the Discord round-trip (e.g. /league/123), falling back to the app
+        // base URL when there is nothing to restore (LGN-037). The candidate is
+        // still routed through getSafeRedirectTarget so a poisoned config value
+        // or a tampered came-from entry can never turn this into an open
+        // redirect, whether we SPA-navigate or fall back to a full reload
+        // (LS-6691).
+        const cameFrom = consumeCameFrom();
+        const safeTarget = getSafeRedirectTarget(cameFrom ?? env.baseUrl);
         const hydrated = hydrateSession(result.jwt);
         if (hydrated) {
           window.history.replaceState(null, '', safeTarget);
@@ -370,6 +376,10 @@ export function LoginPage(): React.JSX.Element {
   const handleDiscordSignIn = useCallback(() => {
     const oauthProxyUrl = config.oauthProxyUrl;
     if (!oauthProxyUrl) return;
+    // Stash the deep-link the user is on before the browser leaves for Discord,
+    // so the callback handler can return them here instead of the app root
+    // (LGN-037).
+    storeCameFrom();
     window.location.href = `${oauthProxyUrl}/discord/authorize`;
   }, [config.oauthProxyUrl]);
 

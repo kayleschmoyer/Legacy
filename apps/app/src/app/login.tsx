@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 import { Theme, YStack } from 'tamagui';
 import { LoginPage } from '@legacy-sports/shared-components';
 import { useAuthHandlers } from '../common/auth/AuthHooks';
 import { isAppleAuthAvailable } from '../common/auth/appleAuth';
+import { resolvePostLoginDestination } from '../common/auth/postLoginDestination';
 
 const Login: React.FC = () => {
   const router = useRouter();
+  // The guard renders this screen in place at the deep-linked route, so the
+  // current pathname is the destination to return to after login (LGN-037).
+  const pathname = usePathname();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -41,7 +46,7 @@ const Login: React.FC = () => {
     onSuccess: () => {
       setIsGoogleLoading(false);
       setIsAppleLoading(false);
-      router.replace('/');
+      router.replace(resolvePostLoginDestination(pathname) as Href);
     },
   });
 
