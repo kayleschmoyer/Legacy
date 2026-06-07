@@ -2,8 +2,14 @@ import React, { useState } from 'react';
 import { Platform, ScrollView } from 'react-native';
 import { Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
+import { getExpoPushTokenAsync } from 'expo-notifications';
+import { LOGGER } from '@legacy-sports/logging';
 import { useAuthHandlers } from '../../../common/auth/AuthHooks';
-import { useGetUnreadNotificationCountQuery } from '../../../api/db/graphql.generated';
+import {
+  useDisableDeviceTokenMutation,
+  useGetUnreadNotificationCountQuery,
+} from '../../../api/db/graphql.generated';
+import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 
 const BRAND_GOLD = '#C5A55A';
 const BRAND_SEAM_RED = '#C41E3A';
@@ -80,13 +86,32 @@ function MenuRow({
 export default function YouTab(): React.JSX.Element {
   const router = useRouter();
   const { logout } = useAuthHandlers();
+  const [disableDeviceToken] = useDisableDeviceTokenMutation();
   const [loggingOut, setLoggingOut] = useState(false);
   const { data: unreadData } = useGetUnreadNotificationCountQuery();
   const unreadCount = unreadData?.getUnreadNotificationCount ?? 0;
 
   const handleLogout = () => {
     setLoggingOut(true);
-    void logout().finally(() => {
+    void (async () => {
+      // Best-effort: deactivate the Expo push token before clearing
+      // credentials so a logged-out device stops receiving notifications.
+      // (Previously handled by the drawer's doLogout, removed in LS-7792.)
+      if (isPhysicalDevice) {
+        try {
+          const tokenData = await getExpoPushTokenAsync();
+          await disableDeviceToken({
+            variables: { deviceToken: tokenData.data },
+          });
+        } catch (err) {
+          LOGGER.warn(
+            'Could not deactivate push token on logout:',
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+      await logout();
+    })().finally(() => {
       setLoggingOut(false);
     });
   };
@@ -144,6 +169,30 @@ export default function YouTab(): React.JSX.Element {
             icon="💎"
             label="Billing &amp; Subscription"
             onPress={() => router.navigate('subscription-settings')}
+          />
+        </YStack>
+
+        {/* Leagues */}
+        <YStack
+          marginHorizontal="$4"
+          borderRadius="$6"
+          borderWidth={1}
+          borderColor="$borderColor"
+          overflow="hidden"
+          marginBottom="$4"
+        >
+          <MenuRow
+            testID="you-messages"
+            icon="💬"
+            label="Messages"
+            onPress={() => router.navigate('DirectMessages')}
+          />
+          <Separator marginHorizontal="$4" />
+          <MenuRow
+            testID="you-management"
+            icon="🛠️"
+            label="Management"
+            onPress={() => router.navigate('management')}
           />
         </YStack>
 

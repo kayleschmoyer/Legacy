@@ -30,7 +30,7 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
       expect(content).toContain('APP_TEST_IDS');
       expect(content).toContain("loginScreen: 'login-screen'");
       expect(content).toContain("homeScreen: 'home-screen'");
-      expect(content).toContain("drawerContent: 'drawer-content'");
+      expect(content).toContain("gestureHandler: 'gesture-handler'");
     });
 
     it('should have loading panel available', () => {
@@ -41,35 +41,53 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
   });
 
   describe('Navigation and Screens', () => {
-    it('should have drawer navigator with all routes', () => {
+    it('should have a stack navigator anchored on the tab group', () => {
       const layoutPath = path.join(APP_ROOT, 'app/(app)/_layout.tsx');
       const content = fs.readFileSync(layoutPath, 'utf8');
 
-      expect(content).toContain("from 'expo-router/drawer'");
-      expect(content).toContain("title: 'Home'");
-      expect(content).toContain("title: 'Football'");
-      expect(content).toContain("title: 'Baseball'");
+      // The flat drawer was removed: the (app) group is now a Stack whose
+      // landing route is the (tabs) navigator (see mobile-navigation.md).
+      expect(content).toContain("Stack } from 'expo-router'");
+      expect(content).toContain("initialRouteName: '(tabs)'");
+      expect(content).toContain('name="(tabs)"');
       expect(content).toContain("title: 'Draft Board'");
       expect(content).toContain("title: 'Free Agents'");
     });
 
-    it('should have drawer items with testID props', () => {
-      const layoutPath = path.join(APP_ROOT, 'app/(app)/_layout.tsx');
-      const content = fs.readFileSync(layoutPath, 'utf8');
+    it('should have the five-tab navigator', () => {
+      const tabsLayoutPath = path.join(
+        APP_ROOT,
+        'app/(app)/(tabs)/_layout.tsx',
+      );
+      expect(fs.existsSync(tabsLayoutPath)).toBe(true);
 
-      expect(content).toContain('testID="drawer-content"');
-      expect(content).toContain('testID="drawer-logout"');
-      expect(content).toContain('testID={`drawer-item-');
+      const content = fs.readFileSync(tabsLayoutPath, 'utf8');
+      expect(content).toContain('name="home"');
+      expect(content).toContain('name="leagues"');
+      expect(content).toContain('name="players"');
+      expect(content).toContain('name="games"');
+      expect(content).toContain('name="you"');
     });
 
-    it('should have home screen with sport navigation', () => {
-      const homePath = path.join(APP_ROOT, 'app/(app)/index.tsx');
+    it('should redirect the app index to the tab home', () => {
+      const indexPath = path.join(APP_ROOT, 'app/(app)/index.tsx');
+      expect(fs.existsSync(indexPath)).toBe(true);
+
+      const content = fs.readFileSync(indexPath, 'utf8');
+      expect(content).toContain('Redirect');
+      expect(content).toContain('href="/home"');
+    });
+
+    it('should render the shared HomeScreen component in the Home tab', () => {
+      const homePath = path.join(APP_ROOT, 'app/(app)/(tabs)/home.tsx');
       expect(fs.existsSync(homePath)).toBe(true);
 
+      // The Home tab renders the shared cross-platform component rather than
+      // re-implementing the UI natively (shared-components-first, LS-7790).
       const content = fs.readFileSync(homePath, 'utf8');
-      expect(content).toContain('testID="home-screen"');
-      expect(content).toContain('testID="sport-selection"');
-      expect(content).toContain('sport-button-');
+      expect(content).toContain('HomeScreen');
+      expect(content).toContain('@legacy-sports/shared-components');
+      expect(content).toContain('onSportPress');
     });
   });
 

@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Import the component under test ──────────────────────────────────────────
@@ -18,21 +13,33 @@ type RNComponents = {
   ActivityIndicator: React.ComponentType;
 };
 
-interface MockDrawerContentProps {
-  navigation: { closeDrawer: jest.Mock; navigate: jest.Mock };
-  state: { routes: unknown[]; index: number };
-  descriptors: Record<string, unknown>;
-}
-
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-// Mock expo-router
-const mockNavigate = jest.fn();
+// Mock expo-router (Stack navigator + Redirect)
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Text } = require('react-native') as RNComponents;
+  const { View, Text } = require('react-native') as RNComponents;
+
+  const Stack = ({ children }: { children: React.ReactNode }) => (
+    <View testID="stack-navigator">{children}</View>
+  );
+
+  Stack.Screen = ({
+    name,
+    options,
+  }: {
+    name: string;
+    options?: Record<string, unknown>;
+  }) => (
+    <View testID={`screen-${name}`}>
+      <Text testID={`opts-${name}`}>
+        {JSON.stringify({ name, ...(options ?? {}) })}
+      </Text>
+    </View>
+  );
+
   return {
-    useRouter: () => ({ navigate: mockNavigate }),
+    Stack,
     Redirect: ({ href }: { href: string }) => (
       <Text testID="redirect">{`Redirect:${href}`}</Text>
     ),
@@ -55,74 +62,6 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
-// Mock expo-router/drawer
-const mockCloseDrawer = jest.fn();
-
-jest.mock('expo-router/drawer', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View, Text } = require('react-native') as RNComponents;
-
-  const Drawer = ({
-    children,
-    drawerContent,
-  }: {
-    children: React.ReactNode;
-    drawerContent?: (props: MockDrawerContentProps) => React.ReactNode;
-    screenOptions?: Record<string, unknown>;
-  }) => (
-    <View testID="drawer-navigator">
-      {drawerContent?.({
-        navigation: {
-          closeDrawer: mockCloseDrawer,
-          navigate: jest.fn(),
-        },
-        state: { routes: [], index: 0 },
-        descriptors: {},
-      })}
-      {children}
-    </View>
-  );
-
-  Drawer.Screen = ({
-    name,
-  }: {
-    name: string;
-    options?: Record<string, unknown>;
-  }) => (
-    <View testID={`screen-${name}`}>
-      <Text>{name}</Text>
-    </View>
-  );
-
-  return { Drawer };
-});
-
-// Mock expo-notifications
-jest.mock('expo-notifications', () => ({
-  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'mock-token' }),
-}));
-
-// Mock expo-device
-jest.mock('expo-device', () => ({ isDevice: false }));
-
-// Mock @legacy-sports/logging
-jest.mock('@legacy-sports/logging', () => ({
-  LOGGER: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-}));
-
-// Mock @growthbook/growthbook-react
-jest.mock('@growthbook/growthbook-react', () => ({
-  useFeatureIsOn: jest.fn(() => true),
-  useFeatureValue: jest.fn(() => null),
-  GrowthBookProvider: ({ children }: { children: React.ReactNode }) => children,
-  GrowthBook: jest.fn(),
-}));
-
 // Mock @legacy-sports/shared-components
 jest.mock('@legacy-sports/shared-components', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -133,94 +72,16 @@ jest.mock('@legacy-sports/shared-components', () => {
         <ActivityIndicator />
       </View>
     ),
-    NFL_TEAMS: {},
   };
 });
-
-// Mock tamagui
-jest.mock('tamagui', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const RN = require('react-native') as RNComponents & {
-    Pressable: React.ComponentType<{
-      onPress?: () => void;
-      children: React.ReactNode;
-      testID?: string;
-    }>;
-  };
-  const { View, Text: RNText, Pressable } = RN;
-  return {
-    Text: ({
-      children,
-      onPress,
-      color: _color,
-      ...rest
-    }: {
-      children: React.ReactNode;
-      onPress?: () => void;
-      color?: string;
-      testID?: string;
-      padding?: string;
-      fontSize?: string;
-      pressStyle?: Record<string, unknown>;
-    }) => (
-      <RNText onPress={onPress} {...rest}>
-        {children}
-      </RNText>
-    ),
-    YStack: ({
-      children,
-      ...rest
-    }: {
-      children: React.ReactNode;
-      flex?: number;
-      backgroundColor?: string;
-      padding?: string;
-    }) => <View {...rest}>{children}</View>,
-    XStack: ({
-      children,
-      onPress,
-      pressStyle: _pressStyle,
-      ...rest
-    }: {
-      children: React.ReactNode;
-      onPress?: () => void;
-      testID?: string;
-      padding?: string;
-      alignItems?: string;
-      justifyContent?: string;
-      pressStyle?: Record<string, unknown>;
-    }) =>
-      onPress ? (
-        <Pressable onPress={onPress} {...rest}>
-          {children}
-        </Pressable>
-      ) : (
-        <View {...rest}>{children}</View>
-      ),
-    Separator: () => <View testID="separator" />,
-  };
-});
-
-// Mock the GraphQL mutation and notification count query
-const mockDisableDeviceToken = jest.fn().mockResolvedValue({});
-const mockUseGetUnreadNotificationCountQuery = jest.fn(() => ({
-  data: null,
-}));
-jest.mock('../../api/db/graphql.generated', () => ({
-  useDisableDeviceTokenMutation: () => [mockDisableDeviceToken],
-  useGetUnreadNotificationCountQuery: (...args: unknown[]) =>
-    mockUseGetUnreadNotificationCountQuery(...args),
-}));
 
 // Mock auth hooks
-const mockLogout = jest.fn().mockResolvedValue(undefined);
 const mockCurrentUser = { id: 1, name: 'Test User' };
 const mockUseCurrentUserInfo = jest.fn(() => ({
-  data: mockCurrentUser,
+  data: mockCurrentUser as { id: number; name: string } | null,
   loading: false,
 }));
 jest.mock('../../common/auth/AuthHooks', () => ({
-  useAuthHandlers: () => ({ logout: mockLogout }),
   useCurrentUserInfo: (...args: unknown[]) => mockUseCurrentUserInfo(...args),
 }));
 
@@ -242,125 +103,7 @@ jest.mock('../../features/notifications/hooks/usePushNotifications', () => ({
   usePushNotifications: jest.fn(),
 }));
 
-// Mock DeviceUtils
-jest.mock('../../common/utilities/DeviceUtils', () => ({
-  isPhysicalDevice: false,
-}));
-
-// Mock all screen components with inline factories (jest.mock is hoisted)
-jest.mock('./baseball', () => ({
-  __esModule: true,
-  default: () => 'BaseballHome',
-}));
-jest.mock('./DraftBoardPage', () => ({
-  __esModule: true,
-  default: () => 'DraftBoardPage',
-}));
-jest.mock('./football', () => ({
-  __esModule: true,
-  default: () => 'FootballHome',
-}));
-jest.mock('./games/index', () => ({
-  __esModule: true,
-  default: () => 'MinigamesHubScreen',
-}));
-jest.mock('./season-draft', () => ({
-  __esModule: true,
-  default: () => 'SeasonDraftGamesScreen',
-}));
-jest.mock('./season-draft/[gameId]', () => ({
-  __esModule: true,
-  default: () => 'SeasonDraftGameScreen',
-}));
-jest.mock('./season-draft/create', () => ({
-  __esModule: true,
-  default: () => 'SeasonDraftGameCreateScreen',
-}));
-jest.mock('./PlayerDetail', () => ({
-  __esModule: true,
-  default: () => 'PlayerDetail',
-}));
-jest.mock('./PlayerStats', () => ({
-  __esModule: true,
-  default: () => 'PlayerStats',
-}));
-jest.mock('./view_career_stats', () => ({
-  __esModule: true,
-  default: () => 'ViewCareerStats',
-}));
-jest.mock('./view_game_logs', () => ({
-  __esModule: true,
-  default: () => 'ViewGameLogs',
-}));
-jest.mock('./FreeAgents', () => ({
-  __esModule: true,
-  default: () => 'FreeAgents',
-}));
-jest.mock('./management', () => ({
-  __esModule: true,
-  default: () => 'ManagementScreen',
-}));
-jest.mock('./about', () => ({
-  __esModule: true,
-  default: () => 'AboutScreen',
-}));
-jest.mock('./help', () => ({
-  __esModule: true,
-  default: () => 'HelpScreen',
-}));
-jest.mock('./profile-settings', () => ({
-  __esModule: true,
-  default: () => 'ProfileSettingsScreen',
-}));
-jest.mock('./preferences', () => ({
-  __esModule: true,
-  default: () => 'PreferencesScreen',
-}));
-jest.mock('./notifications', () => ({
-  __esModule: true,
-  default: () => 'NotificationsScreen',
-}));
-jest.mock('./subscription-settings', () => ({
-  __esModule: true,
-  default: () => 'SubscriptionSettingsScreen',
-}));
-jest.mock('./update-check', () => ({
-  __esModule: true,
-  default: () => 'UpdateCheckScreen',
-}));
-jest.mock('./admin-revenue', () => ({
-  __esModule: true,
-  default: () => 'AdminRevenueScreen',
-}));
-jest.mock('.', () => ({ __esModule: true, default: () => 'Home' }));
-jest.mock('./baseball/league/create', () => ({
-  __esModule: true,
-  default: () => 'LeagueCreatePage',
-}));
-jest.mock('./baseball/league/join', () => ({
-  __esModule: true,
-  default: () => 'JoinLeagueByCode',
-}));
-jest.mock('./football/league/join', () => ({
-  __esModule: true,
-  default: () => 'JoinFootballLeagueByCode',
-}));
-jest.mock('./league-discovery', () => ({
-  __esModule: true,
-  default: () => 'LeagueDiscoveryScreen',
-}));
-jest.mock('./TradeCenterPage', () => ({
-  __esModule: true,
-  default: () => 'TradeCenterPage',
-}));
-jest.mock('./baseball/matchup', () => ({
-  __esModule: true,
-  default: () => 'MatchupDetail',
-}));
-jest.mock('./football/matchup', () => ({
-  __esModule: true,
-  default: () => 'FootballMatchupDetail',
-}));
+// Mock the header-bearing route modules (named header exports only)
 jest.mock('./baseball/league/[leagueId]', () => ({
   __esModule: true,
   default: () => 'LeagueId',
@@ -389,34 +132,54 @@ jest.mock('./football/team/[teamId]', () => ({
 
 // ── Expected data ────────────────────────────────────────────────────────────
 
-const EXPECTED_DRAWER_ROUTES = [
-  { route: 'index', title: 'Home' },
-  { route: 'view_game_logs', title: 'View Game Logs' },
-  { route: 'view_career_stats', title: 'View Career Stats' },
-  { route: 'PlayerStats', title: 'Player Statistics' },
-  { route: 'baseball/index', title: 'Baseball' },
-  { route: 'baseball/league/create', title: 'Create League' },
-  { route: 'football/index', title: 'Football' },
-  { route: 'DraftBoardPage', title: 'Draft Board' },
-  { route: 'games/index', title: 'Minigames' },
-  { route: 'season-draft/index', title: 'Season Draft Games' },
-  { route: 'FreeAgents', title: 'Free Agents' },
-  { route: 'TradeCenterPage', title: 'Trade Center' },
-  { route: 'DirectMessages', title: 'Messages' },
-  { route: 'management', title: 'Management' },
-  { route: 'baseball/league/join', title: 'Join League' },
-  { route: 'football/league/join', title: 'Join Football League' },
-  { route: 'league-discovery', title: 'Browse Leagues' },
-  { route: 'notifications', title: 'Notifications' },
-  { route: 'preferences', title: 'Preferences' },
-  { route: 'profile-settings', title: 'Profile Settings' },
-  { route: 'help', title: 'Help' },
-  { route: 'about', title: 'About' },
+const EXPECTED_SCREENS = [
+  '(tabs)',
+  'index',
+  'baseball/index',
+  'football/index',
+  'baseball/league/create',
+  'football/league/create',
+  'baseball/league/join',
+  'football/league/join',
+  'league-discovery',
+  'league/[leagueId]',
+  'baseball/league/[leagueId]',
+  'football/league/[leagueId]',
+  'baseball/team/[teamId]',
+  'football/team/[teamId]',
+  'baseball/matchup',
+  'football/matchup',
+  'DraftBoardPage',
+  'FreeAgents',
+  'PlayerStats',
+  'PlayerDetail',
+  'DirectMessages',
+  'management',
+  'games/index',
+  'disclosure-game/index',
+  'season-draft/index',
+  'season-draft/[gameId]',
+  'season-draft/create',
+  'about',
+  'help',
+  'profile-settings',
+  'preferences',
+  'notifications',
+  'subscription-settings',
+  'update-check',
+];
+
+// Screens intentionally removed from navigation (drawer removal).
+const REMOVED_FROM_NAV = [
+  'view_game_logs',
+  'view_career_stats',
+  'TradeCenterPage',
+  'admin-revenue',
 ];
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('App Drawer Layout', () => {
+describe('App (tabs) Stack Layout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseCurrentUserInfo.mockReturnValue({
@@ -425,267 +188,55 @@ describe('App Drawer Layout', () => {
     });
   });
 
-  describe('drawer route definitions', () => {
-    it('renders all expected drawer items', () => {
+  describe('navigation structure', () => {
+    it('renders a Stack navigator (the flat drawer is removed)', () => {
       render(<Layout />);
-
-      for (const { title } of EXPECTED_DRAWER_ROUTES) {
-        expect(screen.getByText(title)).toBeTruthy();
-      }
+      expect(screen.getByTestId('stack-navigator')).toBeTruthy();
     });
 
-    it('renders exactly 22 navigation items plus Logout', () => {
+    it('registers every expected screen in the stack', () => {
       render(<Layout />);
-
-      for (const { title } of EXPECTED_DRAWER_ROUTES) {
-        expect(screen.getByText(title)).toBeTruthy();
-      }
-      expect(screen.getByText('Logout')).toBeTruthy();
-
-      // Verify exact count: each drawer route has a testID
-      const drawerItems = EXPECTED_DRAWER_ROUTES.map((r) =>
-        screen.getByTestId(`drawer-item-${r.route.replace(/\//g, '-')}`),
-      );
-      expect(drawerItems).toHaveLength(EXPECTED_DRAWER_ROUTES.length);
-    });
-
-    it('renders the Logout button', () => {
-      render(<Layout />);
-      expect(screen.getByText('Logout')).toBeTruthy();
-    });
-  });
-
-  describe('drawer item navigation', () => {
-    it('navigates to Home when Home item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-index'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('index');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Baseball when Baseball item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-baseball-index'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('baseball/index');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Football when Football item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-football-index'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('football/index');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Draft Board when Draft Board item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-DraftBoardPage'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('DraftBoardPage');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Free Agents when Free Agents item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-FreeAgents'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('FreeAgents');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Notifications when Notifications item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-notifications'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('notifications');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Preferences when Preferences item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-preferences'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('preferences');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Profile Settings when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-profile-settings'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('profile-settings');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Help when Help item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-help'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('help');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to About when About item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-about'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('about');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Management when Management item is pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-management'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('management');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Season Draft Games when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-season-draft-index'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('season-draft/index');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Player Statistics when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-PlayerStats'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('PlayerStats');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to View Game Logs when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-view_game_logs'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('view_game_logs');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to View Career Stats when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-view_career_stats'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('view_career_stats');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Create League when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-baseball-league-create'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('baseball/league/create');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('navigates to Join League when pressed', () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-baseball-league-join'));
-
-      expect(mockNavigate).toHaveBeenCalledWith('baseball/league/join');
-      expect(mockCloseDrawer).toHaveBeenCalled();
-    });
-
-    it('closes drawer after each navigation', () => {
-      render(<Layout />);
-
-      fireEvent.press(screen.getByTestId('drawer-item-index'));
-      expect(mockCloseDrawer).toHaveBeenCalledTimes(1);
-
-      fireEvent.press(screen.getByTestId('drawer-item-about'));
-      expect(mockCloseDrawer).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('logout flow', () => {
-    it('calls logout when Logout is pressed', async () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByText('Logout'));
-
-      await waitFor(() => {
-        expect(mockLogout).toHaveBeenCalled();
-      });
-    });
-
-    it('closes drawer after logout', async () => {
-      render(<Layout />);
-      fireEvent.press(screen.getByText('Logout'));
-
-      await waitFor(() => {
-        expect(mockCloseDrawer).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('screen registration', () => {
-    it('registers all 33 screens in the drawer navigator', () => {
-      render(<Layout />);
-
-      const expectedScreenNames = [
-        'index',
-        'view_game_logs',
-        'view_career_stats',
-        'football/index',
-        'baseball/index',
-        'baseball/league/create',
-        'league/[leagueId]',
-        'baseball/league/[leagueId]',
-        'football/league/[leagueId]',
-        'baseball/team/[teamId]',
-        'DraftBoardPage',
-        'games/index',
-        'disclosure-game/index',
-        'season-draft/index',
-        'season-draft/[gameId]',
-        'season-draft/create',
-        'FreeAgents',
-        'TradeCenterPage',
-        'PlayerStats',
-        'PlayerDetail',
-        'management',
-        'baseball/league/join',
-        'football/league/join',
-        'baseball/matchup',
-        'football/matchup',
-        'about',
-        'help',
-        'profile-settings',
-        'preferences',
-        'notifications',
-        'subscription-settings',
-        'update-check',
-        'league-discovery',
-        'admin-revenue',
-      ];
-
-      for (const name of expectedScreenNames) {
+      for (const name of EXPECTED_SCREENS) {
         expect(screen.getByTestId(`screen-${name}`)).toBeTruthy();
+      }
+    });
+
+    it('hides the header on the (tabs) group and the index redirect', () => {
+      render(<Layout />);
+      // Both the tab group and the `/` redirect opt out of a stack header so
+      // there is no chrome stacked above the tab bar / during the redirect.
+      expect(
+        screen.getByText(
+          JSON.stringify({ name: '(tabs)', headerShown: false }),
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(JSON.stringify({ name: 'index', headerShown: false })),
+      ).toBeTruthy();
+    });
+
+    it('no longer registers screens removed from navigation', () => {
+      render(<Layout />);
+      for (const name of REMOVED_FROM_NAV) {
+        expect(screen.queryByTestId(`screen-${name}`)).toBeNull();
       }
     });
   });
 
   describe('auth-dependent rendering', () => {
-    it('renders the drawer when user is authenticated', () => {
+    it('renders the navigator when the user is authenticated', () => {
       render(<Layout />);
-      expect(screen.getByTestId('drawer-navigator')).toBeTruthy();
+      expect(screen.getByTestId('stack-navigator')).toBeTruthy();
     });
 
-    it('shows loading panel when user data is loading', () => {
+    it('shows the loading panel while user data is loading', () => {
       mockUseCurrentUserInfo.mockReturnValue({ data: null, loading: true });
-
       render(<Layout />);
       expect(screen.getByTestId('loading-panel')).toBeTruthy();
     });
 
-    it('redirects to login when user is not authenticated', () => {
+    it('redirects to login when the user is not authenticated', () => {
       mockUseCurrentUserInfo.mockReturnValue({ data: null, loading: false });
-
       render(<Layout />);
       expect(screen.getByTestId('redirect')).toBeTruthy();
       expect(screen.getByText('Redirect:/login')).toBeTruthy();
@@ -694,113 +245,6 @@ describe('App Drawer Layout', () => {
     it('wraps content with AuthorizedUserContextProvider', () => {
       render(<Layout />);
       expect(screen.getByTestId('auth-context')).toBeTruthy();
-    });
-  });
-
-  describe('notification unread badge', () => {
-    it('shows badge with correct count when unread count is positive', () => {
-      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
-        data: { getUnreadNotificationCount: 5 },
-      });
-
-      render(<Layout />);
-
-      expect(screen.getByText('5')).toBeTruthy();
-    });
-
-    it('shows "99+" when unread count exceeds 99', () => {
-      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
-        data: { getUnreadNotificationCount: 150 },
-      });
-
-      render(<Layout />);
-
-      expect(screen.getByText('99+')).toBeTruthy();
-    });
-
-    it('does not show badge when unread count is zero', () => {
-      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
-        data: { getUnreadNotificationCount: 0 },
-      });
-
-      render(<Layout />);
-
-      expect(screen.queryByText('99+')).toBeNull();
-      // The count text should not appear as a standalone element
-      expect(screen.queryByText('0')).toBeNull();
-    });
-
-    it('does not show badge on non-notification drawer items', () => {
-      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
-        data: { getUnreadNotificationCount: 5 },
-      });
-
-      render(<Layout />);
-
-      // Badge count "5" should appear exactly once (only on Notifications item)
-      const badges = screen.getAllByText('5');
-      expect(badges).toHaveLength(1);
-    });
-  });
-
-  describe('dynamic route parameters (type safety)', () => {
-    it('defines leagueId parameter for league detail route', () => {
-      render(<Layout />);
-      expect(
-        screen.getByTestId('screen-baseball/league/[leagueId]'),
-      ).toBeTruthy();
-    });
-
-    it('defines teamId parameter for team detail route', () => {
-      render(<Layout />);
-      expect(screen.getByTestId('screen-baseball/team/[teamId]')).toBeTruthy();
-    });
-
-    it('defines gameId parameter for season draft game route', () => {
-      render(<Layout />);
-      expect(screen.getByTestId('screen-season-draft/[gameId]')).toBeTruthy();
-    });
-
-    it('defines matchup parameters for matchup detail route', () => {
-      render(<Layout />);
-      expect(screen.getByTestId('screen-baseball/matchup')).toBeTruthy();
-    });
-
-    it('defines matchup parameters for football matchup detail route', () => {
-      render(<Layout />);
-      expect(screen.getByTestId('screen-football/matchup')).toBeTruthy();
-    });
-  });
-
-  describe('admin revenue navigation', () => {
-    it('does not show Revenue Analytics link for non-admin users', () => {
-      mockUseCurrentUserInfo.mockReturnValue({
-        data: { ...mockCurrentUser, isAdmin: false },
-        loading: false,
-      });
-      render(<Layout />);
-      expect(screen.queryByTestId('drawer-item-admin-revenue')).toBeNull();
-    });
-
-    it('shows Revenue Analytics link for admin users', () => {
-      mockUseCurrentUserInfo.mockReturnValue({
-        data: { ...mockCurrentUser, isAdmin: true },
-        loading: false,
-      });
-      render(<Layout />);
-      expect(screen.getByTestId('drawer-item-admin-revenue')).toBeTruthy();
-      expect(screen.getByText('Revenue Analytics')).toBeTruthy();
-    });
-
-    it('navigates to admin-revenue when Revenue Analytics is pressed', () => {
-      mockUseCurrentUserInfo.mockReturnValue({
-        data: { ...mockCurrentUser, isAdmin: true },
-        loading: false,
-      });
-      render(<Layout />);
-      fireEvent.press(screen.getByTestId('drawer-item-admin-revenue'));
-      expect(mockNavigate).toHaveBeenCalledWith('admin-revenue');
-      expect(mockCloseDrawer).toHaveBeenCalled();
     });
   });
 });

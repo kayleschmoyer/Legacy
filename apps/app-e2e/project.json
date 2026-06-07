@@ -65,7 +65,7 @@
       "options": {
         "jestConfig": "apps/app-e2e/jest.config.json",
         "testPathPattern": ["app\\.spec\\.ts"],
-        "testNamePattern": "should have root layout component|should have drawer navigator"
+        "testNamePattern": "should have root layout component|should have a stack navigator"
       }
     },
     "lint": {

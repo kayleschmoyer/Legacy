@@ -1,6 +1,6 @@
 # Mobile Navigation Architecture
 
-> **Status:** Accepted design — implementation tracked under [LS-7735](https://bkrupa.atlassian.net/browse/LS-7735) and its child tickets.
+> **Status:** Implemented — tracked under [LS-7735](https://bkrupa.atlassian.net/browse/LS-7735) and its child tickets. The tab bar is the live navigation and the flat drawer has been removed (see [Implementation plan](#implementation-plan)).
 > **Scope:** The native (Expo / React Native) app under `apps/app`. The web app is referenced as the comparison baseline but is not changed by this design.
 
 ## Summary
@@ -82,21 +82,26 @@ Tapping a league opens a tabbed league-context screen. This single move absorbs 
 
 Every current drawer entry has an unambiguous home in the new model:
 
-| Old drawer item                                                             | New home                                                           |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Home                                                                        | **Home** tab                                                       |
-| Player Statistics / Compare Players                                         | **Players** tab (segments)                                         |
-| Football Players                                                            | **Players** tab (sport filter — de-duplicated)                     |
-| Baseball / Football "Home"                                                  | **Leagues** tab (sport is an attribute)                            |
-| Create / Join League (×baseball, ×football)                                 | **Leagues** tab → unified, sport-aware Create / Join (4 items → 2) |
-| Browse Leagues                                                              | **Leagues** tab action / empty state                               |
-| Free Agents, Trade Center, Messages, Draft Board, Management, Matchup, Team | **League context** (tabs inside a league)                          |
-| Minigames, Season Draft Games, Who Am I?                                    | **Games** tab                                                      |
-| Notifications, Preferences, Profile, Help, About, Billing, Update check     | **You** tab                                                        |
-| View Game Logs, View Career Stats                                           | **Removed** (dev utilities)¹                                       |
-| Logout                                                                      | **You** tab                                                        |
+| Old drawer item                                                         | New home                                                           |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Home                                                                    | **Home** tab                                                       |
+| Player Statistics / Compare Players                                     | **Players** tab (segments)                                         |
+| Football Players                                                        | **Players** tab (sport filter — de-duplicated)                     |
+| Baseball / Football "Home"                                              | **Leagues** tab (sport is an attribute)                            |
+| Create / Join League (×baseball, ×football)                             | **Leagues** tab → unified, sport-aware Create / Join (4 items → 2) |
+| Browse Leagues                                                          | **Leagues** tab action / empty state                               |
+| Free Agents, Draft Board, Matchup, Team, per-league Trades & Chat       | **League context** (tabs inside a league)                          |
+| Messages (cross-league DMs), Management                                 | **You** tab rows — see ²                                           |
+| Trade Center (cross-league)                                             | **Removed** — per-league Trades tab supersedes it ²                |
+| Minigames, Season Draft Games, Who Am I?                                | **Games** tab                                                      |
+| Notifications, Preferences, Profile, Help, About, Billing, Update check | **You** tab                                                        |
+| View Game Logs, View Career Stats                                       | **Removed** (dev utilities)¹                                       |
+| Revenue Analytics (admin)                                               | **Removed** from native — admin UI is web-only (LS-5739) ²         |
+| Logout                                                                  | **You** tab                                                        |
 
 ¹ If "Career Stats" turns out to be a genuine user feature rather than a dev utility, it folds into the **Player detail** screen as a career segment rather than returning to global nav.
+
+² **Cross-league screens.** The original mapping assumed Messages, Trade Center, and Management all collapsed into the per-league league-context screen. The drawer-removal audit found this only holds for the _per-league_ versions: the standalone screens were **cross-league** (cross-league DMs, a cross-league trade center, a global management hub). Resolution: **Messages** and **Management** are genuine global features and keep a home as **You** tab rows; the cross-league **Trade Center** was dropped because the per-league **Trades** tab is the better model and cross-league trading is niche; native **Revenue Analytics** was dropped to match the web-only-admin decision (the screen remains but is not in native nav). Dev utilities (View Game Logs / View Career Stats) and the removed screens still exist as URL-only routes pending a dead-code cleanup.
 
 ## Invariants
 
@@ -115,13 +120,15 @@ The web app's _mobile_ layout (a bottom bar plus a grouped drawer) is the closes
 
 Implementation is intentionally **out of scope for the doc PR** and is sliced into child tickets under [LS-7735](https://bkrupa.atlassian.net/browse/LS-7735) so the app is never left in a half-migrated, broken state:
 
-1. **Tabs layout** — introduce the `(tabs)` navigator with the five tabs; keep existing screens reachable during migration.
-2. **Leagues hub + league-context screen** — the list-of-leagues hub and the tabbed league-context screen that absorbs the seven contextual items.
-3. **Players segments** — fold Stats/Compare into segments; make sport a filter; remove "Football Players".
-4. **Games tab** — minigames hub, Season Draft, "Who Am I?"; add engagement instrumentation.
-5. **You screen** — consolidate account items; notifications badge on the tab icon.
-6. **Unified Create / Join** — single sport-aware onboarding flow; remove the four duplicated entries.
-7. **Drawer removal** — delete the flat drawer once all destinations have a home.
+1. ✅ **Tabs layout** — introduce the `(tabs)` navigator with the five tabs; keep existing screens reachable during migration.
+2. ✅ **Leagues hub + league-context screen** — the list-of-leagues hub and the tabbed league-context screen that absorbs the seven contextual items.
+3. ✅ **Players segments** — fold Stats/Compare into segments; make sport a filter; remove "Football Players".
+4. ✅ **Games tab** — minigames hub, Season Draft, "Who Am I?"; add engagement instrumentation.
+5. ✅ **You screen** — consolidate account items; notifications badge on the tab icon.
+6. ✅ **Unified Create / Join** — single sport-aware onboarding flow; remove the four duplicated entries.
+7. ✅ **Drawer removal** — the flat drawer is gone. `(app)/_layout.tsx` is now a `Stack` whose anchor is the `(tabs)` group; `(app)/index.tsx` redirects `/` → the Home tab so post-login `router.replace('/')` lands on the bar; the Home tab renders the shared cross-platform `HomeScreen` component (interim — the unified shared home/dashboard is tracked in LS-7791 under the shared-components-first principle, LS-7790); Messages/Management became **You** rows; Trade Center, Revenue Analytics, and the dev utilities were dropped from nav (see ²). All other destinations are pushed onto the Stack with a standard back affordance.
+
+> **Slices 1–6 shipped only the tab _files_ — the `(tabs)` navigator was never actually wired in as the landing surface, so the flat drawer remained the only live navigation until slice 7.** Slice 7 is the integration step that made the tabs reachable.
 
 ---
 

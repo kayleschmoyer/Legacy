@@ -164,7 +164,5 @@ export const APP_TEST_IDS = {
   sportButtonFootball: 'sport-button-football',
   sportButtonBaseball: 'sport-button-baseball',
   aboutButton: 'about-button',
-  drawerContent: 'drawer-content',
-  drawerLogout: 'drawer-logout',
   gestureHandler: 'gesture-handler',
 } as const;

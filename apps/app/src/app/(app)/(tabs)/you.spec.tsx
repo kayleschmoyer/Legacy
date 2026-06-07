@@ -13,9 +13,35 @@ import YouTab from './you';
 
 const mockNavigate = jest.fn();
 const mockLogout = jest.fn<Promise<void>, []>();
+const mockDisableDeviceToken = jest.fn().mockResolvedValue({});
+const mockGetExpoPushTokenAsync = jest
+  .fn<Promise<{ data: string }>, []>()
+  .mockResolvedValue({ data: 'mock-token' });
+let mockIsPhysicalDevice = false;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate }),
+}));
+
+jest.mock('expo-notifications', () => ({
+  // Lazy wrapper: the mock factory is hoisted above the const initialization,
+  // so reference the typed mock at call time (not factory-eval time).
+  getExpoPushTokenAsync: () => mockGetExpoPushTokenAsync(),
+}));
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
+jest.mock('../../../common/utilities/DeviceUtils', () => ({
+  get isPhysicalDevice() {
+    return mockIsPhysicalDevice;
+  },
 }));
 
 jest.mock('../../../common/auth/AuthHooks', () => ({
@@ -28,6 +54,7 @@ jest.mock('../../../api/db/graphql.generated', () => ({
   useGetUnreadNotificationCountQuery: () => ({
     data: { getUnreadNotificationCount: mockUnreadCount },
   }),
+  useDisableDeviceTokenMutation: () => [mockDisableDeviceToken],
 }));
 
 jest.mock('tamagui', () => {
@@ -118,8 +145,11 @@ describe('YouTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUnreadCount = 0;
+    mockIsPhysicalDevice = false;
     setPlatformOS('ios');
     mockLogout.mockResolvedValue(undefined);
+    mockDisableDeviceToken.mockResolvedValue({});
+    mockGetExpoPushTokenAsync.mockResolvedValue({ data: 'mock-token' });
   });
 
   describe('account items rendering', () => {
@@ -151,6 +181,16 @@ describe('YouTab', () => {
     it('renders About row', () => {
       renderYouTab();
       expect(screen.getByTestId('you-about')).toBeTruthy();
+    });
+
+    it('renders Messages row', () => {
+      renderYouTab();
+      expect(screen.getByTestId('you-messages')).toBeTruthy();
+    });
+
+    it('renders Management row', () => {
+      renderYouTab();
+      expect(screen.getByTestId('you-management')).toBeTruthy();
     });
 
     it('renders Sign Out row', () => {
@@ -230,6 +270,18 @@ describe('YouTab', () => {
       expect(mockNavigate).toHaveBeenCalledWith('about');
     });
 
+    it('navigates to DirectMessages when Messages row is pressed', () => {
+      renderYouTab();
+      fireEvent.press(screen.getByTestId('you-messages'));
+      expect(mockNavigate).toHaveBeenCalledWith('DirectMessages');
+    });
+
+    it('navigates to management when Management row is pressed', () => {
+      renderYouTab();
+      fireEvent.press(screen.getByTestId('you-management'));
+      expect(mockNavigate).toHaveBeenCalledWith('management');
+    });
+
     it('navigates to update-check when Check for Updates row is pressed (Android)', () => {
       setPlatformOS('android');
       renderYouTab();
@@ -240,6 +292,38 @@ describe('YouTab', () => {
 
   describe('logout', () => {
     it('calls logout when Sign Out is pressed', async () => {
+      renderYouTab();
+      fireEvent.press(screen.getByTestId('you-logout'));
+      await waitFor(() => {
+        expect(mockLogout).toHaveBeenCalled();
+      });
+    });
+
+    it('deactivates the push token before logout on a physical device', async () => {
+      mockIsPhysicalDevice = true;
+      renderYouTab();
+      fireEvent.press(screen.getByTestId('you-logout'));
+      await waitFor(() => {
+        expect(mockDisableDeviceToken).toHaveBeenCalledWith({
+          variables: { deviceToken: 'mock-token' },
+        });
+      });
+      expect(mockLogout).toHaveBeenCalled();
+    });
+
+    it('skips push token deactivation on non-physical devices', async () => {
+      mockIsPhysicalDevice = false;
+      renderYouTab();
+      fireEvent.press(screen.getByTestId('you-logout'));
+      await waitFor(() => {
+        expect(mockLogout).toHaveBeenCalled();
+      });
+      expect(mockDisableDeviceToken).not.toHaveBeenCalled();
+    });
+
+    it('still logs out if push token deactivation fails', async () => {
+      mockIsPhysicalDevice = true;
+      mockDisableDeviceToken.mockRejectedValue(new Error('network'));
       renderYouTab();
       fireEvent.press(screen.getByTestId('you-logout'));
       await waitFor(() => {

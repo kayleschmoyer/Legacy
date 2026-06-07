@@ -20,11 +20,11 @@ describe('Sports Feature Infrastructure', () => {
       expect(content).toContain('export default');
     });
 
-    it('should have football route in drawer navigator', () => {
+    it('should register the football home route in the stack navigator', () => {
       const layoutPath = path.join(APP_SRC, 'app/(app)/_layout.tsx');
       const content = fs.readFileSync(layoutPath, 'utf8');
 
-      expect(content).toContain("title: 'Football'");
+      expect(content).toContain("title: 'Football Home'");
       expect(content).toContain('name="football/index"');
     });
   });
@@ -38,11 +38,11 @@ describe('Sports Feature Infrastructure', () => {
       expect(content).toContain('export default');
     });
 
-    it('should have baseball route in drawer navigator', () => {
+    it('should register the baseball home route in the stack navigator', () => {
       const layoutPath = path.join(APP_SRC, 'app/(app)/_layout.tsx');
       const content = fs.readFileSync(layoutPath, 'utf8');
 
-      expect(content).toContain("title: 'Baseball'");
+      expect(content).toContain("title: 'Baseball Home'");
       expect(content).toContain('name="baseball/index"');
     });
 
@@ -118,13 +118,14 @@ describe('Sports Feature Infrastructure', () => {
       }
     });
 
-    it('should have home screen as sport selection hub', () => {
-      const homePath = path.join(APP_SRC, 'app/(app)/index.tsx');
+    it('should render the sport-selection Home tab via the shared HomeScreen', () => {
+      // The sport-picker moved from the old drawer `index.tsx` into the Home
+      // tab, which renders the shared cross-platform HomeScreen component.
+      const homePath = path.join(APP_SRC, 'app/(app)/(tabs)/home.tsx');
       const content = fs.readFileSync(homePath, 'utf8');
 
-      expect(content).toContain('Fantasy Sports Hub');
-      expect(content).toContain("name: 'Football'");
-      expect(content).toContain("name: 'Baseball'");
+      expect(content).toContain('HomeScreen');
+      expect(content).toContain('@legacy-sports/shared-components');
       expect(content).toContain('router.push');
     });
   });
