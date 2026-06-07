@@ -129,6 +129,8 @@ export * from './Dropdown';
 
 // Team components
 export * from './features/teams/TeamPicker';
+export * from './features/teams/TeamBrandingControl';
+export * from './features/teams/useTeamBranding';
 
 // Sport-agnostic filter UI
 export * from './features/shared/FilterOptions';

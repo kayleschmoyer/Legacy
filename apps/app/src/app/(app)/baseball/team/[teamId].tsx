@@ -1,9 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Button, Input, Label, Separator, Tabs, Text, YStack } from 'tamagui';
+import { Separator, Tabs, Text, YStack } from 'tamagui';
 import { Alert, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
-import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+import {
+  TeamBrandingControl,
+  type TeamBrandingTeam,
+  UnifiedLoadingPanel,
+} from '@legacy-sports/shared-components';
 import { applyMultiplierGroups } from '../../../../common/scoring';
 import {
   LeaguePositionFragment,
@@ -14,7 +18,6 @@ import {
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetUserTeamIdQuery,
-  useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
 import {
@@ -54,68 +57,6 @@ function getMatchupPlayers(data: unknown): readonly MatchupPlayerStats[] {
 const ALL_TABS = Object.freeze(['Lineup', 'Rotation', 'Settings'] as const);
 type Tab = (typeof ALL_TABS)[number];
 
-interface BrandingSettingsProps {
-  teamId: number;
-  leagueId: number;
-  currentAvatarUrl: string | null | undefined;
-  currentBannerUrl: string | null | undefined;
-}
-
-function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
-  const { teamId, leagueId, currentAvatarUrl, currentBannerUrl } = props;
-  const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl ?? '');
-  const [bannerUrl, setBannerUrl] = useState(currentBannerUrl ?? '');
-  const [updateTeamBranding, { loading }] = useUpdateTeamBrandingMutation();
-
-  const handleSave = () => {
-    updateTeamBranding({
-      variables: {
-        teamId,
-        leagueId,
-        avatarUrl: avatarUrl || null,
-        bannerUrl: bannerUrl || null,
-      },
-    })
-      .then(() => {
-        Alert.alert('Saved', 'Team branding updated successfully.');
-      })
-      .catch(handleError);
-  };
-
-  return (
-    <YStack padding="$4" gap="$3">
-      <Text fontSize="$5" fontWeight="600">
-        Team Branding
-      </Text>
-      <Text fontSize="$3" color="$gray10">
-        Enter image URLs for your team logo and banner. Images are displayed
-        across the app and must comply with community guidelines.
-      </Text>
-      <Label htmlFor="avatar-url">Avatar URL</Label>
-      <Input
-        id="avatar-url"
-        value={avatarUrl}
-        onChangeText={setAvatarUrl}
-        placeholder="https://example.com/avatar.png"
-        autoCapitalize="none"
-        keyboardType="url"
-      />
-      <Label htmlFor="banner-url">Banner URL</Label>
-      <Input
-        id="banner-url"
-        value={bannerUrl}
-        onChangeText={setBannerUrl}
-        placeholder="https://example.com/banner.png"
-        autoCapitalize="none"
-        keyboardType="url"
-      />
-      <Button onPress={handleSave} disabled={loading} theme="active">
-        {loading ? 'Saving…' : 'Save Branding'}
-      </Button>
-    </YStack>
-  );
-}
-
 interface TabContentProps {
   matchup: MatchupFragment | null | undefined;
   selectedTab: Tab;
@@ -136,8 +77,7 @@ interface TabContentProps {
   pitchingSettings: Partial<Record<string, number>>;
   teamId: number;
   leagueId: number;
-  avatarUrl: string | null | undefined;
-  bannerUrl: string | null | undefined;
+  brandingTeam: TeamBrandingTeam | null;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -155,8 +95,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     pitchingSettings,
     teamId,
     leagueId,
-    avatarUrl,
-    bannerUrl,
+    brandingTeam,
   } = props;
 
   const { data: statsData, loading: loadingStats } = useGetMatchupPlayersQuery({
@@ -334,12 +273,17 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
       );
     case 'Settings':
       return isOwner ? (
-        <BrandingSettings
-          teamId={teamId}
-          leagueId={leagueId}
-          currentAvatarUrl={avatarUrl}
-          currentBannerUrl={bannerUrl}
-        />
+        <YStack padding="$4">
+          <TeamBrandingControl
+            teamId={teamId}
+            leagueId={leagueId}
+            team={brandingTeam}
+            onSaved={() =>
+              Alert.alert('Saved', 'Team branding updated successfully.')
+            }
+            onError={handleError}
+          />
+        </YStack>
       ) : (
         <YStack padding="$4">
           <Text color="$gray10">
@@ -506,8 +450,7 @@ export default function Team(): React.JSX.Element {
           pitchingSettings={pitchingSettings}
           teamId={numTeamId ?? 0}
           leagueId={team.team.leagueId ?? 0}
-          avatarUrl={team.team.avatarUrl}
-          bannerUrl={team.team.bannerUrl}
+          brandingTeam={team.team}
         />
       </YStack>
     </ScrollView>

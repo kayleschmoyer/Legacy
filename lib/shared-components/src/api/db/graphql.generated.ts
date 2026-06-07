@@ -8456,6 +8456,47 @@ export type SubmitGuessMutation = {
   } | null;
 };
 
+export type RenameTeamMutationVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  newName: Scalars['String']['input'];
+}>;
+
+export type RenameTeamMutation = {
+  __typename?: 'Mutation';
+  renameTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
+  } | null;
+};
+
+export type UpdateTeamBrandingMutationVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  logoUrl?: InputMaybe<Scalars['String']['input']>;
+  primaryColor?: InputMaybe<Scalars['String']['input']>;
+  secondaryColor?: InputMaybe<Scalars['String']['input']>;
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateTeamBrandingMutation = {
+  __typename?: 'Mutation';
+  updateTeamBranding?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+  } | null;
+};
+
 export type TeamMemberFragment = {
   __typename?: 'TeamMember';
   id?: number | null;
@@ -19318,6 +19359,139 @@ export type SubmitGuessMutationResult =
 export type SubmitGuessMutationOptions = BaseMutationOptions<
   SubmitGuessMutation,
   SubmitGuessMutationVariables
+>;
+export const RenameTeam = gql`
+  mutation RenameTeam($teamId: Int!, $leagueId: Int!, $newName: String!) {
+    renameTeam(teamId: $teamId, leagueId: $leagueId, newName: $newName) {
+      id
+      name
+      leagueId
+    }
+  }
+`;
+export type RenameTeamMutationFn = MutationFunction<
+  RenameTeamMutation,
+  RenameTeamMutationVariables
+>;
+
+/**
+ * __useRenameTeamMutation__
+ *
+ * To run a mutation, you first call `useRenameTeamMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRenameTeamMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [renameTeamMutation, { data, loading, error }] = useRenameTeamMutation({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      leagueId: // value for 'leagueId'
+ *      newName: // value for 'newName'
+ *   },
+ * });
+ */
+export function useRenameTeamMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RenameTeamMutation,
+    RenameTeamMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<RenameTeamMutation, RenameTeamMutationVariables>(
+    RenameTeam,
+    options,
+  );
+}
+export type RenameTeamMutationHookResult = ReturnType<
+  typeof useRenameTeamMutation
+>;
+export type RenameTeamMutationResult =
+  Apollo.MutationResult<RenameTeamMutation>;
+export type RenameTeamMutationOptions = BaseMutationOptions<
+  RenameTeamMutation,
+  RenameTeamMutationVariables
+>;
+export const UpdateTeamBranding = gql`
+  mutation UpdateTeamBranding(
+    $teamId: Int!
+    $leagueId: Int!
+    $logoUrl: String
+    $primaryColor: String
+    $secondaryColor: String
+    $avatarUrl: String
+    $bannerUrl: String
+  ) {
+    updateTeamBranding(
+      teamId: $teamId
+      leagueId: $leagueId
+      logoUrl: $logoUrl
+      primaryColor: $primaryColor
+      secondaryColor: $secondaryColor
+      avatarUrl: $avatarUrl
+      bannerUrl: $bannerUrl
+    ) {
+      id
+      name
+      leagueId
+      logoUrl
+      primaryColor
+      secondaryColor
+      avatarUrl
+      bannerUrl
+    }
+  }
+`;
+export type UpdateTeamBrandingMutationFn = MutationFunction<
+  UpdateTeamBrandingMutation,
+  UpdateTeamBrandingMutationVariables
+>;
+
+/**
+ * __useUpdateTeamBrandingMutation__
+ *
+ * To run a mutation, you first call `useUpdateTeamBrandingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateTeamBrandingMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateTeamBrandingMutation, { data, loading, error }] = useUpdateTeamBrandingMutation({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      leagueId: // value for 'leagueId'
+ *      logoUrl: // value for 'logoUrl'
+ *      primaryColor: // value for 'primaryColor'
+ *      secondaryColor: // value for 'secondaryColor'
+ *      avatarUrl: // value for 'avatarUrl'
+ *      bannerUrl: // value for 'bannerUrl'
+ *   },
+ * });
+ */
+export function useUpdateTeamBrandingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateTeamBrandingMutation,
+    UpdateTeamBrandingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateTeamBrandingMutation,
+    UpdateTeamBrandingMutationVariables
+  >(UpdateTeamBranding, options);
+}
+export type UpdateTeamBrandingMutationHookResult = ReturnType<
+  typeof useUpdateTeamBrandingMutation
+>;
+export type UpdateTeamBrandingMutationResult =
+  Apollo.MutationResult<UpdateTeamBrandingMutation>;
+export type UpdateTeamBrandingMutationOptions = BaseMutationOptions<
+  UpdateTeamBrandingMutation,
+  UpdateTeamBrandingMutationVariables
 >;
 export const GetTiebreakerRules = gql`
   query GetTiebreakerRules($leagueId: Int!) {

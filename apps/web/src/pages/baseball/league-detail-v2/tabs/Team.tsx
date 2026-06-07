@@ -1,29 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useTeamBranding } from '@legacy-sports/shared-components';
 import {
   type LeagueFragment,
   type TeamFragment,
   useGetTeamMembersQuery,
-  useRenameTeamMutation,
-  useUpdateTeamBrandingMutation,
 } from '../../../../api/db/graphql.generated';
 import { colorFromString, Empty, initialsFromName, Section } from '../Shared';
 import { I } from '../Icons';
-
-const PRESET_COLORS = [
-  '#1B3A5C',
-  '#C41E3A',
-  '#2D6A4F',
-  '#8B6F47',
-  '#7C6CAE',
-  '#C5A55A',
-  '#0E7490',
-  '#9F1239',
-];
-
-const normalizeColor = (c: string | null | undefined, fallback: string) => {
-  if (!c) return fallback;
-  return c.startsWith('#') ? c.toUpperCase() : c;
-};
 
 export interface TeamTabProps {
   league: LeagueFragment;
@@ -42,45 +25,37 @@ export const TeamTab: React.FC<TeamTabProps> = ({
   });
   const teamMembers = teamMembersData?.teamMembers ?? [];
 
-  const [name, setName] = useState(myTeam?.name ?? '');
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [primaryColor, setPrimaryColor] = useState(
-    normalizeColor(myTeam?.primaryColor, PRESET_COLORS[0]),
-  );
-  const [secondaryColor, setSecondaryColor] = useState(
-    normalizeColor(myTeam?.secondaryColor, PRESET_COLORS[5]),
-  );
-  const [logoUrl, setLogoUrl] = useState(myTeam?.logoUrl ?? '');
-  const [savedFlash, setSavedFlash] = useState<'name' | 'branding' | null>(
-    null,
-  );
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // When team data arrives or changes (different team selected), seed form values
-  useEffect(() => {
-    if (myTeam) {
-      setName(myTeam.name ?? '');
-      setPrimaryColor(normalizeColor(myTeam.primaryColor, PRESET_COLORS[0]));
-      setSecondaryColor(
-        normalizeColor(myTeam.secondaryColor, PRESET_COLORS[5]),
-      );
-      setLogoUrl(myTeam.logoUrl ?? '');
-    }
-  }, [
-    myTeam?.id,
-    myTeam?.name,
-    myTeam?.primaryColor,
-    myTeam?.secondaryColor,
-    myTeam?.logoUrl,
-    myTeam,
-  ]);
-
-  const [renameTeam, { loading: renaming }] = useRenameTeamMutation();
-  const [updateBranding, { loading: savingBranding }] =
-    useUpdateTeamBrandingMutation();
-
-  const currentTeamName = myTeam?.name ?? '';
-  const trimmedName = name.trim();
-  const nameDirty = trimmedName.length > 0 && trimmedName !== currentTeamName;
+  // Save wiring (form state, dirty tracking, rename/branding mutations, saved
+  // flash) is shared cross-platform via useTeamBranding (LS-7809); this tab
+  // keeps its bespoke editorial markup.
+  const {
+    name,
+    setName,
+    primaryColor,
+    setPrimaryColor,
+    secondaryColor,
+    setSecondaryColor,
+    logoUrl,
+    setLogoUrl,
+    currentTeamName,
+    trimmedName,
+    nameDirty,
+    renaming,
+    savingBranding,
+    savedFlash,
+    presetColors,
+    saveName,
+    saveBranding,
+  } = useTeamBranding({
+    teamId: myTeamId,
+    leagueId: league.id ?? null,
+    team: myTeam,
+    onSaved: () => setSaveError(null),
+    onError: (err) => setSaveError(err.message),
+  });
 
   const requestRename = () => {
     if (!myTeamId || !nameDirty || !league.id) return;
@@ -88,36 +63,9 @@ export const TeamTab: React.FC<TeamTabProps> = ({
   };
 
   const onSaveName = async () => {
-    if (!myTeamId || !nameDirty || !league.id) return;
-    await renameTeam({
-      variables: {
-        teamId: myTeamId,
-        leagueId: league.id,
-        newName: trimmedName,
-      },
-    });
+    await saveName();
     setConfirmOpen(false);
-    setSavedFlash('name');
-    setTimeout(() => setSavedFlash(null), 1500);
   };
-  const onSaveBranding = async () => {
-    if (!myTeamId || !league.id) return;
-    await updateBranding({
-      variables: {
-        teamId: myTeamId,
-        leagueId: league.id,
-        primaryColor,
-        secondaryColor,
-        logoUrl: logoUrl || null,
-      },
-    });
-    setSavedFlash('branding');
-    setTimeout(() => setSavedFlash(null), 1500);
-  };
-
-  useEffect(() => {
-    setSavedFlash(null);
-  }, [myTeamId]);
 
   if (!myTeamId) {
     return (
@@ -136,6 +84,22 @@ export const TeamTab: React.FC<TeamTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {saveError ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            background: 'rgba(196, 30, 58, 0.1)',
+            border: '1px solid rgba(196, 30, 58, 0.4)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#c41e3a',
+            fontWeight: 600,
+          }}
+        >
+          Error saving team: {saveError}
+        </div>
+      ) : null}
       <Section
         title="Team Identity"
         sub="How your team appears in standings, chat, and the draft room."
@@ -264,7 +228,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
             <div className="ls-field">
               <label>Primary Color</label>
               <div className="ls-color-row">
-                {PRESET_COLORS.map((c) => (
+                {presetColors.map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -279,7 +243,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
             <div className="ls-field">
               <label>Secondary Color</label>
               <div className="ls-color-row">
-                {PRESET_COLORS.map((c) => (
+                {presetColors.map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -342,7 +306,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
               className="ls-btn ls-btn-gold block"
               style={{ marginTop: 14 }}
               onClick={() => {
-                void onSaveBranding();
+                void saveBranding();
               }}
               disabled={savingBranding}
             >
