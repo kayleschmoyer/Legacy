@@ -2,6 +2,13 @@ import React from 'react';
 import { Button, Card, Spinner, Text, Theme, XStack, YStack } from 'tamagui';
 import { BrandIcon } from '../../components/icons';
 
+/**
+ * How long an error banner stays visible before auto-dismissing, in ms.
+ * Long enough to read a short sign-in error, short enough that a stale banner
+ * does not linger after the user has moved on (LGN-027).
+ */
+const ERROR_AUTO_DISMISS_MS = 8000;
+
 export interface LoginPageProps {
   /** Called when the user presses the Google sign-in button */
   onGoogleSignIn: () => void;
@@ -22,6 +29,12 @@ export interface LoginPageProps {
   isConfiguring?: boolean;
   /** Error text shown below the buttons */
   errorMessage?: string;
+  /**
+   * Called to clear the current error. When provided, the error banner renders
+   * a dismiss (×) control and auto-dismisses after {@link ERROR_AUTO_DISMISS_MS}.
+   * Omit to keep the banner persistent (no close button, no timer).
+   */
+  onDismissError?: () => void;
   /** Extra style forwarded to the card container */
   style?: React.CSSProperties | Record<string, unknown>;
 }
@@ -35,12 +48,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   isAppleLoading = false,
   isConfiguring = false,
   errorMessage,
+  onDismissError,
   style,
 }) => {
   const anyLoading = isGoogleLoading || isDiscordLoading || isAppleLoading;
   const googleDisabled = anyLoading || isConfiguring;
   const discordDisabled = anyLoading;
   const appleDisabled = anyLoading || isConfiguring;
+
+  // Keep the latest dismiss callback in a ref so the auto-dismiss effect only
+  // depends on the error text. Consumers commonly pass an inline arrow whose
+  // identity changes every render; depending on it directly would restart the
+  // timer on each render and the banner would never auto-dismiss.
+  const dismissErrorRef = React.useRef(onDismissError);
+  dismissErrorRef.current = onDismissError;
+
+  // Auto-dismiss the error banner after a delay so a stale error does not
+  // persist once the user has moved on (LGN-027). Gated on onDismissError so
+  // consumers that opt out keep a persistent banner.
+  React.useEffect(() => {
+    if (!errorMessage || !dismissErrorRef.current) return;
+    const timer = setTimeout(() => {
+      dismissErrorRef.current?.();
+    }, ERROR_AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [errorMessage]);
 
   return (
     <Theme name="legacy_dark">
@@ -183,7 +215,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         {/* Error message */}
         {!!errorMessage && (
-          <YStack
+          <XStack
             testID="login-error"
             marginTop="$3"
             padding="$3"
@@ -191,11 +223,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             backgroundColor="rgba(196,30,58,0.12)"
             borderColor="rgba(196,30,58,0.35)"
             borderWidth={1}
+            alignItems="center"
+            gap="$2"
           >
-            <Text color="#e63950" fontSize={14} textAlign="center">
+            <Text color="#e63950" fontSize={14} textAlign="center" flex={1}>
               {errorMessage}
             </Text>
-          </YStack>
+            {!!onDismissError && (
+              <Button
+                testID="login-error-dismiss"
+                aria-label="Dismiss error"
+                onPress={onDismissError}
+                unstyled
+                padding="$1"
+                borderRadius={8}
+                hoverStyle={{ opacity: 0.7 }}
+                pressStyle={{ opacity: 0.5 }}
+              >
+                <BrandIcon name="close" size={16} color="#e63950" decorative />
+              </Button>
+            )}
+          </XStack>
         )}
 
         {/* Legal */}

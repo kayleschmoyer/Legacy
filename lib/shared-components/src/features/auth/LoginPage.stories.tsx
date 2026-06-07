@@ -18,6 +18,7 @@ const meta: Meta<typeof LoginPage> = {
   argTypes: {
     onGoogleSignIn: { action: 'google-sign-in' },
     onDiscordSignIn: { action: 'discord-sign-in' },
+    onDismissError: { action: 'dismiss-error' },
     isGoogleLoading: { control: 'boolean' },
     isDiscordLoading: { control: 'boolean' },
     isConfiguring: { control: 'boolean' },
@@ -105,7 +106,25 @@ export const WithError: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Error message shown below the buttons.',
+        story:
+          'Persistent error banner — no dismiss control or auto-dismiss timer because onDismissError is omitted.',
+      },
+    },
+  },
+};
+
+export const WithDismissibleError: Story = {
+  args: {
+    onGoogleSignIn: fn(),
+    onDiscordSignIn: fn(),
+    errorMessage: 'Sign-in failed. Please try again.',
+    onDismissError: fn(),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Error banner with a dismiss (×) control. Passing onDismissError also enables an auto-dismiss timer that clears the banner after a few seconds.',
       },
     },
   },

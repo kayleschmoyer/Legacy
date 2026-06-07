@@ -80,6 +80,7 @@ export function LoginPage(): React.JSX.Element {
     loginWithOAuth,
     hydrateSession,
     error: authError,
+    clearError,
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
@@ -133,6 +134,14 @@ export function LoginPage(): React.JSX.Element {
   }, [onThisDayData]);
 
   const displayError = errorMessage || authError || '';
+
+  // Clear both error sources so the banner fully dismisses — displayError falls
+  // back to authError, so clearing only the local message would leave an
+  // auth-originated error visible (LGN-027).
+  const handleDismissError = useCallback(() => {
+    setErrorMessage('');
+    clearError();
+  }, [clearError]);
 
   /* Discord callback handling */
   useEffect(() => {
@@ -471,6 +480,7 @@ export function LoginPage(): React.JSX.Element {
               isDiscordLoading={isDiscordLoading}
               isConfiguring={isConfiguring}
               errorMessage={displayError || undefined}
+              onDismissError={handleDismissError}
             />
 
             <div className="ll-card-footer">

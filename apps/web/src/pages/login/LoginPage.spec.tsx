@@ -58,6 +58,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
     loginWithOAuth: jest.fn(),
     hydrateSession: mockHydrateSession,
     error: null,
+    clearError: jest.fn(),
   }),
 }));
 
