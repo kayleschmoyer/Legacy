@@ -27,6 +27,7 @@ import {
   useGetUserTeamIdLazyQuery,
 } from '../../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../../lib/scoring';
+import { setLastVisitedLeague } from '../../../lib/last-visited-league';
 import { LeagueWebSocketContext } from '../../../context/LeagueWebSocketContext';
 import { useLeagueWebSocket } from '../../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketLifecycle } from '../../../hooks/useLeagueWebSocketLifecycle';
@@ -97,6 +98,16 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     | LeagueFragment
     | null
     | undefined;
+
+  // Persist this league as the user's most recently opened one so the next
+  // login can redirect them straight here instead of the generic `/` route
+  // (LS-6694). Best-effort and storage-failure tolerant.
+  const leagueSport = league?.sport;
+  useEffect(() => {
+    if (Number.isFinite(leagueId) && leagueSport) {
+      setLastVisitedLeague(leagueId, leagueSport);
+    }
+  }, [leagueId, leagueSport]);
 
   const [getTeams, { data: teamsData }] = useGetLeagueTeamsLazyQuery();
   useEffect(() => {

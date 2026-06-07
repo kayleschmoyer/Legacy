@@ -52,6 +52,7 @@ import { handleError } from '../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import { toIntId } from '../../../common/utilities/RouteUtils';
+import { setLastVisitedLeague } from '../../../common/utilities/lastVisitedLeague';
 import { useStandings } from '../../../features/matchup/hooks/useStandings';
 import { LeagueFreeAgents } from '../FreeAgents';
 
@@ -242,6 +243,16 @@ export default function LeagueContext(): React.JSX.Element {
   } = useLeagueScoringSettings(numLeagueId);
 
   const league = leagueData?.league;
+
+  // Persist this league as the user's most recently opened one so the next
+  // login can redirect them straight here instead of the generic `/` route
+  // (LS-6694). Best-effort and storage-failure tolerant.
+  const leagueSport = league?.sport;
+  useEffect(() => {
+    if (!isNaN(numLeagueId) && leagueSport) {
+      setLastVisitedLeague(numLeagueId, leagueSport);
+    }
+  }, [numLeagueId, leagueSport]);
 
   const wsUrl = config.websocketUrl;
   const { connected: _wsConnected } = useWebSocket({

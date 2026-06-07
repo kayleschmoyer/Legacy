@@ -1,0 +1,87 @@
+/**
+ * Last-visited-league persistence helpers (shared across web and mobile).
+ *
+ * Stores the league a user most recently opened so that, on the next login, a
+ * returning user can be sent straight back to their league hub instead of the
+ * generic `/` landing route (LS-6694 / LGN-039).
+ *
+ * This module is intentionally storage-agnostic: it only owns the canonical
+ * storage key, the persisted shape, route building, and (de)serialization with
+ * strict validation. Each platform wraps these with its own storage backend
+ * (web: `localStorage`; mobile: `AsyncStorage`) so the same parse/serialize
+ * rules are shared and the redirect behaviour stays consistent.
+ */
+import type { Sport } from './colors';
+
+/** Persisted shape of the user's most recently opened league. */
+export interface LastVisitedLeague {
+  leagueId: number;
+  sport: Sport;
+}
+
+/** Storage key used by both the web (`localStorage`) and mobile (`AsyncStorage`) wrappers. */
+export const LAST_VISITED_LEAGUE_KEY = 'ls_last_visited_league';
+
+/** Narrow an arbitrary sport value to the canonical union (defaults to baseball). */
+function normalizeSport(sport: unknown): Sport {
+  return sport === 'football' ? 'football' : 'baseball';
+}
+
+/**
+ * Build the in-app route for a league detail page: `/{sport}/league/{id}`.
+ * Mirrors the route patterns registered in `apps/web` (`/baseball/league/:id`,
+ * `/football/league/:id`).
+ */
+export function lastVisitedLeaguePath(league: LastVisitedLeague): string {
+  const sportPrefix = league.sport === 'football' ? 'football' : 'baseball';
+  return `/${sportPrefix}/league/${league.leagueId}`;
+}
+
+/**
+ * Build a `LastVisitedLeague` from a (possibly loosely-typed) sport string —
+ * convenient for callers that hold `league.sport: string | null | undefined`.
+ */
+export function makeLastVisitedLeague(
+  leagueId: number,
+  sport: string | null | undefined,
+): LastVisitedLeague {
+  return { leagueId, sport: normalizeSport(sport) };
+}
+
+/** Serialize a last-visited league for storage. */
+export function serializeLastVisitedLeague(league: LastVisitedLeague): string {
+  return JSON.stringify({
+    leagueId: league.leagueId,
+    sport: normalizeSport(league.sport),
+  });
+}
+
+/**
+ * Parse a stored last-visited league. Returns `null` for any malformed input
+ * (missing/empty value, invalid JSON, wrong shape, non-positive id, or an
+ * unrecognized sport) so callers can safely fall back to the default route.
+ */
+export function parseLastVisitedLeague(
+  raw: string | null | undefined,
+): LastVisitedLeague | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const { leagueId, sport } = parsed as {
+      leagueId?: unknown;
+      sport?: unknown;
+    };
+    if (
+      typeof leagueId !== 'number' ||
+      !Number.isInteger(leagueId) ||
+      leagueId <= 0
+    ) {
+      return null;
+    }
+    if (sport !== 'baseball' && sport !== 'football') return null;
+    return { leagueId, sport };
+  } catch {
+    return null;
+  }
+}

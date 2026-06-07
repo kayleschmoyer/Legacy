@@ -43,6 +43,7 @@ import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
+import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
 
 export default function LeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
@@ -177,6 +178,16 @@ export default function LeagueId(): React.JSX.Element {
       tradeRefetchRef.current = null;
     };
   }, []);
+
+  // Persist this league as the user's most recently opened one so the next
+  // login can redirect them straight here instead of the generic `/` route
+  // (LS-6694). Sport is fixed by this route.
+  const leagueLoaded = !!league;
+  useEffect(() => {
+    if (!isNaN(numLeagueId) && leagueLoaded) {
+      setLastVisitedLeague(numLeagueId, 'baseball');
+    }
+  }, [numLeagueId, leagueLoaded]);
 
   // WebSocket for live league updates
   const wsUrl = config.websocketUrl;

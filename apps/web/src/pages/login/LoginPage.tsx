@@ -11,12 +11,14 @@ import {
   OAuthProvider,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { lastVisitedLeaguePath } from '@legacy-sports/shared-components/utils';
 import { LoginPage as AuthCard } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 import { getSafeRedirectTarget } from '../../lib/safe-redirect';
 import { consumeCameFrom, storeCameFrom } from '../../lib/came-from';
+import { getLastVisitedLeague } from '../../lib/last-visited-league';
 import { env } from '../../config/environment';
 import {
   useGetOnThisDayQuery,
@@ -54,6 +56,23 @@ function DiscordGlyph() {
 }
 
 /* ── Helpers ── */
+
+/**
+ * Resolve the post-login redirect target. Precedence:
+ *   1. An explicit deep-link the user came from before the Discord round-trip
+ *      (LGN-037) — consumed here so it is used at most once.
+ *   2. The user's last-opened league, for returning users (LS-6694).
+ *   3. The generic app-root destination.
+ * Always routed through getSafeRedirectTarget so a poisoned config value or a
+ * tampered came-from entry can never turn this into an open redirect (LS-6691).
+ */
+function resolvePostLoginRedirect(): string {
+  const cameFrom = consumeCameFrom();
+  if (cameFrom) return getSafeRedirectTarget(cameFrom);
+  const lastLeague = getLastVisitedLeague();
+  const target = lastLeague ? lastVisitedLeaguePath(lastLeague) : env.baseUrl;
+  return getSafeRedirectTarget(target);
+}
 
 function formatBattingMarquee(
   lastName: string,
@@ -254,15 +273,14 @@ export function LoginPage(): React.JSX.Element {
         // URL is rewritten to the app root *before* that swap so the Router
         // mounts on the home route rather than the Discord-link callback route.
         //
-        // Restore the page the user deep-linked into before being sent through
-        // the Discord round-trip (e.g. /league/123), falling back to the app
-        // base URL when there is nothing to restore (LGN-037). The candidate is
-        // still routed through getSafeRedirectTarget so a poisoned config value
-        // or a tampered came-from entry can never turn this into an open
-        // redirect, whether we SPA-navigate or fall back to a full reload
+        // Destination precedence (resolvePostLoginRedirect): the deep-link the
+        // user came from before the Discord round-trip (e.g. /league/123,
+        // LGN-037) → the user's last-opened league (LS-6694) → the app base URL.
+        // The candidate is routed through getSafeRedirectTarget so a poisoned
+        // config value or a tampered came-from entry can never turn this into an
+        // open redirect, whether we SPA-navigate or fall back to a full reload
         // (LS-6691).
-        const cameFrom = consumeCameFrom();
-        const safeTarget = getSafeRedirectTarget(cameFrom ?? env.baseUrl);
+        const safeTarget = resolvePostLoginRedirect();
         const hydrated = hydrateSession(result.jwt);
         if (hydrated) {
           window.history.replaceState(null, '', safeTarget);
@@ -327,6 +345,14 @@ export function LoginPage(): React.JSX.Element {
       setErrorMessage('');
       try {
         await loginWithOAuth(customEvent.detail.authResponse);
+        // Send returning users back to their last-opened league. The auth-guard
+        // swaps in the Router after the auth state flips; rewriting the URL here
+        // (before that re-render commits) makes the Router mount on the target
+        // route. LoginPage renders outside the Router, so navigate() is not
+        // available — replaceState mirrors the Discord callback path (LS-6694).
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', resolvePostLoginRedirect());
+        }
       } catch (error) {
         LOGGER.error(
           'One Tap authentication failed on login page:',
@@ -356,6 +382,11 @@ export function LoginPage(): React.JSX.Element {
     try {
       const oauthResponse = await OAuthProvider.signIn();
       await loginWithOAuth(oauthResponse);
+      // Redirect returning users to their last-opened league (LS-6694). See the
+      // One Tap handler above for why replaceState is used here.
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', resolvePostLoginRedirect());
+      }
     } catch (error) {
       const isCancelled =
         error instanceof Error &&

@@ -385,8 +385,10 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
 
   beforeEach(() => {
     mockHydrateSession.mockReset();
-    // Clear any came-from entry so it cannot leak between tests (LGN-037).
+    // Clear came-from (LGN-037) and last-visited-league (LS-6694) so neither
+    // leaks between tests.
     sessionStorage.clear();
+    localStorage.clear();
     // Put jsdom on the Discord callback URL so the LoginPage effect fires.
     window.history.replaceState(
       {},
@@ -454,6 +456,39 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
     expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
 
     replaceStateSpy.mockRestore();
+  });
+
+  it('redirects to the stored last-visited league after a Discord login (LS-6694)', async () => {
+    localStorage.setItem(
+      'ls_last_visited_league',
+      JSON.stringify({ leagueId: 42, sport: 'football' }),
+    );
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(''),
+        json: () =>
+          Promise.resolve({ jwt: 'header.payload.sig', csrfToken: 'csrf-1' }),
+      }),
+    ) as unknown as typeof fetch;
+    mockHydrateSession.mockReturnValue(true);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockHydrateSession).toHaveBeenCalledWith('header.payload.sig');
+    });
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        null,
+        '',
+        '/football/league/42',
+      );
+    });
+
+    replaceStateSpy.mockRestore();
+    localStorage.clear();
   });
 
   it('falls back to pre-cache + full reload when the JWT cannot be hydrated', async () => {
