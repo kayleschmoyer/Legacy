@@ -12,6 +12,7 @@ import {
   BrandIcon,
   type BrandIconName,
 } from '../../components/icons';
+import { env } from '../../config/environment';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
@@ -349,10 +350,20 @@ export function PublicLandingPage(): React.JSX.Element {
       return;
     }
 
+    // All validation guards (code/state above and oauthProxyUrl below) run
+    // before setIsDiscordLoading(true), so an early return never leaves the
+    // Discord button stuck in a loading state — there is no loading flag to
+    // reset on these paths.
+    const oauthProxyUrl = config.oauthProxyUrl;
+    if (!oauthProxyUrl) {
+      setErrorMessage(
+        'Discord sign-in failed: OAuth proxy URL is not configured.',
+      );
+      return;
+    }
+
     setIsDiscordLoading(true);
     setErrorMessage('');
-
-    const oauthProxyUrl = config.oauthProxyUrl ?? 'http://localhost:5001';
 
     const exchangeCode = async () => {
       try {
@@ -402,7 +413,7 @@ export function PublicLandingPage(): React.JSX.Element {
 
         // Navigate to home; AuthProvider will restore the session from cache
         // and the HttpOnly JWT cookie will authenticate API requests.
-        window.location.replace(import.meta.env.BASE_URL || '/');
+        window.location.replace(env.baseUrl);
       } catch (err) {
         LOGGER.error('Discord callback exchange failed:', String(err));
         setErrorMessage(
@@ -548,7 +559,7 @@ export function PublicLandingPage(): React.JSX.Element {
             {/* Logo */}
             <XStack alignItems="center" gap="$2">
               <img
-                src={`${import.meta.env.BASE_URL}logo.png`}
+                src={`${env.baseUrl}logo.png`}
                 alt="Legacy Sports"
                 style={{ height: 38, width: 'auto', display: 'block' }}
               />
