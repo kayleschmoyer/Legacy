@@ -169,6 +169,17 @@ export const tamaguiMocks = {
     return React.createElement(Text, { onPress, ...rest }, children);
   },
 
+  Paragraph: ({
+    children,
+    ...rest
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => {
+    const { Text } = getRN();
+    return React.createElement(Text, rest, children);
+  },
+
   XStack: ({
     children,
   }: {

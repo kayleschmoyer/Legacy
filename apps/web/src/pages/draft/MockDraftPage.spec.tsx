@@ -57,8 +57,24 @@ jest.mock('@legacy-sports/shared-components', () => ({
   Skeleton: () => <div data-testid="mock-draft-skeleton" />,
 }));
 
+// The interactive settings form lives in shared-components (LS-7711); these
+// page tests cover MockDraftPage's state selection (skeleton vs limit-reached
+// vs form) and the usage-label wiring, so we stub the shared form to surface
+// the usageLabel it receives plus a Start button.
 jest.mock('@legacy-sports/shared-components/draft', () => ({
-  FootballMockPoolPreview: () => <div data-testid="football-mock-pool" />,
+  MockDraftSetup: ({
+    usageLabel,
+    onStart,
+  }: {
+    usageLabel?: string;
+    onStart?: (settings: unknown) => void;
+    [key: string]: unknown;
+  }) => (
+    <div data-testid="mock-draft-setup">
+      {usageLabel ? <p>{usageLabel}</p> : null}
+      <button onClick={() => onStart?.({})}>Start Mock Draft</button>
+    </div>
+  ),
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => ({

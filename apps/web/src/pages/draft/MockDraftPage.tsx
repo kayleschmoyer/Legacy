@@ -9,7 +9,10 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { Skeleton } from '@legacy-sports/shared-components';
-import { FootballMockPoolPreview } from '@legacy-sports/shared-components/draft';
+import {
+  type MockDraftSettings,
+  MockDraftSetup,
+} from '@legacy-sports/shared-components/draft';
 import { Lock } from '@tamagui/lucide-icons';
 import {
   useGetMyMockDraftUsageQuery,
@@ -23,7 +26,6 @@ import {
   BRAND_GOLD,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
-  EMERALD,
   GRADIENT_BOARD_BG,
   OVERLAY_WHITE_10,
   SURFACE_CARD,
@@ -35,120 +37,6 @@ import {
  * (ADR 0011 §4, LS-4666). When off, the page behaves exactly as before.
  */
 export const FOOTBALL_MOCK_PLAYERS_FLAG = 'football-mock-players';
-
-type SportKind = 'baseball' | 'football';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface MockDraftSettings {
-  numTeams: number;
-  rosterSize: number;
-  userPickPosition: number;
-  draftOrder: 'snake' | 'linear';
-  playerPool: 'all' | 'nl' | 'al';
-  sport: SportKind;
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const DRAFT_ORDER_OPTIONS: { label: string; value: 'snake' | 'linear' }[] = [
-  { label: 'Snake', value: 'snake' },
-  { label: 'Linear', value: 'linear' },
-];
-
-const PLAYER_POOL_OPTIONS: {
-  label: string;
-  value: 'all' | 'nl' | 'al';
-}[] = [
-  { label: 'All MLB', value: 'all' },
-  { label: 'NL Only', value: 'nl' },
-  { label: 'AL Only', value: 'al' },
-];
-
-// ─── Field section wrapper ───────────────────────────────────────────────────
-
-interface FieldSectionProps {
-  label: string;
-  labelId: string;
-  children: React.ReactNode;
-  helper?: React.ReactNode;
-}
-
-function FieldSection({
-  label,
-  labelId,
-  children,
-  helper,
-}: FieldSectionProps): React.JSX.Element {
-  return (
-    <YStack
-      tag="section"
-      aria-labelledby={labelId}
-      gap="$2.5"
-      marginBottom="$5"
-    >
-      <Text
-        id={labelId}
-        fontFamily="$display"
-        fontSize={13}
-        fontWeight="600"
-        color="$gray11"
-        textTransform="uppercase"
-        letterSpacing={1}
-      >
-        {label}
-      </Text>
-      {children}
-      {helper}
-    </YStack>
-  );
-}
-
-// ─── Option button (centered, design-system styling) ─────────────────────────
-
-interface OptionButtonProps {
-  label: string;
-  selected: boolean;
-  accent: string;
-  onPress: () => void;
-  width?: number;
-}
-
-function OptionButton({
-  label,
-  selected,
-  accent,
-  onPress,
-  width,
-}: OptionButtonProps): React.JSX.Element {
-  return (
-    <Button
-      size="$3"
-      variant={selected ? 'primary' : 'outlined'}
-      onPress={onPress}
-      minWidth={width ?? 56}
-      width={width}
-      backgroundColor={selected ? withAlpha(accent, 0.18) : '$color2'}
-      borderColor={selected ? accent : '$borderColor'}
-      borderWidth={selected ? 2 : 1}
-      hoverStyle={{
-        backgroundColor: selected ? withAlpha(accent, 0.28) : '$color3',
-      }}
-      pressStyle={{ scale: 0.96 }}
-      aria-pressed={selected}
-    >
-      <Text
-        fontFamily="$body"
-        fontSize={15}
-        fontWeight={selected ? '700' : '500'}
-        color={selected ? '$color' : '$gray11'}
-        style={{ fontVariantNumeric: 'tabular-nums' }}
-      >
-        {label}
-      </Text>
-    </Button>
-  );
-}
 
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
 
@@ -169,14 +57,13 @@ interface SetupScreenProps {
   usageLabel?: string;
 }
 
-// Snap to the closest supported team count to keep the option buttons in sync.
-const TEAM_OPTIONS = [4, 6, 8, 10, 12] as const;
-function clampToTeamOption(n: number): number {
-  return TEAM_OPTIONS.reduce((best, opt) =>
-    Math.abs(opt - n) < Math.abs(best - n) ? opt : best,
-  );
-}
-
+/**
+ * Web Mock Draft setup screen: brand chrome (gradient background, "Practice
+ * Mode" card) wrapping the shared {@link MockDraftSetup} form (LS-7711). The
+ * interactive settings live in shared-components so web and native render the
+ * same battle-tested form; web owns the surrounding presentation, premium
+ * gating, navigation, and the `initializeMockDraft` wiring.
+ */
 function SetupScreen({
   onStart,
   loading = false,
@@ -187,32 +74,6 @@ function SetupScreen({
   usageLabel,
 }: SetupScreenProps): React.JSX.Element {
   const navigate = useNavigate();
-  const [numTeams, setNumTeams] = React.useState(
-    initialNumTeams != null ? clampToTeamOption(initialNumTeams) : 8,
-  );
-  const [rosterSize, setRosterSize] = React.useState(10);
-  const [userPickPosition, setUserPickPosition] = React.useState(1);
-  const [draftOrder, setDraftOrder] = React.useState<
-    MockDraftSettings['draftOrder']
-  >(initialDraftOrder ?? 'snake');
-  const [playerPool, setPlayerPool] =
-    React.useState<MockDraftSettings['playerPool']>('all');
-  const [sport, setSport] = React.useState<SportKind>('baseball');
-
-  const handleStart = () => {
-    onStart({
-      numTeams,
-      rosterSize,
-      userPickPosition,
-      draftOrder,
-      playerPool,
-      sport,
-    });
-  };
-
-  // Football mock-draft engine wiring lands with LS-4657 → LS-4665. Until those
-  // ship, the football toggle is a preview affordance only — Start is disabled.
-  const footballPreviewActive = footballMockEnabled && sport === 'football';
 
   return (
     <YStack
@@ -282,224 +143,16 @@ function SetupScreen({
           borderColor={OVERLAY_WHITE_10}
           style={{ boxShadow: `0 16px 64px ${withAlpha(BLACK, 0.4)}` }}
         >
-          {/* Sport — only visible when the football-mock-players flag is on */}
-          {footballMockEnabled && (
-            <FieldSection label="Sport" labelId="sport-label">
-              <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-                <OptionButton
-                  label="⚾ Baseball"
-                  selected={sport === 'baseball'}
-                  accent={BRAND_SEAM_RED}
-                  onPress={() => setSport('baseball')}
-                  width={140}
-                />
-                <OptionButton
-                  label="🏈 Football"
-                  selected={sport === 'football'}
-                  accent={BRAND_GOLD}
-                  onPress={() => setSport('football')}
-                  width={140}
-                />
-              </XStack>
-            </FieldSection>
-          )}
-
-          {/* Football mock pool preview — engine wiring follows in LS-4657→LS-4665 */}
-          {footballPreviewActive && (
-            <YStack marginBottom="$5" gap="$2">
-              <FootballMockPoolPreview />
-              <Paragraph
-                fontFamily="$body"
-                fontSize={12}
-                color="$gray10"
-                margin={0}
-                textAlign="center"
-              >
-                Football draft engine wiring lands with the rest of the sport
-                toggle slice (LS-4657 → LS-4665). Start is disabled until the
-                backend can consume this pool.
-              </Paragraph>
-            </YStack>
-          )}
-
-          {/* Number of Teams */}
-          <FieldSection label="Number of Teams" labelId="teams-label">
-            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-              {[4, 6, 8, 10, 12].map((n) => (
-                <OptionButton
-                  key={n}
-                  label={String(n)}
-                  selected={numTeams === n}
-                  accent={BRAND_SEAM_RED}
-                  onPress={() => {
-                    setNumTeams(n);
-                    if (userPickPosition > n) setUserPickPosition(n);
-                  }}
-                />
-              ))}
-            </XStack>
-          </FieldSection>
-
-          {/* Rounds / Roster Size */}
-          <FieldSection label="Rounds (Roster Size)" labelId="roster-label">
-            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-              {[5, 8, 10, 15].map((n) => (
-                <OptionButton
-                  key={n}
-                  label={String(n)}
-                  selected={rosterSize === n}
-                  accent={EMERALD}
-                  onPress={() => setRosterSize(n)}
-                />
-              ))}
-            </XStack>
-          </FieldSection>
-
-          {/* Draft Position */}
-          <FieldSection
-            label="Your Draft Position"
-            labelId="pick-label"
-            helper={
-              <Paragraph
-                fontFamily="$body"
-                fontSize={12}
-                color="$gray10"
-                textAlign="center"
-                margin={0}
-              >
-                {draftOrder === 'snake' ? 'Snake' : 'Linear'} draft — you pick{' '}
-                {draftOrder === 'snake'
-                  ? userPickPosition === 1
-                    ? 'first every odd round'
-                    : userPickPosition === numTeams
-                      ? 'first every even round'
-                      : `at position ${userPickPosition}`
-                  : `at position ${userPickPosition} every round`}
-              </Paragraph>
-            }
-          >
-            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-              {Array.from({ length: numTeams }, (_, i) => i + 1).map((pos) => (
-                <OptionButton
-                  key={pos}
-                  label={String(pos)}
-                  selected={userPickPosition === pos}
-                  accent={BRAND_GOLD}
-                  onPress={() => setUserPickPosition(pos)}
-                  width={48}
-                />
-              ))}
-            </XStack>
-          </FieldSection>
-
-          {/* Draft Order */}
-          <FieldSection label="Draft Order" labelId="draft-order-label">
-            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-              {DRAFT_ORDER_OPTIONS.map((opt) => (
-                <OptionButton
-                  key={opt.value}
-                  label={opt.label}
-                  selected={draftOrder === opt.value}
-                  accent={BRAND_GOLD}
-                  onPress={() => setDraftOrder(opt.value)}
-                />
-              ))}
-            </XStack>
-          </FieldSection>
-
-          {/* Player Pool */}
-          <FieldSection label="Player Pool" labelId="player-pool-label">
-            <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-              {PLAYER_POOL_OPTIONS.map((opt) => (
-                <OptionButton
-                  key={opt.value}
-                  label={opt.label}
-                  selected={playerPool === opt.value}
-                  accent={BRAND_GOLD}
-                  onPress={() => setPlayerPool(opt.value)}
-                />
-              ))}
-            </XStack>
-          </FieldSection>
-
-          {/* Error */}
-          {error && (
-            <YStack
-              backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
-              borderWidth={1}
-              borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
-              borderRadius="$3"
-              paddingHorizontal="$3"
-              paddingVertical="$2"
-              marginBottom="$3"
-            >
-              <Text fontFamily="$body" fontSize={13} color={BRAND_SEAM_RED}>
-                {error}
-              </Text>
-            </YStack>
-          )}
-
-          {/* Weekly-usage helper for free-tier users (LS-5178) */}
-          {usageLabel && (
-            <Paragraph
-              fontFamily="$body"
-              fontSize={12}
-              color="$gray10"
-              textAlign="center"
-              marginBottom="$3"
-              margin={0}
-              style={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {usageLabel}
-            </Paragraph>
-          )}
-
-          {/* Actions */}
-          <XStack gap="$3" marginTop="$2">
-            <Button
-              size="$5"
-              variant="primary"
-              onPress={handleStart}
-              disabled={loading || footballPreviewActive}
-              flex={1}
-              backgroundColor={BRAND_SEAM_RED}
-              borderColor={BRAND_SEAM_RED}
-              hoverStyle={{ backgroundColor: '#A8182F' }}
-              pressStyle={{ scale: 0.98 }}
-              opacity={loading || footballPreviewActive ? 0.5 : 1}
-              aria-label={
-                footballPreviewActive
-                  ? 'Football mock draft coming soon — engine wiring pending'
-                  : undefined
-              }
-            >
-              <Text
-                fontFamily="$display"
-                fontSize={16}
-                fontWeight="700"
-                color="$color"
-                letterSpacing={0.5}
-              >
-                {loading
-                  ? '⏳ Starting…'
-                  : footballPreviewActive
-                    ? '🏈 Football — Coming Soon'
-                    : '🚀 Start Mock Draft'}
-              </Text>
-            </Button>
-            <Button
-              size="$5"
-              variant="outlined"
-              onPress={() => navigate('/baseball')}
-              backgroundColor="transparent"
-              borderColor={BRAND_NAVY_LIGHT}
-              hoverStyle={{ backgroundColor: '$color3' }}
-            >
-              <Text fontFamily="$body" fontSize={15} color="$gray11">
-                Cancel
-              </Text>
-            </Button>
-          </XStack>
+          <MockDraftSetup
+            onStart={onStart}
+            onCancel={() => navigate('/baseball')}
+            loading={loading}
+            error={error}
+            footballMockEnabled={footballMockEnabled}
+            initialNumTeams={initialNumTeams}
+            initialDraftOrder={initialDraftOrder}
+            usageLabel={usageLabel}
+          />
         </YStack>
 
         {/* Info line */}
