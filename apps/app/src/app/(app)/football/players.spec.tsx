@@ -32,6 +32,11 @@ jest.mock('@tamagui/lucide-icons', () => ({
   ChevronDown: 'ChevronDown',
 }));
 
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 jest.mock('tamagui', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createElement } = require('react') as typeof import('react');
@@ -411,6 +416,14 @@ describe('FootballPlayers', () => {
         { variables: { search?: string } },
       ];
       expect(lastCall[0].variables.search).toBeUndefined();
+    });
+  });
+
+  describe('navigation', () => {
+    it('navigates to the player detail screen when a card is pressed', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByText('Patrick Mahomes'));
+      expect(mockPush).toHaveBeenCalledWith('/football/players/1');
     });
   });
 });

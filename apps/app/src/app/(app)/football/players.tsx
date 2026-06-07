@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown } from '@tamagui/lucide-icons';
+import { useRouter } from 'expo-router';
 import type { NflTeam } from '@legacy-sports/shared-components';
 import { NFL_TEAMS } from '@legacy-sports/shared-components';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
@@ -218,7 +219,13 @@ function PlayerStats({ player }: { player: FootballPlayerNode }) {
   );
 }
 
-function PlayerRow({ player }: { player: FootballPlayerNode }) {
+function PlayerRow({
+  player,
+  onPress,
+}: {
+  player: FootballPlayerNode;
+  onPress?: () => void;
+}) {
   const pos = player.position;
   const isDst = player.isDst;
   const displayPos = isDst ? 'DST' : (pos ?? '?');
@@ -236,6 +243,8 @@ function PlayerRow({ player }: { player: FootballPlayerNode }) {
       padding="$3"
       marginBottom="$2"
       gap="$2"
+      onPress={onPress}
+      pressStyle={onPress ? { opacity: 0.7 } : undefined}
     >
       <XStack gap="$3" alignItems="flex-start">
         {/* Team badge */}
@@ -340,6 +349,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function FootballPlayers(): React.JSX.Element {
+  const router = useRouter();
   const [position, setPosition] = useState<FootballPosition>('All');
   const [teamFilter, setTeamFilter] = useState('All');
   const [searchInput, setSearchInput] = useState('');
@@ -550,7 +560,12 @@ export default function FootballPlayers(): React.JSX.Element {
           <FlatList
             data={allNodes}
             keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => <PlayerRow player={item} />}
+            renderItem={({ item }) => (
+              <PlayerRow
+                player={item}
+                onPress={() => router.push(`/football/players/${item.id}`)}
+              />
+            )}
             windowSize={10}
             contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
             ListEmptyComponent={

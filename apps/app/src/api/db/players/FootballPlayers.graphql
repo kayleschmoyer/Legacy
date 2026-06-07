@@ -58,3 +58,48 @@ query FootballPlayers(
     }
   }
 }
+
+query FootballPlayer($id: Int!) {
+  footballPlayer(id: $id) {
+    id
+    firstName
+    lastName
+    position
+    isDst
+    nflTeam
+    pfrId
+    careerStats {
+      passing {
+        yds
+        td
+        int
+        rating
+      }
+      rushing {
+        yds
+        td
+      }
+      receiving {
+        rec
+        yds
+        td
+      }
+      kicking {
+        fgm
+        fga
+      }
+      defense {
+        sacks
+        int
+        ptsAllowedPerG
+      }
+      idp {
+        soloTkl
+        astTkl
+        sacks
+        int
+        ff
+      }
+    }
+  }
+}

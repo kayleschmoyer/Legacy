@@ -6293,6 +6293,64 @@ export type FootballPlayersQuery = {
   } | null;
 };
 
+export type FootballPlayerQueryVariables = Exact<{
+  id: Scalars['Int']['input'];
+}>;
+
+export type FootballPlayerQuery = {
+  __typename?: 'Query';
+  footballPlayer?: {
+    __typename?: 'FootballPlayer';
+    id: number;
+    firstName: string;
+    lastName: string;
+    position?: string | null;
+    isDst: boolean;
+    nflTeam?: string | null;
+    pfrId?: string | null;
+    careerStats?: {
+      __typename?: 'FootballCareerStats';
+      passing?: {
+        __typename?: 'FootballCareerPassing';
+        yds?: number | null;
+        td?: number | null;
+        int?: number | null;
+        rating?: number | null;
+      } | null;
+      rushing?: {
+        __typename?: 'FootballCareerRushing';
+        yds?: number | null;
+        td?: number | null;
+      } | null;
+      receiving?: {
+        __typename?: 'FootballCareerReceiving';
+        rec?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      } | null;
+      kicking?: {
+        __typename?: 'FootballCareerKicking';
+        fgm?: number | null;
+        fga?: number | null;
+      } | null;
+      defense?: {
+        __typename?: 'FootballCareerDefense';
+        sacks?: number | null;
+        int?: number | null;
+        ptsAllowedPerG?: number | null;
+      } | null;
+      idp?: {
+        __typename?: 'FootballCareerIdp';
+        soloTkl?: number | null;
+        astTkl?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        ff?: number | null;
+      } | null;
+    } | null;
+  } | null;
+};
+
 export type GetFreeAgentPlayersQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -11056,6 +11114,135 @@ export type FootballPlayersSuspenseQueryHookResult = ReturnType<
 export type FootballPlayersQueryResult = Apollo.QueryResult<
   FootballPlayersQuery,
   FootballPlayersQueryVariables
+>;
+export const FootballPlayer = gql`
+  query FootballPlayer($id: Int!) {
+    footballPlayer(id: $id) {
+      id
+      firstName
+      lastName
+      position
+      isDst
+      nflTeam
+      pfrId
+      careerStats {
+        passing {
+          yds
+          td
+          int
+          rating
+        }
+        rushing {
+          yds
+          td
+        }
+        receiving {
+          rec
+          yds
+          td
+        }
+        kicking {
+          fgm
+          fga
+        }
+        defense {
+          sacks
+          int
+          ptsAllowedPerG
+        }
+        idp {
+          soloTkl
+          astTkl
+          sacks
+          int
+          ff
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * __useFootballPlayerQuery__
+ *
+ * To run a query within a React component, call `useFootballPlayerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useFootballPlayerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useFootballPlayerQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useFootballPlayerQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    FootballPlayerQuery,
+    FootballPlayerQueryVariables
+  > &
+    (
+      | { variables: FootballPlayerQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<FootballPlayerQuery, FootballPlayerQueryVariables>(
+    FootballPlayer,
+    options,
+  );
+}
+export function useFootballPlayerLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    FootballPlayerQuery,
+    FootballPlayerQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<FootballPlayerQuery, FootballPlayerQueryVariables>(
+    FootballPlayer,
+    options,
+  );
+}
+export function useFootballPlayerSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        FootballPlayerQuery,
+        FootballPlayerQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    FootballPlayerQuery,
+    FootballPlayerQueryVariables
+  >(
+    FootballPlayer,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          FootballPlayerQuery,
+          FootballPlayerQueryVariables
+        >,
+  );
+}
+export type FootballPlayerQueryHookResult = ReturnType<
+  typeof useFootballPlayerQuery
+>;
+export type FootballPlayerLazyQueryHookResult = ReturnType<
+  typeof useFootballPlayerLazyQuery
+>;
+export type FootballPlayerSuspenseQueryHookResult = ReturnType<
+  typeof useFootballPlayerSuspenseQuery
+>;
+export type FootballPlayerQueryResult = Apollo.QueryResult<
+  FootballPlayerQuery,
+  FootballPlayerQueryVariables
 >;
 export const GetFreeAgentPlayers = gql`
   query GetFreeAgentPlayers($leagueId: Int!) {

@@ -5,3 +5,9 @@ export {
   type FootballPlayerCardPlayer,
   type FootballPlayerCardStats,
 } from './FootballPlayerCard';
+export {
+  FootballPlayerDetail,
+  type FootballPlayerDetailProps,
+  type FootballPlayerDetailPlayer,
+  type FootballPlayerDetailStats,
+} from './FootballPlayerDetail';
