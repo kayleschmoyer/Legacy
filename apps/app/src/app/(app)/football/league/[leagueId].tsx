@@ -11,11 +11,13 @@ import React, {
   useState,
 } from 'react';
 import { H3, Spinner, Text, YStack } from 'tamagui';
-import { Tabs } from '@tamagui/tabs';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
+  LeagueDetailShell,
+  type LeagueRole,
+  type LeagueTabDef,
   PendingTradeOfferBanner,
   PendingWaiverClaims,
   PlayoffBracket,
@@ -40,17 +42,31 @@ import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { CommissionerScreen } from '../../../../features/commissioner/CommissionerScreen';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
 import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
+import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
 
+const FOOTBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'roster', label: 'Roster' },
+  { id: 'matchups', label: 'Matchups' },
+  { id: 'trades', label: 'Trades' },
+  { id: 'standings', label: 'Standings' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'commissioner', label: 'Settings', commishOnly: true },
+];
+
 export default function FootballLeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
   const leagueId = params.leagueId;
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('overview');
+  // View-as role preference (in-memory; mirrors web v2's derive-from-perms
+  // logic). `null` means "follow the user's actual highest role".
+  const [rolePref, setRolePref] = useState<LeagueRole | null>(null);
   const userInfo = useAuthorizedUserInfo();
   const [wsToken, setWsToken] = useState<string | undefined>();
 
@@ -146,6 +162,10 @@ export default function FootballLeagueId(): React.JSX.Element {
     isNaN(numLeagueId) ? null : numLeagueId,
   );
 
+  const scoring = useLeagueScoringSettings(
+    isNaN(numLeagueId) ? undefined : numLeagueId,
+  );
+
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
   const isCommissioner = useMemo(() => {
@@ -175,6 +195,40 @@ export default function FootballLeagueId(): React.JSX.Element {
       setLastVisitedLeague(numLeagueId, 'football');
     }
   }, [numLeagueId, leagueLoaded]);
+
+  const isMember = isCommissioner || userTeamId != null;
+
+  // Effective view-as role: honour the user's toggle when valid, else fall
+  // back to their highest actual role.
+  const role: LeagueRole = useMemo(() => {
+    if (rolePref === 'commish' && isCommissioner) return 'commish';
+    if (rolePref === 'member' && isMember) return 'member';
+    if (rolePref === 'spectator') return 'spectator';
+    return isCommissioner ? 'commish' : isMember ? 'member' : 'spectator';
+  }, [rolePref, isCommissioner, isMember]);
+  const setRole = useCallback((r: LeagueRole) => setRolePref(r), []);
+
+  const [season, setSeason] = useState<string>(
+    String(league?.seasonNumber ?? new Date().getFullYear()),
+  );
+  useEffect(() => {
+    if (league?.seasonNumber) setSeason(String(league.seasonNumber));
+  }, [league?.seasonNumber]);
+  // Native intentionally surfaces only the league's active season today, matching
+  // canonical web v2 (the shell hides the selector unless seasons.length > 1).
+  // Multi-season history isn't exposed by the league API yet; populating this
+  // with prior seasons is deferred to the follow-up that adds that data source.
+  const seasonOptions = useMemo(
+    () => [
+      {
+        value: String(league?.seasonNumber ?? new Date().getFullYear()),
+        label: `Season ${league?.seasonNumber ?? new Date().getFullYear()} · ${
+          league?.frozenAt ? 'Final' : 'Active'
+        }`,
+      },
+    ],
+    [league?.seasonNumber, league?.frozenAt],
+  );
 
   const wsUrl = config.websocketUrl;
   const { connected: _wsConnected } = useWebSocket({
@@ -301,7 +355,35 @@ export default function FootballLeagueId(): React.JSX.Element {
   }
 
   return (
-    <YStack flex={1}>
+    <LeagueDetailShell
+      sport="football"
+      fill
+      league={{
+        name: league.name ?? 'League',
+        scoringLabel: scoring.profileName ?? 'Standard',
+        era:
+          league.minCareerSeasons || league.minCareerGames
+            ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
+            : 'All-Time',
+        draftStatus: league.draftStatus ?? 'pre-draft',
+        currentWeek: league.currentWeekNumber ?? null,
+        totalMatchups: league.totalMatchups ?? null,
+        teamCount: rankedStandings.length || null,
+        inviteCode: league.inviteCode,
+      }}
+      role={role}
+      onRoleChange={setRole}
+      season={season}
+      onSeasonChange={setSeason}
+      seasons={seasonOptions}
+      isCommissioner={isCommissioner}
+      isMember={isMember}
+      tabs={FOOTBALL_LEAGUE_TABS}
+      activeTab={selectedTab}
+      onTabChange={setSelectedTab}
+      onBack={() => router.back()}
+      onInvite={() => void handleInviteShare()}
+    >
       {userTeamId != null && (
         <YStack paddingHorizontal="$2" paddingTop="$2">
           <PendingTradeOfferBanner
@@ -310,44 +392,8 @@ export default function FootballLeagueId(): React.JSX.Element {
           />
         </YStack>
       )}
-      <Tabs
-        value={selectedTab}
-        onValueChange={setSelectedTab}
-        flexDirection="column"
-        flex={1}
-      >
-        <Tabs.List
-          backgroundColor="$background"
-          paddingHorizontal="$2"
-          flexWrap="wrap"
-        >
-          <Tabs.Tab value="overview" flex={1}>
-            <Text fontSize="$2">Overview</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="roster" flex={1}>
-            <Text fontSize="$2">Roster</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="matchups" flex={1}>
-            <Text fontSize="$2">Matchups</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="trades" flex={1}>
-            <Text fontSize="$2">Trades</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="standings" flex={1}>
-            <Text fontSize="$2">Standings</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="chat" flex={1}>
-            <Text fontSize="$2">Chat</Text>
-          </Tabs.Tab>
-          {isCommissioner && (
-            <Tabs.Tab value="commissioner" flex={1}>
-              <Text fontSize="$2">Settings</Text>
-            </Tabs.Tab>
-          )}
-        </Tabs.List>
-
-        {/* Overview Tab */}
-        <Tabs.Content value="overview" flex={1}>
+      {selectedTab === 'overview' && (
+        <YStack flex={1}>
           <LeagueOverviewTab
             league={league}
             leagueId={numLeagueId}
@@ -371,9 +417,11 @@ export default function FootballLeagueId(): React.JSX.Element {
               })
             }
           />
-        </Tabs.Content>
+        </YStack>
+      )}
 
-        <Tabs.Content value="roster" flex={1}>
+      {selectedTab === 'roster' && (
+        <YStack flex={1}>
           <LeagueRosterManagement
             positions={positionsData?.leaguePositions || []}
             teamPlayers={
@@ -389,9 +437,11 @@ export default function FootballLeagueId(): React.JSX.Element {
             }}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
           />
-        </Tabs.Content>
+        </YStack>
+      )}
 
-        <Tabs.Content value="matchups" flex={1}>
+      {selectedTab === 'matchups' && (
+        <YStack flex={1}>
           <MatchupList
             matchups={matchups}
             loading={matchupsLoading}
@@ -408,10 +458,12 @@ export default function FootballLeagueId(): React.JSX.Element {
               }
             }}
           />
-        </Tabs.Content>
+        </YStack>
+      )}
 
-        {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
-        <Tabs.Content value="trades" flex={1}>
+      {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
+      {selectedTab === 'trades' && (
+        <YStack flex={1}>
           <ScrollView>
             <YStack padding="$3" space="$4">
               {userTeamId ? (
@@ -431,9 +483,11 @@ export default function FootballLeagueId(): React.JSX.Element {
               )}
             </YStack>
           </ScrollView>
-        </Tabs.Content>
+        </YStack>
+      )}
 
-        <Tabs.Content value="standings" flex={1}>
+      {selectedTab === 'standings' && (
+        <YStack flex={1}>
           <ScrollView>
             <YStack padding="$3" space="$4">
               <StandingsTable
@@ -446,23 +500,25 @@ export default function FootballLeagueId(): React.JSX.Element {
               ) : null}
             </YStack>
           </ScrollView>
-        </Tabs.Content>
+        </YStack>
+      )}
 
-        <Tabs.Content value="chat" flex={1}>
+      {selectedTab === 'chat' && (
+        <YStack flex={1}>
           <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
-        </Tabs.Content>
+        </YStack>
+      )}
 
-        {isCommissioner && (
-          <Tabs.Content value="commissioner" flex={1}>
-            <CommissionerScreen
-              leagueId={numLeagueId}
-              league={league}
-              onLeagueDeleted={() => router.navigate('/')}
-            />
-          </Tabs.Content>
-        )}
-      </Tabs>
-    </YStack>
+      {selectedTab === 'commissioner' && isCommissioner && (
+        <YStack flex={1}>
+          <CommissionerScreen
+            leagueId={numLeagueId}
+            league={league}
+            onLeagueDeleted={() => router.navigate('/')}
+          />
+        </YStack>
+      )}
+    </LeagueDetailShell>
   );
 }
 

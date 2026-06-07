@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import BaseballLeagueId from './[leagueId]';
@@ -87,8 +87,49 @@ jest.mock('@tamagui/tabs', () => {
 });
 
 jest.mock('@legacy-sports/shared-components', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
+  const { View, Text, TouchableOpacity } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  const LeagueDetailShell = ({
+    tabs,
+    isCommissioner,
+    isMember,
+    onTabChange,
+    children,
+  }: {
+    tabs: ReadonlyArray<{
+      id: string;
+      label: string;
+      memberOnly?: boolean;
+      commishOnly?: boolean;
+    }>;
+    isCommissioner: boolean;
+    isMember: boolean;
+    onTabChange: (id: string) => void;
+    children?: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <View>
+      <View testID="tabs-list">
+        {tabs
+          .filter(
+            (t) =>
+              (!t.memberOnly || isMember) && (!t.commishOnly || isCommissioner),
+          )
+          .map((t) => (
+            <TouchableOpacity
+              key={t.id}
+              testID={`tab-${t.id}`}
+              onPress={() => onTabChange(t.id)}
+            >
+              <Text>{t.label}</Text>
+            </TouchableOpacity>
+          ))}
+      </View>
+      {children}
+    </View>
+  );
   return {
+    LeagueDetailShell,
     CommissionerAuditLog: () => <View testID="commissioner-audit-log" />,
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
     DeleteLeagueControl: () => <View testID="delete-league-control" />,
@@ -391,6 +432,8 @@ describe('BaseballLeagueId', () => {
       useAuthorizedUserInfo.mockReturnValue({ id: 99, isAdmin: false });
 
       render(<BaseballLeagueId />);
+      // Tab content mounts on selection (only the active tab renders).
+      fireEvent.press(screen.getByTestId('tab-commissioner'));
       expect(screen.getByTestId('commissioner-screen')).toBeTruthy();
     });
 

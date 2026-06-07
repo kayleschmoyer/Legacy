@@ -285,6 +285,7 @@ export * from './constants/nflTeams';
 export * from './features/chat/GifPicker';
 
 // League feature components
+export * from './features/leagues/LeagueDetailShell';
 export * from './features/leagues/LeagueActivityFeed';
 export * from './features/leagues/LeagueScoringSummary';
 export * from './features/leagues/OnThisDayFeed';

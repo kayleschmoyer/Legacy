@@ -21,7 +21,7 @@ import {
   Rank,
   Section,
 } from '../Shared';
-import type { TabId } from '../TabBar';
+import type { TabId } from '../tabConfig';
 
 type SubTab = 'activity' | 'chat' | 'scoring';
 
