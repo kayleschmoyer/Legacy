@@ -72,6 +72,8 @@ export function MatchupDetailLayout({
 
   return (
     <YStack
+      role="main"
+      aria-label="Matchup details"
       width="100%"
       maxWidth={1200}
       alignSelf="center"
