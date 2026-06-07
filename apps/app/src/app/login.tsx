@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Theme, YStack } from 'tamagui';
 import { LoginPage } from '@legacy-sports/shared-components';
@@ -60,26 +59,25 @@ const Login: React.FC = () => {
 
   return (
     <Theme name="legacy_dark">
-      <KeyboardAvoidingView
+      {/* This OAuth-only screen has no text inputs, so it never raises a soft
+          keyboard — a KeyboardAvoidingView wrapper would be dead code. Per
+          LS-6656 the app is OAuth-only (no email/password parity to autofill),
+          so a plain layout container is used here. */}
+      <YStack
         testID="login-screen"
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        flex={1}
+        justifyContent="center"
+        padding="$5"
+        backgroundColor="#0A0F1A"
       >
-        <YStack
-          flex={1}
-          justifyContent="center"
-          padding="$5"
-          backgroundColor="#0A0F1A"
-        >
-          <LoginPage
-            onGoogleSignIn={handleGoogleSignIn}
-            onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
-            isGoogleLoading={isGoogleLoading}
-            isAppleLoading={isAppleLoading}
-            errorMessage={errorMessage}
-          />
-        </YStack>
-      </KeyboardAvoidingView>
+        <LoginPage
+          onGoogleSignIn={handleGoogleSignIn}
+          onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
+          isGoogleLoading={isGoogleLoading}
+          isAppleLoading={isAppleLoading}
+          errorMessage={errorMessage}
+        />
+      </YStack>
     </Theme>
   );
 };
