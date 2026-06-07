@@ -69,6 +69,8 @@ export const usersInAppInternal = appInternal.table(
     discordAvatar: varchar('discord_avatar', { length: 255 }),
     themePreference: varchar('theme_preference', { length: 10 }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    mfaEnabled: boolean('mfa_enabled').notNull().default(false),
+    totpSecret: text('totp_secret'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

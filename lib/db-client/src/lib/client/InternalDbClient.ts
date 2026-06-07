@@ -137,6 +137,49 @@ export async function updateLastLoginAt(
     .where(eq(Schema.usersInAppInternal.id, userId));
 }
 
+/** A user's multi-factor-auth state as stored in the internal schema. */
+export interface UserMfaState {
+  mfaEnabled: boolean;
+  totpSecret: string | null;
+}
+
+/**
+ * Read a user's MFA state (enrollment flag + TOTP secret), or null if the
+ * user does not exist. Selects only the MFA columns rather than the full row
+ * so the secret is never fetched alongside unrelated user data by accident.
+ */
+export async function getUserMfa(
+  db: InternalDb,
+  userId: number,
+): Promise<UserMfaState | null> {
+  return await db
+    .select({
+      mfaEnabled: Schema.usersInAppInternal.mfaEnabled,
+      totpSecret: Schema.usersInAppInternal.totpSecret,
+    })
+    .from(Schema.usersInAppInternal)
+    .where(() => eq(Schema.usersInAppInternal.id, userId))
+    .then(TakeUniqueOrNull);
+}
+
+/**
+ * Update a user's MFA state. Sets both the enrollment flag and the TOTP secret
+ * (pass totpSecret: null to clear it when disabling MFA). Returns the updated
+ * user row.
+ */
+export async function setUserMfa(
+  db: InternalDb,
+  userId: number,
+  { mfaEnabled, totpSecret }: UserMfaState,
+): Promise<InternalUser> {
+  return await db
+    .update(Schema.usersInAppInternal)
+    .set({ mfaEnabled, totpSecret, updatedAt: new Date() })
+    .where(eq(Schema.usersInAppInternal.id, userId))
+    .returning()
+    .then(TakeUniqueOrThrow);
+}
+
 export async function unlinkDiscordAccount(
   db: InternalDb,
   userId: number,

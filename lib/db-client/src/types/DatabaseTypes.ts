@@ -74,7 +74,15 @@ export type GameFootballPassing = typeof gameFootballPassing.$inferSelect;
 export type GameFootballReceiving = typeof gameFootballReceiving.$inferSelect;
 export type GameFootballRushing = typeof gameFootballRushing.$inferSelect;
 export type GamePitching = typeof gamePitching.$inferSelect;
-export type InternalUser = typeof usersInAppInternal.$inferSelect;
+// `totpSecret` is a credential and must never be exposed through the
+// general-purpose InternalUser type — otherwise every accessor returning
+// InternalUser (getUserById, getUserByEmail, etc.) would implicitly leak it.
+// The secret is read/written only via the dedicated getUserMfa/setUserMfa
+// accessors, which use the explicit UserMfaState shape. (LS-7830 / security review)
+export type InternalUser = Omit<
+  typeof usersInAppInternal.$inferSelect,
+  'totpSecret'
+>;
 export type Matchup = typeof matchups.$inferSelect;
 export type MatchupPlayer = typeof matchupPlayers.$inferSelect;
 export type MatchupPlayerGame = typeof matchupPlayerGames.$inferSelect;
