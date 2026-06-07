@@ -36,9 +36,9 @@ function makeGameState(overrides: Record<string, unknown> = {}) {
   return {
     __typename: 'TwentyQuestionsGame',
     id: GAME_ID,
-    status: 'ACTIVE',
-    difficulty: 'MEDIUM',
-    sport: 'BASEBALL',
+    status: 'active',
+    difficulty: 'medium',
+    sport: 'baseball',
     questionsUsed: 0,
     maxQuestions: MAX_QUESTIONS,
     tokensEarned: null,
@@ -91,7 +91,7 @@ async function setupTwentyQuestionsMocks(
                 questions: [
                   {
                     questionNumber: questionsAsked,
-                    category: 'POSITION',
+                    category: 'position',
                     parameter: '{"position":"C"}',
                     answer: true,
                     isGuess: false,
@@ -109,7 +109,7 @@ async function setupTwentyQuestionsMocks(
             body: JSON.stringify({
               data: {
                 twentyQuestionsGuess: makeGameState({
-                  status: 'WON',
+                  status: 'won',
                   questionsUsed: questionsAsked,
                   tokensEarned: TOKENS_EARNED,
                   targetPlayer: {
@@ -143,7 +143,7 @@ async function setupTwentyQuestionsMocks(
           body: JSON.stringify({
             data: {
               twentyQuestionsAbandon: makeGameState({
-                status: 'ABANDONED',
+                status: 'abandoned',
                 questionsUsed: questionsAsked,
                 targetPlayer: {
                   id: CORRECT_PLAYER_ID,
@@ -218,7 +218,7 @@ test.describe('Twenty Questions Game @minigame', () => {
     await page.getByTestId('twenty-questions-playing').waitFor();
 
     // Select Position category and ask
-    await page.getByTestId('category-POSITION').click();
+    await page.getByTestId('category-position').click();
     await page.getByTestId('position-C').click();
     await page.getByTestId('ask-question-button').click();
 
