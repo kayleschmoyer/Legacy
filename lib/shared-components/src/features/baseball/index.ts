@@ -6,6 +6,13 @@ export {
   type MLBHomeLeagueCap,
 } from './MLBHome';
 export {
+  LeagueDetailFreeAgentsTab,
+  buildFreeAgentAriaLabel,
+  type LeagueDetailFreeAgentsTabProps,
+  type FreeAgentsTabLeague,
+  type FreeAgentClaimPlayer,
+} from './LeagueDetailFreeAgentsTab';
+export {
   CreateLeagueDialog,
   type CreateLeagueDialogProps,
   type QuickCreateLeagueInput,

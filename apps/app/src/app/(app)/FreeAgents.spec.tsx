@@ -9,18 +9,12 @@ import FreeAgentsScreen from './FreeAgents';
 // allows referencing them from inside the jest.mock factory below.
 let mockUserLeagues: unknown;
 let mockLeague: unknown;
-let mockFreeAgents: unknown;
 let mockTeamMembers: unknown;
 let mockClaim: jest.Mock;
-let mockRefetch: jest.Mock;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 // Prevent expo-router's native EventEmitter from crashing Jest.
-// Must call jest.requireActual('react-native') inside the factory so that
-// react-native's native module proxies are initialised before expo-modules-core
-// tries to access EventEmitter — the same pattern used in _layout.spec.tsx and
-// AuthorizedUserContext.spec.tsx.
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.requireActual must use require-style import inside jest.mock factory
   jest.requireActual<typeof import('react-native')>('react-native');
@@ -34,20 +28,46 @@ jest.mock('../../common/auth/AuthorizedUserContext', () => ({
   useAuthorizedUserInfo: () => ({ id: 1, email: 'test@example.com' }),
 }));
 
-// Mock all GraphQL hooks used by FreeAgentsScreen / LeagueFreeAgents. The
-// hooks read from the mutable mock state so individual tests can drive the
-// league / free-agent / waiver-type scenarios.
+// Mock the GraphQL hooks used by FreeAgentsScreen / LeagueFreeAgents. The hooks
+// read from the mutable mock state so individual tests can drive the league /
+// waiver-type scenarios. The player pool + filters now live in the shared
+// LeagueDetailFreeAgentsTab (mocked below), so no player-pool query is needed.
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetUserLeaguesQuery: () => ({ data: mockUserLeagues, loading: false }),
-  useGetFreeAgentPlayersQuery: () => ({
-    data: mockFreeAgents,
-    loading: false,
-    refetch: mockRefetch,
-  }),
   useGetLeagueByIdQuery: () => ({ data: mockLeague }),
   useGetTeamMembersQuery: () => ({ data: mockTeamMembers }),
   useGetUserTeamIdQuery: () => ({ data: { userTeamId: 42 } }),
   useClaimFreeAgentMutation: () => [mockClaim, { loading: false }],
+}));
+
+// Stub the shared free-agents tab: it owns the pool/filters/columns/banners
+// (covered by its own spec). Here we only need it to surface the native inline
+// claim cluster so the FAAB claim-flow logic in the wrapper is exercised. The
+// tab only renders the claim action for a member on a team, mirroring the real
+// component's gating.
+jest.mock('@legacy-sports/shared-components', () => ({
+  LeagueDetailFreeAgentsTab: ({
+    renderClaimAction,
+    myTeamId,
+    isMember,
+  }: {
+    renderClaimAction?: (p: {
+      id: number;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: string[] | null;
+    }) => React.ReactNode;
+    myTeamId: number | null;
+    isMember: boolean;
+  }) =>
+    isMember && myTeamId != null && renderClaimAction
+      ? renderClaimAction({
+          id: 99,
+          firstName: 'Mike',
+          lastName: 'Trout',
+          eligiblePositions: ['OF'],
+        })
+      : null,
 }));
 
 jest.mock('tamagui', () => {
@@ -123,7 +143,6 @@ jest.mock('tamagui', () => {
 
 jest.mock('@tamagui/lucide-icons', () => ({
   ChevronLeft: () => null,
-  Search: () => null,
   UserPlus: () => null,
   Users: () => null,
 }));
@@ -133,14 +152,6 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-const FAAB_PLAYER = {
-  id: 99,
-  firstName: 'Mike',
-  lastName: 'Trout',
-  eligiblePositions: ['OF'],
-  scoring: { avgPointsPerGame: 5.5 },
-};
 
 /** Render the screen and drill into a single league's free-agent list. */
 function selectLeague(): void {
@@ -152,10 +163,8 @@ function selectLeague(): void {
 beforeEach(() => {
   mockUserLeagues = undefined;
   mockLeague = undefined;
-  mockFreeAgents = undefined;
   mockTeamMembers = { teamMembers: [] };
   mockClaim = jest.fn();
-  mockRefetch = jest.fn();
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 });
 
@@ -187,7 +196,6 @@ describe('FreeAgentsScreen', () => {
 describe('FreeAgentsScreen — FAAB waiver bidding', () => {
   beforeEach(() => {
     mockUserLeagues = { userLeagues: [{ id: 1, name: 'Test League' }] };
-    mockFreeAgents = { freeAgents: [FAAB_PLAYER] };
   });
 
   it('shows a FAAB bid input when claiming in a FAAB league', () => {

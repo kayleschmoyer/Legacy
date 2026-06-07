@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, ScrollView } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, ScrollView } from 'react-native';
 import { Button, Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronLeft, Search, UserPlus, Users } from '@tamagui/lucide-icons';
+import { ChevronLeft, UserPlus, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  type FreeAgentClaimPlayer,
+  LeagueDetailFreeAgentsTab,
+} from '@legacy-sports/shared-components';
 
 import {
-  type GetFreeAgentPlayersQuery,
   useClaimFreeAgentMutation,
-  useGetFreeAgentPlayersQuery,
   useGetLeagueByIdQuery,
   useGetTeamMembersQuery,
   useGetUserLeaguesQuery,
@@ -16,12 +18,17 @@ import {
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { useIsMounted } from '../../common/hooks/useIsMounted';
 
-type FreeAgentPlayer = NonNullable<
-  GetFreeAgentPlayersQuery['freeAgents']
->[number];
-
-const POSITIONS = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'SP', 'RP'];
-
+/**
+ * Native league free-agents view (LS-7818).
+ *
+ * Wraps the cross-platform `LeagueDetailFreeAgentsTab`
+ * (`@legacy-sports/shared-components`) so native matches web v2 at parity:
+ * paginated pool, position/name filters, full stat columns, member/spectator
+ * banners. Native supplies the waiver-claim flow via `renderClaimAction` — an
+ * inline FAAB cluster (web uses a modal instead). This component is consumed by
+ * both the league-detail Free Agents tab and the standalone Free Agents screen
+ * below, so there is a single free-agent UI on native.
+ */
 export function LeagueFreeAgents({
   leagueId,
   leagueName,
@@ -31,50 +38,31 @@ export function LeagueFreeAgents({
   leagueName: string;
   onBack?: () => void;
 }) {
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [position, setPosition] = useState('ALL');
-  const isSearchDebouncing = search !== debouncedSearch;
   const [claimingPlayerId, setClaimingPlayerId] = useState<number | null>(null);
   const [faabBid, setFaabBid] = useState('');
-
-  // Debounce search input to avoid re-querying on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
 
   const { data: teamData } = useGetUserTeamIdQuery({
     variables: { leagueId },
   });
-  const userTeamId = teamData?.userTeamId;
+  const userTeamId = teamData?.userTeamId ?? null;
 
   const { data: leagueData } = useGetLeagueByIdQuery({
     variables: { id: leagueId },
   });
-  const waiverEnabled = leagueData?.league?.waiverEnabled ?? false;
-  const maxRosterSize = leagueData?.league?.maxRosterSize ?? Infinity;
+  const league = leagueData?.league;
+  const waiverEnabled = league?.waiverEnabled ?? false;
+  const maxRosterSize = league?.maxRosterSize ?? Infinity;
   // FAAB (Free Agent Acquisition Budget) leagues require a bid amount on every
-  // waiver claim; standard/priority waiver leagues do not. The bid input and
-  // the required-bid validation below are gated on this flag so non-FAAB
-  // leagues never show an irrelevant bid field.
-  const waiverType = leagueData?.league?.waiverType ?? 'standard';
+  // waiver claim; standard/priority waiver leagues do not. The inline bid input
+  // and the required-bid validation below are gated on this flag.
+  const waiverType = league?.waiverType ?? 'standard';
   const isFaab = waiverEnabled && waiverType === 'faab';
 
   const { data: rosterData } = useGetTeamMembersQuery({
     variables: { teamId: userTeamId ?? 0 },
     skip: !userTeamId,
   });
-
-  // The freeAgents query performs server-side filtering: it excludes all
-  // players already on a roster in the league, so no client-side workaround
-  // is needed. Search and position filters are applied client-side on the
-  // already-filtered result set.
-  const { data, loading, refetch } = useGetFreeAgentPlayersQuery({
-    variables: { leagueId },
-  });
+  const userRosterSize = rosterData?.teamMembers?.length ?? 0;
 
   const isMounted = useIsMounted();
 
@@ -84,17 +72,14 @@ export function LeagueFreeAgents({
       if (!isMounted()) return;
       setClaimingPlayerId(null);
       setFaabBid('');
-      void refetch();
     },
     onError: (error) => {
-      LOGGER.error('Failed to claim free agent:', error.message);
+      // Pass the Error instance (not just its message) so Rollbar captures the
+      // full stack trace (LS-7818 review).
+      LOGGER.error('Failed to claim free agent:', error);
       Alert.alert('Error', error.message);
     },
   });
-
-  // The user's own roster size, used to check if the roster is full before
-  // claiming a player.
-  const userRosterSize = rosterData?.teamMembers?.length ?? 0;
 
   const handleClaim = useCallback(
     (playerId: number) => {
@@ -111,12 +96,10 @@ export function LeagueFreeAgents({
         return;
       }
 
-      // FAAB leagues require a non-negative bid on every claim — the server
-      // rejects a missing or negative bid with a UserInputError. Enforce it
-      // client-side so the user gets clear guidance instead of a raw error.
-      // Require a whole, non-negative integer string: parseInt would otherwise
-      // silently truncate inputs like "15.5" or "15abc", submitting a bid the
-      // user did not intend (the backend expects a GraphQL Int).
+      // FAAB leagues require a whole, non-negative bid on every claim — the
+      // server rejects a missing or negative bid with a UserInputError. Enforce
+      // it client-side so the user gets clear guidance. Require a whole integer
+      // string: parseInt would otherwise silently truncate inputs like "15.5".
       let bidAmount: number | undefined;
       if (isFaab) {
         const trimmedBid = faabBid.trim();
@@ -130,11 +113,7 @@ export function LeagueFreeAgents({
         bidAmount = parseInt(trimmedBid, 10);
       }
       void claimFreeAgent({
-        variables: {
-          leagueId,
-          playerId,
-          faabBid: bidAmount,
-        },
+        variables: { leagueId, playerId, faabBid: bidAmount },
       });
     },
     [claimFreeAgent, leagueId, faabBid, isFaab, userRosterSize, maxRosterSize],
@@ -142,9 +121,9 @@ export function LeagueFreeAgents({
 
   const handleAddDirectly = useCallback(
     (playerId: number) => {
-      // TODO: Wire up a direct add mutation once the backend supports it.
-      // For now, show informational alert — claimFreeAgent rejects when
-      // waivers are disabled, so we must not call it here.
+      // Direct free-agent adds are not yet supported on the backend, and
+      // claimFreeAgent rejects when waivers are disabled — so surface guidance
+      // instead of attempting a claim.
       Alert.alert(
         'Add Player',
         'Direct free-agent adds are not yet supported. Ask your commissioner to enable waivers.',
@@ -157,134 +136,91 @@ export function LeagueFreeAgents({
     [leagueId],
   );
 
-  // The server already filters out rostered players. Apply client-side
-  // search and position filters on the pre-filtered free-agent list.
-  const players = useMemo(() => {
-    const searchLower = debouncedSearch.toLowerCase();
-    return (data?.freeAgents ?? []).filter((p) => {
-      if (
-        searchLower &&
-        !`${p.firstName ?? ''} ${p.lastName ?? ''}`
-          .toLowerCase()
-          .includes(searchLower)
-      ) {
-        return false;
-      }
-      if (
-        position !== 'ALL' &&
-        !(p.eligiblePositions ?? []).includes(position)
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [data?.freeAgents, debouncedSearch, position]);
-
-  const renderPlayer = ({ item }: { item: FreeAgentPlayer }) => {
-    const isClaiming = claimingPlayerId === item.id;
-    const positions = item.eligiblePositions?.join(', ') ?? '';
-    const ppg = item.scoring?.avgPointsPerGame?.toFixed(1) ?? '—';
-
-    return (
-      <Card
-        backgroundColor="$surfacePanel"
-        borderColor="$surfacePanelBorder"
-        borderWidth={1}
-        borderRadius="$4"
-        padding="$3"
-        marginBottom="$2"
-      >
-        <XStack alignItems="center" justifyContent="space-between">
-          <YStack flex={1} gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              {item.firstName} {item.lastName}
-            </Text>
-            <XStack gap="$2">
-              <Text fontSize="$2" color="$textMuted">
-                {positions}
-              </Text>
-              <Text fontSize="$2" color="$blue10" fontWeight="600">
-                {ppg} PPG
-              </Text>
+  // The inline FAAB claim cluster, supplied to the shared tab via
+  // `renderClaimAction`. Only rendered for a viewer on a team.
+  const renderClaimAction = useCallback(
+    (player: FreeAgentClaimPlayer) => {
+      const isClaimingThis = claimingPlayerId === player.id;
+      if (isClaimingThis) {
+        return (
+          <YStack gap="$1" alignItems="flex-end">
+            {isFaab && (
+              <Input
+                size="$2"
+                width={80}
+                placeholder="FAAB $"
+                value={faabBid}
+                onChangeText={setFaabBid}
+                keyboardType="numeric"
+                accessibilityLabel="FAAB bid amount"
+              />
+            )}
+            <XStack gap="$1">
+              <Button
+                size="$2"
+                backgroundColor="$green3"
+                borderColor="$green7"
+                borderWidth={1}
+                borderRadius="$2"
+                disabled={claiming}
+                onPress={() => handleClaim(player.id)}
+                icon={claiming ? <Spinner size="small" /> : undefined}
+              >
+                <Text fontSize="$1" color="$green10" fontWeight="600">
+                  Confirm
+                </Text>
+              </Button>
+              <Button
+                size="$2"
+                backgroundColor="$gray3"
+                borderRadius="$2"
+                onPress={() => {
+                  setClaimingPlayerId(null);
+                  setFaabBid('');
+                }}
+              >
+                <Text fontSize="$1" color="$textMuted">
+                  Cancel
+                </Text>
+              </Button>
             </XStack>
           </YStack>
-
-          {item.id != null && (
-            <YStack alignItems="flex-end" gap="$1">
-              {isClaiming ? (
-                <YStack gap="$1" alignItems="flex-end">
-                  {isFaab && (
-                    <Input
-                      size="$2"
-                      width={80}
-                      placeholder="FAAB $"
-                      value={faabBid}
-                      onChangeText={setFaabBid}
-                      keyboardType="numeric"
-                      accessibilityLabel="FAAB bid amount"
-                    />
-                  )}
-                  <XStack gap="$1">
-                    <Button
-                      size="$2"
-                      backgroundColor="$green3"
-                      borderColor="$green7"
-                      borderWidth={1}
-                      borderRadius="$2"
-                      disabled={claiming}
-                      onPress={() => item.id != null && handleClaim(item.id)}
-                      icon={claiming ? <Spinner size="small" /> : undefined}
-                    >
-                      <Text fontSize="$1" color="$green10" fontWeight="600">
-                        Confirm
-                      </Text>
-                    </Button>
-                    <Button
-                      size="$2"
-                      backgroundColor="$gray3"
-                      borderRadius="$2"
-                      onPress={() => {
-                        setClaimingPlayerId(null);
-                        setFaabBid('');
-                      }}
-                    >
-                      <Text fontSize="$1" color="$textMuted">
-                        Cancel
-                      </Text>
-                    </Button>
-                  </XStack>
-                </YStack>
-              ) : (
-                <Button
-                  size="$2"
-                  backgroundColor="$blue3"
-                  borderColor="$blue7"
-                  borderWidth={1}
-                  borderRadius="$2"
-                  onPress={() => {
-                    if (!waiverEnabled && item.id != null) {
-                      // Waivers disabled — direct add (no claim mutation)
-                      handleAddDirectly(item.id);
-                    } else if (item.id != null) {
-                      if (item.id !== claimingPlayerId) {
-                        setFaabBid('');
-                      }
-                      setClaimingPlayerId(item.id);
-                    }
-                  }}
-                  icon={<UserPlus size={12} color="$blue10" />}
-                >
-                  <Text fontSize="$1" color="$blue10" fontWeight="600">
-                    {waiverEnabled ? 'Claim' : 'Add'}
-                  </Text>
-                </Button>
-              )}
-            </YStack>
-          )}
-        </XStack>
-      </Card>
-    );
-  };
+        );
+      }
+      return (
+        <Button
+          size="$2"
+          backgroundColor="$blue3"
+          borderColor="$blue7"
+          borderWidth={1}
+          borderRadius="$2"
+          onPress={() => {
+            if (!waiverEnabled) {
+              // Waivers disabled — direct add (no claim mutation).
+              handleAddDirectly(player.id);
+              return;
+            }
+            if (player.id !== claimingPlayerId) setFaabBid('');
+            setClaimingPlayerId(player.id);
+          }}
+          icon={<UserPlus size={12} color="$blue10" />}
+        >
+          <Text fontSize="$1" color="$blue10" fontWeight="600">
+            {waiverEnabled ? 'Claim' : 'Add'}
+          </Text>
+        </Button>
+      );
+    },
+    [
+      claimingPlayerId,
+      faabBid,
+      isFaab,
+      claiming,
+      waiverEnabled,
+      handleClaim,
+      handleAddDirectly,
+    ],
+  );
 
   return (
     <YStack flex={1}>
@@ -307,73 +243,18 @@ export function LeagueFreeAgents({
         </XStack>
       )}
 
-      {/* Search */}
-      <XStack padding="$3" paddingTop="$1" gap="$2" alignItems="center">
-        {isSearchDebouncing ? (
-          <Spinner size="small" color="$color" />
-        ) : (
-          <Search size={16} color="$textMuted" />
-        )}
-        <Input
-          flex={1}
-          size="$3"
-          placeholder="Search players..."
-          value={search}
-          onChangeText={setSearch}
-        />
-      </XStack>
-
-      {/* Position filters */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, gap: 6 }}
-      >
-        <XStack gap="$1.5">
-          {POSITIONS.map((pos) => (
-            <Text
-              key={pos}
-              onPress={() => setPosition(pos)}
-              paddingHorizontal="$2.5"
-              paddingVertical="$1"
-              borderRadius="$10"
-              backgroundColor={position === pos ? '$blue10' : '$gray3'}
-              color={position === pos ? 'white' : '$gray11'}
-              fontSize="$2"
-              fontWeight={position === pos ? '700' : '500'}
-              accessibilityRole="button"
-              accessibilityLabel={pos === 'ALL' ? 'All positions' : pos}
-              accessibilityState={{ selected: position === pos }}
-            >
-              {pos}
-            </Text>
-          ))}
-        </XStack>
-      </ScrollView>
-
-      {/* Player list */}
-      {loading ? (
-        <YStack flex={1} alignItems="center" justifyContent="center">
-          <Spinner size="large" color="$color" />
-        </YStack>
-      ) : (
-        <FlatList
-          data={players}
-          renderItem={renderPlayer}
-          keyExtractor={(item, index) =>
-            item.id != null ? String(item.id) : `free-agent-${index}`
-          }
-          contentContainerStyle={{ padding: 12 }}
-          ListEmptyComponent={
-            <YStack alignItems="center" padding="$6" gap="$2">
-              <Users size={32} color="$textMuted" />
-              <Text color="$textMuted" fontSize="$4">
-                No free agents found
-              </Text>
-            </YStack>
-          }
-        />
-      )}
+      <LeagueDetailFreeAgentsTab
+        league={{
+          id: leagueId,
+          sport: league?.sport ?? 'baseball',
+          waiverEnabled,
+          waiverType,
+          gamesPerMatchup: league?.gamesPerMatchup,
+        }}
+        isMember
+        myTeamId={userTeamId}
+        renderClaimAction={renderClaimAction}
+      />
     </YStack>
   );
 }
