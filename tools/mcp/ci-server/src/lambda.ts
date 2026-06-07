@@ -15,23 +15,41 @@ import {
 } from '@legacy-sports/mcp-bearer-auth';
 
 const sm = new SecretsManagerClient({});
-let tokenInitialized = false;
+let credentialsInitialized = false;
 
-async function ensureToken(): Promise<void> {
-  if (tokenInitialized) return;
+async function ensureCredentials(): Promise<void> {
+  if (credentialsInitialized) return;
   const secretName = process.env['GITHUB_TOKEN_SECRET_NAME'];
   if (!secretName) throw new Error('GITHUB_TOKEN_SECRET_NAME not configured');
   const result = await sm.send(
     new GetSecretValueCommand({ SecretId: secretName }),
   );
-  const token = result.SecretString?.trim();
-  if (!token) {
+  const raw = result.SecretString?.trim();
+  if (!raw) {
     throw new Error(
       `Secret "${secretName}" is missing SecretString or contains only whitespace`,
     );
   }
-  process.env['GITHUB_TOKEN'] = token;
-  tokenInitialized = true;
+  let secret: {
+    app_id?: string;
+    installation_id?: string;
+    private_key?: string;
+  };
+  try {
+    secret = JSON.parse(raw) as typeof secret;
+  } catch {
+    throw new Error(`Secret "${secretName}" is not valid JSON`);
+  }
+  if (!secret.private_key) {
+    throw new Error(
+      `Secret "${secretName}" is missing required field: private_key`,
+    );
+  }
+  process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = secret.private_key;
+  if (secret.app_id) process.env['GITHUB_APP_ID'] = secret.app_id;
+  if (secret.installation_id)
+    process.env['GITHUB_INSTALLATION_ID'] = secret.installation_id;
+  credentialsInitialized = true;
 }
 
 export const handler = async (
@@ -49,7 +67,7 @@ export const handler = async (
   });
   if (authError) return authError;
 
-  await ensureToken();
+  await ensureCredentials();
 
   const domainName = event.requestContext.domainName ?? 'localhost';
   const qs = event.rawQueryString ? `?${event.rawQueryString}` : '';
