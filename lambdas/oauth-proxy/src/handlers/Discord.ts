@@ -9,6 +9,7 @@ import {
   linkDiscordAccount,
   setInitialAvatarUrl,
   unlinkDiscordAccount,
+  updateUserEmail,
 } from '@legacy-sports/db-client';
 import { verify } from 'jsonwebtoken';
 import {
@@ -462,6 +463,33 @@ async function completeDiscordSignIn(
         discordUser.username,
         discordUser.avatar,
       );
+    }
+
+    // Refresh the stored email when Discord reports a different verified email
+    // than the one captured at initial link time (LS-6660). Without this, a
+    // user who changes their Discord email keeps signing into the originally-
+    // linked account under a stale users.email forever. New users and users
+    // found by email match already carry the current email, so this only fires
+    // on the subsequent-sign-in (Discord-ID match) path where it has drifted.
+    //
+    // Guard against the unique email constraint (users_email_uk): if another
+    // account already owns the incoming email, skip the refresh and keep the
+    // existing email rather than failing the sign-in. We never merge accounts
+    // here — that requires an explicit, authenticated step (cf. LS-6695).
+    if (user.email !== email) {
+      const emailOwner = await getUserByEmail(db, email);
+      if (emailOwner && emailOwner.id !== user.id) {
+        LOGGER.warn(
+          'Discord email refresh skipped: new email already belongs to another account',
+          { userId: user.id, discordId: discordUser.id },
+        );
+      } else {
+        user = await updateUserEmail(db, user.id, email);
+        LOGGER.info('Refreshed user email from Discord profile', {
+          userId: user.id,
+          discordId: discordUser.id,
+        });
+      }
     }
 
     // Set initial avatar for users who don't have one yet (new and existing)

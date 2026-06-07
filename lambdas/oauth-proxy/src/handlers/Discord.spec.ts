@@ -7,6 +7,7 @@ import {
   getUserById,
   linkDiscordAccount,
   setInitialAvatarUrl,
+  updateUserEmail,
 } from '@legacy-sports/db-client';
 import {
   checkDiscordRedirectUriConfig,
@@ -43,6 +44,7 @@ jest.mock('@legacy-sports/db-client', () => ({
   linkDiscordAccount: jest.fn(),
   setInitialAvatarUrl: jest.fn().mockResolvedValue(undefined),
   unlinkDiscordAccount: jest.fn(),
+  updateUserEmail: jest.fn(),
 }));
 
 jest.mock('../util/db', () => ({
@@ -123,6 +125,9 @@ const mockParseJwtFromCookies = parseJwtFromCookies as jest.MockedFunction<
   typeof parseJwtFromCookies
 >;
 const mockGetUserById = getUserById as jest.MockedFunction<typeof getUserById>;
+const mockUpdateUserEmail = updateUserEmail as jest.MockedFunction<
+  typeof updateUserEmail
+>;
 
 jest.mock('jsonwebtoken', () => ({
   verify: jest.fn().mockReturnValue({ id: 42 }),
@@ -363,6 +368,87 @@ describe('handleDiscordAuth', () => {
       'ls_oauth_state_login=tok-from-discord',
       'ls_oauth_state_login',
     );
+  });
+});
+
+describe('handleDiscordAuth — email refresh on subsequent sign-in (LS-6660)', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
+    process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
+    mockSetInitialAvatarUrl.mockResolvedValue(undefined);
+    mockVerifyOauthState.mockReturnValue(true);
+
+    // Discord now reports a NEW verified email for this account.
+    fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(
+        makeDiscordUserResponse({ email: 'new@example.com' }),
+      );
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('refreshes users.email when the Discord-side email has changed', async () => {
+    // Existing linked account still carries the original (now stale) email.
+    mockGetUserByDiscordId.mockResolvedValue({
+      ...mockUser,
+      email: 'discord@example.com',
+    });
+    // No other account owns the new email.
+    mockGetUserByEmail.mockResolvedValue(null);
+    mockUpdateUserEmail.mockResolvedValue({
+      ...mockUser,
+      email: 'new@example.com',
+    });
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockUpdateUserEmail).toHaveBeenCalledTimes(1);
+    expect(mockUpdateUserEmail).toHaveBeenCalledWith(
+      expect.anything(),
+      mockUser.id,
+      'new@example.com',
+    );
+  });
+
+  it('does not refresh the email when it is unchanged', async () => {
+    // Discord reports the same email already stored on the account.
+    fetchSpy.mockReset();
+    fetchSpy
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(makeDiscordUserResponse());
+    mockGetUserByDiscordId.mockResolvedValue(mockUser);
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockUpdateUserEmail).not.toHaveBeenCalled();
+  });
+
+  it('skips the refresh (and still signs in) when the new email belongs to another account', async () => {
+    mockGetUserByDiscordId.mockResolvedValue({
+      ...mockUser,
+      email: 'discord@example.com',
+    });
+    // The new email is already owned by a DIFFERENT account — refusing the
+    // refresh avoids a unique-constraint failure and an implicit account merge.
+    mockGetUserByEmail.mockResolvedValue({
+      ...mockUser,
+      id: 777,
+      email: 'new@example.com',
+    });
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockUpdateUserEmail).not.toHaveBeenCalled();
   });
 });
 

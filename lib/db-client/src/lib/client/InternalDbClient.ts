@@ -102,6 +102,27 @@ export async function linkDiscordAccount(
 }
 
 /**
+ * Updates a user's email address.
+ *
+ * The email column carries a unique constraint (users_email_uk), so callers
+ * must ensure no other account already owns `email` before invoking this —
+ * otherwise the update throws on the constraint. Used to refresh the stored
+ * email when an OAuth provider reports a changed verified email (LS-6660).
+ */
+export async function updateUserEmail(
+  db: InternalDb,
+  userId: number,
+  email: string,
+): Promise<InternalUser> {
+  return await db
+    .update(Schema.usersInAppInternal)
+    .set({ email, updatedAt: new Date() })
+    .where(eq(Schema.usersInAppInternal.id, userId))
+    .returning()
+    .then(TakeUniqueOrThrow);
+}
+
+/**
  * Sets avatarUrl for a user only if their current avatarUrl is null.
  * Safe to call unconditionally — it is a no-op when avatarUrl is already set.
  */
