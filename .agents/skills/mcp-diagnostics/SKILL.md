@@ -92,6 +92,12 @@ The three hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-
 
 ### Recovery: Missing node_modules
 
+**Known causes of a broken/missing pooled symlink:**
+
+- Running `pnpm exec nx reset` directly in a worktree — use `make clean-cache` (or `make reset`) instead; it re-links automatically (LS-5242)
+- `worktree_rebase` (LS-3663)
+- Between `worktree_run` calls (LS-3687, LS-3689)
+
 Run the pool resolver from your terminal (works before MCP servers are connected):
 
 ```bat

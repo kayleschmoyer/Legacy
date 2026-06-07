@@ -249,9 +249,14 @@ clean-python: ## Clean Python dependencies only
 	@$(call echo_blue,Cleaning Python dependencies...)
 	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
 
-clean-cache: ## Clear Nx cache
+clean-cache: ## Clear Nx cache (re-links node_modules symlink afterward when in a pooled-symlink worktree)
 	@$(call echo_blue,Clearing Nx cache...)
 	pnpm exec nx reset
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "if (Test-Path '.git' -PathType Leaf) { Write-Host '[clean-cache] worktree detected — re-linking node_modules after nx reset...'; node scripts/modules-pool/link.mjs; if ($$LASTEXITCODE -ne 0) { throw 'node_modules re-linking failed.' } }"
+else
+	@if [ -f .git ]; then echo '[clean-cache] worktree detected — re-linking node_modules after nx reset...'; node scripts/modules-pool/link.mjs || exit 1; fi
+endif
 
 reset: clean-cache ## Reset Nx cache (alias for clean-cache)
 
