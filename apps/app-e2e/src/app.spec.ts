@@ -78,16 +78,17 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
       expect(content).toContain('href="/home"');
     });
 
-    it('should render the shared HomeScreen component in the Home tab', () => {
+    it('should render the shared league dashboard in the Home tab', () => {
       const homePath = path.join(APP_ROOT, 'app/(app)/(tabs)/home.tsx');
       expect(fs.existsSync(homePath)).toBe(true);
 
-      // The Home tab renders the shared cross-platform component rather than
-      // re-implementing the UI natively (shared-components-first, LS-7790).
+      // The Home tab renders the shared cross-platform HomeScreen dashboard
+      // wired to mobile's data layer (shared-components-first, LS-7790).
       const content = fs.readFileSync(homePath, 'utf8');
       expect(content).toContain('HomeScreen');
       expect(content).toContain('@legacy-sports/shared-components');
-      expect(content).toContain('onSportPress');
+      expect(content).toContain('useGetUserLeagueSummariesQuery');
+      expect(content).toContain('OnThisDayFeed');
     });
   });
 

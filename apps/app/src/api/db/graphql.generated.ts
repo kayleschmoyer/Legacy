@@ -4727,6 +4727,116 @@ export type GetAllTimeRecordsQuery = {
   }> | null;
 };
 
+export type UserLeagueSummaryFragment = {
+  __typename?: 'UserLeagueSummary';
+  leagueId?: number | null;
+  leagueName?: string | null;
+  sport?: string | null;
+  leaguePhase?: string | null;
+  seasonNumber?: number | null;
+  draftStatus?: string | null;
+  draftScheduledAt?: string | null;
+  draftMode?: string | null;
+  selectionMethod?: string | null;
+  teamCount?: number | null;
+  wins?: number | null;
+  losses?: number | null;
+  ties?: number | null;
+  rank?: number | null;
+  totalTeams?: number | null;
+  pointsFor?: number | null;
+  currentWeekNumber?: number | null;
+  totalMatchups?: number | null;
+  matchupId?: number | null;
+  matchupStatus?: string | null;
+  matchupEndTime?: string | null;
+  userScore?: number | null;
+  opponentScore?: number | null;
+  opponentTeamName?: string | null;
+  eraFilter?: string | null;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
+  isCommissioner?: boolean | null;
+};
+
+export type GetUserLeagueSummariesQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetUserLeagueSummariesQuery = {
+  __typename?: 'Query';
+  getUserLeagueSummaries: Array<{
+    __typename?: 'UserLeagueSummary';
+    leagueId?: number | null;
+    leagueName?: string | null;
+    sport?: string | null;
+    leaguePhase?: string | null;
+    seasonNumber?: number | null;
+    draftStatus?: string | null;
+    draftScheduledAt?: string | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    teamCount?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    ties?: number | null;
+    rank?: number | null;
+    totalTeams?: number | null;
+    pointsFor?: number | null;
+    currentWeekNumber?: number | null;
+    totalMatchups?: number | null;
+    matchupId?: number | null;
+    matchupStatus?: string | null;
+    matchupEndTime?: string | null;
+    userScore?: number | null;
+    opponentScore?: number | null;
+    opponentTeamName?: string | null;
+    eraFilter?: string | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    isCommissioner?: boolean | null;
+  }>;
+};
+
+export type GetArchivedUserLeagueSummariesQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetArchivedUserLeagueSummariesQuery = {
+  __typename?: 'Query';
+  getArchivedUserLeagueSummaries: Array<{
+    __typename?: 'UserLeagueSummary';
+    leagueId?: number | null;
+    leagueName?: string | null;
+    sport?: string | null;
+    leaguePhase?: string | null;
+    seasonNumber?: number | null;
+    draftStatus?: string | null;
+    draftScheduledAt?: string | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    teamCount?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    ties?: number | null;
+    rank?: number | null;
+    totalTeams?: number | null;
+    pointsFor?: number | null;
+    currentWeekNumber?: number | null;
+    totalMatchups?: number | null;
+    matchupId?: number | null;
+    matchupStatus?: string | null;
+    matchupEndTime?: string | null;
+    userScore?: number | null;
+    opponentScore?: number | null;
+    opponentTeamName?: string | null;
+    eraFilter?: string | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    isCommissioner?: boolean | null;
+  }>;
+};
+
 export type LeagueFragment = {
   __typename?: 'League';
   id?: number | null;
@@ -7293,6 +7403,38 @@ export const MemberPaymentStatusFragmentDoc = gql`
     updatedAt
   }
 `;
+export const UserLeagueSummaryFragmentDoc = gql`
+  fragment UserLeagueSummary on UserLeagueSummary {
+    leagueId
+    leagueName
+    sport
+    leaguePhase
+    seasonNumber
+    draftStatus
+    draftScheduledAt
+    draftMode
+    selectionMethod
+    teamCount
+    wins
+    losses
+    ties
+    rank
+    totalTeams
+    pointsFor
+    currentWeekNumber
+    totalMatchups
+    matchupId
+    matchupStatus
+    matchupEndTime
+    userScore
+    opponentScore
+    opponentTeamName
+    eraFilter
+    customEraStartYear
+    customEraEndYear
+    isCommissioner
+  }
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -8401,6 +8543,178 @@ export type GetAllTimeRecordsSuspenseQueryHookResult = ReturnType<
 export type GetAllTimeRecordsQueryResult = Apollo.QueryResult<
   GetAllTimeRecordsQuery,
   GetAllTimeRecordsQueryVariables
+>;
+export const GetUserLeagueSummaries = gql`
+  query GetUserLeagueSummaries {
+    getUserLeagueSummaries {
+      ...UserLeagueSummary
+    }
+  }
+  ${UserLeagueSummaryFragmentDoc}
+`;
+
+/**
+ * __useGetUserLeagueSummariesQuery__
+ *
+ * To run a query within a React component, call `useGetUserLeagueSummariesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUserLeagueSummariesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUserLeagueSummariesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetUserLeagueSummariesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetUserLeagueSummariesQuery,
+    GetUserLeagueSummariesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetUserLeagueSummariesQuery,
+    GetUserLeagueSummariesQueryVariables
+  >(GetUserLeagueSummaries, options);
+}
+export function useGetUserLeagueSummariesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUserLeagueSummariesQuery,
+    GetUserLeagueSummariesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetUserLeagueSummariesQuery,
+    GetUserLeagueSummariesQueryVariables
+  >(GetUserLeagueSummaries, options);
+}
+export function useGetUserLeagueSummariesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserLeagueSummariesQuery,
+        GetUserLeagueSummariesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetUserLeagueSummariesQuery,
+    GetUserLeagueSummariesQueryVariables
+  >(
+    GetUserLeagueSummaries,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetUserLeagueSummariesQuery,
+          GetUserLeagueSummariesQueryVariables
+        >,
+  );
+}
+export type GetUserLeagueSummariesQueryHookResult = ReturnType<
+  typeof useGetUserLeagueSummariesQuery
+>;
+export type GetUserLeagueSummariesLazyQueryHookResult = ReturnType<
+  typeof useGetUserLeagueSummariesLazyQuery
+>;
+export type GetUserLeagueSummariesSuspenseQueryHookResult = ReturnType<
+  typeof useGetUserLeagueSummariesSuspenseQuery
+>;
+export type GetUserLeagueSummariesQueryResult = Apollo.QueryResult<
+  GetUserLeagueSummariesQuery,
+  GetUserLeagueSummariesQueryVariables
+>;
+export const GetArchivedUserLeagueSummaries = gql`
+  query GetArchivedUserLeagueSummaries {
+    getArchivedUserLeagueSummaries {
+      ...UserLeagueSummary
+    }
+  }
+  ${UserLeagueSummaryFragmentDoc}
+`;
+
+/**
+ * __useGetArchivedUserLeagueSummariesQuery__
+ *
+ * To run a query within a React component, call `useGetArchivedUserLeagueSummariesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetArchivedUserLeagueSummariesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetArchivedUserLeagueSummariesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetArchivedUserLeagueSummariesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetArchivedUserLeagueSummariesQuery,
+    GetArchivedUserLeagueSummariesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetArchivedUserLeagueSummariesQuery,
+    GetArchivedUserLeagueSummariesQueryVariables
+  >(GetArchivedUserLeagueSummaries, options);
+}
+export function useGetArchivedUserLeagueSummariesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetArchivedUserLeagueSummariesQuery,
+    GetArchivedUserLeagueSummariesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetArchivedUserLeagueSummariesQuery,
+    GetArchivedUserLeagueSummariesQueryVariables
+  >(GetArchivedUserLeagueSummaries, options);
+}
+export function useGetArchivedUserLeagueSummariesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetArchivedUserLeagueSummariesQuery,
+        GetArchivedUserLeagueSummariesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetArchivedUserLeagueSummariesQuery,
+    GetArchivedUserLeagueSummariesQueryVariables
+  >(
+    GetArchivedUserLeagueSummaries,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetArchivedUserLeagueSummariesQuery,
+          GetArchivedUserLeagueSummariesQueryVariables
+        >,
+  );
+}
+export type GetArchivedUserLeagueSummariesQueryHookResult = ReturnType<
+  typeof useGetArchivedUserLeagueSummariesQuery
+>;
+export type GetArchivedUserLeagueSummariesLazyQueryHookResult = ReturnType<
+  typeof useGetArchivedUserLeagueSummariesLazyQuery
+>;
+export type GetArchivedUserLeagueSummariesSuspenseQueryHookResult = ReturnType<
+  typeof useGetArchivedUserLeagueSummariesSuspenseQuery
+>;
+export type GetArchivedUserLeagueSummariesQueryResult = Apollo.QueryResult<
+  GetArchivedUserLeagueSummariesQuery,
+  GetArchivedUserLeagueSummariesQueryVariables
 >;
 export const GetLeagueById = gql`
   query GetLeagueById(

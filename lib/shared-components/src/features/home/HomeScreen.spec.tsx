@@ -1,238 +1,115 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
-import { HomeScreen, HomeScreenProps } from './HomeScreen';
+import {
+  type HomeLeagueSummary,
+  HomeScreen,
+  type HomeScreenProps,
+} from './HomeScreen';
+
+const baseProps: HomeScreenProps = {
+  userName: 'Casey',
+  leagues: [],
+  onViewLeague: jest.fn(),
+  onCreateLeague: jest.fn(),
+  onJoinLeague: jest.fn(),
+  onBrowseStats: jest.fn(),
+  onViewSport: jest.fn(),
+};
+
+const league: HomeLeagueSummary = {
+  leagueId: 42,
+  leagueName: 'Iron Horse Dynasty',
+  sport: 'baseball',
+  leaguePhase: 'active',
+  wins: 6,
+  losses: 2,
+  rank: 1,
+  totalTeams: 10,
+  teamCount: 10,
+  currentWeekNumber: 8,
+  totalMatchups: 14,
+};
 
 describe('HomeScreen', () => {
-  const mockOnSportPress = jest.fn();
+  beforeEach(() => jest.clearAllMocks());
 
-  const defaultProps: HomeScreenProps = {
-    onSportPress: mockOnSportPress,
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  describe('Rendering Tests', () => {
-    it('renders correctly with default props', () => {
-      const { getByText } = render(<HomeScreen {...defaultProps} />);
-
-      // Should render default title and subtitle
-      expect(getByText('Fantasy Sports Hub')).toBeTruthy();
+  describe('new-user empty state', () => {
+    it('renders the getting-started hero and both sport cards', () => {
+      const { getByText, getAllByText } = render(<HomeScreen {...baseProps} />);
+      expect(getByText('Start your dynasty.')).toBeTruthy();
       expect(getByText('Choose your sport')).toBeTruthy();
+      expect(getAllByText('Baseball').length).toBeGreaterThan(0);
+      expect(getAllByText('Football').length).toBeGreaterThan(0);
+      // Both onboarding CTAs are present.
+      expect(getAllByText('Create League').length).toBeGreaterThan(0);
+      expect(getByText('Join League')).toBeTruthy();
     });
 
-    it('renders correctly with custom title and subtitle', () => {
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        title: 'Custom Fantasy League',
-        subtitle: 'Select your favorite sport',
-      };
-
-      const { getByText } = render(<HomeScreen {...props} />);
-      expect(getByText('Custom Fantasy League')).toBeTruthy();
-      expect(getByText('Select your favorite sport')).toBeTruthy();
-    });
-
-    it('renders custom sports list correctly', () => {
-      const customSports = [
-        { key: 'football', name: 'Football', enabled: true },
-        { key: 'baseball', name: 'Baseball', enabled: true },
-      ];
-
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        sports: customSports,
-      };
-
-      const { getByText, queryByText } = render(<HomeScreen {...props} />);
-      expect(getByText('Football')).toBeTruthy();
-      expect(getByText('Baseball')).toBeTruthy();
-      // Should not render other default sports
-      expect(queryByText('Basketball')).toBeNull();
-    });
-
-    it('renders custom actions correctly', () => {
-      const customActions = [
-        {
-          title: 'Settings',
-          onPress: jest.fn(),
-          color: '#007AFF',
-        },
-        {
-          title: 'Help',
-          onPress: jest.fn(),
-          color: '#FF9500',
-        },
-      ];
-
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        customActions,
-      };
-
-      const { getByText } = render(<HomeScreen {...props} />);
-      expect(getByText('Settings')).toBeTruthy();
-      expect(getByText('Help')).toBeTruthy();
-    });
-
-    it('handles disabled sports correctly when showAllSports is true', () => {
-      const sportsWithDisabled = [
-        { key: 'football', name: 'Football', enabled: true },
-        { key: 'baseball', name: 'Baseball', enabled: false },
-        { key: 'basketball', name: 'Basketball', enabled: true },
-      ];
-
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        sports: sportsWithDisabled,
-        showAllSports: true,
-      };
-
-      const { getByText } = render(<HomeScreen {...props} />);
-      expect(getByText('Football')).toBeTruthy();
-      expect(getByText('Baseball')).toBeTruthy(); // Should show disabled sport
-      expect(getByText('Basketball')).toBeTruthy();
-    });
-
-    it('filters out disabled sports when showAllSports is false', () => {
-      const enabledSports = [
-        { key: 'football', name: 'Football', enabled: true },
-        { key: 'baseball', name: 'Baseball', enabled: false },
-      ];
-
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        sports: enabledSports,
-        showAllSports: false,
-      };
-
-      const { getByText, queryByText } = render(<HomeScreen {...props} />);
-      expect(getByText('Football')).toBeTruthy();
-      expect(queryByText('Baseball')).toBeNull(); // Should not show disabled sport
-    });
-
-    it('handles empty sports list gracefully', () => {
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        sports: [],
-      };
-
-      const { getByText, queryByText } = render(<HomeScreen {...props} />);
-      expect(getByText('Fantasy Sports Hub')).toBeTruthy();
-      // Should not crash and should still show title
-      expect(queryByText('Football')).toBeNull();
-    });
-
-    it('renders with full configuration correctly', () => {
-      const fullConfigProps: HomeScreenProps = {
-        title: 'Ultimate Fantasy Hub',
-        subtitle: 'Choose your championship sport',
-        sports: [
-          { key: 'football', name: 'NFL Football', enabled: true, icon: '🏈' },
-          { key: 'baseball', name: 'MLB Baseball', enabled: true, icon: '⚾' },
-          {
-            key: 'basketball',
-            name: 'NBA Basketball',
-            enabled: false,
-            icon: '🏀',
-          },
-          { key: 'hockey', name: 'NHL Hockey', enabled: true, icon: '🏒' },
-        ],
-        onSportPress: mockOnSportPress,
-        customActions: [
-          {
-            title: 'My Profile',
-            onPress: jest.fn(),
-            color: '#007AFF',
-            icon: '👤',
-          },
-          {
-            title: 'League Settings',
-            onPress: jest.fn(),
-            color: '#34C759',
-            icon: '⚙️',
-          },
-        ],
-        showAllSports: false,
-      };
-
-      const { getByText } = render(<HomeScreen {...fullConfigProps} />);
-      expect(getByText('Ultimate Fantasy Hub')).toBeTruthy();
-      expect(getByText('Choose your championship sport')).toBeTruthy();
-      expect(getByText('NFL Football')).toBeTruthy();
-      expect(getByText('My Profile')).toBeTruthy();
-      expect(getByText('League Settings')).toBeTruthy();
+    it('fires onCreateLeague and onJoinLeague from the empty-state CTAs', () => {
+      const onCreateLeague = jest.fn();
+      const onJoinLeague = jest.fn();
+      const { getAllByText, getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          onCreateLeague={onCreateLeague}
+          onJoinLeague={onJoinLeague}
+        />,
+      );
+      fireEvent.click(getAllByText('Create League')[0]);
+      fireEvent.click(getByText('Join League'));
+      expect(onCreateLeague).toHaveBeenCalledTimes(1);
+      expect(onJoinLeague).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Behavior Tests', () => {
-    it('calls onSportPress when a sport card is pressed', () => {
-      const { getByText } = render(<HomeScreen {...defaultProps} />);
-
-      // Assuming default sports include Football
-      const footballCard = getByText('Football');
-      fireEvent.click(footballCard);
-
-      expect(mockOnSportPress).toHaveBeenCalledWith('football');
+  describe('returning-user dashboard', () => {
+    it('renders the greeting and the hero league name', () => {
+      const { getByText } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(getByText('Casey')).toBeTruthy();
+      expect(getByText('Iron Horse Dynasty')).toBeTruthy();
     });
 
-    it('calls custom action onPress when custom action is pressed', () => {
-      const mockCustomAction = jest.fn();
-      const customActions = [
-        {
-          title: 'Test Action',
-          onPress: mockCustomAction,
-        },
-      ];
-
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        customActions,
-      };
-
-      const { getByText } = render(<HomeScreen {...props} />);
-
-      const actionButton = getByText('Test Action');
-      fireEvent.click(actionButton);
-
-      expect(mockCustomAction).toHaveBeenCalled();
+    it('fires onViewLeague when the hero View League button is pressed', () => {
+      const onViewLeague = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onViewLeague={onViewLeague}
+        />,
+      );
+      fireEvent.click(getByText('View League'));
+      expect(onViewLeague).toHaveBeenCalledWith(league);
     });
 
-    it('only shows enabled sports when showAllSports is false', () => {
-      const sportsWithDisabled = [
-        { key: 'football', name: 'Football', enabled: true },
-        { key: 'baseball', name: 'Baseball', enabled: false },
-      ];
+    it('renders the On This Day slot when provided', () => {
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onThisDay={<span>OTD-FEED-MARKER</span>}
+        />,
+      );
+      expect(getByText('OTD-FEED-MARKER')).toBeTruthy();
+    });
+  });
 
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        sports: sportsWithDisabled,
-        showAllSports: false,
-      };
-
-      const { getByText, queryByText } = render(<HomeScreen {...props} />);
-
-      expect(getByText('Football')).toBeTruthy();
-      expect(queryByText('Baseball')).toBeNull();
+  describe('loading and error states', () => {
+    it('renders the loading view', () => {
+      const { getByText } = render(<HomeScreen {...baseProps} loading />);
+      expect(getByText('Loading your dashboard…')).toBeTruthy();
     });
 
-    it('shows all sports including disabled when showAllSports is true', () => {
-      const sportsWithDisabled = [
-        { key: 'football', name: 'Football', enabled: true },
-        { key: 'baseball', name: 'Baseball', enabled: false },
-      ];
-
-      const props: HomeScreenProps = {
-        ...defaultProps,
-        sports: sportsWithDisabled,
-        showAllSports: true,
-      };
-
-      const { getByText } = render(<HomeScreen {...props} />);
-
-      expect(getByText('Football')).toBeTruthy();
-      expect(getByText('Baseball')).toBeTruthy();
+    it('renders the error view and fires onRetry', () => {
+      const onRetry = jest.fn();
+      const { getByText } = render(
+        <HomeScreen {...baseProps} error onRetry={onRetry} />,
+      );
+      expect(getByText('Unable to load your leagues')).toBeTruthy();
+      fireEvent.click(getByText('Retry'));
+      expect(onRetry).toHaveBeenCalledTimes(1);
     });
   });
 });
