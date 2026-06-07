@@ -28,6 +28,7 @@ export type {
   LeagueChatMessageNotification,
   DirectMessageNotification,
   RosterUpdateNotification,
+  TradeOfferNotification,
   UserJoinedNotification,
   UserLeftNotification,
   UserListNotification,

@@ -3,17 +3,22 @@ import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { H3, Spinner, Text, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
-  LeagueTradeBlock,
-  PendingTradeOffers,
   PendingWaiverClaims,
   StandingsTable,
+  TradingCenter,
   useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
@@ -162,6 +167,17 @@ export default function LeagueId(): React.JSX.Element {
 
   const league = leagueData?.league;
 
+  // Bridge native's league WebSocket to TradingCenter's refetch. TradingCenter
+  // registers its refetch via `onSubscribeRefresh`; we stash it in a ref and
+  // invoke it on trade-offer / roster-update notifications for real-time updates.
+  const tradeRefetchRef = useRef<(() => void) | null>(null);
+  const onTradesSubscribeRefresh = useCallback((refetch: () => void) => {
+    tradeRefetchRef.current = refetch;
+    return () => {
+      tradeRefetchRef.current = null;
+    };
+  }, []);
+
   // WebSocket for live league updates
   const wsUrl = config.websocketUrl;
   const { connected: _wsConnected } = useWebSocket({
@@ -171,7 +187,10 @@ export default function LeagueId(): React.JSX.Element {
     viewContext: 'league',
     autoConnect: !isNaN(numLeagueId) && !!wsUrl && !!wsToken,
     onRosterUpdate: () => {
-      // Trigger refetches on roster updates
+      tradeRefetchRef.current?.();
+    },
+    onTradeOffer: () => {
+      tradeRefetchRef.current?.();
     },
     onDraftCompleted: () => {
       Alert.alert('Draft Complete', 'The draft has finished!');
@@ -395,30 +414,25 @@ export default function LeagueId(): React.JSX.Element {
           />
         </Tabs.Content>
 
-        {/* Trades Tab — Trade Block + Pending Offers */}
+        {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
         <Tabs.Content value="trades" flex={1}>
           <ScrollView>
             <YStack padding="$3" space="$4">
-              <YStack>
-                <Text fontSize="$5" fontWeight="600" marginBottom="$2">
-                  Trade Block
+              {userTeamId ? (
+                <>
+                  <TradingCenter
+                    leagueId={numLeagueId}
+                    userTeamId={userTeamId}
+                    isCommissioner={isCommissioner}
+                    onSubscribeRefresh={onTradesSubscribeRefresh}
+                  />
+                  <PendingWaiverClaims teamId={userTeamId} />
+                </>
+              ) : (
+                <Text color="$textMuted">
+                  Join this league to propose and manage trades.
                 </Text>
-                <LeagueTradeBlock
-                  leagueId={numLeagueId}
-                  userTeamId={userTeamId}
-                />
-              </YStack>
-
-              {userTeamId && (
-                <YStack>
-                  <Text fontSize="$5" fontWeight="600" marginBottom="$2">
-                    Pending Trade Offers
-                  </Text>
-                  <PendingTradeOffers teamId={userTeamId} />
-                </YStack>
               )}
-
-              {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
             </YStack>
           </ScrollView>
         </Tabs.Content>

@@ -272,6 +272,27 @@ describe('useWebSocket', () => {
     expect(onRosterUpdate).toHaveBeenCalledWith(update);
   });
 
+  it('calls onTradeOffer handler', () => {
+    const onTradeOffer = jest.fn();
+    renderHook(() =>
+      useWebSocket({
+        url: 'wss://example.com',
+        token: 'jwt-token',
+        onTradeOffer,
+      }),
+    );
+
+    const offer = {
+      leagueId: 42,
+      tradeOfferId: 7,
+      proposingTeamId: 1,
+      receivingTeamId: 2,
+    };
+    act(() => mockInstance._emit(ClientNotificationType.TRADE_OFFER, offer));
+
+    expect(onTradeOffer).toHaveBeenCalledWith(offer);
+  });
+
   it('calls onUserJoined handler', () => {
     const onUserJoined = jest.fn();
     renderHook(() =>
