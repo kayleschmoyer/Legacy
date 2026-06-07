@@ -1,0 +1,25 @@
+# .cursorignore — block secrets from Cursor indexing, @-mentions, and agent reads.
+# Mirrors the permissions.deny list in .claude/settings.json so Cursor and Claude
+# Code refuse the same files. NOTE: per Cursor docs, terminal and MCP server tools
+# used by the agent can still reach these paths — .cursorignore is a guardrail for
+# AI context/indexing, not a hard security boundary. Real secrets stay in the OS
+# keychain / .env.local (gitignored), never committed.
+
+# Environment / dotenv files (.env, .env.local, .env.*)
+.env
+.env.*
+
+# Private keys & certificates
+*.pem
+*.key
+*.p12
+*.p8
+*.jks
+
+# Terraform state and secret vars
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+
+# Local database dumps / seeds
+dev.dump

@@ -1,0 +1,60 @@
+---
+description: Core safety, workflow, and MCP-first rules for the legacy-sports monorepo (Cursor). Always applied.
+alwaysApply: true
+---
+
+# legacy-sports — core rules (Cursor)
+
+The full agent guide is [AGENTS.md](mdc:AGENTS.md) at the repo root (Cursor reads it
+automatically). This rule restates the **non-negotiable** subset and the parts that
+differ in Cursor. When this rule and AGENTS.md disagree about a Cursor-specific
+detail, this rule wins.
+
+## What's different in Cursor (vs. Claude Code)
+
+- **No hooks.** Claude Code's `.claude/hooks/*` (worktree symlink setup, main-repo
+  write-guard, MCP-first nudge, incomplete-work block) do **not** run here. Their
+  intent is encoded as rules below — you must self-enforce; nothing blocks you.
+- **No Skills / slash commands.** Workflows like `/work-ticket`, `/review`,
+  `/create-pr` don't exist in Cursor. Do the equivalent steps manually.
+- **MCP servers must be enabled once** in Cursor Settings → MCP (and trust-approved),
+  and the 3 hosted servers need bearer env vars exported before launch. See
+  [docs/dev-process/cursor-setup.md](mdc:docs/dev-process/cursor-setup.md).
+
+## Safety (never violate)
+
+- **Never commit to `main`.** All work happens on a feature branch / worktree.
+- **Never put raw secret values** in tool calls, edits, or commits. Secrets live in
+  the OS keychain / `.env.local` (gitignored), never committed.
+- **One ticket = one branch = one PR.** Don't fold unrelated changes into a branch.
+- **Never run auth-generation commands** (`aws sso login`, `gh auth login`, interactive
+  OAuth). If a tool reports an auth error, stop and ask the user to re-authenticate.
+
+## MCP-first (this is what keeps the agent off raw bash)
+
+Once the MCP servers are connected, **prefer the MCP tool over the shell equivalent** —
+this is the single biggest difference between a good and a noisy Cursor session here:
+
+- File ops → `Read` / `Glob` / `Grep`, not `cat` / `find` / `ls` / `grep`.
+- Builds & checks → `make_run` (e.g. `make pc`), not raw `make`.
+- Nx tasks → `nx_run` / `nx_run_affected`, not `pnpm exec nx`.
+- Git / worktree / PR ops → `worktree_*` and `github_*` MCP tools, not raw `git`/`gh`.
+- DB ops → `db_*` MCP tools (migrate, status, query).
+
+If an MCP tool is genuinely unavailable, fall back to the shell — but first confirm the
+server is actually connected (Settings → MCP). A flood of bash usually means MCP is
+not connected, not that bash is the right tool.
+
+## Workflow discipline
+
+- Run `make pc` (via `make_run`) and self-review every changed file before pushing.
+- Run DB migrations (`db_migration_status` → `db_migrate`) before validating.
+- Work is not done until the PR is **merged** and the Jira ticket is **Done** — a PR
+  left in draft is skipped by every downstream actor.
+
+## Code quality
+
+- No `console.*` — use `LOGGER` from `@legacy-sports/logging` (see AGENTS.md for the
+  narrow `scripts/` / CLI exceptions).
+- No suppression — fix root causes; never `@ts-ignore` or `eslint-disable`.
+- Surgical edits only; match surrounding style. Unrelated cleanup is a separate ticket.

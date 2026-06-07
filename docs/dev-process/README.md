@@ -81,6 +81,8 @@ E2E and integration tests must satisfy the **12 determinism levers** before merg
 ## Where to read next
 
 - Want a visual orientation for the new-feature path with diagrams? See [agentic-workflow.md](./agentic-workflow.md).
+- Which AI coding environments are supported (Claude Code, Copilot, VS Code, Cursor, Codex) and why their MCP auth differs? See [llm-environments.md](./llm-environments.md).
+- Running this repo in **Cursor** instead of Claude Code? See [cursor-setup.md](./cursor-setup.md).
 - New to the codebase? Start with [AGENTS.md](../../AGENTS.md), then read this doc, then the [dev-process SKILL.md](../../.agents/skills/dev-process/SKILL.md).
 - Picking up an in-flight PR? Read [10-inherited-pr.md](../../.agents/skills/dev-process/entrypoints/10-inherited-pr.md).
 - Investigating a bug? Read [02-bug-investigation.md](../../.agents/skills/dev-process/entrypoints/02-bug-investigation.md).

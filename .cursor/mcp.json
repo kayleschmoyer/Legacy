@@ -1,13 +1,16 @@
 {
   "mcpServers": {
     "legacy-sports-ci": {
-      "url": "https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com"
+      "url": "https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com",
+      "headers": { "Authorization": "Bearer ${env:MCP_CI_BEARER}" }
     },
     "legacy-sports-jira": {
-      "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com"
+      "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com",
+      "headers": { "Authorization": "Bearer ${env:MCP_JIRA_BEARER}" }
     },
     "legacy-sports-github": {
-      "url": "https://lhnqee219k.execute-api.us-east-1.amazonaws.com"
+      "url": "https://lhnqee219k.execute-api.us-east-1.amazonaws.com",
+      "headers": { "Authorization": "Bearer ${env:MCP_GITHUB_BEARER}" }
     },
     "legacy-sports-ci-local": {
       "command": "node",
