@@ -19,7 +19,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.legacySports",
       "googleServicesFile": "./ios/GoogleService-Info.plist",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:legacy-fantasy.com",
+        "applinks:app.legacy-fantasy.com"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +31,18 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.legacySports",
-      "googleServicesFile": "./android/app/google-services.json"
+      "googleServicesFile": "./android/app/google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "legacy-fantasy.com" },
+            { "scheme": "https", "host": "app.legacy-fantasy.com" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",

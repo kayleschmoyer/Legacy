@@ -152,6 +152,10 @@ export default function Layout() {
             name="season-draft/create"
             options={{ title: 'Create Season Draft Game' }}
           />
+          <Stack.Screen
+            name="season-draft/join"
+            options={{ title: 'Join Season Draft Game' }}
+          />
 
           {/* Account / settings */}
           <Stack.Screen name="about" options={{ title: 'About' }} />
