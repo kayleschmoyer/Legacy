@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import {
+  Button,
+  H1,
+  H2,
   H3,
   ScrollView,
   Separator,
   Spinner,
-  Stack,
   Text,
   XStack,
   YStack,
@@ -17,58 +19,6 @@ import { useNotifications } from './hooks/useNotifications';
 import { type NotificationHistoryItem } from '../../api/db/graphql.generated';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
-
-const NOTIFICATION_FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'trade', label: 'Trades' },
-  { key: 'waiver', label: 'Waivers' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'matchup', label: 'Matchups' },
-  { key: 'league', label: 'League' },
-] as const;
-
-type FilterKey = (typeof NOTIFICATION_FILTERS)[number]['key'];
-
-function FilterChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Stack
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
-      paddingHorizontal="$3"
-      paddingVertical="$1.5"
-      borderRadius="$10"
-      backgroundColor={active ? BRAND_GOLD_LIGHT : '$gray3'}
-      pressStyle={{ opacity: 0.7 }}
-    >
-      <Text
-        color={active ? '$gray1' : '$gray11'}
-        fontSize="$2"
-        fontWeight={active ? '700' : '500'}
-      >
-        {label}
-      </Text>
-    </Stack>
-  );
-}
-
-function matchesFilter(
-  notification: NotificationHistoryItem,
-  filter: FilterKey,
-): boolean {
-  if (filter === 'all') return true;
-  const type = notification.notificationType?.toLowerCase() ?? '';
-  return type.includes(filter);
-}
 
 export interface NotificationsScreenProps {
   userId: number;
@@ -95,26 +45,25 @@ export function NotificationsScreen({
   onNavigateToMatchup,
   onNavigateToLeague,
 }: NotificationsScreenProps): React.JSX.Element {
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
-
   const {
     notifications,
     preferences,
     unreadCount,
     loading,
+    error,
     updatingPreferences,
+    page,
+    hasNextPage,
+    goToNextPage,
+    goToPrevPage,
     markAsRead,
     markAllAsRead,
     updatePreferences,
+    refetchHistory,
   } = useNotifications(userId, {
     websocketUrl,
     token: websocketToken,
   });
-
-  const filteredNotifications = useMemo(
-    () => notifications.filter((n) => matchesFilter(n, activeFilter)),
-    [notifications, activeFilter],
-  );
 
   const handleNotificationPress = (notification: NotificationHistoryItem) => {
     if (!notification.read && notification.id) {
@@ -136,141 +85,175 @@ export function NotificationsScreen({
     }
   };
 
-  if (loading) {
-    return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
+  const handleMarkAllRead = () => {
+    markAllAsRead().catch((err: unknown) => {
+      LOGGER.warn(
+        'Failed to mark all notifications as read:',
+        err instanceof Error ? err.message : String(err),
+      );
+    });
+  };
+
+  const subtitle =
+    unreadCount > 0
+      ? `You have ${unreadCount} unread notification${
+          unreadCount === 1 ? '' : 's'
+        }`
+      : 'You’re all caught up';
+
+  let body: React.ReactNode;
+  if (loading && notifications.length === 0) {
+    body = (
+      <YStack
+        alignItems="center"
+        justifyContent="center"
+        gap="$3"
+        paddingVertical="$10"
+      >
         <Spinner size="large" />
-        <Text marginTop="$3" color="$gray11">
-          Loading notifications...
+        <Text color="$gray11">Loading notifications...</Text>
+      </YStack>
+    );
+  } else if (error) {
+    body = (
+      <YStack
+        alignItems="center"
+        justifyContent="center"
+        gap="$3"
+        paddingVertical="$10"
+      >
+        <Bell size={40} color="$gray8" />
+        <H2 fontSize="$7" color="$color" textAlign="center">
+          Unable to load your notifications
+        </H2>
+        <Text color="$gray11" textAlign="center">
+          Something went wrong while fetching your notifications. Please try
+          again.
         </Text>
+        <Button onPress={() => refetchHistory()}>Try again</Button>
+      </YStack>
+    );
+  } else if (notifications.length === 0 && page === 0) {
+    body = (
+      <YStack
+        alignItems="center"
+        justifyContent="center"
+        gap="$3"
+        paddingVertical="$10"
+      >
+        <Bell size={40} color="$gray8" />
+        <H2 fontSize="$7" color="$color" textAlign="center">
+          No notifications yet
+        </H2>
+        <Text color="$gray11" textAlign="center">
+          When something happens in your leagues, you{'’'}ll see it here.
+        </Text>
+      </YStack>
+    );
+  } else {
+    body = (
+      <YStack gap="$4">
+        <NotificationList
+          notifications={notifications}
+          onNotificationPress={handleNotificationPress}
+          onMarkAsRead={markAsRead}
+        />
+        <XStack
+          alignItems="center"
+          justifyContent="center"
+          gap="$4"
+          paddingVertical="$2"
+        >
+          <Button
+            size="$3"
+            disabled={page === 0}
+            accessibilityLabel="Previous page"
+            onPress={goToPrevPage}
+          >
+            Previous
+          </Button>
+          <Text fontSize="$3" color="$gray11">
+            Page {page + 1}
+          </Text>
+          <Button
+            size="$3"
+            disabled={!hasNextPage}
+            accessibilityLabel="Next page"
+            onPress={goToNextPage}
+          >
+            Next
+          </Button>
+        </XStack>
       </YStack>
     );
   }
 
-  const listHeader = (
-    <YStack
-      padding="$5"
-      paddingBottom="$2"
-      gap="$5"
-      backgroundColor="$background"
-    >
-      <XStack alignItems="center" justifyContent="space-between">
-        <XStack alignItems="center" gap="$2">
-          <Bell size={20} color={BRAND_GOLD_LIGHT} />
-          <Text fontSize="$6" fontWeight="700" color="$color">
-            Notifications
-          </Text>
-        </XStack>
-        {unreadCount > 0 && (
-          <XStack
-            backgroundColor="$red10"
-            borderRadius="$10"
-            paddingHorizontal="$2.5"
-            paddingVertical="$1"
-            minWidth={24}
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Text
-              fontSize="$2"
-              fontWeight="700"
-              color="white"
-              textAlign="center"
-            >
-              {unreadCount}
-            </Text>
-          </XStack>
-        )}
-      </XStack>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <XStack gap="$2">
-          {NOTIFICATION_FILTERS.map((f) => (
-            <FilterChip
-              key={f.key}
-              label={f.label}
-              active={activeFilter === f.key}
-              onPress={() => setActiveFilter(f.key)}
-            />
-          ))}
-        </XStack>
-      </ScrollView>
-
-      <YStack
-        borderRadius="$6"
-        borderTopLeftRadius="$6"
-        borderTopRightRadius="$6"
-        borderWidth={1}
-        borderBottomWidth={0}
-        borderColor="$borderColor"
-        overflow="hidden"
-      >
-        <XStack
-          paddingHorizontal="$5"
-          paddingVertical="$4"
-          alignItems="center"
-          justifyContent="space-between"
-          borderBottomWidth={1}
-          borderBottomColor="$borderColor"
-        >
-          <H3 color="$color">
-            {activeFilter === 'all'
-              ? 'All Notifications'
-              : (NOTIFICATION_FILTERS.find((f) => f.key === activeFilter)
-                  ?.label ?? 'Notifications')}
-          </H3>
-          <Text fontSize="$2" color="$textMuted">
-            {filteredNotifications.length} notification
-            {filteredNotifications.length !== 1 ? 's' : ''}
-          </Text>
-        </XStack>
-      </YStack>
-    </YStack>
-  );
-
-  const listFooter = (
-    <YStack padding="$5" paddingTop="$2" gap="$5" backgroundColor="$background">
-      <Separator />
-
-      {preferences && (
-        <YStack
-          borderRadius="$6"
-          borderWidth={1}
-          borderColor="$borderColor"
-          overflow="hidden"
-        >
-          <XStack
-            paddingHorizontal="$5"
-            paddingVertical="$4"
-            alignItems="center"
-            gap="$3"
-            borderBottomWidth={1}
-            borderBottomColor="$borderColor"
-          >
-            <H3 color="$color">Notification Preferences</H3>
-          </XStack>
-          <YStack padding="$4">
-            <NotificationSettings
-              preferences={preferences}
-              onUpdate={updatePreferences}
-              loading={updatingPreferences}
-            />
-          </YStack>
-        </YStack>
-      )}
-    </YStack>
-  );
-
   return (
     <YStack flex={1} backgroundColor="$background">
-      <NotificationList
-        notifications={filteredNotifications}
-        onNotificationPress={handleNotificationPress}
-        onMarkAsRead={markAsRead}
-        onMarkAllRead={markAllAsRead}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-      />
+      <ScrollView>
+        <YStack
+          width="100%"
+          maxWidth={760}
+          alignSelf="center"
+          padding="$5"
+          gap="$5"
+        >
+          <YStack gap="$2">
+            <XStack
+              alignItems="center"
+              justifyContent="space-between"
+              gap="$3"
+              flexWrap="wrap"
+            >
+              <XStack alignItems="center" gap="$2">
+                <Bell size={24} color={BRAND_GOLD_LIGHT} />
+                <H1 fontSize="$9" color="$color">
+                  Notifications
+                </H1>
+              </XStack>
+              {unreadCount > 0 && (
+                <Button size="$3" onPress={handleMarkAllRead}>
+                  Mark all as read
+                </Button>
+              )}
+            </XStack>
+            <Text fontSize="$4" color="$gray11">
+              {subtitle}
+            </Text>
+          </YStack>
+
+          {body}
+
+          {preferences && (
+            <YStack gap="$3">
+              <Separator />
+              <YStack
+                borderRadius="$6"
+                borderWidth={1}
+                borderColor="$borderColor"
+                overflow="hidden"
+              >
+                <XStack
+                  paddingHorizontal="$5"
+                  paddingVertical="$4"
+                  alignItems="center"
+                  borderBottomWidth={1}
+                  borderBottomColor="$borderColor"
+                >
+                  <H3 color="$color">Notification Preferences</H3>
+                </XStack>
+                <YStack padding="$4">
+                  <NotificationSettings
+                    preferences={preferences}
+                    onUpdate={updatePreferences}
+                    loading={updatingPreferences}
+                  />
+                </YStack>
+              </YStack>
+            </YStack>
+          )}
+        </YStack>
+      </ScrollView>
     </YStack>
   );
 }

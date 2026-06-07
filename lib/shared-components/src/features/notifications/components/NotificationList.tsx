@@ -1,158 +1,107 @@
 import React from 'react';
 import { type GestureResponderEvent } from 'react-native';
-import {
-  Button,
-  Card,
-  Circle,
-  H6,
-  ScrollView,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
-import { Bell, Check } from '@tamagui/lucide-icons';
+import { Button, Card, Circle, H3, Text, XStack, YStack } from 'tamagui';
+import { Check } from '@tamagui/lucide-icons';
 import { type NotificationHistoryItem } from '../../../api/db/graphql.generated';
 
 export interface NotificationListProps {
   notifications: NotificationHistoryItem[];
   onNotificationPress?: (notification: NotificationHistoryItem) => void;
   onMarkAsRead?: (notificationId: number) => Promise<void>;
-  onMarkAllRead?: () => Promise<void>;
-  loading?: boolean;
-  ListHeaderComponent?: React.ReactElement | null;
-  ListFooterComponent?: React.ReactElement | null;
 }
 
+function formatTimeAgo(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+/**
+ * Renders the paginated notification cards. Each card's title is an `H3`
+ * (semantic heading) so screen readers and tests can target individual
+ * notifications by their title. Empty / loading / pagination chrome is owned
+ * by `NotificationsScreen`.
+ */
 export function NotificationList({
   notifications,
   onNotificationPress,
   onMarkAsRead,
-  onMarkAllRead,
-  loading = false,
-  ListHeaderComponent,
-  ListFooterComponent,
 }: NotificationListProps) {
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const renderNotification = (item: NotificationHistoryItem, index: number) => (
-    <Card
-      key={item.id?.toString() ?? `item-${index}`}
-      elevate
-      size="$3"
-      bordered
-      backgroundColor={item.read ? '$gray1' : '$blue2'}
-      pressStyle={{ scale: 0.98 }}
-      onPress={() => onNotificationPress?.(item)}
-      animation="bouncy"
-      margin="$2"
-    >
-      <YStack padding="$3" gap="$2">
-        <XStack justifyContent="space-between" alignItems="flex-start">
-          <XStack flex={1} gap="$2" alignItems="center">
-            <Bell size="$1" color={item.read ? '$gray11' : '$blue10'} />
-            <YStack flex={1}>
-              <H6>{item.title}</H6>
-              <Text fontSize="$2" color="$gray11" numberOfLines={2}>
-                {item.message}
-              </Text>
-            </YStack>
-          </XStack>
-          {!item.read && (
-            <Circle size="$1" backgroundColor="$blue10" marginLeft="$2" />
-          )}
-        </XStack>
-
-        <XStack justifyContent="space-between" alignItems="center">
-          <Text fontSize="$1" color="$gray11">
-            {item.sentAt ? formatTime(item.sentAt) : 'Unknown time'}
-          </Text>
-          {!item.read && onMarkAsRead && item.id && (
-            <Button
-              size="$2"
-              icon={Check}
-              onPress={(e: GestureResponderEvent) => {
-                e.stopPropagation();
-                if (item.id) void onMarkAsRead(Number(item.id));
-              }}
-              chromeless
-            >
-              Mark as read
-            </Button>
-          )}
-        </XStack>
-      </YStack>
-    </Card>
-  );
-
-  if (notifications.length === 0) {
-    return (
-      <YStack flex={1}>
-        {ListHeaderComponent}
-        <YStack
-          padding="$4"
-          alignItems="center"
-          justifyContent="center"
-          gap="$2"
-        >
-          <Bell size="$4" color="$gray10" />
-          <Text fontSize="$4" color="$gray11">
-            No notifications
-          </Text>
-          <Text fontSize="$2" color="$gray10" textAlign="center">
-            You'll see notifications here when you receive them
-          </Text>
-        </YStack>
-        {ListFooterComponent}
-      </YStack>
-    );
-  }
-
   return (
-    <YStack flex={1}>
-      {unreadCount > 0 && onMarkAllRead && (
-        <XStack
-          padding="$3"
-          justifyContent="space-between"
-          alignItems="center"
-          backgroundColor="$gray2"
+    <YStack gap="$3">
+      {notifications.map((item, index) => (
+        <Card
+          key={item.id?.toString() ?? `item-${index}`}
+          elevate
+          size="$3"
+          bordered
+          backgroundColor={item.read ? '$background' : '$blue2'}
+          pressStyle={{ scale: 0.985 }}
+          onPress={() => onNotificationPress?.(item)}
+          animation="bouncy"
+          accessibilityLabel={`${item.read ? 'Read' : 'Unread'} notification: ${
+            item.title ?? 'Notification'
+          }. ${item.message ?? ''}`.trim()}
         >
-          <Text fontSize="$3" fontWeight="600">
-            {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-          </Text>
-          <Button
-            size="$3"
-            onPress={() => {
-              void onMarkAllRead();
-            }}
-            disabled={loading}
-            chromeless
-          >
-            Mark all as read
-          </Button>
-        </XStack>
-      )}
-      <ScrollView>
-        <YStack>
-          {ListHeaderComponent}
-          {notifications.map((item, index) => renderNotification(item, index))}
-          {ListFooterComponent}
-        </YStack>
-      </ScrollView>
+          <YStack padding="$4" gap="$2">
+            <XStack
+              justifyContent="space-between"
+              alignItems="flex-start"
+              gap="$3"
+            >
+              <YStack flex={1} gap="$1">
+                <H3
+                  fontSize="$6"
+                  fontWeight={item.read ? '600' : '800'}
+                  color="$color"
+                >
+                  {item.title}
+                </H3>
+                <Text fontSize="$3" color="$gray11" numberOfLines={3}>
+                  {item.message}
+                </Text>
+              </YStack>
+              {!item.read && (
+                <Circle
+                  size={10}
+                  backgroundColor="$blue10"
+                  marginTop="$2"
+                  marginLeft="$2"
+                />
+              )}
+            </XStack>
+
+            <XStack justifyContent="space-between" alignItems="center">
+              <Text fontSize="$2" color="$gray10">
+                {item.sentAt ? formatTimeAgo(item.sentAt) : 'Unknown time'}
+              </Text>
+              {!item.read && onMarkAsRead && item.id != null && (
+                <Button
+                  size="$2"
+                  icon={Check}
+                  chromeless
+                  accessibilityLabel={`Mark "${item.title}" as read`}
+                  onPress={(e: GestureResponderEvent) => {
+                    e.stopPropagation();
+                    if (item.id != null) void onMarkAsRead(Number(item.id));
+                  }}
+                >
+                  Mark as read
+                </Button>
+              )}
+            </XStack>
+          </YStack>
+        </Card>
+      ))}
     </YStack>
   );
 }
