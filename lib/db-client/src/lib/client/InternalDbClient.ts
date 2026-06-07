@@ -121,6 +121,22 @@ export async function setInitialAvatarUrl(
     );
 }
 
+/**
+ * Stamp a user's `last_login_at` with the current time after a successful
+ * login. Intentionally does NOT touch `updated_at` — a login is an
+ * authentication event, not a profile mutation, so it should not move the
+ * row's content-modification timestamp. (LS-6674 / LGN-019)
+ */
+export async function updateLastLoginAt(
+  db: InternalDb,
+  userId: number,
+): Promise<void> {
+  await db
+    .update(Schema.usersInAppInternal)
+    .set({ lastLoginAt: new Date() })
+    .where(eq(Schema.usersInAppInternal.id, userId));
+}
+
 export async function unlinkDiscordAccount(
   db: InternalDb,
   userId: number,

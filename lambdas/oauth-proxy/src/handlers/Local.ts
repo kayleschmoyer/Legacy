@@ -4,6 +4,7 @@ import {
   createUser,
   getSubscriptionByUserId,
   getUserByEmail,
+  updateLastLoginAt,
 } from '@legacy-sports/db-client';
 import { z, ZodError } from 'zod';
 import { hashPassword, testPassword } from '../Users';
@@ -19,6 +20,8 @@ import {
   isLoginLocked,
   recordFailedLogin,
 } from '../util/login-throttle';
+import { getClientIp } from '../util/rate-limit';
+import { maskEmail } from '../util/email';
 
 // Minimum password length on registration. New accounts must meet this bar.
 export const MIN_PASSWORD_LENGTH = 12;
@@ -70,6 +73,12 @@ export const handleLogin = async (
     return errorResponse(400, 'Invalid request body');
   }
 
+  // Sanitized identifiers for the audit trail (LGN-019). The masked email and
+  // client IP let incident response answer "is someone brute-forcing user X?"
+  // without writing plaintext PII into logs.
+  const ip = getClientIp(event);
+  const maskedEmail = maskEmail(email);
+
   // Per-email lockout (LGN-020 / LS-6675). The IP limiter in util/rate-limit.ts
   // is per-instance and per-IP only, so credential-stuffing against a single
   // email from many IPs slips past it. This counter is keyed by the target
@@ -99,6 +108,12 @@ export const handleLogin = async (
 
     if (!user?.passwordHash) {
       await recordFailedLogin(email);
+      LOGGER.warn('login.failed', {
+        audit: true,
+        email: maskedEmail,
+        ip,
+        reason: 'unknown_user',
+      });
       return errorResponse(401, 'Invalid credentials');
     }
 
@@ -106,10 +121,29 @@ export const handleLogin = async (
 
     if (!isCorrect) {
       await recordFailedLogin(email);
+      LOGGER.warn('login.failed', {
+        audit: true,
+        email: maskedEmail,
+        ip,
+        reason: 'invalid_password',
+      });
       return errorResponse(401, 'Invalid credentials');
     }
 
+    // Successful login: clear the failed-attempt counter (LGN-020), stamp
+    // last_login_at for account-security UX, and emit a structured audit event
+    // for observability / incident response (LGN-019). The audit email is
+    // deliberately masked here too — userId already gives full traceability for
+    // incident response, so there is no need to write plaintext email PII into
+    // CloudWatch on every successful login.
     await clearFailedLogins(email);
+    await updateLastLoginAt(db, user.id);
+    LOGGER.info('login.success', {
+      audit: true,
+      userId: user.id,
+      email: maskedEmail,
+      ip,
+    });
 
     const internalJwt = await createJwt(user);
 

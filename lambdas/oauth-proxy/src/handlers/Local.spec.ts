@@ -3,6 +3,7 @@ import {
   createUser,
   getSubscriptionByUserId,
   getUserByEmail,
+  updateLastLoginAt,
 } from '@legacy-sports/db-client';
 import { handleLogin, handleRegister } from './Local';
 import { notifyNewUserSignup } from '../util/discord';
@@ -22,10 +23,19 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Typed handle on the mocked LOGGER. Pulled via requireMock (rather than a
+// module-scope jest.fn() referenced from the factory) to avoid a temporal-dead-
+// zone error: importing ./Local triggers the factory before module-scope consts
+// initialize. Typing it as a plain object of jest.Mock also sidesteps the
+// unbound-method lint rule that fires on the real LOGGER's typed methods.
+const { LOGGER: mockLogger }: { LOGGER: { info: jest.Mock; warn: jest.Mock } } =
+  jest.requireMock('@legacy-sports/logging');
+
 jest.mock('@legacy-sports/db-client', () => ({
   createUser: jest.fn(),
   getUserByEmail: jest.fn(),
   getSubscriptionByUserId: jest.fn(),
+  updateLastLoginAt: jest.fn(),
 }));
 
 jest.mock('../util/db', () => ({
@@ -76,6 +86,9 @@ const mockGetSubscriptionByUserId =
   getSubscriptionByUserId as jest.MockedFunction<
     typeof getSubscriptionByUserId
   >;
+const mockUpdateLastLoginAt = updateLastLoginAt as jest.MockedFunction<
+  typeof updateLastLoginAt
+>;
 const mockCreateUser = createUser as jest.MockedFunction<typeof createUser>;
 const mockNotifyNewUserSignup = notifyNewUserSignup as jest.MockedFunction<
   typeof notifyNewUserSignup
@@ -215,6 +228,82 @@ describe('handleLogin', () => {
 
       expect(result.statusCode).toBe(401);
       expect(mockGetSubscriptionByUserId).not.toHaveBeenCalled();
+    });
+
+    it('stamps last_login_at and emits a login.success audit event (LGN-019)', async () => {
+      mockGetSubscriptionByUserId.mockResolvedValue(null);
+
+      const result = await handleLogin(makeEvent(validBody));
+
+      expect(result.statusCode).toBe(200);
+      expect(mockUpdateLastLoginAt).toHaveBeenCalledWith(expect.anything(), 7);
+      // ip is null because makeEvent carries no X-Forwarded-For / sourceIp;
+      // the email is masked the same way it is on the failure paths.
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'login.success',
+        expect.objectContaining({
+          audit: true,
+          userId: 7,
+          email: 'u***@example.com',
+          ip: null,
+        }),
+      );
+    });
+  });
+
+  describe('failed-login audit trail (LGN-019)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('emits a login.failed audit event with a sanitized email and IP when the user is unknown', async () => {
+      mockGetUserByEmail.mockResolvedValue(null);
+
+      const event = {
+        body: JSON.stringify({
+          email: 'victim@example.com',
+          password: 'password123',
+        }),
+        headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' },
+      } as unknown as APIGatewayEvent;
+
+      const result = await handleLogin(event);
+
+      expect(result.statusCode).toBe(401);
+      expect(mockUpdateLastLoginAt).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'login.failed',
+        expect.objectContaining({
+          audit: true,
+          email: 'v***@example.com',
+          ip: '203.0.113.7',
+          reason: 'unknown_user',
+        }),
+      );
+    });
+
+    it('emits a login.failed audit event when the password is incorrect', async () => {
+      mockGetUserByEmail.mockResolvedValue({
+        id: 7,
+        email: 'user@example.com',
+        passwordHash: 'stored-hash',
+      } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
+      mockTestPassword.mockResolvedValue(false);
+
+      const result = await handleLogin(
+        makeEvent({ email: 'user@example.com', password: 'wrong-password' }),
+      );
+
+      expect(result.statusCode).toBe(401);
+      expect(mockUpdateLastLoginAt).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'login.failed',
+        expect.objectContaining({
+          audit: true,
+          email: 'u***@example.com',
+          reason: 'invalid_password',
+        }),
+      );
     });
   });
 
