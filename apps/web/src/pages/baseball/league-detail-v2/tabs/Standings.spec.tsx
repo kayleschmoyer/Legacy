@@ -1,21 +1,27 @@
 /**
- * Tests for StandingsTab (LS-4637).
+ * Tests for StandingsTab (LS-7814).
  *
- * Covers the redesign acceptance criteria:
- *   1. Win % column renders with .xxx (leading-zero stripped) formatting.
- *   2. Division grouping activates when ≥2 distinct divisionIds are present;
- *      single division renders flat.
- *   3. "You" chip renders on the viewer's own row.
- *   4. Empty state renders when neither standings nor teams are provided.
+ * The standings table is now the shared `StandingsTable` from
+ * `@legacy-sports/shared-components` (the web-only custom table was deleted).
+ * These tests verify the tab's own responsibilities: wiring standings/props
+ * through to the shared table, the team-list fallback, subtitle computation,
+ * and the playoff bracket gate. Column rendering, Win % formatting, division
+ * grouping, and the "You" highlight are covered by the shared component's own
+ * spec (lib/shared-components/.../StandingsTable.spec.tsx).
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
-/* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
+import { StandingsTable } from '@legacy-sports/shared-components';
 import { StandingsTab } from './Standings';
 
 let mockStandings: ReadonlyArray<Record<string, unknown>> = [];
+let mockBracket: Record<string, unknown> | null = null;
+
+jest.mock('@legacy-sports/shared-components', () => ({
+  StandingsTable: jest.fn(() => <div data-testid="standings-table" />),
+}));
 
 jest.mock('../../../../api/db/graphql.generated', () => ({
   PlayoffMatchupStatus: { Completed: 'completed' },
@@ -25,19 +31,22 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
     loading: false,
   })),
   useGetPlayoffBracketQuery: jest.fn(() => ({
-    data: { getPlayoffBracket: null },
+    data: { getPlayoffBracket: mockBracket },
   })),
 }));
+
+const StandingsTableMock = StandingsTable as unknown as jest.Mock;
 
 const league = {
   id: 1,
   name: 'Test League',
+  sport: 'baseball',
   playoffEnabled: false,
   playoffFormat: 'Single elimination',
 } as any;
 
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
-  teamId: 100,
+  teamId: '100',
   teamName: 'Team A',
   wins: 8,
   losses: 4,
@@ -52,12 +61,27 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+interface CapturedProps {
+  standings: Array<Record<string, unknown>>;
+  loading?: boolean;
+  currentUserTeamId: number | null;
+  onTeamPress: unknown;
+  subtitle: string;
+}
+
+const lastProps = (): CapturedProps =>
+  StandingsTableMock.mock.calls[
+    StandingsTableMock.mock.calls.length - 1
+  ][0] as CapturedProps;
+
 beforeEach(() => {
   mockStandings = [];
+  mockBracket = null;
+  StandingsTableMock.mockClear();
 });
 
 describe('StandingsTab', () => {
-  it('renders the Win % column header (AC: design adds Win %)', () => {
+  it('passes fetched standings through to the shared StandingsTable', () => {
     mockStandings = [makeRow()];
     render(
       <StandingsTab
@@ -67,123 +91,46 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(
-      screen.getByRole('columnheader', { name: 'Win %' }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('standings-table')).toBeInTheDocument();
+    expect(lastProps().standings).toHaveLength(1);
+    expect(lastProps().standings[0].teamName).toBe('Team A');
   });
 
-  it('formats Win % as .xxx with leading zero stripped', () => {
-    mockStandings = [makeRow({ winPercentage: 0.625 })];
+  it('wires currentUserTeamId and onTeamPress through to the shared table', () => {
+    const onTeam = jest.fn();
+    mockStandings = [makeRow({ teamId: '42' })];
+    render(
+      <StandingsTab league={league} teams={[]} myTeamId={42} onTeam={onTeam} />,
+    );
+    expect(lastProps().currentUserTeamId).toBe(42);
+    expect(lastProps().onTeamPress).toBe(onTeam);
+  });
+
+  it('falls back to the team list when no standings are available', () => {
+    mockStandings = [];
     render(
       <StandingsTab
         league={league}
-        teams={[]}
+        teams={
+          [
+            { id: 7, name: 'Fallback FC', primaryColor: '#ff0033' },
+            { id: 8, name: 'Bench United' },
+          ] as any
+        }
         myTeamId={null}
         onTeam={jest.fn()}
       />,
     );
-    expect(screen.getByText('.625')).toBeInTheDocument();
+    const { standings } = lastProps();
+    expect(standings).toHaveLength(2);
+    expect(standings[0]).toMatchObject({
+      teamId: '7',
+      teamName: 'Fallback FC',
+    });
+    expect(standings[0].wins).toBeNull();
   });
 
-  it('renders a flat list when only one division is present', () => {
-    mockStandings = [
-      makeRow({ teamId: 100, teamName: 'Solo Div', divisionId: 1 }),
-      makeRow({ teamId: 101, teamName: 'Also Solo', divisionId: 1 }),
-    ];
-    render(
-      <StandingsTab
-        league={league}
-        teams={[]}
-        myTeamId={null}
-        onTeam={jest.fn()}
-      />,
-    );
-    expect(screen.queryByText(/^Division /)).not.toBeInTheDocument();
-  });
-
-  it('groups teams by division when ≥2 divisions are present', () => {
-    mockStandings = [
-      makeRow({
-        teamId: 100,
-        teamName: 'East A',
-        divisionId: 1,
-        winPercentage: 0.8,
-      }),
-      makeRow({
-        teamId: 101,
-        teamName: 'West A',
-        divisionId: 2,
-        winPercentage: 0.7,
-      }),
-      makeRow({
-        teamId: 102,
-        teamName: 'East B',
-        divisionId: 1,
-        winPercentage: 0.4,
-      }),
-    ];
-    render(
-      <StandingsTab
-        league={league}
-        teams={[]}
-        myTeamId={null}
-        onTeam={jest.fn()}
-      />,
-    );
-    expect(screen.getByText('Division 1')).toBeInTheDocument();
-    expect(screen.getByText('Division 2')).toBeInTheDocument();
-  });
-
-  it('shows "You" chip on the viewer\'s row', () => {
-    mockStandings = [
-      makeRow({ teamId: 42, teamName: 'My Crew' }),
-      makeRow({ teamId: 99, teamName: 'Rival' }),
-    ];
-    render(
-      <StandingsTab
-        league={league}
-        teams={[]}
-        myTeamId={42}
-        onTeam={jest.fn()}
-      />,
-    );
-    const myRow = screen.getByText('My Crew').closest('tr');
-    expect(myRow).not.toBeNull();
-    expect(within(myRow as HTMLElement).getByText('You')).toBeInTheDocument();
-    const rivalRow = screen.getByText('Rival').closest('tr');
-    expect(
-      within(rivalRow as HTMLElement).queryByText('You'),
-    ).not.toBeInTheDocument();
-  });
-
-  it('only applies a backend-supplied primaryColor if it matches a safe CSS color shape', () => {
-    mockStandings = [
-      makeRow({ teamId: 100, teamName: 'Hex Team', primaryColor: '#ff0033' }),
-      makeRow({
-        teamId: 101,
-        teamName: 'Unsafe Team',
-        primaryColor: 'url(javascript:alert(1))',
-      }),
-    ];
-    render(
-      <StandingsTab
-        league={league}
-        teams={[]}
-        myTeamId={null}
-        onTeam={jest.fn()}
-      />,
-    );
-    const hexRow = screen.getByText('Hex Team').closest('tr');
-    const unsafeRow = screen.getByText('Unsafe Team').closest('tr');
-    expect(hexRow).not.toBeNull();
-    expect(unsafeRow).not.toBeNull();
-    const hexAvatar = (hexRow as HTMLElement).querySelector('.ls-avatar');
-    const unsafeAvatar = (unsafeRow as HTMLElement).querySelector('.ls-avatar');
-    expect((hexAvatar as HTMLElement).style.background).toBe('rgb(255, 0, 51)');
-    expect((unsafeAvatar as HTMLElement).style.background).toBe('');
-  });
-
-  it('renders the empty-state message when no standings and no teams', () => {
+  it('passes an empty array when there are no standings and no teams', () => {
     mockStandings = [];
     render(
       <StandingsTab
@@ -193,12 +140,10 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(
-      screen.getByText('No teams have joined this league yet.'),
-    ).toBeInTheDocument();
+    expect(lastProps().standings).toHaveLength(0);
   });
 
-  it('shows football subtitle "Sorted by W, then PF" for football leagues', () => {
+  it('shows a football subtitle for football leagues', () => {
     mockStandings = [makeRow()];
     render(
       <StandingsTab
@@ -208,10 +153,10 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(screen.getByText(/Sorted by W, then PF/)).toBeInTheDocument();
+    expect(lastProps().subtitle).toMatch(/then PF/);
   });
 
-  it('shows baseball subtitle "Sorted by win percentage" for baseball leagues', () => {
+  it('shows a baseball subtitle for baseball leagues', () => {
     mockStandings = [makeRow()];
     render(
       <StandingsTab
@@ -221,6 +166,37 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(screen.getByText(/Sorted by win percentage/)).toBeInTheDocument();
+    expect(lastProps().subtitle).toMatch(/Sorted by win percentage$/);
+  });
+
+  it('renders the playoff bracket section when a bracket is present', () => {
+    mockStandings = [makeRow()];
+    mockBracket = { matchups: [], status: 'pending', championTeam: null };
+    render(
+      <StandingsTab
+        league={league}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Playoff Bracket')).toBeInTheDocument();
+    expect(
+      screen.getByText('Playoff bracket has not been set yet.'),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the playoff bracket section when no bracket and playoffs disabled', () => {
+    mockStandings = [makeRow()];
+    mockBracket = null;
+    render(
+      <StandingsTab
+        league={league}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(screen.queryByText('Playoff Bracket')).not.toBeInTheDocument();
   });
 });

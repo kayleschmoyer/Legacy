@@ -201,4 +201,43 @@ describe('StandingsTable', () => {
     expect(getByText('Cyclones')).toBeTruthy();
     expect(getByText('Blaze')).toBeTruthy();
   });
+
+  it('renders the point differential (Diff = PF − PA)', () => {
+    const { getByText } = render(<StandingsTable standings={mockStandings} />);
+
+    // Thunder: 1250.5 − 1100.2 = +150.3
+    expect(getByText('+150.3')).toBeTruthy();
+  });
+
+  it('shows a "You" chip on the current user row', () => {
+    const { getByText } = render(
+      <StandingsTable standings={mockStandings} currentUserTeamId={1} />,
+    );
+    expect(getByText('You')).toBeTruthy();
+  });
+
+  it('does not show a "You" chip when no current user is set', () => {
+    const { queryByText } = render(
+      <StandingsTable standings={mockStandings} />,
+    );
+    expect(queryByText('You')).toBeNull();
+  });
+
+  it('invokes onTeamPress with the numeric team id when a row is pressed', () => {
+    const onTeamPress = jest.fn();
+    const { getByText } = render(
+      <StandingsTable standings={mockStandings} onTeamPress={onTeamPress} />,
+    );
+
+    fireEvent.click(getByText('Thunder'));
+    expect(onTeamPress).toHaveBeenCalledWith(1);
+  });
+
+  it('renders an optional subtitle', () => {
+    const { getByText } = render(
+      <StandingsTable standings={mockStandings} subtitle="3 teams" />,
+    );
+
+    expect(getByText('3 teams')).toBeTruthy();
+  });
 });

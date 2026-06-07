@@ -494,6 +494,7 @@ export default function FootballLeagueId(): React.JSX.Element {
                 standings={standings}
                 loading={standingsLoading}
                 error={standingsError}
+                currentUserTeamId={userTeamId ?? null}
               />
               {playoffBracket ? (
                 <PlayoffBracket bracket={playoffBracket} />
