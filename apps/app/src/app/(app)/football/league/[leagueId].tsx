@@ -16,6 +16,7 @@ import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
+  PendingTradeOfferBanner,
   PendingWaiverClaims,
   StandingsTable,
   TradingCenter,
@@ -295,6 +296,14 @@ export default function FootballLeagueId(): React.JSX.Element {
 
   return (
     <YStack flex={1}>
+      {userTeamId != null && (
+        <YStack paddingHorizontal="$2" paddingTop="$2">
+          <PendingTradeOfferBanner
+            teamId={userTeamId}
+            onReview={() => setSelectedTab('trades')}
+          />
+        </YStack>
+      )}
       <Tabs
         value={selectedTab}
         onValueChange={setSelectedTab}

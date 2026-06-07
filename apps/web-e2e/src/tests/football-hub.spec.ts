@@ -613,9 +613,9 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
     ).toBeVisible({ timeout: 10000 });
 
     await page.goto('/baseball');
-    await expect(
-      page.locator('[aria-label="Baseball fantasy landing page"]'),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('baseball-screen')).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('primary navigation is visible on the football hub', async ({

@@ -97,6 +97,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     LeagueDuesPaymentStatus: () => <View testID="league-dues-payment-status" />,
     LeagueScoringSummary: () => <View testID="league-scoring-summary" />,
     OnThisDayFeed: () => <View testID="on-this-day-feed" />,
+    PendingTradeOfferBanner: () => <View testID="pending-trade-offer-banner" />,
     PendingWaiverClaims: () => <View testID="pending-waiver-claims" />,
     StandingsTable: () => <View testID="standings-table" />,
     TradingCenter: () => <View testID="trading-center" />,

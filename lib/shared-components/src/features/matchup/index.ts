@@ -8,6 +8,7 @@ export * from './MatchupRecapPanel';
 export * from './LeagueTradeBlock';
 export * from './StandingsTable';
 export * from './PendingTradeOffers';
+export * from './PendingTradeOfferBanner';
 export * from './PendingWaiverClaims';
 export * from './MatchupNavigationControls';
 export * from './MatchupDetailLayout';

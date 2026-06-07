@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { PendingTradeOfferBanner } from './PendingTradeOfferBanner';
+import { useNavigate } from 'react-router-dom';
+import { PendingTradeOfferBanner } from '@legacy-sports/shared-components';
 import {
   type LeagueFragment,
   type LeaguePositionFragment,
@@ -32,6 +33,7 @@ const WeekChip: React.FC<{
 );
 
 export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
+  const navigate = useNavigate();
   const { data: positionsData } = useGetPositionsForLeagueQuery({
     variables: { leagueId: league.id ?? 0 },
     skip: !league.id,
@@ -178,7 +180,10 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       )}
 
       {isCurrent && league.id != null && (
-        <PendingTradeOfferBanner leagueId={league.id} myTeamId={myTeamId} />
+        <PendingTradeOfferBanner
+          teamId={myTeamId}
+          onReview={() => navigate(`/baseball/league/${league.id}/trades`)}
+        />
       )}
 
       {isCurrent && <PendingWaiverClaims teamId={myTeamId} />}
