@@ -5,7 +5,6 @@ import {
   H2,
   H3,
   ScrollView,
-  Separator,
   Spinner,
   Text,
   XStack,
@@ -70,7 +69,7 @@ export function NotificationsScreen({
       markAsRead(Number(notification.id)).catch((err: unknown) => {
         LOGGER.warn(
           'Failed to mark notification as read:',
-          err instanceof Error ? err.message : String(err),
+          err instanceof Error ? err : String(err),
         );
       });
     }
@@ -89,7 +88,7 @@ export function NotificationsScreen({
     markAllAsRead().catch((err: unknown) => {
       LOGGER.warn(
         'Failed to mark all notifications as read:',
-        err instanceof Error ? err.message : String(err),
+        err instanceof Error ? err : String(err),
       );
     });
   };
@@ -188,14 +187,50 @@ export function NotificationsScreen({
     );
   }
 
+  // Responsive two-pane layout (AC2): on web the original NotificationsPage was
+  // a constrained, centered column rather than a single mobile-first stripe. We
+  // keep the mobile-first single column by default and, on wide viewports
+  // (`$gtMd` ≈ ≥1021px), split into a ~1.15fr / 1fr two-pane layout — the
+  // notification list (main) beside the preferences panel (aside) — mirroring
+  // the original web grid that collapsed to one column on narrow screens. The
+  // container only widens past the comfortable reading width when there is an
+  // aside to place next to it, so a preferences-less view stays centered.
+  const preferencesPanel = preferences ? (
+    <YStack
+      borderRadius="$6"
+      borderWidth={1}
+      borderColor="$borderColor"
+      overflow="hidden"
+    >
+      <XStack
+        paddingHorizontal="$5"
+        paddingVertical="$4"
+        alignItems="center"
+        borderBottomWidth={1}
+        borderBottomColor="$borderColor"
+      >
+        <H3 color="$color">Notification Preferences</H3>
+      </XStack>
+      <YStack padding="$4">
+        <NotificationSettings
+          preferences={preferences}
+          onUpdate={updatePreferences}
+          loading={updatingPreferences}
+        />
+      </YStack>
+    </YStack>
+  ) : null;
+
   return (
     <YStack flex={1} backgroundColor="$background">
       <ScrollView>
         <YStack
           width="100%"
           maxWidth={760}
+          $gtMd={{ maxWidth: preferencesPanel ? 1140 : 760 }}
           alignSelf="center"
-          padding="$5"
+          padding="$4"
+          $gtSm={{ padding: '$5' }}
           gap="$5"
         >
           <YStack gap="$2">
@@ -222,36 +257,30 @@ export function NotificationsScreen({
             </Text>
           </YStack>
 
-          {body}
-
-          {preferences && (
-            <YStack gap="$3">
-              <Separator />
-              <YStack
-                borderRadius="$6"
-                borderWidth={1}
-                borderColor="$borderColor"
-                overflow="hidden"
-              >
-                <XStack
-                  paddingHorizontal="$5"
-                  paddingVertical="$4"
-                  alignItems="center"
-                  borderBottomWidth={1}
-                  borderBottomColor="$borderColor"
-                >
-                  <H3 color="$color">Notification Preferences</H3>
-                </XStack>
-                <YStack padding="$4">
-                  <NotificationSettings
-                    preferences={preferences}
-                    onUpdate={updatePreferences}
-                    loading={updatingPreferences}
-                  />
-                </YStack>
-              </YStack>
+          <YStack
+            gap="$5"
+            $gtMd={{ flexDirection: 'row', alignItems: 'flex-start' }}
+          >
+            <YStack
+              gap="$5"
+              $gtMd={{ flexGrow: 1.15, flexShrink: 1, flexBasis: 0 }}
+            >
+              {body}
             </YStack>
-          )}
+
+            {preferencesPanel && (
+              <YStack
+                $gtMd={{
+                  flexGrow: 1,
+                  flexShrink: 1,
+                  flexBasis: 0,
+                  maxWidth: 380,
+                }}
+              >
+                {preferencesPanel}
+              </YStack>
+            )}
+          </YStack>
         </YStack>
       </ScrollView>
     </YStack>

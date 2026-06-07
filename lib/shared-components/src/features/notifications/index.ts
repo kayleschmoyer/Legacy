@@ -6,3 +6,9 @@ export type { NotificationListProps } from './components/NotificationList';
 export { NotificationSettings } from './components/NotificationSettings';
 export type { NotificationSettingsProps } from './components/NotificationSettings';
 export { useNotifications } from './hooks/useNotifications';
+export {
+  dayKey,
+  daySeparatorLabel,
+  groupNotificationsByDay,
+} from './utils/dayGrouping';
+export type { DayGroup, DayGroupable } from './utils/dayGrouping';

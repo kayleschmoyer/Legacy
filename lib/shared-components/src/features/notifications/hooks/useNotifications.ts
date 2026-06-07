@@ -147,7 +147,10 @@ export function useNotifications(
           },
         });
       } catch (error) {
-        LOGGER.error('Error updating notification preferences:', String(error));
+        LOGGER.error(
+          'Error updating notification preferences:',
+          error instanceof Error ? error : String(error),
+        );
         throw error;
       }
     },
@@ -161,7 +164,10 @@ export function useNotifications(
           variables: { notificationId },
         });
       } catch (error) {
-        LOGGER.error('Error marking notification as read:', String(error));
+        LOGGER.error(
+          'Error marking notification as read:',
+          error instanceof Error ? error : String(error),
+        );
         throw error;
       }
     },
@@ -172,7 +178,10 @@ export function useNotifications(
     try {
       await markAllAsReadMutation();
     } catch (error) {
-      LOGGER.error('Error marking all notifications as read:', String(error));
+      LOGGER.error(
+        'Error marking all notifications as read:',
+        error instanceof Error ? error : String(error),
+      );
       throw error;
     }
   }, [markAllAsReadMutation]);
