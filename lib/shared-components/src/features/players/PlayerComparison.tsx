@@ -401,6 +401,10 @@ function PlayerSearchInput({
             aria-label="Search players to compare"
             accessibilityLabel="Search players to compare"
             editable={!disabled}
+            // RN's `editable={false}` renders as `readonly`, not `disabled`, so
+            // expose the disabled state to assistive tech (and Playwright's
+            // toBeDisabled) explicitly when at max capacity (LS-7843).
+            aria-disabled={disabled || undefined}
             value={query}
             onChangeText={(text) => {
               setQuery(text);
@@ -1108,6 +1112,7 @@ function SeasonBattingBlock({
       {!loading && rows.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View
+            role="table"
             aria-label={`Season batting for ${player.name}`}
             style={{ minWidth: 580 }}
           >
@@ -1156,6 +1161,7 @@ function SeasonBattingBlock({
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View
+              role="table"
               aria-label={`Season pitching for ${player.name}`}
               style={{ minWidth: 480 }}
             >

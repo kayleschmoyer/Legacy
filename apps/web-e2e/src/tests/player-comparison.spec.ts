@@ -558,8 +558,13 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
   freeUserTest(
     'shows upgrade button in premium gate overlay',
     async ({ page }) => {
+      // Scope to the gate overlay: the blurred PlayerComparison behind it also
+      // renders an "Upgrade" pill (shared-components inline banner), so an
+      // unscoped /upgrade/i button query is ambiguous (LS-7843).
       await expect(
-        page.getByRole('button', { name: /upgrade/i }),
+        page
+          .getByTestId('premium-feature-gate')
+          .getByRole('button', { name: /upgrade/i }),
       ).toBeVisible();
     },
   );
