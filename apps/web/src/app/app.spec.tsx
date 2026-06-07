@@ -235,12 +235,6 @@ jest.mock('../components/baseball', () => ({
   BaseballScreen: () => <div>Baseball Screen</div>,
 }));
 
-// Mock football screen (kept for FootballLandingPage usage elsewhere)
-jest.mock('../components/football', () => ({
-  FootballScreen: () => <div>Football Screen</div>,
-  FootballLandingPage: () => <div>Football Screen</div>,
-}));
-
 // Mock football hub page (used for /football route)
 jest.mock('../pages/football/FootballHubPage', () => ({
   FootballHubPage: () => <div>Football Hub</div>,
