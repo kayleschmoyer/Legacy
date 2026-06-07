@@ -82,8 +82,13 @@ test.describe('PremiumGate — free user @critical', () => {
       await page.goto('/players/compare');
       await page.waitForLoadState('load');
 
-      // The lock overlay card should be visible
-      const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
+      // The lock overlay card should be visible. Target the gate's CTA by its
+      // full label "Upgrade to Premium" — the gated PlayerComparison content
+      // also renders an inline "Upgrade" pill (LS-7804), so a bare /upgrade/i
+      // match is ambiguous and would resolve to that inert, blurred pill first.
+      const upgradeBtn = page
+        .getByRole('button', { name: /upgrade to premium/i })
+        .first();
       await expect(upgradeBtn).toBeVisible();
     },
   );
@@ -101,7 +106,12 @@ test.describe('PremiumGate — free user @critical', () => {
       await page.goto('/players/compare');
       await page.waitForLoadState('load');
 
-      const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
+      // Click the gate's CTA specifically — see the note above on why the bare
+      // /upgrade/i selector is ambiguous now that the gated content renders an
+      // inline "Upgrade" pill.
+      const upgradeBtn = page
+        .getByRole('button', { name: /upgrade to premium/i })
+        .first();
       await upgradeBtn.click();
 
       // UpgradeModal should be visible — check for the modal title heading
@@ -134,9 +144,11 @@ test.describe('PremiumGate — free user @critical', () => {
       await page.goto('/players/compare');
       await page.waitForLoadState('load');
 
-      // Open the UpgradeModal via the PremiumGate overlay
+      // Open the UpgradeModal via the PremiumGate overlay. Match the gate CTA by
+      // its full "Upgrade to Premium" label so we don't hit the inline "Upgrade"
+      // pill inside the gated PlayerComparison content (LS-7804).
       await page
-        .getByRole('button', { name: /upgrade/i })
+        .getByRole('button', { name: /upgrade to premium/i })
         .first()
         .click();
       await expect(
