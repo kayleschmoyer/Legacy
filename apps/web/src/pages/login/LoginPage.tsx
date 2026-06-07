@@ -277,7 +277,18 @@ export function LoginPage(): React.JSX.Element {
         // getter throwing from a hot-swapped config) is still caught and the
         // `finally` below resets the loading state — otherwise the Discord
         // button would stay disabled forever (LS-6687).
-        const oauthProxyUrl = config.oauthProxyUrl ?? 'http://localhost:5001';
+        //
+        // LGN-010 (LS-6665): never fall back to an `http://localhost:5001`
+        // proxy. If `oauthProxyUrl` were ever undefined in production (e.g. an
+        // environment-config bug), that fallback would POST the OAuth code over
+        // plaintext http, opening a MITM path to plant a forged JWT whose
+        // unverified payload claims the UI then trusts (accessLevel gating).
+        // Hard-fail instead — this mirrors the guard already in
+        // handleDiscordSignIn, which refuses to start the flow without a proxy.
+        const oauthProxyUrl = config.oauthProxyUrl;
+        if (!oauthProxyUrl) {
+          throw new Error('Discord sign-in is not configured.');
+        }
 
         const response = await fetch(`${oauthProxyUrl}/discord`, {
           method: 'POST',

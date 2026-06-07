@@ -196,6 +196,64 @@ describe('LoginPage Discord callback — synchronous config fault (LS-6687)', ()
   });
 });
 
+describe('LoginPage Discord callback — missing oauthProxyUrl hard-fail (LGN-010 / LS-6665)', () => {
+  const ORIGINAL_URL = window.location.href;
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    window.history.replaceState({}, '', ORIGINAL_URL);
+  });
+
+  it('does not POST to a localhost fallback and surfaces an error when oauthProxyUrl is missing', async () => {
+    // Production-config bug: discordClientId is present (so the callback effect
+    // runs) but oauthProxyUrl is undefined. The callback must hard-fail rather
+    // than fall back to http://localhost:5001 and POST the OAuth code in the
+    // clear (the MITM injection vector described in LGN-010).
+    mockAuthConfig = {
+      googleClientId: 'test-client-id',
+      discordClientId: 'test-discord-id',
+      // oauthProxyUrl intentionally omitted
+    };
+
+    const fetchSpy = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(''),
+        json: () => Promise.resolve({ jwt: 'header.payload.sig' }),
+      }),
+    ) as unknown as typeof fetch;
+    global.fetch = fetchSpy;
+
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/discord/callback?code=abc&state=xyz',
+    );
+
+    renderPage();
+
+    // The callback must error out cleanly — never POST anywhere.
+    await waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Discord callback exchange failed:',
+        expect.any(Error),
+      );
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/discord sign-in is not configured/i),
+    ).toBeTruthy();
+    // The Discord button must recover — never stuck in the "Connecting…" state.
+    await waitFor(() => {
+      const discordBtn = screen.getByRole('button', {
+        name: /continue with discord/i,
+      });
+      expect(discordBtn).not.toBeDisabled();
+    });
+  });
+});
+
 describe('LoginPage handleSignIn catch block', () => {
   it('does not log an error or show a message when the user cancels the popup', async () => {
     const cancelledError = Object.assign(
