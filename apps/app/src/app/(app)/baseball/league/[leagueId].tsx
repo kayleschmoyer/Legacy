@@ -33,6 +33,7 @@ import {
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
+  useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
@@ -182,6 +183,7 @@ export default function LeagueId(): React.JSX.Element {
   );
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
+  const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
   // Check if user is league owner/commissioner
   const isCommissioner = useMemo(() => {
@@ -338,6 +340,32 @@ export default function LeagueId(): React.JSX.Element {
     [updateTeamMemberPosition, teamMembersData],
   );
 
+  const handlePlayerSwap = useCallback(
+    async (
+      incoming: TeamMemberFragment,
+      target: LeaguePositionFragment,
+      displaced: TeamMemberFragment,
+    ) => {
+      if (typeof incoming.id !== 'number' || typeof displaced.id !== 'number') {
+        handleError(new Error('Missing team member identifier'));
+        return;
+      }
+      try {
+        await swapTeamMemberPositions({
+          variables: {
+            teamMemberIdA: incoming.id,
+            positionIdA: target.id ?? undefined,
+            teamMemberIdB: displaced.id,
+            positionIdB: incoming.positionId ?? undefined,
+          },
+        });
+      } catch (error) {
+        handleError(error);
+      }
+    },
+    [swapTeamMemberPositions],
+  );
+
   const rankedStandings = useMemo(() => {
     const formatRecord = (
       w: number | null | undefined,
@@ -458,7 +486,14 @@ export default function LeagueId(): React.JSX.Element {
             onPlayerRemove={(position) => {
               void handlePlayerRemove(position);
             }}
+            onPlayerSwap={(incoming, target, displaced) => {
+              void handlePlayerSwap(incoming, target, displaced);
+            }}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
+            leagueId={numLeagueId}
+            currentWeek={league?.currentWeekNumber}
+            totalWeeks={league?.totalMatchups}
+            myTeamId={userTeamId}
           />
         </YStack>
       )}

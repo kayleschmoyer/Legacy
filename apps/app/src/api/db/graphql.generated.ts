@@ -7168,6 +7168,34 @@ export type UpdateTeamMemberPositionMutation = {
   } | null;
 };
 
+export type SwapTeamMemberPositionsMutationVariables = Exact<{
+  teamMemberIdA: Scalars['Int']['input'];
+  positionIdA?: InputMaybe<Scalars['Int']['input']>;
+  teamMemberIdB: Scalars['Int']['input'];
+  positionIdB?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SwapTeamMemberPositionsMutation = {
+  __typename?: 'Mutation';
+  swapTeamMemberPositions?: Array<{
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    onTradeBlock?: boolean | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  }> | null;
+};
+
 export type SetTradeBlockMutationVariables = Exact<{
   teamMemberId: Scalars['Int']['input'];
   onTradeBlock: Scalars['Boolean']['input'];
@@ -13309,6 +13337,70 @@ export type UpdateTeamMemberPositionMutationResult =
 export type UpdateTeamMemberPositionMutationOptions = BaseMutationOptions<
   UpdateTeamMemberPositionMutation,
   UpdateTeamMemberPositionMutationVariables
+>;
+export const SwapTeamMemberPositions = gql`
+  mutation SwapTeamMemberPositions(
+    $teamMemberIdA: Int!
+    $positionIdA: Int
+    $teamMemberIdB: Int!
+    $positionIdB: Int
+  ) {
+    swapTeamMemberPositions(
+      teamMemberIdA: $teamMemberIdA
+      positionIdA: $positionIdA
+      teamMemberIdB: $teamMemberIdB
+      positionIdB: $positionIdB
+    ) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+export type SwapTeamMemberPositionsMutationFn = MutationFunction<
+  SwapTeamMemberPositionsMutation,
+  SwapTeamMemberPositionsMutationVariables
+>;
+
+/**
+ * __useSwapTeamMemberPositionsMutation__
+ *
+ * To run a mutation, you first call `useSwapTeamMemberPositionsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSwapTeamMemberPositionsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [swapTeamMemberPositionsMutation, { data, loading, error }] = useSwapTeamMemberPositionsMutation({
+ *   variables: {
+ *      teamMemberIdA: // value for 'teamMemberIdA'
+ *      positionIdA: // value for 'positionIdA'
+ *      teamMemberIdB: // value for 'teamMemberIdB'
+ *      positionIdB: // value for 'positionIdB'
+ *   },
+ * });
+ */
+export function useSwapTeamMemberPositionsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SwapTeamMemberPositionsMutation,
+    SwapTeamMemberPositionsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SwapTeamMemberPositionsMutation,
+    SwapTeamMemberPositionsMutationVariables
+  >(SwapTeamMemberPositions, options);
+}
+export type SwapTeamMemberPositionsMutationHookResult = ReturnType<
+  typeof useSwapTeamMemberPositionsMutation
+>;
+export type SwapTeamMemberPositionsMutationResult =
+  Apollo.MutationResult<SwapTeamMemberPositionsMutation>;
+export type SwapTeamMemberPositionsMutationOptions = BaseMutationOptions<
+  SwapTeamMemberPositionsMutation,
+  SwapTeamMemberPositionsMutationVariables
 >;
 export const SetTradeBlock = gql`
   mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {

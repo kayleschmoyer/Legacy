@@ -285,11 +285,11 @@ test.describe('Roster Management – player data @regression', () => {
 
   test('shows SP position type label', async ({ page }) => {
     // The Starting Pitchers section contains the SP slot. Scope to that card
-    // (RosterBoardV2 Section → div.ls-card) to avoid collisions with other "SP"
-    // text elsewhere on the page.
-    const pitchersCard = page.locator('.ls-card').filter({
-      has: page.getByRole('heading', { name: 'Starting Pitchers' }),
-    });
+    // (RosterBoard SectionCard → data-testid="roster-section-pitchers") to avoid
+    // collisions with other "SP" text elsewhere on the page.
+    const pitchersCard = page.locator(
+      '[data-testid="roster-section-pitchers"]',
+    );
     await expect(
       pitchersCard.getByText('SP', { exact: true }).first(),
     ).toBeVisible();

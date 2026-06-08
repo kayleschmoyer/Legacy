@@ -286,6 +286,7 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
     mockGetUserTeamIdLazyQuery(...args),
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUpdateTeamMemberPositionMutation(...args),
+  useSwapTeamMemberPositionsMutation: () => [jest.fn()],
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

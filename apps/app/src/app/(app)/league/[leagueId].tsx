@@ -38,6 +38,7 @@ import {
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
   useStartDraftMutation,
+  useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../features/roster/LeagueRosterManagement';
@@ -214,6 +215,7 @@ export default function LeagueContext(): React.JSX.Element {
   } = useStandings(isNaN(numLeagueId) ? null : numLeagueId);
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
+  const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
   const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
     refetchQueries: ['GetLeagueById'],
@@ -336,6 +338,32 @@ export default function LeagueContext(): React.JSX.Element {
     [updateTeamMemberPosition, teamMembersData],
   );
 
+  const handlePlayerSwap = useCallback(
+    async (
+      incoming: TeamMemberFragment,
+      target: LeaguePositionFragment,
+      displaced: TeamMemberFragment,
+    ) => {
+      if (typeof incoming.id !== 'number' || typeof displaced.id !== 'number') {
+        handleError(new Error('Missing team member identifier'));
+        return;
+      }
+      try {
+        await swapTeamMemberPositions({
+          variables: {
+            teamMemberIdA: incoming.id,
+            positionIdA: target.id ?? undefined,
+            teamMemberIdB: displaced.id,
+            positionIdB: incoming.positionId ?? undefined,
+          },
+        });
+      } catch (error) {
+        handleError(error);
+      }
+    },
+    [swapTeamMemberPositions],
+  );
+
   const matchupPathname =
     sport === 'football' ? '/football/matchup' : '/baseball/matchup';
 
@@ -421,7 +449,14 @@ export default function LeagueContext(): React.JSX.Element {
             onPlayerRemove={(position) => {
               void handlePlayerRemove(position);
             }}
+            onPlayerSwap={(incoming, target, displaced) => {
+              void handlePlayerSwap(incoming, target, displaced);
+            }}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
+            leagueId={numLeagueId}
+            currentWeek={league?.currentWeekNumber}
+            totalWeeks={league?.totalMatchups}
+            myTeamId={userTeamId}
           />
         </Tabs.Content>
 

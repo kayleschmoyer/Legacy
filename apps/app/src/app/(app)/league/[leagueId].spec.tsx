@@ -220,6 +220,7 @@ jest.mock('../../../api/db/graphql.generated', () => ({
   ],
   useStartDraftMutation: () => [jest.fn(), { loading: false }],
   useUpdateTeamMemberPositionMutation: () => [jest.fn()],
+  useSwapTeamMemberPositionsMutation: () => [jest.fn()],
 }));
 
 const mockUseAuthorizedUserInfo = jest.fn(() => ({
