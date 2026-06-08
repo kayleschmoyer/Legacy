@@ -1,0 +1,185 @@
+import React from 'react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+
+import TradeCenterPage from './TradeCenterPage';
+
+// ── Configurable mock state ──────────────────────────────────────────────────
+let mockUserLeagues: unknown;
+let mockUserTeamId: number | null;
+let mockLeague: unknown;
+
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({}),
+  Redirect: () => null,
+}));
+
+jest.mock('../../common/auth/AuthorizedUserContext', () => ({
+  useAuthorizedUserInfo: () => ({ id: 1, email: 'test@example.com' }),
+}));
+
+jest.mock('../../common/auth/AuthHooks', () => ({
+  readKeychainValue: jest.fn().mockResolvedValue('mock-token'),
+  Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
+}));
+
+jest.mock('../../api/db/graphql.generated', () => ({
+  useGetUserLeaguesQuery: () => ({
+    data: mockUserLeagues,
+    loading: false,
+    error: undefined,
+    refetch: jest.fn(),
+  }),
+  useGetUserTeamIdQuery: () => ({
+    data: { userTeamId: mockUserTeamId },
+    loading: false,
+  }),
+  useGetLeagueByIdQuery: () => ({ data: mockLeague, loading: false }),
+}));
+
+jest.mock('@legacy-sports/shared-components', () => {
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    TradingCenter: ({ leagueId }: { leagueId: number }) => (
+      <View testID={`trading-center-${leagueId}`} />
+    ),
+    useWebSocket: jest.fn().mockReturnValue({ connected: false }),
+  };
+});
+
+jest.mock('@legacy-sports/app-config/native', () => ({
+  config: { websocketUrl: 'wss://example.com' },
+}));
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: { error: jest.fn(), warn: jest.fn() },
+}));
+
+jest.mock('tamagui', () => {
+  const { View, Text, Pressable } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Card: ({
+      children,
+      onPress,
+      ...rest
+    }: {
+      children: React.ReactNode;
+      onPress?: () => void;
+      [key: string]: unknown;
+    }) => (
+      <Pressable onPress={onPress} {...(rest as object)}>
+        {children}
+      </Pressable>
+    ),
+    Spinner: () => <View testID="spinner" />,
+    Text: ({
+      children,
+      onPress,
+      ...rest
+    }: {
+      children: React.ReactNode;
+      onPress?: () => void;
+      [key: string]: unknown;
+    }) => (
+      <Text onPress={onPress} {...(rest as object)}>
+        {children}
+      </Text>
+    ),
+    XStack: ({ children }: { children: React.ReactNode }) => (
+      <View>{children}</View>
+    ),
+    YStack: ({ children }: { children: React.ReactNode }) => (
+      <View>{children}</View>
+    ),
+    ScrollView: ({ children }: { children: React.ReactNode }) => (
+      <View>{children}</View>
+    ),
+  };
+});
+
+jest.mock('@tamagui/lucide-icons', () => ({
+  ArrowLeftRight: () => null,
+  ChevronLeft: () => null,
+  RefreshCw: () => null,
+  Users: () => null,
+}));
+
+jest.mock('./_screenErrorBoundary', () => ({
+  ScreenErrorBoundary: () => null,
+}));
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  mockUserLeagues = undefined;
+  mockUserTeamId = null;
+  mockLeague = undefined;
+});
+
+describe('TradeCenterPage', () => {
+  it('renders without crashing', () => {
+    render(<TradeCenterPage />);
+  });
+
+  it('renders the Trade Center heading', () => {
+    render(<TradeCenterPage />);
+    expect(screen.getByText(/Trade Center/i)).toBeTruthy();
+  });
+
+  it('renders the league selection prompt', () => {
+    render(<TradeCenterPage />);
+    expect(screen.getByText(/Select a league/i)).toBeTruthy();
+  });
+
+  it('renders an empty state when no leagues are returned', () => {
+    mockUserLeagues = { userLeagues: [] };
+    render(<TradeCenterPage />);
+    expect(screen.getByText(/No leagues found/i)).toBeTruthy();
+  });
+
+  it('renders league cards when leagues are returned', () => {
+    mockUserLeagues = {
+      userLeagues: [
+        { id: 1, name: 'Test League A' },
+        { id: 2, name: 'Test League B' },
+      ],
+    };
+    render(<TradeCenterPage />);
+    expect(screen.getByLabelText('View trades for Test League A')).toBeTruthy();
+    expect(screen.getByLabelText('View trades for Test League B')).toBeTruthy();
+  });
+
+  it('navigates into league trades when a league card is pressed', async () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-center-1')).toBeTruthy();
+    });
+  });
+
+  it('shows the non-member state when user has no team in the selected league', async () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserTeamId = null;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/not a member/i)).toBeTruthy();
+    });
+  });
+});

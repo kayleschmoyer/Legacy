@@ -218,6 +218,11 @@ const StandingsRedirectPage = lazyWithRetry(() =>
   })),
 );
 const DonatePage = lazyWithRetry(() => import('../pages/donate/DonatePage'));
+const TradeCenterPage = lazyWithRetry(() =>
+  import('../pages/trade-center/TradeCenterPage').then((m) => ({
+    default: m.TradeCenterPage,
+  })),
+);
 
 /* ────────────────────────────────────────────────────────
  * Nav – styled components
@@ -703,6 +708,7 @@ function App() {
               element={<TwentyQuestionsPage />}
             />
             <Route path="/donate" element={<DonatePage />} />
+            <Route path="/trade-center" element={<TradeCenterPage />} />
             {/* /draft/mock is a legacy alias — redirect to the canonical route. */}
             <Route
               path="/draft/mock"
