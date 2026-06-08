@@ -411,13 +411,6 @@ test.describe
     commissionerPage: page,
     commissionerJwt,
   }) => {
-    // LS-5054 / LS-5051 — see comment on Phase 5 of league-activity-feed-ui.
-    // V2 web Trades tab lacks both `trade-center-heading` and the Propose
-    // Trade dialog. Re-enable Phases 5–9 when LS-5055 lands the V2 UI.
-    test.fixme(
-      true,
-      'V2 web Trades tab lacks Propose Trade UI — tracked in LS-5055',
-    );
     await test.step('Navigate to Trades tab', async () => {
       await goToTrades(page, state.leagueId);
     });
@@ -493,7 +486,6 @@ test.describe
     managerPage1,
     commissionerJwt,
   }) => {
-    test.fixme(true, 'Depends on Phase 5 — see LS-5055');
     // Dedicated managerPage1 context instead of switchUser — avoids the
     // AUTH_LOGOUT race documented in LS-3672/LS-3705/LS-3735 and fixed here
     // per LS-3767. The commissioner's browser context is untouched.
@@ -565,7 +557,6 @@ test.describe
     managerPage1,
     managerJwt1,
   }) => {
-    test.fixme(true, 'Depends on Phase 5 — see LS-5055');
     // Dedicated managerPage1 context (LS-3767) — no switchUser race.
     await test.step('Navigate to Trades tab as manager', async () => {
       await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
@@ -779,7 +770,6 @@ test.describe
     commissionerPage: page,
     commissionerJwt,
   }) => {
-    test.fixme(true, 'Depends on Phase 5 — see LS-5055');
     await test.step('Navigate to Trades tab as commissioner', async () => {
       await goToTrades(page, state.leagueId);
     });
@@ -847,7 +837,6 @@ test.describe
     commissionerPage: page,
     managerPage1,
   }) => {
-    test.fixme(true, 'Depends on Phase 5 — see LS-5055');
     await test.step('Commissioner sees accepted trade in Trade History', async () => {
       await goToTrades(page, state.leagueId);
 
