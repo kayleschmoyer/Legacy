@@ -8,6 +8,7 @@ This directory contains technical architecture documentation for the Legacy Spor
 
 - **[Multi-Sport Architecture](multi-sport.md)** - How baseball and football share a single data model; sport discriminator pattern; how to add a third sport
 - **[Build System](build-system.md)** - Nx monorepo, dependency management, and build workflows
+- **[Shared-Components Architecture](shared-components.md)** - The shared-components-first principle; Tamagui layering, entry points, and viewport-responsive patterns
 - **[Cross-Platform System](cross-platform-system.md)** - Magic strings and native module resolution
 - **[Mobile Navigation](mobile-navigation.md)** - Native app information architecture; the entity-noun tab bar and league-context model
 - **[Database Schema](database-schema.md)** - Complete database design and entity relationships
@@ -21,8 +22,9 @@ This directory contains technical architecture documentation for the Legacy Spor
 ### Start Here
 
 1. **[Build System](build-system.md)** - Learn how the monorepo works
-2. **[Cross-Platform System](cross-platform-system.md)** - Understand shared code strategy
-3. **[Database Schema](database-schema.md)** - Review data models
+2. **[Shared-Components Architecture](shared-components.md)** - Understand the UI sharing principle
+3. **[Cross-Platform System](cross-platform-system.md)** - Understand platform resolution (magic strings, `.native.ts`)
+4. **[Database Schema](database-schema.md)** - Review data models
 
 ### Key Concepts
 
@@ -100,7 +102,7 @@ See [GraphQL Integration](graphql-integration.md) for API design.
 
 ### How does code sharing work between web and mobile?
 
-See [Cross-Platform System](cross-platform-system.md) for the magic string resolution pattern that enables platform-specific imports.
+See [Shared-Components Architecture](shared-components.md) for the UI sharing principle, entry-point mechanism, and responsive strategy. See [Cross-Platform System](cross-platform-system.md) for the magic string resolution pattern that enables platform-specific imports.
 
 ### How is the build system organized?
 

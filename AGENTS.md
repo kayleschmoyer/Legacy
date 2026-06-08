@@ -60,6 +60,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **No suppression** — fix root causes; never use `@ts-ignore` or `eslint-disable` (see `.agents/skills/standards/SKILL.md`)
 - **E2E tests are hermetic** — never use `route.continue()` in `apps/web-e2e/src/tests/`. Use `route.fulfill()` for unmatched operations. **Exception**: `apps/web-e2e/src/integration/tests/` is a live-backend integration suite (config: `playwright.integration.config.ts`, `baseURL: api.legacy-fantasy.com`) — direct API calls via `page.request` are expected there and are not hermeticity violations. See `.agents/skills/testing/SKILL.md`.
 - **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`.
+- **Shared-components-first** — before building UI in `apps/web` or `apps/app`, check `lib/shared-components`; build cross-platform Tamagui components and adapt by viewport (media props / `useMedia`) rather than duplicating per platform — see `.agents/skills/shared-components-first/SKILL.md`.
 
 ## Task Completion Signal
 
@@ -131,6 +132,8 @@ Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scr
 `apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (19+ shared libraries) · `terraform/` · `.agents/skills/`
 
 The codebase supports **multiple sports** (baseball, football) under a single data model. Every league and player carries a `sport` discriminator (`'baseball' | 'football'`). Sport-specific stat tables, scoring rules, and position configs are gated on this field. See **[`docs/architecture/multi-sport.md`](docs/architecture/multi-sport.md)** for the full multi-sport design and [how to add a third sport](docs/architecture/multi-sport.md#how-to-add-a-third-sport).
+
+UI is built once in `lib/shared-components` (Tamagui) and consumed by both `apps/web` and `apps/app` via viewport-responsive props — never duplicated per platform. See **[`docs/architecture/shared-components.md`](docs/architecture/shared-components.md)** for the layering, entry-point mechanism, and responsive strategy.
 
 See `.agents/skills/architecture/SKILL.md` for system overview. For a fast capability → file path lookup (use before Glob sweeps): **`.agents/skills/architecture/FILE-MAP.md`**.
 
