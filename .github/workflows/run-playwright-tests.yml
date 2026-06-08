@@ -777,6 +777,121 @@ jobs:
           echo "**JSON:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/$DEST/test-results.json" >> $GITHUB_STEP_SUMMARY
           echo "**Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
+  # ===========================================================================
+  # Surface-map drift audit (LS-7850, detection child of LS-7848)
+  # ===========================================================================
+  # Consumes the per-shard spec→source-file coverage fragments (LS-7849), unions
+  # them across the matrix, and diffs observed coverage against BOTH surface maps
+  # (integration-surface-map.json + e2e-surface-map.json from LS-7846):
+  #   - UNDER-SELECTION (HIGH): a spec executed a file no glob accounts for —
+  #     flagged immediately (the new-source-file onboarding trigger).
+  #   - DEAD GLOB (LOW): a glob matched nothing for K consecutive nightlies —
+  #     a per-glob miss counter persisted in S3 across runs.
+  # Report-only: never mutates a map, never fails a PR (auto-remediation is the
+  # downstream LS-7851). Runs on the same conditions that produce fragments:
+  # nightly schedule, or manual dispatch with collect-coverage=true.
+  audit-coverage:
+    name: "Audit Surface-Map Coverage"
+    needs: [run-tests, notify-nightly-start]
+    if: ${{ !cancelled() && needs.run-tests.result != 'skipped' && (github.event_name == 'schedule' || inputs['collect-coverage']) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: "Download Coverage Fragments from S3"
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: download
+          name: playwright-coverage
+          path: all-coverage-fragments
+
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts
+          aws-region: us-east-1
+
+      - name: "Run Surface-Map Drift Audit"
+        id: audit
+        shell: bash
+        env:
+          # Cross-run dead-glob counters live under the ci-artifacts/ prefix the
+          # narrow OIDC role is scoped to (terraform/main/ci-artifacts.tf). The
+          # bucket expires every object after 3 days, but the nightly overwrites
+          # this key each run, refreshing its last-modified date — so the state
+          # survives as long as the nightly runs at least every 3 days. A longer
+          # gap simply resets the counters (conservative: it only delays
+          # dead-glob flags, never produces a false one).
+          STATE_KEY: "s3://legacy-sports-dev-ci-artifacts/ci-artifacts/coverage-audit-state/dead-glob-state.json"
+        run: |
+          mkdir -p coverage-audit-state
+          STATE_IN_ARGS=()
+          if aws s3 cp "$STATE_KEY" coverage-audit-state/state.json --quiet 2>/dev/null; then
+            echo "Loaded previous dead-glob state."
+            STATE_IN_ARGS=(--state-in coverage-audit-state/state.json)
+          else
+            echo "No previous dead-glob state — counters start fresh."
+          fi
+
+          node .github/scripts/coverage-audit/audit-coverage.mjs \
+            --fragments-dir all-coverage-fragments \
+            --e2e-map apps/web-e2e/src/e2e-surface-map.json \
+            --integration-map apps/web-e2e/src/integration/integration-surface-map.json \
+            "${STATE_IN_ARGS[@]}" \
+            --state-out coverage-audit-state/state.json \
+            --k 3 \
+            --report-md coverage-audit-report.md \
+            --discord-md coverage-audit-discord.md \
+            --github-output >> "$GITHUB_OUTPUT"
+
+          # Persist the updated counters for the next nightly (best-effort — a
+          # failed upload must not fail the audit; counters just reset next run).
+          if aws s3 cp coverage-audit-state/state.json "$STATE_KEY" --quiet; then
+            echo "Persisted dead-glob state."
+          else
+            echo "::warning::Failed to persist dead-glob state (counters reset next run)."
+          fi
+
+          # Full report to the job summary.
+          cat coverage-audit-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Build Discord Description"
+        id: discord
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo 'description<<EOF_COVERAGE_AUDIT'
+            if [ -f coverage-audit-discord.md ]; then
+              cat coverage-audit-discord.md
+            else
+              echo 'Surface-map coverage audit produced no report (no coverage fragments found).'
+            fi
+            echo 'EOF_COVERAGE_AUDIT'
+          } >> "$GITHUB_OUTPUT"
+
+      # Appends to the nightly Discord thread created by notify-nightly-start.
+      # Under-selection (HIGH) flips the embed to the failure colour so it stands
+      # out; dead globs (LOW) stay informational. This NEVER fails the job.
+      - name: "Discord Coverage Audit Results"
+        if: always()
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
+          status: ${{ steps.audit.outputs.has-under-selection == 'true' && 'failure' || 'success' }}
+          title: "Surface-Map Coverage Audit"
+          description: ${{ steps.discord.outputs.description }}
+          thread-id: ${{ needs.notify-nightly-start.outputs.thread-id }}
+
   # ---------------------------------------------------------------------------
   # Discord notification — fires after tests finish (schedule + manual dispatch)
   # ---------------------------------------------------------------------------
