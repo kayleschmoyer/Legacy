@@ -352,26 +352,52 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(page.getByText(/describe what happened/i)).toBeVisible();
   });
 
+  // The "Suggest a Feature" / "Community Discussions" contact cards open
+  // external links via `window.open(url, '_blank', 'noopener,noreferrer')`
+  // (HelpPage ContactOption). Asserting these with `page.waitForEvent('popup')`
+  // is the nightly-flake source LS-7859: a real popup (a) escapes the
+  // page-scoped API isolation and loads github.com over the network — a
+  // hermeticity violation — and (b) `window.open` with `noopener` does not
+  // reliably emit Playwright's `popup` event under load, so the wait
+  // intermittently times out. Intercept `window.open` to capture the intended
+  // URL deterministically and hermetically — the same pattern the
+  // "Join our Discord" test below already uses.
   test('Suggest a Feature option opens GitHub issues in a new tab', async ({
     page,
   }) => {
-    const [popup] = await Promise.all([
-      page.waitForEvent('popup'),
-      page.getByText('Suggest a Feature').click(),
-    ]);
-    await expect(popup).toHaveURL(/github\.com.*issues.*labels=enhancement/i);
-    await popup.close();
+    await page.evaluate(() => {
+      (window as unknown as Record<string, string>).__openedUrl = '';
+      window.open = ((url?: string | URL) => {
+        (window as unknown as Record<string, string>).__openedUrl = String(
+          url ?? '',
+        );
+        return null;
+      }) as typeof window.open;
+    });
+    await page.getByText('Suggest a Feature').click();
+    const openedUrl = await page.evaluate(
+      () => (window as unknown as Record<string, string>).__openedUrl,
+    );
+    expect(openedUrl).toMatch(/github\.com.*issues.*labels=enhancement/i);
   });
 
   test('Community Discussions option opens GitHub discussions in a new tab', async ({
     page,
   }) => {
-    const [popup] = await Promise.all([
-      page.waitForEvent('popup'),
-      page.getByText('Community Discussions').click(),
-    ]);
-    await expect(popup).toHaveURL(/github\.com.*discussions/i);
-    await popup.close();
+    await page.evaluate(() => {
+      (window as unknown as Record<string, string>).__openedUrl = '';
+      window.open = ((url?: string | URL) => {
+        (window as unknown as Record<string, string>).__openedUrl = String(
+          url ?? '',
+        );
+        return null;
+      }) as typeof window.open;
+    });
+    await page.getByText('Community Discussions').click();
+    const openedUrl = await page.evaluate(
+      () => (window as unknown as Record<string, string>).__openedUrl,
+    );
+    expect(openedUrl).toMatch(/github\.com.*discussions/i);
   });
 
   test('shows Join our Discord contact option', async ({ page }) => {
