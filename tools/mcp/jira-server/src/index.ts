@@ -349,6 +349,10 @@ server.tool(
 server.tool(
   'jira_transition',
   'Transition one or more tickets to a new status. Accepts a single key or an array of keys. ' +
+    'Supports forward (In Progress/In Review/Done) and backward (To Do/Backlog) transitions; ' +
+    "the transition id is resolved dynamically from the issue's available workflow transitions, " +
+    'and an actionable error listing the available targets is returned if the workflow disallows it ' +
+    '(e.g. resetting a stale-claim ticket from In Progress back to To Do). ' +
     'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
     'On Done, warns about open subtasks.',
   {

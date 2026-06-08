@@ -3,7 +3,13 @@ import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-export const VALID_STATUSES = ['In Progress', 'In Review', 'Done'] as const;
+export const VALID_STATUSES = [
+  'Backlog',
+  'To Do',
+  'In Progress',
+  'In Review',
+  'Done',
+] as const;
 export type ValidStatus = (typeof VALID_STATUSES)[number];
 
 interface TransitionParams {

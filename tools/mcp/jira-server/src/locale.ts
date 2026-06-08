@@ -10,6 +10,7 @@
  * by exact (case-insensitive) comparison, which the caller should try first.
  */
 const STATUS_ALIASES: Record<string, string[]> = {
+  backlog: ['待办列表', 'rückstand', 'pila de trabajo', 'lista de pendências'],
   'to do': ['待办', 'à faire', 'zu erledigen', 'por hacer', 'em aberto'],
   'in progress': [
     '正在进行',
