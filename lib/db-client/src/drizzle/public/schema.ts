@@ -18,4 +18,5 @@ export * from './models/Sports';
 export * from './models/Statistics';
 export * from './models/TwentyQuestionsGame';
 export * from './models/TwentyQuestionsQuestion';
+export * from './models/UserIdentities';
 export * from './models/Users';

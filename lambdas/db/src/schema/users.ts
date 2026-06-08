@@ -44,6 +44,73 @@ UserRef.implement({
   }),
 });
 
+// UserIdentity type (LS-7822) — one row per linked auth provider.
+// provider_account_id is intentionally NOT exposed: the provider's raw account
+// id never leaves the internal schema (the public.user_identities view omits it).
+export const UserIdentityRef = builder.objectRef<{
+  id: number;
+  userId: number;
+  provider: string;
+  providerEmail?: string | null;
+  providerEmailVerified: boolean;
+  providerUsername?: string | null;
+  providerAvatar?: string | null;
+  linkedAt: string;
+  lastLoginAt?: string | null;
+}>('UserIdentity');
+
+UserIdentityRef.implement({
+  description:
+    'A single authentication provider linked to a user (Discord, Google, Apple, or local password). The provider account id is never exposed.',
+  fields: (t) => ({
+    // id, userId, provider, providerEmailVerified, and linkedAt are NOT NULL in
+    // app_internal.user_identities, so they are exposed as non-nullable here.
+    id: t.exposeInt('id', { nullable: false }),
+    userId: t.exposeInt('userId', { nullable: false }),
+    provider: t.exposeString('provider', { nullable: false }),
+    providerEmail: t.exposeString('providerEmail', { nullable: true }),
+    providerEmailVerified: t.exposeBoolean('providerEmailVerified', {
+      nullable: false,
+    }),
+    providerUsername: t.exposeString('providerUsername', { nullable: true }),
+    providerAvatar: t.exposeString('providerAvatar', { nullable: true }),
+    linkedAt: t.exposeString('linkedAt', { nullable: false }),
+    lastLoginAt: t.exposeString('lastLoginAt', { nullable: true }),
+  }),
+});
+
+// Authenticated user's own linked identities. Restricted to the caller so one
+// user can never enumerate another user's provider emails.
+builder.queryField('myIdentities', (t) =>
+  t.field({
+    type: [UserIdentityRef],
+    nullable: false,
+    description:
+      "List the authenticated user's linked authentication provider identities.",
+    resolve: async (root, args, context) => {
+      const user = requireAuth(context);
+
+      const identities = await dbService.users.getUserIdentities(
+        Number(user.id),
+      );
+
+      // id, userId, provider, providerEmailVerified, and linkedAt are NOT NULL
+      // in the view, so no null-coalescing is needed for them.
+      return identities.map((identity) => ({
+        id: Number(identity.id),
+        userId: Number(identity.userId),
+        provider: identity.provider,
+        providerEmail: identity.providerEmail ?? null,
+        providerEmailVerified: identity.providerEmailVerified,
+        providerUsername: identity.providerUsername ?? null,
+        providerAvatar: identity.providerAvatar ?? null,
+        linkedAt: identity.linkedAt.toISOString(),
+        lastLoginAt: identity.lastLoginAt?.toISOString() ?? null,
+      }));
+    },
+  }),
+);
+
 // Add users query to the Query type
 builder.queryField('users', (t) =>
   t.field({

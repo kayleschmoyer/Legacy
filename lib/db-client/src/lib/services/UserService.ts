@@ -17,7 +17,7 @@ import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithInternalClient, runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
 import * as InternalSchema from '../../drizzle/internal/schema';
-import { User } from '../../types/DatabaseTypes';
+import { User, UserIdentity } from '../../types/DatabaseTypes';
 
 export interface UserFilters {
   ids?: number[];
@@ -126,6 +126,23 @@ export class UserService {
         .limit(1);
 
       return results[0] || null;
+    });
+  }
+
+  /**
+   * Get all linked provider identities for a user (LS-7822).
+   *
+   * Reads the public.user_identities view, which deliberately omits
+   * provider_account_id so the provider's raw account id never leaves the
+   * internal schema. Ordered by linked_at for a stable display order.
+   */
+  async getUserIdentities(userId: number): Promise<UserIdentity[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      return db
+        .select()
+        .from(PublicSchema.userIdentities)
+        .where(eq(PublicSchema.userIdentities.userId, userId))
+        .orderBy(asc(PublicSchema.userIdentities.linkedAt));
     });
   }
 

@@ -2914,6 +2914,8 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  /** List the authenticated user's linked authentication provider identities. */
+  myIdentities: Array<UserIdentity>;
   myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
@@ -4453,6 +4455,20 @@ export type UserDataExport = {
   userCreatedAt?: Maybe<Scalars['String']['output']>;
   userEmail?: Maybe<Scalars['String']['output']>;
   userUsername?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single authentication provider linked to a user (Discord, Google, Apple, or local password). The provider account id is never exposed. */
+export type UserIdentity = {
+  __typename?: 'UserIdentity';
+  id: Scalars['Int']['output'];
+  lastLoginAt?: Maybe<Scalars['String']['output']>;
+  linkedAt: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  providerAvatar?: Maybe<Scalars['String']['output']>;
+  providerEmail?: Maybe<Scalars['String']['output']>;
+  providerEmailVerified: Scalars['Boolean']['output'];
+  providerUsername?: Maybe<Scalars['String']['output']>;
+  userId: Scalars['Int']['output'];
 };
 
 /** Dashboard summary combining league phase, draft state, standings, and current matchup for a single league. */

@@ -863,3 +863,229 @@ describe('updateUserTheme mutation', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('myIdentities query', () => {
+  let schema: GraphQLSchema;
+  let mockContext: {
+    user: {
+      id: number;
+      email: string;
+      username: string;
+      isAdmin: boolean;
+    } | null;
+  };
+  let mockGetUserIdentities: jest.Mock;
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockGetUserIdentities = jest.fn();
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/logging', () => ({
+      LOGGER: {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      },
+    }));
+
+    jest.doMock('jsonwebtoken', () => ({
+      sign: jest.fn(),
+      verify: jest.fn(),
+      decode: jest.fn(),
+    }));
+
+    jest.doMock('../server/context', () => ({
+      getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(() => ({
+        users: {
+          getUserById: jest.fn(),
+          getUserIdentities: mockGetUserIdentities,
+        },
+        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
+      })),
+      runWithPublicClient: jest.fn(),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+      PublicSchema: {
+        leagues: {
+          id: 'id',
+          name: 'name',
+          currentWeek: 'cw',
+          currentMatchup: 'cm',
+        },
+        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'l',
+          userId: 'u',
+          teamId: 't',
+          permissionLevel: 'p',
+        },
+        teamMembers: {
+          id: 'id',
+          teamId: 't',
+          leagueId: 'l',
+          playerId: 'p',
+          positionId: 'pos',
+        },
+        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+        matchups: {
+          id: 'id',
+          leagueId: 'l',
+          weekNumber: 'w',
+          status: 's',
+          team1Id: 't1',
+          team2Id: 't2',
+        },
+        matchupPlayers: {
+          id: 'id',
+          matchupId: 'm',
+          playerId: 'p',
+          teamId: 't',
+        },
+        leagueWeekPlayerSeasons: {
+          playerId: 'p',
+          season: 's',
+          leagueId: 'l',
+          weekNumber: 'w',
+        },
+        leagueSeasonAwards: {
+          id: 'id',
+          leagueId: 'l',
+          season: 's',
+          playerId: 'p',
+          awardType: 'a',
+          notes: 'n',
+          createdAt: 'c',
+          updatedAt: 'u',
+        },
+        leagueActivityLog: {
+          id: 'id',
+          leagueId: 'l',
+          eventType: 'e',
+          occurredAt: 'o',
+        },
+        leagueActivityEventType: { enumValues: [] },
+      },
+      InternalSchema: {
+        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
+      },
+      PublicDb: {},
+    }));
+
+    jest.doMock('../services/standings-service', () => ({
+      StandingsService: {
+        getHeadToHead: jest.fn(),
+        getSeasonSummary: jest.fn(),
+        getStandings: jest.fn(),
+        getMatchupStats: jest.fn(),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+    const schemaModule = require('../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: {
+        id: 42,
+        email: 'user@example.com',
+        username: 'user42',
+        isAdmin: false,
+      },
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver() {
+    const queryType = schema.getQueryType();
+    const field = queryType?.getFields().myIdentities;
+    if (!field?.resolve) {
+      throw new Error('myIdentities resolver not found');
+    }
+    return field.resolve.bind(field);
+  }
+
+  it('throws UNAUTHENTICATED when not logged in', async () => {
+    const resolve = getResolver();
+    await expect(
+      resolve({}, {}, { user: null }, undefined as never),
+    ).rejects.toThrow(/Authentication required|UNAUTHENTICATED/i);
+    expect(mockGetUserIdentities).not.toHaveBeenCalled();
+  });
+
+  it('returns the caller-scoped identities and never exposes providerAccountId', async () => {
+    const linkedAt = new Date('2025-01-02T03:04:05.000Z');
+    mockGetUserIdentities.mockResolvedValue([
+      {
+        id: 7,
+        userId: 42,
+        provider: 'discord',
+        providerEmail: 'gamer@discord.example',
+        providerEmailVerified: true,
+        providerUsername: 'gamer#1234',
+        providerAvatar: 'https://cdn.example/avatar.png',
+        linkedAt,
+        lastLoginAt: null,
+      },
+    ]);
+    const resolve = getResolver();
+
+    const result = (await resolve(
+      {},
+      {},
+      mockContext,
+      undefined as never,
+    )) as Array<Record<string, unknown>>;
+
+    // Scoped to the authenticated user only.
+    expect(mockGetUserIdentities).toHaveBeenCalledWith(42);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: 7,
+      userId: 42,
+      provider: 'discord',
+      providerEmail: 'gamer@discord.example',
+      providerEmailVerified: true,
+      providerUsername: 'gamer#1234',
+      linkedAt: '2025-01-02T03:04:05.000Z',
+      lastLoginAt: null,
+    });
+    // The provider's raw account id must never leak to the client.
+    expect(result[0]).not.toHaveProperty('providerAccountId');
+  });
+
+  it('returns an empty list when the user has no linked identities', async () => {
+    mockGetUserIdentities.mockResolvedValue([]);
+    const resolve = getResolver();
+
+    const result = await resolve({}, {}, mockContext, undefined as never);
+
+    expect(result).toEqual([]);
+  });
+});

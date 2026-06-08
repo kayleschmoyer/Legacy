@@ -3215,6 +3215,11 @@ type Query {
   Get all data export/deletion requests for the authenticated user
   """
   myDataRequests: [DataRequest!]
+
+  """
+  List the authenticated user's linked authentication provider identities.
+  """
+  myIdentities: [UserIdentity!]!
   myLeagues(sport: Sport): [League!]!
 
   """
@@ -4482,6 +4487,21 @@ type UserDataExport {
   userCreatedAt: String
   userEmail: String
   userUsername: String
+}
+
+"""
+A single authentication provider linked to a user (Discord, Google, Apple, or local password). The provider account id is never exposed.
+"""
+type UserIdentity {
+  id: Int!
+  lastLoginAt: String
+  linkedAt: String!
+  provider: String!
+  providerAvatar: String
+  providerEmail: String
+  providerEmailVerified: Boolean!
+  providerUsername: String
+  userId: Int!
 }
 
 """

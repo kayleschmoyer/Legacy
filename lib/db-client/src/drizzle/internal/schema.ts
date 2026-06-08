@@ -49,6 +49,11 @@ export const subscriptionTierInAppInternal = appInternal.enum(
   ['free', 'premium'],
 );
 
+export const identityProviderInAppInternal = appInternal.enum(
+  'identity_provider',
+  ['local', 'discord', 'google', 'apple'],
+);
+
 export const usersInAppInternal = appInternal.table(
   'users',
   {
@@ -71,6 +76,9 @@ export const usersInAppInternal = appInternal.table(
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     mfaEnabled: boolean('mfa_enabled').notNull().default(false),
     totpSecret: text('totp_secret'),
+    canonicalEmailSource: identityProviderInAppInternal(
+      'canonical_email_source',
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -87,6 +95,41 @@ export const usersInAppInternal = appInternal.table(
       emailIdx: index().using('btree', table.email.asc().nullsLast()),
       usersUsernameUk: unique('users_username_uk').on(table.username),
       usersEmailUk: unique('users_email_uk').on(table.email),
+    };
+  },
+);
+
+export const userIdentities = appInternal.table(
+  'user_identities',
+  {
+    id: serial('id').primaryKey().notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => usersInAppInternal.id, { onDelete: 'cascade' }),
+    provider: identityProviderInAppInternal('provider').notNull(),
+    providerAccountId: varchar('provider_account_id', { length: 255 }),
+    providerEmail: varchar('provider_email', { length: 255 }),
+    providerEmailVerified: boolean('provider_email_verified')
+      .notNull()
+      .default(false),
+    providerUsername: varchar('provider_username', { length: 255 }),
+    providerAvatar: varchar('provider_avatar', { length: 512 }),
+    linkedAt: timestamp('linked_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (table) => {
+    return {
+      userIdIdx: index('user_identities_user_id_idx').on(table.userId),
+      providerAccountUk: unique('user_identities_provider_account_uk').on(
+        table.provider,
+        table.providerAccountId,
+      ),
+      userProviderUk: unique('user_identities_user_provider_uk').on(
+        table.userId,
+        table.provider,
+      ),
     };
   },
 );

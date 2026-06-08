@@ -44,6 +44,7 @@ import {
   teams,
   tradeOfferPlayers,
   tradeOffers,
+  userIdentities,
   users,
 } from '../drizzle/public/schema';
 import { usersInAppInternal } from '../drizzle/internal/schema';
@@ -139,3 +140,4 @@ export type ScoringStatGroup = InferEnumValue<typeof scoringStatGroup>;
 export type ScoringProfileStatus = InferEnumValue<typeof scoringProfileStatus>;
 export type ScoringChangeAction = InferEnumValue<typeof scoringChangeAction>;
 export type User = InferModelFromView<typeof users>;
+export type UserIdentity = InferModelFromView<typeof userIdentities>;

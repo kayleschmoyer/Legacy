@@ -31,6 +31,7 @@ export const users = pgView('users', {
   discordUsername: varchar('discord_username', { length: 100 }),
   discordAvatar: varchar('discord_avatar', { length: 255 }),
   themePreference: varchar('theme_preference', { length: 10 }),
+  canonicalEmailSource: text('canonical_email_source'),
 }).as(sql`SELECT id,
        email,
        username,
@@ -40,5 +41,6 @@ export const users = pgView('users', {
        discord_id,
        discord_username,
        discord_avatar,
-       theme_preference
+       theme_preference,
+       canonical_email_source::text AS canonical_email_source
 FROM app_internal.users`);
