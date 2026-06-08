@@ -348,7 +348,7 @@ Now phase 10 can re-read without race. The mutation phase has paid the visibilit
 
 - **Shared helper** (e.g. `waitForSeasonActive` doing 20 navigation loops) → fix the helper (see antipattern #2).
 - **Mutation→read lag** → apply antipattern #3 (the visibility tax belongs to the mutation).
-- **Genuine backend load under sharding** → this is not a test fix. Escalate. The right answer is the per-spec teardown ([LS-4356](https://legacysports.atlassian.net/browse/LS-4356)) / per-spec user pool ([LS-4357](https://legacysports.atlassian.net/browse/LS-4357)) refactor, not another per-phase timeout bump.
+- **Genuine backend load under sharding** → this is not a test fix. Escalate. The right answer is the per-spec teardown ([LS-4356](https://legacysports.atlassian.net/browse/LS-4356)) / per-spec user pool ([LS-4357](https://legacysports.atlassian.net/browse/LS-4357)) refactor, or rebalancing the shards themselves (see [Shard balancing](#shard-balancing-integration-suite) below — [LS-7845](https://legacysports.atlassian.net/browse/LS-7845)), not another per-phase timeout bump.
 
 The "Nth regression guard" framing in a ticket title is a tell that this antipattern is in play. If you're about to bump `timeout` and you can't articulate which of the three mechanisms above the contention sits on, **stop and escalate** — the ticket is misclassified.
 
@@ -361,6 +361,15 @@ Cross-referenced from [`integration-commands.md` — `expect.poll()` passes but 
 **Why the obvious fix is wrong:** Re-running the test or extending the poll does nothing — the poll already succeeded. The async process completed, just with wrong output.
 
 **Right fix:** This is a **real product bug**, not a test bug. Follow [`debugging/SKILL.md`](../../debugging/SKILL.md) to root-cause the upstream Lambda/SQS/RDS pipeline. Do **not** add fallback logic, retries, or "if empty then refetch" branches to the test — that hides the bug from nightly and from production.
+
+## Shard balancing (integration suite)
+
+The nightly integration run ([run-playwright-tests.yml](../../../../.github/workflows/run-playwright-tests.yml)) fans the live-backend suite out across 3 shards. Playwright's native `--shard=k/n` splits the **alphabetically-sorted** spec files into contiguous chunks of roughly equal _test count_ — which, with `fullyParallel: false` + `workers: 1`, dumped every heavy draft/season spec (`live-draft-ui`, `matchup-detail-ui`, `matchup-roster-editor-ui`, `matchup-roster-recap-ui`, `mock-draft-simulator-ui`) into the alphabetical **middle third (shard 2)**. Shard 2 then ran ~5 multi-minute flows back-to-back, saturating the live Lambda/RDS/SQS backend so latency-sensitive phases there blew their deadlines while shards 1 & 3 stayed green. The _shifting_ set of failing phases run-to-run is the signature of load contention, not discrete bugs — antipattern #4 above ([LS-7845](https://legacysports.atlassian.net/browse/LS-7845)).
+
+The fix is weight-balanced sharding, not per-phase timeout bumps:
+
+- **Weights manifest:** [`apps/web-e2e/src/integration/integration-shard-weights.json`](../../../../apps/web-e2e/src/integration/integration-shard-weights.json) — approximate worst-case runtime (seconds) per spec. **Add an entry whenever you add a heavy spec.** A unit test (`shard-partition.test.ts`) fails CI if a spec is missing a weight or an entry is stale.
+- **Partition:** [`apps/web-e2e/src/integration/shard-partition.ts`](../../../../apps/web-e2e/src/integration/shard-partition.ts) distributes specs across shards by weight using the Longest-Processing-Time greedy heuristic (deterministic; bin spread bounded by the single heaviest spec). The nightly workflow runs its CLI to pass each shard an explicit file list instead of `--shard`; shard identity for the cleanup guards travels via `INTEGRATION_SHARD_CURRENT` / `INTEGRATION_SHARD_TOTAL`.
 
 ## Related
 

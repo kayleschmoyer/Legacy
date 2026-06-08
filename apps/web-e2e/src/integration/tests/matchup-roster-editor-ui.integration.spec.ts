@@ -286,9 +286,11 @@ test.describe
       // LeagueHero (top of LeagueDetailPageV2) whenever draftStatus is
       // 'active' or 'completed', so it is visible on any tab.
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
-      await page
-        .waitForLoadState('networkidle', { timeout: 20_000 })
-        .catch(() => undefined);
+      // The auto-retrying visibility assertion below is the deterministic gate
+      // (levers #3/#9). A prior networkidle load-state gate was removed
+      // (LS-7845): on a live app with Apollo polling networkidle never settles,
+      // so the call burned its full timeout before the .catch() — dead
+      // wall-clock that compounded shard-2's load pressure.
       await expect(page.getByText('Season Active')).toBeVisible({
         timeout: 15_000,
       });
@@ -482,30 +484,23 @@ test.describe
       );
 
       // MatchupDetailPage renders the roster editor only after useGetUserTeamIdQuery
-      // resolves (its result gates the render condition). waitForLoadState('load')
-      // fires when page resources finish loading, but Apollo GraphQL queries
-      // (userTeamId, getMatchupPlayers, getPositionsForLeague) are still in-flight
-      // at that point. Waiting for networkidle ensures those queries complete and
-      // React has re-rendered with the resolved data before we check visibility
-      // (State B regression guard — LS-4283).
+      // resolves (its result gates the render condition). `reloadUntilVisible`
+      // reloads and polls the locator's own visibility, so it deterministically
+      // waits for the Apollo queries (userTeamId, getMatchupPlayers,
+      // getPositionsForLeague) to resolve and re-render (State B regression guard
+      // — LS-4283). A prior networkidle load-state gate (both before the loop
+      // and inside afterReload) was removed (LS-7845): on a live app with
+      // Apollo polling networkidle never settles, so each call burned its
+      // full timeout before the .catch() — dead wall-clock that compounded
+      // shard-2's load pressure without adding determinism the visibility poll
+      // (which page.reload() already precedes with waitForLoadState('load'))
+      // lacks.
       const editLineup = page.getByText('Edit Lineup', { exact: true }).first();
-      await page
-        .waitForLoadState('networkidle', { timeout: 15_000 })
-        .catch(() => undefined);
-
-      // Force Apollo refetches by reloading until the editor appears, then
-      // assert strictly. `reloadUntilVisible` is the canonical helper for
-      // this pattern (LS-4458, LS-4457).
       await reloadUntilVisible(page, editLineup, {
         attempts: 30,
         pollTimeoutMs: 1_000,
         cooldownMs: 2_000,
         finalTimeoutMs: 20_000,
-        afterReload: async () => {
-          await page
-            .waitForLoadState('networkidle', { timeout: 20_000 })
-            .catch(() => undefined);
-        },
       });
     });
 
@@ -646,10 +641,11 @@ test.describe
       );
       await benchBtn.click();
       await mutationSettled;
-      // Wait for the subsequent refetch to also settle
-      await page
-        .waitForLoadState('networkidle', { timeout: 10_000 })
-        .catch(() => undefined);
+      // The mutation's GraphQL response (awaited above) is the authoritative
+      // settle signal; the assertion / API read in the next step gates on the
+      // refetched data. A prior networkidle load-state gate was removed
+      // (LS-7845): on a live app with Apollo polling, networkidle never settles,
+      // so the call only burned its full timeout before the .catch().
     });
 
     await test.step('Player now appears in Bench section with BN badge', async () => {
@@ -751,10 +747,11 @@ test.describe
       // Click the first available position option to assign the player
       await positionButtons.click();
       await mutationSettled;
-      // Wait for the subsequent refetch to also settle
-      await page
-        .waitForLoadState('networkidle', { timeout: 10_000 })
-        .catch(() => undefined);
+      // The mutation's GraphQL response (awaited above) is the authoritative
+      // settle signal; the assertion / API read in the next step gates on the
+      // refetched data. A prior networkidle load-state gate was removed
+      // (LS-7845): on a live app with Apollo polling, networkidle never settles,
+      // so the call only burned its full timeout before the .catch().
     });
 
     await test.step('Player removed from bench section after assignment', async () => {
@@ -895,9 +892,13 @@ test.describe
       await firstPlayerRow.click();
 
       // "Tap to swap" hint appearing is the deterministic signal that the
-      // row is in its selected state — replaces a 500ms wait.
+      // row is in its selected state — replaces a 500ms wait. The selected-state
+      // render can lag under shared-runner load, so match the generous ceiling
+      // of the sibling row-visibility assertion above; the tighter 5s tripped
+      // Phase 8 under nightly load (LS-7845). This is a client-side render wait,
+      // not a backend poll.
       await expect(page.getByText('Tap to swap').first()).toBeVisible({
-        timeout: 5_000,
+        timeout: 15_000,
       });
     });
 
@@ -919,10 +920,11 @@ test.describe
       );
       await secondPlayerRow.click();
       await mutationSettled;
-      // Wait for the subsequent refetch to also settle
-      await page
-        .waitForLoadState('networkidle', { timeout: 10_000 })
-        .catch(() => undefined);
+      // The mutation's GraphQL response (awaited above) is the authoritative
+      // settle signal; the assertion / API read in the next step gates on the
+      // refetched data. A prior networkidle load-state gate was removed
+      // (LS-7845): on a live app with Apollo polling, networkidle never settles,
+      // so the call only burned its full timeout before the .catch().
     });
 
     await test.step('Verify swap persisted via API — players exchanged positions', async () => {

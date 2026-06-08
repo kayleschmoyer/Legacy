@@ -25,6 +25,13 @@ export interface ChipProps extends Omit<
 > {
   label: string;
   tone?: ChipTone;
+  /**
+   * Optional `data-testid` applied to the chip's label <Text>. The testid is
+   * placed on the Text (not the wrapping XStack) because Tamagui forwards
+   * `data-*` to the DOM on a Text host but not on the styled Stack (LS-7845).
+   * Inert on native.
+   */
+  labelTestID?: string;
   /** Whether the chip is in a "selected" filter state. */
   selected?: boolean;
   /** Optional leading node (icon, dot). */
@@ -159,6 +166,7 @@ export function Chip({
   leading,
   trailing,
   size = 'md',
+  labelTestID,
   ...rest
 }: ChipProps): React.JSX.Element {
   const styles = TONE_STYLES[tone];
@@ -206,6 +214,7 @@ export function Chip({
         color={styles.fg}
         letterSpacing={isStatus ? 1.32 : 0.4}
         textTransform={isStatus ? 'uppercase' : undefined}
+        {...(labelTestID ? { 'data-testid': labelTestID } : {})}
       >
         {label}
       </Text>

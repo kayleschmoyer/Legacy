@@ -7,6 +7,7 @@ import {
   clearActiveRunLock,
   isTestLeague,
   isYoungerThanCleanupThreshold,
+  resolveShardIdentity,
 } from './test-league-cleanup';
 import { COLLECT_COVERAGE, mergeShardFragments } from '../fixtures/coverage';
 import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
@@ -117,8 +118,10 @@ export default async function globalTeardown(
   // userLeagues, see leagues created by slower shards still mid-test, and
   // delete them — yanking the league row out from under an in-flight test
   // (LS-4318). Skip teardown in that case; the next run's globalSetup
-  // deletes any leagues left behind, so accumulation is bounded.
-  if (config.shard) {
+  // deletes any leagues left behind, so accumulation is bounded. Shard
+  // identity comes from INTEGRATION_SHARD_CURRENT/TOTAL under the
+  // weighted-balance partition (LS-7845), falling back to config.shard.
+  if (resolveShardIdentity(config)) {
     // Still clear the active-run lock so the next single-process run can
     // sweep — the shard-skip rule only applies to *this* sweep, not to
     // future ones.

@@ -13,6 +13,7 @@ import {
   isTestLeague,
   isYoungerThanCleanupThreshold,
   listIntegrationSpecSlugs,
+  resolveShardIdentity,
   writeActiveRunLock,
 } from './test-league-cleanup';
 import {
@@ -351,9 +352,12 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // 2+ skipping here prevents them from deleting leagues that shard 1's tests
   // are actively using (LS-4391). Mirrors the guard in global-teardown.ts
   // (LS-4318) which already skips teardown entirely when sharding is active.
-  if (config.shard && config.shard.current !== 1) {
+  // Shard identity comes from INTEGRATION_SHARD_CURRENT/TOTAL under the
+  // weighted-balance partition (LS-7845), falling back to config.shard.
+  const shard = resolveShardIdentity(config);
+  if (shard && shard.current !== 1) {
     LOGGER.info(
-      `[integration setup] Shard ${config.shard.current}/${config.shard.total} — skipping pre-run cleanup (runs on shard 1 only).`,
+      `[integration setup] Shard ${shard.current}/${shard.total} — skipping pre-run cleanup (runs on shard 1 only).`,
     );
     return;
   }

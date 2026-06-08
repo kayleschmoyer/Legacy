@@ -504,13 +504,15 @@ test.describe('WebSocket real-time updates @critical', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    // Confirm the initial draft status chip is in the 'not-started' state
-    // (DraftStatusChip maps 'not-started' → 'Pre-Draft' label)
-    await expect(
-      page.locator(
-        '[data-testid="draft-status-chip"][data-status="not-started"]',
-      ),
-    ).toBeVisible();
+    // Confirm the initial draft status chip is in the pre-draft state. Assert by
+    // testid + visible label rather than the brittle
+    // `[data-status="not-started"]` selector: the league hero renders the
+    // pre-draft state with `data-status="pre-draft"`, so the exact-value selector
+    // never matched. "Pre-Draft" is the stable contract (matches the
+    // football-hub spec's pattern). LS-7845.
+    await expect(page.getByTestId('draft-status-chip')).toContainText(
+      /Pre-Draft/i,
+    );
 
     // 2. Wait for WS connection
     await expect.poll(() => wsRoute !== undefined).toBe(true);
@@ -531,7 +533,10 @@ test.describe('WebSocket real-time updates @critical', () => {
     );
 
     // 4. After the refetch resolves the badge should change to "Draft Queued"
-    // (DraftStatusChip maps 'queued' → 'Draft Queued')
-    await expect(page.getByText('Draft Queued')).toBeVisible();
+    // (DraftStatusChip maps 'queued' → 'Draft Queued'). Scope to the chip testid
+    // so the assertion targets the hero badge specifically. LS-7845.
+    await expect(page.getByTestId('draft-status-chip')).toContainText(
+      'Draft Queued',
+    );
   });
 });

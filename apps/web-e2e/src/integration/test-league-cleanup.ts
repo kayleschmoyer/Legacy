@@ -36,6 +36,45 @@ export function isTestLeague(name: string): boolean {
   );
 }
 
+/** Shard identity for the integration run (1-based current of total). */
+export interface ShardIdentity {
+  current: number;
+  total: number;
+}
+
+/**
+ * Resolve the integration run's shard identity (LS-7845).
+ *
+ * The nightly workflow used to fan out via Playwright's native `--shard`, which
+ * populated `config.shard`. The weighted-balance partition (shard-partition.ts)
+ * passes each shard its own explicit spec list instead and no longer sets
+ * `--shard`, so shard identity now travels via the `INTEGRATION_SHARD_CURRENT` /
+ * `INTEGRATION_SHARD_TOTAL` env vars. This helper prefers those env vars and
+ * falls back to `config.shard` for any path still using native sharding.
+ *
+ * Returns `null` for a non-sharded run (single job / `1/1`) — callers treat
+ * that as "this process owns the whole suite" and run the cleanup sweep.
+ */
+export function resolveShardIdentity(config?: {
+  shard?: { current: number; total: number } | null;
+}): ShardIdentity | null {
+  const envCurrent = Number(process.env.INTEGRATION_SHARD_CURRENT);
+  const envTotal = Number(process.env.INTEGRATION_SHARD_TOTAL);
+  if (
+    Number.isInteger(envCurrent) &&
+    Number.isInteger(envTotal) &&
+    envTotal > 1 &&
+    envCurrent >= 1 &&
+    envCurrent <= envTotal
+  ) {
+    return { current: envCurrent, total: envTotal };
+  }
+  if (config?.shard && config.shard.total > 1) {
+    return { current: config.shard.current, total: config.shard.total };
+  }
+  return null;
+}
+
 /**
  * Enumerate the slugs of every integration spec file in `tests/`. The slug
  * matches `specSlugFromTestInfo` (test-user-auth.ts) so it can be fed to

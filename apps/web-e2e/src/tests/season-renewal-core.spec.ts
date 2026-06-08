@@ -372,12 +372,19 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
       'Unexpected Application Error',
     );
 
-    // The renewed league has draftStatus='not-started' — expect Pre-Draft badge
-    await expect(
-      page.locator(
-        '[data-testid="draft-status-chip"][data-status="not-started"]',
-      ),
-    ).toBeVisible({ timeout: 15_000 });
+    // The renewed league is pre-draft — expect the Pre-Draft badge. Assert by
+    // testid + visible label rather than the brittle
+    // `[data-status="not-started"]` selector: the league hero (LeagueDetailShell
+    // via LeagueDetailPageV2) renders the pre-draft state with
+    // `data-status="pre-draft"`, so the exact-value selector never matched. The
+    // "Pre-Draft" label is the stable contract (matches the football-hub spec's
+    // pattern). LS-7845.
+    await expect(page.getByTestId('draft-status-chip')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('draft-status-chip')).toContainText(
+      /Pre-Draft/i,
+    );
   });
 
   test('original league is hidden behind frozen state after renewal', async ({

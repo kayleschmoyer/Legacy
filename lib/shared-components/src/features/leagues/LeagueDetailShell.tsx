@@ -150,16 +150,15 @@ export function LeagueDraftStatusChip({
 }): React.JSX.Element | null {
   const def = getDraftStatusChipDef(status);
   if (!def) return null;
-  // `data-testid` / `data-status` preserve the web e2e contract from the
-  // pre-extraction LeagueHero (selectors like
-  // `[data-testid="draft-status-chip"][data-status="not-started"]`). Tamagui
-  // forwards the data-* attrs to the DOM on web; they are inert on native.
+  // Preserve the web e2e contract: the league-detail specs locate this badge via
+  // `data-testid="draft-status-chip"`. The testid is applied to the chip's inner
+  // label <Text> (via `labelTestID`), not the wrapping XStack — Tamagui forwards
+  // `data-*` to the DOM on a `Text` host (the `league-title` heading relies on
+  // the same behaviour) but NOT on the styled `XStack`, so a wrapper-level
+  // `data-testid` was silently dropped and season-renewal-core /
+  // websocket-realtime found no chip (LS-7845). Inert on native.
   return (
-    <Chip
-      tone={def.tone}
-      label={def.label}
-      {...{ 'data-testid': 'draft-status-chip', 'data-status': status }}
-    />
+    <Chip tone={def.tone} label={def.label} labelTestID="draft-status-chip" />
   );
 }
 
