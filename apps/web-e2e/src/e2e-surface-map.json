@@ -1,0 +1,651 @@
+{
+  "$comment": "Maps each HERMETIC Playwright e2e spec (apps/web-e2e/src/tests/) to the source surfaces it exercises. Used by .github/scripts/integration-select/select-specs.mjs (shared engine) to run only the affected specs on a PR, in addition to the always-on @critical safety net (LS-7846). This file is the maintained source of truth: when a spec starts covering a new area, add the glob here. Globs support ** (cross-segment) and * (within-segment). Over-selection is safe; under-selection risks a missed regression, so lean broad. When adding a NEW e2e spec, add an entry here (.github/checks/integration-select-tests.sh enforces coverage). This map is also the seed data for the LS-7850 drift auditor.",
+  "runAllWhenChanged": [
+    "lambdas/db/schema.graphql",
+    "lambdas/db/src/schema/**",
+    "lib/shared-components/src/**",
+    "apps/web/src/app/**",
+    "apps/web/src/main.tsx",
+    "apps/web/src/context/**",
+    "apps/web/src/api/**",
+    "apps/web/src/lib/**",
+    "apps/web/src/components/layout/**",
+    "apps/web/src/components/a11y/**",
+    "apps/web/src/components/common/**",
+    "apps/web-e2e/src/utils/**",
+    "apps/web-e2e/src/global-setup.ts",
+    "apps/web-e2e/playwright.config.ts",
+    ".github/actions/e2e-testing/**"
+  ],
+  "specs": {
+    "apps/web-e2e/src/tests/about-page.spec.ts": [
+      "apps/web/src/pages/about/**"
+    ],
+    "apps/web-e2e/src/tests/accessibility.spec.ts": [
+      "apps/web/src/pages/about/**",
+      "apps/web/src/pages/help/**"
+    ],
+    "apps/web-e2e/src/tests/admin-auth-loading-redirect.spec.ts": [
+      "apps/web/src/pages/admin/**"
+    ],
+    "apps/web-e2e/src/tests/admin-console.spec.ts": [
+      "apps/web/src/pages/admin/**"
+    ],
+    "apps/web-e2e/src/tests/admin-cross-platform-parity.spec.ts": [
+      "apps/web/src/pages/admin/**"
+    ],
+    "apps/web-e2e/src/tests/admin-dashboard.spec.ts": [
+      "apps/web/src/pages/admin/**"
+    ],
+    "apps/web-e2e/src/tests/admin-hub-navigation.spec.ts": [
+      "apps/web/src/pages/admin/**"
+    ],
+    "apps/web-e2e/src/tests/app.spec.ts": ["apps/web/src/pages/home/**"],
+    "apps/web-e2e/src/tests/auction-draft.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/auth-flows.spec.ts": [
+      "apps/web/src/pages/auth/**",
+      "apps/web/src/pages/login/**"
+    ],
+    "apps/web-e2e/src/tests/baseball-landing-responsive.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/landing/**"
+    ],
+    "apps/web-e2e/src/tests/baseball-ui.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/bug-report.spec.ts": [
+      "apps/web/src/pages/about/**"
+    ],
+    "apps/web-e2e/src/tests/combobox-search-a11y.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-announcements.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-audit-delete.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-draft-status.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**",
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-game-selection.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**",
+      "lambdas/game-selection/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-league-settings.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-scoring-editor.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**",
+      "apps/web/src/lib/scoring.ts",
+      "lib/scoring/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-tab-nav.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/commissioner-waiver-errors.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/tests/dark-mode.spec.ts": [
+      "apps/web/src/pages/preferences/**",
+      "apps/web/src/pages/about/**"
+    ],
+    "apps/web-e2e/src/tests/disclosure-game.spec.ts": [
+      "apps/web/src/pages/games/**"
+    ],
+    "apps/web-e2e/src/tests/donate-page.spec.ts": [
+      "apps/web/src/pages/donate/**"
+    ],
+    "apps/web-e2e/src/tests/draft-functionality.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/draft-graphql-integration.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/draft-order-settings.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/commissioner/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/commissioner/**",
+      "apps/web/src/components/management/**",
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/draft-selection-workflow.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/faq-page.spec.ts": [
+      "apps/web/src/pages/help/**",
+      "apps/web/src/pages/pricing/**"
+    ],
+    "apps/web-e2e/src/tests/football-hub.spec.ts": [
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/football/**"
+    ],
+    "apps/web-e2e/src/tests/form-a11y.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**"
+    ],
+    "apps/web-e2e/src/tests/free-agents-pickup.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/tests/full-season-ui.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/gif-picker.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/global-error-handling.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/pages/about/**"
+    ],
+    "apps/web-e2e/src/tests/heading-hierarchy-a11y.spec.ts": [
+      "apps/web/src/pages/about/**",
+      "apps/web/src/pages/help/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/help-page.spec.ts": ["apps/web/src/pages/help/**"],
+    "apps/web-e2e/src/tests/homepage.spec.ts": [
+      "apps/web/src/pages/home/**",
+      "apps/web/src/pages/landing/**"
+    ],
+    "apps/web-e2e/src/tests/join-league.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/jwt-examples.spec.ts": [
+      "apps/web/src/pages/home/**"
+    ],
+    "apps/web-e2e/src/tests/league-chat-activity.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/hooks/useLeagueChat.ts"
+    ],
+    "apps/web-e2e/src/tests/league-creation-advanced.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/league-creation-football.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/components/football/**"
+    ],
+    "apps/web-e2e/src/tests/league-creation.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/league-detail-tabs.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/league-discovery.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/loading-state-a11y.spec.ts": [
+      "apps/web/src/pages/about/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/login-completion.spec.ts": [
+      "apps/web/src/pages/auth/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/pages/home/**"
+    ],
+    "apps/web-e2e/src/tests/management-and-pages.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/management/**",
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/matchup-detail.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**"
+    ],
+    "apps/web-e2e/src/tests/matchup-week-navigation.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**"
+    ],
+    "apps/web-e2e/src/tests/mid-draft-trades.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/tests/minigames-hub.spec.ts": [
+      "apps/web/src/pages/games/**"
+    ],
+    "apps/web-e2e/src/tests/mobile-responsive-nav.spec.ts": [
+      "apps/web/src/pages/about/**"
+    ],
+    "apps/web-e2e/src/tests/mock-draft-simulator.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/navigation-dropdowns.spec.ts": [
+      "apps/web/src/pages/home/**"
+    ],
+    "apps/web-e2e/src/tests/navigation.spec.ts": [
+      "apps/web/src/pages/about/**"
+    ],
+    "apps/web-e2e/src/tests/notification-dropdown-navigation.spec.ts": [
+      "apps/web/src/pages/notifications/**"
+    ],
+    "apps/web-e2e/src/tests/notifications-hub.spec.ts": [
+      "apps/web/src/pages/notifications/**"
+    ],
+    "apps/web-e2e/src/tests/notifications-page.spec.ts": [
+      "apps/web/src/pages/notifications/**"
+    ],
+    "apps/web-e2e/src/tests/on-this-day.spec.ts": [
+      "apps/web/src/pages/home/**"
+    ],
+    "apps/web-e2e/src/tests/onboarding-tutorial.spec.ts": [
+      "apps/web/src/components/onboarding/**",
+      "apps/web/src/pages/help/**"
+    ],
+    "apps/web-e2e/src/tests/player-brefid-route.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/player-comparison-stats-charts.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/player-comparison.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/player-detail-bio-career-arc.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/player-detail-modal.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/player-stats-mocked.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/player-stats.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/players-directory.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/playoff-bracket.spec.ts": [
+      "apps/web/src/pages/standings/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**"
+    ],
+    "apps/web-e2e/src/tests/preferences.spec.ts": [
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**"
+    ],
+    "apps/web-e2e/src/tests/pricing-page.spec.ts": [
+      "apps/web/src/pages/pricing/**",
+      "apps/web/src/pages/donate/**"
+    ],
+    "apps/web-e2e/src/tests/profile-league-branding.spec.ts": [
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/profile-settings.spec.ts": [
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**"
+    ],
+    "apps/web-e2e/src/tests/qr-invite-link.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/roster-management.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/tests/scoreboard.spec.ts": [
+      "apps/web/src/pages/scoreboard/**",
+      "apps/web/src/components/scoreboard/**"
+    ],
+    "apps/web-e2e/src/tests/season-awards.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/management/**",
+      "apps/web/src/pages/standings/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/tests/season-draft-game-detail.spec.ts": [
+      "apps/web/src/pages/games/**",
+      "apps/web/src/pages/draft/**",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/season-draft-games-flow.spec.ts": [
+      "apps/web/src/pages/games/**",
+      "apps/web/src/pages/draft/**",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/season-draft-games.spec.ts": [
+      "apps/web/src/pages/games/**",
+      "apps/web/src/pages/draft/**",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/season-draft-sport-toggle.spec.ts": [
+      "apps/web/src/pages/games/**",
+      "apps/web/src/pages/draft/**",
+      "lambdas/draft-processor/**"
+    ],
+    "apps/web-e2e/src/tests/season-progression.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/season-renewal-core.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/season-renewal-teams-errors.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/season-renewal.spec.ts": [
+      "apps/web/src/pages/management/**",
+      "apps/web/src/features/management/**",
+      "apps/web/src/components/management/**"
+    ],
+    "apps/web-e2e/src/tests/skip-link-pages-a11y.spec.ts": [
+      "apps/web/src/pages/help/**",
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**",
+      "apps/web/src/pages/notifications/**",
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**"
+    ],
+    "apps/web-e2e/src/tests/standings.spec.ts": [
+      "apps/web/src/pages/standings/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/tests/subscription.spec.ts": [
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**",
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**",
+      "apps/web/src/pages/pricing/**",
+      "apps/web/src/pages/donate/**"
+    ],
+    "apps/web-e2e/src/tests/tab-navigation-a11y.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/table-a11y.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**"
+    ],
+    "apps/web-e2e/src/tests/team-detail-info-roster-branding.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/tests/team-detail.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/tests/trade-block.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/tests/trading-center.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**",
+      "apps/web/src/components/league/**"
+    ],
+    "apps/web-e2e/src/tests/twenty-questions.spec.ts": [
+      "apps/web/src/pages/games/**"
+    ],
+    "apps/web-e2e/src/tests/user-preferences.spec.ts": [
+      "apps/web/src/pages/profile/**",
+      "apps/web/src/pages/preferences/**"
+    ],
+    "apps/web-e2e/src/tests/view-game-logs-filters.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**",
+      "apps/web/src/pages/games/**"
+    ],
+    "apps/web-e2e/src/tests/waiver-claims.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/tests/websocket-realtime-updates.spec.ts": [
+      "apps/web/src/hooks/useLeagueWebSocket.ts",
+      "apps/web/src/hooks/useLeagueWebSocketLifecycle.ts",
+      "lambdas/websocket/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/websocket-realtime.spec.ts": [
+      "apps/web/src/hooks/useLeagueWebSocket.ts",
+      "apps/web/src/hooks/useLeagueWebSocketLifecycle.ts",
+      "lambdas/websocket/**",
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/league/**",
+      "apps/web/src/components/leagues/**",
+      "apps/web/src/features/baseball/**"
+    ]
+  }
+}

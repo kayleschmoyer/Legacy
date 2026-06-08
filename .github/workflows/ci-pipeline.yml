@@ -97,6 +97,14 @@ jobs:
       api-surface: ${{ steps.detect.outputs.api-surface }}
       affected-components: ${{ steps.detect.outputs.affected-components }}
       requires-full-build: ${{ steps.detect.outputs.requires-full-build }}
+      # Hermetic e2e affected-spec selection (LS-7846). The e2e job consumes
+      # these to run @critical PLUS the specs the PR's changed files map to,
+      # or the FULL suite (sharded) when a broad surface changed.
+      e2e-affected-run-all: ${{ steps.e2e-select.outputs.run-all }}
+      e2e-affected-specs: ${{ steps.e2e-select.outputs.specs }}
+      e2e-grep: ${{ steps.e2e-select.outputs.grep }}
+      e2e-grep-invert: ${{ steps.e2e-select.outputs.grep-invert }}
+      e2e-shard-matrix: ${{ steps.e2e-select.outputs.shard-matrix }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -117,6 +125,95 @@ jobs:
         uses: ./.github/actions/detect-changes
         with:
           force-full-build: ${{ github.ref == 'refs/heads/main' || inputs.debug_mode }}
+
+      # Hermetic e2e affected-spec selection (LS-7846). Maps the PR's changed
+      # files to the e2e specs that exercise the affected surfaces, using the
+      # shared selector + apps/web-e2e/src/e2e-surface-map.json. Emits:
+      #   run-all     — "true" when a broad surface (schema, shared-components,
+      #                 shared e2e harness) changed → run the FULL suite, sharded.
+      #   specs       — newline list of affected spec files (narrow changes).
+      #   grep/invert — Playwright grep for the main e2e run (@critical safety
+      #                 net for narrow changes; "" = all tests when run-all).
+      #   shard-matrix— JSON array consumed by the e2e job's matrix.
+      # Over-selection is safe; under-selection risks a missed regression.
+      - name: "Compute affected hermetic E2E specs"
+        id: e2e-select
+        shell: bash
+        env:
+          BASE_REF: ${{ steps.detect.outputs.base-ref-used }}
+          HEAD_REF: ${{ steps.detect.outputs.head-ref-used }}
+          GREP_NARROW: ${{ inputs.e2e-test-patterns }}
+          GREP_INVERT: ${{ inputs.e2e-exclude-patterns }}
+          SHARD_TOTAL: ${{ inputs.e2e-shard-total }}
+        run: |
+          # NOTE: deliberately NOT `set -e`. This step must never fail the
+          # detect-changes job — on any selection error it degrades to
+          # @critical-only (today's behaviour) and always emits valid outputs.
+          set -uo pipefail
+          MANIFEST="apps/web-e2e/src/e2e-surface-map.json"
+
+          # Compute changed files; fall back to empty (no affected specs, @critical
+          # still runs) if the diff cannot be computed (e.g. shallow/new branch).
+          : > /tmp/e2e-changed.txt
+          if [ -n "${BASE_REF:-}" ] && [ -n "${HEAD_REF:-}" ]; then
+            git diff --name-only --diff-filter=AMRD "$BASE_REF" "$HEAD_REF" > /tmp/e2e-changed.txt 2>/dev/null || : > /tmp/e2e-changed.txt
+          fi
+
+          RUN_ALL=false
+          SPECS=""
+          if node .github/scripts/integration-select/select-specs.mjs \
+               --manifest "$MANIFEST" \
+               --changed-from-stdin --json < /tmp/e2e-changed.txt > /tmp/e2e-select.json 2>/tmp/e2e-select.err; then
+            cat /tmp/e2e-select.json
+            RUN_ALL=$(node -e "process.stdout.write(String(require('/tmp/e2e-select.json').runAll))" 2>/dev/null || echo false)
+            SPECS=$(node -e "process.stdout.write(require('/tmp/e2e-select.json').specs.join('\n'))" 2>/dev/null || echo "")
+          else
+            echo "::warning::E2E spec selection failed — falling back to @critical-only. Details:"
+            cat /tmp/e2e-select.err || true
+          fi
+
+          # Default grep (narrow change): @critical safety net, exclude @slow.
+          GREP="$GREP_NARROW"
+          if [ "$RUN_ALL" = "true" ]; then
+            # Broad change → run the whole hermetic suite (still excludes @slow),
+            # sharded so it stays within the per-job timeout budget.
+            GREP=""
+            SHARD_MATRIX='["1/3","2/3","3/3"]'
+          else
+            case "${SHARD_TOTAL:-1}" in
+              3) SHARD_MATRIX='["1/3","2/3","3/3"]' ;;
+              1) SHARD_MATRIX='["1/1"]' ;;
+              *) SHARD_MATRIX='["1/2","2/2"]' ;;
+            esac
+          fi
+
+          # Defense-in-depth (review thread 01KTJCV6WH4CGS5DDKG92XPBJD): the grep
+          # values originate from the trusted orchestrator (static "@critical" /
+          # "@slow"), never from PR-controlled data — but the downstream
+          # e2e-testing action evals the grep into a shell command, so constrain
+          # both to a safe Playwright-grep charset before emitting. Anything
+          # outside it falls back to the @critical/@slow defaults.
+          SAFE_GREP_RE='^[A-Za-z0-9@|()_.*-]*$'
+          if ! [[ "$GREP" =~ $SAFE_GREP_RE ]]; then
+            echo "::warning::e2e grep pattern '$GREP' has unexpected characters — falling back to @critical"
+            GREP="@critical"
+          fi
+          if ! [[ "$GREP_INVERT" =~ $SAFE_GREP_RE ]]; then
+            echo "::warning::e2e grep-invert pattern '$GREP_INVERT' has unexpected characters — falling back to @slow"
+            GREP_INVERT="@slow"
+          fi
+
+          {
+            echo "run-all=$RUN_ALL"
+            echo "grep=$GREP"
+            echo "grep-invert=$GREP_INVERT"
+            echo "shard-matrix=$SHARD_MATRIX"
+            echo "specs<<__E2E_SPECS__"
+            echo "$SPECS"
+            echo "__E2E_SPECS__"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "::notice::E2E selection — run-all=$RUN_ALL, affected specs=$(echo "$SPECS" | grep -c . || true), shards=$SHARD_MATRIX"
 
   # ============================================================================
   # STAGE 2 — Granular required checks (run in parallel)
@@ -501,7 +598,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ inputs.e2e-shard-total == 3 && fromJSON('["1/3","2/3","3/3"]') || inputs.e2e-shard-total == 1 && fromJSON('["1/1"]') || fromJSON('["1/2","2/2"]') }}
+        # Shard count is computed by detect-changes (LS-7846): 1 shard for a
+        # narrow change (@critical + affected specs), 3 shards when a broad
+        # surface changed and the full suite runs.
+        shard: ${{ fromJSON(needs.detect-changes.outputs.e2e-shard-matrix) }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -533,8 +633,11 @@ jobs:
         with:
           should-run-e2e: ${{ needs.build.outputs.artifacts-ready }}
           shard: ${{ matrix.shard }}
-          test-patterns: ${{ inputs.e2e-test-patterns }}
-          test-patterns-invert: ${{ inputs.e2e-exclude-patterns }}
+          # LS-7846: grep is computed by detect-changes — "@critical" for a
+          # narrow change (the affected specs run in the step below) or "" (the
+          # full suite) when a broad surface changed.
+          test-patterns: ${{ needs.detect-changes.outputs.e2e-grep }}
+          test-patterns-invert: ${{ needs.detect-changes.outputs.e2e-grep-invert }}
           e2e-commissioner-email: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
           e2e-commissioner-password: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
           e2e-manager-1-email: ${{ secrets.E2E_MANAGER_1_EMAIL }}
@@ -544,6 +647,45 @@ jobs:
           e2e-manager-3-email: ${{ secrets.E2E_MANAGER_3_EMAIL }}
           e2e-manager-3-password: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
 
+      # LS-7846: run the specs the PR's changed files map to, IN ADDITION to
+      # the @critical run above. This is the gate that catches regressions in
+      # the affected (non-@critical) area before merge instead of at the
+      # nightly. Skipped when a broad surface changed (run-all → the step above
+      # already ran the full suite) or when nothing mapped. @critical and @slow
+      # are excluded here: @critical already ran above, @slow stays nightly-only.
+      # Uses the line reporter so it does not clobber the shard blob report.
+      - name: "E2E Tests (affected specs)"
+        if: >-
+          needs.build.outputs.artifacts-ready == 'true' &&
+          needs.detect-changes.outputs.e2e-affected-run-all != 'true' &&
+          needs.detect-changes.outputs.e2e-affected-specs != ''
+        shell: bash
+        env:
+          CI: "true"
+          AFFECTED_SPECS: ${{ needs.detect-changes.outputs.e2e-affected-specs }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$AFFECTED_SPECS" | grep -v '^[[:space:]]*$' > /tmp/affected-specs.txt
+          mapfile -t SPECS < /tmp/affected-specs.txt
+          # Defensive: never run Playwright with zero file args (that would run
+          # the WHOLE suite on a single shard). The job `if` already guards this,
+          # but a list that filters to empty must skip, not fall through.
+          if [ "${#SPECS[@]}" -eq 0 ]; then
+            echo "No affected specs after filtering — nothing to run."
+            exit 0
+          fi
+          echo "🎯 Running affected hermetic e2e specs (excluding @critical/@slow):"
+          cat /tmp/affected-specs.txt
+          # PLAYWRIGHT_BROWSERS_PATH was exported to "" via GITHUB_ENV by the
+          # E2E Testing step, so browsers resolve from the user cache here too.
+          pnpm exec playwright test \
+            --config=apps/web-e2e/playwright.config.ts \
+            --project=chromium \
+            --grep-invert="@critical|@slow" \
+            --reporter=line \
+            --output=apps/web-e2e/test-results-affected \
+            "${SPECS[@]}"
+
       - name: "Upload Blob Report to S3"
         if: ${{ !cancelled() }}
         uses: ./.github/actions/s3-artifact
@@ -552,6 +694,47 @@ jobs:
           name: playwright-blobs/${{ strategy.job-index }}
           path: blob-report/
           if-no-files-found: warn
+
+  # ============================================================================
+  # STAGE 3a — E2E affected-selection merge gate (LS-7846)
+  # ============================================================================
+  # Stable-named aggregation check over the (matrix, dynamically-sharded) e2e
+  # job so the merge gate has ONE fixed required-check context regardless of how
+  # many shards ran. This is the check listed in .github/ruleset.json — it makes
+  # hermetic e2e regressions (in @critical OR the affected area) block merge
+  # instead of leaking to the nightly.
+  #
+  # Always runs (if: always()) so it never sits "Expected" and never blocks a
+  # PR that legitimately skipped e2e. Passes when e2e succeeded OR was skipped
+  # (no web/e2e/api change); fails when any e2e shard failed.
+  e2e-affected:
+    name: "e2e-affected"
+    needs: [detect-changes, e2e]
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Evaluate e2e result"
+        env:
+          E2E_RESULT: ${{ needs.e2e.result }}
+          RUN_ALL: ${{ needs.detect-changes.outputs.e2e-affected-run-all }}
+          SPEC_LIST: ${{ needs.detect-changes.outputs.e2e-affected-specs }}
+        run: |
+          set -euo pipefail
+          echo "e2e job result: $E2E_RESULT"
+          echo "run-all: ${RUN_ALL:-false}"
+          echo "affected specs:"
+          printf '%s\n' "${SPEC_LIST:-}" | grep -v '^[[:space:]]*$' || echo "  (none — @critical only)"
+          case "$E2E_RESULT" in
+            success|skipped)
+              echo "✅ e2e-affected gate passed (e2e=$E2E_RESULT)"
+              ;;
+            *)
+              echo "::error::e2e-affected gate failed — the e2e job result was '$E2E_RESULT'."
+              echo "::error::A hermetic e2e regression in @critical or the PR's affected area must be fixed before merge."
+              exit 1
+              ;;
+          esac
 
   # ============================================================================
   # STAGE 3b — Merge E2E shard reports and deploy to GitHub Pages

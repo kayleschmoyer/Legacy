@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/github-ruleset.json",
-  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh. Rules marked _staged:true represent target-state checks not yet ready to be managed from this checked-in config; apply-ruleset.sh and check-ruleset.yml filter them out of config-driven apply/drift checks for now, and any currently live rules of those staged types may be retained until the staged config is promoted. The CI pipeline checks (🚀 CI Pipeline / lint|format|build|test|custom-checks) are in the active required_status_checks rule because they are ALREADY LIVE in the GitHub ruleset — the CI pipeline refactor (ci-orchestrator.yml + ci-pipeline.yml) added them to the live ruleset before this config was updated to track them.",
+  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh. Rules marked _staged:true represent target-state checks not yet ready to be managed from this checked-in config; apply-ruleset.sh and check-ruleset.yml filter them out of config-driven apply/drift checks for now, and any currently live rules of those staged types may be retained until the staged config is promoted. The CI pipeline checks (🚀 CI Pipeline / lint|format|build|test|custom-checks) are in the active required_status_checks rule because they are ALREADY LIVE in the GitHub ruleset — the CI pipeline refactor (ci-orchestrator.yml + ci-pipeline.yml) added them to the live ruleset before this config was updated to track them. The 🚀 CI Pipeline / e2e-affected check (LS-7846) is NOT yet live — it is tracked here ahead of enforcement; a maintainer runs scripts/apply-ruleset.sh to push it live (until then check-ruleset.yml reports drift, which is expected).",
   "name": "Protect Main",
   "target": "branch",
   "enforcement": "active",
@@ -76,6 +76,11 @@
             "_comment": "Custom checks job (migration immutability, schema drift, skill linting) in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml. integration_id removed by LS-4925 (see lint entry above).",
             "_calledWorkflow": true,
             "context": "🚀 CI Pipeline / custom-checks"
+          },
+          {
+            "_comment": "Hermetic e2e affected-selection merge gate (LS-7846). Stable-named aggregation job (ci-pipeline.yml job `e2e-affected`) over the dynamically-sharded `e2e` job — passes when e2e succeeded or was legitimately skipped, fails when any e2e shard failed. Makes hermetic e2e regressions (in @critical OR the PR's affected area, selected via apps/web-e2e/src/e2e-surface-map.json) block merge instead of leaking to the nightly. A single fixed context is required here because the underlying e2e job's shard count (and therefore its per-shard check names) varies per PR. ADDED IN CONFIG AHEAD OF LIVE: a maintainer must run `bash scripts/apply-ruleset.sh` to push this into the live ruleset — until then check-ruleset.yml (a non-required drift check) will report drift, and this PR is gated only by the 8 previously-live required checks. See docs/decisions/0012-pr-ci-e2e-coverage.md.",
+            "_calledWorkflow": true,
+            "context": "🚀 CI Pipeline / e2e-affected"
           }
         ]
       }
