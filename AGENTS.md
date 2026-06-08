@@ -38,7 +38,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 
 - **MCP-first, then Make**: always prefer MCP tools over shell commands — `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`. Shell equivalents are fallbacks only. See `.agents/skills/mcp-first/SKILL.md` for the full tool mapping and substitution table.
 - **Chip dispatch via `mcp__ccd_session__spawn_task`, never `Agent`** — when any skill (work-ticket, sweep-prs, sweep-dependabot, etc.) needs to spawn an independent agent session for a child ticket or follow-up, `mcp__ccd_session__spawn_task` is the **only** correct tool. The `Agent(...)` tool creates an **in-context subagent** that shares the parent's context window; it cannot create its own worktree, cannot drive a PR to merge independently, and does not produce a visible chip in the UI. Using `Agent(...)` instead of `mcp__ccd_session__spawn_task(...)` is not a fallback — it is a categorically different operation that will not produce the correct result. If `mcp__ccd_session__spawn_task` is unavailable (ToolSearch returns no result), stop and inform the user rather than substituting the `Agent` tool.
-- **Tool-first for file operations**: use `Glob` (not `find`/`ls` — `ls <dir>` → `Glob(pattern: "*", path: "<dir>")`), `Grep` (not `grep`/`rg`), and `Read` (not `cat`/`head`/`tail`). To read the tail of a file, use `Read(file_path: "...", offset: <approx_line>, limit: N)` — estimate the offset from file size via `worktree_file_info`, or use a large offset for persisted output files; for small files, read in full with no offset. `Grep` works on single files and directories alike — common Bash grep patterns map directly: `grep -n "pattern" file` → `Grep(pattern: "pattern", path: "file", output_mode: "content")`; `grep -rn "pattern" dir/` → `Grep(pattern: "pattern", path: "dir", output_mode: "content")` (line numbers included by default in content mode; the `-r` and `-n` flags are implicit); `grep -i "pattern" file` → `Grep(pattern: "pattern", path: "file", "-i": true, output_mode: "content")`; multi-pattern `grep -n "pat1\|pat2" file` → `Grep(pattern: "pat1|pat2", path: "file", output_mode: "content")` (ripgrep uses `|` not `\|` for alternation). For reading files at git refs: use `worktree_show_file` for any locally-available ref (HEAD, SHA, local branch names, tags, remote-tracking branches like `origin/main`, and special refs `FETCH_HEAD`/`ORIG_HEAD`/`REBASE_HEAD`) and `worktree_show_remote` when you need to auto-fetch a remote branch first. **Never use `git show ref:path` shell commands on Windows** — colon-separator quoting fails in bash; `worktree_show_file` uses `execFileSync` and works cross-platform. During rebase conflict resolution, use `worktree_show_file({ ref: "origin/main", path: "..." })` to read the base branch version before deciding which side to keep. See `.agents/skills/mcp-first/SKILL.md` for the complete substitution table.
+- **Tool-first for file operations**: use `Glob` (not `find`/`ls`), `Grep` (not `grep`/`rg`), and `Read` (not `cat`/`head`/`tail`). To read the tail of a file, use `Read(file_path: "...", offset: <approx_line>, limit: N)`. For reading files at git refs: use `worktree_show_file` for any locally-available ref (HEAD, SHA, branch names, `origin/main`, `FETCH_HEAD`/`ORIG_HEAD`/`REBASE_HEAD`) and `worktree_show_remote` to auto-fetch a remote branch first. **Never use `git show ref:path` on Windows** — colon-separator quoting fails; `worktree_show_file` works cross-platform. See `.agents/skills/mcp-first/SKILL.md` for the full substitution table.
 - **Jira — auth-aware routing**: call `jira_auth_status` first. If `configured: true`, use custom MCP tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false` or API calls fail, fall back to the Atlassian plugin (`mcp__claude_ai_Atlassian__*`, cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`). Only use `acli` as a **last resort** if both the Jira MCP server and the Atlassian plugin are confirmed unavailable or unusable for the specific operation (e.g. a known plugin bug that persists after retrying). **The `legacy-sports-jira` MCP server is independent of the `worktree` MCP server** — never skip to `acli` just because `worktree_*` tools aren't loaded; check `jira_auth_status` first regardless of which other MCP servers are available. Fallback order: `jira_*` MCP → Atlassian plugin → `acli` CLI. **Exception — native ephemeral worktree sessions** (`.claude/worktrees/<name>/`): `legacy-sports-jira` is registered in `.mcp.json` but requires the `MCP_JIRA_URL` environment variable to connect (supplied via the main worktree's `.env` file — worktrees symlink back to it, but freshly-created worktrees may not yet have it in scope). When `MCP_JIRA_URL` is unset the server won't connect and `jira_auth_status` will not be available as a tool. If `jira_auth_status` is not in scope, use the Atlassian plugin (`mcp__claude_ai_Atlassian__*`). Caution: the Atlassian plugin has known encoding bugs for `transitionJiraIssue` and `createJiraIssue` — see the **`transitionJiraIssue`/`createJiraIssue` Atlassian plugin bug** bullet below.
 - **Jira — listing epic/story children**: always use `jira_list_children(key: "LS-####")` — never `searchJiraIssuesUsingJql` with `parent = LS-####`. Raw JQL returns verbose markdown-formatted output that overflows the MCP context limit (~192K chars for 50 results); `jira_list_children` returns compact structured JSON with pagination support and stays well under the limit. See `.agents/skills/mcp-first/SKILL.md` for the full Jira tool mapping.
 - **Jira — JQL search**: use `jira_search` instead of `searchJiraIssuesUsingJql` for any JQL query. The Atlassian plugin's search tool returns ~3.8 KB per issue (~190 KB for 50 results) due to metadata envelope overhead (expand URLs, self links, avatar URLs, statusCategory objects). **The `fields` filtering parameter does NOT reduce payload size** — the Atlassian plugin ignores field selection server-side and always returns full issue metadata (LS-3569). `jira_search` returns compact structured JSON with only the fields agents need; use `compact: true` for large result sets to get `{ issues: [{key, summary, status}], nextPageToken? }` (typically under 2 KB for 50 issues). When the response includes `nextPageToken`, pass it as `pageToken` in the next call to fetch the next page. **If you must fall back to `searchJiraIssuesUsingJql`** (e.g. the custom Jira server is unavailable), cap `maxResults` at 5 — the `fields` param provides no relief, so 50 results will always overflow.
@@ -143,53 +143,7 @@ The full design system lives at **https://claude.ai/design/p/670f7892-5193-4b8a-
 
 **Design sync process**: synced bundles are pulled in by the `/sync-designs` cloud agent (one Jira ticket per changed design) and consumed by `/implement-design LS-####` locally. Full process: [`docs/dev-process/design-sync.md`](docs/dev-process/design-sync.md). Operator runbook: [`.agents/skills/design-sync/SKILL.md`](.agents/skills/design-sync/SKILL.md).
 
-Key brand guidelines are summarized below for reference.
-
-### Users
-
-Fantasy sports players (25–45) who are league commissioners and active participants in baseball and football leagues. They use the app nights and evenings — often while watching live games. This is a passion and ritual, not a utility. They are competitive, data-obsessive, and have deep league loyalty.
-
-**Emotional goal**: anticipation and excitement — the feeling right before draft picks start, when everything feels possible.
-
-### Brand Personality
-
-**Nostalgic, sporty, professional.** The confident voice of a seasoned beat reporter who still gets excited every Opening Day. Not flashy, not corporate, not casual. Heritage details (aged gold, deep navy) are earned — they appear at meaningful moments, not as wallpaper.
-
-**Anti-reference**: Yahoo Sports — blocky, no craft, information dumped in uniform card grids. Every screen should have an editorial point of view.
-
-### Typography
-
-- **Display / Headings**: Big Shoulders Display (condensed grotesque — scoreboard, pennant, vintage baseball program energy)
-- **Body / UI**: Literata (reading-optimized, editorial warmth — not a tech tool font)
-- **Data**: tabular figures (`font-variant-numeric: tabular-nums`) for all statistics; numbers in columns must align on the decimal
-- **Scale**: fixed `rem` steps for app/dashboard UI; fluid `clamp()` only for marketing/landing pages
-- **Never use**: Inter, Playfair Display, Syne, or any font from the standard AI design reflex list
-
-### Color Application Rules
-
-- **Backgrounds**: layer `#0A0F1A` → `#0D1526` → `#111B2F` → `#16223A` (page → subtle → panel → elevated)
-- **Accents** (use sparingly — these are earned moments, not decoration):
-  - Heritage gold `#C5A55A` — match results, wins, trophy states
-  - Seam red `#C41E3A` — critical alerts, losing states, action required
-  - Deep navy `#1B3A5C` — primary interactive (buttons, selected states)
-- **Banned patterns**:
-  - No `border-left` / `border-right` accent stripes wider than 1px on cards or callouts
-  - No gradient text (`background-clip: text` with a gradient)
-  - No cyan/purple/neon glow accents
-
-### Navigation & Motion
-
-- **Route transitions must have directional meaning**: drill-down slides in from right; back slides out to left; tab switches crossfade (parallel, not hierarchical)
-- **Timing**: navigation 280–320ms ease-out-quart; micro-interactions 120–150ms
-- **Animate only transform and opacity** — never width, height, padding, or margin
-- **Honor `prefers-reduced-motion`**: crossfades only, no positional movement
-
-### Layout Principles
-
-- **Progressive disclosure**: surface what matters now; hide secondary navigation behind deliberate action
-- **Editorial hierarchy**: not everything is equal weight — a standings table and a player card are different, treat them differently
-- **No generic card grids**: not every piece of content belongs in the same card template
-- **Data is the product**: statistics tables should feel as designed as headlines — crisp, legible, visually weighted
+**Brand guidelines** (typography, colors, motion, layout): [`docs/design/brand.md`](docs/design/brand.md). Load before any frontend design work.
 
 ## Skills
 
