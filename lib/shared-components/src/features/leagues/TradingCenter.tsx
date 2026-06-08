@@ -42,6 +42,7 @@ import {
   Zap,
 } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { PremiumTradeTools } from './PremiumTradeTools';
 import { Button } from '../../Button';
 import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
 import {
@@ -1665,6 +1666,14 @@ export function TradingCenter({
 
       {/* Trade Block */}
       <LeagueTradeBlock leagueId={leagueId} userTeamId={userTeamId} />
+
+      <Separator borderColor="$outlineSubtle" />
+
+      {/* Premium Trade Tools */}
+      <PremiumTradeTools
+        userTeamId={userTeamId}
+        pendingTrades={pendingTrades}
+      />
 
       {/* Propose trade dialog */}
       {showProposeDialog && (

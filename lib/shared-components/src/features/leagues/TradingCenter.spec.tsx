@@ -200,6 +200,105 @@ describe('TradingCenter — LeagueTradeBlock integration', () => {
   });
 });
 
+describe('TradingCenter — PremiumTradeTools integration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProposerRosterReturn = { data: undefined };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+  });
+
+  it('renders the Premium Trade Tools section', async () => {
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByText('Premium Trade Tools')).toBeTruthy();
+  });
+
+  it('expands to show Trade Analyzer and Value Calculator tabs', async () => {
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    const header = await findByText('Premium Trade Tools');
+    header.click();
+
+    expect(await findByText('Trade Analyzer')).toBeTruthy();
+    expect(getByText('Value Calculator')).toBeTruthy();
+  });
+
+  it('shows empty state in Trade Analyzer when there are no pending trades', async () => {
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    const header = await findByText('Premium Trade Tools');
+    header.click();
+
+    expect(
+      await findByText(/no pending trade offers to analyze/i),
+    ).toBeTruthy();
+  });
+
+  it('lists pending trade offers in the Trade Analyzer', async () => {
+    mockPendingReturn = {
+      data: { teamTradeOffers: [incomingOffer] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    const header = await findByText('Premium Trade Tools');
+    header.click();
+
+    expect(await findByText('Sluggers')).toBeTruthy();
+  });
+
+  it('shows the Value Calculator with baseball positions when that tab is selected', async () => {
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    const header = await findByText('Premium Trade Tools');
+    header.click();
+
+    const calcTab = await findByText('Value Calculator');
+    calcTab.click();
+
+    expect(await findByText('Starting Pitcher')).toBeTruthy();
+  });
+});
+
 describe('TradingCenter — stale player detection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
