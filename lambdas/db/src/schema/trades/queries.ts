@@ -10,6 +10,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
+import { verifyLeagueMembership } from '../authorization';
 import { builder, type Context } from '../builder';
 import { requireAuth, verifyLeagueMembership } from '../authorization';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
@@ -112,6 +113,9 @@ builder.queryField('leagueTradeOffers', (t) =>
       }
 
       const { leagueId } = args;
+
+      await verifyLeagueMembership(context.db, leagueId, context.user.id);
+
       const statusFilter = (args.status ?? null) as
         | 'pending'
         | 'accepted'
