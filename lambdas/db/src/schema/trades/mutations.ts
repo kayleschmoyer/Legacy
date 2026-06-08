@@ -32,6 +32,12 @@ import { ENTITLEMENTS } from '../entitlements';
 
 const TRADE_EXPIRATION_FREE_LIMIT_DAYS = 7;
 const TRADE_EXPIRATION_MAX_DAYS = 30;
+const TRADE_MESSAGE_MAX_LENGTH = 500;
+
+function sanitizeTradeMessage(raw: string): string {
+  // Strip HTML tags to prevent XSS when the message is rendered or embedded in notifications
+  return raw.replace(/<[^>]*>/g, '').trim();
+}
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
 
@@ -364,11 +370,23 @@ builder.mutationField('proposeTrade', (t) =>
         receivingTeamId,
         offeringPlayerIds,
         requestingPlayerIds,
-        message,
+        message: rawMessage,
         expiresInDays,
       } = args;
       const userId = context.user.id;
       const db = context.db;
+
+      // Validate and sanitize the optional trade message
+      let message: string | null = null;
+      if (rawMessage != null) {
+        const sanitized = sanitizeTradeMessage(rawMessage);
+        if (sanitized.length > TRADE_MESSAGE_MAX_LENGTH) {
+          throw UserInputError(
+            `Trade message cannot exceed ${TRADE_MESSAGE_MAX_LENGTH} characters.`,
+          );
+        }
+        message = sanitized.length > 0 ? sanitized : null;
+      }
 
       if (offeringPlayerIds.length === 0 && requestingPlayerIds.length === 0) {
         throw new Error(
