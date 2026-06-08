@@ -11,7 +11,8 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import { builder, type Context } from '../builder';
-import { AuthenticationError } from '../graphql-errors';
+import { requireAuth, verifyLeagueMembership } from '../authorization';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -154,11 +155,25 @@ builder.queryField('teamTradeOffers', (t) =>
       status: t.arg.string({ required: false }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) {
-        throw AuthenticationError();
-      }
+      const user = requireAuth(context);
 
       const { teamId } = args;
+
+      // Look up the team to find its league, then verify the caller is a
+      // member of that league. Without this check any authenticated user can
+      // enumerate trade offers for any team across any league.
+      const [team] = await context.db
+        .select({ leagueId: PublicSchema.teams.leagueId })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        throw ForbiddenError('Team not found or access denied');
+      }
+
+      await verifyLeagueMembership(context.db, team.leagueId, user.id);
+
       const statusFilter = (args.status ?? null) as
         | 'pending'
         | 'accepted'

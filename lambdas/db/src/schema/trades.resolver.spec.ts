@@ -274,7 +274,35 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
+    it('throws when team does not exist', async () => {
+      // Team lookup returns no rows
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      const resolver = getResolver('query', 'teamTradeOffers');
+      await expect(
+        resolver({}, { teamId: 999 }, mockContext, undefined as never),
+      ).rejects.toThrow('Team not found or access denied');
+    });
+
+    it('throws when user is not a member of the league', async () => {
+      // Team lookup succeeds
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 5 }]);
+      // League membership lookup returns no rows
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      const resolver = getResolver('query', 'teamTradeOffers');
+      await expect(
+        resolver({}, { teamId: 1 }, mockContext, undefined as never),
+      ).rejects.toThrow('not a member of this league');
+    });
+
     it('returns empty array when no trades exist', async () => {
+      // Team lookup
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]);
+      // League membership lookup
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
       mockDb.orderBy.mockResolvedValueOnce([]);
 
       const resolver = getResolver('query', 'teamTradeOffers');
@@ -319,11 +347,19 @@ describe('Trades Resolver', () => {
         updatedAt: new Date(),
       };
 
+      // Authorization: team lookup → .where().limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]);
+      // Authorization: membership lookup → .where().limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 2 },
+      ]);
       // Main tradeOffers query: select().from().where().orderBy()
-      // The DB would return only the pending trade after filtering by status='pending'
+      // .where() must return mockDb so .orderBy() can chain
       mockDb.where.mockReturnValueOnce(mockDb);
       mockDb.orderBy.mockResolvedValueOnce([counterTrade]);
-      // hydrateTrades — teams lookup: select().from().where()
+      // hydrateTrades — teams lookup: select().from().where() (awaited directly)
       mockDb.where.mockResolvedValueOnce([
         { id: 1, name: 'Commissioner Team' },
         { id: 2, name: 'Manager Team' },
