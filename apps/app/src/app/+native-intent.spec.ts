@@ -48,4 +48,52 @@ describe('redirectSystemPath', () => {
       redirectSystemPath({ path: '/season-draft/join', initial: true }),
     ).toBe('/season-draft/join');
   });
+
+  it('rewrites baseball league trades path to flat route with initialTab query param', () => {
+    expect(
+      redirectSystemPath({
+        path: '/baseball/league/123/trades',
+        initial: true,
+      }),
+    ).toBe('/baseball/league/123?initialTab=trades');
+  });
+
+  it('rewrites football league trades path to flat route with initialTab query param', () => {
+    expect(
+      redirectSystemPath({
+        path: '/football/league/456/trades',
+        initial: false,
+      }),
+    ).toBe('/football/league/456?initialTab=trades');
+  });
+
+  it('rewrites league trades path with a trailing slash', () => {
+    expect(
+      redirectSystemPath({
+        path: '/baseball/league/789/trades/',
+        initial: false,
+      }),
+    ).toBe('/baseball/league/789?initialTab=trades');
+  });
+
+  it('preserves existing query params when rewriting trade paths', () => {
+    expect(
+      redirectSystemPath({
+        path: '/baseball/league/123/trades?ref=push',
+        initial: true,
+      }),
+    ).toBe('/baseball/league/123?ref=push&initialTab=trades');
+  });
+
+  it('passes through non-trades league sub-paths unchanged', () => {
+    expect(
+      redirectSystemPath({
+        path: '/baseball/league/123/roster',
+        initial: false,
+      }),
+    ).toBe('/baseball/league/123/roster');
+    expect(
+      redirectSystemPath({ path: '/baseball/league/123', initial: false }),
+    ).toBe('/baseball/league/123');
+  });
 });

@@ -128,7 +128,9 @@ export default function LeagueContext(): React.JSX.Element {
   const params = useLocalSearchParams();
   const leagueId = params.leagueId;
   const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState('matchup');
+  const initialTab =
+    typeof params.initialTab === 'string' ? params.initialTab : undefined;
+  const [selectedTab, setSelectedTab] = useState(initialTab ?? 'matchup');
   const userInfo = useAuthorizedUserInfo();
   const [wsToken, setWsToken] = useState<string | undefined>();
 

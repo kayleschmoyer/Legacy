@@ -27,6 +27,9 @@ const NotificationsPage: React.FC = () => {
         onNavigateToLeague={(leagueId: number) =>
           navigate(`/baseball/league/${leagueId}`)
         }
+        onNavigateToTrades={(leagueId: number) =>
+          navigate(`/baseball/league/${leagueId}/trades`)
+        }
       />
     </>
   );

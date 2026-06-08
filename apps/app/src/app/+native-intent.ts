@@ -1,7 +1,7 @@
 import { LOGGER } from '@legacy-sports/logging';
 
 /**
- * Expo Router native deep-link rewriter (LS-7808).
+ * Expo Router native deep-link rewriter (LS-7808, LS-5681).
  *
  * The web invite links are canonical and use the path shape
  * `/games/season-draft/join/<code>` (see `SeasonDraftGame.tsx` share URL and
@@ -10,12 +10,15 @@ import { LOGGER } from '@legacy-sports/logging';
  * `inviteCode` query param, so an incoming web-style path does not map to a
  * file route on its own.
  *
+ * Trade deep links use the web path shape `/baseball/league/<id>/trades` (or
+ * `/football/league/<id>/trades`). The native app has no nested tab route —
+ * the league page reads `initialTab` from query params instead, so we rewrite
+ * to the flat league route with `initialTab=trades`.
+ *
  * `redirectSystemPath` runs for every inbound deep link — both the custom
  * scheme (`legacysports://...`) and universal/app links
- * (`https://legacy-fantasy.com/...`, declared in `app.json`). Here we rewrite
- * the season-draft invite path into the native route + query param so the
- * shared `SeasonDraftJoin` screen opens with the code pre-loaded. All other
- * paths pass through unchanged.
+ * (`https://legacy-fantasy.com/...`, declared in `app.json`). All other paths
+ * pass through unchanged.
  */
 export function redirectSystemPath({
   path,
@@ -25,15 +28,31 @@ export function redirectSystemPath({
 }): string {
   try {
     // Split off any existing query/hash so we only match on the path portion.
-    const [pathname] = path.split(/[?#]/);
+    const [pathname, existingQuery] = path.split(/[?#]/);
 
     // Match `/games/season-draft/join/<code>` or `/season-draft/join/<code>`.
-    const match = pathname.match(
+    const seasonDraftMatch = pathname.match(
       /(?:\/games)?\/season-draft\/join\/([^/]+)\/?$/,
     );
-    if (match) {
-      const inviteCode = decodeURIComponent(match[1]);
+    if (seasonDraftMatch) {
+      const inviteCode = decodeURIComponent(seasonDraftMatch[1]);
       return `/season-draft/join?inviteCode=${encodeURIComponent(inviteCode)}`;
+    }
+
+    // Match `/baseball/league/<id>/trades` or `/football/league/<id>/trades`.
+    // Rewrites to the flat native league route with initialTab=trades so the
+    // league page opens directly on the Trades tab (LS-5681).
+    const tradeMatch = pathname.match(
+      /^\/(baseball|football)\/league\/(\d+)\/trades\/?$/,
+    );
+    if (tradeMatch) {
+      const sport = tradeMatch[1];
+      const leagueId = tradeMatch[2];
+      const base = `/${sport}/league/${leagueId}`;
+      const query = existingQuery
+        ? `${existingQuery}&initialTab=trades`
+        : 'initialTab=trades';
+      return `${base}?${query}`;
     }
 
     return path;

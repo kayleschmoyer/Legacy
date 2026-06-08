@@ -25,6 +25,12 @@ export default function NotificationsScreen(): React.JSX.Element {
           params: { leagueId: String(leagueId) },
         } as never)
       }
+      onNavigateToTrades={(leagueId) =>
+        router.push({
+          pathname: '/baseball/league/[leagueId]' as never,
+          params: { leagueId: String(leagueId), initialTab: 'trades' },
+        } as never)
+      }
     />
   );
 }

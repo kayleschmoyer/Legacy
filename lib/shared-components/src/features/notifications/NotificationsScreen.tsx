@@ -35,6 +35,7 @@ export interface NotificationsScreenProps {
   websocketToken?: string;
   onNavigateToMatchup?: (matchupId: number, leagueId: number) => void;
   onNavigateToLeague?: (leagueId: number) => void;
+  onNavigateToTrades?: (leagueId: number) => void;
 }
 
 export function NotificationsScreen({
@@ -43,6 +44,7 @@ export function NotificationsScreen({
   websocketToken,
   onNavigateToMatchup,
   onNavigateToLeague,
+  onNavigateToTrades,
 }: NotificationsScreenProps): React.JSX.Element {
   const {
     notifications,
@@ -79,6 +81,15 @@ export function NotificationsScreen({
       return;
     }
 
+    const isTradeNotification = (notification.notificationType ?? '')
+      .toLowerCase()
+      .includes('trade');
+
+    if (isTradeNotification && notification.leagueId && onNavigateToTrades) {
+      onNavigateToTrades(notification.leagueId);
+      return;
+    }
+
     if (notification.leagueId) {
       onNavigateToLeague?.(notification.leagueId);
     }
@@ -98,7 +109,7 @@ export function NotificationsScreen({
       ? `You have ${unreadCount} unread notification${
           unreadCount === 1 ? '' : 's'
         }`
-      : 'You’re all caught up';
+      : '’You’re all caught up';
 
   let body: React.ReactNode;
   if (loading && notifications.length === 0) {
@@ -145,7 +156,7 @@ export function NotificationsScreen({
           No notifications yet
         </H2>
         <Text color="$gray11" textAlign="center">
-          When something happens in your leagues, you{'’'}ll see it here.
+          When something happens in your leagues, you{"'"} ll see it here.
         </Text>
       </YStack>
     );
