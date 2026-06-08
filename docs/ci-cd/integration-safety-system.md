@@ -84,6 +84,22 @@ This keeps the live-backend cost proportional to risk: a draft change runs ~5 dr
 
 ---
 
+## Coverage-driven surface-map auto-sync (epic LS-7848)
+
+The surface maps are only as good as their globs. A stale or missing glob silently **under-selects** — a spec exercises a source file no glob accounts for, so changes to that file never trigger the spec. The auto-sync loop keeps the maps honest from the nightly run's actual coverage, across both maps (`integration-surface-map.json` and the hermetic `e2e-surface-map.json`).
+
+- **Coverage collection (LS-7849):** the nightly Playwright matrix records, per spec, the set of source files it actually executed, emitting per-shard `coverage-fragment.json` artifacts.
+- **Drift auditor (LS-7850, `.github/scripts/coverage-audit/audit-coverage.mjs`):** a **report-only** nightly job (`audit-coverage` in `run-playwright-tests.yml`) unions the fragments and diffs observed coverage against both maps, with deliberately asymmetric confidence:
+  - **Under-selection (HIGH, immediate):** a spec executed a file matched by none of its globs nor `runAllWhenChanged`. Flagged on a single night — a positive observation, not an absence — and is the new-source-file onboarding trigger.
+  - **Dead glob (LOW, K-night):** a glob that matched nothing for K=3 consecutive nightlies (per-glob counter persisted in S3). Data-dependent paths under-cover on any given night, so a single miss is never authoritative.
+  - The auditor never mutates a map and never fails a PR; it emits a job-summary report, a Discord note, and `--json` findings.
+- **Remediation bot (LS-7851, `.github/scripts/coverage-audit/remediate-surface-map.mjs`):** the `remediate-surface-map` job runs only when the audit reports under-selection. It **additively** adds the missing directory-level globs (`<dir>/**`) to the owning map — appending to already-mapped specs, onboarding never-mapped specs with a new entry — and opens or idempotently force-refreshes a **single standing PR** (`bot/surface-map-remediation`).
+  - **Additive-only:** it never removes or narrows a glob. Dead-glob pruning stays a deliberate human decision (removal risks silently reintroducing under-selection).
+  - **Never auto-merges:** the PR is reviewed and merged by a human like any other; no merge label is applied.
+  - A hand-rolled serializer reproduces the committed prettier-clean JSON byte-for-byte (round-trip unit-tested), so each diff touches only the specs that changed.
+
+---
+
 ## Tier 2 — Terraform plan gate
 
 `terraform validate -backend=false` (in the build job) only checks syntax. Real breakage — missing IAM permissions, plan-time errors, destructive diffs — currently surfaces only at **post-merge apply**, blocking all backend deploys.
@@ -123,14 +139,16 @@ These require main-branch automation and are intentionally not implemented in Ph
 
 ## File index
 
-| Concern              | Path                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------- |
-| Contract gate script | `.github/scripts/schema-contract/check-contract.mjs`                                    |
-| Contract gate tests  | `.github/scripts/schema-contract/__tests__/check-contract.test.mjs`                     |
-| Contract gate wiring | `.github/workflows/check-schema.yml`                                                    |
-| Spec selector        | `.github/scripts/integration-select/select-specs.mjs`                                   |
-| Surface manifest     | `apps/web-e2e/src/integration/integration-surface-map.json`                             |
-| Advisory workflow    | `.github/workflows/integration-advisory.yml`                                            |
-| Integration runner   | `.github/workflows/run-integration-tests.yml`                                           |
-| Terraform plan gate  | `.github/workflows/terraform-plan.yml`, `.tflint.hcl`                                   |
-| CI test hooks        | `.github/checks/schema-contract-tests.sh`, `.github/checks/integration-select-tests.sh` |
+| Concern              | Path                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Contract gate script | `.github/scripts/schema-contract/check-contract.mjs`                                                                              |
+| Contract gate tests  | `.github/scripts/schema-contract/__tests__/check-contract.test.mjs`                                                               |
+| Contract gate wiring | `.github/workflows/check-schema.yml`                                                                                              |
+| Spec selector        | `.github/scripts/integration-select/select-specs.mjs`                                                                             |
+| Surface manifest     | `apps/web-e2e/src/integration/integration-surface-map.json`                                                                       |
+| Advisory workflow    | `.github/workflows/integration-advisory.yml`                                                                                      |
+| Integration runner   | `.github/workflows/run-integration-tests.yml`                                                                                     |
+| Drift auditor        | `.github/scripts/coverage-audit/audit-coverage.mjs` (`audit-coverage` job)                                                        |
+| Remediation bot      | `.github/scripts/coverage-audit/remediate-surface-map.mjs` (`remediate-surface-map` job)                                          |
+| Terraform plan gate  | `.github/workflows/terraform-plan.yml`, `.tflint.hcl`                                                                             |
+| CI test hooks        | `.github/checks/schema-contract-tests.sh`, `.github/checks/integration-select-tests.sh`, `.github/checks/coverage-audit-tests.sh` |

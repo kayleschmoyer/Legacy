@@ -796,6 +796,10 @@ jobs:
     if: ${{ !cancelled() && needs.run-tests.result != 'skipped' && (github.event_name == 'schedule' || inputs['collect-coverage']) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      # Consumed by the downstream remediate-surface-map job (LS-7851) to decide
+      # whether to open/update the auto-remediation PR.
+      has-under-selection: ${{ steps.audit.outputs.has-under-selection }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -851,6 +855,7 @@ jobs:
             --k 3 \
             --report-md coverage-audit-report.md \
             --discord-md coverage-audit-discord.md \
+            --json coverage-audit.json \
             --github-output >> "$GITHUB_OUTPUT"
 
           # Persist the updated counters for the next nightly (best-effort — a
@@ -891,6 +896,128 @@ jobs:
           title: "Surface-Map Coverage Audit"
           description: ${{ steps.discord.outputs.description }}
           thread-id: ${{ needs.notify-nightly-start.outputs.thread-id }}
+
+      # Hand the structured findings to the downstream remediation job — only
+      # when there is under-selection to act on, so the bot can read the exact
+      # finding list that drove has-under-selection.
+      - name: "Upload Coverage Audit Findings"
+        if: ${{ steps.audit.outputs.has-under-selection == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-audit-findings
+          path: coverage-audit.json
+          retention-days: 3
+          if-no-files-found: error
+
+  # ===========================================================================
+  # Surface-map auto-remediation bot (LS-7851, remediation child of LS-7848)
+  # ===========================================================================
+  # Closes the loop: turns the auditor's under-selection findings into a
+  # reviewable map update. When the audit flags persistent under-selection (a
+  # spec exercising source files no glob accounts for — including brand-new,
+  # never-mapped files), this job ADDITIVELY adds the missing directory-level
+  # globs to the owning surface map(s) and opens — or idempotently UPDATES — a
+  # single standing bot PR.
+  #
+  # Safety, by construction:
+  #   - Additive-only: never removes or narrows a glob (dead-glob pruning stays a
+  #     manual human decision; removal risks silently reintroducing under-selection).
+  #   - NEVER auto-merges and applies no merge label — reviewed/merged by a human.
+  #   - Idempotent: the branch is force-derived from main + the current findings
+  #     each run, refreshing the one open PR rather than spawning duplicates.
+  remediate-surface-map:
+    name: "Remediate Surface-Map Drift (PR)"
+    needs: [audit-coverage]
+    if: ${{ !cancelled() && needs.audit-coverage.result == 'success' && needs.audit-coverage.outputs.has-under-selection == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      REMEDIATION_BRANCH: bot/surface-map-remediation
+      E2E_MAP: apps/web-e2e/src/e2e-surface-map.json
+      INTEGRATION_MAP: apps/web-e2e/src/integration/integration-surface-map.json
+    steps:
+      - name: "Checkout main"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: "Download Coverage Audit Findings"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: coverage-audit-findings
+          path: audit-findings
+
+      # Bot App token so the branch push triggers PR CI (the default GITHUB_TOKEN
+      # would suppress downstream workflow runs). Same app identity as the other
+      # bot workflows.
+      - name: "Generate bot app token"
+        id: bot-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: "Apply additive remediation to surface maps"
+        id: remediate
+        shell: bash
+        run: |
+          node .github/scripts/coverage-audit/remediate-surface-map.mjs \
+            --audit-json audit-findings/coverage-audit.json \
+            --e2e-map "$E2E_MAP" \
+            --integration-map "$INTEGRATION_MAP" \
+            --write \
+            --pr-body-out remediation-pr-body.md \
+            --run-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --github-output >> "$GITHUB_OUTPUT"
+
+      - name: "Open or update the remediation PR"
+        if: ${{ steps.remediate.outputs.changed == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
+        shell: bash
+        run: |
+          git config user.name "legacy-sports-code-bot[bot]"
+          git config user.email "270182682+legacy-sports-code-bot[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
+
+          # Re-derive the branch from main + the night's full finding set, so the
+          # single standing PR is refreshed in place (idempotent) rather than
+          # accumulating stale diffs or spawning duplicates.
+          git checkout -B "$REMEDIATION_BRANCH"
+          git add "$E2E_MAP" "$INTEGRATION_MAP"
+
+          if git diff --cached --quiet; then
+            echo "Maps already cover the flagged files on main — nothing to propose."
+            exit 0
+          fi
+
+          # No Jira key in the title/commit/branch on purpose: this is a recurring
+          # operational PR, and a key would make Jira Branch Sync re-transition
+          # the implementing ticket (LS-7851) every night.
+          COMMIT_MSG="chore(web-e2e): auto-sync surface-map globs for under-selected specs"
+          git commit -m "$COMMIT_MSG"
+          git push --force origin "$REMEDIATION_BRANCH"
+
+          EXISTING=$(gh pr list --head "$REMEDIATION_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "Refreshed existing remediation PR #$EXISTING (force-pushed branch)."
+          else
+            gh pr create \
+              --title "$COMMIT_MSG" \
+              --body-file remediation-pr-body.md \
+              --head "$REMEDIATION_BRANCH" \
+              --base main
+            echo "Opened new remediation PR."
+          fi
 
   # ---------------------------------------------------------------------------
   # Discord notification — fires after tests finish (schedule + manual dispatch)
