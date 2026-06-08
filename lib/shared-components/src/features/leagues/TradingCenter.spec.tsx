@@ -1,7 +1,8 @@
 import React from 'react';
 import { TradingCenter } from './TradingCenter';
-import { render, waitFor } from '../../test-utils';
+import { fireEvent, render, waitFor } from '../../test-utils';
 import type {
+  GetLeagueTradeOffersQuery,
   GetTeamMembersQuery,
   GetTeamTradeOffersQuery,
   TradeOffer,
@@ -15,6 +16,16 @@ let mockPendingReturn: {
   data: GetTeamTradeOffersQuery | undefined;
   loading: boolean;
   refetch: jest.Mock;
+};
+
+let mockLeagueTradesReturn: {
+  data: GetLeagueTradeOffersQuery | undefined;
+  loading: boolean;
+  refetch: jest.Mock;
+} = {
+  data: undefined,
+  loading: false,
+  refetch: jest.fn(),
 };
 
 let mockProposerRosterReturn: {
@@ -34,11 +45,7 @@ const mockRefetch = jest.fn().mockResolvedValue({});
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetLeagueByIdQuery: () => ({ data: undefined }),
   useGetTeamTradeOffersQuery: jest.fn(() => mockPendingReturn),
-  useGetLeagueTradeOffersQuery: () => ({
-    data: undefined,
-    loading: false,
-    refetch: jest.fn(),
-  }),
+  useGetLeagueTradeOffersQuery: jest.fn(() => mockLeagueTradesReturn),
   useGetLeagueTeamsQuery: () => ({ data: undefined }),
   useGetTeamMembersLazyQuery: jest.fn(() => [
     mockLoadProposerRoster,
@@ -351,5 +358,325 @@ describe('TradingCenter — stale player detection', () => {
 
     // Should NOT have fetched roster (not an incoming offer for this user)
     expect(mockLoadProposerRoster).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Completed Trade History
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — Completed Trade History', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockLeagueTradesReturn = {
+      data: undefined,
+      loading: false,
+      refetch: jest.fn(),
+    };
+    mockProposerRosterReturn = { data: undefined };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+  });
+
+  it('renders the Trade History toggle button', async () => {
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByText('Trade History')).toBeTruthy();
+  });
+
+  it('history section is hidden by default', () => {
+    const { queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(queryByText(/No trade history yet/i)).toBeNull();
+  });
+
+  it('shows trade history section when toggle is clicked', async () => {
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: [] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText(/No trade history yet/i)).toBeTruthy();
+  });
+
+  it('hides trade history after clicking the toggle again', async () => {
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: [] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    // Open
+    fireEvent.click(getByText('Trade History'));
+    await findByText(/No trade history yet/i);
+    // Close
+    fireEvent.click(getByText('Trade History'));
+    await waitFor(() => {
+      expect(queryByText(/No trade history yet/i)).toBeNull();
+    });
+  });
+
+  it('shows loading spinner while fetching history', async () => {
+    mockLeagueTradesReturn = {
+      data: undefined,
+      loading: true,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText, getAllByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    // Spinner mock renders as "Loading..."
+    await waitFor(() => {
+      expect(getAllByText('Loading...').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('renders accepted trade cards in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 200,
+            status: 'accepted',
+            respondedAt: '2026-03-20T10:00:00Z',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    // Badge renders the status in uppercase
+    expect(await findByText('ACCEPTED')).toBeTruthy();
+  });
+
+  it('renders rejected trade cards in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 201,
+            status: 'rejected',
+            respondedAt: '2026-03-21T09:00:00Z',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText('REJECTED')).toBeTruthy();
+  });
+
+  it('renders vetoed trade cards in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 202,
+            status: 'vetoed',
+            vetoedAt: '2026-03-22T12:00:00Z',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText('VETOED')).toBeTruthy();
+  });
+
+  it('renders cancelled trade cards in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [makeOffer({ id: 203, status: 'cancelled' })],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText('CANCELLED')).toBeTruthy();
+  });
+
+  it('filters out pending trades — only non-pending appear in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({ id: 210, status: 'pending' }),
+          makeOffer({
+            id: 211,
+            status: 'accepted',
+            respondedAt: '2026-03-20T10:00:00Z',
+            proposingTeamName: 'Sluggers',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText, queryAllByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    // Badge for the accepted trade should appear exactly once
+    await findByText('ACCEPTED');
+    // Badge "PENDING" must not appear in the history section
+    expect(queryAllByText('PENDING')).toHaveLength(0);
+  });
+
+  it('shows player names within completed trade cards', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 220,
+            status: 'accepted',
+            respondedAt: '2026-03-20T10:00:00Z',
+            players: [
+              {
+                __typename: 'TradeOfferPlayer' as const,
+                id: 1,
+                tradeOfferId: 220,
+                playerId: 100,
+                fromTeamId: PROPOSING_TEAM_ID,
+                playerName: 'Shohei Ohtani',
+                playerPosition: 'DH',
+              },
+            ],
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText('Shohei Ohtani')).toBeTruthy();
+  });
+
+  it('shows commissioner veto button on accepted trades in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 230,
+            status: 'accepted',
+            respondedAt: '2026-03-20T10:00:00Z',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        isCommissioner
+      />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText('Veto')).toBeTruthy();
+  });
+
+  it('does not show veto button for non-commissioner in history', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 231,
+            status: 'accepted',
+            respondedAt: '2026-03-20T10:00:00Z',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    await findByText('ACCEPTED');
+    expect(queryByText('Veto')).toBeNull();
+  });
+
+  it('renders multiple completed trade cards', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [
+          makeOffer({
+            id: 240,
+            status: 'accepted',
+            respondedAt: '2026-03-18T10:00:00Z',
+          }),
+          makeOffer({
+            id: 241,
+            status: 'rejected',
+            respondedAt: '2026-03-19T10:00:00Z',
+          }),
+          makeOffer({
+            id: 242,
+            status: 'vetoed',
+            vetoedAt: '2026-03-20T10:00:00Z',
+          }),
+        ],
+      },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByText, getByText, getAllByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    // Wait for at least one badge to appear
+    await findByText('ACCEPTED');
+    // All three status badges (exact uppercase) should be present
+    expect(getAllByText('ACCEPTED')).toHaveLength(1);
+    expect(getAllByText('REJECTED')).toHaveLength(1);
+    expect(getAllByText('VETOED')).toHaveLength(1);
   });
 });
