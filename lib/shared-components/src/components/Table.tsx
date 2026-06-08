@@ -40,6 +40,10 @@ function resolveCellValue(cell: TableCellData): {
 function HeaderCell({ column }: { column: TableColumn }) {
   return (
     <XStack
+      tag="th"
+      // `scope` is omitted from Tamagui's stack prop types; spread it so the
+      // attribute reaches the DOM (see LeagueDetailShell.tsx:310).
+      {...{ scope: 'col' }}
       role="columnheader"
       flex={1}
       justifyContent={column.numeric ? 'flex-end' : 'flex-start'}
@@ -93,6 +97,7 @@ function DataCell({
 
   return (
     <XStack
+      tag="td"
       role="cell"
       flex={1}
       justifyContent={column.numeric ? 'flex-end' : 'flex-start'}
@@ -108,7 +113,12 @@ function DataCell({
 
 export function Table({ columns, rows, title }: TableProps): React.JSX.Element {
   return (
+    // Emit real <table>/<caption>/<thead>/<tbody>/<tr>/<th>/<td> on web via the
+    // Tamagui `tag` prop (it survives the optimizing compiler; `role` is
+    // stripped from the prod build — LS-7861). `role` is kept for native screen
+    // readers. Layout is unchanged — `tag` only sets the DOM element name.
     <YStack
+      tag="table"
       role="table"
       aria-label={title}
       backgroundColor="$surfacePanel"
@@ -120,6 +130,7 @@ export function Table({ columns, rows, title }: TableProps): React.JSX.Element {
     >
       {title ? (
         <XStack
+          tag="caption"
           paddingHorizontal={14}
           paddingVertical={12}
           borderBottomWidth={1}
@@ -137,9 +148,10 @@ export function Table({ columns, rows, title }: TableProps): React.JSX.Element {
         </XStack>
       ) : null}
 
-      {/* Header — role="rowgroup" + role="row" mirrors <thead><tr> semantics */}
-      <XStack role="rowgroup">
+      {/* Header — <thead><tr> on web, role="rowgroup"/"row" for native */}
+      <XStack tag="thead" role="rowgroup">
         <XStack
+          tag="tr"
           role="row"
           flex={1}
           backgroundColor="$surfaceCard"
@@ -152,11 +164,12 @@ export function Table({ columns, rows, title }: TableProps): React.JSX.Element {
         </XStack>
       </XStack>
 
-      {/* Body — role="rowgroup" mirrors <tbody> semantics */}
-      <YStack role="rowgroup">
+      {/* Body — <tbody> on web, role="rowgroup" for native */}
+      <YStack tag="tbody" role="rowgroup">
         {rows.map((row, rowIdx) => (
           <XStack
             key={rowIdx}
+            tag="tr"
             role="row"
             hoverStyle={{ backgroundColor: '$surfaceInteractive' }}
           >

@@ -14,7 +14,7 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { adminTest, expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -357,6 +357,168 @@ async function mockPlayerStatsGraphQL(page: import('@playwright/test').Page) {
   });
 }
 
+// Two premium players with the career/scoring fields the comparison table reads.
+const MOCK_COMPARE_PLAYERS = [
+  {
+    __typename: 'Player',
+    id: 1,
+    firstName: 'Aaron',
+    lastName: 'Judge',
+    eligiblePositions: ['OF'],
+    scoring: {
+      __typename: 'PlayerScoring',
+      totalScore: 850,
+      avgPointsPerGame: 2.1,
+      hitterScore: 80,
+      pitchingScore: 0,
+      fieldingScore: 5,
+    },
+    careerBatting: {
+      games: 900,
+      hits: 900,
+      homeRuns: 220,
+      rbi: 600,
+      runs: 520,
+      stolenBases: 10,
+      baseOnBalls: 400,
+      totalBases: 1800,
+      offensiveWAR: 42.0,
+    },
+    averageSeasonBatting: {
+      battingAverage: 0.282,
+      onBasePercentage: 0.387,
+      sluggingPercentage: 0.579,
+    },
+    careerPitching: null,
+    careerAchievements: {
+      allStarSelections: 5,
+      mvpAwards: 2,
+      cyYoungAwards: 0,
+      goldGloves: 0,
+      silverSluggers: 3,
+      worldSeriesRings: 1,
+    },
+  },
+  {
+    __typename: 'Player',
+    id: 2,
+    firstName: 'Shohei',
+    lastName: 'Ohtani',
+    eligiblePositions: ['SP', 'DH'],
+    scoring: {
+      __typename: 'PlayerScoring',
+      totalScore: 960,
+      avgPointsPerGame: 2.6,
+      hitterScore: 75,
+      pitchingScore: 60,
+      fieldingScore: 3,
+    },
+    careerBatting: {
+      games: 760,
+      hits: 640,
+      homeRuns: 175,
+      rbi: 480,
+      runs: 400,
+      stolenBases: 50,
+      baseOnBalls: 310,
+      totalBases: 1400,
+      offensiveWAR: 38.5,
+    },
+    averageSeasonBatting: {
+      battingAverage: 0.274,
+      onBasePercentage: 0.377,
+      sluggingPercentage: 0.564,
+    },
+    careerPitching: {
+      games: 130,
+      wins: 55,
+      losses: 23,
+      saves: 0,
+      strikeouts: 1200,
+      baseOnBalls: 250,
+      winPercentage: 0.705,
+      era: '2.94',
+    },
+    careerAchievements: {
+      allStarSelections: 4,
+      mvpAwards: 2,
+      cyYoungAwards: 0,
+      goldGloves: 0,
+      silverSluggers: 2,
+      worldSeriesRings: 0,
+    },
+  },
+];
+
+/** Mocks the GraphQL surface needed to render the premium comparison table. */
+async function mockPlayerComparisonGraphQL(
+  page: import('@playwright/test').Page,
+) {
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const postData = route.request().postData()?.toLowerCase() ?? '';
+
+    if (postData.includes('getplayerswithstats')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { players: MOCK_COMPARE_PLAYERS } }),
+      });
+    } else if (postData.includes('getuserbyid')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            user: {
+              __typename: 'User',
+              id: 1,
+              email: 'user@test.com',
+              username: 'testuser',
+              accessLevel: 'none',
+              subscriptionTier: 'premium',
+              avatarUrl: null,
+            },
+          },
+        }),
+      });
+    } else if (postData.includes('getmysubscription')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            mySubscription: {
+              __typename: 'SubscriptionInfo',
+              status: 'active',
+              tier: 'premium',
+              currentPeriodEnd: '2026-12-31T00:00:00.000Z',
+              cancelAtPeriodEnd: false,
+              trialEndsAt: null,
+              gracePeriodEndsAt: null,
+            },
+          },
+        }),
+      });
+    } else if (postData.includes('getallplayerseasonstats')) {
+      // Season-by-season query — empty so the comparison table is the only
+      // <table> under assertion (season blocks render a no-data message).
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { playerSeasonBatting: [], playerSeasonPitching: [] },
+        }),
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -467,6 +629,67 @@ test.describe('Table accessibility @regression', () => {
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Player comparison table — real <table> markup (LS-7861)
+  //
+  // The head-to-head ComparisonTable only renders once 2+ players are selected
+  // and the viewer is premium. Selecting two players exercises the shared
+  // PlayerComparison component's table semantics in the prod build (the Tamagui
+  // optimizer strips `role`; the `tag` prop is what produces a real <table>).
+  // -------------------------------------------------------------------------
+
+  adminTest.describe('Player comparison table semantics', () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockPlayerComparisonGraphQL(page);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+
+      const input = page.getByLabel('Search players to compare');
+      await input.fill('Aa');
+      await expect(page.getByText('Aaron Judge')).toBeVisible();
+      await page.getByText('Aaron Judge').click();
+
+      // Add a second player (retry fill+click — dropdown can close on re-render)
+      await expect(async () => {
+        await input.fill('Sh');
+        await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
+      }).toPass({ timeout: 15000 });
+
+      // The comparison table renders a real <table> once 2 players are present.
+      await page.waitForSelector('table', { timeout: 10000 });
+    });
+
+    adminTest('comparison renders a real <table> element', async ({ page }) => {
+      const { tableCount } = await evaluateTableA11y(page);
+      expect(tableCount).toBeGreaterThan(0);
+    });
+
+    adminTest('comparison table has thead and tbody', async ({ page }) => {
+      const { tableDetails } = await evaluateTableA11y(page);
+      for (const detail of tableDetails) {
+        if (detail.headerCount > 0) {
+          expect(detail.hasThead).toBe(true);
+        }
+        expect(detail.hasTbody).toBe(true);
+      }
+    });
+
+    adminTest('comparison header cells declare a scope', async ({ page }) => {
+      const { tableDetails } = await evaluateTableA11y(page);
+      for (const detail of tableDetails) {
+        if (detail.headerCount > 0) {
+          expect(detail.headersWithScope).toBe(detail.headerCount);
+        }
+      }
+    });
+
+    adminTest('comparison tables have no a11y issues', async ({ page }) => {
+      const { issues } = await evaluateTableA11y(page);
+      expect(issues).toHaveLength(0);
     });
   });
 

@@ -11,6 +11,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Lock, Plus, X } from '@tamagui/lucide-icons';
+// Structural table elements use a Tamagui stack: on web the `tag` prop renders
+// a real <table>/<thead>/<tbody>/<tr>/<th>/<td> host element (with `role` kept
+// for native screen readers, since the optimizer strips `role` from the web
+// build). React Native's `View` has no `tag` prop. See StandingsTable (LS-7860).
+import { YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   type GetAllPlayerSeasonStatsQuery,
@@ -723,119 +728,144 @@ function ComparisonTable({
       }}
     >
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ minWidth: METRIC_W + players.length * VALUE_W }}>
+        {/* Emit real <table>/<thead>/<tbody>/<tr>/<th>/<td> on web via the
+            Tamagui `tag` prop (it survives the optimizing compiler; `role` is
+            stripped from the prod build — LS-7861). `role` is kept for native
+            screen readers. Flex layout is unchanged — `tag` only sets the DOM
+            element name. */}
+        <YStack
+          tag="table"
+          role="table"
+          aria-label="Player comparison"
+          minWidth={METRIC_W + players.length * VALUE_W}
+        >
           {/* Header row */}
-          <View
-            style={{
-              flexDirection: 'row',
-              backgroundColor: SURFACE_PANEL,
-              borderBottomWidth: 1,
-              borderBottomColor: withAlpha(BRAND_NAVY_LIGHT, 0.2),
-            }}
-          >
-            <View style={{ width: METRIC_W, padding: 14 }}>
-              <Text
-                style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: '700',
-                  fontSize: 11,
-                  letterSpacing: 1.3,
-                  textTransform: 'uppercase',
-                  color: TEXT_MUTED,
-                }}
-              >
-                Metric
-              </Text>
-            </View>
-            {players.map((p, i) => (
-              <View
-                key={p.id}
-                style={{
-                  width: VALUE_W,
-                  padding: 14,
-                  alignItems: 'flex-end',
-                  borderLeftWidth: 1,
-                  borderLeftColor: withAlpha(BRAND_NAVY_LIGHT, 0.15),
-                }}
+          <YStack tag="thead" role="rowgroup">
+            <YStack
+              tag="tr"
+              role="row"
+              flexDirection="row"
+              backgroundColor={SURFACE_PANEL}
+              borderBottomWidth={1}
+              borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)}
+            >
+              <YStack
+                tag="th"
+                {...{ scope: 'col' }}
+                role="columnheader"
+                width={METRIC_W}
+                padding={14}
               >
                 <Text
-                  numberOfLines={1}
                   style={{
                     fontFamily: FONT_DISPLAY,
-                    fontWeight: '800',
-                    fontSize: 18,
-                    color: WHITE,
-                    textAlign: 'right',
-                  }}
-                >
-                  {p.name}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontStyle: 'italic',
+                    fontWeight: '700',
                     fontSize: 11,
+                    letterSpacing: 1.3,
+                    textTransform: 'uppercase',
                     color: TEXT_MUTED,
                   }}
                 >
-                  {p.position}
+                  Metric
                 </Text>
-                <View
-                  aria-hidden
-                  style={{
-                    width: 32,
-                    height: 3,
-                    borderRadius: 2,
-                    marginTop: 6,
-                    backgroundColor: PLAYER_ACCENTS[i] ?? BRAND_GOLD,
-                  }}
-                />
-              </View>
-            ))}
-          </View>
-
-          {/* Groups */}
-          {groups.map((g) => (
-            <View key={g.title}>
-              <View
-                style={{
-                  backgroundColor: SURFACE_SUBTLE,
-                  paddingVertical: 10,
-                  paddingHorizontal: 14,
-                  borderBottomWidth: 1,
-                  borderBottomColor: withAlpha(BRAND_NAVY_LIGHT, 0.2),
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: '800',
-                    fontSize: 11,
-                    letterSpacing: 2,
-                    textTransform: 'uppercase',
-                    color: BRAND_GOLD_LIGHT,
-                  }}
+              </YStack>
+              {players.map((p, i) => (
+                <YStack
+                  key={p.id}
+                  tag="th"
+                  {...{ scope: 'col' }}
+                  role="columnheader"
+                  width={VALUE_W}
+                  padding={14}
+                  alignItems="flex-end"
+                  borderLeftWidth={1}
+                  borderLeftColor={withAlpha(BRAND_NAVY_LIGHT, 0.15)}
                 >
-                  {g.title}
-                </Text>
-              </View>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '800',
+                      fontSize: 18,
+                      color: WHITE,
+                      textAlign: 'right',
+                    }}
+                  >
+                    {p.name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: FONT_BODY,
+                      fontStyle: 'italic',
+                      fontSize: 11,
+                      color: TEXT_MUTED,
+                    }}
+                  >
+                    {p.position}
+                  </Text>
+                  <View
+                    aria-hidden
+                    style={{
+                      width: 32,
+                      height: 3,
+                      borderRadius: 2,
+                      marginTop: 6,
+                      backgroundColor: PLAYER_ACCENTS[i] ?? BRAND_GOLD,
+                    }}
+                  />
+                </YStack>
+              ))}
+            </YStack>
+          </YStack>
+
+          {/* Groups — each renders as its own <tbody>; the group title is a
+              full-width <tr><td> and every stat is a <tr> of <td> cells. */}
+          {groups.map((g) => (
+            <YStack tag="tbody" role="rowgroup" key={g.title}>
+              <YStack tag="tr" role="row">
+                <YStack
+                  tag="td"
+                  role="cell"
+                  backgroundColor={SURFACE_SUBTLE}
+                  paddingVertical={10}
+                  paddingHorizontal={14}
+                  borderBottomWidth={1}
+                  borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)}
+                >
+                  <Text
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '800',
+                      fontSize: 11,
+                      letterSpacing: 2,
+                      textTransform: 'uppercase',
+                      color: BRAND_GOLD_LIGHT,
+                    }}
+                  >
+                    {g.title}
+                  </Text>
+                </YStack>
+              </YStack>
               {g.rows.map((row, ri) => {
                 const bi = bestIndex(row.nums, row.lowerIsBetter);
                 const isLast = ri === g.rows.length - 1;
                 return (
-                  <View
+                  <YStack
+                    tag="tr"
+                    role="row"
                     key={row.label}
-                    style={{ flexDirection: 'row', alignItems: 'stretch' }}
+                    flexDirection="row"
+                    alignItems="stretch"
                   >
-                    <View
-                      style={{
-                        width: METRIC_W,
-                        paddingVertical: 13,
-                        paddingHorizontal: 14,
-                        borderBottomWidth: isLast ? 0 : 1,
-                        borderBottomColor: cellBorder,
-                        justifyContent: 'center',
-                      }}
+                    <YStack
+                      tag="td"
+                      role="cell"
+                      width={METRIC_W}
+                      paddingVertical={13}
+                      paddingHorizontal={14}
+                      borderBottomWidth={isLast ? 0 : 1}
+                      borderBottomColor={cellBorder}
+                      justifyContent="center"
                     >
                       <Text
                         style={{
@@ -860,25 +890,25 @@ function ComparisonTable({
                           {row.desc}
                         </Text>
                       ) : null}
-                    </View>
+                    </YStack>
                     {row.vals.map((val, vi) => {
                       const isBest = bi === vi;
                       return (
-                        <View
+                        <YStack
+                          tag="td"
+                          role="cell"
                           key={vi}
-                          style={{
-                            width: VALUE_W,
-                            paddingVertical: 13,
-                            paddingHorizontal: 14,
-                            borderBottomWidth: isLast ? 0 : 1,
-                            borderBottomColor: cellBorder,
-                            borderLeftWidth: 1,
-                            borderLeftColor: cellBorder,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                            gap: 6,
-                          }}
+                          width={VALUE_W}
+                          paddingVertical={13}
+                          paddingHorizontal={14}
+                          borderBottomWidth={isLast ? 0 : 1}
+                          borderBottomColor={cellBorder}
+                          borderLeftWidth={1}
+                          borderLeftColor={cellBorder}
+                          flexDirection="row"
+                          alignItems="center"
+                          justifyContent="flex-end"
+                          gap={6}
                         >
                           {isBest ? (
                             <Text style={{ color: BRAND_GOLD, fontSize: 9 }}>
@@ -915,15 +945,15 @@ function ComparisonTable({
                               BEST
                             </Text>
                           ) : null}
-                        </View>
+                        </YStack>
                       );
                     })}
-                  </View>
+                  </YStack>
                 );
               })}
-            </View>
+            </YStack>
           ))}
-        </View>
+        </YStack>
       </ScrollView>
     </View>
   );
@@ -988,20 +1018,24 @@ function SeasonCell({
         textAlign: isFirst ? 'left' : 'right',
         fontVariant: ['tabular-nums'],
       };
+  // Header cells render as <th scope="col">; data cells as <td> (web `tag`
+  // survives the optimizer; `role` is kept for native — LS-7861). `scope` is
+  // omitted from Tamagui's prop types, so spread it (see LeagueDetailShell).
   return (
-    <View
-      style={{
-        width: isFirst ? 64 : 52,
-        paddingVertical: 10,
-        paddingHorizontal: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: isHeader
-          ? withAlpha(BRAND_NAVY_LIGHT, 0.25)
-          : 'rgba(255,255,255,0.04)',
-      }}
+    <YStack
+      tag={isHeader ? 'th' : 'td'}
+      role={isHeader ? 'columnheader' : 'cell'}
+      {...(isHeader ? { scope: 'col' } : {})}
+      width={isFirst ? 64 : 52}
+      paddingVertical={10}
+      paddingHorizontal={6}
+      borderBottomWidth={1}
+      borderBottomColor={
+        isHeader ? withAlpha(BRAND_NAVY_LIGHT, 0.25) : 'rgba(255,255,255,0.04)'
+      }
     >
       <Text style={style}>{value}</Text>
-    </View>
+    </YStack>
   );
 }
 
@@ -1015,7 +1049,7 @@ function SeasonRow({
   isHeader?: boolean;
 }) {
   return (
-    <View style={{ flexDirection: 'row' }}>
+    <YStack tag="tr" role="row" flexDirection="row">
       {cells.map((c, i) => (
         <SeasonCell
           key={i}
@@ -1025,7 +1059,7 @@ function SeasonRow({
           isHeader={isHeader}
         />
       ))}
-    </View>
+    </YStack>
   );
 }
 
@@ -1111,36 +1145,41 @@ function SeasonBattingBlock({
 
       {!loading && rows.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View
+          <YStack
+            tag="table"
             role="table"
             aria-label={`Season batting for ${player.name}`}
-            style={{ minWidth: 580 }}
+            minWidth={580}
           >
-            <SeasonRow
-              cells={[...SEASON_BATTING_HEADERS]}
-              accent={accent}
-              isHeader
-            />
-            {rows.map((r, idx) => (
+            <YStack tag="thead" role="rowgroup">
               <SeasonRow
-                key={`${r?.season}-${idx}`}
+                cells={[...SEASON_BATTING_HEADERS]}
                 accent={accent}
-                cells={[
-                  String(r?.season ?? '—'),
-                  fmt(r?.games),
-                  fmt(r?.plateAppearances),
-                  fmt(r?.atBats),
-                  fmt(r?.hits),
-                  fmt(r?.homeRuns),
-                  fmt(r?.rbi),
-                  fmt(r?.stolenBases),
-                  fmtAvg(r?.battingAverage),
-                  fmtAvg(r?.onBasePercentage),
-                  fmtAvg(r?.sluggingPercentage),
-                ]}
+                isHeader
               />
-            ))}
-          </View>
+            </YStack>
+            <YStack tag="tbody" role="rowgroup">
+              {rows.map((r, idx) => (
+                <SeasonRow
+                  key={`${r?.season}-${idx}`}
+                  accent={accent}
+                  cells={[
+                    String(r?.season ?? '—'),
+                    fmt(r?.games),
+                    fmt(r?.plateAppearances),
+                    fmt(r?.atBats),
+                    fmt(r?.hits),
+                    fmt(r?.homeRuns),
+                    fmt(r?.rbi),
+                    fmt(r?.stolenBases),
+                    fmtAvg(r?.battingAverage),
+                    fmtAvg(r?.onBasePercentage),
+                    fmtAvg(r?.sluggingPercentage),
+                  ]}
+                />
+              ))}
+            </YStack>
+          </YStack>
         </ScrollView>
       ) : null}
 
@@ -1160,43 +1199,48 @@ function SeasonBattingBlock({
             Pitching
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View
+            <YStack
+              tag="table"
               role="table"
               aria-label={`Season pitching for ${player.name}`}
-              style={{ minWidth: 480 }}
+              minWidth={480}
             >
-              <SeasonRow
-                cells={[...SEASON_PITCHING_HEADERS]}
-                accent={accent}
-                isHeader
-              />
-              {pitchingRows.map((r, idx) => {
-                const era = r?.earnedRunAverage
-                  ? parseFloat(r.earnedRunAverage)
-                  : null;
-                return (
-                  <SeasonRow
-                    key={`${r?.season}-${idx}`}
-                    accent={accent}
-                    cells={[
-                      String(r?.season ?? '—'),
-                      fmt(r?.games),
-                      fmt(r?.wins),
-                      fmt(r?.losses),
-                      era != null && Number.isFinite(era)
-                        ? era.toFixed(2)
-                        : '—',
-                      r?.inningsPitched != null
-                        ? r.inningsPitched.toFixed(1)
-                        : '—',
-                      fmt(r?.strikeouts),
-                      fmt(r?.baseOnBalls),
-                      r?.whip != null ? r.whip.toFixed(2) : '—',
-                    ]}
-                  />
-                );
-              })}
-            </View>
+              <YStack tag="thead" role="rowgroup">
+                <SeasonRow
+                  cells={[...SEASON_PITCHING_HEADERS]}
+                  accent={accent}
+                  isHeader
+                />
+              </YStack>
+              <YStack tag="tbody" role="rowgroup">
+                {pitchingRows.map((r, idx) => {
+                  const era = r?.earnedRunAverage
+                    ? parseFloat(r.earnedRunAverage)
+                    : null;
+                  return (
+                    <SeasonRow
+                      key={`${r?.season}-${idx}`}
+                      accent={accent}
+                      cells={[
+                        String(r?.season ?? '—'),
+                        fmt(r?.games),
+                        fmt(r?.wins),
+                        fmt(r?.losses),
+                        era != null && Number.isFinite(era)
+                          ? era.toFixed(2)
+                          : '—',
+                        r?.inningsPitched != null
+                          ? r.inningsPitched.toFixed(1)
+                          : '—',
+                        fmt(r?.strikeouts),
+                        fmt(r?.baseOnBalls),
+                        r?.whip != null ? r.whip.toFixed(2) : '—',
+                      ]}
+                    />
+                  );
+                })}
+              </YStack>
+            </YStack>
           </ScrollView>
         </View>
       ) : null}
