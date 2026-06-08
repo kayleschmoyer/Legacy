@@ -8,6 +8,7 @@ import { TradeCenterPage } from './TradeCenterPage';
 let mockUserLeagues: unknown;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
+let mockTeamTradeOffers: unknown[];
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,10 @@ jest.mock('../../api/db/graphql.generated', () => ({
     loading: false,
   }),
   useGetLeagueByIdQuery: () => ({ data: mockLeague, loading: false }),
+  useGetTeamTradeOffersQuery: () => ({
+    data: { teamTradeOffers: mockTeamTradeOffers },
+    loading: false,
+  }),
 }));
 
 jest.mock('../../features/baseball/TradingCenter', () => ({
@@ -89,6 +94,7 @@ beforeEach(() => {
   mockUserLeagues = undefined;
   mockUserTeamId = null;
   mockLeague = undefined;
+  mockTeamTradeOffers = [];
 });
 
 describe('TradeCenterPage', () => {
@@ -170,5 +176,29 @@ describe('TradeCenterPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('trading-center-5')).toBeInTheDocument();
     });
+  });
+
+  it('shows a pending badge when the user has pending trade offers in a league', () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Badge League' }] };
+    mockUserTeamId = 7;
+    mockTeamTradeOffers = [{ id: 10 }, { id: 11 }];
+    renderPage();
+    expect(screen.getByLabelText('2 pending offers')).toBeInTheDocument();
+  });
+
+  it('shows singular label when exactly one pending offer exists', () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Badge League' }] };
+    mockUserTeamId = 7;
+    mockTeamTradeOffers = [{ id: 10 }];
+    renderPage();
+    expect(screen.getByLabelText('1 pending offer')).toBeInTheDocument();
+  });
+
+  it('does not show a badge when there are no pending offers', () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'No Badge League' }] };
+    mockUserTeamId = 7;
+    mockTeamTradeOffers = [];
+    renderPage();
+    expect(screen.queryByLabelText(/pending offer/i)).not.toBeInTheDocument();
   });
 });

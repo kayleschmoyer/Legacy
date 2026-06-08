@@ -11,10 +11,51 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { TradingCenter } from '../../features/baseball/TradingCenter';
 import {
   useGetLeagueByIdQuery,
+  useGetTeamTradeOffersQuery,
   useGetUserLeaguesQuery,
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
+
+// ── League pending-offers badge ───────────────────────────────────────────────
+
+function LeaguePendingBadge({ leagueId }: { leagueId: number }) {
+  const { data: teamData } = useGetUserTeamIdQuery({
+    variables: { leagueId },
+  });
+  const teamId = teamData?.userTeamId ?? null;
+
+  const { data: offersData } = useGetTeamTradeOffersQuery({
+    variables: { teamId: teamId!, status: 'pending' },
+    skip: teamId == null,
+  });
+
+  const count = offersData?.teamTradeOffers?.length ?? 0;
+  if (count === 0) return null;
+
+  return (
+    <div
+      aria-label={`${count} pending offer${count !== 1 ? 's' : ''}`}
+      style={{
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#C41E3A',
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: 700,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingLeft: 5,
+        paddingRight: 5,
+        flexShrink: 0,
+      }}
+    >
+      {count}
+    </div>
+  );
+}
 
 // ── League trades view ────────────────────────────────────────────────────────
 
@@ -361,6 +402,7 @@ export function TradeCenterPage(): React.JSX.Element {
                         {league.name}
                       </div>
                     </div>
+                    <LeaguePendingBadge leagueId={league.id} />
                   </div>
                 );
               })}
