@@ -7,6 +7,13 @@ import { getActiveSprintId } from './get-active-sprint.js';
 interface CreateTicketParams {
   summary: string;
   type?: string;
+  /**
+   * Alias for `type`. Agents have historically passed `issueType` (the field
+   * name does not match the tool param `type`), which was silently dropped and
+   * left `type` at its default, creating a Task instead of the requested Epic
+   * (LS-7852). Accepting it as an alias makes the requested type deterministic.
+   */
+  issueType?: string;
   description?: string;
   context?: string;
   risk?: string;
@@ -37,7 +44,8 @@ export async function createTicket(
 ): Promise<CallToolResult> {
   const {
     summary,
-    type = 'Task',
+    type,
+    issueType,
     description,
     context,
     risk,
@@ -46,6 +54,11 @@ export async function createTicket(
     sprint,
   } = params;
 
+  // Resolve the effective issue type: explicit `type` wins, then the
+  // `issueType` alias, then default to Task. This keeps `type:"Epic"`
+  // deterministic and prevents the historical silent-Task fallback (LS-7852).
+  const resolvedType = type ?? issueType ?? 'Task';
+
   // Resolve credentials once upfront to avoid redundant lookups for the
   // browse URL later.
   const creds = await getJiraCredentials();
@@ -53,7 +66,7 @@ export async function createTicket(
 
   const fields: Record<string, unknown> = {
     project: { key: 'LS' },
-    issuetype: { name: type },
+    issuetype: { name: resolvedType },
     summary,
   };
 

@@ -7,6 +7,8 @@ import { getActiveSprintId } from './get-active-sprint.js';
 export interface BulkCreateTicketInput {
   summary: string;
   type?: string;
+  /** Alias for `type` — see create-ticket.ts (LS-7852). */
+  issueType?: string;
   description?: string;
   context?: string;
   risk?: string;
@@ -133,7 +135,9 @@ export async function bulkCreate(
   const issueUpdates = tickets.map((ticket) => {
     const fields: Record<string, unknown> = {
       project: { key: 'LS' },
-      issuetype: { name: ticket.type ?? 'Task' },
+      // Explicit `type` wins, then the `issueType` alias, then default to Task
+      // (LS-7852 — keeps requested type deterministic, matching create-ticket).
+      issuetype: { name: ticket.type ?? ticket.issueType ?? 'Task' },
       summary: ticket.summary,
     };
     const adfDescription = buildStructuredDescription({

@@ -94,8 +94,16 @@ server.tool(
     summary: z.string().describe('Ticket summary / title'),
     type: z
       .enum(['Task', 'Bug', 'Story', 'Epic'])
-      .default('Task')
-      .describe('Issue type (default: Task)'),
+      .optional()
+      .describe(
+        'Issue type (default: Task). Pass "Epic" to create an Epic in one call. Accepts `issueType` as an alias.',
+      ),
+    issueType: z
+      .enum(['Task', 'Bug', 'Story', 'Epic'])
+      .optional()
+      .describe(
+        'Alias for `type`, accepted for agent compatibility. Prefer `type`.',
+      ),
     description: z.string().optional().describe('Ticket description'),
     context: z
       .string()
@@ -130,8 +138,16 @@ const ticketSchema = z.object({
   summary: z.string().describe('Ticket summary / title'),
   type: z
     .enum(['Task', 'Bug', 'Story', 'Epic'])
-    .default('Task')
-    .describe('Issue type (default: Task)'),
+    .optional()
+    .describe(
+      'Issue type (default: Task). Pass "Epic" to create an Epic. Accepts `issueType` as an alias.',
+    ),
+  issueType: z
+    .enum(['Task', 'Bug', 'Story', 'Epic'])
+    .optional()
+    .describe(
+      'Alias for `type`, accepted for agent compatibility. Prefer `type`.',
+    ),
   description: z.string().optional().describe('Ticket description'),
   context: z
     .string()
