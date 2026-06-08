@@ -123,6 +123,8 @@ function StandingsRow({
   return (
     <XStack
       key={standing.teamId}
+      tag="tr"
+      role="row"
       paddingVertical="$3"
       paddingHorizontal="$3"
       backgroundColor={
@@ -137,12 +139,24 @@ function StandingsRow({
       hoverStyle={pressable ? { backgroundColor: '$gray3' } : undefined}
       onPress={pressable ? () => onTeamPress(teamId) : undefined}
     >
-      <YStack width={44} alignItems="center" justifyContent="center">
+      <YStack
+        tag="td"
+        role="cell"
+        width={44}
+        alignItems="center"
+        justifyContent="center"
+      >
         <Text fontSize="$3" fontWeight="bold" color="$gray11">
           {rank}
         </Text>
       </YStack>
-      <YStack flex={1} minWidth={120} justifyContent="center">
+      <YStack
+        tag="td"
+        role="cell"
+        flex={1}
+        minWidth={120}
+        justifyContent="center"
+      >
         <XStack gap="$2" alignItems="center">
           <AvatarImage
             url={standing.avatarUrl}
@@ -172,17 +186,19 @@ function StandingsRow({
           ) : null}
         </XStack>
       </YStack>
-      <YStack width={44} alignItems="center">
+      <YStack tag="td" role="cell" width={44} alignItems="center">
         <Text fontSize="$3" color="$green10" fontWeight="bold">
           {standing.wins ?? 0}
         </Text>
       </YStack>
-      <YStack width={44} alignItems="center">
+      <YStack tag="td" role="cell" width={44} alignItems="center">
         <Text fontSize="$3" color="$red10" fontWeight="bold">
           {standing.losses ?? 0}
         </Text>
       </YStack>
       <YStack
+        tag="td"
+        role="cell"
         width={44}
         alignItems="center"
         display="none"
@@ -191,6 +207,8 @@ function StandingsRow({
         <Text fontSize="$3">{standing.ties ?? 0}</Text>
       </YStack>
       <YStack
+        tag="td"
+        role="cell"
         width={60}
         alignItems="center"
         display="none"
@@ -201,6 +219,8 @@ function StandingsRow({
         </Text>
       </YStack>
       <YStack
+        tag="td"
+        role="cell"
         width={80}
         alignItems="center"
         display="none"
@@ -209,6 +229,8 @@ function StandingsRow({
         <Text fontSize="$3">{(standing.pointsFor ?? 0).toFixed(2)}</Text>
       </YStack>
       <YStack
+        tag="td"
+        role="cell"
         width={80}
         alignItems="center"
         display="none"
@@ -217,6 +239,8 @@ function StandingsRow({
         <Text fontSize="$3">{(standing.pointsAgainst ?? 0).toFixed(2)}</Text>
       </YStack>
       <YStack
+        tag="td"
+        role="cell"
         width={70}
         alignItems="center"
         display="none"
@@ -335,69 +359,119 @@ export function StandingsTable({
     </Text>
   );
 
+  // Header renders as a semantic <thead><tr><th scope="col"> on web (via the
+  // Tamagui `tag` prop, which survives the optimizing compiler — `role` does
+  // not) and carries matching ARIA roles for native screen readers. This keeps
+  // the standings table accessible cross-platform after the LS-7814
+  // consolidation onto this shared component (which previously rendered an
+  // HTML <table> in the web league-detail tab).
   const HeaderRow = () => (
-    <XStack
-      paddingVertical="$2"
-      paddingHorizontal="$3"
-      borderBottomWidth={1}
-      borderBottomColor="$gray6"
-      gap="$2"
-    >
-      <YStack width={44} alignItems="center">
-        <Text fontSize="$3" fontWeight="bold" color="$gray11">
-          #
-        </Text>
-      </YStack>
-      <YStack flex={1} minWidth={120}>
-        <SortButton label="Team" sortKeyValue="team" />
-      </YStack>
-      <YStack width={44} alignItems="center">
-        <SortButton label="W" sortKeyValue="wins" />
-      </YStack>
-      <YStack width={44} alignItems="center">
-        <SortButton label="L" sortKeyValue="losses" />
-      </YStack>
-      <YStack
-        width={44}
-        alignItems="center"
-        display="none"
-        $gtSm={{ display: 'flex' }}
+    <YStack tag="thead" role="rowgroup">
+      <XStack
+        tag="tr"
+        role="row"
+        width="100%"
+        paddingVertical="$2"
+        paddingHorizontal="$3"
+        borderBottomWidth={1}
+        borderBottomColor="$gray6"
+        gap="$2"
       >
-        <SortButton label="T" sortKeyValue="ties" />
-      </YStack>
-      <YStack
-        width={60}
-        alignItems="center"
-        display="none"
-        $gtSm={{ display: 'flex' }}
-      >
-        <SortButton label="Win%" sortKeyValue="winPct" />
-      </YStack>
-      <YStack
-        width={80}
-        alignItems="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
-      >
-        <SortButton label="PF" sortKeyValue="pointsFor" />
-      </YStack>
-      <YStack
-        width={80}
-        alignItems="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
-      >
-        <SortButton label="PA" sortKeyValue="pointsAgainst" />
-      </YStack>
-      <YStack
-        width={70}
-        alignItems="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
-      >
-        <SortButton label="Diff" sortKeyValue="diff" />
-      </YStack>
-    </XStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={44}
+          alignItems="center"
+        >
+          <Text fontSize="$3" fontWeight="bold" color="$gray11">
+            #
+          </Text>
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          flex={1}
+          minWidth={120}
+        >
+          <SortButton label="Team" sortKeyValue="team" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={44}
+          alignItems="center"
+        >
+          <SortButton label="W" sortKeyValue="wins" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={44}
+          alignItems="center"
+        >
+          <SortButton label="L" sortKeyValue="losses" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={44}
+          alignItems="center"
+          display="none"
+          $gtSm={{ display: 'flex' }}
+        >
+          <SortButton label="T" sortKeyValue="ties" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={60}
+          alignItems="center"
+          display="none"
+          $gtSm={{ display: 'flex' }}
+        >
+          <SortButton label="Win%" sortKeyValue="winPct" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={80}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
+          <SortButton label="PF" sortKeyValue="pointsFor" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={80}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
+          <SortButton label="PA" sortKeyValue="pointsAgainst" />
+        </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={70}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
+          <SortButton label="Diff" sortKeyValue="diff" />
+        </YStack>
+      </XStack>
+    </YStack>
   );
 
   return (
@@ -425,26 +499,32 @@ export function StandingsTable({
                   Division {group.divisionId}
                 </Text>
               </XStack>
-              <HeaderRow />
-              <YStack>
-                {group.teams.map((standing, index) => (
-                  <StandingsRow
-                    key={standing.teamId}
-                    standing={standing}
-                    index={index}
-                    rank={index + 1}
-                    isCurrentUser={isCurrentUser(standing)}
-                    onTeamPress={onTeamPress}
-                  />
-                ))}
+              <YStack
+                tag="table"
+                role="table"
+                aria-label={`${title} — Division ${group.divisionId}`}
+              >
+                <HeaderRow />
+                <YStack tag="tbody" role="rowgroup">
+                  {group.teams.map((standing, index) => (
+                    <StandingsRow
+                      key={standing.teamId}
+                      standing={standing}
+                      index={index}
+                      rank={index + 1}
+                      isCurrentUser={isCurrentUser(standing)}
+                      onTeamPress={onTeamPress}
+                    />
+                  ))}
+                </YStack>
               </YStack>
             </YStack>
           ))}
         </YStack>
       ) : (
-        <>
+        <YStack tag="table" role="table" aria-label={title}>
           <HeaderRow />
-          <YStack>
+          <YStack tag="tbody" role="rowgroup">
             {sortedStandings.map((standing, index) => (
               <StandingsRow
                 key={standing.teamId}
@@ -456,7 +536,7 @@ export function StandingsTable({
               />
             ))}
           </YStack>
-        </>
+        </YStack>
       )}
     </Card>
   );
