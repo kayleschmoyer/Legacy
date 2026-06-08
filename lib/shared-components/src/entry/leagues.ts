@@ -7,4 +7,5 @@ export * from '../features/leagues/LeagueActivityFeed';
 export * from '../features/leagues/LeagueScoringSummary';
 export * from '../features/leagues/OnThisDayFeed';
 export * from '../features/leagues/premium';
+export * from '../features/leagues/PremiumTradeTools';
 export * from '../features/leagues/TradingCenter';

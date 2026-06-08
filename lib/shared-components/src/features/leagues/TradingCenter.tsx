@@ -87,6 +87,12 @@ export interface TradingCenterProps {
   leagueId: number;
   userTeamId: number;
   isCommissioner?: boolean;
+  /** Whether the current user/league has the `premium` entitlement. When true,
+   * the Premium Analysis Tools panel is unlocked. */
+  isPremium?: boolean;
+  /** Called when a non-premium user clicks "Upgrade to Premium" in the
+   * Premium Analysis Tools gate overlay. */
+  onUpgradePremium?: () => void;
   /**
    * Optional callback invoked when real-time events (trade offers, roster
    * updates) should trigger a data refresh.  On web this is wired to
@@ -1298,6 +1304,8 @@ export function TradingCenter({
   leagueId,
   userTeamId,
   isCommissioner = false,
+  isPremium = false,
+  onUpgradePremium,
   onSubscribeRefresh,
 }: TradingCenterProps): React.JSX.Element {
   const [showProposeDialog, setShowProposeDialog] = useState(false);
@@ -1664,16 +1672,18 @@ export function TradingCenter({
 
       <Separator borderColor="$outlineSubtle" />
 
-      {/* Trade Block */}
-      <LeagueTradeBlock leagueId={leagueId} userTeamId={userTeamId} />
-
-      <Separator borderColor="$outlineSubtle" />
-
       {/* Premium Trade Tools */}
       <PremiumTradeTools
         userTeamId={userTeamId}
         pendingTrades={pendingTrades}
+        isPremium={isPremium}
+        onUpgrade={onUpgradePremium}
       />
+
+      <Separator borderColor="$outlineSubtle" />
+
+      {/* Trade Block */}
+      <LeagueTradeBlock leagueId={leagueId} userTeamId={userTeamId} />
 
       {/* Propose trade dialog */}
       {showProposeDialog && (

@@ -120,7 +120,11 @@ describe('PremiumTradeTools — null / undefined TradeOfferFragment fields', () 
   it('renders without error when players array is empty', async () => {
     const offer = makeOffer({ id: 1, players: [] });
     const { findByText } = render(
-      <PremiumTradeTools userTeamId={USER_TEAM_ID} pendingTrades={[offer]} />,
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
     );
     // Expand the section
     (await findByText('Premium Trade Tools')).click();
@@ -144,7 +148,11 @@ describe('PremiumTradeTools — null / undefined TradeOfferFragment fields', () 
       ],
     });
     const { findByText, findAllByText } = render(
-      <PremiumTradeTools userTeamId={USER_TEAM_ID} pendingTrades={[offer]} />,
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
     );
     (await findByText('Premium Trade Tools')).click();
     // Select the offer to open the analysis panel
@@ -170,7 +178,11 @@ describe('PremiumTradeTools — null / undefined TradeOfferFragment fields', () 
       ],
     });
     const { findByText } = render(
-      <PremiumTradeTools userTeamId={USER_TEAM_ID} pendingTrades={[offer]} />,
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
     );
     (await findByText('Premium Trade Tools')).click();
     (await findByText('Sluggers')).click();
@@ -193,11 +205,64 @@ describe('PremiumTradeTools — null / undefined TradeOfferFragment fields', () 
       ],
     });
     const { findByText } = render(
-      <PremiumTradeTools userTeamId={USER_TEAM_ID} pendingTrades={[offer]} />,
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
     );
     (await findByText('Premium Trade Tools')).click();
     (await findByText('Sluggers')).click();
     // Player name is visible — default value used, no crash
     expect(await findByText('Mystery Player')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PremiumTradeTools — premium gate
+// ---------------------------------------------------------------------------
+
+describe('PremiumTradeTools — premium gate', () => {
+  it('does not show gate overlay for premium users', async () => {
+    const offer = makeOffer({ id: 1, players: [] });
+    const { findByText, queryByTestId } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    expect(queryByTestId('premium-trade-tools-gate')).toBeNull();
+  });
+
+  it('shows gate overlay for non-premium users', async () => {
+    const offer = makeOffer({ id: 1, players: [] });
+    const { findByText, findByTestId } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium={false}
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    expect(await findByTestId('premium-trade-tools-gate')).toBeTruthy();
+  });
+
+  it('calls onUpgrade when upgrade button is pressed', async () => {
+    const onUpgrade = jest.fn();
+    const offer = makeOffer({ id: 1, players: [] });
+    const { findByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium={false}
+        onUpgrade={onUpgrade}
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    const btn = (await findByText('Upgrade to Premium')).closest('button');
+    btn?.click();
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 });

@@ -232,7 +232,11 @@ describe('TradingCenter — PremiumTradeTools integration', () => {
     };
 
     const { findByText, getByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        isPremium
+      />,
     );
 
     const header = await findByText('Premium Trade Tools');
@@ -250,7 +254,11 @@ describe('TradingCenter — PremiumTradeTools integration', () => {
     };
 
     const { findByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        isPremium
+      />,
     );
 
     const header = await findByText('Premium Trade Tools');
@@ -269,7 +277,11 @@ describe('TradingCenter — PremiumTradeTools integration', () => {
     };
 
     const { findByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        isPremium
+      />,
     );
 
     const header = await findByText('Premium Trade Tools');
@@ -286,7 +298,11 @@ describe('TradingCenter — PremiumTradeTools integration', () => {
     };
 
     const { findByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        isPremium
+      />,
     );
 
     const header = await findByText('Premium Trade Tools');

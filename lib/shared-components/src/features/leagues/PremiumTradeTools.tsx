@@ -6,6 +6,8 @@
  *    breakdown with a fairness verdict
  *  - Value Calculator: reference table of per-position fantasy values for
  *    baseball and football
+ *
+ * Entitlement-gated: non-premium users see a lock overlay prompting upgrade.
  */
 import React, { useState } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
@@ -14,6 +16,7 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
+  Lock,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -21,8 +24,11 @@ import {
 import { Button } from '../../Button';
 import type { TradeOfferFragment } from '../../api/db/graphql.generated';
 import {
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  SURFACE_CARD,
   SURFACE_PANEL,
   withAlpha,
 } from '../../utils/colors';
@@ -595,6 +601,10 @@ function ValueCalculator() {
 export interface PremiumTradeToolsProps {
   userTeamId: number;
   pendingTrades: TradeOfferFragment[];
+  /** Whether the current user/league has the `premium` entitlement. */
+  isPremium?: boolean;
+  /** Called when a non-premium user presses "Upgrade to Premium". */
+  onUpgrade?: () => void;
 }
 
 type ActiveTab = 'analyzer' | 'calculator';
@@ -602,6 +612,8 @@ type ActiveTab = 'analyzer' | 'calculator';
 export function PremiumTradeTools({
   userTeamId,
   pendingTrades,
+  isPremium = false,
+  onUpgrade,
 }: PremiumTradeToolsProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('analyzer');
@@ -630,77 +642,129 @@ export function PremiumTradeTools({
         </XStack>
       </Button>
 
-      {expanded && (
-        <YStack gap="$4">
-          {/* Tab bar */}
-          <XStack
-            backgroundColor="$surfaceSubtle"
-            borderRadius="$4"
-            padding="$0.5"
-            alignSelf="flex-start"
-            gap="$0.5"
-          >
-            <Button
-              size="$2"
-              backgroundColor={
-                activeTab === 'analyzer' ? BRAND_NAVY_LIGHT : 'transparent'
-              }
-              borderWidth={0}
-              borderRadius="$3"
-              onPress={() => setActiveTab('analyzer')}
-              animation="quick"
-              icon={
-                <BarChart2
-                  size={13}
+      {expanded &&
+        (isPremium ? (
+          <YStack gap="$4">
+            {/* Tab bar */}
+            <XStack
+              backgroundColor="$surfaceSubtle"
+              borderRadius="$4"
+              padding="$0.5"
+              alignSelf="flex-start"
+              gap="$0.5"
+            >
+              <Button
+                size="$2"
+                backgroundColor={
+                  activeTab === 'analyzer' ? BRAND_NAVY_LIGHT : 'transparent'
+                }
+                borderWidth={0}
+                borderRadius="$3"
+                onPress={() => setActiveTab('analyzer')}
+                animation="quick"
+                icon={
+                  <BarChart2
+                    size={13}
+                    color={activeTab === 'analyzer' ? 'white' : '$textMuted'}
+                  />
+                }
+              >
+                <Text
+                  fontSize="$2"
+                  fontWeight={activeTab === 'analyzer' ? '700' : '400'}
                   color={activeTab === 'analyzer' ? 'white' : '$textMuted'}
-                />
-              }
-            >
-              <Text
-                fontSize="$2"
-                fontWeight={activeTab === 'analyzer' ? '700' : '400'}
-                color={activeTab === 'analyzer' ? 'white' : '$textMuted'}
+                >
+                  Trade Analyzer
+                </Text>
+              </Button>
+              <Button
+                size="$2"
+                backgroundColor={
+                  activeTab === 'calculator' ? BRAND_NAVY_LIGHT : 'transparent'
+                }
+                borderWidth={0}
+                borderRadius="$3"
+                onPress={() => setActiveTab('calculator')}
+                animation="quick"
+                icon={
+                  <Calculator
+                    size={13}
+                    color={activeTab === 'calculator' ? 'white' : '$textMuted'}
+                  />
+                }
               >
-                Trade Analyzer
-              </Text>
-            </Button>
-            <Button
-              size="$2"
-              backgroundColor={
-                activeTab === 'calculator' ? BRAND_NAVY_LIGHT : 'transparent'
-              }
-              borderWidth={0}
-              borderRadius="$3"
-              onPress={() => setActiveTab('calculator')}
-              animation="quick"
-              icon={
-                <Calculator
-                  size={13}
+                <Text
+                  fontSize="$2"
+                  fontWeight={activeTab === 'calculator' ? '700' : '400'}
                   color={activeTab === 'calculator' ? 'white' : '$textMuted'}
-                />
-              }
-            >
-              <Text
-                fontSize="$2"
-                fontWeight={activeTab === 'calculator' ? '700' : '400'}
-                color={activeTab === 'calculator' ? 'white' : '$textMuted'}
-              >
-                Value Calculator
-              </Text>
-            </Button>
-          </XStack>
+                >
+                  Value Calculator
+                </Text>
+              </Button>
+            </XStack>
 
-          {/* Tab content */}
-          {activeTab === 'analyzer' ? (
-            <TradeAnalyzer
-              userTeamId={userTeamId}
-              pendingTrades={pendingTrades}
-            />
-          ) : (
-            <ValueCalculator />
-          )}
-        </YStack>
-      )}
+            {/* Tab content */}
+            {activeTab === 'analyzer' ? (
+              <TradeAnalyzer
+                userTeamId={userTeamId}
+                pendingTrades={pendingTrades}
+              />
+            ) : (
+              <ValueCalculator />
+            )}
+          </YStack>
+        ) : (
+          /* Premium gate overlay */
+          <YStack
+            data-testid="premium-trade-tools-gate"
+            backgroundColor={withAlpha(SURFACE_CARD, 0.94)}
+            borderWidth={1}
+            borderColor={withAlpha(BRAND_GOLD, 0.4)}
+            borderRadius="$5"
+            paddingHorizontal="$5"
+            paddingVertical="$5"
+            alignItems="center"
+            gap="$3"
+            style={{ boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.5)}` }}
+          >
+            <Lock size={28} color={BRAND_GOLD_LIGHT} />
+            <YStack alignItems="center" gap="$1">
+              <Text
+                color={BRAND_GOLD}
+                fontSize="$5"
+                fontWeight="bold"
+                textAlign="center"
+              >
+                Premium Feature
+              </Text>
+              <Text
+                color="$colorSubtle"
+                fontSize="$3"
+                textAlign="center"
+                maxWidth={300}
+              >
+                Unlock the Trade Analyzer and Value Calculator to make smarter
+                deals.
+              </Text>
+            </YStack>
+            {onUpgrade && (
+              <Button
+                onPress={onUpgrade}
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD_LIGHT} 100%)`,
+                }}
+                color={BRAND_NAVY}
+                fontWeight="bold"
+                pressStyle={{ opacity: 0.85, scale: 0.97 }}
+                hoverStyle={{ opacity: 0.92 }}
+                borderRadius="$4"
+                paddingHorizontal="$5"
+              >
+                Upgrade to Premium
+              </Button>
+            )}
+          </YStack>
+        ))}
     </YStack>
   );
 }
