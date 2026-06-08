@@ -347,6 +347,7 @@
     "typescript": "~5.9.2",
     "vite": "^6.3.5",
     "vite-plugin-dts": "~4.5.0",
+    "vite-plugin-istanbul": "6.0.2",
     "vite-plugin-react-native-web": "^2.6.0",
     "wait-on": "^9.0.4",
     "yaml-language-server": "^1.21.0",

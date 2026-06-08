@@ -104,6 +104,11 @@ on:
         required: false
         default: ""
         type: string
+      collect-coverage:
+        description: "Repopulate the coverage map on demand (LS-7849): instrument the build and collect per-test coverage. Pair with test-suite=all after a large refactor."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -221,6 +226,16 @@ jobs:
     needs: [prepare]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
+    env:
+      # Per-test source-coverage collection (LS-7849): nightly schedule, plus the
+      # on-demand "repopulate coverage map" lever (manual dispatch with
+      # collect-coverage=true). Set at job scope so it reaches both the e2e
+      # "Build Web Application" step (instruments the served build via
+      # vite-plugin-istanbul) and the "Run Playwright Tests" step (enables the
+      # _coverage fixture). Left empty (and therefore falsy) on ordinary manual
+      # dispatch and on PR CI so those builds are never instrumented — coverage
+      # collection is intentionally OFF the per-PR path (keeps PRs fast).
+      COLLECT_COVERAGE: ${{ (github.event_name == 'schedule' || inputs['collect-coverage']) && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -527,6 +542,21 @@ jobs:
           mode: upload
           name: playwright-blobs/${{ strategy.job-index }}
           path: blob-report/
+          if-no-files-found: ignore
+
+      # Per-shard spec→source-file coverage fragment (LS-7849). Mirrors the blob
+      # upload above: one artifact per shard (e2e + integration), namespaced by
+      # job index. Runs on the nightly schedule and on the on-demand repopulate
+      # lever (manual dispatch with collect-coverage=true) — the same conditions
+      # that set COLLECT_COVERAGE. On other runs no fragment is produced and the
+      # upload is skipped anyway (if-no-files-found: ignore).
+      - name: "Upload Coverage Fragment to S3"
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs['collect-coverage']) }}
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: upload
+          name: playwright-coverage/${{ strategy.job-index }}
+          path: apps/web-e2e/coverage-fragments/
           if-no-files-found: ignore
 
   # ===========================================================================

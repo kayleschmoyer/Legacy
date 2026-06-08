@@ -28,6 +28,9 @@ export default defineConfig({
    *     validates it).
    * Local: uses OAuth device flow (opens browser, caches token). */
   globalSetup: require.resolve('./src/global-setup'),
+  /* Merge per-test source-coverage fragments into one per-shard artifact at the
+   * end of the run (LS-7849). No-op unless COLLECT_COVERAGE is set (nightly). */
+  globalTeardown: require.resolve('./src/coverage-global-teardown'),
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

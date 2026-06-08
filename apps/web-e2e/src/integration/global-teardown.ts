@@ -8,6 +8,7 @@ import {
   isTestLeague,
   isYoungerThanCleanupThreshold,
 } from './test-league-cleanup';
+import { COLLECT_COVERAGE, mergeShardFragments } from '../fixtures/coverage';
 import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
 
 /**
@@ -100,6 +101,17 @@ async function gqlFetch<T>(
 export default async function globalTeardown(
   config: FullConfig,
 ): Promise<void> {
+  // Merge this shard's per-test coverage fragments first, before any early
+  // return below (the nightly integration run is sharded, so the league-cleanup
+  // logic returns early on each shard). Gated on COLLECT_COVERAGE — a no-op in
+  // PR CI / local runs. See apps/web-e2e/src/fixtures/coverage.ts (LS-7849).
+  if (COLLECT_COVERAGE) {
+    const { specs, files } = mergeShardFragments();
+    LOGGER.info(
+      `[integration teardown] Coverage fragment: ${specs} spec(s), ${files} file ref(s).`,
+    );
+  }
+
   // In sharded CI runs, multiple Playwright processes share the same
   // commissioner test user. The fastest shard finishing first would call
   // userLeagues, see leagues created by slower shards still mid-test, and

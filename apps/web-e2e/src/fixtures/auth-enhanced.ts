@@ -9,6 +9,7 @@ import {
   BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
 } from './shared-mocks';
+import { attributePageCoverage, snapshotCoverageBaseline } from './coverage';
 import { E2E_SIGNING_SECRET, E2EJwtUtil, signE2EJwt } from '../utils/jwt';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
@@ -156,7 +157,23 @@ const GSI_MOCK_SCRIPT = [
   '}};',
 ].join('\n');
 
-const isolated = base.extend<{ _apiIsolation: void }>({
+const isolated = base.extend<{ _apiIsolation: void; _coverage: void }>({
+  // Per-test source-coverage collection (LS-7849). Snapshots window.__coverage__
+  // before/after the test and attributes executed source files to the owning
+  // spec, writing a per-shard fragment uploaded by the nightly workflow. Fully
+  // gated on COLLECT_COVERAGE and best-effort — a no-op in PR CI / local runs.
+  _coverage: [
+    async (
+      { page }: { page: Page },
+      use: () => Promise<void>,
+      testInfo: TestInfo,
+    ) => {
+      const baseline = await snapshotCoverageBaseline(page);
+      await use();
+      await attributePageCoverage(page, testInfo, baseline);
+    },
+    { auto: true },
+  ],
   _apiIsolation: [
     async (
       { page }: { page: Page },

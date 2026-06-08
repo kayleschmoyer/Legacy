@@ -91,6 +91,8 @@ cache/
 __pycache__
 .coverage
 coverage
+# Per-shard Playwright source-coverage fragments (LS-7849); built in CI, uploaded to S3
+coverage-fragments/
 reports
 
 # Xcode

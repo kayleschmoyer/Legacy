@@ -736,6 +736,9 @@ importers:
       vite-plugin-dts:
         specifier: ~4.5.0
         version: 4.5.4(@types/node@24.10.0)(rollup@4.60.3)(typescript@5.9.3)(vite@6.4.2(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.9.0))
+      vite-plugin-istanbul:
+        specifier: 6.0.2
+        version: 6.0.2(vite@6.4.2(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.9.0))
       vite-plugin-react-native-web:
         specifier: ^2.6.0
         version: 2.7.1

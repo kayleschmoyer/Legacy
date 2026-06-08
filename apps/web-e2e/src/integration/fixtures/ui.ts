@@ -11,6 +11,10 @@ import os from 'os';
 import path from 'path';
 import { assertJwtNotExpired, JwtExpiredError } from '../../utils/jwt';
 import {
+  attributePageCoverage,
+  snapshotCoverageBaseline,
+} from '../../fixtures/coverage';
+import {
   getSpecUserJwt,
   specSlugFromTestInfo,
 } from '../../utils/test-user-auth';
@@ -229,9 +233,18 @@ async function withTracedContext(
     }
 
     const page = await context.newPage();
+    // Per-test source-coverage baseline (LS-7849). A no-op today — integration
+    // specs run against the live, non-instrumented site (INTEGRATION_WEB_URL),
+    // so window.__coverage__ is absent and nothing is attributed. The hook is
+    // here so the moment that URL points at an instrumented build, integration
+    // coverage flows into the same per-shard fragment as the e2e suite.
+    const coverageBaseline = await snapshotCoverageBaseline(page);
     try {
       await use(page);
     } finally {
+      // Attribute executed source files while the page is still open (the outer
+      // finally closes the context). Best-effort and gated on COLLECT_COVERAGE.
+      await attributePageCoverage(page, testInfo, coverageBaseline);
       // Only save the trace when the test actually failed — matches the
       // intent of `on-first-retry` and keeps passing-retry reports clean.
       if (shouldTrace && testInfo.status !== testInfo.expectedStatus) {

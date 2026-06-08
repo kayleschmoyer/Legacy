@@ -12,6 +12,7 @@ import {
   spaRouteFallbackPlugin,
 } from '../../tools/vite-configs';
 import { visualizer } from 'rollup-plugin-visualizer';
+import istanbul from 'vite-plugin-istanbul';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -166,6 +167,35 @@ export default defineConfig(({ mode }) => {
               gzipSize: true,
               brotliSize: true,
               template: 'treemap',
+            }),
+          ]
+        : []),
+      // Source coverage instrumentation for the nightly Playwright run only
+      // (LS-7849). Gated on COLLECT_COVERAGE so PR CI builds are never
+      // instrumented (keeps PRs fast) — the nightly run-playwright-tests.yml
+      // sets it on the e2e build + test steps. babel-plugin-istanbul (via this
+      // plugin) attributes coverage directly to source, populating
+      // window.__coverage__ which the _coverage Playwright fixture reads.
+      ...(process.env.COLLECT_COVERAGE
+        ? [
+            istanbul({
+              // Resolve include/exclude globs from the workspace root so they
+              // match the bundled web + shared-component source files.
+              cwd: resolve(__dirname, '../..'),
+              include: ['apps/web/src/**', 'lib/**/src/**'],
+              exclude: [
+                'node_modules',
+                '**/*.spec.*',
+                '**/*.test.*',
+                '**/*.stories.*',
+                '**/*.d.ts',
+                'apps/web-e2e/**',
+              ],
+              extension: ['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs'],
+              // `nx build web` is a production `vite build`; the plugin skips
+              // instrumentation during build unless forced. The nightly suite
+              // serves this build, so force instrumentation on.
+              forceBuildInstrument: true,
             }),
           ]
         : []),
