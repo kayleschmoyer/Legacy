@@ -28,6 +28,7 @@
     "jsonwebtoken": "*",
     "jwt-decode": "*",
     "memoize-one": "*",
+    "otplib": "*",
     "zod": "^4.0.0"
   },
   "devDependencies": {

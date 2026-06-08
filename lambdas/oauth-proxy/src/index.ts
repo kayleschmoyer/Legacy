@@ -37,6 +37,7 @@ import {
   handleImpersonate,
   handleStopImpersonate,
 } from './handlers/Impersonate';
+import { handleMfaEnroll, handleMfaVerifySetup } from './handlers/Mfa';
 import { withRateLimit } from './util/rate-limit';
 import { sanitizeHeaders } from './util/lambda';
 
@@ -262,6 +263,8 @@ const baseOAuthHandler = async (
               '/oauth/discord (Discord OAuth login)',
               '/oauth/discord/link (link Discord to existing account)',
               '/oauth/discord/unlink (unlink Discord from account)',
+              '/oauth/mfa/enroll (begin TOTP enrollment)',
+              '/oauth/mfa/verify-setup (confirm TOTP enrollment)',
             ],
             security:
               'New users are automatically created on first OAuth login with default access level',
@@ -422,6 +425,30 @@ const baseOAuthHandler = async (
         }
         break;
 
+      case '/oauth/mfa/enroll':
+      case '/dev/oauth/mfa/enroll':
+        if (event.httpMethod === 'POST') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.mfa.enroll', ...AUTH_RATE_LIMIT },
+            () => handleMfaEnroll(event),
+          );
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/mfa/verify-setup':
+      case '/dev/oauth/mfa/verify-setup':
+        if (event.httpMethod === 'POST') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.mfa.verify-setup', ...AUTH_RATE_LIMIT },
+            () => handleMfaVerifySetup(event),
+          );
+          return cors(result);
+        }
+        break;
+
       case '/oauth/discord/authorize':
       case '/dev/oauth/discord/authorize':
         if (event.httpMethod === 'GET') {
@@ -509,3 +536,4 @@ export * from './handlers/Verify';
 export * from './handlers/DeviceFlow';
 export * from './handlers/RefreshJwt';
 export * from './handlers/Impersonate';
+export * from './handlers/Mfa';

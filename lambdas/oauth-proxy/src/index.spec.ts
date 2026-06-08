@@ -73,6 +73,10 @@ jest.mock('./handlers/Discord', () => ({
   handleDiscordLink: jest.fn(),
   handleDiscordUnlink: jest.fn(),
 }));
+jest.mock('./handlers/Mfa', () => ({
+  handleMfaEnroll: jest.fn(),
+  handleMfaVerifySetup: jest.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
