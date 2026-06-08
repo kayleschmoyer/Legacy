@@ -615,8 +615,15 @@ jobs:
             # merge config pointing to the common parent directory. Use printf with
             # a single-quoted format string so the JS payload is written verbatim —
             # no backslash escaping, no shell interpolation.
-            # Include both HTML (for browsing) and JSON (machine-readable for agents).
-            printf '%s\n' 'module.exports = { testDir: "apps/web-e2e/src", reporter: [["html"], ["json", { outputFile: "test-results.json" }]] };' > playwright.merge.config.js
+            # Emit HTML (for browsing), JSON (machine-readable), and a compact
+            # agent-targeted Markdown summary (LS-7838) that is copied next to
+            # index.html so agents can fetch one small file instead of inflating
+            # the embedded report.json.
+            {
+              printf '%s' 'module.exports = { testDir: "apps/web-e2e/src", reporter: ['
+              printf '%s' '["html"], ["json", { outputFile: "test-results.json" }], '
+              printf '%s\n' '["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md" }]] };'
+            } > playwright.merge.config.js
             pnpm dlx playwright@1.58.2 merge-reports -c playwright.merge.config.js ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
@@ -670,6 +677,7 @@ jobs:
             mkdir -p "${WORKSPACE}/_deploy/${DEST_DIR}"
             cp -r "${REPORT_SRC}/." "${WORKSPACE}/_deploy/${DEST_DIR}/"
             [ -f "${WORKSPACE}/test-results.json" ] && cp "${WORKSPACE}/test-results.json" "${WORKSPACE}/_deploy/${DEST_DIR}/test-results.json"
+            [ -f "${WORKSPACE}/summary.md" ] && cp "${WORKSPACE}/summary.md" "${WORKSPACE}/_deploy/${DEST_DIR}/summary.md"
 
             # Prune old nightly/manual reports — keep the 10 most recent of each type
             # so the deploy repo doesn't grow unbounded with scheduled runs.

@@ -24,7 +24,15 @@ export default defineConfig({
   // workers.
   workers: 1,
   fullyParallel: false,
-  reporter: [['html', { open: 'never' }], ['list']],
+  reporter: [
+    // Compact, agent-targeted Markdown summary (LS-7838).
+    [
+      './src/reporters/agent-md-reporter.ts',
+      { outputFile: 'test-results/summary.md' },
+    ],
+    ['html', { open: 'never' }],
+    ['list'],
+  ],
   use: {
     baseURL:
       process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',

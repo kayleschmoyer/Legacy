@@ -256,7 +256,7 @@ gates     validation
 - Downloads web build artifact from Stage 2b
 - Uploads blob reports for merged Playwright report
 
-**Stage 3b -- Deploy Playwright Report:** Merges shard reports and deploys to GitHub Pages (`bkrupa/legacy-sports-deploys`).
+**Stage 3b -- Deploy Playwright Report:** Merges shard reports and deploys to GitHub Pages (`bkrupa/legacy-sports-deploys`). The merge step emits both `index.html` (browsable SPA) and `summary.md` (compact agent-targeted Markdown, ~20–50× smaller). Both are copied to `playwright-report/<name>/` — agents should fetch `summary.md` first via `ci_get_playwright_report` (one GET, no zip inflation); the HTML SPA is the human-readable fallback. See [read-playwright-report skill](../read-playwright-report/SKILL.md).
 
 ### Manual Playwright Dispatch (`run-playwright-tests.yml`)
 
@@ -269,7 +269,7 @@ Separate from the CI Orchestrator. Triggered via `workflow_dispatch` or the nigh
 | `test-grep`   | `(all)`         | Playwright `--grep` pattern; pipe-separated for OR (e.g. `"roster-management\|trade-flow"`). Use instead of `test-file` for tag or partial-name filtering. |
 | `shard-total` | `2`             | Number of parallel shards                                                                                                                                  |
 
-Reports are published to `playwright-report/manual-<run_number>/` on GitHub Pages. Always verify `stats.total > 0` after reading a report — Playwright exits 0 with `ok: true` even when 0 tests run, so a green CI run does not guarantee tests executed. See [read-playwright-report skill](../read-playwright-report/SKILL.md).
+Reports are published to `playwright-report/manual-<run_number>/` on GitHub Pages — both `index.html` and `summary.md` (LS-7838). Always verify `stats.total > 0` after reading a report — Playwright exits 0 with `ok: true` even when 0 tests run, so a green CI run does not guarantee tests executed. See [read-playwright-report skill](../read-playwright-report/SKILL.md).
 
 **Stage 4 -- Summarize & Report:** Always runs (unless cancelled).
 

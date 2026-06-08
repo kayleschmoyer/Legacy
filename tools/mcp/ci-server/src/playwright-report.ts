@@ -285,3 +285,160 @@ export async function fetchPlaywrightReport(
 export function fullTitle(test: PlaywrightTest): string {
   return [...(test.path ?? []), test.title].join(' > ');
 }
+
+/**
+ * Fetch the pre-rendered `summary.md` published alongside the HTML report.
+ * Returns `null` when the file is absent (e.g. reports generated before this
+ * feature shipped) so callers can fall back to rendering from report.json.
+ */
+export async function fetchPlaywrightSummary(
+  reportName: string,
+): Promise<string | null> {
+  if (!/^[\w.-]+$/.test(reportName)) return null;
+  try {
+    return await fetchFileContent(
+      DEPLOYS_REPO,
+      `playwright-report/${reportName}/summary.md`,
+      DEPLOYS_BRANCH,
+    );
+  } catch {
+    return null;
+  }
+}
+
+// eslint-disable-next-line no-control-regex
+const ANSI = /\x1b\[[0-9;]*m/g;
+
+/** Backslash-escape the Markdown metacharacters that could let untrusted test
+ * error/snippet text inject structure (fake `##` headings, `**emphasis**`,
+ * links, or a stray ``` fence) when the report is rendered. (LS-7838 review:
+ * Markdown-injection hardening.) */
+function escapeMarkdown(text: string): string {
+  return text.replace(/[\\`*_[\]()#>|]/g, '\\$&');
+}
+
+/** Strip ANSI codes, cap length so the Markdown stays token-cheap, then escape
+ * Markdown metacharacters in the (untrusted) result. */
+function clamp(text: string, max = 1500): string {
+  const trimmed = text.replace(ANSI, '').trim();
+  const capped =
+    trimmed.length > max
+      ? `${trimmed.slice(0, max)}\n… (${trimmed.length - max} more chars truncated)`
+      : trimmed;
+  return escapeMarkdown(capped);
+}
+
+/**
+ * Render a parsed Playwright report as compact, agent-targeted Markdown.
+ *
+ * The layout is **asymmetric**: passing tests collapse to a single count while
+ * failures, flaky tests, and skips get full detail (location, error, snippet,
+ * skip reason). This is the same shape the web-e2e `agent-md-reporter` writes
+ * to `summary.md`; keep the two in sync so a fetched file and a server-rendered
+ * fallback read identically.
+ */
+export function renderReportAsMarkdown(report: PlaywrightReport): string {
+  const s = report.stats;
+  const ok = s.ok && s.total > 0;
+  const lines: string[] = [];
+
+  lines.push(`# E2E Report — ${ok ? '✅ PASSED' : '❌ FAILED'}`);
+  lines.push('');
+  lines.push(
+    `**${s.unexpected} failed** · ${s.expected} passed · ${s.flaky} flaky · ` +
+      `${s.skipped} skipped · **${s.total} total**`,
+  );
+  lines.push('');
+
+  if (s.total === 0) {
+    lines.push(
+      '> ⚠️ **Zero tests ran.** This is NOT a passing result — the run was ' +
+        'likely misconfigured (wrong testDir, grep matched nothing, or build ' +
+        'failed before tests started).',
+    );
+    lines.push('');
+  }
+
+  const failures: Array<{
+    title: string;
+    file: string;
+    line?: number;
+    error: string | null;
+    snippet: string | null;
+  }> = [];
+  const flaky: string[] = [];
+  const skipped: Array<{ title: string; reason: string | null }> = [];
+
+  for (const file of report.files ?? []) {
+    for (const test of file.tests ?? []) {
+      // Join with U+203A "›" to match the web-e2e agent-md-reporter (which
+      // derives the same path from live Suite titles). `fullTitle` uses " > "
+      // and is kept for the other CI tools that already depend on that shape.
+      const title = [...(test.path ?? []), test.title].join(' › ');
+      if (test.outcome === 'unexpected') {
+        const firstError = test.results?.find(
+          (r) => r.errors && r.errors.length > 0,
+        )?.errors?.[0];
+        failures.push({
+          title,
+          file: file.fileName,
+          line: test.location?.line,
+          error: firstError?.message ?? firstError?.value ?? null,
+          snippet: firstError?.snippet ?? null,
+        });
+      } else if (test.outcome === 'flaky') {
+        flaky.push(`${file.fileName} › ${title}`);
+      } else if (test.outcome === 'skipped') {
+        const ann = test.annotations?.find(
+          (a) => a.type === 'skip' || a.type === 'fixme',
+        );
+        skipped.push({
+          title: `${file.fileName} › ${title}`,
+          reason: ann?.description
+            ? `${ann.type}: ${ann.description}`
+            : (ann?.type ?? null),
+        });
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    lines.push(`## ❌ Failures (${failures.length})`);
+    lines.push('');
+    for (const f of failures) {
+      const loc = f.line ? `${f.file}:${f.line}` : f.file;
+      lines.push(`### ${f.title}`);
+      lines.push(`- **Location**: ${loc}`);
+      if (f.error) {
+        lines.push(`- **Error**: ${clamp(f.error).split('\n').join('\n  ')}`);
+      }
+      if (f.snippet) {
+        lines.push(
+          `- **Snippet**: ${clamp(f.snippet, 800).split('\n').join('\n  ')}`,
+        );
+      }
+      lines.push('');
+    }
+  }
+
+  if (flaky.length > 0) {
+    lines.push(`## ⚠️ Flaky (${flaky.length})`);
+    lines.push('');
+    for (const t of flaky) lines.push(`- ${t}`);
+    lines.push('');
+  }
+
+  if (skipped.length > 0) {
+    lines.push(`## ⏭️ Skipped (${skipped.length})`);
+    lines.push('');
+    for (const t of skipped) {
+      lines.push(`- ${t.title}${t.reason ? ` — ${t.reason}` : ''}`);
+    }
+    lines.push('');
+  }
+
+  lines.push(`## ✅ Passed: ${s.expected}`);
+  lines.push('');
+
+  return lines.join('\n');
+}

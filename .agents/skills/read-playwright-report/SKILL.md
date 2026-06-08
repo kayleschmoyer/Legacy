@@ -22,6 +22,28 @@ Report URL pattern:
 https://bkrupa.github.io/legacy-sports-deploys/playwright-report/<name>/
 ```
 
+## Preferred: `summary.md` (LS-7838)
+
+Every report published after LS-7838 includes a compact, agent-targeted **`summary.md`** next to `index.html`:
+
+```
+https://bkrupa.github.io/legacy-sports-deploys/playwright-report/<name>/summary.md
+```
+
+It carries the top-line stats plus full detail for failures (location + error + snippet), flaky tests, and skips (with reason); passing tests collapse to a count. It is ~20-50x smaller than the HTML SPA and needs **no zip extraction** — a single fetch.
+
+- **Via MCP (preferred)**: `ci_get_playwright_report(reportName: "<name>")` now returns this Markdown directly — it fetches the published `summary.md` when present and otherwise renders the same layout server-side from `report.json`, so it works for historical reports too.
+- **Via GitHub API**: fetch the file directly:
+
+  ```bash
+  gh api repos/bkrupa/legacy-sports-deploys/contents/playwright-report/<name>/summary.md?ref=gh-pages \
+    --jq '.content' | base64 -d
+  ```
+
+The header line makes a zero-test run explicit (`0 total` → `❌ FAILED` with a warning), so the [Zero-Test Guard](#zero-test-guard-mandatory-before-posting-evidence) still applies — never treat `0 total` as passing evidence.
+
+Fall back to the embedded-zip parse below only for reports that predate this feature **and** are unreachable via the MCP tool.
+
 ## Why WebFetch Doesn't Work
 
 The Playwright HTML report is a client-side SPA — the `index.html` is a JS bundle that renders test data at runtime. `WebFetch` only retrieves static HTML, so it returns minified JS with no readable test data. Use the GitHub API instead.

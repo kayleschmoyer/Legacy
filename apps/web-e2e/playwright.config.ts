@@ -49,6 +49,12 @@ export default defineConfig({
   timeout: 30000,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
+    // Compact, agent-targeted Markdown summary (LS-7838) — readable with a
+    // plain file read, ~20-50x smaller than the HTML SPA.
+    [
+      './src/reporters/agent-md-reporter.ts',
+      { outputFile: 'test-results/summary.md' },
+    ],
     ['json', { outputFile: 'test-results/results.json' }],
     ['line'], // Console output for real-time feedback
     ...(process.env.CI ? [['blob'] as const] : []),

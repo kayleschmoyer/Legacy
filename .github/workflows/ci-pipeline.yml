@@ -618,7 +618,17 @@ jobs:
       - name: "Merge Playwright Reports"
         if: steps.check-reports.outputs.has-reports == 'true'
         run: |
-          pnpm dlx playwright@1.58.2 merge-reports --reporter html ./all-blob-reports
+          # Emit HTML (for browsing) plus a compact agent-targeted Markdown
+          # summary (LS-7838), copied next to index.html so agents can fetch one
+          # small file instead of inflating the embedded report.json. A merge
+          # config (rather than --reporter) is required to register the custom
+          # reporter; testDir points at the common parent of the e2e/integration
+          # specs so mixed-testDir blobs merge cleanly.
+          {
+            printf '%s' 'module.exports = { testDir: "apps/web-e2e/src", reporter: ['
+            printf '%s\n' '["html"], ["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md" }]] };'
+          } > playwright.merge.config.js
+          pnpm dlx playwright@1.58.2 merge-reports -c playwright.merge.config.js ./all-blob-reports
 
       - name: "Generate App Token"
         id: app-token
@@ -664,6 +674,7 @@ jobs:
             rm -rf "${WORKSPACE}/_deploy/${DEST_DIR}"
             mkdir -p "${WORKSPACE}/_deploy/${DEST_DIR}"
             cp -r "${REPORT_SRC}/." "${WORKSPACE}/_deploy/${DEST_DIR}/"
+            [ -f "${WORKSPACE}/summary.md" ] && cp "${WORKSPACE}/summary.md" "${WORKSPACE}/_deploy/${DEST_DIR}/summary.md"
 
             cd "${WORKSPACE}/_deploy"
             git config user.name "github-actions[bot]"
