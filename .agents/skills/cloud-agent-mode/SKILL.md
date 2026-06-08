@@ -136,23 +136,27 @@ This is the runbook for default Claude Code on the web sessions. Three diagnosti
    - File reads → `Read(file_path: "...")`
    - File discovery → Bash `find . -name "*.tsx" -type f` / `grep -rl "pat" path/` / `ls -1 path/` (Glob/Grep absent — see [Degraded-tools fallback](#degraded-tools-fallback-when-globgrep-are-unavailable))
    - Edits → `Edit` / `Write`
-5. **Validate**: `Bash` → `make pc`. The exit code is the truth; on failure, parse the output, fix the failing step, re-run.
-6. **Self-review**: read every changed file in full, walk the patterns checklist from [`common-review-patterns.md`](../pr-lifecycle/references/common-review-patterns.md). The `/review` slash command may not be available in CC web — inline the checklist.
-7. **Commit and push**:
+5. **Commit and push** (establish durable branch before the long validation step):
    ```bash
    git add <specific files>                              # never `git add .` — sensitive-file risk
    git commit -m "<type>(<scope>): <msg> (LS-####)"
    git push -u origin HEAD                               # sets upstream on first push
    ```
-8. **Open PR and mark ready**:
+6. **Open draft PR** (durable checkpoint — do this BEFORE `make pc` so a container reap is non-fatal):
    ```
    mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })
+   ```
+   The PR stays draft (inert — no CI, no review) until it is marked ready in step 9; opening it early just ensures the branch and PR survive a container kill. If the custom `legacy-sports-github` server is available, also apply `agent-in-progress`: `github_manage_labels({ prs: [N], add: ["agent-in-progress"] })`.
+7. **Validate**: `Bash` → `make pc`. The exit code is the truth; on failure, parse the output, fix the failing step, re-run. The draft PR from step 6 makes a container kill here non-fatal.
+8. **Self-review**: read every changed file in full, walk the patterns checklist from [`common-review-patterns.md`](../pr-lifecycle/references/common-review-patterns.md). The `/review` slash command may not be available in CC web — inline the checklist. Fix any issues, then re-run `make pc` if you changed code.
+9. **Mark PR ready** (gate: `make pc` must pass first):
+   ```
    mcp__github__update_pull_request({ owner: "bkrupa", repo: "legacy-sports", pullNumber: N, draft: false })
    github_manage_labels({ prs: [N], add: ["bot:ready-for-review"] })   ← custom server; mandatory
    ```
    The built-in `update_pull_request({ draft: false })` flips the draft flag only — it does not apply `bot:ready-for-review`. After calling it, call `github_manage_labels` from the custom `legacy-sports-github` server to apply the trigger label. Without this label, the first review cycle fires on `ready_for_review` but does not re-fire after fix-pushes — Cycle-1 mandates stall permanently. `github_manage_labels` has no built-in equivalent; if the custom server is unavailable, fall back to `gh pr edit N --add-label "bot:ready-for-review"` and note this to the user.
-9. **Transition Jira to In Review**: `transitionJiraIssue({ ..., transition: { id: "2" } })`.
-10. **Watch for bot review** — Claude Code surfaces review events natively, no polling needed.
+10. **Transition Jira to In Review**: `transitionJiraIssue({ ..., transition: { id: "2" } })`.
+11. **Watch for bot review** — Claude Code surfaces review events natively, no polling needed.
     - **Cycle 1 clean (LGTM)** → merge via `mcp__github__merge_pull_request` if available, or ask the user to merge.
     - **Cycle 1 with mandates** → reply to each thread's top-level comment with `FIX: <sha>` via `mcp__github__add_reply_to_pull_request_comment({ pullNumber, commentId, body: "FIX: <sha>" })`, push fix commits, then **STOP**. Thread resolution is the hard blocker — see the explicit handoff message below.
 
