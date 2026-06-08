@@ -21,8 +21,17 @@ import {
 import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
 import { notifyDiscordTradeEvent } from '../../services/discord-league';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../graphql-errors';
 import { assertSportCompatibility } from '../sport-eligibility';
+import { requireEntitlement } from '../authorization';
+import { ENTITLEMENTS } from '../entitlements';
+
+const TRADE_EXPIRATION_FREE_LIMIT_DAYS = 7;
+const TRADE_EXPIRATION_MAX_DAYS = 30;
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
 
@@ -373,6 +382,22 @@ builder.mutationField('proposeTrade', (t) =>
         throw new Error(
           'You must request at least one player from the other team',
         );
+      }
+
+      // 0a. Enforce expiration limits — free tier capped at TRADE_EXPIRATION_FREE_LIMIT_DAYS
+      if (expiresInDays !== null && expiresInDays !== undefined) {
+        if (expiresInDays > TRADE_EXPIRATION_MAX_DAYS) {
+          throw UserInputError(
+            `Trade expiration cannot exceed ${TRADE_EXPIRATION_MAX_DAYS} days.`,
+          );
+        }
+        if (expiresInDays > TRADE_EXPIRATION_FREE_LIMIT_DAYS) {
+          await requireEntitlement(
+            context,
+            ENTITLEMENTS.extended_trade_expiration,
+            `Trade expiration beyond ${TRADE_EXPIRATION_FREE_LIMIT_DAYS} days requires a premium subscription. Upgrade to set longer trade deadlines.`,
+          );
+        }
       }
 
       // 0. Check league phase — trades are only allowed during the active season

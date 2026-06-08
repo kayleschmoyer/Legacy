@@ -425,6 +425,49 @@ describe('Trades Resolver', () => {
         ),
       ).rejects.toThrow('at least one player');
     });
+
+    it('throws BAD_USER_INPUT when expiresInDays exceeds the 30-day maximum', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+            expiresInDays: 31,
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('30 days'),
+      });
+    });
+
+    it('throws PREMIUM_REQUIRED when free-tier user sets expiresInDays beyond 7 days', async () => {
+      // Default mockDb limit() → then → [] means subscription tier = 'free'
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+            expiresInDays: 14,
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'PREMIUM_REQUIRED' },
+        message: expect.stringContaining('premium subscription'),
+      });
+    });
   });
 
   // ── acceptTrade ────────────────────────────────────────────────────────────
