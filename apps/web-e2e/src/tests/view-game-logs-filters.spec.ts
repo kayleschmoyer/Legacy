@@ -1,17 +1,20 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 /**
  * E2E coverage for the GameLogsTable opponent + home/away filters
- * (LS-5704 / LS-5702 — closes LS-7479 and LS-7467).
+ * (LS-5704 / LS-5702).
  *
  * Unit tests cover `buildGameLogsRequestBody` exhaustively (opponent expansion,
  * venue serialization, franchise-relocation mapping). These specs prove the
  * rendered controls drive the POST body end-to-end.
  *
- * Marked `.fixme` for the same reason as the date-range suite: GameLogsTable
- * is exported from `lib/shared-components` but the View Game Logs page isn't
- * routed yet. Drop the `.fixme` markers once the page lands at
- * `/players/view-game-logs`.
+ * The View Game Logs page is now routed at `/players/view-game-logs` (LS-7466),
+ * so the combined-filter spec below runs against the real app shell with the
+ * hermetic `auth-enhanced` fixture (baseline GraphQL mocks; per-test
+ * `route.fulfill` for the stats endpoint). The remaining specs stay parked as
+ * `test.fixme` pending their own automation tickets — un-skipping them is owned
+ * by LS-7479 (opponent enumeration), LS-7478 (franchise relocation), and
+ * LS-7467 (home/away venue=away + venue=all).
  */
 
 const PAGE_URL = '/players/view-game-logs';
@@ -19,7 +22,7 @@ const PAGE_URL = '/players/view-game-logs';
 test.describe('View Game Logs — Opponent + Home/Away filters @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(PAGE_URL);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
   });
 
   test.fixme('opponent dropdown lists all 30 MLB teams (LS-7479)', async ({
@@ -30,7 +33,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
     await expect(options).toHaveCount(31);
   });
 
-  test.fixme('selecting an opponent + Home toggle posts the combined filter (LS-7466, LS-7467)', async ({
+  test('selecting an opponent + Home toggle posts the combined filter (LS-7466, LS-7467)', async ({
     page,
   }) => {
     let body: Record<string, unknown> | null = null;

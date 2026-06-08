@@ -57,6 +57,11 @@ const PlayerComparisonPage = lazyWithRetry(() =>
     default: m.PlayerComparisonPage,
   })),
 );
+const ViewGameLogsPage = lazyWithRetry(() =>
+  import('../pages/players/ViewGameLogsPage').then((m) => ({
+    default: m.ViewGameLogsPage,
+  })),
+);
 const LeagueCreatePage = lazyWithRetry(
   () => import('../pages/baseball/LeagueCreatePage'),
 );
@@ -645,6 +650,10 @@ function App() {
             />
             <Route path="/players/stats" element={<PlayerStatsPage />} />
             <Route path="/players/compare" element={<PlayerComparisonPage />} />
+            <Route
+              path="/players/view-game-logs"
+              element={<ViewGameLogsPage />}
+            />
             <Route path="/players/:id" element={<PlayerDetailPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/help" element={<HelpPage />} />
