@@ -29,8 +29,6 @@ function LeagueTradesView({
   leagueName,
   onBack,
 }: LeagueTradesViewProps) {
-  const { user } = useAuth();
-
   const { data: teamData, loading: teamLoading } = useGetUserTeamIdQuery({
     variables: { leagueId },
   });
@@ -41,7 +39,11 @@ function LeagueTradesView({
     skip: !leagueId,
   });
   const league = leagueData?.league;
-  const isCommissioner = Boolean(league && user && league.owner === user.id);
+  const permissionLevel = league?.userMembership?.permissionLevel;
+  const isCommissioner =
+    permissionLevel === 'general_manager' ||
+    permissionLevel === 'assistant_manager' ||
+    permissionLevel === 'commissioner';
 
   if (teamLoading || leagueLoading) {
     return (
