@@ -4,6 +4,7 @@
  * Access-Control-Allow-Origin: * when credentials are involved.
  */
 import type { APIGatewayEvent, Context } from 'aws-lambda';
+import { _resetRateLimitForTests } from './util/rate-limit';
 
 // ---------------------------------------------------------------------------
 // Module mocks (must be at top level before any imports)
@@ -64,6 +65,13 @@ jest.mock('./handlers/DeviceFlow', () => ({
   handleDeviceCompleteLocal: jest.fn(),
   handleDeviceToken: jest.fn(),
   handleDeviceVerify: jest.fn(),
+}));
+jest.mock('./handlers/Discord', () => ({
+  checkDiscordRedirectUriConfig: jest.fn(),
+  handleDiscordAuthorize: jest.fn(),
+  handleDiscordAuth: jest.fn(),
+  handleDiscordLink: jest.fn(),
+  handleDiscordUnlink: jest.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -303,5 +311,105 @@ describe('OAuth proxy CORS headers', () => {
       'https://legacy-fantasy.com',
     );
     expect(result.headers?.['Access-Control-Allow-Origin']).not.toBe('*');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Discord route rate limiting
+// ---------------------------------------------------------------------------
+
+describe('Discord route rate limiting', () => {
+  type DiscordMock = {
+    handleDiscordAuthorize: jest.Mock;
+    handleDiscordAuth: jest.Mock;
+  };
+
+  let handler: (
+    event: APIGatewayEvent,
+    ctx: Context,
+  ) => Promise<{
+    statusCode: number;
+    headers?: Record<string, string | boolean | number>;
+    body: string;
+  }>;
+
+  beforeAll(async () => {
+    const mod = await import('./index');
+    handler = mod.handler as typeof handler;
+  });
+
+  beforeEach(() => {
+    _resetRateLimitForTests();
+    const discord = jest.requireMock<DiscordMock>('./handlers/Discord');
+    discord.handleDiscordAuth.mockResolvedValue({
+      statusCode: 200,
+      body: '{}',
+    });
+    discord.handleDiscordAuthorize.mockReturnValue({
+      statusCode: 302,
+      body: '',
+    });
+  });
+
+  function makeDiscordPostEvent(): APIGatewayEvent {
+    return {
+      httpMethod: 'POST',
+      path: '/oauth/discord',
+      headers: { 'X-Forwarded-For': '10.0.0.1' },
+      multiValueHeaders: {},
+      body: null,
+      queryStringParameters: null,
+      multiValueQueryStringParameters: null,
+      pathParameters: null,
+      stageVariables: null,
+      requestContext: {
+        identity: { sourceIp: '10.0.0.1' },
+      } as APIGatewayEvent['requestContext'],
+      resource: '/oauth/discord',
+      isBase64Encoded: false,
+    };
+  }
+
+  function makeDiscordAuthorizeEvent(): APIGatewayEvent {
+    return {
+      httpMethod: 'GET',
+      path: '/oauth/discord/authorize',
+      headers: { 'X-Forwarded-For': '10.0.0.1' },
+      multiValueHeaders: {},
+      body: null,
+      queryStringParameters: null,
+      multiValueQueryStringParameters: null,
+      pathParameters: null,
+      stageVariables: null,
+      requestContext: {
+        identity: { sourceIp: '10.0.0.1' },
+      } as APIGatewayEvent['requestContext'],
+      resource: '/oauth/discord/authorize',
+      isBase64Encoded: false,
+    };
+  }
+
+  it('POST /oauth/discord returns 429 once AUTH_RATE_LIMIT is exceeded and does not invoke the handler', async () => {
+    const discord = jest.requireMock<DiscordMock>('./handlers/Discord');
+    // AUTH_RATE_LIMIT is 5/min — exhaust the bucket
+    for (let i = 0; i < 5; i++) {
+      const r = await handler(makeDiscordPostEvent(), {} as Context);
+      expect(r.statusCode).toBe(200);
+    }
+    const blocked = await handler(makeDiscordPostEvent(), {} as Context);
+    expect(blocked.statusCode).toBe(429);
+    expect(discord.handleDiscordAuth).toHaveBeenCalledTimes(5);
+  });
+
+  it('GET /oauth/discord/authorize returns 429 once AUTH_RATE_LIMIT is exceeded and does not invoke the handler', async () => {
+    const discord = jest.requireMock<DiscordMock>('./handlers/Discord');
+    // AUTH_RATE_LIMIT is 5/min — exhaust the bucket
+    for (let i = 0; i < 5; i++) {
+      const r = await handler(makeDiscordAuthorizeEvent(), {} as Context);
+      expect(r.statusCode).toBe(302);
+    }
+    const blocked = await handler(makeDiscordAuthorizeEvent(), {} as Context);
+    expect(blocked.statusCode).toBe(429);
+    expect(discord.handleDiscordAuthorize).toHaveBeenCalledTimes(5);
   });
 });

@@ -425,7 +425,11 @@ const baseOAuthHandler = async (
       case '/oauth/discord/authorize':
       case '/dev/oauth/discord/authorize':
         if (event.httpMethod === 'GET') {
-          const result = handleDiscordAuthorize(event);
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.discord.authorize', ...AUTH_RATE_LIMIT },
+            () => Promise.resolve(handleDiscordAuthorize(event)),
+          );
           return cors(result);
         }
         break;
@@ -433,7 +437,11 @@ const baseOAuthHandler = async (
       case '/oauth/discord':
       case '/dev/oauth/discord':
         if (event.httpMethod === 'POST') {
-          const result = await handleDiscordAuth(event);
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.discord', ...AUTH_RATE_LIMIT },
+            () => handleDiscordAuth(event),
+          );
           return cors(result);
         }
         break;
