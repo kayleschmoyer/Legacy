@@ -10,8 +10,8 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
-import { builder, type Context } from '../builder';
 import { requireAuth, verifyLeagueMembership } from '../authorization';
+import { builder, type Context } from '../builder';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // ── helpers ────────────────────────────────────────────────────────────────

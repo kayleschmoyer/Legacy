@@ -30,6 +30,7 @@ import { assertSportCompatibility } from '../sport-eligibility';
 import { requireEntitlement } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
 
+const TRADE_EXPIRATION_MIN_DAYS = 1;
 const TRADE_EXPIRATION_FREE_LIMIT_DAYS = 7;
 const TRADE_EXPIRATION_MAX_DAYS = 30;
 const TRADE_MESSAGE_MAX_LENGTH = 500;
@@ -417,6 +418,11 @@ builder.mutationField('proposeTrade', (t) =>
 
       // 0a. Enforce expiration limits — free tier capped at TRADE_EXPIRATION_FREE_LIMIT_DAYS
       if (expiresInDays !== null && expiresInDays !== undefined) {
+        if (expiresInDays < TRADE_EXPIRATION_MIN_DAYS) {
+          throw UserInputError(
+            `Trade expiration must be at least ${TRADE_EXPIRATION_MIN_DAYS} day.`,
+          );
+        }
         if (expiresInDays > TRADE_EXPIRATION_MAX_DAYS) {
           throw UserInputError(
             `Trade expiration cannot exceed ${TRADE_EXPIRATION_MAX_DAYS} days.`,

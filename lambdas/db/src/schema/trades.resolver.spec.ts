@@ -208,6 +208,12 @@ describe('Trades Resolver', () => {
     });
 
     it('returns empty array when no trades exist', async () => {
+      // verifyLeagueMembership: select().from().where().limit(1)
+      // .where() returns mockDb so .limit() can chain; .limit(1) resolves to membership
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
       mockDb.orderBy.mockResolvedValueOnce([]);
 
       const resolver = getResolver('query', 'leagueTradeOffers');
@@ -236,6 +242,12 @@ describe('Trades Resolver', () => {
         updatedAt: new Date(),
       };
 
+      // verifyLeagueMembership: select().from().where().limit(1)
+      // .where() returns mockDb so .limit() can chain; .limit(1) resolves to membership
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
       // Main tradeOffers query chain: select().from().where().orderBy()
       // .where() must return mockDb so .orderBy() can chain; only then does .orderBy resolve
       mockDb.where.mockReturnValueOnce(mockDb);
@@ -424,6 +436,48 @@ describe('Trades Resolver', () => {
           undefined as never,
         ),
       ).rejects.toThrow('at least one player');
+    });
+
+    it('throws BAD_USER_INPUT when expiresInDays is zero', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+            expiresInDays: 0,
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('at least 1 day'),
+      });
+    });
+
+    it('throws BAD_USER_INPUT when expiresInDays is negative', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+            expiresInDays: -5,
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('at least 1 day'),
+      });
     });
 
     it('throws BAD_USER_INPUT when expiresInDays exceeds the 30-day maximum', async () => {
