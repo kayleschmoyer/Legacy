@@ -9,6 +9,7 @@ let mockUserLeagues: unknown;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
+let mockIsPremium = false;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,38 @@ jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
 }));
 
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremium: () => mockIsPremium,
+}));
+
+jest.mock('../../components/PremiumGate', () => ({
+  PremiumGate: ({
+    children,
+    isPremium,
+    featureName,
+    featureDescription,
+  }: {
+    children: React.ReactNode;
+    isPremium: boolean;
+    featureName: string;
+    featureDescription?: string;
+  }) => (
+    <div
+      data-testid="premium-gate"
+      data-is-premium={String(isPremium)}
+      data-feature-name={featureName}
+      data-feature-description={featureDescription ?? ''}
+    >
+      {children}
+    </div>
+  ),
+}));
+
+jest.mock('../../constants/colors', () => ({
+  BRAND_GOLD: '#C5A55A',
+  withAlpha: () => 'rgba(0,0,0,0)',
+}));
+
 jest.mock('tamagui', () => {
   return {
     Spinner: () => <div data-testid="spinner" />,
@@ -71,6 +104,7 @@ jest.mock('tamagui', () => {
 
 jest.mock('@tamagui/lucide-icons', () => ({
   ArrowLeftRight: () => null,
+  BarChart2: () => null,
   ChevronLeft: () => null,
   RefreshCw: () => null,
   Users: () => null,
@@ -95,6 +129,7 @@ beforeEach(() => {
   mockUserTeamId = null;
   mockLeague = undefined;
   mockTeamTradeOffers = [];
+  mockIsPremium = false;
 });
 
 describe('TradeCenterPage', () => {
@@ -200,5 +235,71 @@ describe('TradeCenterPage', () => {
     mockTeamTradeOffers = [];
     renderPage();
     expect(screen.queryByLabelText(/pending offer/i)).not.toBeInTheDocument();
+  });
+
+  describe('TradeAnalyzerCard', () => {
+    it('renders the Trade Analyzer heading on the landing screen', () => {
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      expect(screen.getByText('Trade Analyzer')).toBeInTheDocument();
+    });
+
+    it('shows PREMIUM badge and PremiumGate with isPremium=false for free users', () => {
+      mockIsPremium = false;
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      expect(screen.getByText('PREMIUM')).toBeInTheDocument();
+      const gate = screen.getByTestId('premium-gate');
+      expect(gate).toBeInTheDocument();
+      expect(gate.getAttribute('data-is-premium')).toBe('false');
+      expect(gate.getAttribute('data-feature-name')).toBe('Trade Analyzer');
+    });
+
+    it('passes a featureDescription to PremiumGate', () => {
+      mockIsPremium = false;
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      const gate = screen.getByTestId('premium-gate');
+      expect(gate.getAttribute('data-feature-description')).toMatch(
+        /trade fairness/i,
+      );
+    });
+
+    it('hides PREMIUM badge for premium users', () => {
+      mockIsPremium = true;
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      expect(screen.queryByText('PREMIUM')).not.toBeInTheDocument();
+    });
+
+    it('shows coming soon message for premium users', () => {
+      mockIsPremium = true;
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      expect(screen.getByText(/Coming soon/i)).toBeInTheDocument();
+    });
+
+    it('passes isPremium=true to PremiumGate for premium users', () => {
+      mockIsPremium = true;
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      const gate = screen.getByTestId('premium-gate');
+      expect(gate.getAttribute('data-is-premium')).toBe('true');
+    });
+
+    it('does not render TradeAnalyzerCard when a league is selected', async () => {
+      mockUserLeagues = { userLeagues: [{ id: 3, name: 'My League' }] };
+      mockUserTeamId = 42;
+      mockLeague = { league: { id: 3, owner: 99 } };
+      renderPage();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /View trades for My League/i }),
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('premium-gate')).not.toBeInTheDocument();
+      });
+    });
   });
 });

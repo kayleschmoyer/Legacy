@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
+  BarChart2,
   ChevronLeft,
   RefreshCw,
   Users,
@@ -16,6 +17,135 @@ import {
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
+import { BRAND_GOLD, withAlpha } from '../../constants/colors';
+
+// ── Trade Analyzer premium upsell card ───────────────────────────────────────
+
+function TradeAnalyzerCard(): React.JSX.Element {
+  const isPremium = useIsPremium();
+
+  return (
+    <YStack gap="$3">
+      <XStack alignItems="center" gap="$2">
+        <BarChart2 size={18} color="$color" />
+        <Text
+          fontSize="$5"
+          fontWeight="700"
+          color="$color"
+          style={{
+            fontFamily: "'Big Shoulders Display', system-ui, sans-serif",
+          }}
+        >
+          Trade Analyzer
+        </Text>
+        {!isPremium && (
+          <XStack
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+            borderRadius="$2"
+            style={{ background: withAlpha(BRAND_GOLD, 0.15) }}
+          >
+            <Text fontSize="$1" fontWeight="700" style={{ color: BRAND_GOLD }}>
+              PREMIUM
+            </Text>
+          </XStack>
+        )}
+      </XStack>
+
+      <PremiumGate
+        isPremium={isPremium}
+        featureName="Trade Analyzer"
+        featureDescription="Evaluate trade fairness with projected values, rest-of-season stats, and roster impact scores."
+      >
+        {/* Teaser — blurred for free users, visible (coming soon) for premium */}
+        <YStack
+          gap="$3"
+          padding="$4"
+          backgroundColor="$surfacePanel"
+          borderRadius="$4"
+          borderWidth={1}
+          borderColor="$outlineSubtle"
+        >
+          <XStack gap="$3">
+            <YStack flex={1} gap="$2">
+              <Text fontWeight="600" fontSize="$3" color="$color">
+                You Give
+              </Text>
+              {['Mike Trout', 'Shohei Ohtani'].map((p) => (
+                <XStack
+                  key={p}
+                  alignItems="center"
+                  gap="$2"
+                  padding="$2"
+                  backgroundColor="$surfaceSubtle"
+                  borderRadius="$3"
+                >
+                  <Text fontSize="$3" color="$color">
+                    {p}
+                  </Text>
+                </XStack>
+              ))}
+            </YStack>
+            <ArrowLeftRight
+              size={20}
+              color="$colorPress"
+              style={{ alignSelf: 'center' }}
+            />
+            <YStack flex={1} gap="$2">
+              <Text fontWeight="600" fontSize="$3" color="$color">
+                You Get
+              </Text>
+              {['Ronald Acuña Jr.', 'Juan Soto'].map((p) => (
+                <XStack
+                  key={p}
+                  alignItems="center"
+                  gap="$2"
+                  padding="$2"
+                  backgroundColor="$surfaceSubtle"
+                  borderRadius="$3"
+                >
+                  <Text fontSize="$3" color="$color">
+                    {p}
+                  </Text>
+                </XStack>
+              ))}
+            </YStack>
+          </XStack>
+          <YStack
+            padding="$3"
+            backgroundColor="$surfaceSubtle"
+            borderRadius="$3"
+            gap="$1"
+          >
+            <Text fontWeight="700" fontSize="$4" color="$color">
+              Analysis
+            </Text>
+            <Text fontSize="$3" color="$colorPress">
+              Trade value: Slightly favors you
+            </Text>
+            <Text fontSize="$3" color="$colorPress">
+              ROS impact: +12.4 pts/week
+            </Text>
+          </YStack>
+          {isPremium && (
+            <YStack alignItems="center" padding="$2">
+              <Text
+                fontSize="$3"
+                color="$colorPress"
+                textAlign="center"
+                fontStyle="italic"
+              >
+                Coming soon — AI-powered trade analysis is under development.
+              </Text>
+            </YStack>
+          )}
+        </YStack>
+      </PremiumGate>
+    </YStack>
+  );
+}
 
 // ── League pending-offers badge ───────────────────────────────────────────────
 
@@ -406,6 +536,8 @@ export function TradeCenterPage(): React.JSX.Element {
                   </div>
                 );
               })}
+
+            {!loading && !error && <TradeAnalyzerCard />}
           </YStack>
         )}
       </YStack>
