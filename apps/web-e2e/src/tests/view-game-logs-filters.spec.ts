@@ -8,13 +8,13 @@ import { expect, test } from '../fixtures/auth-enhanced';
  * venue serialization, franchise-relocation mapping). These specs prove the
  * rendered controls drive the POST body end-to-end.
  *
- * The View Game Logs page is now routed at `/players/view-game-logs` (LS-7466),
- * so the combined-filter, franchise-relocation, and opponent-enumeration specs
- * below run against the real app shell with the hermetic `auth-enhanced` fixture
- * (baseline GraphQL mocks; per-test `route.fulfill` for the stats endpoint). The
- * remaining venue specs stay parked as `test.fixme` pending their own automation
- * ticket — un-skipping them is owned by LS-7467 (home/away venue=away +
- * venue=all).
+ * The View Game Logs page is routed at `/players/view-game-logs` (LS-7864),
+ * mounting GameLogsTable from `lib/shared-components`, so these specs run
+ * against the real app shell with the hermetic `auth-enhanced` fixture
+ * (baseline GraphQL mocks; per-test `route.fulfill` for the stats endpoint).
+ * All five specs are now enabled: combined-filter (LS-7466), opponent
+ * enumeration (LS-7479), franchise relocation (LS-7478), and the home/away
+ * venue specs (LS-7467).
  */
 
 const PAGE_URL = '/players/view-game-logs';
@@ -88,7 +88,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
     expect(opponentAbbrs).toEqual(expect.arrayContaining(['ATH', 'OAK', 'LV']));
   });
 
-  test.fixme('Away toggle posts venue=away (LS-7465)', async ({ page }) => {
+  test('Away toggle posts venue=away (LS-7467)', async ({ page }) => {
     let body: Record<string, unknown> | null = null;
     await page.route('**/baseball-game-logs', async (route) => {
       body = JSON.parse(route.request().postData() ?? '{}') as Record<
@@ -110,7 +110,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
     expect((body as { venue?: string }).venue).toBe('away');
   });
 
-  test.fixme('venue=all (default) omits the venue key entirely', async ({
+  test('venue=all (default) omits the venue key entirely (LS-7467)', async ({
     page,
   }) => {
     let body: Record<string, unknown> | null = null;
