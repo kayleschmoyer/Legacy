@@ -12,59 +12,112 @@ import {
 // Platform-agnostic React components (no React Native imports)
 // Using CSS-in-JS for styling instead of StyleSheet
 
+/** Em-dash used to disambiguate "no value" from a real zero stat. (LS-7461) */
+const EM_DASH = '—';
+
+/** Cell values returned from the stats API. `null` / `undefined` / `''` are
+ *  "missing" and rendered as em-dash; a real `0` is preserved. (LS-7461) */
+type CellValue = string | number | null | undefined;
+
+function renderCell(cell: CellValue): string | number {
+  if (cell === null || cell === undefined) return EM_DASH;
+  if (typeof cell === 'string' && cell.trim() === '') return EM_DASH;
+  return cell;
+}
+
 // Cross-platform table implementation
 interface TableProps {
   headers: string[];
-  data: Array<Array<string | number>>;
+  data: Array<Array<CellValue>>;
   title?: string;
+  /**
+   * Stable identifier per row (e.g. gameId). Used as React key so that
+   * sort/filter changes don't cause reconciliation churn — the wrong rows
+   * keep their internal state if we use the array index. (LS-7460)
+   */
+  rowKeys?: string[];
 }
 
-const CrossPlatformTable: React.FC<TableProps> = ({ headers, data, title }) => {
+const CrossPlatformTable: React.FC<TableProps> = ({
+  headers,
+  data,
+  title,
+  rowKeys,
+}) => {
   if (Platform.OS === 'web') {
     return (
-      <table
-        style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}
+      <div
+        // LS-7459 — wrap the table in a horizontally-scrollable container so
+        // wide stat tables don't overflow the viewport on narrow screens.
+        // `minWidth` on the inner table keeps columns from collapsing.
+        style={{
+          overflowX: 'auto',
+          maxWidth: '100%',
+          marginTop: 16,
+        }}
       >
-        <thead>
-          <tr>
-            {headers.map((header, index) => (
-              <th
-                key={index}
-                style={{
-                  padding: 8,
-                  border: '1px solid #ddd',
-                  backgroundColor: '#f5f5f5',
-                  textAlign: 'left',
-                }}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell, cellIndex) => (
-                <td
-                  key={cellIndex}
+        <table
+          style={{
+            width: '100%',
+            minWidth: 600,
+            borderCollapse: 'collapse',
+          }}
+        >
+          <thead
+            // LS-7458 — keep column labels in view as the user scrolls a
+            // 162-game MLB season. `position: sticky` resolves against the
+            // nearest scrollable ancestor (the page's outer ScrollView).
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
+              backgroundColor: '#f5f5f5',
+            }}
+          >
+            <tr>
+              {headers.map((header, index) => (
+                <th
+                  key={index}
                   style={{
                     padding: 8,
                     border: '1px solid #ddd',
+                    backgroundColor: '#f5f5f5',
+                    textAlign: 'left',
                   }}
                 >
-                  {cell}
-                </td>
+                  {header}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((row, rowIndex) => (
+              // LS-7460 — prefer the explicit row key (e.g. gameId) so React
+              // re-uses the right <tr> across sort/filter changes.
+              <tr key={rowKeys?.[rowIndex] ?? rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={cellIndex}
+                    style={{
+                      padding: 8,
+                      border: '1px solid #ddd',
+                    }}
+                  >
+                    {renderCell(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
-  // React Native implementation
-  return <Table headers={headers} data={data} title={title} />;
+  // React Native implementation — normalize empty cells the same way so the
+  // em-dash treatment is consistent across web + native. (LS-7461)
+  const normalizedData = data.map((row) => row.map(renderCell));
+  return <Table headers={headers} data={normalizedData} title={title} />;
 };
 
 // ---------------------------------------------------------------------------
@@ -290,10 +343,13 @@ function GameLogsTable({
     }
   };
 
-  // Prepare table data
-  const tableData = data
-    ? Object.keys(data).map((gameId) => stats.map((s) => data[gameId][s] || ''))
-    : [];
+  // Prepare table data + stable row identifiers (gameIds) so the table can use
+  // them as React keys. Use `??` (not `||`) so a real `0` stat is preserved as
+  // `0`, not coerced to the missing-value sentinel. (LS-7460, LS-7461)
+  const gameIds: string[] = data ? Object.keys(data) : [];
+  const tableData: Array<Array<CellValue>> = gameIds.map((gameId) =>
+    stats.map((s) => data?.[gameId]?.[s] ?? null),
+  );
 
   return (
     <ScrollView flex={1} padding="$4">
@@ -439,7 +495,11 @@ function GameLogsTable({
 
       {data && stats.length > 0 ? (
         <YStack marginTop="$4">
-          <CrossPlatformTable headers={stats} data={tableData} />
+          <CrossPlatformTable
+            headers={stats}
+            data={tableData}
+            rowKeys={gameIds}
+          />
         </YStack>
       ) : null}
     </ScrollView>
