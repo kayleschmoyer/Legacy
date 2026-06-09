@@ -6,11 +6,15 @@
  */
 import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, gte, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, ne } from 'drizzle-orm';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../graphql-errors';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -135,36 +139,96 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
         try {
           const db = context.db;
 
-          // Update the team member position
-          const updated = await db
-            .update(PublicSchema.teamMembers)
-            .set({ positionId: positionId ?? null })
-            .where(eq(PublicSchema.teamMembers.id, teamMemberId))
-            .returning({
-              id: PublicSchema.teamMembers.id,
-              teamId: PublicSchema.teamMembers.teamId,
-              leagueId: PublicSchema.teamMembers.leagueId,
-              playerId: PublicSchema.teamMembers.playerId,
-              positionId: PublicSchema.teamMembers.positionId,
-              onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
-            });
+          // Assigning a position that another member of the same team already
+          // holds would violate the `team_members_uk_team_position`
+          // UNIQUE(team_id, position_id) constraint and surface to the client
+          // as an opaque "Internal server error" (HTTP 500). This is the data
+          // state of a freshly-drafted league, where every starting slot is
+          // auto-assigned at draft completion. Free the target slot first
+          // (displacing the incumbent to the bench), then assign — mirroring
+          // the clear-then-assign pattern in `swapTeamMemberPositions`. Both
+          // steps run in one transaction so a failure never leaves the
+          // incumbent benched without the new player taking the slot. The web
+          // UI routes occupied-slot moves through `swapTeamMemberPositions`, so
+          // this path is exercised mainly by direct API callers (LS-7871).
+          const { member, displaced } = await db.transaction(async (tx) => {
+            // Resolve the member's team so slot-clearing is scoped to it.
+            const [existing] = await tx
+              .select({ teamId: PublicSchema.teamMembers.teamId })
+              .from(PublicSchema.teamMembers)
+              .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+              .limit(1);
 
-          if (updated.length === 0) {
-            throw new Error('Failed to update team member position');
-          }
+            if (!existing) {
+              throw UserInputError('Team member not found');
+            }
 
-          const member = updated[0];
+            // Free the target slot if a different member on the same team
+            // currently occupies it. Skipped when clearing a position (null),
+            // which can never collide.
+            let displaced: Array<{ teamId: number | null; playerId: number }> =
+              [];
+            if (positionId != null && existing.teamId != null) {
+              displaced = await tx
+                .update(PublicSchema.teamMembers)
+                .set({ positionId: null })
+                .where(
+                  and(
+                    eq(PublicSchema.teamMembers.teamId, existing.teamId),
+                    eq(PublicSchema.teamMembers.positionId, positionId),
+                    ne(PublicSchema.teamMembers.id, teamMemberId),
+                  ),
+                )
+                .returning({
+                  teamId: PublicSchema.teamMembers.teamId,
+                  playerId: PublicSchema.teamMembers.playerId,
+                });
+            }
 
-          // Mirror the position change onto matchup_players for the active week
+            // Update the team member position
+            const updated = await tx
+              .update(PublicSchema.teamMembers)
+              .set({ positionId: positionId ?? null })
+              .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+              .returning({
+                id: PublicSchema.teamMembers.id,
+                teamId: PublicSchema.teamMembers.teamId,
+                leagueId: PublicSchema.teamMembers.leagueId,
+                playerId: PublicSchema.teamMembers.playerId,
+                positionId: PublicSchema.teamMembers.positionId,
+                onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+              });
+
+            if (updated.length === 0) {
+              throw UserInputError('Team member not found');
+            }
+
+            return { member: updated[0], displaced };
+          });
+
+          // Mirror the position change(s) onto matchup_players for the active
+          // week. The assigned member moves to `positionId`; any displaced
+          // incumbent is benched (null) so the lineup stays consistent.
           if (member.teamId) {
+            const changes = [
+              {
+                teamId: member.teamId,
+                playerId: member.playerId,
+                positionId: positionId ?? null,
+              },
+              ...displaced
+                .filter(
+                  (d): d is { teamId: number; playerId: number } =>
+                    d.teamId != null,
+                )
+                .map((d) => ({
+                  teamId: d.teamId,
+                  playerId: d.playerId,
+                  positionId: null,
+                })),
+            ];
             try {
-              await syncCurrentMatchupPositions(db, member.leagueId, [
-                {
-                  teamId: member.teamId,
-                  playerId: member.playerId,
-                  positionId: positionId ?? null,
-                },
-              ]);
+              await syncCurrentMatchupPositions(db, member.leagueId, changes);
             } catch (syncError) {
               LOGGER.warn(
                 'Failed to sync matchup player position after roster update',
