@@ -437,10 +437,12 @@ test.describe
     });
 
     await test.step('Verify all 4 teams appear in standings', async () => {
-      // LeagueDetailPageV2 renders StandingsTab, which uses a <table> not a list.
-      // Each team occupies a <tr> in the <table aria-label="League Standings"> tbody.
+      // LeagueDetailPageV2 renders StandingsTab via the shared StandingsTable
+      // (LS-7814 consolidation). It renders one `<table role="table">` per
+      // division with `aria-label="League Standings — Division N"`, so match the
+      // aria-label by prefix and count rows across every division table.
       const teamRows = page.locator(
-        'table[aria-label="League Standings"] tbody tr',
+        'table[aria-label^="League Standings"] tbody tr',
       );
       await expect
         .poll(async () => teamRows.count(), {
@@ -464,14 +466,16 @@ test.describe
     });
 
     await test.step('Verify team rank badges are visible in standings', async () => {
-      // Wait for a table row to confirm standings data has loaded; <Rank> badges
-      // render in the same pass, so this gates the .ls-rank check below.
+      // Wait for a table row to confirm standings data has loaded; rank badges
+      // render in the same pass, so this gates the rank-cell check below.
       await expect(
-        page.locator('table[aria-label="League Standings"] tbody tr').first(),
+        page.locator('table[aria-label^="League Standings"] tbody tr').first(),
       ).toBeVisible({ timeout: 15_000 });
 
+      // The shared StandingsTable (LS-7814) renders the rank as the first
+      // `<td role="cell">` of each row (the old `.ls-rank` class is gone).
       const rankBadges = page.locator(
-        'table[aria-label="League Standings"] .ls-rank',
+        'table[aria-label^="League Standings"] tbody tr > td:first-child',
       );
       await expect(rankBadges.first()).toBeVisible({ timeout: 10_000 });
       const rankCount = await rankBadges.count();

@@ -419,14 +419,19 @@ test.describe
     });
 
     await test.step('Verify standings table renders rows for all four teams', async () => {
-      // The LS-4127 StandingsTab redesign uses a plain <table> with Rank/Team/W/L/T/PF/PA columns.
-      // Waiver order is no longer displayed in the standings UI; the GQL steps above already
-      // capture and assert waiverOrder values for both teams.
-      const standingsTable = page.locator(
-        'table[aria-label="League Standings"]',
-      );
+      // The StandingsTab renders via the shared StandingsTable (LS-7814
+      // consolidation): one `<table role="table">` per division, labelled
+      // `aria-label="League Standings — Division N"`. Match the aria-label by
+      // prefix and count rows across every division table.
+      // Waiver order is no longer displayed in the standings UI; the GQL steps
+      // above already capture and assert waiverOrder values for both teams.
+      const standingsTable = page
+        .locator('table[aria-label^="League Standings"]')
+        .first();
       await expect(standingsTable).toBeVisible({ timeout: 15000 });
-      const teamRows = standingsTable.locator('tbody tr');
+      const teamRows = page.locator(
+        'table[aria-label^="League Standings"] tbody tr',
+      );
       // The standings query may still be in-flight when the table first
       // renders, leaving only the empty-state row (count=1) visible.  Retry
       // until all four team rows have loaded — same toPass pattern used in

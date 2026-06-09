@@ -554,14 +554,14 @@ test.describe
     });
 
     await test.step('New league shows "Pre-Draft" status badge', async () => {
-      // keepRosters=false → draftStatus = 'not-started' → "Pre-Draft" badge
-      await expect(
-        page.locator(
-          '[data-testid="draft-status-chip"][data-status="not-started"]',
-        ),
-      ).toBeVisible({
-        timeout: 15_000,
-      });
+      // keepRosters=false → draftStatus = 'not-started'. The V2 overview's
+      // draft-status chip no longer carries a `data-status` attribute; the
+      // not-started state is conveyed by its visible "Pre-Draft" label.
+      const draftStatusChip = page
+        .locator('[data-testid="draft-status-chip"]')
+        .first();
+      await expect(draftStatusChip).toBeVisible({ timeout: 15_000 });
+      await expect(draftStatusChip).toHaveText(/Pre-?Draft/i);
     });
 
     await test.step('Via API: verify season lineage and state', async () => {
@@ -733,13 +733,13 @@ test.describe
     });
 
     await test.step('New league shows "Pre-Draft" status to manager', async () => {
-      await expect(
-        page.locator(
-          '[data-testid="draft-status-chip"][data-status="not-started"]',
-        ),
-      ).toBeVisible({
-        timeout: 10_000,
-      });
+      // The V2 overview draft-status chip no longer carries a `data-status`
+      // attribute; not-started is conveyed by its visible "Pre-Draft" label.
+      const draftStatusChip = page
+        .locator('[data-testid="draft-status-chip"]')
+        .first();
+      await expect(draftStatusChip).toBeVisible({ timeout: 10_000 });
+      await expect(draftStatusChip).toHaveText(/Pre-?Draft/i);
     });
   });
 });

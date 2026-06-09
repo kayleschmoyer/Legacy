@@ -317,18 +317,30 @@ test.describe
       });
     });
 
+    // Scope percentage assertions to the win-probability panel. The previous
+    // page-wide `text=/^\d+%$/` locator was brittle: under the Tamagui/RNW span
+    // structure it failed to match the two team values ("98%" / "2%") and instead
+    // matched an unrelated "0%" elsewhere on the page (count=1). Reading the
+    // panel's own text and extracting `\d+%` tokens is robust to that.
+    const winProbPanel = page.getByTestId('win-probability-panel');
+    const panelPercents = async (): Promise<number[]> =>
+      ((await winProbPanel.innerText()).match(/\d+%/g) ?? []).map((t) =>
+        parseInt(t, 10),
+      );
+
     await test.step('Probability percentages are shown', async () => {
-      // Find all percentage text on the page — at least the two win-probability values
-      const pctLocator = page.locator('text=/^\\d+%$/');
-      await expect(pctLocator.first()).toBeVisible({ timeout: 10_000 });
-      const count = await pctLocator.count();
-      expect(count).toBeGreaterThanOrEqual(2);
+      await expect(winProbPanel).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(async () => (await panelPercents()).length, {
+          timeout: 10_000,
+          intervals: [500, 1_000, 2_000],
+        })
+        .toBeGreaterThanOrEqual(2);
     });
 
     await test.step('Probability percentages sum to 100', async () => {
-      const texts = await page.locator('text=/^\\d+%$/').allTextContents();
-      // Find the win-probability pair: two percentages that sum to 100
-      const nums = texts.map((t) => parseInt(t.replace('%', ''), 10));
+      // Find the win-probability pair: two percentages that sum to 100.
+      const nums = await panelPercents();
       const hasPairSumTo100 = nums.some((n, i) =>
         nums.some((m, j) => i !== j && n + m === 100),
       );

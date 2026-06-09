@@ -829,13 +829,17 @@ test.describe
     let player1InitialPositionId: number | null = null;
     let player2InitialPositionId: number | null = null;
 
-    await test.step('Record initial positions of two starters via API', async () => {
+    await test.step('Record positions of two mutually-swap-eligible starters via API', async () => {
       const { getMatchupPlayers } = await gqlFetch<{
         getMatchupPlayers: Array<{
           id: string;
           positionId: number | null;
           teamId: number;
-          player: { firstName: string; lastName: string };
+          player: {
+            firstName: string;
+            lastName: string;
+            eligiblePositions: string[] | null;
+          };
         }>;
       }>(
         commissionerJwt,
@@ -847,6 +851,7 @@ test.describe
             player {
               firstName
               lastName
+              eligiblePositions
             }
           }
         }`,
@@ -862,13 +867,66 @@ test.describe
         { leagueId: state.leagueId },
       );
 
-      // Find two starters (positionId non-null) for commissioner's team
+      // Map positionId → positionType so we can mirror the editor's eligibility
+      // gate. The MatchupRosterEditor only fires SwapMatchupPlayerPositions when
+      // BOTH players are eligible for the other's slot type
+      // (MatchupRosterEditorView.handlePlayerClick); picking two arbitrary
+      // starters (e.g. a 1B and an SP) silently no-ops the swap and times out
+      // the waitForResponse below. So we must pick a mutually-eligible pair.
+      const { leaguePositions } = await gqlFetch<{
+        leaguePositions: Array<{ id: number; positionType: string }>;
+      }>(
+        commissionerJwt,
+        `query LeaguePositions($leagueId: Int!) {
+          leaguePositions(leagueId: $leagueId) { id positionType }
+        }`,
+        { leagueId: state.leagueId },
+      );
+      const positionTypeById = new Map(
+        leaguePositions.map((p) => [p.id, p.positionType]),
+      );
+      const slotTypeOf = (positionId: number | null): string | null =>
+        positionId != null ? (positionTypeById.get(positionId) ?? null) : null;
+      const eligibleForSlot = (
+        eligible: string[] | null,
+        slotType: string | null,
+      ): boolean => {
+        if (!slotType) return true; // bench slot always allowed
+        if (!eligible || eligible.length === 0) return false;
+        const target = slotType.toUpperCase();
+        return eligible.some((p) => p.toUpperCase() === target);
+      };
+
+      // Find two starters (positionId non-null) for commissioner's team that can
+      // swap into each other's slot.
       const starters = getMatchupPlayers.filter(
         (mp) => mp.teamId === commTeamId && mp.positionId !== null,
       );
       expect(starters.length).toBeGreaterThanOrEqual(2);
 
-      const [first, second] = starters;
+      let pair: [(typeof starters)[number], (typeof starters)[number]] | null =
+        null;
+      for (let i = 0; i < starters.length && !pair; i++) {
+        for (let j = i + 1; j < starters.length && !pair; j++) {
+          const a = starters[i];
+          const b = starters[j];
+          const aEligibleForB = eligibleForSlot(
+            a.player.eligiblePositions,
+            slotTypeOf(b.positionId),
+          );
+          const bEligibleForA = eligibleForSlot(
+            b.player.eligiblePositions,
+            slotTypeOf(a.positionId),
+          );
+          if (aEligibleForB && bEligibleForA) pair = [a, b];
+        }
+      }
+      expect(
+        pair,
+        'two starters mutually eligible for each other’s slot (required for the swap UI to fire)',
+      ).not.toBeNull();
+      // Non-null asserted above; capture for the rest of the phase.
+      const [first, second] = pair as NonNullable<typeof pair>;
       player1FirstName = first.player.firstName;
       player1LastName = first.player.lastName;
       player2FirstName = second.player.firstName;
