@@ -57,8 +57,20 @@ runs:
         BUCKET: ${{ inputs.bucket }}
         IF_NO_FILES: ${{ inputs.if-no-files-found }}
       run: |
-        # Include run_attempt in the prefix so job retries get a clean artifact set
-        S3_PREFIX="s3://${BUCKET}/ci-artifacts/${RUN_ID}/${GITHUB_RUN_ATTEMPT}/${NAME}"
+        # Namespace by RUN_ID only — NOT run_attempt. Artifact content is a pure
+        # function of the commit (RUN_ID is unique per run, stable across attempts),
+        # so per-attempt scoping adds no isolation but breaks two real cases:
+        #   1. "Re-run failed jobs" (LS-7873): the producer job (e.g. build) is not
+        #      re-run, so it never uploads under the new attempt number, yet the
+        #      re-run consumer (e.g. e2e) looks under that new attempt and finds
+        #      nothing — the web-build download silently misses and E2E aborts with
+        #      an empty blob-report, blocking the merge queue for every PR.
+        #   2. Cross-workflow handoff (deploy-pr-preview passes run-id of another
+        #      run, but GITHUB_RUN_ATTEMPT is this workflow's attempt, not the
+        #      producer's) — only worked by coincidence when both were on attempt 1.
+        # A re-run that DOES re-run the producer overwrites the stable prefix via the
+        # `aws s3 sync --delete` upload below, so retries still get a clean set.
+        S3_PREFIX="s3://${BUCKET}/ci-artifacts/${RUN_ID}/${NAME}"
 
         if [ "$MODE" = "upload" ]; then
           # Check if there are files to upload
