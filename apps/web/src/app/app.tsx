@@ -650,6 +650,9 @@ function App() {
             />
             <Route path="/players/stats" element={<PlayerStatsPage />} />
             <Route path="/players/compare" element={<PlayerComparisonPage />} />
+            {/* Static segment must precede the /players/:id dynamic route
+                (react-router v6 ranks static over dynamic; ordered explicitly
+                for clarity). LS-7864 */}
             <Route
               path="/players/view-game-logs"
               element={<ViewGameLogsPage />}
