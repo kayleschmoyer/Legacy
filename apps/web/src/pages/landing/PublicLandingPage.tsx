@@ -314,7 +314,7 @@ const SPORTS = [
 /* ─── Component ─── */
 
 export function PublicLandingPage(): React.JSX.Element {
-  const { config, loginWithOAuth, error: authError } = useAuth();
+  const { config, loginWithOAuth, clearError, error: authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
@@ -364,6 +364,7 @@ export function PublicLandingPage(): React.JSX.Element {
 
     setIsDiscordLoading(true);
     setErrorMessage('');
+    clearError();
 
     const exchangeCode = async () => {
       try {
@@ -427,7 +428,7 @@ export function PublicLandingPage(): React.JSX.Element {
     };
 
     void exchangeCode();
-  }, [config.oauthProxyUrl]);
+  }, [config.oauthProxyUrl, clearError]);
 
   // Configure OAuth on mount.
   // One Tap is disabled here: the public landing page is only shown to
@@ -465,6 +466,7 @@ export function PublicLandingPage(): React.JSX.Element {
       }>;
       setIsLoading(true);
       setErrorMessage('');
+      clearError();
       try {
         await loginWithOAuth(customEvent.detail.authResponse);
       } catch (error) {
@@ -486,12 +488,13 @@ export function PublicLandingPage(): React.JSX.Element {
     };
     window.addEventListener('gsi-one-tap-success', wrapper);
     return () => window.removeEventListener('gsi-one-tap-success', wrapper);
-  }, [loginWithOAuth]);
+  }, [loginWithOAuth, clearError]);
 
   const handleSignIn = useCallback(async () => {
     if (!isConfigured || isLoading || isConfiguring) return;
     setIsLoading(true);
     setErrorMessage('');
+    clearError();
     try {
       const oauthResponse = await OAuthProvider.signIn();
       await loginWithOAuth(oauthResponse);
@@ -505,7 +508,7 @@ export function PublicLandingPage(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [isConfigured, isConfiguring, isLoading, loginWithOAuth]);
+  }, [isConfigured, isConfiguring, isLoading, loginWithOAuth, clearError]);
 
   const handleDiscordSignIn = useCallback(() => {
     // Delegate state generation and cookie binding to the backend.

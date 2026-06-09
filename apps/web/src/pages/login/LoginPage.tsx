@@ -148,8 +148,8 @@ export function LoginPage(): React.JSX.Element {
     login,
     loginWithOAuth,
     hydrateSession,
-    error: authError,
     clearError,
+    error: authError,
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isEmailLoading, setIsEmailLoading] = useState(false);
@@ -270,6 +270,7 @@ export function LoginPage(): React.JSX.Element {
 
     setIsDiscordLoading(true);
     setErrorMessage('');
+    clearError();
 
     const exchangeCode = async () => {
       try {
@@ -372,7 +373,7 @@ export function LoginPage(): React.JSX.Element {
     };
 
     void exchangeCode();
-  }, [config.oauthProxyUrl]);
+  }, [config.oauthProxyUrl, clearError, hydrateSession]);
 
   /* Google OAuth configure */
   useEffect(() => {
@@ -403,6 +404,7 @@ export function LoginPage(): React.JSX.Element {
       }>;
       setIsLoading(true);
       setErrorMessage('');
+      clearError();
       try {
         await loginWithOAuth(customEvent.detail.authResponse);
         // Send returning users back to their last-opened league. The auth-guard
@@ -428,13 +430,14 @@ export function LoginPage(): React.JSX.Element {
     };
     window.addEventListener('gsi-one-tap-success', wrapper);
     return () => window.removeEventListener('gsi-one-tap-success', wrapper);
-  }, [loginWithOAuth]);
+  }, [loginWithOAuth, clearError]);
 
   const handleSignIn = useCallback(async () => {
     if (!isConfigured || isConfiguring || signInInFlightRef.current) return;
     signInInFlightRef.current = true;
     setIsLoading(true);
     setErrorMessage('');
+    clearError();
     try {
       const oauthResponse = await OAuthProvider.signIn();
       await loginWithOAuth(oauthResponse);
@@ -462,7 +465,7 @@ export function LoginPage(): React.JSX.Element {
       signInInFlightRef.current = false;
       setIsLoading(false);
     }
-  }, [isConfigured, isConfiguring, loginWithOAuth]);
+  }, [isConfigured, isConfiguring, loginWithOAuth, clearError]);
 
   // Email/password sign-in (LGN-017). The full chain already exists end-to-end
   // (useAuth().login → AuthService.authenticateWithEmail → POST /oauth/login);

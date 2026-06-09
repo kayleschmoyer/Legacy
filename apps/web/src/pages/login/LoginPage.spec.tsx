@@ -22,6 +22,8 @@ import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 const mockHydrateSession = jest.fn();
 // Shared handle for the email/password login path (LGN-017).
 const mockLogin = jest.fn();
+const mockClearError = jest.fn();
+let mockAuthError: string | null = null;
 
 // ---------------------------------------------------------------------------
 // Module mocks — factories use jest.fn() inline to avoid hoisting/TDZ issues
@@ -60,8 +62,8 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
     login: mockLogin,
     loginWithOAuth: jest.fn(),
     hydrateSession: mockHydrateSession,
-    error: null,
-    clearError: jest.fn(),
+    clearError: mockClearError,
+    error: mockAuthError,
   }),
 }));
 
@@ -123,6 +125,7 @@ let configureSpy: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
   mockLogin.mockResolvedValue(undefined);
+  mockAuthError = null;
   mockAuthConfig = {
     googleClientId: 'test-client-id',
     oauthProxyUrl: 'http://localhost:5001',
@@ -786,4 +789,27 @@ describe('LoginPage Discord callback error mapping (LS-6664)', () => {
       ).toBeNull();
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// LS-6681 — clearError() is called when a new sign-in attempt begins so a
+// stale auth-context error does not mask the clean state.
+// ---------------------------------------------------------------------------
+
+describe('LoginPage clearError on new sign-in attempt (LS-6681)', () => {
+  it('calls clearError() when the Google sign-in button is clicked', async () => {
+    mockAuthError = 'Previous auth failure';
+    signInSpy.mockResolvedValueOnce({});
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    act(() => {
+      fireEvent.click(btn);
+    });
+
+    await waitFor(() => {
+      expect(mockClearError).toHaveBeenCalled();
+    });
+  });
 });

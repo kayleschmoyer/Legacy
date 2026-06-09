@@ -46,6 +46,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({
     config: mockAuthConfig,
     loginWithOAuth: jest.fn(),
+    clearError: jest.fn(),
     error: null,
   }),
 }));
