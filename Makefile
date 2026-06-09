@@ -639,9 +639,11 @@ else
 	ENVIRONMENT=$(or $(ENVIRONMENT),prod) DRY_RUN=$(DRY_RUN) bash scripts$(PATH_SEP)rotate-runner-secrets.sh
 endif
 
-runner-lambdas-sync: ## Download Lambda zips matching the github-aws-runners version in terraform/runners/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
+runner-lambdas-sync: ## Sync runner Lambda zips (downloads webhook + syncer, builds patched control-plane runners.zip) matching the github-aws-runners version in terraform/runners/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
 	@$(call echo_blue,Syncing runner Lambda zips...)
 	node scripts$(PATH_SEP)download-runner-lambdas.js $(VERSION)
+	@$(call echo_blue,Building patched control-plane runners.zip (LS-7870 scale-down debounce)...)
+	bash scripts/build-runner-control-plane-lambda.sh $(VERSION)
 
 # Environment Management
 sync-env: ## Sync environment variables

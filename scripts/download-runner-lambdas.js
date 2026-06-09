@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // download-runner-lambdas.js
 //
-// Downloads the three Lambda zip files required by the github-aws-runners
-// Terraform module. The module version is read from terraform/runners/github-runners.tf
-// so this script always downloads the version that matches what is deployed.
+// Downloads the unpatched Lambda zip files required by the github-aws-runners
+// Terraform module (webhook.zip, runner-binaries-syncer.zip). The control-plane
+// runners.zip is built from patched source instead — see
+// scripts/build-runner-control-plane-lambda.sh and
+// terraform/runners/lambda-patches/README.md (LS-7870). The module version is
+// read from terraform/runners/github-runners.tf so this always matches what is
+// deployed.
 //
 // Usage:
 //   node scripts/download-runner-lambdas.js          # auto-detect version
@@ -19,7 +23,12 @@ const https = require('https');
 const path = require('path');
 
 const REPO = 'github-aws-runners/terraform-aws-github-runner';
-const ZIPS = ['webhook.zip', 'runners.zip', 'runner-binaries-syncer.zip'];
+// runners.zip (the control-plane bundle) is NOT downloaded here — it is built
+// from patched source by scripts/build-runner-control-plane-lambda.sh so it
+// carries the scale-down idle-strike debounce (LS-7870). See
+// terraform/runners/lambda-patches/README.md. Only the two unpatched bundles
+// are fetched from the upstream release.
+const ZIPS = ['webhook.zip', 'runner-binaries-syncer.zip'];
 const OUT_DIR = path.join(__dirname, '..', 'terraform', 'runners', 'lambdas');
 
 // ── Version detection ────────────────────────────────────────────────────────

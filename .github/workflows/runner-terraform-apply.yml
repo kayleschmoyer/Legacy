@@ -122,6 +122,13 @@ jobs:
       - name: Download runner Lambda zips
         run: node scripts/download-runner-lambdas.js
 
+      - name: Build patched control-plane Lambda (scale-down debounce, LS-7870)
+        # runners.zip is built from upstream source with the idle-strike debounce
+        # patch applied (see terraform/runners/lambda-patches/README.md) rather than
+        # downloaded, so the deployed scale-down Lambda tolerates transient GitHub
+        # busy:false readings instead of killing long jobs mid-run.
+        run: bash scripts/build-runner-control-plane-lambda.sh
+
       - name: Bootstrap IAM permissions
         # Targeted apply for the github_actions_runners IAM policy and its role
         # attachment. This step is a bootstrap guard: the permissions granted by

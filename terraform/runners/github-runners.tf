@@ -38,7 +38,13 @@ module "github_runners" {
     webhook_secret = var.github_app_webhook_secret
   }
 
-  # ── Lambda zips (pre-downloaded from module releases) ───────────────────────
+  # ── Lambda zips ─────────────────────────────────────────────────────────────
+  # webhook.zip and runner-binaries-syncer.zip are pre-downloaded from the module
+  # release (scripts/download-runner-lambdas.js). runners.zip (the control-plane
+  # bundle) is built from PATCHED upstream source — it carries the scale-down
+  # idle-strike debounce (LS-7870) so a transient GitHub busy:false reading cannot
+  # terminate a long-running job mid-run. See terraform/runners/lambda-patches/
+  # README.md and scripts/build-runner-control-plane-lambda.sh.
   webhook_lambda_zip                = "${path.module}/lambdas/webhook.zip"
   runners_lambda_zip                = "${path.module}/lambdas/runners.zip"
   runner_binaries_syncer_lambda_zip = "${path.module}/lambdas/runner-binaries-syncer.zip"
