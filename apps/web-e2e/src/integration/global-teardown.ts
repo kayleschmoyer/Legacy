@@ -11,6 +11,7 @@ import {
 } from './test-league-cleanup';
 import { COLLECT_COVERAGE, mergeShardFragments } from '../fixtures/coverage';
 import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
+import { fetchWithBackoff } from '../utils/retry-with-backoff';
 
 /**
  * Playwright global teardown for integration tests.
@@ -75,14 +76,20 @@ async function gqlFetch<T>(
   variables?: Record<string, unknown>,
 ): Promise<T | undefined> {
   try {
-    const res = await fetch(GQL_BASE + 'graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
+    // Best-effort cleanup: retry 429 + transient network errors with backoff
+    // honouring Retry-After (LS-7866) so a throttle never strands leagues.
+    const res = await fetchWithBackoff(
+      GQL_BASE + 'graphql',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
       },
-      body: JSON.stringify({ query, variables }),
-    });
+      { label: 'integration-teardown gqlFetch' },
+    );
     const json = (await res.json()) as GqlResponse<T>;
     if (json.errors?.length) {
       LOGGER.error(

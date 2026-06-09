@@ -130,20 +130,44 @@ jobs:
       - id: set
         shell: bash
         run: |
+          # ---------------------------------------------------------------
+          # Integration concurrency ceiling (LS-7866).
+          # The integration suite runs against the SHARED live backend
+          # (api.legacy-fantasy.com). Every concurrent shard runs its own
+          # league-creation / draft / season flow against that one backend,
+          # and N concurrent shards = N× the API-Gateway/Lambda load — which
+          # produced the 39× HTTP 429 cascade in run 27186006949. Workers are
+          # already pinned to 1 per shard (see the "Run Playwright Tests"
+          # step), so SHARD COUNT is the live-backend concurrency knob.
+          #
+          # The documented ceiling is **1 integration shard** (fully serial,
+          # one in-flight flow at a time) — the configuration confirmed to
+          # collapse the 429 failures. Comprehensive Retry-After backoff on
+          # every live call (LS-7866) absorbs any residual throttle; bounding
+          # concurrency keeps that residual near zero. A single serial shard
+          # runs longer, so the integration job raises its timeout (see
+          # `run-tests.timeout-minutes`). E2E is hermetic (no shared backend)
+          # and stays at 3 shards for speed.
+          # ---------------------------------------------------------------
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
-            # Nightly or manual "all": integration (3 shards) + e2e (3 shards), all tests, no filters
-            MATRIX='[{"suite":"integration","shard":"1/3"},{"suite":"integration","shard":"2/3"},'
-            MATRIX+='{"suite":"integration","shard":"3/3"},{"suite":"e2e","shard":"1/3"},'
+            # Nightly or manual "all": integration (1 shard, serial) + e2e (3 shards), all tests, no filters
+            MATRIX='[{"suite":"integration","shard":"1/1"},{"suite":"e2e","shard":"1/3"},'
             MATRIX+='{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]'
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           else
             SUITE="${{ inputs.test-suite }}"
-            case "${{ inputs.shard-total }}" in
-              1) SHARDS=("1/1") ;;
-              2) SHARDS=("1/2" "2/2") ;;
-              3) SHARDS=("1/3" "2/3" "3/3") ;;
-              4) SHARDS=("1/4" "2/4" "3/4" "4/4") ;;
-            esac
+            if [ "$SUITE" = "integration" ]; then
+              # Force a single serial shard regardless of the shard-total input —
+              # the live backend does not tolerate concurrent integration shards.
+              SHARDS=("1/1")
+            else
+              case "${{ inputs.shard-total }}" in
+                1) SHARDS=("1/1") ;;
+                2) SHARDS=("1/2" "2/2") ;;
+                3) SHARDS=("1/3" "2/3" "3/3") ;;
+                4) SHARDS=("1/4" "2/4" "3/4" "4/4") ;;
+              esac
+            fi
             MATRIX=$(
               for SHARD in "${SHARDS[@]}"; do
                 jq -cn --arg suite "$SUITE" --arg shard "$SHARD" '{suite: $suite, shard: $shard}'
@@ -225,7 +249,9 @@ jobs:
     name: "Playwright ${{ matrix.suite }} (${{ matrix.shard }})"
     needs: [prepare]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 60
+    # Integration runs as a single serial shard (LS-7866 concurrency ceiling),
+    # so it needs more wall-clock than a 3-way-sharded e2e job. E2E stays at 60.
+    timeout-minutes: ${{ matrix.suite == 'integration' && 120 || 60 }}
     env:
       # Per-test source-coverage collection (LS-7849): nightly schedule, plus the
       # on-demand "repopulate coverage map" lever (manual dispatch with
@@ -527,7 +553,10 @@ jobs:
           # throttling and flaky "Failed to fetch" / null teamId responses.
           # playwright.integration.config.ts sets workers: 1 for the same
           # reason, but CLI --workers overrides the config value, so we must
-          # be explicit here too. See LS-2824.
+          # be explicit here too. See LS-2824. The matching SHARD ceiling
+          # (1 integration shard) is enforced in the `prepare` job — together
+          # they bound live-backend concurrency to a single in-flight flow
+          # (LS-7866).
           if [ "$SUITE" = "integration" ]; then
             PLAYWRIGHT_ARGS+=( "--workers=1" )
           elif [ "$IS_NIGHTLY_LIKE" = "true" ]; then

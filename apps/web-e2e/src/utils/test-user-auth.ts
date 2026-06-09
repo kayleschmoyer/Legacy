@@ -18,6 +18,7 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { fetchWithBackoff } from './retry-with-backoff';
 
 /**
  * Predefined test users for integration tests.
@@ -163,35 +164,35 @@ export async function getTestUserJwt(
   return jwt;
 }
 
-/** Plain timer sleep for rate-limit backoff — no Playwright coupling. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * fetch() wrapper that retries on HTTP 429 (rate limited) with exponential
- * backoff. All other status codes are returned immediately.
+ * backoff honouring the server's `Retry-After` header. All other status codes
+ * are returned immediately.
  *
- * Backoff schedule (maxAttempts=7): no wait → 1 s → 2 s → 4 s → 8 s → 16 s → 32 s,
- * total ~63 s — enough to outlast the OAuth proxy's 60 s rate-limit window
- * (5 requests / minute per IP per route, see
- * `lambdas/oauth-proxy/src/index.ts`'s `AUTH_RATE_LIMIT`). Per-spec unique
- * emails (LS-4940) avoid per-identity contention; this retry covers the
- * per-IP throttle so back-to-back integration runs from the same host don't
- * fail when the auth-route bucket fills.
+ * Delegates to the shared `fetchWithBackoff` (LS-7866) so the auth path, the
+ * GraphQL `gqlFetch` path, and the Playwright `graphql` path share one backoff
+ * policy. The oauth-proxy rate limiter sets `Retry-After` (see
+ * `lambdas/oauth-proxy/src/util/rate-limit.ts`), so honouring it waits exactly
+ * as long as the bucket needs instead of guessing.
+ *
+ * Backoff budget (maxAttempts=7, base=1 s): when no `Retry-After` is present the
+ * exponential schedule reaches ~32 s per wait (1 → 2 → 4 → 8 → 16 → 32 s,
+ * full-jittered), enough to outlast the OAuth proxy's 60 s rate-limit window
+ * (5 requests / minute per IP per route, `AUTH_RATE_LIMIT`). Per-spec unique
+ * emails (LS-4940) avoid per-identity contention; this retry covers the per-IP
+ * throttle so back-to-back integration runs from the same host don't fail when
+ * the auth-route bucket fills.
  */
 async function fetchWithRateLimitRetry(
   url: string,
   options: RequestInit,
   maxAttempts = 7,
 ): Promise<Response> {
-  let last!: Response;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    last = await fetch(url, options);
-    if (last.status !== 429 || attempt === maxAttempts) return last;
-    await sleep(1_000 * Math.pow(2, attempt - 1));
-  }
-  return last;
+  return fetchWithBackoff(url, options, {
+    maxAttempts,
+    baseDelayMs: 1_000,
+    label: 'oauth-proxy auth',
+  });
 }
 
 async function registerOrLogin(

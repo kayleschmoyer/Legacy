@@ -21,6 +21,7 @@ import {
   getTestUserJwt,
   TEST_USERS,
 } from '../utils/test-user-auth';
+import { fetchWithBackoff } from '../utils/retry-with-backoff';
 
 /**
  * Wall-clock budget for the per-spec commissioner sweep (LS-7704). Minting one
@@ -34,6 +35,26 @@ const PER_SPEC_SWEEP_BUDGET_MS = 90_000;
 
 /** Spacing between per-spec commissioner mints to ease oauth-proxy throttling. */
 const PER_SPEC_MINT_SPACING_MS = 250;
+
+/**
+ * Personas the per-spec fixtures authenticate as (`api` → MANAGER_1, `api2` →
+ * MANAGER_2, `apiCommissioner` → COMMISSIONER — see `fixtures/api.ts`). These
+ * are the identities pre-warmed by `warmPerSpecFixtureJwts` so the concurrent
+ * test phase only ever reads the JWT cache.
+ */
+const PER_SPEC_FIXTURE_PERSONAS = [
+  'MANAGER_1',
+  'MANAGER_2',
+  'COMMISSIONER',
+] as const;
+
+/**
+ * Wall-clock budget for the per-spec fixture JWT pre-warm (LS-7866). Each
+ * identity is a distinct oauth-proxy login against the shared per-IP rate limit
+ * (5/60s), so warming the whole suite is paced by the backoff and bounded here;
+ * any identity not reached falls back to the existing lazy (cached) mint.
+ */
+const PER_SPEC_WARM_BUDGET_MS = 5 * 60_000;
 
 /**
  * Playwright global setup for integration tests.
@@ -96,46 +117,110 @@ async function gqlFetch<T>(
   jwt: string,
   query: string,
   variables?: Record<string, unknown>,
-  retries = 2,
 ): Promise<T | undefined> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(GQL_BASE + 'graphql', {
+  // Best-effort cleanup call: retries 429 + transient network errors with
+  // exponential backoff honouring Retry-After (LS-7866), then returns undefined
+  // on any persistent failure so a cleanup miss never throws out of globalSetup.
+  try {
+    const res = await fetchWithBackoff(
+      GQL_BASE + 'graphql',
+      {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${jwt}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query, variables }),
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        LOGGER.error(
-          `[integration setup] HTTP ${res.status}: ${body.slice(0, 200)}`,
-        );
-        if (attempt < retries) continue;
-        return undefined;
-      }
-      const json = (await res.json()) as GqlResponse<T>;
-      if (json.errors?.length) {
-        LOGGER.error(
-          `[integration setup] GraphQL error: ${json.errors[0].message}`,
-        );
-        return undefined;
-      }
-      return json.data;
-    } catch (err) {
+      },
+      { label: 'integration-setup gqlFetch' },
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
       LOGGER.error(
-        `[integration setup] Network error (attempt ${attempt + 1}/${retries + 1}): ${err instanceof Error ? err.message : String(err)}`,
+        `[integration setup] HTTP ${res.status}: ${body.slice(0, 200)}`,
       );
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
-      }
       return undefined;
     }
+    const json = (await res.json()) as GqlResponse<T>;
+    if (json.errors?.length) {
+      LOGGER.error(
+        `[integration setup] GraphQL error: ${json.errors[0].message}`,
+      );
+      return undefined;
+    }
+    return json.data;
+  } catch (err) {
+    LOGGER.error(
+      `[integration setup] Network error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return undefined;
   }
-  return undefined;
+}
+
+/**
+ * Pre-warm every spec's per-spec fixture identities (MANAGER_1 / MANAGER_2 /
+ * COMMISSIONER — LS-4940) into the shared disk JWT cache (LS-5149) BEFORE any
+ * spec runs, so the test phase only ever reads the cache and never logs in
+ * (LS-7866).
+ *
+ * Why this matters for concurrency: `warmTestUserJwtCache` above only mints the
+ * four *base* personas, but the fixtures authenticate as per-spec identities
+ * (`manager1-<hash>@…`), which are otherwise minted lazily on first use inside
+ * each spec. With more than one worker on a runner, those lazy first-use logins
+ * fire simultaneously and stampede the oauth-proxy login route (5/60s per IP).
+ * Pre-minting them here — sequentially, paced by the shared Retry-After backoff,
+ * to the /tmp disk cache every worker on this runner reads — decouples auth from
+ * the concurrent test phase: tests can run simultaneously without re-minting.
+ *
+ * Gated on `workers > 1` by the caller: at the serial `workers=1` ceiling there
+ * is no stampede to prevent, so the lazy path is left untouched and startup
+ * pays nothing. JWTs live 24h (oauth-proxy `jwt.ts`), far longer than a full
+ * suite, so a token warmed at startup never expires mid-run. Best-effort and
+ * budget-bounded — any identity not reached falls back to lazy (cached) mint.
+ */
+async function warmPerSpecFixtureJwts(): Promise<void> {
+  const slugs = listIntegrationSpecSlugs();
+  if (slugs.length === 0) return;
+
+  const personas = PER_SPEC_FIXTURE_PERSONAS.filter(
+    (persona) => TEST_USERS[persona].password,
+  );
+  if (personas.length === 0) {
+    LOGGER.info(
+      '[integration setup] No persona passwords configured — skipping per-spec JWT pre-warm.',
+    );
+    return;
+  }
+
+  const start = Date.now();
+  let warmed = 0;
+  let attempted = 0;
+  for (const slug of slugs) {
+    for (const persona of personas) {
+      if (Date.now() - start > PER_SPEC_WARM_BUDGET_MS) {
+        LOGGER.info(
+          `[integration setup] Per-spec JWT pre-warm budget elapsed after ${warmed}/${attempted} identity(ies); remaining identities fall back to lazy (cached) mint.`,
+        );
+        return;
+      }
+      attempted++;
+      try {
+        await getSpecUserJwt(persona, slug);
+        warmed++;
+      } catch (err) {
+        LOGGER.info(
+          `[integration setup] Per-spec JWT pre-warm skipped ${persona}/${slug}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, PER_SPEC_MINT_SPACING_MS));
+    }
+  }
+
+  LOGGER.info(
+    `[integration setup] Per-spec JWT pre-warm: cached ${warmed}/${attempted} fixture identity(ies) across ${slugs.length} spec(s).`,
+  );
 }
 
 /**
@@ -363,6 +448,16 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   }
 
   await warmTestUserJwtCache();
+
+  // Pre-warm per-spec fixture identities only when the run is actually
+  // concurrent (workers > 1). At the serial workers=1 ceiling the lazy
+  // (cached) mint path is sufficient and startup pays nothing (LS-7866).
+  if (config.workers > 1) {
+    LOGGER.info(
+      `[integration setup] workers=${config.workers} — pre-warming per-spec fixture JWTs for concurrent execution.`,
+    );
+    await warmPerSpecFixtureJwts();
+  }
 
   const jwt = await getAuthJwt();
   if (!jwt) {

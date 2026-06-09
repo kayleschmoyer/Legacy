@@ -1,4 +1,8 @@
 import type { APIRequestContext } from '@playwright/test';
+import {
+  parseRetryAfterMs,
+  retryWithBackoff,
+} from '../../utils/retry-with-backoff';
 
 export interface GraphQLResult<T = Record<string, unknown>> {
   data?: T;
@@ -30,44 +34,41 @@ export function awsRequestContext(
   return parts.length ? ` [${parts.join(' ')}]` : '';
 }
 
-/** Small delay helper for retry back-off. */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * Execute a typed GraphQL request against the integration API.
- * Retries up to 3 times on HTTP-level failures with exponential back-off.
- * Throws on HTTP errors; returns the raw GraphQL response (may contain `errors`).
+ *
+ * Retries on HTTP 429 (rate limit) and 5xx (transient gateway/Lambda) errors
+ * with exponential backoff honouring `Retry-After` (LS-7866 — shared with the
+ * `gqlFetch` and auth paths via `retry-with-backoff`). Throws on a persistent
+ * HTTP error after the retry budget; returns the raw GraphQL response (which may
+ * still contain `errors[]`) on success.
  */
 export async function graphql<T = Record<string, unknown>>(
   api: APIRequestContext,
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<GraphQLResult<T>> {
-  const maxAttempts = 3;
+  const response = await retryWithBackoff(
+    () => api.post('graphql', { data: { query, variables } }),
+    (res) => {
+      const shouldRetry = res.status() === 429 || res.status() >= 500;
+      return {
+        retry: shouldRetry,
+        retryAfterMs: shouldRetry
+          ? parseRetryAfterMs(res.headers()['retry-after'])
+          : undefined,
+      };
+    },
+    { label: 'integration graphql' },
+  );
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const response = await api.post('graphql', {
-      data: { query, variables },
-    });
-
-    if (response.ok()) {
-      return response.json() as Promise<GraphQLResult<T>>;
-    }
-
-    // On the last attempt, throw instead of retrying
-    if (attempt === maxAttempts) {
-      throw new Error(
-        `GraphQL HTTP ${response.status()}: ${await response.text()}`,
-      );
-    }
-
-    await delay(1_000 * attempt);
+  if (response.ok()) {
+    return response.json() as Promise<GraphQLResult<T>>;
   }
 
-  // Unreachable, but satisfies TypeScript
-  throw new Error('GraphQL request failed after retries');
+  throw new Error(
+    `GraphQL HTTP ${response.status()}: ${await response.text()}`,
+  );
 }
 
 /**

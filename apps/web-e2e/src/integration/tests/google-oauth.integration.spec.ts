@@ -28,6 +28,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { fetchWithBackoff } from '../../utils/retry-with-backoff';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -68,7 +69,10 @@ test.describe('Google OAuth — API smoke tests @critical', () => {
     );
     try {
       const start = Date.now();
-      const res = await fetch(OAUTH_GOOGLE_URL, {
+      // Retry transient 429s with backoff (LS-7866); the happy path (a real
+      // 400) returns on the first attempt so the latency assertion below is
+      // unaffected.
+      const res = await fetchWithBackoff(OAUTH_GOOGLE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: 'invalid-google-id-token' }),
@@ -102,7 +106,10 @@ test.describe('Google OAuth — API smoke tests @critical', () => {
     );
     try {
       const start = Date.now();
-      const res = await fetch(OAUTH_GOOGLE_URL, {
+      // Retry transient 429s with backoff (LS-7866); the happy path (a real
+      // 400) returns on the first attempt so the latency assertion below is
+      // unaffected.
+      const res = await fetchWithBackoff(OAUTH_GOOGLE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
@@ -124,7 +131,10 @@ test.describe('Google OAuth — API smoke tests @critical', () => {
     );
     try {
       const start = Date.now();
-      const res = await fetch(OAUTH_GOOGLE_URL, {
+      // Retry transient 429s with backoff (LS-7866); the happy path (a real
+      // 400) returns on the first attempt so the latency assertion below is
+      // unaffected.
+      const res = await fetchWithBackoff(OAUTH_GOOGLE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: 'invalid-auth-code' }),

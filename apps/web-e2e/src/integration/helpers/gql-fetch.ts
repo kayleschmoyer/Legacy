@@ -1,4 +1,5 @@
 import { awsRequestContext } from './graphql';
+import { fetchWithBackoff } from '../../utils/retry-with-backoff';
 
 /**
  * Single source of truth for raw GraphQL calls from integration tests.
@@ -66,15 +67,23 @@ async function rawGqlPost<T>(
   variables: Record<string, unknown> | undefined,
   options: GqlFetchOptions,
 ): Promise<GqlEnvelopeResult<T>> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    signal: options.signal,
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
+  // Retry on HTTP 429 with exponential backoff honouring Retry-After (LS-7866).
+  // This is the dominant live-call surface in the integration suite; before
+  // this it had no retry at all, so a single API Gateway throttle failed the
+  // spec outright.
+  const res = await fetchWithBackoff(
+    GQL_URL,
+    {
+      method: 'POST',
+      signal: options.signal,
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
     },
-    body: JSON.stringify({ query, variables }),
-  });
+    { label: 'gqlFetch' },
+  );
 
   // Capture trace headers before parsing so we can still report them if the
   // response body is malformed.
