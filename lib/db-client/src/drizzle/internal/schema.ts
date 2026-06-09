@@ -134,6 +134,42 @@ export const userIdentities = appInternal.table(
   },
 );
 
+/**
+ * Single-use, expiring password-reset tokens (LS-6678 / LGN-023).
+ *
+ * Only the SHA-256 hash of the reset token is persisted — the raw token lives
+ * solely in the email link, so a database compromise cannot be used to reset
+ * an account. `usedAt` enforces single-use; `expiresAt` enforces expiry. Rows
+ * are reaped lazily on consume and may also be cleaned up out-of-band.
+ */
+export const passwordResetTokens = appInternal.table(
+  'password_reset_tokens',
+  {
+    id: serial('id').primaryKey().notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => usersInAppInternal.id, { onDelete: 'cascade' }),
+    // Hex-encoded SHA-256 digest of the raw token (64 chars).
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      tokenHashUk: unique('password_reset_tokens_token_hash_uk').on(
+        table.tokenHash,
+      ),
+      userIdIdx: index('password_reset_tokens_user_id_idx').on(table.userId),
+      expiresAtIdx: index('password_reset_tokens_expires_at_idx').on(
+        table.expiresAt,
+      ),
+    };
+  },
+);
+
 export const userConsents = appInternal.table(
   'user_consents',
   {

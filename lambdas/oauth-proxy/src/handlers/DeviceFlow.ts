@@ -896,6 +896,10 @@ function getVerificationHtml(error?: string): string {
             /><br>
             <button type="submit" class="btn-secondary">Log In Locally</button>
         </form>
+
+        <div class="instructions" style="margin-top: 14px;">
+            <a href="/oauth/forgot-password" style="color: #C5A55A; text-decoration: none;">Forgot password?</a>
+        </div>
     </div>
 
     <script>

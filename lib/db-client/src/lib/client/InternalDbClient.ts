@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { TakeUniqueOrNull, TakeUniqueOrThrow } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
 import { InternalUser } from '../../types/DatabaseTypes';
@@ -199,6 +199,80 @@ export async function setUserMfa(
     .where(eq(Schema.usersInAppInternal.id, userId))
     .returning()
     .then(TakeUniqueOrThrow);
+}
+
+/** A single password-reset token row as stored in the internal schema. */
+export type InternalPasswordResetToken =
+  typeof Schema.passwordResetTokens.$inferSelect;
+
+/**
+ * Overwrite a user's password hash. Used by the reset-password flow after a
+ * valid, single-use reset token has been consumed.
+ */
+export async function updateUserPassword(
+  db: InternalDb,
+  userId: number,
+  passwordHash: string,
+): Promise<void> {
+  await db
+    .update(Schema.usersInAppInternal)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(Schema.usersInAppInternal.id, userId));
+}
+
+/**
+ * Delete every existing reset token for a user. Called before issuing a new
+ * token so that requesting a fresh reset invalidates any outstanding links.
+ */
+export async function deletePasswordResetTokensForUser(
+  db: InternalDb,
+  userId: number,
+): Promise<void> {
+  await db
+    .delete(Schema.passwordResetTokens)
+    .where(eq(Schema.passwordResetTokens.userId, userId));
+}
+
+/**
+ * Persist a new reset token. `tokenHash` is the hex SHA-256 digest of the raw
+ * token; the raw token is only ever sent in the email link and never stored.
+ */
+export async function createPasswordResetToken(
+  db: InternalDb,
+  userId: number,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<InternalPasswordResetToken> {
+  return await db
+    .insert(Schema.passwordResetTokens)
+    .values({ userId, tokenHash, expiresAt })
+    .returning()
+    .then(TakeUniqueOrThrow);
+}
+
+/**
+ * Atomically consume a reset token: mark it used and return the row, but only
+ * when it is currently unused and unexpired. Returns null when the token does
+ * not exist, was already used, or has expired — the single UPDATE makes the
+ * check-and-consume race-free so a token can never be redeemed twice.
+ */
+export async function consumePasswordResetToken(
+  db: InternalDb,
+  tokenHash: string,
+): Promise<InternalPasswordResetToken | null> {
+  const now = new Date();
+  return await db
+    .update(Schema.passwordResetTokens)
+    .set({ usedAt: now })
+    .where(
+      and(
+        eq(Schema.passwordResetTokens.tokenHash, tokenHash),
+        isNull(Schema.passwordResetTokens.usedAt),
+        gt(Schema.passwordResetTokens.expiresAt, now),
+      ),
+    )
+    .returning()
+    .then(TakeUniqueOrNull);
 }
 
 export async function unlinkDiscordAccount(

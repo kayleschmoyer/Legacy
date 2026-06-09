@@ -29,6 +29,16 @@ export function parseEventBody<T>(
   return raw as T;
 }
 
+/**
+ * Build the externally-reachable base URL for the current request from the API
+ * Gateway context, e.g. `https://api.example.com/prod`. Used to construct links
+ * (such as password-reset URLs) that point back at the proxy's own endpoints.
+ */
+export function getRequestBaseUrl(event: APIGatewayEvent): string {
+  const { domainName, stage } = event.requestContext;
+  return `https://${domainName}/${stage}`;
+}
+
 const SAFE_HEADER_ALLOWLIST = new Set([
   'user-agent',
   'x-forwarded-for',

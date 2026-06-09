@@ -146,6 +146,9 @@ const mockUser = {
   discordUsername: 'DiscordUser',
   discordAvatar: null,
   themePreference: null,
+  lastLoginAt: null,
+  mfaEnabled: false,
+  canonicalEmailSource: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

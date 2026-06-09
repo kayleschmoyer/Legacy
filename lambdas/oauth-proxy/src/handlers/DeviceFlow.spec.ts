@@ -191,6 +191,9 @@ describe('DeviceFlow', () => {
         discordUsername: null,
         discordAvatar: null,
         themePreference: null,
+        lastLoginAt: null,
+        mfaEnabled: false,
+        canonicalEmailSource: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -250,6 +253,9 @@ describe('DeviceFlow', () => {
         discordUsername: null,
         discordAvatar: null,
         themePreference: null,
+        lastLoginAt: null,
+        mfaEnabled: false,
+        canonicalEmailSource: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -298,6 +304,9 @@ describe('DeviceFlow', () => {
         discordUsername: null,
         discordAvatar: null,
         themePreference: null,
+        lastLoginAt: null,
+        mfaEnabled: false,
+        canonicalEmailSource: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -380,6 +389,9 @@ describe('DeviceFlow', () => {
           discordUsername: null,
           discordAvatar: null,
           themePreference: null,
+          lastLoginAt: null,
+          mfaEnabled: false,
+          canonicalEmailSource: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

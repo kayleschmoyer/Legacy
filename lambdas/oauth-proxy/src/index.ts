@@ -17,6 +17,12 @@ import {
 } from './handlers/Google';
 import { handleSecureAppleAuth } from './handlers/Apple';
 import { handleLogin, handleRegister } from './handlers/Local';
+import {
+  handleForgotPassword,
+  handleForgotPasswordPage,
+  handleResetPassword,
+  handleResetPasswordPage,
+} from './handlers/PasswordReset';
 import { handleVerify } from './handlers/Verify';
 import { handleRefreshJwt } from './handlers/RefreshJwt';
 import { handleLogout } from './handlers/Logout';
@@ -253,6 +259,8 @@ const baseOAuthHandler = async (
               '/oauth/refresh-jwt (silent JWT refresh for live sessions)',
               '/oauth/login',
               '/oauth/register',
+              '/oauth/forgot-password (request a password-reset link)',
+              '/oauth/reset-password (consume a reset token, set new password)',
               '/oauth/device/authorize (CLI device flow)',
               '/oauth/device/token (CLI device flow)',
               '/oauth/device/verify (CLI device flow)',
@@ -359,6 +367,39 @@ const baseOAuthHandler = async (
             event,
             { route: 'oauth.register', ...AUTH_RATE_LIMIT },
             () => handleRegister(event),
+          );
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/forgot-password':
+      case '/dev/oauth/forgot-password':
+        // GET renders the request-a-link page; POST issues the reset token and
+        // sends the email (rate-limited as a credential endpoint).
+        if (event.httpMethod === 'GET') {
+          return cors(handleForgotPasswordPage(event));
+        }
+        if (event.httpMethod === 'POST') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.forgot-password', ...AUTH_RATE_LIMIT },
+            () => handleForgotPassword(event),
+          );
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/reset-password':
+      case '/dev/oauth/reset-password':
+        // GET renders the choose-a-password page; POST consumes the token.
+        if (event.httpMethod === 'GET') {
+          return cors(handleResetPasswordPage(event));
+        }
+        if (event.httpMethod === 'POST') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.reset-password', ...AUTH_RATE_LIMIT },
+            () => handleResetPassword(event),
           );
           return cors(result);
         }
@@ -532,6 +573,7 @@ export const handler = withRollbar(baseOAuthHandler);
 // Export individual handlers for backward compatibility and testing
 export * from './handlers/Google';
 export * from './handlers/Local';
+export * from './handlers/PasswordReset';
 export * from './handlers/Verify';
 export * from './handlers/DeviceFlow';
 export * from './handlers/RefreshJwt';
