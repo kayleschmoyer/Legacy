@@ -110,7 +110,10 @@ async function resolveUserTeam(
   db: Context['db'],
 ) {
   const [membership] = await db
-    .select({ teamId: PublicSchema.leagueMembers.teamId })
+    .select({
+      teamId: PublicSchema.leagueMembers.teamId,
+      permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+    })
     .from(PublicSchema.leagueMembers)
     .where(
       and(
@@ -122,6 +125,16 @@ async function resolveUserTeam(
 
   if (!membership?.teamId) {
     throw ForbiddenError('You do not have a team in this league');
+  }
+
+  if (
+    membership.permissionLevel !== 'general_manager' &&
+    membership.permissionLevel !== 'assistant_manager' &&
+    membership.permissionLevel !== 'commissioner'
+  ) {
+    throw ForbiddenError(
+      'You are not an active manager of a team in this league',
+    );
   }
 
   return membership.teamId;

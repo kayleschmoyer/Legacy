@@ -447,6 +447,36 @@ describe('Trades Resolver', () => {
       });
     });
 
+    it('throws FORBIDDEN when user permissionLevel is not an active management role', async () => {
+      // League check passes (active phase)
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]);
+      // resolveUserTeam: membership row with a hypothetical non-manager role (e.g. future 'spectator')
+      // Cast needed because current enum only has the three active-manager roles
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'spectator' as unknown },
+      ]);
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+        message: expect.stringContaining('active manager'),
+      });
+    });
+
     it('throws PREMIUM_REQUIRED when free-tier user sets expiresInDays beyond 7 days', async () => {
       // Default mockDb limit() → then → [] means subscription tier = 'free'
       const resolver = getResolver('mutation', 'proposeTrade');
