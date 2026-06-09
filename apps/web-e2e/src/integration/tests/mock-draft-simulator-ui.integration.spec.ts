@@ -28,6 +28,7 @@
 import { expect } from '@playwright/test';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { cleanupLeague } from '../helpers/cleanup-league';
+import { resetMockDraftUsage } from '../helpers/reset-mock-draft-usage';
 import { test } from '../fixtures/ui';
 import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
 
@@ -51,8 +52,12 @@ test.describe
   .serial('Mock Draft Simulator UI (Live Backend) @integration @critical', () => {
   test.describe.configure({ retries: 0 });
 
-  test.beforeAll(() => {
+  test.beforeAll(async ({ apiCommissioner }) => {
     state = { leagueId: 0, numTeams: 4, rosterSize: 5 };
+    // Reset the per-spec commissioner's free-tier weekly mock-draft usage so
+    // MockDraftPage renders the setup form (not LimitReachedScreen) regardless
+    // of leftover mock-draft leagues from prior runs (LS-7872).
+    await resetMockDraftUsage(apiCommissioner);
   });
 
   // Layer-2 per-test league cleanup (LS-4539). Removes orphans even when the
@@ -324,35 +329,28 @@ test.describe
           .catch(() => false);
         if (draftDone) break;
 
-        // Is it the user's turn?
-        // NOTE: locator.isVisible({ timeout }) is deprecated in Playwright
-        // v1.40+ — the timeout is silently ignored and the call returns
-        // immediately.  Use waitFor() to actually wait for the element.
-        const isMyTurn = await page
-          .getByText('Your pick', { exact: true })
+        // Is it the user's turn? Detect by the presence of a clickable
+        // "Draft <player> now" button rather than the on-the-clock header text.
+        // PlayerCard renders that accessible name only when isMyPick is true;
+        // otherwise the button reads "Waiting for your turn to draft <player>",
+        // which does not match /Draft .* now/i. The EliteDraftBoard redesign
+        // renders the header as "YOUR PICK" (uppercase), so the spec's previous
+        // getByText('Your pick', { exact: true }) never matched it — isMyTurn was
+        // always false, no user pick was ever clicked, and every pick fell
+        // through to the 30 s server auto-pick, timing the whole draft out
+        // (LS-7872). Gating on the button (the thing we actually act on) also
+        // removes the old header-render-lag race, so no extra settle wait is
+        // needed below.
+        const allDraftBtns = page.getByRole('button', {
+          name: /Draft .* now/i,
+        });
+        const isMyTurn = await allDraftBtns
           .first()
           .waitFor({ state: 'visible', timeout: 2_000 })
           .then(() => true)
           .catch(() => false);
 
         if (isMyTurn) {
-          // Wait for at least one "Draft ... now" button to appear.
-          // "Your pick" in the header can render before the PlayerCard
-          // components re-render with isMyPick=true (which changes the
-          // aria-label from "Waiting for your turn..." to "Draft X now").
-          // Without this wait, the button count can be 0 on every iteration
-          // until the server auto-processes the pick (30 s timer), causing
-          // pickCount to stay at 0.
-          const allDraftBtns = page.getByRole('button', {
-            name: /Draft .* now/i,
-          });
-          await allDraftBtns
-            .first()
-            .waitFor({ state: 'visible', timeout: 10_000 })
-            .catch(() => {
-              // If no draft button appears within 10 s, fall through to the
-              // "no undrafted button found" path below.
-            });
           const btnCount = await allDraftBtns.count().catch(() => 0);
           let draftBtnIdx = -1;
           let ariaLabel: string | null = null;
@@ -383,7 +381,25 @@ test.describe
               .textContent()
               .catch(() => null);
 
-            await allDraftBtns.nth(draftBtnIdx).click({ force: true });
+            // Re-resolve the target by its exact accessible name at click time
+            // rather than reusing the positional `nth(draftBtnIdx)` locator
+            // (LS-7872). The available-players grid re-renders after every pick
+            // — PlayerCards are keyed by player.id and unmount when drafted — so
+            // a positional locator can resolve to a different card or a node
+            // that is mid-reconciliation, producing the "Element is not visible"
+            // force-click failure that stalled Phase 3. A name-scoped
+            // getByRole locator targets this specific player and, because the
+            // accessible name is "Draft <player> now" only while the button is
+            // in the can-draft (isMyPick) state, lets Playwright auto-wait for
+            // it to be visible and stable instead of force-clicking a transient
+            // element. (The only infinite animation is on a pointer-events:none
+            // ::after pseudo-element, so the button's box stays stable.)
+            const draftButton = ariaLabel
+              ? page
+                  .getByRole('button', { name: ariaLabel, exact: true })
+                  .first()
+              : allDraftBtns.nth(draftBtnIdx);
+            await draftButton.click({ timeout: 10_000 });
 
             let wasAccepted = false;
 
@@ -409,13 +425,17 @@ test.describe
                 );
               }
             } else {
-              // Fallback: use "Your pick" disappearance heuristic
-              wasAccepted = await page
-                .getByText('Your pick', { exact: true })
-                .first()
-                .waitFor({ state: 'hidden', timeout: 8_000 })
-                .then(() => true)
-                .catch(() => false);
+              // Fallback when the Round·Pick label can't be read: the drafted
+              // player's PlayerCard unmounts once the pick commits, so its
+              // "Draft <player> now" button disappears from the board.
+              wasAccepted = ariaLabel
+                ? await page
+                    .getByRole('button', { name: ariaLabel, exact: true })
+                    .first()
+                    .waitFor({ state: 'hidden', timeout: 8_000 })
+                    .then(() => true)
+                    .catch(() => false)
+                : false;
             }
 
             if (wasAccepted) {
