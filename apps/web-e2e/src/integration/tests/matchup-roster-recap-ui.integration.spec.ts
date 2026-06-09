@@ -286,8 +286,16 @@ test.describe
     });
 
     await test.step('Verify STANDOUT PERFORMANCES section', async () => {
-      // The highlights section header appears when at least one highlight exists
-      await expect(page.getByText('STANDOUT PERFORMANCES')).toBeVisible({
+      // The highlights section header appears when at least one highlight exists.
+      // Target the real recap heading via its data-testid — a plain getByText
+      // matched both this heading and the PremiumGate upsell card whose copy
+      // also contains "standout performances", tripping a strict-mode violation
+      // for free-tier users (the blurred recap children still render in the DOM).
+      // exact:true is insufficient here because the texts differ in case, not
+      // exactness (LS-7868).
+      await expect(
+        page.getByTestId('matchup-recap-standout-performances'),
+      ).toBeVisible({
         timeout: 10_000,
       });
     });

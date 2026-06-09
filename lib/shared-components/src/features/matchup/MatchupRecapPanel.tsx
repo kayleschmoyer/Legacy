@@ -146,6 +146,7 @@ export function MatchupRecapPanel({ matchupId }: MatchupRecapPanelProps) {
               <XStack alignItems="center" gap="$1.5">
                 <Star size={14} color={BRAND_GOLD_LIGHT} />
                 <Text
+                  data-testid="matchup-recap-standout-performances"
                   fontSize="$2"
                   fontWeight="700"
                   color={BRAND_GOLD_LIGHT}
