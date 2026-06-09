@@ -117,8 +117,10 @@ permissions:
 jobs:
   # ---------------------------------------------------------------------------
   # Compute the test matrix.
-  # Nightly: integration (1 shard) + e2e (3 shards), all tests, no filters.
-  # Manual:  single suite, N shards, using workflow_dispatch inputs.
+  # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e (3 shards),
+  #          all tests, no filters.
+  # Manual:  single suite, N shards (integration clamped to the ceiling),
+  #          using workflow_dispatch inputs.
   # ---------------------------------------------------------------------------
   prepare:
     name: "Prepare Matrix"
@@ -131,48 +133,68 @@ jobs:
         shell: bash
         run: |
           # ---------------------------------------------------------------
-          # Integration concurrency ceiling (LS-7866).
+          # Integration concurrency ceiling (LS-7866 → LS-7867).
+          #
           # The integration suite runs against the SHARED live backend
           # (api.legacy-fantasy.com). Every concurrent shard runs its own
           # league-creation / draft / season flow against that one backend,
-          # and N concurrent shards = N× the API-Gateway/Lambda load — which
-          # produced the 39× HTTP 429 cascade in run 27186006949. Workers are
-          # already pinned to 1 per shard (see the "Run Playwright Tests"
-          # step), so SHARD COUNT is the live-backend concurrency knob.
+          # so N concurrent shards = N× the API-Gateway/Lambda load — the
+          # original 3-shard fan-out produced a 39× HTTP 429 cascade in run
+          # 27186006949. Workers are already pinned to 1 per shard (see the
+          # "Run Playwright Tests" step), so SHARD COUNT is the live-backend
+          # concurrency knob.
           #
-          # The documented ceiling is **1 integration shard** (fully serial,
-          # one in-flight flow at a time) — the configuration confirmed to
-          # collapse the 429 failures. Comprehensive Retry-After backoff on
-          # every live call (LS-7866) absorbs any residual throttle; bounding
-          # concurrency keeps that residual near zero. A single serial shard
-          # runs longer, so the integration job raises its timeout (see
-          # `run-tests.timeout-minutes`). E2E is hermetic (no shared backend)
-          # and stays at 3 shards for speed.
+          # LS-7866 first collapsed this to a single serial shard, but at 1/1
+          # the suite no longer finishes inside the 120-min job timeout (run
+          # 27216379406 reached only 69/186 in ~46 min → ~2 h extrapolated).
+          # LS-7867 restores BOUNDED sharding: the universal Retry-After
+          # backoff (LS-7866 axis 2, apps/web-e2e/src/utils/retry-with-backoff.ts)
+          # absorbs the transient 429s that moderate concurrency produces, and
+          # the per-shard staggered start (see the "Run Playwright Tests" step)
+          # spreads the initial auth/token-mint burst so the shards don't
+          # stampede the oauth-proxy login route (5/60s per IP) at second 0.
+          #
+          # INTEGRATION_SHARD_CEILING is the empirically-validated maximum
+          # shard count that BOTH finishes within the timeout AND yields 0
+          # 429-driven failures across ≥2 consecutive runs (LS-7867). The
+          # single heaviest spec (live-draft-ui ≈ 1400 s) bounds the makespan,
+          # so gains past ~3 shards are marginal while 429 risk keeps climbing.
+          # Do NOT raise this without re-validating via workflow_dispatch
+          # (test-suite=integration) at the higher count and confirming 0
+          # 429-driven failures across ≥2 runs. E2E is hermetic (no shared
+          # backend) and stays at 3 shards for speed.
           # ---------------------------------------------------------------
+          INTEGRATION_SHARD_CEILING=3
+
+          # Emit one {"suite","shard":"i/n"} JSON object per line for a suite.
+          emit_shards() {
+            local suite="$1" total="$2" i
+            for ((i = 1; i <= total; i++)); do
+              jq -cn --arg suite "$suite" --arg shard "$i/$total" \
+                '{suite: $suite, shard: $shard}'
+            done
+          }
+
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
-            # Nightly or manual "all": integration (1 shard, serial) + e2e (3 shards), all tests, no filters
-            MATRIX='[{"suite":"integration","shard":"1/1"},{"suite":"e2e","shard":"1/3"},'
-            MATRIX+='{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]'
+            # Nightly or manual "all": integration (ceiling shards) + e2e
+            # (3 shards), all tests, no filters.
+            MATRIX=$(
+              {
+                emit_shards integration "$INTEGRATION_SHARD_CEILING"
+                emit_shards e2e 3
+              } | jq -sc '.'
+            )
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           else
             SUITE="${{ inputs.test-suite }}"
-            if [ "$SUITE" = "integration" ]; then
-              # Force a single serial shard regardless of the shard-total input —
-              # the live backend does not tolerate concurrent integration shards.
-              SHARDS=("1/1")
-            else
-              case "${{ inputs.shard-total }}" in
-                1) SHARDS=("1/1") ;;
-                2) SHARDS=("1/2" "2/2") ;;
-                3) SHARDS=("1/3" "2/3" "3/3") ;;
-                4) SHARDS=("1/4" "2/4" "3/4" "4/4") ;;
-              esac
+            TOTAL="${{ inputs.shard-total }}"
+            if [ "$SUITE" = "integration" ] && [ "$TOTAL" -gt "$INTEGRATION_SHARD_CEILING" ]; then
+              # Honor the shard-total input but clamp to the live-backend
+              # ceiling — concurrency past the ceiling re-opens the 429 cascade.
+              echo "Requested $TOTAL integration shards exceeds the live-backend ceiling ($INTEGRATION_SHARD_CEILING) — clamping to $INTEGRATION_SHARD_CEILING."
+              TOTAL="$INTEGRATION_SHARD_CEILING"
             fi
-            MATRIX=$(
-              for SHARD in "${SHARDS[@]}"; do
-                jq -cn --arg suite "$SUITE" --arg shard "$SHARD" '{suite: $suite, shard: $shard}'
-              done | jq -sc '.'
-            )
+            MATRIX=$(emit_shards "$SUITE" "$TOTAL" | jq -sc '.')
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           fi
 
@@ -199,7 +221,7 @@ jobs:
             echo "title=Nightly Playwright Suite" >> "$GITHUB_OUTPUT"
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
-              echo '**Suite:** Integration (1 shard, real server) + E2E (3 shards)'
+              echo '**Suite:** Integration (real server, sharded) + E2E (3 shards)'
               echo '**Browser:** chromium · **Workers:** 4 · **Retries:** 2'
               echo '**Filters:** none — all tests including @slow'
               echo 'EOF_PLAYWRIGHT_NOTIFY'
@@ -209,7 +231,7 @@ jobs:
             echo "title=Manual Playwright Suite (All)" >> "$GITHUB_OUTPUT"
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
-              echo '**Suite:** Integration (1 shard, real server) + E2E (3 shards)'
+              echo '**Suite:** Integration (real server, sharded) + E2E (3 shards)'
               echo '**Browser:** chromium · **Workers:** 4 · **Retries:** 2'
               echo '**Filters:** none — all tests including @slow'
               echo 'EOF_PLAYWRIGHT_NOTIFY'
@@ -249,8 +271,11 @@ jobs:
     name: "Playwright ${{ matrix.suite }} (${{ matrix.shard }})"
     needs: [prepare]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    # Integration runs as a single serial shard (LS-7866 concurrency ceiling),
-    # so it needs more wall-clock than a 3-way-sharded e2e job. E2E stays at 60.
+    # Integration runs at a bounded shard count (LS-7867 concurrency ceiling)
+    # with workers=1 per shard, so a single shard still runs the heaviest
+    # specs (live-draft-ui ≈ 1400 s) plus Retry-After backoff waits — it keeps
+    # the 120-min cap as headroom above the observed per-shard wall-clock.
+    # E2E is hermetic and stays at 60.
     timeout-minutes: ${{ matrix.suite == 'integration' && 120 || 60 }}
     env:
       # Per-test source-coverage collection (LS-7849): nightly schedule, plus the
@@ -542,6 +567,22 @@ jobs:
             mapfile -t INTEGRATION_SPEC_ARGS < /tmp/integration-shard-specs.txt
             echo "Balanced integration shard $SHARD_INDEX/$SHARD_TOTAL → ${#INTEGRATION_SPEC_ARGS[@]} spec(s):"
             printf '  - %s\n' "${INTEGRATION_SPEC_ARGS[@]}"
+
+            # Per-shard staggered start (LS-7867). The integration shards may
+            # share a NAT egress IP on the self-hosted runners; without a stagger
+            # all N shards hit the oauth-proxy login route (5/60s per IP) and the
+            # shared backend at second 0, producing an initial 429 burst the
+            # universal backoff (LS-7866) then has to absorb all at once. A
+            # deterministic per-shard offset spreads that first wave so concurrency
+            # can be raised safely. shard 1 starts immediately; each later shard
+            # waits STAGGER_SECONDS × (index − 1) — negligible against the
+            # multi-minute spec runtimes, and skipped entirely for a single shard.
+            INTEGRATION_SHARD_STAGGER_SECONDS=30
+            if [ "$SHARD_TOTAL" -gt 1 ] && [ "$SHARD_INDEX" -gt 1 ]; then
+              STAGGER=$(( INTEGRATION_SHARD_STAGGER_SECONDS * (SHARD_INDEX - 1) ))
+              echo "Staggering integration shard $SHARD_INDEX/$SHARD_TOTAL start by ${STAGGER}s to spread the initial auth burst."
+              sleep "$STAGGER"
+            fi
           else
             # 1/1 is valid and runs all tests in one shard.
             PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
@@ -1083,7 +1124,7 @@ jobs:
 
           # Build test run summary
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
-            SUMMARY_LINE1="**Suite:** Integration (1 shard, real server) + E2E (3 shards)"
+            SUMMARY_LINE1="**Suite:** Integration (real server, sharded) + E2E (3 shards)"
             SUMMARY_LINE2="**Browser:** chromium · **Workers:** 4 · **Retries:** 2"
             SUMMARY_LINE3="**Filters:** none — all tests including @slow"
           else
