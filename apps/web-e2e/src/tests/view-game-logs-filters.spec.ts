@@ -9,12 +9,12 @@ import { expect, test } from '../fixtures/auth-enhanced';
  * rendered controls drive the POST body end-to-end.
  *
  * The View Game Logs page is now routed at `/players/view-game-logs` (LS-7466),
- * so the combined-filter and franchise-relocation specs below run against the
- * real app shell with the hermetic `auth-enhanced` fixture (baseline GraphQL
- * mocks; per-test `route.fulfill` for the stats endpoint). The remaining specs
- * stay parked as `test.fixme` pending their own automation tickets — un-skipping
- * them is owned by LS-7479 (opponent enumeration) and LS-7467 (home/away
- * venue=away + venue=all).
+ * so the combined-filter, franchise-relocation, and opponent-enumeration specs
+ * below run against the real app shell with the hermetic `auth-enhanced` fixture
+ * (baseline GraphQL mocks; per-test `route.fulfill` for the stats endpoint). The
+ * remaining venue specs stay parked as `test.fixme` pending their own automation
+ * ticket — un-skipping them is owned by LS-7467 (home/away venue=away +
+ * venue=all).
  */
 
 const PAGE_URL = '/players/view-game-logs';
@@ -25,7 +25,7 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
     await page.waitForLoadState('load');
   });
 
-  test.fixme('opponent dropdown lists all 30 MLB teams (LS-7479)', async ({
+  test('opponent dropdown lists all 30 MLB teams (LS-7479)', async ({
     page,
   }) => {
     const options = page.locator('[data-testid="opponent-filter"] option');
