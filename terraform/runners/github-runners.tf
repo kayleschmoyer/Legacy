@@ -99,10 +99,18 @@ module "github_runners" {
   runner_extra_labels = ["ci-runner"]
   runner_run_as       = "ubuntu" # Packer AMI is Ubuntu, not Amazon Linux
 
-  # Attach S3 cache IAM policy so runner instances can read/write the pnpm
-  # store tarball. The permissions boundary already permits this bucket but
-  # the module's runner role also needs an attached policy (LS-1663).
-  runner_iam_role_managed_policy_arns = [aws_iam_policy.runner_cache.arn]
+  # Attach extra IAM policies to the module's runner instance role. The
+  # permissions boundary already permits these actions, but the module's runner
+  # role also needs an attached policy granting them (LS-1663):
+  #   - runner_cache:    read/write the pnpm store tarball in the cache bucket.
+  #   - runner_self_tag: manage ONLY the ghr:job_heartbeat tag on the runner's
+  #                      own instance so a long integration job can mark itself
+  #                      active and survive scale-down (LS-7874, see
+  #                      runner-self-tag.tf).
+  runner_iam_role_managed_policy_arns = [
+    aws_iam_policy.runner_cache.arn,
+    aws_iam_policy.runner_self_tag.arn,
+  ]
 
   # CloudWatch agent — custom config avoids the module default's invalid
   # log_class property that causes the agent to fail on startup (LS-1667).

@@ -1,29 +1,31 @@
 diff --git a/lambdas/functions/control-plane/src/aws/runners.d.ts b/lambdas/functions/control-plane/src/aws/runners.d.ts
-index 7e9bf0f..dc8890d 100644
+index 7e9bf0f..d5cfeca 100644
 --- a/lambdas/functions/control-plane/src/aws/runners.d.ts
 +++ b/lambdas/functions/control-plane/src/aws/runners.d.ts
-@@ -12,6 +12,7 @@ export interface RunnerList {
+@@ -12,6 +12,8 @@ export interface RunnerList {
    orphan?: boolean;
    runnerId?: string;
    bypassRemoval?: boolean;
 +  idleStrikes?: string;
++  jobHeartbeat?: string;
  }
  
  export interface RunnerInfo {
 diff --git a/lambdas/functions/control-plane/src/aws/runners.ts b/lambdas/functions/control-plane/src/aws/runners.ts
-index 7f7f575..835b74a 100644
+index 7f7f575..c916d25 100644
 --- a/lambdas/functions/control-plane/src/aws/runners.ts
 +++ b/lambdas/functions/control-plane/src/aws/runners.ts
-@@ -94,6 +94,7 @@ function getRunnerInfo(runningInstances: DescribeInstancesResult) {
+@@ -94,6 +94,8 @@ function getRunnerInfo(runningInstances: DescribeInstancesResult) {
              orphan: i.Tags?.find((e) => e.Key === 'ghr:orphan')?.Value === 'true',
              runnerId: i.Tags?.find((e) => e.Key === 'ghr:github_runner_id')?.Value as string,
              bypassRemoval: i.Tags?.find((e) => e.Key === 'ghr:bypass-removal')?.Value === 'true',
 +            idleStrikes: i.Tags?.find((e) => e.Key === 'ghr:idle_strikes')?.Value as string,
++            jobHeartbeat: i.Tags?.find((e) => e.Key === 'ghr:job_heartbeat')?.Value as string,
            });
          }
        }
 diff --git a/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts b/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts
-index 2dfb190..e18d1c5 100644
+index 2dfb190..9591847 100644
 --- a/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts
 +++ b/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts
 @@ -102,6 +102,8 @@ describe('Scale down runners', () => {
@@ -35,7 +37,7 @@ index 2dfb190..e18d1c5 100644
  
      nock.disableNetConnect();
      vi.clearAllMocks();
-@@ -286,6 +288,58 @@ describe('Scale down runners', () => {
+@@ -286,6 +288,98 @@ describe('Scale down runners', () => {
          checkNonTerminated(runners);
        });
  
@@ -74,6 +76,46 @@ index 2dfb190..e18d1c5 100644
 +        checkTerminated(runners);
 +      });
 +
++      // ── LS-7874: job-heartbeat override ────────────────────────────────────
++      it(`Should defer removal when an idle runner has a fresh job heartbeat.`, async () => {
++        process.env.SCALE_DOWN_IDLE_STRIKES = '1';
++        process.env.SCALE_DOWN_HEARTBEAT_TTL_SECONDS = '180';
++        const runners = [
++          createRunnerTestData('heartbeat-fresh', type, MINIMUM_TIME_RUNNING_IN_MINUTES + 5, true, false, false),
++        ];
++        // Fresh heartbeat (just now) — even with the debounce disabled, the
++        // runner must be treated as active and skipped.
++        runners[0].jobHeartbeat = `${Math.floor(Date.now() / 1000)}`;
++        runners[0].idleStrikes = '2';
++
++        mockGitHubRunners(runners);
++        mockAwsRunners(runners);
++
++        await scaleDown();
++
++        expect(terminateRunner).not.toHaveBeenCalled();
++        // A fresh heartbeat also resets any strikes accrued by a transient blip.
++        expect(mockUntagRunners).toHaveBeenCalledWith(runners[0].instanceId, [{ Key: 'ghr:idle_strikes' }]);
++      });
++
++      it(`Should terminate an idle runner whose job heartbeat has gone stale.`, async () => {
++        process.env.SCALE_DOWN_IDLE_STRIKES = '1';
++        process.env.SCALE_DOWN_HEARTBEAT_TTL_SECONDS = '180';
++        const runners = [
++          createRunnerTestData('heartbeat-stale', type, MINIMUM_TIME_RUNNING_IN_MINUTES + 5, true, false, true),
++        ];
++        // Heartbeat far older than the TTL — the override lapses and the runner
++        // is reaped by the normal idle path (self-healing).
++        runners[0].jobHeartbeat = `${Math.floor(Date.now() / 1000) - 100000}`;
++
++        mockGitHubRunners(runners);
++        mockAwsRunners(runners);
++
++        await scaleDown();
++
++        checkTerminated(runners);
++      });
++
 +      it(`Should reset idle strikes when the runner is observed busy.`, async () => {
 +        process.env.SCALE_DOWN_IDLE_STRIKES = '3';
 +        const runners = [
@@ -95,13 +137,42 @@ index 2dfb190..e18d1c5 100644
          // setup
          const runners = [
 diff --git a/lambdas/functions/control-plane/src/scale-runners/scale-down.ts b/lambdas/functions/control-plane/src/scale-runners/scale-down.ts
-index 6086af7..a8910d0 100644
+index 6086af7..d07c086 100644
 --- a/lambdas/functions/control-plane/src/scale-runners/scale-down.ts
 +++ b/lambdas/functions/control-plane/src/scale-runners/scale-down.ts
-@@ -146,6 +146,27 @@ async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promi
+@@ -146,6 +146,56 @@ async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promi
      );
  
      if (states.every((busy) => busy === false)) {
++      // LS-7874: Job-heartbeat override for the idle-strike debounce (LS-7870).
++      // The strike debounce still reaps a runner whose GitHub `busy` flag reads
++      // false for SCALE_DOWN_IDLE_STRIKES consecutive polls. The heaviest
++      // integration shard (live-draft-ui) has multi-minute quiet phases that can
++      // exceed that window, so a long job is still killed mid-run. A runner
++      // actively executing such a job self-reports a periodic heartbeat by tagging
++      // its own instance with `ghr:job_heartbeat=<unix-seconds>` (see
++      // .github/workflows/run-playwright-tests.yml). While that tag is fresher than
++      // SCALE_DOWN_HEARTBEAT_TTL_SECONDS we treat the runner as active regardless of
++      // the flaky GitHub flag: skip removal and clear any accrued idle strikes. The
++      // TTL is self-healing — when the job ends (tag deleted) or the runner dies
++      // (tag goes stale) the override lapses and normal scale-down resumes.
++      const heartbeatTtl = parseInt(process.env.SCALE_DOWN_HEARTBEAT_TTL_SECONDS || '180', 10);
++      if (heartbeatTtl > 0 && runnerList.jobHeartbeat) {
++        const heartbeatEpoch = parseInt(runnerList.jobHeartbeat, 10);
++        const ageSeconds = Date.now() / 1000 - heartbeatEpoch;
++        if (Number.isFinite(heartbeatEpoch) && ageSeconds >= 0 && ageSeconds < heartbeatTtl) {
++          if (runnerList.idleStrikes !== undefined) {
++            await untag(ec2runner.instanceId, [{ Key: 'ghr:idle_strikes' }]).catch((e) => {
++              logger.debug(`Failed to clear idle-strikes tag for '${ec2runner.instanceId}': ${e}`);
++            });
++          }
++          logger.info(
++            `Runner '${ec2runner.instanceId}' has a fresh job heartbeat (age ${Math.round(ageSeconds)}s < ` +
++              `${heartbeatTtl}s); treating as active and deferring removal (LS-7874).`,
++          );
++          return;
++        }
++      }
 +      // LS-7870: Debounce idle observations before de-registering a runner.
 +      // The GitHub API `busy` flag is eventually consistent and intermittently
 +      // returns a false-negative (busy:false) for a runner that is actively
@@ -126,7 +197,7 @@ index 6086af7..a8910d0 100644
        const statuses = await Promise.all(
          ghRunnerIds.map(async (ghRunnerId) => {
            return (
-@@ -170,6 +191,13 @@ async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promi
+@@ -170,6 +220,13 @@ async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promi
          logger.error(`Failed to de-register GitHub runner: ${statuses}`);
        }
      } else {
