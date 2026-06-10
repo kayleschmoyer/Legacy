@@ -189,13 +189,20 @@ export default function TradeCenterPage() {
     tradeOfferId?: number;
   } | null>(null);
 
-  const { data, loading, error, refetch } = useGetUserLeaguesQuery({
-    skip: !userInfo?.id,
-    fetchPolicy: 'cache-first',
-  });
+  const { data, previousData, loading, error, refetch } =
+    useGetUserLeaguesQuery({
+      skip: !userInfo?.id,
+      fetchPolicy: 'cache-first',
+    });
 
+  // Fall back to previousData so stale leagues render instantly on re-entry
+  // instead of showing the spinner when Apollo briefly resets data during a
+  // skip transition or screen remount.
   // Pre-select a league when arriving via deep link with ?leagueId=X[&tradeOfferId=Y]
-  const leagues = useMemo(() => data?.userLeagues ?? [], [data?.userLeagues]);
+  const leagues = useMemo(
+    () => (data ?? previousData)?.userLeagues ?? [],
+    [data, previousData],
+  );
   useEffect(() => {
     if (!leagueIdParam || selectedLeague != null) return;
     const id = parseInt(leagueIdParam, 10);

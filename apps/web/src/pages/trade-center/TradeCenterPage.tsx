@@ -412,12 +412,16 @@ export function TradeCenterPage(): React.JSX.Element {
     [pendingCounts],
   );
 
-  const { data, loading, error, refetch } = useGetUserLeaguesQuery({
-    skip: !user,
-    fetchPolicy: 'cache-first',
-  });
+  const { data, previousData, loading, error, refetch } =
+    useGetUserLeaguesQuery({
+      skip: !user,
+      fetchPolicy: 'cache-first',
+    });
 
-  const leagues = data?.userLeagues ?? [];
+  // Fall back to previousData so stale leagues render instantly on re-entry
+  // instead of showing the spinner when Apollo briefly resets data during a
+  // skip transition or component remount.
+  const leagues = (data ?? previousData)?.userLeagues ?? [];
 
   // Capture a stable correlation ID and error code when an error first occurs.
   // The correlation ID changes on each new error occurrence (e.g. after retry),
