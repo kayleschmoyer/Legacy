@@ -228,6 +228,10 @@ describe('Trades Resolver', () => {
     });
 
     it('returns hydrated trades when trades exist', async () => {
+      // verifyLeagueMembership: select().from().where().limit(1)
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
       const rawTrade = {
         id: 10,
         leagueId: 1,
@@ -242,12 +246,8 @@ describe('Trades Resolver', () => {
         updatedAt: new Date(),
       };
 
-      // verifyLeagueMembership: select().from().where().limit(1)
-      // .where() returns mockDb so .limit() can chain; .limit(1) resolves to membership
+      // verifyLeagueMembership .where() — consumed before the main query runs
       mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce([
-        { permissionLevel: 'general_manager', teamId: 1 },
-      ]);
       // Main tradeOffers query chain: select().from().where().orderBy()
       // .where() must return mockDb so .orderBy() can chain; only then does .orderBy resolve
       mockDb.where.mockReturnValueOnce(mockDb);
@@ -477,6 +477,66 @@ describe('Trades Resolver', () => {
       ).rejects.toMatchObject({
         extensions: { code: 'BAD_USER_INPUT' },
         message: expect.stringContaining('at least 1 day'),
+      });
+    });
+
+    it('throws BAD_USER_INPUT when offeringPlayerIds contains duplicate IDs', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [10, 10],
+            requestingPlayerIds: [20],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('duplicate'),
+      });
+    });
+
+    it('throws BAD_USER_INPUT when requestingPlayerIds contains duplicate IDs', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [10],
+            requestingPlayerIds: [20, 20],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('duplicate'),
+      });
+    });
+
+    it('throws BAD_USER_INPUT when the same player appears on both sides of the trade', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [10],
+            requestingPlayerIds: [10],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('both sides'),
       });
     });
 

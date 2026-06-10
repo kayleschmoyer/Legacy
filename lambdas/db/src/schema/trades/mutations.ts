@@ -418,6 +418,27 @@ builder.mutationField('proposeTrade', (t) =>
         );
       }
 
+      // Guard: duplicate player IDs within each side
+      const uniqueOfferingIds = new Set(offeringPlayerIds);
+      if (uniqueOfferingIds.size !== offeringPlayerIds.length) {
+        throw UserInputError('offeringPlayerIds contains duplicate player IDs');
+      }
+      const uniqueRequestingIds = new Set(requestingPlayerIds);
+      if (uniqueRequestingIds.size !== requestingPlayerIds.length) {
+        throw UserInputError(
+          'requestingPlayerIds contains duplicate player IDs',
+        );
+      }
+
+      // Guard: a player cannot appear on both sides of the trade
+      for (const id of requestingPlayerIds) {
+        if (uniqueOfferingIds.has(id)) {
+          throw UserInputError(
+            'A player cannot appear on both sides of a trade',
+          );
+        }
+      }
+
       // 0a. Enforce expiration limits — free tier capped at TRADE_EXPIRATION_FREE_LIMIT_DAYS
       if (expiresInDays !== null && expiresInDays !== undefined) {
         if (expiresInDays < TRADE_EXPIRATION_MIN_DAYS) {
