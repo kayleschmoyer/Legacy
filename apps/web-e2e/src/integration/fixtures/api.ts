@@ -18,6 +18,12 @@ export interface IntegrationFixtures {
   api2: APIRequestContext;
   /** A third authenticated API context (commissioner/admin). */
   apiCommissioner: APIRequestContext;
+  /**
+   * Raw JWT for the commissioner persona — same identity backing
+   * `apiCommissioner`. Exposed so specs can drive backend cleanup helpers that
+   * take a bearer token directly (e.g. `freeCommissionerLeagueSlots`).
+   */
+  commissionerJwt: string;
 }
 
 const GQL_BASE = (
@@ -97,13 +103,15 @@ export const test = base.extend<IntegrationFixtures>({
     await api2.dispose();
   },
 
-  apiCommissioner: async ({ playwright }, use, testInfo) => {
-    const jwt = await getAuthJwt(testInfo);
+  commissionerJwt: async ({}, use, testInfo) => {
+    await use(await getAuthJwt(testInfo));
+  },
 
+  apiCommissioner: async ({ playwright, commissionerJwt }, use) => {
     const api = await playwright.request.newContext({
       baseURL: GQL_BASE,
       extraHTTPHeaders: {
-        Authorization: `Bearer ${jwt}`,
+        Authorization: `Bearer ${commissionerJwt}`,
         'Content-Type': 'application/json',
       },
     });

@@ -1,4 +1,5 @@
 import { cleanupLeague } from '../helpers/cleanup-league';
+import { freeCommissionerLeagueSlots } from '../helpers/free-league-slots';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
 
@@ -100,10 +101,23 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // PHASE 1 — PRE-SEASON: LEAGUE SETUP
   // -------------------------------------------------------------------------
 
-  test('Phase 1: League setup', async ({ api, api2, apiCommissioner }) => {
+  test('Phase 1: League setup', async ({
+    api,
+    api2,
+    apiCommissioner,
+    commissionerJwt,
+  }) => {
     // Reset teams array so retries (global retries: 1) start fresh
     state.teams = [];
     await test.step('1.1 Commissioner creates league', async () => {
+      // Free any leftover leagues owned by this spec's per-spec commissioner
+      // persona before creating. A prior run that leaked its league — or a
+      // retry of this very phase, which creates a fresh league each attempt —
+      // can otherwise push the identity over the free-tier 3-league cap, so
+      // createLeagueAndTeams fails with "You have reached the 3-league limit
+      // for your current plan." (LS-7879; same root cause and helper as the
+      // LS-7704 fix in season-renewal-migration-ui). Best-effort: never throws.
+      await freeCommissionerLeagueSlots(commissionerJwt);
       const data = await graphqlOk<{
         createLeagueAndTeams: {
           league: { id: number; name: string; inviteCode: string };

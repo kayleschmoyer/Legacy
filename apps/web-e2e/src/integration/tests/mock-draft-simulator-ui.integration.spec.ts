@@ -313,6 +313,11 @@ test.describe
     // know) — LS-3704. 15 × 1 s iterations = 15 s before reload.
     let noButtonFoundCount = 0;
     const MAX_NO_BUTTON_FOUND = 15;
+    // A user-pick click that can't land because the chosen card is mid-reflow
+    // (Apollo cache update unmounting drafted PlayerCards) resyncs via reload
+    // after this many consecutive failures rather than failing the draft.
+    let pickClickFailures = 0;
+    const MAX_PICK_CLICK_FAILURES = 3;
     let lastNudgeMs = -Infinity;
     const NUDGE_INTERVAL_MS = 5_000;
 
@@ -399,7 +404,46 @@ test.describe
                   .getByRole('button', { name: ariaLabel, exact: true })
                   .first()
               : allDraftBtns.nth(draftBtnIdx);
-            await draftButton.click({ timeout: 10_000 });
+
+            try {
+              await draftButton.click({ timeout: 10_000 });
+            } catch {
+              // The available-players grid re-flows as PlayerCards unmount
+              // after each pick; if the chosen card is still mid-reflow when we
+              // click, Playwright's actionability ("visible, enabled and
+              // stable") wait can exhaust its budget and throw (LS-7879: run
+              // 27257814209 timed out clicking "Draft George Kelly now"). Treat
+              // a click-timeout as transient and resync instead of failing the
+              // whole draft on one unstable card: after a bounded number of
+              // failures, reload so the next iteration acts on a freshly
+              // hydrated, stable grid. This is a re-read of the source of
+              // truth, not a blind re-click of the same element — and it is
+              // bounded by maxPicks and the final "Draft Complete!" assertion,
+              // so a genuinely stuck board still fails loudly.
+              pickClickFailures++;
+              if (pickClickFailures >= MAX_PICK_CLICK_FAILURES) {
+                await page.reload();
+                await page.waitForLoadState('load');
+                await page
+                  .getByText('LIVE DRAFT')
+                  .first()
+                  .waitFor({ state: 'visible', timeout: 30_000 })
+                  .catch(() => undefined);
+                pickClickFailures = 0;
+                consecutiveMisses = 0;
+                lastNudgeMs = -Infinity;
+              } else {
+                // Anti-spin pacing before re-evaluating the board — not a UI
+                // wait (LS-4457).
+                await new Promise<void>((resolve) =>
+                  setTimeout(resolve, 1_000),
+                );
+              }
+              continue;
+            }
+
+            // Click landed — clear the resync counter.
+            pickClickFailures = 0;
 
             let wasAccepted = false;
 

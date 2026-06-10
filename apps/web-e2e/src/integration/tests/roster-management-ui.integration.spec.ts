@@ -186,7 +186,16 @@ test.describe
       const draftSettingsBtn = page.getByRole('button', {
         name: /Draft Settings/i,
       });
-      await expect(draftSettingsBtn).toBeVisible({ timeout: 10_000 });
+      // First interactive element after navigating to the commissioner panel.
+      // page.goto + waitForLoadState('load') only awaits the document load
+      // event; the Draft Settings accordion is rendered by the panel's initial
+      // GraphQL query, whose Lambda can cold-start past 10s under the 3-shard
+      // integration ceiling (LS-7879: run 27257814209 → "Draft Settings" not
+      // found after 10s). Budget the gate to 30s to cover the cold-start
+      // window, matching the sibling waits on this same navigation (the
+      // error-boundary check above and the start-draft button below both
+      // already use 30s).
+      await expect(draftSettingsBtn).toBeVisible({ timeout: 30_000 });
       await draftSettingsBtn.click();
 
       // Use data-testid rather than aria-label matching: the button's accessible
