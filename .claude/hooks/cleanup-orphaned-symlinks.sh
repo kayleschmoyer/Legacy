@@ -13,9 +13,10 @@
 #      are at risk when VS Code archives an agent session — the extension may delete
 #      the worktree directory recursively, following the link into the main repo.
 #
-# cmd //c rmdir (non-recursive) removes symlinks and empty real directories,
-# but fails harmlessly on non-empty real directories. So a full independent install
-# in a sibling worktree is safe; only symlinks and empty dirs are removed.
+# rm -f (symlinks/junctions) and Node fs.rmdirSync (empty real directories) remove
+# only the link or empty dir and fail harmlessly on non-empty real directories. So a
+# full independent install in a sibling worktree is safe; only symlinks and empty
+# dirs are removed. Neither spawns a console window (LS-7892).
 #
 # Active-session protection: setup-worktree-symlink.sh (also a SessionStart hook,
 # runs first) writes a .claude-session marker with the current epoch. Sibling
@@ -33,21 +34,24 @@ fi
 remove_symlink() {
   local J="$1"
   local WIN_PATH
-  local CMD_OUTPUT
-  local CMD_STATUS
   [ -e "$J" ] || [ -L "$J" ] || return 0
-  WIN_PATH=$(cygpath -w "$J" 2>/dev/null || echo "$J" | sed 's|/d/|D:\\|; s|/|\\|g')
-  CMD_OUTPUT=$(cmd //c "rmdir \"$WIN_PATH\"" 2>&1)
-  CMD_STATUS=$?
+  if [ -L "$J" ]; then
+    # Git Bash reports both symlinks and junctions as -L; rm unlinks the link itself
+    # without following it and spawns no console window — `cmd //c rmdir` flashed a
+    # focus-stealing terminal per orphan (LS-7892).
+    rm -f "$J" 2>/dev/null
+  else
+    # Empty real directories (the other case cmd rmdir used to handle): Node
+    # fs.rmdirSync removes empty dirs and links only, throws harmlessly on
+    # non-empty real directories, and spawns no console window.
+    WIN_PATH=$(cygpath -w "$J" 2>/dev/null || echo "$J" | sed 's|/d/|D:\\|; s|/|\\|g')
+    node -e "try{require('fs').rmdirSync(process.argv[1])}catch{}" "$WIN_PATH" >/dev/null 2>&1
+  fi
   # Verify removal succeeded by checking the path no longer exists
   if [ ! -e "$J" ] && [ ! -L "$J" ]; then
     return 0
   fi
-  if [ "$CMD_STATUS" -ne 0 ] && [ -n "$CMD_OUTPUT" ]; then
-    printf 'Warning: failed to remove symlink "%s" (exit %s): %s\n' "$J" "$CMD_STATUS" "$CMD_OUTPUT" >&2
-  else
-    printf 'Warning: failed to remove symlink "%s"; path still exists after rmdir.\n' "$J" >&2
-  fi
+  printf 'Warning: failed to remove symlink "%s"; path still exists after removal attempt.\n' "$J" >&2
 }
 
 # Remove all symlinks in a worktree directory, respecting the session marker.

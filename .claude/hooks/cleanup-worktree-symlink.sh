@@ -10,9 +10,9 @@
 # until a later SessionStart re-links it — an intermittent, hard-to-trace failure.
 # SessionEnd fires once, at true session end, so the symlink survives across turns.
 #
-# Uses `cmd //c rmdir` (non-recursive) which safely removes symlinks without
-# touching the target. Real directories are left untouched.
-# cmd rmdir succeeds for symlinks and fails harmlessly on non-empty real dirs.
+# Uses `rm -f` for symlinks/junctions and Node fs.rmdirSync as the non-symlink
+# fallback — both remove only the link, never the target, and neither spawns a
+# console window. Real non-empty directories are left untouched.
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
@@ -39,10 +39,12 @@ if [ -L "$NM" ]; then
   exit 0
 fi
 
-# Fallback for non-symlink links (e.g. NTFS junctions): non-recursive cmd rmdir removes the
-# link without touching the target. This branch still spawns a brief console window, but it is
-# only reached for junctions, which the setup script no longer creates.
+# Fallback for non-symlink links: Node fs.rmdirSync removes a junction (or an empty real
+# directory) without following it, and throws harmlessly on non-empty real directories —
+# the same semantics as non-recursive `cmd //c rmdir`, but with no console window.
+# bash-spawned cmd.exe/powershell.exe each flash a focus-stealing terminal (LS-7892);
+# node spawned from a hook does not.
 WIN_PATH=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-cmd //c "rmdir \"$WIN_PATH\"" >/dev/null 2>&1
+node -e "try{require('fs').rmdirSync(process.argv[1])}catch{}" "$WIN_PATH" >/dev/null 2>&1
 
 exit 0

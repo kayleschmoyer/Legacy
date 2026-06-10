@@ -12,8 +12,8 @@
 # Code or the OS cleans up the worktree directory — a live junction would cause the main
 # repo's node_modules to be deleted.
 #
-# Uses `cmd //c rmdir` (non-recursive) so only the junction link is removed, never the
-# target contents. Real directories are left untouched (rmdir fails on non-empty dirs).
+# Uses Node fs.rmdirSync (non-recursive) so only the junction link is removed, never
+# the target contents. Real directories are left untouched.
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
@@ -39,17 +39,17 @@ if [ -L "$NM" ]; then
   exit 0
 fi
 
-# Only act if the link is an NTFS junction (not a symlink — those are handled by
-# cleanup-worktree-symlink.sh). Junctions report LinkType "Junction" via PowerShell.
-# Skip the check on non-Windows hosts where junctions cannot exist.
+# Defensive branch: current Git Bash reports junctions as symlinks (-L), so they are
+# normally caught by the fast bail above. On MSYS2 builds where a junction shows up as
+# a plain directory instead, probe and remove it via Node — fs.lstatSync reports
+# junctions as symbolic links and fs.rmdirSync removes only the link, never the target.
+# Real directories fail the isSymbolicLink check and are left untouched. Node spawns no
+# console window; the previous powershell LinkType probe + cmd rmdir each flashed a
+# focus-stealing terminal on session end (LS-7892).
+# Skip on non-Windows hosts where junctions cannot exist.
 if command -v cygpath &>/dev/null; then
   WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  LINK_TYPE=$(powershell -NoProfile -NonInteractive -Command \
-    "(Get-Item -LiteralPath '$WIN_NM' -Force -ErrorAction SilentlyContinue).LinkType" 2>/dev/null || true)
-  if [ "$LINK_TYPE" != "Junction" ]; then
-    exit 0
-  fi
-  cmd //c "rmdir \"$WIN_NM\"" >/dev/null 2>&1
+  node -e "const fs=require('fs');const p=process.argv[1];try{if(fs.lstatSync(p).isSymbolicLink())fs.rmdirSync(p)}catch{}" "$WIN_NM" >/dev/null 2>&1
 fi
 
 exit 0

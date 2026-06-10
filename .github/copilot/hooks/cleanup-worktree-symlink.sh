@@ -32,10 +32,15 @@ if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
   exit 0
 fi
 
-# Non-recursive removal — removes symlinks, fails harmlessly on real dirs
-if command -v cygpath &>/dev/null; then
+# Non-recursive removal — removes only the link, fails harmlessly on real dirs.
+# rm -f handles symlinks AND junctions (Git Bash reports both as -L) without following
+# the target; the Node fallback covers any non-symlink link type. Neither spawns a
+# console window — bash-spawned cmd.exe flashed a focus-stealing terminal (LS-7892).
+if [ -L "$NM" ]; then
+  rm -f "$NM" 2>/dev/null || true
+elif command -v cygpath &>/dev/null; then
   WIN_PATH=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  cmd //c "rmdir \"$WIN_PATH\"" >/dev/null 2>&1 || true
+  node -e "try{require('fs').rmdirSync(process.argv[1])}catch{}" "$WIN_PATH" >/dev/null 2>&1 || true
 else
   rm -rf "$NM"
 fi

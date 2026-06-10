@@ -138,6 +138,9 @@ if (isLocalWorktree && localWorktreeMainNm !== null) {
         if (process.platform === 'win32') {
           execFileSync('cmd', ['/c', `rmdir "${worktreeNm}"`], {
             stdio: 'ignore',
+            // CREATE_NO_WINDOW — a cmd.exe spawned from a hidden stdio process
+            // otherwise flashes a focus-stealing console window (LS-7892)
+            windowsHide: true,
           });
         } else {
           fs.rmSync(worktreeNm, { force: true, recursive: false });
@@ -153,6 +156,7 @@ if (isLocalWorktree && localWorktreeMainNm !== null) {
       try {
         execFileSync('cmd', ['/c', `mklink /D "${worktreeNm}" "${mainNm}"`], {
           stdio: 'ignore',
+          windowsHide: true,
         });
       } catch {
         // Fall back to PowerShell New-Item (also creates a SymbolicLink, not junction).
@@ -166,7 +170,7 @@ if (isLocalWorktree && localWorktreeMainNm !== null) {
         let psFallbackOk = false;
         for (const psExe of ['pwsh', 'powershell']) {
           try {
-            execFileSync(psExe, psArgs, { stdio: 'ignore' });
+            execFileSync(psExe, psArgs, { stdio: 'ignore', windowsHide: true });
             psFallbackOk = true;
             break;
           } catch {

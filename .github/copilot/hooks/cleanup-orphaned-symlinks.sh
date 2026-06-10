@@ -39,10 +39,16 @@ NOW=$(date +%s)
 remove_symlink() {
   local LINK="$1"
   [ -e "$LINK" ] || [ -L "$LINK" ] || return 0
-  if command -v cygpath &>/dev/null; then
+  # rm -f handles symlinks AND junctions (Git Bash reports both as -L) without
+  # following the target; the Node fallback covers any non-symlink link type or
+  # empty dir. Neither spawns a console window — bash-spawned cmd.exe flashed a
+  # focus-stealing terminal per orphan (LS-7892).
+  if [ -L "$LINK" ]; then
+    rm -f "$LINK" 2>/dev/null || true
+  elif command -v cygpath &>/dev/null; then
     local WIN_PATH
     WIN_PATH=$(cygpath -w "$LINK" 2>/dev/null || echo "$LINK" | sed 's|/d/|D:\\|; s|/|\\|g')
-    cmd //c "rmdir \"$WIN_PATH\"" >/dev/null 2>&1 || true
+    node -e "try{require('fs').rmdirSync(process.argv[1])}catch{}" "$WIN_PATH" >/dev/null 2>&1 || true
   else
     rm -rf "$LINK"
   fi
