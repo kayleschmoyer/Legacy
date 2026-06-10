@@ -3,11 +3,18 @@ import { LOGGER } from '@legacy-sports/logging';
 import { decode, verify } from 'jsonwebtoken';
 import type { JwtPayload } from 'jsonwebtoken';
 import { createPublicKey } from 'crypto';
-import { getOrCreateUser } from './UserManager';
+import { resolveOrCreateUser } from './resolveOrCreateUser';
+import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
+import {
+  getAuthenticatedUserId,
+  requireCsrf,
+} from '../util/authenticated-request';
 import { parseEventBody } from '../util/lambda';
+import { withDbClient } from '../util/db';
+import { notifyNewUserSignup } from '../util/discord';
 
 const APPLE_ISSUER = 'https://appleid.apple.com';
 const APPLE_KEYS_URL = 'https://appleid.apple.com/auth/keys';
@@ -123,6 +130,15 @@ async function verifyAppleIdentityToken(
 }
 
 /**
+ * Apple reports `email_verified` as either a boolean or the string `"true"`
+ * depending on the flow; normalize to a boolean.
+ */
+function appleEmailVerified(claims: JwtPayload): boolean {
+  const value = (claims as Record<string, unknown>)['email_verified'];
+  return value === true || value === 'true';
+}
+
+/**
  * Exchange a native Sign in with Apple identity token for a Legacy Sports JWT.
  *
  * Mirrors {@link handleSecureGoogleAuth}: verify the provider-signed token,
@@ -163,9 +179,49 @@ export const handleSecureAppleAuth = async (
       };
     }
 
-    LOGGER.info('Getting or creating user from Apple OAuth flow');
-    const user = await getOrCreateUser(email, undefined, 'apple');
+    const sub = typeof claims.sub === 'string' ? claims.sub : undefined;
+    if (!sub) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Bad request',
+          message: 'Apple identity token did not include a subject',
+        }),
+      };
+    }
+
+    // Resolve via the shared multi-provider resolver, keyed on the Apple
+    // subject id with a guarded email-owner fallback. Replaces the email-only
+    // getOrCreateUser and extends the LS-6695 takeover guard to Apple.
+    LOGGER.info('Resolving user from Apple OAuth flow');
+    const resolved = await withDbClient((db) =>
+      resolveOrCreateUser(db, {
+        provider: 'apple',
+        providerAccountId: sub,
+        providerEmail: email,
+        emailVerified: appleEmailVerified(claims),
+      }),
+    );
+
+    if (resolved.status === 'conflict') {
+      return {
+        statusCode: 409,
+        body: JSON.stringify({
+          error: 'Account exists',
+          message:
+            'An account with this email already exists. Sign in, then link Apple from your account settings.',
+        }),
+      };
+    }
+
+    const user = resolved.user;
     LOGGER.info(`User ready for authentication (ID: ${user.id})`);
+
+    // Best-effort new-user Discord notification (preserves the behavior the
+    // removed getOrCreateUser provided).
+    if (resolved.outcome === 'new_user') {
+      await notifyNewUserSignup(email, user.id, 'apple');
+    }
 
     const internalJwt = await createJwt(user);
 
@@ -202,4 +258,107 @@ export const handleSecureAppleAuth = async (
       }),
     };
   }
+};
+
+/**
+ * POST /oauth/apple/link
+ * Links an Apple account to the authenticated user. Accepts `{ identityToken }`;
+ * the subject id and email are extracted from the verified token and persisted
+ * as a `user_identities` row via the shared provider-agnostic link core.
+ */
+export const handleAppleLink = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  const csrfError = requireCsrf(event);
+  if (csrfError) return csrfError;
+
+  const userId = await getAuthenticatedUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Authentication required' }),
+    };
+  }
+
+  const body = parseEventBody<AppleAuthRequest>(event);
+  if (!body.identityToken) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: 'Bad request',
+        message: 'Missing Apple identity token',
+      }),
+    };
+  }
+
+  let sub: string;
+  let email: string | null;
+  let emailVerified: boolean;
+  try {
+    const claims = await verifyAppleIdentityToken(body.identityToken);
+    if (typeof claims.sub !== 'string') {
+      throw new Error('Apple identity token did not include a subject');
+    }
+    sub = claims.sub;
+    email = typeof claims.email === 'string' ? claims.email : null;
+    emailVerified = appleEmailVerified(claims);
+  } catch (error) {
+    LOGGER.warn(
+      'Apple link: identity token verification failed',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Apple authentication failed' }),
+    };
+  }
+
+  return withDbClient(async (db) => {
+    const linked = await linkProviderIdentity(db, userId, {
+      provider: 'apple',
+      providerAccountId: sub,
+      providerEmail: email,
+      emailVerified,
+    });
+    if (!linked.ok) {
+      return {
+        statusCode: linked.statusCode,
+        body: JSON.stringify({ error: linked.message }),
+      };
+    }
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ provider: 'apple', linked: true }),
+    };
+  });
+};
+
+/**
+ * POST /oauth/apple/unlink
+ * Removes the Apple identity from the authenticated user.
+ */
+export const handleAppleUnlink = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  const csrfError = requireCsrf(event);
+  if (csrfError) return csrfError;
+
+  const userId = await getAuthenticatedUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Authentication required' }),
+    };
+  }
+
+  return withDbClient(async (db) => {
+    const unlinked = await unlinkProviderIdentity(db, userId, 'apple');
+    if (!unlinked.ok) {
+      return {
+        statusCode: unlinked.statusCode,
+        body: JSON.stringify({ error: unlinked.message }),
+      };
+    }
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  });
 };

@@ -1,31 +1,16 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
-import {
-  createUser,
-  getUserByDiscordId,
-  getUserByEmail,
-  getUserById,
-  linkDiscordAccount,
-  setInitialAvatarUrl,
-  unlinkDiscordAccount,
-  updateUserEmail,
-} from '@legacy-sports/db-client';
-import { verify } from 'jsonwebtoken';
-import {
-  createJwt,
-  JWT_AUDIENCE,
-  JWT_COOKIE_NAME,
-  JWT_ISSUER,
-} from '../util/jwt';
+import { setInitialAvatarUrl } from '@legacy-sports/db-client';
+import { resolveOrCreateUser } from './resolveOrCreateUser';
+import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
+import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
+import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import {
-  buildAuthCookies,
-  CSRF_HEADER,
-  generateCsrfToken,
-  parseJwtFromCookies,
-  validateCsrf,
-} from '../util/jwt-cookie';
+  getAuthenticatedUserId,
+  requireCsrf,
+} from '../util/authenticated-request';
 import {
   buildClearOauthStateCookie,
   buildOauthStateCookie,
@@ -282,47 +267,6 @@ async function exchangeCodeForUser(
   return (await userRes.json()) as DiscordUser;
 }
 
-/**
- * Extract and verify the authenticated user ID from the JWT cookie.
- * Returns null if not authenticated.
- */
-async function getAuthenticatedUserId(
-  event: APIGatewayEvent,
-): Promise<number | null> {
-  const cookieHeader = event.headers?.['Cookie'] ?? event.headers?.['cookie'];
-  const jwtToken = parseJwtFromCookies(cookieHeader);
-
-  if (!jwtToken) return null;
-
-  try {
-    const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
-    const decoded = verify(jwtToken, jwtKey, {
-      algorithms: ['HS256'],
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    }) as { id: number };
-    return decoded.id;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Validate CSRF double-submit token for cookie-authenticated requests.
- * Returns an error response if validation fails, or null if valid.
- */
-function requireCsrf(event: APIGatewayEvent): APIGatewayProxyResult | null {
-  const cookieHeader = event.headers?.['Cookie'] ?? event.headers?.['cookie'];
-  const csrfHeaderValue =
-    event.headers[CSRF_HEADER] ?? event.headers['X-CSRF-Token'];
-
-  if (!validateCsrf(csrfHeaderValue, cookieHeader)) {
-    LOGGER.warn('CSRF validation failed');
-    return errorResponse(403, 'CSRF validation failed');
-  }
-  return null;
-}
-
 // ── Public handlers ──────────────────────────────────────────────────────────
 
 /**
@@ -415,81 +359,36 @@ async function completeDiscordSignIn(
 
   let newUserId: number | null = null;
   const result = await withDbClient(async (db) => {
-    // First check if a user with this Discord ID already exists
-    let user = await getUserByDiscordId(db, discordUser.id);
+    // Shared resolver: matched by (provider, providerAccountId) with a guarded
+    // email-owner fallback. The LS-6695 takeover guard (no auto-link onto a
+    // password-protected or colliding account) and the canonical-email rule
+    // (replacing LS-6660's unconditional refresh) live in the resolver.
+    const resolved = await resolveOrCreateUser(db, {
+      provider: 'discord',
+      providerAccountId: discordUser.id,
+      providerEmail: email,
+      emailVerified: discordUser.verified,
+      meta: {
+        providerUsername: discordUser.username,
+        providerAvatar: discordUser.avatar,
+      },
+    });
 
-    if (!user) {
-      // Fall back to email-based lookup
-      const emailMatch = await getUserByEmail(db, email);
-
-      // Security (LS-6695): refuse to silently take over an existing account.
-      // If the email matches a user who registered with a password
-      // (i.e. via /oauth/register) and has no Discord account linked yet,
-      // auto-linking here would let any Discord account whose verified email
-      // collides with that local-auth account sign in as them ("OAuth-to-
-      // existing-account takeover via verified-email match"). Require an
-      // explicit, authenticated account-link step (/oauth/discord/link)
-      // instead of auto-linking on a bare email match.
-      if (emailMatch && emailMatch.passwordHash && !emailMatch.discordId) {
-        LOGGER.warn(
-          'Discord OAuth blocked: email matches a password-protected account with no Discord linkage',
-          {
-            discordId: discordUser.id,
-            existingUserId: emailMatch.id,
-          },
-        );
-        return errorResponse(
-          409,
-          'An account with this email already exists. Sign in with your password, then link Discord from your account settings.',
-        );
-      }
-
-      user = emailMatch;
-    }
-
-    if (!user) {
-      // Create new user
-      user = await createUser(db, email);
-      LOGGER.info('Created new user via Discord OAuth', { userId: user.id });
-      newUserId = user.id;
-    }
-
-    // Link Discord account if not already linked
-    if (!user.discordId) {
-      user = await linkDiscordAccount(
-        db,
-        user.id,
-        discordUser.id,
-        discordUser.username,
-        discordUser.avatar,
+    if (resolved.status === 'conflict') {
+      LOGGER.warn(
+        'Discord OAuth blocked: verified email matches an existing account',
+        { discordId: discordUser.id },
+      );
+      return errorResponse(
+        409,
+        'An account with this email already exists. Sign in with your password, then link Discord from your account settings.',
       );
     }
 
-    // Refresh the stored email when Discord reports a different verified email
-    // than the one captured at initial link time (LS-6660). Without this, a
-    // user who changes their Discord email keeps signing into the originally-
-    // linked account under a stale users.email forever. New users and users
-    // found by email match already carry the current email, so this only fires
-    // on the subsequent-sign-in (Discord-ID match) path where it has drifted.
-    //
-    // Guard against the unique email constraint (users_email_uk): if another
-    // account already owns the incoming email, skip the refresh and keep the
-    // existing email rather than failing the sign-in. We never merge accounts
-    // here — that requires an explicit, authenticated step (cf. LS-6695).
-    if (user.email !== email) {
-      const emailOwner = await getUserByEmail(db, email);
-      if (emailOwner && emailOwner.id !== user.id) {
-        LOGGER.warn(
-          'Discord email refresh skipped: new email already belongs to another account',
-          { userId: user.id, discordId: discordUser.id },
-        );
-      } else {
-        user = await updateUserEmail(db, user.id, email);
-        LOGGER.info('Refreshed user email from Discord profile', {
-          userId: user.id,
-          discordId: discordUser.id,
-        });
-      }
+    let user = resolved.user;
+    if (resolved.outcome === 'new_user') {
+      LOGGER.info('Created new user via Discord OAuth', { userId: user.id });
+      newUserId = user.id;
     }
 
     // Set initial avatar for users who don't have one yet (new and existing)
@@ -702,52 +601,30 @@ export const handleDiscordLink = async (
   }
 
   const linkResult = await withDbClient(async (db) => {
-    // Check if this Discord account is already linked to another user.
-    // Use a generic error message that does not confirm the link exists,
-    // so a logged-in caller cannot enumerate which Discord IDs belong to
-    // other Legacy Sports users (LS-2549).
-    const existingUser = await getUserByDiscordId(db, discordUser.id);
-    if (existingUser && existingUser.id !== userId) {
-      LOGGER.warn(
-        'Discord link blocked: account already linked to another user',
-        {
-          userId,
-          discordId: discordUser.id,
-          existingUserId: existingUser.id,
-        },
-      );
-      return errorResponse(409, 'Could not link Discord account');
-    }
-
-    // Check if the authenticated user already has a different Discord account linked
-    const currentUser = await getUserById(db, userId);
-    if (currentUser?.discordId && currentUser.discordId !== discordUser.id) {
-      return errorResponse(
-        409,
-        'A different Discord account is already linked — unlink it first',
-      );
-    }
-
-    const user = await linkDiscordAccount(
-      db,
-      userId,
-      discordUser.id,
-      discordUser.username,
-      discordUser.avatar,
-    );
-
-    LOGGER.info('Discord account linked', {
-      userId,
-      discordId: discordUser.id,
+    // The link rules (provider account already linked to another user; user
+    // already has this provider) live in the provider-agnostic core. It uses a
+    // generic conflict message that does not confirm the link exists, so a
+    // logged-in caller cannot enumerate other users' Discord IDs (LS-2549).
+    const linked = await linkProviderIdentity(db, userId, {
+      provider: 'discord',
+      providerAccountId: discordUser.id,
+      providerEmail: discordUser.email,
+      emailVerified: discordUser.verified,
+      providerUsername: discordUser.username,
+      providerAvatar: discordUser.avatar,
     });
+
+    if (!linked.ok) {
+      return errorResponse(linked.statusCode, linked.message);
+    }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        discordId: user.discordId,
-        discordUsername: user.discordUsername,
-        discordAvatar: user.discordAvatar
-          ? discordAvatarUrl(discordUser.id, user.discordAvatar)
+        discordId: discordUser.id,
+        discordUsername: discordUser.username,
+        discordAvatar: discordUser.avatar
+          ? discordAvatarUrl(discordUser.id, discordUser.avatar)
           : null,
       }),
     };
@@ -772,14 +649,10 @@ export const handleDiscordUnlink = async (
   }
 
   return await withDbClient(async (db) => {
-    const user = await getUserById(db, userId);
-    if (!user?.discordId) {
-      return errorResponse(400, 'No Discord account linked');
+    const unlinked = await unlinkProviderIdentity(db, userId, 'discord');
+    if (!unlinked.ok) {
+      return errorResponse(unlinked.statusCode, unlinked.message);
     }
-
-    await unlinkDiscordAccount(db, userId);
-
-    LOGGER.info('Discord account unlinked', { userId });
 
     return {
       statusCode: 200,

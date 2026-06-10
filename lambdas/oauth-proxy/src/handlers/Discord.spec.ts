@@ -1,26 +1,20 @@
 import { APIGatewayEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  createUser,
-  getUserByDiscordId,
-  getUserByEmail,
-  getUserById,
-  linkDiscordAccount,
-  setInitialAvatarUrl,
-  updateUserEmail,
-} from '@legacy-sports/db-client';
+import { setInitialAvatarUrl } from '@legacy-sports/db-client';
 import {
   checkDiscordRedirectUriConfig,
   handleDiscordAuth,
   handleDiscordAuthorize,
   handleDiscordLink,
+  handleDiscordUnlink,
 } from './Discord';
+import { resolveOrCreateUser } from './resolveOrCreateUser';
+import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
 import { verifyOauthState } from '../util/oauth-state';
-import { parseJwtFromCookies } from '../util/jwt-cookie';
-
-const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
-  typeof verifyOauthState
->;
+import {
+  getAuthenticatedUserId,
+  requireCsrf,
+} from '../util/authenticated-request';
 import { notifyNewUserSignup } from '../util/discord';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -36,15 +30,20 @@ jest.mock('@legacy-sports/aws-utils', () => ({
   readSecret: jest.fn().mockResolvedValue('test-client-secret'),
 }));
 
+// The shared resolver and the provider-agnostic link core are unit-tested in
+// their own specs; here we mock them so the handler tests focus on token
+// exchange, OAuth-state handling, cookies, and result mapping.
 jest.mock('@legacy-sports/db-client', () => ({
-  createUser: jest.fn(),
-  getUserByDiscordId: jest.fn(),
-  getUserByEmail: jest.fn(),
-  getUserById: jest.fn(),
-  linkDiscordAccount: jest.fn(),
   setInitialAvatarUrl: jest.fn().mockResolvedValue(undefined),
-  unlinkDiscordAccount: jest.fn(),
-  updateUserEmail: jest.fn(),
+}));
+
+jest.mock('./resolveOrCreateUser', () => ({
+  resolveOrCreateUser: jest.fn(),
+}));
+
+jest.mock('./IdentityLink', () => ({
+  linkProviderIdentity: jest.fn(),
+  unlinkProviderIdentity: jest.fn(),
 }));
 
 jest.mock('../util/db', () => ({
@@ -63,14 +62,14 @@ jest.mock('../util/cookie', () => ({
 jest.mock('../util/jwt-cookie', () => ({
   buildAuthCookies: jest.fn().mockReturnValue(['auth-cookie']),
   generateCsrfToken: jest.fn().mockReturnValue('csrf-token'),
-  parseJwtFromCookies: jest.fn().mockReturnValue(null),
-  validateCsrf: jest.fn().mockReturnValue(true),
-  CSRF_HEADER: 'x-csrf-token',
+}));
+
+jest.mock('../util/authenticated-request', () => ({
+  getAuthenticatedUserId: jest.fn().mockResolvedValue(42),
+  requireCsrf: jest.fn().mockReturnValue(null),
 }));
 
 jest.mock('../util/oauth-state', () => ({
-  // Reflect the flow-specific cookie name (2nd/1st arg) in the returned
-  // Set-Cookie so tests can assert each flow scopes to its own cookie.
   buildOauthStateCookie: jest.fn(
     (_token: string, name = 'ls_oauth_state') => `${name}=stub`,
   ),
@@ -105,33 +104,26 @@ jest.mock('../util', () => ({
   },
 }));
 
-const mockCreateUser = createUser as jest.MockedFunction<typeof createUser>;
-const mockGetUserByDiscordId = getUserByDiscordId as jest.MockedFunction<
-  typeof getUserByDiscordId
+const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
+  typeof verifyOauthState
 >;
-const mockGetUserByEmail = getUserByEmail as jest.MockedFunction<
-  typeof getUserByEmail
+const mockResolveOrCreateUser = resolveOrCreateUser as jest.MockedFunction<
+  typeof resolveOrCreateUser
 >;
-const mockLinkDiscordAccount = linkDiscordAccount as jest.MockedFunction<
-  typeof linkDiscordAccount
+const mockLinkProviderIdentity = linkProviderIdentity as jest.MockedFunction<
+  typeof linkProviderIdentity
 >;
+const mockUnlinkProviderIdentity =
+  unlinkProviderIdentity as jest.MockedFunction<typeof unlinkProviderIdentity>;
 const mockSetInitialAvatarUrl = setInitialAvatarUrl as jest.MockedFunction<
   typeof setInitialAvatarUrl
 >;
 const mockNotifyNewUserSignup = notifyNewUserSignup as jest.MockedFunction<
   typeof notifyNewUserSignup
 >;
-const mockParseJwtFromCookies = parseJwtFromCookies as jest.MockedFunction<
-  typeof parseJwtFromCookies
->;
-const mockGetUserById = getUserById as jest.MockedFunction<typeof getUserById>;
-const mockUpdateUserEmail = updateUserEmail as jest.MockedFunction<
-  typeof updateUserEmail
->;
-
-jest.mock('jsonwebtoken', () => ({
-  verify: jest.fn().mockReturnValue({ id: 42 }),
-}));
+const mockGetAuthenticatedUserId =
+  getAuthenticatedUserId as jest.MockedFunction<typeof getAuthenticatedUserId>;
+const mockRequireCsrf = requireCsrf as jest.MockedFunction<typeof requireCsrf>;
 
 const mockUser = {
   id: 99,
@@ -148,10 +140,16 @@ const mockUser = {
   themePreference: null,
   lastLoginAt: null,
   mfaEnabled: false,
-  canonicalEmailSource: null,
+  canonicalEmailSource: 'discord' as const,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
+
+function resolvedOk(
+  outcome: 'returning_identity' | 'auto_linked' | 'new_user',
+): Awaited<ReturnType<typeof resolveOrCreateUser>> {
+  return { status: 'ok', user: mockUser, outcome };
+}
 
 function makeDiscordTokenResponse(): Response {
   return new Response(JSON.stringify({ access_token: 'mock-access-token' }), {
@@ -203,10 +201,9 @@ describe('handleDiscordAuth', () => {
     process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
     mockSetInitialAvatarUrl.mockResolvedValue(undefined);
-    // Default: state matches — existing flows under test exercise the happy path
     mockVerifyOauthState.mockReturnValue(true);
+    mockResolveOrCreateUser.mockResolvedValue(resolvedOk('returning_identity'));
 
-    // Default: token exchange then user fetch
     fetchSpy = jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(makeDiscordTokenResponse())
@@ -226,11 +223,22 @@ describe('handleDiscordAuth', () => {
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
   });
 
+  it('routes the verified Discord profile through the shared resolver', async () => {
+    await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(mockResolveOrCreateUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        provider: 'discord',
+        providerAccountId: 'discord-123',
+        providerEmail: 'discord@example.com',
+        emailVerified: true,
+      }),
+    );
+  });
+
   it('sends Discord notification for a brand-new user', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(null);
-    mockGetUserByEmail.mockResolvedValue(null);
-    mockCreateUser.mockResolvedValue({ ...mockUser, discordId: null });
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+    mockResolveOrCreateUser.mockResolvedValue(resolvedOk('new_user'));
 
     const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
 
@@ -243,9 +251,8 @@ describe('handleDiscordAuth', () => {
     );
   });
 
-  it('does not send Discord notification for an existing user found by Discord ID', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(mockUser);
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+  it('does not send a notification for a returning user', async () => {
+    mockResolveOrCreateUser.mockResolvedValue(resolvedOk('returning_identity'));
 
     const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
 
@@ -253,10 +260,10 @@ describe('handleDiscordAuth', () => {
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
   });
 
-  it('does not send Discord notification for an existing user found by email', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(null);
-    mockGetUserByEmail.mockResolvedValue({ ...mockUser, discordId: null });
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+  it('signs in without notifying on the auto_linked outcome', async () => {
+    // auto_linked is a returning historical email-only user being backfilled —
+    // it must sign in (200) but is not a brand-new signup, so no notification.
+    mockResolveOrCreateUser.mockResolvedValue(resolvedOk('auto_linked'));
 
     const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
 
@@ -264,16 +271,8 @@ describe('handleDiscordAuth', () => {
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
   });
 
-  it('blocks auto-link (409) when the email matches a password-protected account with no Discord linkage (LS-6695)', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(null);
-    // Existing local-auth account (registered via /oauth/register): has a
-    // passwordHash and no Discord account linked yet.
-    mockGetUserByEmail.mockResolvedValue({
-      ...mockUser,
-      id: 7,
-      passwordHash: 'hashed-password',
-      discordId: null,
-    });
+  it('returns 409 when the resolver reports a takeover conflict (LS-6695)', async () => {
+    mockResolveOrCreateUser.mockResolvedValue({ status: 'conflict' });
 
     const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
 
@@ -282,41 +281,30 @@ describe('handleDiscordAuth', () => {
       error:
         'An account with this email already exists. Sign in with your password, then link Discord from your account settings.',
     });
-    // Must NOT silently link or issue a session as the matched account.
-    expect(mockLinkDiscordAccount).not.toHaveBeenCalled();
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
   });
 
-  it('still links when the email matches an OAuth-only account with no passwordHash (LS-6695 non-regression)', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(null);
-    // Email match with no passwordHash (e.g. provisioned via another OAuth
-    // provider) — safe to auto-link as before.
-    mockGetUserByEmail.mockResolvedValue({
-      ...mockUser,
-      passwordHash: null,
-      discordId: null,
-    });
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
+  it('rejects a Discord profile without an email (400)', async () => {
+    fetchSpy.mockReset();
+    fetchSpy
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'discord-123',
+            username: 'DiscordUser',
+            email: null,
+            avatar: null,
+            verified: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
 
     const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
 
-    expect(result.statusCode).toBe(200);
-    expect(mockLinkDiscordAccount).toHaveBeenCalledTimes(1);
-  });
-
-  it('signs in a password-protected account found by Discord ID without blocking (LS-6695 non-regression)', async () => {
-    // Already-linked account: found by Discord ID, so the email fallback and
-    // its takeover guard are never reached even though a passwordHash exists.
-    mockGetUserByDiscordId.mockResolvedValue({
-      ...mockUser,
-      passwordHash: 'hashed-password',
-    });
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
-
-    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
-
-    expect(result.statusCode).toBe(200);
-    expect(mockGetUserByEmail).not.toHaveBeenCalled();
+    expect(result.statusCode).toBe(400);
+    expect(mockResolveOrCreateUser).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the OAuth state does not match the cookie', async () => {
@@ -334,124 +322,33 @@ describe('handleDiscordAuth', () => {
   });
 
   it('clears the OAuth state cookie on success (single-use)', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(mockUser);
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
-
     const result = await handleDiscordAuth(
       makeEvent({ code: 'auth-code', state: 'good-state' }),
     );
 
     expect(result.statusCode).toBe(200);
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
-    // Clears the login-flow cookie specifically — a concurrent link tab's
-    // cookie must be left untouched (LS-6661).
     expect(setCookies).toEqual(
       expect.arrayContaining([
         expect.stringContaining('ls_oauth_state_login='),
       ]),
     );
-    // Specifically the clearing cookie (Max-Age=0)
     expect((setCookies as string[]).some((c) => c.includes('Max-Age=0'))).toBe(
       true,
     );
   });
 
   it('verifies and clears only the login-flow state cookie (LS-6661)', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(mockUser);
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
-
     const event = makeEvent({ code: 'auth-code', state: 'tok-from-discord' });
     event.headers = { Cookie: 'ls_oauth_state_login=tok-from-discord' };
 
     await handleDiscordAuth(event);
 
-    // Verifies against the login cookie name (3rd arg), not the shared/link one.
     expect(mockVerifyOauthState).toHaveBeenCalledWith(
       'tok-from-discord',
       'ls_oauth_state_login=tok-from-discord',
       'ls_oauth_state_login',
     );
-  });
-});
-
-describe('handleDiscordAuth — email refresh on subsequent sign-in (LS-6660)', () => {
-  let fetchSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
-    process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
-    mockSetInitialAvatarUrl.mockResolvedValue(undefined);
-    mockVerifyOauthState.mockReturnValue(true);
-
-    // Discord now reports a NEW verified email for this account.
-    fetchSpy = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(makeDiscordTokenResponse())
-      .mockResolvedValueOnce(
-        makeDiscordUserResponse({ email: 'new@example.com' }),
-      );
-  });
-
-  afterEach(() => {
-    fetchSpy.mockRestore();
-  });
-
-  it('refreshes users.email when the Discord-side email has changed', async () => {
-    // Existing linked account still carries the original (now stale) email.
-    mockGetUserByDiscordId.mockResolvedValue({
-      ...mockUser,
-      email: 'discord@example.com',
-    });
-    // No other account owns the new email.
-    mockGetUserByEmail.mockResolvedValue(null);
-    mockUpdateUserEmail.mockResolvedValue({
-      ...mockUser,
-      email: 'new@example.com',
-    });
-
-    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
-
-    expect(result.statusCode).toBe(200);
-    expect(mockUpdateUserEmail).toHaveBeenCalledTimes(1);
-    expect(mockUpdateUserEmail).toHaveBeenCalledWith(
-      expect.anything(),
-      mockUser.id,
-      'new@example.com',
-    );
-  });
-
-  it('does not refresh the email when it is unchanged', async () => {
-    // Discord reports the same email already stored on the account.
-    fetchSpy.mockReset();
-    fetchSpy
-      .mockResolvedValueOnce(makeDiscordTokenResponse())
-      .mockResolvedValueOnce(makeDiscordUserResponse());
-    mockGetUserByDiscordId.mockResolvedValue(mockUser);
-
-    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
-
-    expect(result.statusCode).toBe(200);
-    expect(mockUpdateUserEmail).not.toHaveBeenCalled();
-  });
-
-  it('skips the refresh (and still signs in) when the new email belongs to another account', async () => {
-    mockGetUserByDiscordId.mockResolvedValue({
-      ...mockUser,
-      email: 'discord@example.com',
-    });
-    // The new email is already owned by a DIFFERENT account — refusing the
-    // refresh avoids a unique-constraint failure and an implicit account merge.
-    mockGetUserByEmail.mockResolvedValue({
-      ...mockUser,
-      id: 777,
-      email: 'new@example.com',
-    });
-
-    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
-
-    expect(result.statusCode).toBe(200);
-    expect(mockUpdateUserEmail).not.toHaveBeenCalled();
   });
 });
 
@@ -465,6 +362,7 @@ describe('handleDiscordAuth — native PKCE path (LS-7765)', () => {
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
     process.env['DISCORD_NATIVE_REDIRECT_URIS'] = NATIVE_REDIRECT;
     mockSetInitialAvatarUrl.mockResolvedValue(undefined);
+    mockResolveOrCreateUser.mockResolvedValue(resolvedOk('returning_identity'));
     // If the native path ever consulted the cookie state it would fail here.
     mockVerifyOauthState.mockReturnValue(false);
 
@@ -479,9 +377,6 @@ describe('handleDiscordAuth — native PKCE path (LS-7765)', () => {
   });
 
   it('exchanges with PKCE code_verifier + the native redirect_uri and returns a JWT (no state cookie required)', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(mockUser);
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
-
     const result = await handleDiscordAuth(
       makeEvent({
         code: 'native-auth-code',
@@ -494,11 +389,8 @@ describe('handleDiscordAuth — native PKCE path (LS-7765)', () => {
     expect(JSON.parse(result.body) as { jwt: string }).toMatchObject({
       jwt: 'mock-jwt',
     });
-    // The native path must not depend on the cookie state mechanism.
     expect(mockVerifyOauthState).not.toHaveBeenCalled();
 
-    // The token request (first fetch) must carry the PKCE verifier and the
-    // device-supplied redirect_uri (not the server's web redirect URI).
     const calls = fetchSpy.mock.calls as [string, RequestInit][];
     const tokenBody = calls[0][1].body as URLSearchParams;
     expect(tokenBody.get('code_verifier')).toBe('pkce-verifier-123');
@@ -519,7 +411,6 @@ describe('handleDiscordAuth — native PKCE path (LS-7765)', () => {
     expect(JSON.parse(result.body) as { error: string }).toMatchObject({
       error: 'Invalid redirect_uri',
     });
-    // No exchange should have been attempted.
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
   });
@@ -553,8 +444,6 @@ describe('handleDiscordAuth — native PKCE path (LS-7765)', () => {
 
   it('leaves the web cookie-state path unchanged (no code_verifier → verifyOauthState is used, no PKCE sent)', async () => {
     mockVerifyOauthState.mockReturnValue(true);
-    mockGetUserByDiscordId.mockResolvedValue(mockUser);
-    mockLinkDiscordAccount.mockResolvedValue(mockUser);
 
     const result = await handleDiscordAuth(
       makeEvent({ code: 'web-auth-code', state: 'good-state' }),
@@ -592,13 +481,8 @@ describe('handleDiscordAuthorize', () => {
       'redirect_uri=https%3A%2F%2Fexample.com%2Fcallback',
     );
     expect(location).toContain('scope=identify+email');
-
-    // LS-6669: must NOT force re-consent — omitting `prompt` lets Discord skip
-    // the authorize screen for returning users (it only re-prompts on a new
-    // authorization or scope change).
     expect(location).not.toContain('prompt=');
 
-    // Default (no link=1) binds the sign-in flow cookie (LS-6661).
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
     expect(setCookies).toEqual(
       expect.arrayContaining(['ls_oauth_state_login=stub']),
@@ -616,7 +500,6 @@ describe('handleDiscordAuthorize', () => {
     expect(setCookies).toEqual(
       expect.arrayContaining(['ls_oauth_state_link=stub']),
     );
-    // Must NOT also set the login cookie — that would reintroduce the collision.
     expect(setCookies).not.toEqual(
       expect.arrayContaining(['ls_oauth_state_login=stub']),
     );
@@ -630,9 +513,9 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
     jest.clearAllMocks();
     process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
-    // Authenticated request: parse a cookie token; jsonwebtoken.verify is
-    // mocked to return { id: 42 } (the calling user).
-    mockParseJwtFromCookies.mockReturnValue('mock-jwt');
+    mockGetAuthenticatedUserId.mockResolvedValue(42);
+    mockRequireCsrf.mockReturnValue(null);
+    mockVerifyOauthState.mockReturnValue(true);
 
     fetchSpy = jest
       .spyOn(globalThis, 'fetch')
@@ -644,42 +527,51 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
     fetchSpy.mockRestore();
   });
 
-  it('returns a generic error that does not confirm the Discord account is linked to another user', async () => {
-    // Discord ID is already linked to a DIFFERENT user (id 99, not the
-    // caller id 42). The previous behavior leaked this via a specific
-    // 409 "already linked to another user" message; the fix returns a
-    // generic message instead.
-    mockGetUserByDiscordId.mockResolvedValue({ ...mockUser, id: 99 });
+  it('returns the generic conflict from the link core without confirming the link exists', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({
+      ok: false,
+      statusCode: 409,
+      message: 'Could not link discord account',
+    });
 
     const result = await handleDiscordLink(makeEvent({ code: 'auth-code' }));
 
     expect(result.statusCode).toBe(409);
     const parsed = JSON.parse(result.body) as { error: string };
     expect(parsed.error).not.toMatch(/another user/i);
-    expect(parsed.error).not.toMatch(/already linked/i);
-    expect(parsed.error).toBe('Could not link Discord account');
+    expect(parsed.error).toBe('Could not link discord account');
   });
 
-  it('still allows the calling user to link their own Discord account', async () => {
-    mockGetUserByDiscordId.mockResolvedValue(null);
-    mockGetUserById.mockResolvedValue({
-      ...mockUser,
-      id: 42,
-      discordId: null,
-    });
-    mockLinkDiscordAccount.mockResolvedValue({ ...mockUser, id: 42 });
+  it('links the calling user’s own Discord account and returns its profile', async () => {
+    mockLinkProviderIdentity.mockResolvedValue({ ok: true });
 
     const result = await handleDiscordLink(makeEvent({ code: 'auth-code' }));
 
     expect(result.statusCode).toBe(200);
-    expect(mockLinkDiscordAccount).toHaveBeenCalledTimes(1);
+    expect(mockLinkProviderIdentity).toHaveBeenCalledWith(
+      expect.anything(),
+      42,
+      expect.objectContaining({
+        provider: 'discord',
+        providerAccountId: 'discord-123',
+      }),
+    );
+    expect(JSON.parse(result.body) as { discordId: string }).toMatchObject({
+      discordId: 'discord-123',
+    });
+  });
+
+  it('requires authentication (401) when no user id resolves', async () => {
+    mockGetAuthenticatedUserId.mockResolvedValue(null);
+
+    const result = await handleDiscordLink(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(401);
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
   });
 
   it('verifies and clears only the link-flow state cookie (LS-6661)', async () => {
-    mockVerifyOauthState.mockReturnValue(true);
-    mockGetUserByDiscordId.mockResolvedValue(null);
-    mockGetUserById.mockResolvedValue({ ...mockUser, id: 42, discordId: null });
-    mockLinkDiscordAccount.mockResolvedValue({ ...mockUser, id: 42 });
+    mockLinkProviderIdentity.mockResolvedValue({ ok: true });
 
     const event = makeEvent({ code: 'auth-code', state: 'link-tok' });
     event.headers = {
@@ -690,18 +582,60 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
     const result = await handleDiscordLink(event);
 
     expect(result.statusCode).toBe(200);
-    // Verifies against the link cookie name (3rd arg), not the shared/login one.
     expect(mockVerifyOauthState).toHaveBeenCalledWith(
       'link-tok',
       'ls_oauth_state_link=link-tok',
       'ls_oauth_state_link',
     );
-    // Clears the link-flow cookie specifically — a concurrent sign-in tab's
-    // cookie must be left untouched.
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
     expect(setCookies).toEqual(
       expect.arrayContaining([expect.stringContaining('ls_oauth_state_link=')]),
     );
+  });
+});
+
+describe('handleDiscordUnlink', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAuthenticatedUserId.mockResolvedValue(42);
+    mockRequireCsrf.mockReturnValue(null);
+  });
+
+  it('unlinks via the provider-agnostic core and returns success', async () => {
+    mockUnlinkProviderIdentity.mockResolvedValue({ ok: true });
+
+    const result = await handleDiscordUnlink(makeEvent({}));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockUnlinkProviderIdentity).toHaveBeenCalledWith(
+      expect.anything(),
+      42,
+      'discord',
+    );
+  });
+
+  it('maps a NOT_LINKED result to 400', async () => {
+    mockUnlinkProviderIdentity.mockResolvedValue({
+      ok: false,
+      statusCode: 400,
+      message: 'No discord account linked',
+    });
+
+    const result = await handleDiscordUnlink(makeEvent({}));
+
+    expect(result.statusCode).toBe(400);
+  });
+
+  it('maps the last-identity guard to 409', async () => {
+    mockUnlinkProviderIdentity.mockResolvedValue({
+      ok: false,
+      statusCode: 409,
+      message: 'Cannot unlink your only sign-in method',
+    });
+
+    const result = await handleDiscordUnlink(makeEvent({}));
+
+    expect(result.statusCode).toBe(409);
   });
 });
 
@@ -816,7 +750,6 @@ describe('DISCORD_REDIRECT_URI allow-list self-check (LGN-015 / LS-6670)', () =>
       expect(JSON.parse(result.body) as { error: string }).toMatchObject({
         error: 'Discord authentication failed',
       });
-      // The misconfiguration must short-circuit before any Discord call.
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalled();
 

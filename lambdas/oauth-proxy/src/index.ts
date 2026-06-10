@@ -13,9 +13,15 @@ import {
   handleGoogleAuth,
   handleGoogleAuthorize,
   handleGoogleCallback,
+  handleGoogleLink,
+  handleGoogleUnlink,
   handleSecureGoogleAuth,
 } from './handlers/Google';
-import { handleSecureAppleAuth } from './handlers/Apple';
+import {
+  handleAppleLink,
+  handleAppleUnlink,
+  handleSecureAppleAuth,
+} from './handlers/Apple';
 import { handleLogin, handleRegister } from './handlers/Local';
 import {
   handleForgotPassword,
@@ -526,6 +532,38 @@ const baseOAuthHandler = async (
       case '/dev/oauth/discord/unlink':
         if (event.httpMethod === 'POST') {
           const result = await handleDiscordUnlink(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/google/link':
+      case '/dev/oauth/google/link':
+        if (event.httpMethod === 'POST') {
+          const result = await handleGoogleLink(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/google/unlink':
+      case '/dev/oauth/google/unlink':
+        if (event.httpMethod === 'POST') {
+          const result = await handleGoogleUnlink(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/apple/link':
+      case '/dev/oauth/apple/link':
+        if (event.httpMethod === 'POST') {
+          const result = await handleAppleLink(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/apple/unlink':
+      case '/dev/oauth/apple/unlink':
+        if (event.httpMethod === 'POST') {
+          const result = await handleAppleUnlink(event);
           return cors(result);
         }
         break;

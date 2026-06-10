@@ -7,13 +7,20 @@ import { readSecret } from '@legacy-sports/aws-utils';
 import memoizeOne from 'memoize-one';
 import { InternalUser } from '@legacy-sports/db-client';
 import { z } from 'zod';
-import { getOrCreateUser } from './UserManager';
 import { completeDeviceFlow } from './DeviceFlow';
+import {
+  resolveOrCreateUser,
+  ResolveOrCreateUserResult,
+} from './resolveOrCreateUser';
+import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
 import { Secret, SECRET_CONFIG } from '../util';
-import { getUserFromGoogleEmail } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
+import {
+  getAuthenticatedUserId,
+  requireCsrf,
+} from '../util/authenticated-request';
 import {
   buildClearOauthStateCookie,
   buildOauthStateCookie,
@@ -24,6 +31,7 @@ import {
 } from '../util/oauth-state';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
+import { notifyNewUserSignup } from '../util/discord';
 import { getAuthSuccessHtml, htmlEscape } from '../util/html';
 
 // Extended API Gateway Event with cached OAuth data to prevent duplicate processing
@@ -32,9 +40,27 @@ interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
   _exchangedTokens?: Credentials; // Cached token exchange result
   _resolvedUser?: InternalUser; // Pre-fetched user to skip second DB round-trip
   _googlePicture?: string; // Pre-extracted picture from verified token
+  _googleSub?: string; // Google subject id (stable provider account id)
+  _googleEmailVerified?: boolean; // Whether Google reports the email verified
 }
 
 const GOOGLE_JWT_COOKIE = 'GOOGLE_JWT';
+
+/**
+ * 409 returned when a Google sign-in's verified email matches an existing
+ * credentialed/colliding account. The shared resolver refuses to auto-link in
+ * that case (LS-6695); the user must sign in and link Google from settings.
+ */
+function googleConflictResponse(): APIGatewayProxyResult {
+  return {
+    statusCode: 409,
+    body: JSON.stringify({
+      error: 'Account exists',
+      message:
+        'An account with this email already exists. Sign in, then link Google from your account settings.',
+    }),
+  };
+}
 
 interface GoogleAuthSettings {
   clientId: string;
@@ -416,10 +442,13 @@ export const handleSecureGoogleAuth = async (
         }
         userEmail = payload.email;
 
-        // Store credential and picture on the event so the main flow can reuse them
-        // without re-reading the request body; the ID token is still re-verified later.
+        // Store credential, picture, and the stable subject id on the event so
+        // the main flow can reuse them without re-reading the request body; the
+        // ID token is still re-verified later.
         event._credential = body.credential;
         event._googlePicture = payload.picture;
+        event._googleSub = payload.sub;
+        event._googleEmailVerified = payload.email_verified === true;
 
         LOGGER.debug('Email verified from ID token successfully');
       } catch (error) {
@@ -491,10 +520,13 @@ export const handleSecureGoogleAuth = async (
         }
         userEmail = payload.email;
 
-        // Store tokens and picture on the event so we can reuse them later.
-        // Storing tokens avoids the "invalid_grant" error from double-exchange.
+        // Store tokens, picture, and the stable subject id on the event so we
+        // can reuse them later. Storing tokens avoids the "invalid_grant" error
+        // from double-exchange.
         event._exchangedTokens = tokens;
         event._googlePicture = payload.picture;
+        event._googleSub = payload.sub;
+        event._googleEmailVerified = payload.email_verified === true;
 
         LOGGER.debug(
           'Email verified from authorization code flow successfully',
@@ -538,16 +570,49 @@ export const handleSecureGoogleAuth = async (
       };
     }
 
-    // Step 2: Get or create user in the database
-    // This automatically creates new users with default access level on first login
-    LOGGER.info('Getting or creating user from OAuth flow');
+    // Step 2: Resolve or create the user via the shared multi-provider
+    // resolver, keyed on the Google subject id with a guarded email-owner
+    // fallback. Replaces the email-only getOrCreateUser and extends the LS-6695
+    // takeover guard to Google (a verified-email match onto a credentialed
+    // account no longer silently signs in).
+    LOGGER.info('Resolving user from Google OAuth flow');
 
-    const user = await getOrCreateUser(userEmail, event._googlePicture);
+    if (!event._googleSub) {
+      LOGGER.error('Google ID token missing subject (sub) claim');
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Invalid ID token',
+          message: 'Could not resolve Google account id',
+        }),
+      };
+    }
 
+    const resolved = await withDbClient((db) =>
+      resolveOrCreateUser(db, {
+        provider: 'google',
+        providerAccountId: event._googleSub as string,
+        providerEmail: userEmail,
+        emailVerified: event._googleEmailVerified ?? false,
+        meta: { providerAvatar: event._googlePicture },
+      }),
+    );
+
+    if (resolved.status === 'conflict') {
+      return googleConflictResponse();
+    }
+
+    const user = resolved.user;
     LOGGER.info(`User ready for authentication (ID: ${user.id})`);
 
+    // Best-effort new-user Discord notification (preserves the behavior the
+    // removed getOrCreateUser provided). Fired outside the DB connection.
+    if (resolved.outcome === 'new_user') {
+      await notifyNewUserSignup(userEmail, user.id, 'google');
+    }
+
     // Cache the resolved user on the event so handleGoogleAuth can skip its
-    // own DB lookup (getUserFromGoogleEmail) and avoid a second DB connection.
+    // own DB lookup and avoid a second DB connection.
     event._resolvedUser = user;
 
     // Step 3: NOW do full OAuth validation since user exists
@@ -598,6 +663,8 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   let idToken: string;
   let googleEmail: string;
   let googlePicture: string | undefined;
+  let googleSub: string | undefined;
+  let googleEmailVerified = false;
 
   if (body.code) {
     // Authorization code flow (web/mobile)
@@ -650,6 +717,8 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     }
     googleEmail = codePayload.email;
     googlePicture = codePayload.picture;
+    googleSub = codePayload.sub;
+    googleEmailVerified = codePayload.email_verified === true;
   } else if (body.credential) {
     // ID token flow (One Tap)
 
@@ -696,6 +765,8 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       }
       googleEmail = payload.email;
       googlePicture = payload.picture;
+      googleSub = payload.sub;
+      googleEmailVerified = payload.email_verified === true;
     } catch (error) {
       LOGGER.warn(
         'ID token verification failed:',
@@ -726,37 +797,44 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       });
       LOGGER.debug('Internal JWT created successfully');
     } else {
-      // No pre-resolved user — open a DB connection to look up the user.
+      // No pre-resolved user (e.g. the /oauth/google/legacy endpoint) — resolve
+      // via the shared multi-provider resolver, keyed on the Google subject id.
       LOGGER.debug('Attempting to connect to database...');
 
-      const result = await withDbClient(async (db) => {
-        LOGGER.debug(
-          'Database connection successful, getting user from JWT...',
-        );
+      if (!googleSub) {
+        LOGGER.error('Google ID token missing subject (sub) claim');
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Invalid ID token',
+            message: 'Could not resolve Google account id',
+          }),
+        };
+      }
 
-        const user = await getUserFromGoogleEmail(
-          db,
-          googleEmail,
-          googlePicture,
-        );
+      const resolved: ResolveOrCreateUserResult = await withDbClient((db) =>
+        resolveOrCreateUser(db, {
+          provider: 'google',
+          providerAccountId: googleSub,
+          providerEmail: googleEmail,
+          emailVerified: googleEmailVerified,
+          meta: { providerAvatar: googlePicture },
+        }),
+      );
 
-        LOGGER.debug('User retrieved from database:', {
-          id: user.id,
-          username: user.username,
-          accessLevel: user.accessLevel,
-        });
+      if (resolved.status === 'conflict') {
+        return googleConflictResponse();
+      }
 
-        const jwt = await createJwt(user, {
-          picture: googlePicture,
-        });
-
-        LOGGER.debug('Internal JWT created successfully');
-
-        return { user, jwt };
+      userInfo = resolved.user;
+      if (resolved.outcome === 'new_user') {
+        await notifyNewUserSignup(userInfo.email, userInfo.id, 'google');
+      }
+      internalJwt = await createJwt(userInfo, {
+        picture: googlePicture,
       });
 
-      userInfo = result.user;
-      internalJwt = result.jwt;
+      LOGGER.debug('Internal JWT created successfully');
     }
   } catch (dbError) {
     LOGGER.error(
@@ -837,4 +915,120 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   LOGGER.debug('Complete.');
 
   return result;
+};
+
+/**
+ * POST /oauth/google/link
+ * Links a Google account to the authenticated user. Accepts `{ credential }` (a
+ * Google ID token); the subject id and verified email are extracted from the
+ * verified token and persisted as a `user_identities` row via the shared
+ * provider-agnostic link core.
+ */
+export const handleGoogleLink = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  const csrfError = requireCsrf(event);
+  if (csrfError) return csrfError;
+
+  const userId = await getAuthenticatedUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Authentication required' }),
+    };
+  }
+
+  let credential: string;
+  try {
+    const body = parseEventBody(event, z.object({ credential: z.string() }));
+    credential = body.credential;
+  } catch {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: 'Bad Request',
+        message: 'A Google credential is required',
+      }),
+    };
+  }
+
+  let sub: string;
+  let email: string | null;
+  let emailVerified: boolean;
+  let picture: string | undefined;
+  try {
+    const { clientId, clientSecret } = await getGoogleAuthSettings();
+    const oauthClient = getOAuthClient(clientId, clientSecret);
+    const ticket = await oauthClient.verifyIdToken({
+      idToken: credential,
+      audience: clientId,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.sub) {
+      throw new Error('Google ID token missing subject (sub) claim');
+    }
+    sub = payload.sub;
+    email = payload.email ?? null;
+    emailVerified = payload.email_verified === true;
+    picture = payload.picture;
+  } catch (error) {
+    LOGGER.warn(
+      'Google link: ID token verification failed',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Google authentication failed' }),
+    };
+  }
+
+  return withDbClient(async (db) => {
+    const linked = await linkProviderIdentity(db, userId, {
+      provider: 'google',
+      providerAccountId: sub,
+      providerEmail: email,
+      emailVerified,
+      providerAvatar: picture,
+    });
+    if (!linked.ok) {
+      return {
+        statusCode: linked.statusCode,
+        body: JSON.stringify({ error: linked.message }),
+      };
+    }
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ provider: 'google', linked: true }),
+    };
+  });
+};
+
+/**
+ * POST /oauth/google/unlink
+ * Removes the Google identity from the authenticated user.
+ */
+export const handleGoogleUnlink = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  const csrfError = requireCsrf(event);
+  if (csrfError) return csrfError;
+
+  const userId = await getAuthenticatedUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Authentication required' }),
+    };
+  }
+
+  return withDbClient(async (db) => {
+    const unlinked = await unlinkProviderIdentity(db, userId, 'google');
+    if (!unlinked.ok) {
+      return {
+        statusCode: unlinked.statusCode,
+        body: JSON.stringify({ error: unlinked.message }),
+      };
+    }
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  });
 };

@@ -5,6 +5,7 @@ import {
   handleGoogleCallback,
   handleSecureGoogleAuth,
 } from './Google';
+import { resolveOrCreateUser } from './resolveOrCreateUser';
 import { verifyOauthState } from '../util/oauth-state';
 
 // Mock dependencies
@@ -27,28 +28,41 @@ jest.mock('@legacy-sports/aws-utils', () => ({
   SqsService: jest.fn().mockImplementation(() => ({})),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithInternalClient: jest.fn(),
-  getUserByEmail: jest.fn(),
-  InternalUser: {},
-}));
+jest.mock('@legacy-sports/db-client', () => ({}));
 
-jest.mock('./UserManager', () => ({
-  getOrCreateUser: jest.fn().mockResolvedValue({
-    id: 42,
-    email: 'test@example.com',
-    username: 'testuser',
-    accessLevel: 'player',
-    subscriptionTier: 'free',
+// The shared resolver and link core are unit-tested in their own specs; mock
+// them here so the Google handler tests focus on token verification,
+// redirect_uri validation, CSRF/state, and result mapping.
+jest.mock('./resolveOrCreateUser', () => ({
+  resolveOrCreateUser: jest.fn().mockResolvedValue({
+    status: 'ok',
+    outcome: 'returning_identity',
+    user: {
+      id: 42,
+      email: 'test@example.com',
+      username: 'testuser',
+      accessLevel: 'none',
+      subscriptionTier: 'free',
+    },
   }),
 }));
 
-jest.mock('../util/users', () => ({
-  getUserFromGoogleEmail: jest.fn(),
+jest.mock('./IdentityLink', () => ({
+  linkProviderIdentity: jest.fn(),
+  unlinkProviderIdentity: jest.fn(),
+}));
+
+jest.mock('../util/discord', () => ({
+  notifyNewUserSignup: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../util/authenticated-request', () => ({
+  getAuthenticatedUserId: jest.fn().mockResolvedValue(42),
+  requireCsrf: jest.fn().mockReturnValue(null),
 }));
 
 jest.mock('../util/db', () => ({
-  withDbClient: jest.fn(),
+  withDbClient: jest.fn((cb: (db: unknown) => Promise<unknown>) => cb({})),
 }));
 
 jest.mock('../util/jwt', () => ({
@@ -436,6 +450,32 @@ describe('handleSecureGoogleAuth — error logging', () => {
 const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
   typeof verifyOauthState
 >;
+
+const mockResolveGoogle = resolveOrCreateUser as jest.Mock;
+
+describe('handleSecureGoogleAuth — takeover conflict', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // The db-unavailability suite leaves withDbClient rejecting (mockReject
+    // survives clearAllMocks); restore the pass-through so the resolver runs.
+    mockWithDbClient.mockImplementation((cb) => cb({} as never));
+  });
+
+  it('returns 409 when the resolver reports a conflict (LS-6695)', async () => {
+    // One Tap credential flow: the google-auth mock yields a verified sub+email;
+    // the resolver reports a takeover conflict, which must map to a 409.
+    mockResolveGoogle.mockResolvedValueOnce({ status: 'conflict' });
+
+    const result = await handleSecureGoogleAuth(
+      makeEvent({ credential: 'mock-google-id-token' }),
+    );
+
+    expect(result.statusCode).toBe(409);
+    expect((JSON.parse(result.body) as { error: string }).error).toBe(
+      'Account exists',
+    );
+  });
+});
 
 describe('handleGoogleAuthorize — CSRF state binding', () => {
   beforeEach(() => {

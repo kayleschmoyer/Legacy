@@ -1,7 +1,7 @@
 import { APIGatewayEvent } from 'aws-lambda';
 import { decode, verify } from 'jsonwebtoken';
 import { handleSecureAppleAuth } from './Apple';
-import { getOrCreateUser } from './UserManager';
+import { resolveOrCreateUser } from './resolveOrCreateUser';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -22,13 +22,39 @@ jest.mock('crypto', () => ({
   createPublicKey: jest.fn(() => ({ type: 'public' })),
 }));
 
-jest.mock('./UserManager', () => ({
-  getOrCreateUser: jest.fn().mockResolvedValue({
-    id: 42,
-    email: 'jane@example.com',
-    username: 'jane',
-    accessLevel: 'none',
+jest.mock('@legacy-sports/db-client', () => ({}));
+
+// The shared resolver and link core are unit-tested separately; mock them here
+// so the Apple handler tests focus on token verification and result mapping.
+jest.mock('./resolveOrCreateUser', () => ({
+  resolveOrCreateUser: jest.fn().mockResolvedValue({
+    status: 'ok',
+    outcome: 'new_user',
+    user: {
+      id: 42,
+      email: 'jane@example.com',
+      username: 'jane',
+      accessLevel: 'none',
+    },
   }),
+}));
+
+jest.mock('./IdentityLink', () => ({
+  linkProviderIdentity: jest.fn(),
+  unlinkProviderIdentity: jest.fn(),
+}));
+
+jest.mock('../util/authenticated-request', () => ({
+  getAuthenticatedUserId: jest.fn().mockResolvedValue(42),
+  requireCsrf: jest.fn().mockReturnValue(null),
+}));
+
+jest.mock('../util/db', () => ({
+  withDbClient: jest.fn((cb: (db: unknown) => Promise<unknown>) => cb({})),
+}));
+
+jest.mock('../util/discord', () => ({
+  notifyNewUserSignup: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../util/jwt', () => ({
@@ -53,7 +79,7 @@ jest.mock('../util/lambda', () => ({
 
 const mockDecode = decode as jest.Mock;
 const mockVerify = verify as jest.Mock;
-const mockGetOrCreateUser = getOrCreateUser as jest.Mock;
+const mockResolveOrCreateUser = resolveOrCreateUser as jest.Mock;
 
 function makeEvent(body: unknown): APIGatewayEvent {
   return {
@@ -109,11 +135,14 @@ describe('handleSecureAppleAuth', () => {
         audience: ['com.legacysports.app'],
       }),
     );
-    // New users provisioned via Apple are reported as such.
-    expect(mockGetOrCreateUser).toHaveBeenCalledWith(
-      'jane@example.com',
-      undefined,
-      'apple',
+    // The Apple subject id + email are routed through the shared resolver.
+    expect(mockResolveOrCreateUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        provider: 'apple',
+        providerAccountId: 'apple-user-id',
+        providerEmail: 'jane@example.com',
+      }),
     );
     expect(result.multiValueHeaders?.['Set-Cookie']).toEqual([
       'encrypted-cookie',
@@ -126,7 +155,7 @@ describe('handleSecureAppleAuth', () => {
 
     expect(result.statusCode).toBe(400);
     expect(mockVerify).not.toHaveBeenCalled();
-    expect(mockGetOrCreateUser).not.toHaveBeenCalled();
+    expect(mockResolveOrCreateUser).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the verified token has no email claim', async () => {
@@ -141,7 +170,7 @@ describe('handleSecureAppleAuth', () => {
     );
 
     expect(result.statusCode).toBe(400);
-    expect(mockGetOrCreateUser).not.toHaveBeenCalled();
+    expect(mockResolveOrCreateUser).not.toHaveBeenCalled();
   });
 
   it('returns 500 when token verification fails', async () => {
@@ -158,6 +187,54 @@ describe('handleSecureAppleAuth', () => {
     );
 
     expect(result.statusCode).toBe(500);
-    expect(mockGetOrCreateUser).not.toHaveBeenCalled();
+    expect(mockResolveOrCreateUser).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the resolver reports a takeover conflict', async () => {
+    mockDecode.mockReturnValue({
+      header: { kid: 'test-kid', alg: 'RS256' },
+      payload: {},
+    });
+    mockVerify.mockReturnValue({
+      email: 'jane@example.com',
+      sub: 'apple-user-id',
+    });
+    mockResolveOrCreateUser.mockResolvedValueOnce({ status: 'conflict' });
+
+    const result = await handleSecureAppleAuth(
+      makeEvent({ identityToken: 'apple-id-token' }),
+    );
+
+    expect(result.statusCode).toBe(409);
+    expect((JSON.parse(result.body) as { error: string }).error).toBe(
+      'Account exists',
+    );
+  });
+
+  it('signs in (200) on the auto_linked outcome', async () => {
+    mockDecode.mockReturnValue({
+      header: { kid: 'test-kid', alg: 'RS256' },
+      payload: {},
+    });
+    mockVerify.mockReturnValue({
+      email: 'jane@example.com',
+      sub: 'apple-user-id',
+    });
+    mockResolveOrCreateUser.mockResolvedValueOnce({
+      status: 'ok',
+      outcome: 'auto_linked',
+      user: {
+        id: 42,
+        email: 'jane@example.com',
+        username: 'jane',
+        accessLevel: 'none',
+      },
+    });
+
+    const result = await handleSecureAppleAuth(
+      makeEvent({ identityToken: 'apple-id-token' }),
+    );
+
+    expect(result.statusCode).toBe(200);
   });
 });
