@@ -31,7 +31,11 @@ export function Dropdown({
   'aria-label': ariaLabel,
 }: DropdownProperties): React.JSX.Element {
   return (
-    <Select value={value} onValueChange={disabled ? undefined : onChange}>
+    <Select
+      value={value}
+      onValueChange={disabled ? undefined : onChange}
+      aria-label={ariaLabel}
+    >
       <Select.Trigger
         disabled={disabled}
         opacity={disabled ? 0.5 : 1}

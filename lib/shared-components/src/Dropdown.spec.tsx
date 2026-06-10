@@ -20,7 +20,7 @@ describe('Dropdown', () => {
     expect(getByText('Pick one')).toBeTruthy();
   });
 
-  it('forwards aria-label to the trigger element', () => {
+  it('forwards aria-label to the select element', () => {
     const { getByRole } = render(
       <Dropdown
         value=""
@@ -29,7 +29,7 @@ describe('Dropdown', () => {
         aria-label="Choose a sport"
       />,
     );
-    expect(getByRole('button', { name: 'Choose a sport' })).toBeTruthy();
+    expect(getByRole('combobox', { name: 'Choose a sport' })).toBeTruthy();
   });
 
   it('does not set aria-label when prop is omitted', () => {
@@ -41,7 +41,7 @@ describe('Dropdown', () => {
         placeholder="Pick one"
       />,
     );
-    const trigger = getByRole('button', { name: 'Pick one' });
-    expect(trigger).not.toHaveAttribute('aria-label');
+    const select = getByRole('combobox');
+    expect(select).not.toHaveAttribute('aria-label');
   });
 });

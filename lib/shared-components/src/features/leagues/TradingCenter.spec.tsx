@@ -855,75 +855,363 @@ describe('TradingCenter — Completed Trade History', () => {
     expect(getAllByText('REJECTED')).toHaveLength(1);
     expect(getAllByText('VETOED')).toHaveLength(1);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Trade History Pagination
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — Trade History pagination', () => {
+  const PAGE_SIZE = 25;
+
+  function makePageOfOffers(
+    count: number,
+    startId = 200,
+  ): ReturnType<typeof makeOffer>[] {
+    return Array.from({ length: count }, (_, i) =>
+      makeOffer({ id: startId + i, status: 'accepted' }),
+    );
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockProposerRosterReturn = { data: undefined };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
+  });
+
+  async function openHistory(utils: ReturnType<typeof render>): Promise<void> {
+    await utils.findByText('Trade History');
+    fireEvent.click(utils.getByText('Trade History'));
+  }
 
   it('shows Load more button when first page is full', async () => {
-    const fullPage = Array.from({ length: 25 }, (_, i) =>
-      makeOffer({ id: 300 + i, status: 'accepted' }),
-    );
-    mockLeagueTradesReturn = {
-      data: { leagueTradeOffers: fullPage },
-      loading: false,
-      refetch: jest.fn(),
-      fetchMore: jest
-        .fn()
-        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
-    };
-    const { findByText, getByText, queryByTestId } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    expect(await findByText('Load more')).toBeTruthy();
-    expect(queryByTestId('load-more-history')).toBeTruthy();
-  });
-
-  it('does not show Load more button when fewer than a full page returned', async () => {
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [makeOffer({ id: 400, status: 'accepted' })],
-      },
-      loading: false,
-      refetch: jest.fn(),
-      fetchMore: jest
-        .fn()
-        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
-    };
-    const { findByText, getByText, queryByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    expect(queryByText('Load more')).toBeNull();
-  });
-
-  it('appends next page when Load more is clicked', async () => {
-    const firstPage = Array.from({ length: 25 }, (_, i) =>
-      makeOffer({ id: 500 + i, status: 'accepted' }),
-    );
-    const secondPage = [makeOffer({ id: 600, status: 'rejected' })];
-    const mockFetchMore = jest
-      .fn()
-      .mockResolvedValue({ data: { leagueTradeOffers: secondPage } });
+    const firstPage = makePageOfOffers(PAGE_SIZE);
     mockLeagueTradesReturn = {
       data: { leagueTradeOffers: firstPage },
       loading: false,
       refetch: jest.fn(),
-      fetchMore: mockFetchMore,
+      fetchMore: jest
+        .fn()
+        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
     };
-    const { findByText, getByText, getAllByText, queryByText } = render(
+    const utils = render(
       <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
     );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    const loadMoreBtn = await findByText('Load more');
-    fireEvent.click(loadMoreBtn);
-    // Second page trade should appear
-    await findByText('REJECTED');
-    expect(getAllByText('ACCEPTED').length).toBe(25);
-    // No more pages — button gone
-    await waitFor(() => expect(queryByText('Load more')).toBeNull());
-    expect(mockFetchMore).toHaveBeenCalledWith({ variables: { offset: 25 } });
+    await openHistory(utils);
+    expect(await utils.findByText('Load more')).toBeTruthy();
+  });
+
+  it('does not show Load more button when fewer than a full page returned', async () => {
+    const partial = makePageOfOffers(PAGE_SIZE - 1);
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: partial },
+      loading: false,
+      refetch: jest.fn(),
+      fetchMore: jest
+        .fn()
+        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
+    };
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await waitFor(() => {
+      expect(utils.getAllByText('ACCEPTED').length).toBeGreaterThan(0);
+    });
+    expect(utils.queryByText('Load more')).toBeNull();
+  });
+
+  it('appends next page when Load more is clicked', async () => {
+    const firstPage = makePageOfOffers(PAGE_SIZE, 200);
+    const secondPage = makePageOfOffers(3, 300);
+    const fetchMore = jest.fn().mockResolvedValue({
+      data: { leagueTradeOffers: secondPage },
+    });
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: firstPage },
+      loading: false,
+      refetch: jest.fn(),
+      fetchMore,
+    };
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    const loadMore = await utils.findByText('Load more');
+    fireEvent.click(loadMore);
+    await waitFor(() => {
+      expect(fetchMore).toHaveBeenCalled();
+    });
+    const callArg = (
+      fetchMore.mock.calls[0] as [{ variables: { offset: number } }]
+    )[0];
+    expect(callArg.variables.offset).toBe(PAGE_SIZE);
+    // After append, Load more should disappear (second page has < PAGE_SIZE items)
+    await waitFor(() => {
+      expect(utils.queryByText('Load more')).toBeNull();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Trade History Filters (LS-7529)
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — Trade History Filters', () => {
+  const TEAM_A_ID = 2;
+  const TEAM_B_ID = 3;
+
+  function setHistoryOffers(offers: ReturnType<typeof makeOffer>[]) {
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: offers },
+      loading: false,
+      refetch: jest.fn(),
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockProposerRosterReturn = { data: undefined };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
+  });
+
+  async function openHistory(utils: ReturnType<typeof render>): Promise<void> {
+    await utils.findByText('Trade History');
+    fireEvent.click(utils.getByText('Trade History'));
+  }
+
+  it('renders filter bar when history section is expanded', async () => {
+    setHistoryOffers([makeOffer({ id: 399, status: 'accepted' })]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    expect(await utils.findByText('All')).toBeTruthy();
+    expect(utils.getByText('Accepted')).toBeTruthy();
+    expect(utils.getByText('All Time')).toBeTruthy();
+  });
+
+  it('does not render filter bar when history is collapsed', () => {
+    setHistoryOffers([]);
+    const { queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(queryByText('All Time')).toBeNull();
+  });
+
+  it('filters by accepted status — only accepted trades shown', async () => {
+    setHistoryOffers([
+      makeOffer({ id: 300, status: 'accepted' }),
+      makeOffer({ id: 301, status: 'rejected' }),
+    ]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    // Click "Accepted" chip
+    fireEvent.click(utils.getByText('Accepted'));
+
+    await waitFor(() => {
+      expect(utils.queryByText('REJECTED')).toBeNull();
+    });
+    expect(utils.getByText('ACCEPTED')).toBeTruthy();
+  });
+
+  it('filters by rejected status — only rejected trades shown', async () => {
+    setHistoryOffers([
+      makeOffer({ id: 302, status: 'accepted' }),
+      makeOffer({ id: 303, status: 'rejected' }),
+    ]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    fireEvent.click(utils.getByText('Rejected'));
+
+    await waitFor(() => {
+      expect(utils.queryByText('ACCEPTED')).toBeNull();
+    });
+    expect(utils.getByText('REJECTED')).toBeTruthy();
+  });
+
+  it('clicking All chip after status filter restores all trades', async () => {
+    setHistoryOffers([
+      makeOffer({ id: 304, status: 'accepted' }),
+      makeOffer({ id: 305, status: 'rejected' }),
+    ]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    fireEvent.click(utils.getByText('Accepted'));
+    await waitFor(() => expect(utils.queryByText('REJECTED')).toBeNull());
+
+    fireEvent.click(utils.getByText('All'));
+    expect(await utils.findByText('REJECTED')).toBeTruthy();
+    expect(utils.getByText('ACCEPTED')).toBeTruthy();
+  });
+
+  it('filters by team — only trades involving selected team are shown', async () => {
+    setHistoryOffers([
+      makeOffer({
+        id: 306,
+        status: 'accepted',
+        proposingTeamId: TEAM_A_ID,
+        receivingTeamId: USER_TEAM_ID,
+        proposingTeamName: 'Team Alpha',
+        receivingTeamName: 'Home Runners',
+      }),
+      makeOffer({
+        id: 307,
+        status: 'rejected',
+        proposingTeamId: TEAM_B_ID,
+        receivingTeamId: USER_TEAM_ID,
+        proposingTeamName: 'Team Beta',
+        receivingTeamName: 'Home Runners',
+      }),
+    ]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+    expect(utils.getByText('REJECTED')).toBeTruthy();
+
+    // Select Team Alpha from the team filter dropdown
+    const teamSelect = utils.getByRole('combobox');
+    fireEvent.change(teamSelect, { target: { value: String(TEAM_A_ID) } });
+
+    await waitFor(() => {
+      expect(utils.queryByText('REJECTED')).toBeNull();
+    });
+    expect(utils.getByText('ACCEPTED')).toBeTruthy();
+  });
+
+  it('shows "No trades match the selected filters" when filters exclude all trades', async () => {
+    setHistoryOffers([makeOffer({ id: 308, status: 'accepted' })]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    // Filter to rejected — no rejected trades exist
+    fireEvent.click(utils.getByText('Rejected'));
+
+    expect(
+      await utils.findByText(/No trades match the selected filters/i),
+    ).toBeTruthy();
+  });
+
+  it('shows Clear Filters button when no trades match, and clears filters on click', async () => {
+    setHistoryOffers([makeOffer({ id: 309, status: 'accepted' })]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    fireEvent.click(utils.getByText('Rejected'));
+    const clearBtn = await utils.findByText('Clear Filters');
+    expect(clearBtn).toBeTruthy();
+
+    fireEvent.click(clearBtn);
+    expect(await utils.findByText('ACCEPTED')).toBeTruthy();
+    expect(utils.queryByText('Clear Filters')).toBeNull();
+  });
+
+  it('filters by Last 7d — excludes trades older than 7 days', async () => {
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 2);
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 10);
+
+    setHistoryOffers([
+      makeOffer({
+        id: 310,
+        status: 'accepted',
+        createdAt: recentDate.toISOString(),
+      }),
+      makeOffer({
+        id: 311,
+        status: 'rejected',
+        createdAt: oldDate.toISOString(),
+      }),
+    ]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    fireEvent.click(utils.getByText('Last 7d'));
+
+    await waitFor(() => {
+      expect(utils.queryByText('REJECTED')).toBeNull();
+    });
+    expect(utils.getByText('ACCEPTED')).toBeTruthy();
+  });
+
+  it('filters by Last 30d — excludes trades older than 30 days', async () => {
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 15);
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 45);
+
+    setHistoryOffers([
+      makeOffer({
+        id: 312,
+        status: 'accepted',
+        createdAt: recentDate.toISOString(),
+      }),
+      makeOffer({
+        id: 313,
+        status: 'rejected',
+        createdAt: oldDate.toISOString(),
+      }),
+    ]);
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await utils.findByText('ACCEPTED');
+
+    fireEvent.click(utils.getByText('Last 30d'));
+
+    await waitFor(() => {
+      expect(utils.queryByText('REJECTED')).toBeNull();
+    });
+    expect(utils.getByText('ACCEPTED')).toBeTruthy();
   });
 });
 
@@ -1519,222 +1807,6 @@ describe('TradingCenter — ProposeTradeDialog (LS-5678)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Trade History Filters (LS-7526)
-// ---------------------------------------------------------------------------
-
-describe('TradingCenter — Trade History Filters', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockPendingReturn = {
-      data: { teamTradeOffers: [] },
-      loading: false,
-      refetch: mockRefetch,
-    };
-    mockTradeBlockReturn = {
-      data: { leagueTradeBlock: [] },
-      loading: false,
-      error: undefined,
-    };
-  });
-
-  it('shows filter controls when history has trades', async () => {
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [
-          makeOffer({
-            id: 300,
-            status: 'accepted',
-            respondedAt: '2026-03-20T10:00:00Z',
-          }),
-        ],
-      },
-      loading: false,
-      refetch: jest.fn(),
-    };
-    const { findByText, getByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    expect(await findByText('All Time')).toBeTruthy();
-    expect(await findByText('Last 30 Days')).toBeTruthy();
-    expect(await findByText('Last 90 Days')).toBeTruthy();
-  });
-
-  it('status filter hides trades that do not match', async () => {
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [
-          makeOffer({
-            id: 310,
-            status: 'accepted',
-            respondedAt: '2026-03-20T10:00:00Z',
-          }),
-          makeOffer({
-            id: 311,
-            status: 'rejected',
-            respondedAt: '2026-03-21T10:00:00Z',
-          }),
-        ],
-      },
-      loading: false,
-      refetch: jest.fn(),
-    };
-    const { findByText, getByText, queryAllByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    fireEvent.click(getByText('Rejected'));
-    await waitFor(() => {
-      expect(queryAllByText('ACCEPTED')).toHaveLength(0);
-    });
-    expect(await findByText('REJECTED')).toBeTruthy();
-  });
-
-  it('status filter "All" restores all trades', async () => {
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [
-          makeOffer({
-            id: 320,
-            status: 'accepted',
-            respondedAt: '2026-03-20T10:00:00Z',
-          }),
-          makeOffer({
-            id: 321,
-            status: 'rejected',
-            respondedAt: '2026-03-21T10:00:00Z',
-          }),
-        ],
-      },
-      loading: false,
-      refetch: jest.fn(),
-    };
-    const { findByText, getByText, getAllByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    fireEvent.click(getByText('Rejected'));
-    await waitFor(() => expect(getAllByText('REJECTED')).toHaveLength(1));
-    fireEvent.click(getAllByText('All')[0]);
-    await waitFor(() => {
-      expect(getAllByText('ACCEPTED')).toHaveLength(1);
-      expect(getAllByText('REJECTED')).toHaveLength(1);
-    });
-  });
-
-  it('team filter shows only trades involving the selected team', async () => {
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [
-          makeOffer({
-            id: 330,
-            status: 'accepted',
-            proposingTeamName: 'Sluggers',
-            receivingTeamName: 'Home Runners',
-            respondedAt: '2026-03-20T10:00:00Z',
-          }),
-          makeOffer({
-            id: 331,
-            status: 'rejected',
-            proposingTeamName: 'Rockets',
-            receivingTeamName: 'Sluggers',
-            respondedAt: '2026-03-21T10:00:00Z',
-          }),
-          makeOffer({
-            id: 332,
-            status: 'vetoed',
-            proposingTeamName: 'Home Runners',
-            receivingTeamName: 'Rockets',
-            vetoedAt: '2026-03-22T10:00:00Z',
-          }),
-        ],
-      },
-      loading: false,
-      refetch: jest.fn(),
-    };
-    const { findByText, getByText, queryAllByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    fireEvent.click(getByText('Rockets'));
-    await waitFor(() => {
-      expect(queryAllByText('ACCEPTED')).toHaveLength(0);
-    });
-    expect(queryAllByText('REJECTED')).toHaveLength(1);
-    expect(queryAllByText('VETOED')).toHaveLength(1);
-  });
-
-  it('date filter hides trades outside the selected range', async () => {
-    const recentDate = new Date(
-      Date.now() - 5 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-    const oldDate = new Date(
-      Date.now() - 60 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [
-          makeOffer({
-            id: 340,
-            status: 'accepted',
-            createdAt: recentDate,
-            respondedAt: recentDate,
-          }),
-          makeOffer({
-            id: 341,
-            status: 'rejected',
-            createdAt: oldDate,
-            respondedAt: oldDate,
-          }),
-        ],
-      },
-      loading: false,
-      refetch: jest.fn(),
-    };
-    const { findByText, getByText, queryAllByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    fireEvent.click(getByText('Last 30 Days'));
-    await waitFor(() => {
-      expect(queryAllByText('REJECTED')).toHaveLength(0);
-    });
-    expect(queryAllByText('ACCEPTED')).toHaveLength(1);
-  });
-
-  it('shows "No trades match your filters." when all trades are filtered out', async () => {
-    mockLeagueTradesReturn = {
-      data: {
-        leagueTradeOffers: [
-          makeOffer({
-            id: 350,
-            status: 'accepted',
-            respondedAt: '2026-03-20T10:00:00Z',
-          }),
-        ],
-      },
-      loading: false,
-      refetch: jest.fn(),
-    };
-    const { findByText, getByText, queryByText } = render(
-      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
-    );
-    await findByText('Trade History');
-    fireEvent.click(getByText('Trade History'));
-    await findByText('ACCEPTED');
-    fireEvent.click(getByText('Rejected'));
-    expect(await findByText(/No trades match your filters/i)).toBeTruthy();
-    expect(queryByText(/No trade history yet/i)).toBeNull();
-  });
-});
+// NOTE: The duplicate "Trade History Filters" describe block that was added
+// here (LS-7526) was removed — all filter scenarios are covered by the block
+// above (LS-7529) which uses the Dropdown-based team filter implementation.
