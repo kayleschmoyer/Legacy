@@ -141,6 +141,8 @@ const mockUser = {
   lastLoginAt: null,
   mfaEnabled: false,
   canonicalEmailSource: 'discord' as const,
+  passwordResetToken: null,
+  passwordResetExpiresAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

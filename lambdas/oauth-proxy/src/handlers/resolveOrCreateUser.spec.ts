@@ -83,6 +83,8 @@ function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
     lastLoginAt: null,
     mfaEnabled: false,
     canonicalEmailSource: null,
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

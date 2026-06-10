@@ -1,5 +1,5 @@
 import { APIGatewayEvent } from 'aws-lambda';
-import { getUserByEmail } from '@legacy-sports/db-client';
+import { getUserByEmail, type InternalUser } from '@legacy-sports/db-client';
 import {
   cleanupIntervalHandle,
   handleDeviceAuthorize,
@@ -57,6 +57,31 @@ interface TokenResponse {
 
 function parseBody<T>(body: string): T {
   return JSON.parse(body) as T;
+}
+
+function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
+  return {
+    id: 1,
+    email: 'test@example.com',
+    username: 'testuser',
+    accessLevel: 'none',
+    passwordHash: null,
+    avatarUrl: null,
+    privacyPolicyAcceptedAt: null,
+    subscriptionTier: 'free',
+    discordId: null,
+    discordUsername: null,
+    discordAvatar: null,
+    themePreference: null,
+    lastLoginAt: null,
+    mfaEnabled: false,
+    canonicalEmailSource: null,
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  } as InternalUser;
 }
 
 const mockGetUserByEmail = getUserByEmail as jest.MockedFunction<
@@ -178,26 +203,9 @@ describe('DeviceFlow', () => {
       );
 
       // Mock DB user lookup and password check
-      const mockUser = {
-        id: 42,
-        email: 'test@example.com',
-        username: 'testuser',
-        accessLevel: 'none' as const,
-        passwordHash: 'hashed_password',
-        avatarUrl: null,
-        privacyPolicyAcceptedAt: null,
-        subscriptionTier: 'free' as const,
-        discordId: null,
-        discordUsername: null,
-        discordAvatar: null,
-        themePreference: null,
-        lastLoginAt: null,
-        mfaEnabled: false,
-        canonicalEmailSource: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      mockGetUserByEmail.mockResolvedValue(mockUser);
+      mockGetUserByEmail.mockResolvedValue(
+        makeUser({ id: 42, passwordHash: 'hashed_password' }),
+      );
       mockTestPassword.mockResolvedValue(true);
       mockCreateJwt.mockResolvedValue('mock-jwt-token');
 
@@ -240,26 +248,9 @@ describe('DeviceFlow', () => {
         authorizeResult.body,
       );
 
-      const mockUser = {
-        id: 42,
-        email: 'test@example.com',
-        username: 'testuser',
-        accessLevel: 'none' as const,
-        passwordHash: 'hashed_password',
-        avatarUrl: null,
-        privacyPolicyAcceptedAt: null,
-        subscriptionTier: 'free' as const,
-        discordId: null,
-        discordUsername: null,
-        discordAvatar: null,
-        themePreference: null,
-        lastLoginAt: null,
-        mfaEnabled: false,
-        canonicalEmailSource: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      mockGetUserByEmail.mockResolvedValue(mockUser);
+      mockGetUserByEmail.mockResolvedValue(
+        makeUser({ id: 42, passwordHash: 'hashed_password' }),
+      );
       mockTestPassword.mockResolvedValue(false);
 
       const completeEvent = makeEvent({
@@ -291,25 +282,7 @@ describe('DeviceFlow', () => {
         authorizeResult.body,
       );
 
-      mockGetUserByEmail.mockResolvedValue({
-        id: 42,
-        email: 'test@example.com',
-        username: 'testuser',
-        accessLevel: 'none' as const,
-        passwordHash: null,
-        avatarUrl: null,
-        privacyPolicyAcceptedAt: null,
-        subscriptionTier: 'free' as const,
-        discordId: null,
-        discordUsername: null,
-        discordAvatar: null,
-        themePreference: null,
-        lastLoginAt: null,
-        mfaEnabled: false,
-        canonicalEmailSource: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      mockGetUserByEmail.mockResolvedValue(makeUser({ id: 42 }));
 
       const completeEvent = makeEvent({
         body: JSON.stringify({
@@ -376,25 +349,9 @@ describe('DeviceFlow', () => {
           authorizeResult.body,
         );
 
-        mockGetUserByEmail.mockResolvedValue({
-          id: 1,
-          email: 'test@example.com',
-          username: 'testuser',
-          accessLevel: 'none' as const,
-          passwordHash: 'hashed',
-          avatarUrl: null,
-          privacyPolicyAcceptedAt: null,
-          subscriptionTier: 'free' as const,
-          discordId: null,
-          discordUsername: null,
-          discordAvatar: null,
-          themePreference: null,
-          lastLoginAt: null,
-          mfaEnabled: false,
-          canonicalEmailSource: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        mockGetUserByEmail.mockResolvedValue(
+          makeUser({ passwordHash: 'hashed' }),
+        );
         mockTestPassword.mockResolvedValue(true);
         mockCreateJwt.mockResolvedValue('jwt');
 
