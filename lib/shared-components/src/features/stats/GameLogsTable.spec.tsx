@@ -33,7 +33,8 @@ describe('GameLogsTable', () => {
     const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
-    expect(getByPlaceholderText('YYYY-MM-DD')).toBeTruthy();
+    expect(getByPlaceholderText('Start date (YYYY-MM-DD)')).toBeTruthy();
+    expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
   });
 
@@ -43,7 +44,8 @@ describe('GameLogsTable', () => {
     );
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
-    expect(getByPlaceholderText('YYYY-MM-DD')).toBeTruthy();
+    expect(getByPlaceholderText('Start date (YYYY-MM-DD)')).toBeTruthy();
+    expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
   });
 
@@ -51,7 +53,8 @@ describe('GameLogsTable', () => {
     const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
-    expect(getByPlaceholderText('YYYY-MM-DD')).toBeTruthy();
+    expect(getByPlaceholderText('Start date (YYYY-MM-DD)')).toBeTruthy();
+    expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
   });
 });
@@ -82,14 +85,14 @@ describe('GameLogsTable input validation', () => {
     ).toBeTruthy();
   });
 
-  it('shows inline error for invalid date format', () => {
+  it('shows inline error for invalid start date format', () => {
     const fetchMock = global.fetch as jest.Mock;
     fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
-    fireEvent.change(getByPlaceholderText('YYYY-MM-DD'), {
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
       target: { value: 'not-a-date' },
     });
     const submit =
@@ -97,7 +100,27 @@ describe('GameLogsTable input validation', () => {
       getByText('Get Player Data');
     fireEvent.click(submit);
     expect(
-      getByText('Date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows inline error for invalid end date format', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    fireEvent.change(getByPlaceholderText('End date (YYYY-MM-DD)'), {
+      target: { value: 'bad-end' },
+    });
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+    expect(
+      getByText('End date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
     ).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -127,14 +150,15 @@ describe('Team reference data (LS-7477)', () => {
 describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478)', () => {
   const baseFilters = {
     player: 'mlb-1234',
-    date: '',
+    dateFrom: '',
+    dateTo: '',
     opponentFranchiseIds: [] as string[],
     venue: 'all' as const,
   };
 
-  it('omits opponent + venue keys when filters are inactive', () => {
+  it('omits date range + opponent + venue keys when filters are inactive', () => {
     const body = buildGameLogsRequestBody(baseFilters, 'mlb');
-    expect(body).toEqual({ player_id: 'mlb-1234', game_date: '' });
+    expect(body).toEqual({ player_id: 'mlb-1234' });
   });
 
   it('includes limit when provided (LS-7473)', () => {
@@ -196,11 +220,12 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478)', () => {
     ).toEqual(expect.arrayContaining(['LAC', 'SD']));
   });
 
-  it('forwards combined filter state (player + date + opponent + venue — LS-7466)', () => {
+  it('forwards combined filter state (player + date range + opponent + venue — LS-7466, LS-7450)', () => {
     const body = buildGameLogsRequestBody(
       {
         player: 'mlb-1234',
-        date: '2026-04-15',
+        dateFrom: '2026-04-01',
+        dateTo: '2026-04-30',
         opponentFranchiseIds: ['NYY'],
         venue: 'home',
       },
@@ -208,11 +233,31 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478)', () => {
     );
     expect(body).toEqual({
       player_id: 'mlb-1234',
-      game_date: '2026-04-15',
+      game_date_from: '2026-04-01',
+      game_date_to: '2026-04-30',
       opponent_franchise_ids: ['NYY'],
       opponent_abbrs: ['NYY'],
       venue: 'home',
     });
+  });
+
+  it('sends only game_date_from when only start date is set (LS-7450)', () => {
+    const body = buildGameLogsRequestBody(
+      { ...baseFilters, dateFrom: '2026-04-01' },
+      'mlb',
+    );
+    expect(body).toEqual({
+      player_id: 'mlb-1234',
+      game_date_from: '2026-04-01',
+    });
+  });
+
+  it('sends only game_date_to when only end date is set (LS-7450)', () => {
+    const body = buildGameLogsRequestBody(
+      { ...baseFilters, dateTo: '2026-04-30' },
+      'mlb',
+    );
+    expect(body).toEqual({ player_id: 'mlb-1234', game_date_to: '2026-04-30' });
   });
 });
 

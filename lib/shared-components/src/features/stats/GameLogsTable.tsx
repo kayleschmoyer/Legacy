@@ -146,21 +146,24 @@ export type Venue = 'all' | 'home' | 'away';
 
 export interface FilterState {
   player: string;
-  date: string;
+  dateFrom: string;
+  dateTo: string;
   opponentFranchiseIds: string[];
   venue: Venue;
 }
 
 type FilterAction =
   | { type: 'setPlayer'; value: string }
-  | { type: 'setDate'; value: string }
+  | { type: 'setDateFrom'; value: string }
+  | { type: 'setDateTo'; value: string }
   | { type: 'setOpponents'; value: string[] }
   | { type: 'setVenue'; value: Venue }
   | { type: 'reset' };
 
 const INITIAL_FILTERS: FilterState = {
   player: '',
-  date: '',
+  dateFrom: '',
+  dateTo: '',
   opponentFranchiseIds: [],
   venue: 'all',
 };
@@ -169,8 +172,10 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
   switch (action.type) {
     case 'setPlayer':
       return { ...state, player: action.value };
-    case 'setDate':
-      return { ...state, date: action.value };
+    case 'setDateFrom':
+      return { ...state, dateFrom: action.value };
+    case 'setDateTo':
+      return { ...state, dateTo: action.value };
     case 'setOpponents':
       return { ...state, opponentFranchiseIds: action.value };
     case 'setVenue':
@@ -191,7 +196,8 @@ export function buildGameLogsRequestBody(
   options?: { limit?: number },
 ): {
   player_id: string;
-  game_date: string;
+  game_date_from?: string;
+  game_date_to?: string;
   opponent_franchise_ids?: string[];
   opponent_abbrs?: string[];
   venue?: 'home' | 'away';
@@ -210,7 +216,8 @@ export function buildGameLogsRequestBody(
 
   return {
     player_id: filters.player,
-    game_date: filters.date,
+    ...(filters.dateFrom ? { game_date_from: filters.dateFrom } : {}),
+    ...(filters.dateTo ? { game_date_to: filters.dateTo } : {}),
     ...(filters.opponentFranchiseIds.length > 0
       ? {
           opponent_franchise_ids: filters.opponentFranchiseIds,
@@ -378,8 +385,14 @@ function GameLogsTable({
       );
       return;
     }
-    if (filters.date && !DATE_RE.test(filters.date)) {
-      setInputError('Date must be in YYYY-MM-DD format (e.g. 2024-06-01)');
+    if (filters.dateFrom && !DATE_RE.test(filters.dateFrom)) {
+      setInputError(
+        'Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)',
+      );
+      return;
+    }
+    if (filters.dateTo && !DATE_RE.test(filters.dateTo)) {
+      setInputError('End date must be in YYYY-MM-DD format (e.g. 2024-06-01)');
       return;
     }
 
@@ -503,20 +516,38 @@ function GameLogsTable({
 
       <YStack marginBottom="$4">
         <Text fontSize="$4" fontWeight="600" marginBottom="$2">
-          Date (optional):
+          Date range (optional):
         </Text>
-        <Input
-          borderWidth={1}
-          borderColor="$gray8"
-          borderRadius="$3"
-          padding="$3"
-          fontSize="$4"
-          backgroundColor="$white"
-          value={filters.date}
-          onChangeText={(v: string) => dispatch({ type: 'setDate', value: v })}
-          placeholder="YYYY-MM-DD"
-          editable={!loading}
-        />
+        <YStack gap="$2">
+          <Input
+            borderWidth={1}
+            borderColor="$gray8"
+            borderRadius="$3"
+            padding="$3"
+            fontSize="$4"
+            backgroundColor="$white"
+            value={filters.dateFrom}
+            onChangeText={(v: string) =>
+              dispatch({ type: 'setDateFrom', value: v })
+            }
+            placeholder="Start date (YYYY-MM-DD)"
+            editable={!loading}
+          />
+          <Input
+            borderWidth={1}
+            borderColor="$gray8"
+            borderRadius="$3"
+            padding="$3"
+            fontSize="$4"
+            backgroundColor="$white"
+            value={filters.dateTo}
+            onChangeText={(v: string) =>
+              dispatch({ type: 'setDateTo', value: v })
+            }
+            placeholder="End date (YYYY-MM-DD)"
+            editable={!loading}
+          />
+        </YStack>
       </YStack>
 
       {/* Opponent filter (LS-7865). Web: native <select> preserved so existing
