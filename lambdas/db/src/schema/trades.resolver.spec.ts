@@ -645,6 +645,27 @@ describe('Trades Resolver', () => {
       });
     });
 
+    it('throws BAD_USER_INPUT when expiresInDays is an extreme value like 100000', async () => {
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+            expiresInDays: 100000,
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('30 days'),
+      });
+    });
+
     it('throws when league phase is not active (e.g. draft or offseason)', async () => {
       mockDb.limit.mockResolvedValueOnce([
         { leaguePhase: 'draft', sport: 'baseball' },
@@ -668,7 +689,7 @@ describe('Trades Resolver', () => {
       );
     });
 
-    it('throws FORBIDDEN when user permissionLevel is not the general_manager role', async () => {
+    it('throws FORBIDDEN when user permissionLevel is not an active management role', async () => {
       // League check passes (active phase)
       mockDb.limit.mockResolvedValueOnce([
         { leaguePhase: 'active', sport: 'baseball' },
