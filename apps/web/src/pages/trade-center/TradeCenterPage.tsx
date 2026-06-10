@@ -422,7 +422,8 @@ export function TradeCenterPage(): React.JSX.Element {
   // Fall back to previousData so stale leagues render instantly on re-entry
   // instead of showing the spinner when Apollo briefly resets data during a
   // skip transition or component remount.
-  const leagues = (data ?? previousData)?.userLeagues ?? [];
+  const allLeagues = (data ?? previousData)?.userLeagues ?? [];
+  const leagues = allLeagues.filter((l) => l.leaguePhase === 'active');
 
   // Capture a stable correlation ID and error code when an error first occurs.
   // The correlation ID changes on each new error occurrence (e.g. after retry),
@@ -597,25 +598,33 @@ export function TradeCenterPage(): React.JSX.Element {
                 borderColor="$outlineSubtle"
               >
                 <Users size={32} color="$colorPress" />
-                <Text color="$colorPress" fontSize="$4" textAlign="center">
-                  No leagues yet.
-                </Text>
-                <XStack gap="$3" flexWrap="wrap" justifyContent="center">
-                  <Button
-                    size="$3"
-                    theme="active"
-                    onPress={() => navigate('/baseball/leagues')}
-                  >
-                    Browse Leagues
-                  </Button>
-                  <Button
-                    size="$3"
-                    variant="outlined"
-                    onPress={() => navigate('/league/create')}
-                  >
-                    Create a League
-                  </Button>
-                </XStack>
+                {allLeagues.length === 0 ? (
+                  <>
+                    <Text color="$colorPress" fontSize="$4" textAlign="center">
+                      No leagues yet.
+                    </Text>
+                    <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+                      <Button
+                        size="$3"
+                        theme="active"
+                        onPress={() => navigate('/baseball/leagues')}
+                      >
+                        Browse Leagues
+                      </Button>
+                      <Button
+                        size="$3"
+                        variant="outlined"
+                        onPress={() => navigate('/league/create')}
+                      >
+                        Create a League
+                      </Button>
+                    </XStack>
+                  </>
+                ) : (
+                  <Text color="$colorPress" fontSize="$4" textAlign="center">
+                    Trading is only available during the active season.
+                  </Text>
+                )}
               </YStack>
             )}
 

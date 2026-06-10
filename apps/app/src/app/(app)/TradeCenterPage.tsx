@@ -199,9 +199,14 @@ export default function TradeCenterPage() {
   // instead of showing the spinner when Apollo briefly resets data during a
   // skip transition or screen remount.
   // Pre-select a league when arriving via deep link with ?leagueId=X[&tradeOfferId=Y]
-  const leagues = useMemo(
+  const allLeagues = useMemo(
     () => (data ?? previousData)?.userLeagues ?? [],
     [data, previousData],
+  );
+  // Only active-phase leagues allow trading — filter out pre-draft and offseason
+  const leagues = useMemo(
+    () => allLeagues.filter((l) => l.leaguePhase === 'active'),
+    [allLeagues],
   );
   useEffect(() => {
     if (!leagueIdParam || selectedLeague != null) return;
@@ -275,19 +280,27 @@ export default function TradeCenterPage() {
         {!loading && !error && leagues.length === 0 && (
           <YStack alignItems="center" justifyContent="center" flex={1} gap="$3">
             <Users size={32} color="$textMuted" />
-            <Text color="$textMuted" fontSize="$4" textAlign="center">
-              No leagues found.
-            </Text>
-            <Text color="$textMuted" fontSize="$3" textAlign="center">
-              Join or create a league to start trading.
-            </Text>
-            <Button
-              size="$3"
-              onPress={() => router.navigate('/league-discovery')}
-              accessibilityRole="button"
-            >
-              Browse Leagues
-            </Button>
+            {allLeagues.length === 0 ? (
+              <>
+                <Text color="$textMuted" fontSize="$4" textAlign="center">
+                  No leagues found.
+                </Text>
+                <Text color="$textMuted" fontSize="$3" textAlign="center">
+                  Join or create a league to start trading.
+                </Text>
+                <Button
+                  size="$3"
+                  onPress={() => router.navigate('/league-discovery')}
+                  accessibilityRole="button"
+                >
+                  Browse Leagues
+                </Button>
+              </>
+            ) : (
+              <Text color="$textMuted" fontSize="$4" textAlign="center">
+                Trading is only available during the active season.
+              </Text>
+            )}
           </YStack>
         )}
 

@@ -193,7 +193,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('does not show a spinner when stale league data exists during a background refetch', () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Alpha League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'Alpha League', leaguePhase: 'active' }],
+    };
     mockLeaguesLoading = true;
     render(<TradeCenterPage />);
     expect(screen.queryByTestId('spinner')).toBeNull();
@@ -222,8 +224,8 @@ describe('TradeCenterPage', () => {
   it('renders league cards when leagues are returned', () => {
     mockUserLeagues = {
       userLeagues: [
-        { id: 1, name: 'Test League A' },
-        { id: 2, name: 'Test League B' },
+        { id: 1, name: 'Test League A', leaguePhase: 'active' },
+        { id: 2, name: 'Test League B', leaguePhase: 'active' },
       ],
     };
     render(<TradeCenterPage />);
@@ -232,7 +234,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('navigates into league trades when a league card is pressed', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 42;
     mockLeague = { league: { id: 1, owner: 99 } };
     render(<TradeCenterPage />);
@@ -245,7 +249,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('shows the non-member state when user has no team in the selected league', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = null;
     mockLeague = { league: { id: 1, owner: 99 } };
     render(<TradeCenterPage />);
@@ -259,7 +265,9 @@ describe('TradeCenterPage', () => {
 
   it('pre-selects league from ?leagueId= deep-link param', async () => {
     mockSearchParams = { leagueId: '5' };
-    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep-Link League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 5, name: 'Deep-Link League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
     render(<TradeCenterPage />);
@@ -271,7 +279,9 @@ describe('TradeCenterPage', () => {
 
   it('passes tradeOfferId to TradingCenter when ?tradeOfferId= param is present', async () => {
     mockSearchParams = { leagueId: '5', tradeOfferId: '42' };
-    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep-Link League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 5, name: 'Deep-Link League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
     render(<TradeCenterPage />);
@@ -299,7 +309,9 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
     async (permissionLevel, expected) => {
       // league.owner (999) intentionally does NOT match userInfo.id (1)
       // so the old owner-based check would always return false here.
-      mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+      mockUserLeagues = {
+        userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+      };
       mockUserTeamId = 42;
       mockLeague = {
         league: {
@@ -319,7 +331,9 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
   );
 
   it('passes onSubscribeRefresh as a function to TradingCenter for real-time wiring', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 42;
     mockLeague = { league: { id: 1, owner: 99 } };
     render(<TradeCenterPage />);
@@ -341,7 +355,9 @@ describe('real-time WebSocket subscription (TC-026)', () => {
   const { useWebSocket } = wsShared;
 
   const setup = async () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 42;
     mockLeague = { league: { id: 1, owner: 99 } };
     render(<TradeCenterPage />);

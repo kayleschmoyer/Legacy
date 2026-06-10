@@ -234,7 +234,7 @@ describe('TradeCenterPage', () => {
 
   it('does not show a spinner when stale league data exists during a background refetch', () => {
     mockUserLeagues = {
-      userLeagues: [{ id: 1, name: 'Alpha League' }],
+      userLeagues: [{ id: 1, name: 'Alpha League', leaguePhase: 'active' }],
     };
     mockLeaguesLoading = true;
     renderPage();
@@ -247,7 +247,7 @@ describe('TradeCenterPage', () => {
   it('shows stale leagues from previousData without a spinner when data resets during skip transition', () => {
     mockUserLeagues = undefined;
     mockUserLeaguesPreviousData = {
-      userLeagues: [{ id: 1, name: 'Alpha League' }],
+      userLeagues: [{ id: 1, name: 'Alpha League', leaguePhase: 'active' }],
     };
     mockLeaguesLoading = true;
     renderPage();
@@ -282,8 +282,8 @@ describe('TradeCenterPage', () => {
   it('renders a selectable league card for each league', () => {
     mockUserLeagues = {
       userLeagues: [
-        { id: 1, name: 'Alpha League' },
-        { id: 2, name: 'Beta League' },
+        { id: 1, name: 'Alpha League', leaguePhase: 'active' },
+        { id: 2, name: 'Beta League', leaguePhase: 'active' },
       ],
     };
     renderPage();
@@ -296,7 +296,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('shows TradingCenter when a league is selected and user has a team', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 3, name: 'My League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 3, name: 'My League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 42;
     mockLeague = { league: { id: 3, owner: 99 } };
     renderPage();
@@ -311,7 +313,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('shows non-member message when user has no team in selected league', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 3, name: 'My League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 3, name: 'My League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = null;
     mockLeague = { league: { id: 3, owner: 99 } };
     renderPage();
@@ -326,7 +330,11 @@ describe('TradeCenterPage', () => {
   });
 
   it('pre-selects a league from the ?leagueId= query param', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep Linked League' }] };
+    mockUserLeagues = {
+      userLeagues: [
+        { id: 5, name: 'Deep Linked League', leaguePhase: 'active' },
+      ],
+    };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
 
@@ -338,7 +346,11 @@ describe('TradeCenterPage', () => {
   });
 
   it('passes deepLinkOfferId to TradingCenter when ?offerId= is present', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep Linked League' }] };
+    mockUserLeagues = {
+      userLeagues: [
+        { id: 5, name: 'Deep Linked League', leaguePhase: 'active' },
+      ],
+    };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
 
@@ -352,7 +364,11 @@ describe('TradeCenterPage', () => {
   });
 
   it('ignores non-numeric ?offerId= param', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep Linked League' }] };
+    mockUserLeagues = {
+      userLeagues: [
+        { id: 5, name: 'Deep Linked League', leaguePhase: 'active' },
+      ],
+    };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
 
@@ -365,7 +381,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('shows a pending badge when the user has pending trade offers in a league', () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Badge League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'Badge League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 7;
     mockTeamTradeOffers = [{ id: 10 }, { id: 11 }];
     renderPage();
@@ -373,7 +391,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('shows singular label when exactly one pending offer exists', () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Badge League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'Badge League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 7;
     mockTeamTradeOffers = [{ id: 10 }];
     renderPage();
@@ -381,7 +401,9 @@ describe('TradeCenterPage', () => {
   });
 
   it('does not show a badge when there are no pending offers', () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'No Badge League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'No Badge League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 7;
     mockTeamTradeOffers = [];
     renderPage();
@@ -392,8 +414,8 @@ describe('TradeCenterPage', () => {
     it('shows a summary banner when any league has pending offers', async () => {
       mockUserLeagues = {
         userLeagues: [
-          { id: 1, name: 'League A' },
-          { id: 2, name: 'League B' },
+          { id: 1, name: 'League A', leaguePhase: 'active' },
+          { id: 2, name: 'League B', leaguePhase: 'active' },
         ],
       };
       mockUserTeamId = 7;
@@ -408,8 +430,8 @@ describe('TradeCenterPage', () => {
       // Mock returns 2 offers per league; 2 leagues = 4 total
       mockUserLeagues = {
         userLeagues: [
-          { id: 1, name: 'League A' },
-          { id: 2, name: 'League B' },
+          { id: 1, name: 'League A', leaguePhase: 'active' },
+          { id: 2, name: 'League B', leaguePhase: 'active' },
         ],
       };
       mockUserTeamId = 7;
@@ -423,7 +445,9 @@ describe('TradeCenterPage', () => {
     });
 
     it('uses singular form when only one offer exists across all leagues', async () => {
-      mockUserLeagues = { userLeagues: [{ id: 1, name: 'League A' }] };
+      mockUserLeagues = {
+        userLeagues: [{ id: 1, name: 'League A', leaguePhase: 'active' }],
+      };
       mockUserTeamId = 7;
       mockTeamTradeOffers = [{ id: 10 }];
       renderPage();
@@ -437,8 +461,8 @@ describe('TradeCenterPage', () => {
     it('does not show summary banner when there are no pending offers', async () => {
       mockUserLeagues = {
         userLeagues: [
-          { id: 1, name: 'League A' },
-          { id: 2, name: 'League B' },
+          { id: 1, name: 'League A', leaguePhase: 'active' },
+          { id: 2, name: 'League B', leaguePhase: 'active' },
         ],
       };
       mockUserTeamId = 7;
@@ -456,7 +480,9 @@ describe('TradeCenterPage', () => {
     });
 
     it('does not show summary banner when a league is selected', async () => {
-      mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+      mockUserLeagues = {
+        userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+      };
       mockUserTeamId = 42;
       mockLeague = { league: { id: 1, owner: 99 } };
       mockTeamTradeOffers = [{ id: 10 }];
@@ -523,7 +549,9 @@ describe('TradeCenterPage', () => {
     });
 
     it('does not render TradeAnalyzerCard when a league is selected', async () => {
-      mockUserLeagues = { userLeagues: [{ id: 3, name: 'My League' }] };
+      mockUserLeagues = {
+        userLeagues: [{ id: 3, name: 'My League', leaguePhase: 'active' }],
+      };
       mockUserTeamId = 42;
       mockLeague = { league: { id: 3, owner: 99 } };
       renderPage();
@@ -540,7 +568,14 @@ describe('TradeCenterPage', () => {
 
   it('shows baseball icon for a baseball league', () => {
     mockUserLeagues = {
-      userLeagues: [{ id: 1, name: 'Baseball League', sport: 'baseball' }],
+      userLeagues: [
+        {
+          id: 1,
+          name: 'Baseball League',
+          sport: 'baseball',
+          leaguePhase: 'active',
+        },
+      ],
     };
     renderPage();
     expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
@@ -548,7 +583,14 @@ describe('TradeCenterPage', () => {
 
   it('shows football icon for a football league', () => {
     mockUserLeagues = {
-      userLeagues: [{ id: 2, name: 'Football League', sport: 'football' }],
+      userLeagues: [
+        {
+          id: 2,
+          name: 'Football League',
+          sport: 'football',
+          leaguePhase: 'active',
+        },
+      ],
     };
     renderPage();
     expect(screen.getByTestId('football-icon')).toBeInTheDocument();
@@ -556,13 +598,20 @@ describe('TradeCenterPage', () => {
 
   it('defaults to baseball icon when sport is not set', () => {
     mockUserLeagues = {
-      userLeagues: [{ id: 3, name: 'Unknown Sport League', sport: null }],
+      userLeagues: [
+        {
+          id: 3,
+          name: 'Unknown Sport League',
+          sport: null,
+          leaguePhase: 'active',
+        },
+      ],
     };
     renderPage();
     expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
   });
 
-  it('shows Pre-Draft phase chip for a pre-draft league', () => {
+  it('does not show a pre-draft league (trading requires active phase)', () => {
     mockUserLeagues = {
       userLeagues: [
         {
@@ -574,7 +623,12 @@ describe('TradeCenterPage', () => {
       ],
     };
     renderPage();
-    expect(screen.getByText('Pre-Draft')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /View trades for My League/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Trading is only available during the active season/i),
+    ).toBeInTheDocument();
   });
 
   it('shows Active phase chip with week number for an active league', () => {
@@ -593,7 +647,7 @@ describe('TradeCenterPage', () => {
     expect(screen.getByText('Week 7')).toBeInTheDocument();
   });
 
-  it('shows Offseason phase chip for an offseason league', () => {
+  it('does not show an offseason league (trading requires active phase)', () => {
     mockUserLeagues = {
       userLeagues: [
         {
@@ -605,10 +659,15 @@ describe('TradeCenterPage', () => {
       ],
     };
     renderPage();
-    expect(screen.getByText('Offseason')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /View trades for My League/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Trading is only available during the active season/i),
+    ).toBeInTheDocument();
   });
 
-  it('shows LIVE DRAFT chip when draft is in progress', () => {
+  it('does not show a live-draft league (pre-draft phase is filtered; trading requires active)', () => {
     mockUserLeagues = {
       userLeagues: [
         {
@@ -621,7 +680,12 @@ describe('TradeCenterPage', () => {
       ],
     };
     renderPage();
-    expect(screen.getByText('LIVE DRAFT')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /View trades for My League/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Trading is only available during the active season/i),
+    ).toBeInTheDocument();
   });
 
   // TC-003-P: premium variant — league cards must show sport icon and phase
@@ -633,7 +697,14 @@ describe('TradeCenterPage', () => {
 
     it('shows baseball sport icon for premium users', () => {
       mockUserLeagues = {
-        userLeagues: [{ id: 1, name: 'Baseball League', sport: 'baseball' }],
+        userLeagues: [
+          {
+            id: 1,
+            name: 'Baseball League',
+            sport: 'baseball',
+            leaguePhase: 'active',
+          },
+        ],
       };
       renderPage();
       expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
@@ -641,13 +712,20 @@ describe('TradeCenterPage', () => {
 
     it('shows football sport icon for premium users', () => {
       mockUserLeagues = {
-        userLeagues: [{ id: 2, name: 'Football League', sport: 'football' }],
+        userLeagues: [
+          {
+            id: 2,
+            name: 'Football League',
+            sport: 'football',
+            leaguePhase: 'active',
+          },
+        ],
       };
       renderPage();
       expect(screen.getByTestId('football-icon')).toBeInTheDocument();
     });
 
-    it('shows pre-draft phase chip for premium users', () => {
+    it('does not show a pre-draft league for premium users (active-phase filter applies to all users)', () => {
       mockUserLeagues = {
         userLeagues: [
           {
@@ -659,7 +737,12 @@ describe('TradeCenterPage', () => {
         ],
       };
       renderPage();
-      expect(screen.getByText('Pre-Draft')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /View trades for My League/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Trading is only available during the active season/i),
+      ).toBeInTheDocument();
     });
 
     it('shows active phase chip with week number for premium users', () => {
@@ -678,7 +761,7 @@ describe('TradeCenterPage', () => {
       expect(screen.getByText('Week 4')).toBeInTheDocument();
     });
 
-    it('shows offseason phase chip for premium users', () => {
+    it('does not show an offseason league for premium users (active-phase filter applies to all users)', () => {
       mockUserLeagues = {
         userLeagues: [
           {
@@ -690,10 +773,15 @@ describe('TradeCenterPage', () => {
         ],
       };
       renderPage();
-      expect(screen.getByText('Offseason')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /View trades for My League/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Trading is only available during the active season/i),
+      ).toBeInTheDocument();
     });
 
-    it('shows LIVE DRAFT chip when draft is in progress for premium users', () => {
+    it('does not show a live-draft league for premium users (active-phase filter applies to all users)', () => {
       mockUserLeagues = {
         userLeagues: [
           {
@@ -706,14 +794,29 @@ describe('TradeCenterPage', () => {
         ],
       };
       renderPage();
-      expect(screen.getByText('LIVE DRAFT')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /View trades for My League/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Trading is only available during the active season/i),
+      ).toBeInTheDocument();
     });
 
     it('shows both baseball and football icons when user has mixed-sport leagues', () => {
       mockUserLeagues = {
         userLeagues: [
-          { id: 1, name: 'Baseball League', sport: 'baseball' },
-          { id: 2, name: 'Football League', sport: 'football' },
+          {
+            id: 1,
+            name: 'Baseball League',
+            sport: 'baseball',
+            leaguePhase: 'active',
+          },
+          {
+            id: 2,
+            name: 'Football League',
+            sport: 'football',
+            leaguePhase: 'active',
+          },
         ],
       };
       renderPage();
