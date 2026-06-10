@@ -14,6 +14,13 @@ let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
 let mockIsPremium = false;
 
+const mockNavigate = jest.fn();
+
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual<typeof import('react-router-dom')>('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
@@ -95,6 +102,19 @@ jest.mock('../../constants/colors', () => ({
 
 jest.mock('tamagui', () => {
   return {
+    Button: ({
+      children,
+      onPress,
+      ...rest
+    }: {
+      children: React.ReactNode;
+      onPress?: () => void;
+      [key: string]: unknown;
+    }) => (
+      <button type="button" onClick={onPress} {...(rest as object)}>
+        {children}
+      </button>
+    ),
     Spinner: () => <div data-testid="spinner" />,
     Text: ({
       children,
@@ -156,6 +176,7 @@ beforeEach(() => {
   mockLeague = undefined;
   mockTeamTradeOffers = [];
   mockIsPremium = false;
+  mockNavigate.mockReset();
 });
 
 describe('TradeCenterPage', () => {
@@ -242,6 +263,20 @@ describe('TradeCenterPage', () => {
     expect(screen.getByText(/No leagues yet/i)).toBeInTheDocument();
     expect(screen.getByText(/Browse Leagues/i)).toBeInTheDocument();
     expect(screen.getByText(/Create a League/i)).toBeInTheDocument();
+  });
+
+  it('navigates to /baseball/leagues when Browse Leagues is clicked', () => {
+    mockUserLeagues = { userLeagues: [] };
+    renderPage();
+    fireEvent.click(screen.getByText(/Browse Leagues/i));
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/leagues');
+  });
+
+  it('navigates to /league/create when Create a League is clicked', () => {
+    mockUserLeagues = { userLeagues: [] };
+    renderPage();
+    fireEvent.click(screen.getByText(/Create a League/i));
+    expect(mockNavigate).toHaveBeenCalledWith('/league/create');
   });
 
   it('renders a selectable league card for each league', () => {

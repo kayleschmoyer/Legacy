@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
   BarChart2,
@@ -13,7 +13,7 @@ import {
   RefreshCw,
   Users,
 } from '@tamagui/lucide-icons';
-import { Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { TradingCenter } from '../../features/baseball/TradingCenter';
 import {
@@ -385,6 +385,7 @@ function LeagueTradesView({
 
 export function TradeCenterPage(): React.JSX.Element {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedLeague, setSelectedLeague] = useState<{
@@ -600,28 +601,20 @@ export function TradeCenterPage(): React.JSX.Element {
                   No leagues yet.
                 </Text>
                 <XStack gap="$3" flexWrap="wrap" justifyContent="center">
-                  <Link
-                    to="/baseball/leagues"
-                    style={{
-                      color: 'var(--blue10)',
-                      textDecoration: 'none',
-                      fontSize: 14,
-                      fontWeight: 600,
-                    }}
+                  <Button
+                    size="$3"
+                    theme="active"
+                    onPress={() => navigate('/baseball/leagues')}
                   >
                     Browse Leagues
-                  </Link>
-                  <Link
-                    to="/league/create"
-                    style={{
-                      color: 'var(--blue10)',
-                      textDecoration: 'none',
-                      fontSize: 14,
-                      fontWeight: 600,
-                    }}
+                  </Button>
+                  <Button
+                    size="$3"
+                    variant="outlined"
+                    onPress={() => navigate('/league/create')}
                   >
                     Create a League
-                  </Link>
+                  </Button>
                 </XStack>
               </YStack>
             )}

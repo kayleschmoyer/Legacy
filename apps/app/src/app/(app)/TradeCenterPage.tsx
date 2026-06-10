@@ -175,12 +175,12 @@ function LeagueTrades({
 // ── TradeCenterPage ───────────────────────────────────────────────────────────
 
 export default function TradeCenterPage() {
-  const router = useRouter();
   const { leagueId: leagueIdParam, tradeOfferId: tradeOfferIdParam } =
     useLocalSearchParams<{
       leagueId?: string;
       tradeOfferId?: string;
     }>();
+  const router = useRouter();
   const userInfo = useAuthorizedUserInfo();
 
   const [selectedLeague, setSelectedLeague] = useState<{
