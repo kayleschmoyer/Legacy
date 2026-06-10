@@ -74,6 +74,9 @@ jest.mock('../../components/PremiumGate', () => ({
 
 jest.mock('../../constants/colors', () => ({
   BRAND_GOLD: '#C5A55A',
+  BRAND_NAVY: '#1B3A5C',
+  BRAND_SEAM_RED: '#C41E3A',
+  TEXT_MUTED: '#9CAAC5',
   withAlpha: () => 'rgba(0,0,0,0)',
 }));
 
@@ -108,6 +111,11 @@ jest.mock('@tamagui/lucide-icons', () => ({
   ChevronLeft: () => null,
   RefreshCw: () => null,
   Users: () => null,
+}));
+
+jest.mock('../../components/icons/SportIcons', () => ({
+  BaseballIcon: () => <div data-testid="baseball-icon" />,
+  FootballIcon: () => <div data-testid="football-icon" />,
 }));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -301,5 +309,91 @@ describe('TradeCenterPage', () => {
         expect(screen.queryByTestId('premium-gate')).not.toBeInTheDocument();
       });
     });
+  });
+
+  it('shows baseball icon for a baseball league', () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'Baseball League', sport: 'baseball' }],
+    };
+    renderPage();
+    expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
+  });
+
+  it('shows football icon for a football league', () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 2, name: 'Football League', sport: 'football' }],
+    };
+    renderPage();
+    expect(screen.getByTestId('football-icon')).toBeInTheDocument();
+  });
+
+  it('defaults to baseball icon when sport is not set', () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 3, name: 'Unknown Sport League', sport: null }],
+    };
+    renderPage();
+    expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
+  });
+
+  it('shows Pre-Draft phase chip for a pre-draft league', () => {
+    mockUserLeagues = {
+      userLeagues: [
+        {
+          id: 1,
+          name: 'My League',
+          sport: 'baseball',
+          leaguePhase: 'pre-draft',
+        },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText('Pre-Draft')).toBeInTheDocument();
+  });
+
+  it('shows Active phase chip with week number for an active league', () => {
+    mockUserLeagues = {
+      userLeagues: [
+        {
+          id: 1,
+          name: 'My League',
+          sport: 'baseball',
+          leaguePhase: 'active',
+          currentWeekNumber: 7,
+        },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText('Week 7')).toBeInTheDocument();
+  });
+
+  it('shows Offseason phase chip for an offseason league', () => {
+    mockUserLeagues = {
+      userLeagues: [
+        {
+          id: 1,
+          name: 'My League',
+          sport: 'baseball',
+          leaguePhase: 'offseason',
+        },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText('Offseason')).toBeInTheDocument();
+  });
+
+  it('shows LIVE DRAFT chip when draft is in progress', () => {
+    mockUserLeagues = {
+      userLeagues: [
+        {
+          id: 1,
+          name: 'My League',
+          sport: 'baseball',
+          leaguePhase: 'pre-draft',
+          draftStatus: 'in-progress',
+        },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText('LIVE DRAFT')).toBeInTheDocument();
   });
 });

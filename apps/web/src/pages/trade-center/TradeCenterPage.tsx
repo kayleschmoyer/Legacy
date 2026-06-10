@@ -19,7 +19,66 @@ import {
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useIsPremium } from '../../hooks/useIsPremium';
-import { BRAND_GOLD, withAlpha } from '../../constants/colors';
+import { BaseballIcon, FootballIcon } from '../../components/icons/SportIcons';
+import {
+  BRAND_GOLD,
+  BRAND_NAVY,
+  BRAND_SEAM_RED,
+  TEXT_MUTED,
+  withAlpha,
+} from '../../constants/colors';
+
+// ── Sport / phase helpers ─────────────────────────────────────────────────────
+
+type LeaguePhase = 'pre-draft' | 'active' | 'offseason';
+type DraftStatus = 'not-started' | 'queued' | 'in-progress' | 'completed';
+
+function LeagueSportIcon({
+  sport,
+  size = 18,
+}: {
+  sport: string | null | undefined;
+  size?: number;
+}) {
+  if (sport === 'football') return <FootballIcon size={size} />;
+  return <BaseballIcon size={size} />;
+}
+
+interface PhaseChip {
+  label: string;
+  backgroundColor: string;
+  color: string;
+}
+
+function getPhaseChip(
+  leaguePhase: LeaguePhase | (string & {}) | null | undefined,
+  draftStatus: DraftStatus | (string & {}) | null | undefined,
+  currentWeekNumber: number | null | undefined,
+): PhaseChip | null {
+  if (draftStatus === 'in-progress') {
+    return {
+      label: 'LIVE DRAFT',
+      backgroundColor: BRAND_SEAM_RED,
+      color: '#fff',
+    };
+  }
+  if (!leaguePhase) return null;
+  if (leaguePhase === 'pre-draft') {
+    return { label: 'Pre-Draft', backgroundColor: BRAND_NAVY, color: '#fff' };
+  }
+  if (leaguePhase === 'active') {
+    const label = currentWeekNumber ? `Week ${currentWeekNumber}` : 'Active';
+    return { label, backgroundColor: BRAND_GOLD, color: '#1B1208' };
+  }
+  if (leaguePhase === 'offseason') {
+    return {
+      label: 'Offseason',
+      backgroundColor: 'transparent',
+      color: TEXT_MUTED,
+    };
+  }
+  return null;
+}
 
 // ── Trade Analyzer premium upsell card ───────────────────────────────────────
 
@@ -470,6 +529,11 @@ export function TradeCenterPage(): React.JSX.Element {
               !error &&
               leagues.map((league) => {
                 if (!league.id) return null;
+                const phaseChip = getPhaseChip(
+                  league.leaguePhase,
+                  league.draftStatus,
+                  league.currentWeekNumber,
+                );
                 return (
                   <div
                     key={league.id}
@@ -517,19 +581,49 @@ export function TradeCenterPage(): React.JSX.Element {
                         flexShrink: 0,
                       }}
                     >
-                      <ArrowLeftRight size={18} />
+                      <LeagueSportIcon sport={league.sport} size={18} />
                     </div>
                     <div style={{ flex: 1, overflow: 'hidden' }}>
                       <div
                         style={{
-                          fontWeight: 600,
-                          fontSize: 15,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
                         }}
                       >
-                        {league.name}
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 15,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            flex: 1,
+                          }}
+                        >
+                          {league.name}
+                        </div>
+                        {phaseChip && (
+                          <div
+                            style={{
+                              flexShrink: 0,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              letterSpacing: '0.05em',
+                              paddingInline: 7,
+                              paddingBlock: 3,
+                              borderRadius: 4,
+                              backgroundColor: phaseChip.backgroundColor,
+                              color: phaseChip.color,
+                              border:
+                                phaseChip.backgroundColor === 'transparent'
+                                  ? `1px solid ${TEXT_MUTED}`
+                                  : 'none',
+                            }}
+                          >
+                            {phaseChip.label}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <LeaguePendingBadge leagueId={league.id} />
