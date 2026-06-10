@@ -3324,6 +3324,8 @@ export type QueryLeagueTradeBlockArgs = {
 
 export type QueryLeagueTradeOffersArgs = {
   leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -3527,6 +3529,8 @@ export type QueryTeamMembersArgs = {
 };
 
 export type QueryTeamTradeOffersArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };

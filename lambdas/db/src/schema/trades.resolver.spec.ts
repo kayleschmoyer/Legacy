@@ -17,6 +17,7 @@ describe('Trades Resolver', () => {
       leftJoin: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
       groupBy: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
@@ -214,7 +215,7 @@ describe('Trades Resolver', () => {
       mockDb.limit.mockResolvedValueOnce([
         { permissionLevel: 'general_manager', teamId: 1 },
       ]);
-      mockDb.orderBy.mockResolvedValueOnce([]);
+      // Main query: .where().orderBy().limit().offset() resolved by then: resolve([])
 
       const resolver = getResolver('query', 'leagueTradeOffers');
       const result = await resolver(
@@ -246,12 +247,12 @@ describe('Trades Resolver', () => {
         updatedAt: new Date(),
       };
 
-      // verifyLeagueMembership .where() — consumed before the main query runs
+      // verifyLeagueMembership .where() — consumed before limit(1) resolves membership
       mockDb.where.mockReturnValueOnce(mockDb);
-      // Main tradeOffers query chain: select().from().where().orderBy()
-      // .where() must return mockDb so .orderBy() can chain; only then does .orderBy resolve
+      // Main tradeOffers query chain: select().from().where().orderBy().limit().offset()
+      // .where() returns mockDb so the chain can continue; .offset() is the terminal call
       mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.orderBy.mockResolvedValueOnce([rawTrade]);
+      mockDb.offset.mockResolvedValueOnce([rawTrade]);
       // teams lookup in hydrateTrades: select().from().where() — .where() resolves directly
       mockDb.where.mockResolvedValueOnce([
         { id: 1, name: 'Team A' },
@@ -309,13 +310,13 @@ describe('Trades Resolver', () => {
     });
 
     it('returns empty array when no trades exist', async () => {
-      // Team lookup
+      // Team lookup: .select().from().where().limit(1)
       mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]);
-      // League membership lookup
+      // League membership lookup: .select().from().where().limit(1)
       mockDb.limit.mockResolvedValueOnce([
         { permissionLevel: 'general_manager', teamId: 1 },
       ]);
-      mockDb.orderBy.mockResolvedValueOnce([]);
+      // Main query: .where().orderBy().limit().offset() resolved by then: resolve([])
 
       const resolver = getResolver('query', 'teamTradeOffers');
       const result = await resolver(
@@ -359,18 +360,17 @@ describe('Trades Resolver', () => {
         updatedAt: new Date(),
       };
 
-      // Authorization: team lookup → .where().limit(1)
+      // Authorization: team lookup → .select().from().where().limit(1)
       mockDb.where.mockReturnValueOnce(mockDb);
       mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]);
-      // Authorization: membership lookup → .where().limit(1)
+      // Authorization: membership lookup → .select().from().where().limit(1)
       mockDb.where.mockReturnValueOnce(mockDb);
       mockDb.limit.mockResolvedValueOnce([
         { permissionLevel: 'general_manager', teamId: 2 },
       ]);
-      // Main tradeOffers query: select().from().where().orderBy()
-      // .where() must return mockDb so .orderBy() can chain
+      // Main tradeOffers query: select().from().where().orderBy().limit().offset()
       mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.orderBy.mockResolvedValueOnce([counterTrade]);
+      mockDb.offset.mockResolvedValueOnce([counterTrade]);
       // hydrateTrades — teams lookup: select().from().where() (awaited directly)
       mockDb.where.mockResolvedValueOnce([
         { id: 1, name: 'Commissioner Team' },
@@ -398,6 +398,78 @@ describe('Trades Resolver', () => {
         proposingTeamName: 'Manager Team',
         receivingTeamName: 'Commissioner Team',
       });
+    });
+  });
+
+  // ── pagination (leagueTradeOffers + teamTradeOffers) ───────────────────────
+
+  describe('pagination args', () => {
+    it('passes limit and offset to the DB query for leagueTradeOffers', async () => {
+      // verifyLeagueMembership: .where().limit(1)
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
+      const resolver = getResolver('query', 'leagueTradeOffers');
+      await resolver(
+        {},
+        { leagueId: 1, limit: 10, offset: 20 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.limit).toHaveBeenCalledWith(10);
+      expect(mockDb.offset).toHaveBeenCalledWith(20);
+    });
+
+    it('caps leagueTradeOffers limit at 100', async () => {
+      // verifyLeagueMembership: .where().limit(1)
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
+      const resolver = getResolver('query', 'leagueTradeOffers');
+      await resolver(
+        {},
+        { leagueId: 1, limit: 999 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.limit).toHaveBeenCalledWith(100);
+    });
+
+    it('passes limit and offset to the DB query for teamTradeOffers', async () => {
+      // Team lookup + membership lookup
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]);
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
+      const resolver = getResolver('query', 'teamTradeOffers');
+      await resolver(
+        {},
+        { teamId: 1, limit: 25, offset: 50 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.limit).toHaveBeenCalledWith(25);
+      expect(mockDb.offset).toHaveBeenCalledWith(50);
+    });
+
+    it('caps teamTradeOffers limit at 100', async () => {
+      // Team lookup + membership lookup
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]);
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
+      const resolver = getResolver('query', 'teamTradeOffers');
+      await resolver(
+        {},
+        { teamId: 1, limit: 500 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.limit).toHaveBeenCalledWith(100);
     });
   });
 

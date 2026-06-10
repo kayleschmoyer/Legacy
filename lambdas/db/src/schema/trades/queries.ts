@@ -7,7 +7,7 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import { requireAuth, verifyLeagueMembership } from '../authorization';
@@ -105,6 +105,8 @@ builder.queryField('leagueTradeOffers', (t) =>
     args: {
       leagueId: t.arg.int({ required: true }),
       status: t.arg.string({ required: false }),
+      limit: t.arg.int({ required: false, defaultValue: 50 }),
+      offset: t.arg.int({ required: false, defaultValue: 0 }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -123,6 +125,8 @@ builder.queryField('leagueTradeOffers', (t) =>
         | 'vetoed'
         | 'expired'
         | null;
+      const limit = Math.min(args.limit ?? 50, 100);
+      const offset = args.offset ?? 0;
 
       const conditions = [
         eq(PublicSchema.tradeOffers.leagueId, leagueId),
@@ -135,11 +139,15 @@ builder.queryField('leagueTradeOffers', (t) =>
         .select()
         .from(PublicSchema.tradeOffers)
         .where(and(...conditions))
-        .orderBy(PublicSchema.tradeOffers.createdAt);
+        .orderBy(desc(PublicSchema.tradeOffers.createdAt))
+        .limit(limit)
+        .offset(offset);
 
       LOGGER.debug('leagueTradeOffers query', {
         leagueId,
         statusFilter,
+        limit,
+        offset,
         count: rawTrades.length,
       });
 
@@ -156,6 +164,8 @@ builder.queryField('teamTradeOffers', (t) =>
     args: {
       teamId: t.arg.int({ required: true }),
       status: t.arg.string({ required: false }),
+      limit: t.arg.int({ required: false, defaultValue: 50 }),
+      offset: t.arg.int({ required: false, defaultValue: 0 }),
     },
     resolve: async (_parent, args, context) => {
       const user = requireAuth(context);
@@ -185,6 +195,8 @@ builder.queryField('teamTradeOffers', (t) =>
         | 'vetoed'
         | 'expired'
         | null;
+      const limit = Math.min(args.limit ?? 50, 100);
+      const offset = args.offset ?? 0;
 
       const teamFilter = or(
         eq(PublicSchema.tradeOffers.proposingTeamId, teamId),
@@ -201,11 +213,15 @@ builder.queryField('teamTradeOffers', (t) =>
         .select()
         .from(PublicSchema.tradeOffers)
         .where(and(...conditions))
-        .orderBy(PublicSchema.tradeOffers.createdAt);
+        .orderBy(desc(PublicSchema.tradeOffers.createdAt))
+        .limit(limit)
+        .offset(offset);
 
       LOGGER.debug('teamTradeOffers query', {
         teamId,
         statusFilter,
+        limit,
+        offset,
         count: rawTrades.length,
       });
 
