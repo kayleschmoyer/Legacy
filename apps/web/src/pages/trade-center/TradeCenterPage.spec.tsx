@@ -588,4 +588,102 @@ describe('TradeCenterPage', () => {
     renderPage();
     expect(screen.getByText('LIVE DRAFT')).toBeInTheDocument();
   });
+
+  // TC-003-P: premium variant — league cards must show sport icon and phase
+  // color so users with many leagues across sports can scan the list.
+  describe('premium variant — sport icon and phase color (TC-003-P)', () => {
+    beforeEach(() => {
+      mockIsPremium = true;
+    });
+
+    it('shows baseball sport icon for premium users', () => {
+      mockUserLeagues = {
+        userLeagues: [{ id: 1, name: 'Baseball League', sport: 'baseball' }],
+      };
+      renderPage();
+      expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
+    });
+
+    it('shows football sport icon for premium users', () => {
+      mockUserLeagues = {
+        userLeagues: [{ id: 2, name: 'Football League', sport: 'football' }],
+      };
+      renderPage();
+      expect(screen.getByTestId('football-icon')).toBeInTheDocument();
+    });
+
+    it('shows pre-draft phase chip for premium users', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'My League',
+            sport: 'baseball',
+            leaguePhase: 'pre-draft',
+          },
+        ],
+      };
+      renderPage();
+      expect(screen.getByText('Pre-Draft')).toBeInTheDocument();
+    });
+
+    it('shows active phase chip with week number for premium users', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'My League',
+            sport: 'baseball',
+            leaguePhase: 'active',
+            currentWeekNumber: 4,
+          },
+        ],
+      };
+      renderPage();
+      expect(screen.getByText('Week 4')).toBeInTheDocument();
+    });
+
+    it('shows offseason phase chip for premium users', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'My League',
+            sport: 'baseball',
+            leaguePhase: 'offseason',
+          },
+        ],
+      };
+      renderPage();
+      expect(screen.getByText('Offseason')).toBeInTheDocument();
+    });
+
+    it('shows LIVE DRAFT chip when draft is in progress for premium users', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'My League',
+            sport: 'football',
+            leaguePhase: 'pre-draft',
+            draftStatus: 'in-progress',
+          },
+        ],
+      };
+      renderPage();
+      expect(screen.getByText('LIVE DRAFT')).toBeInTheDocument();
+    });
+
+    it('shows both baseball and football icons when user has mixed-sport leagues', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          { id: 1, name: 'Baseball League', sport: 'baseball' },
+          { id: 2, name: 'Football League', sport: 'football' },
+        ],
+      };
+      renderPage();
+      expect(screen.getByTestId('baseball-icon')).toBeInTheDocument();
+      expect(screen.getByTestId('football-icon')).toBeInTheDocument();
+    });
+  });
 });
