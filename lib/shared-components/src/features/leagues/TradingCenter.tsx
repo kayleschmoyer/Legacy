@@ -192,6 +192,23 @@ function formatDate(iso?: string | null): string {
   });
 }
 
+// ── History filter options ─────────────────────────────────────────────────────
+
+const HISTORY_STATUS_OPTIONS: Array<{ value: string | null; label: string }> = [
+  { value: null, label: 'All' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'vetoed', label: 'Vetoed' },
+  { value: 'expired', label: 'Expired' },
+];
+
+const HISTORY_DATE_OPTIONS = [
+  { value: 'all' as const, label: 'All Time' },
+  { value: '30d' as const, label: 'Last 30 Days' },
+  { value: '90d' as const, label: 'Last 90 Days' },
+];
+
 // ── Expiry options ────────────────────────────────────────────────────────────
 
 const EXPIRY_OPTIONS = [
@@ -1323,6 +1340,15 @@ export function TradingCenter({
   const [showHistory, setShowHistory] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string | null>(
+    null,
+  );
+  const [historyTeamFilter, setHistoryTeamFilter] = useState<string | null>(
+    null,
+  );
+  const [historyDateFilter, setHistoryDateFilter] = useState<
+    'all' | '30d' | '90d'
+  >('all');
 
   const { data: leagueData } = useGetLeagueByIdQuery({
     variables: { id: leagueId },
@@ -1438,6 +1464,39 @@ export function TradingCenter({
     !deepLinkLoading &&
     deepLinkTradesData != null &&
     deepLinkOffer == null;
+
+  const historyTeams = useMemo(() => {
+    const names = new Set<string>();
+    for (const t of historyTrades) {
+      if (t.proposingTeamName) names.add(t.proposingTeamName);
+      if (t.receivingTeamName) names.add(t.receivingTeamName);
+    }
+    return Array.from(names).sort();
+  }, [historyTrades]);
+
+  const filteredHistoryTrades = useMemo(() => {
+    const now = Date.now();
+    return historyTrades.filter((t) => {
+      if (historyStatusFilter && t.status !== historyStatusFilter) return false;
+      if (
+        historyTeamFilter != null &&
+        t.proposingTeamName !== historyTeamFilter &&
+        t.receivingTeamName !== historyTeamFilter
+      )
+        return false;
+      if (historyDateFilter !== 'all' && t.createdAt != null) {
+        const days = historyDateFilter === '30d' ? 30 : 90;
+        const cutoff = now - days * 24 * 60 * 60 * 1000;
+        if (new Date(t.createdAt).getTime() < cutoff) return false;
+      }
+      return true;
+    });
+  }, [
+    historyTrades,
+    historyStatusFilter,
+    historyTeamFilter,
+    historyDateFilter,
+  ]);
 
   return (
     <YStack
@@ -1726,6 +1785,127 @@ export function TradingCenter({
 
         {showHistory && (
           <YStack gap="$3">
+            {/* Filter controls — only shown when history has trades */}
+            {!allLoading && historyTrades.length > 0 && (
+              <YStack gap="$2" data-testid="trade-history-filters">
+                {/* Status filter */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <XStack gap="$1.5" paddingBottom="$1">
+                    {HISTORY_STATUS_OPTIONS.map(({ value, label }) => {
+                      const isActive = historyStatusFilter === value;
+                      return (
+                        <Button
+                          key={value ?? 'all'}
+                          size="$2"
+                          onPress={() => setHistoryStatusFilter(value)}
+                          backgroundColor={
+                            isActive
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.2)
+                              : '$surfaceSubtle'
+                          }
+                          borderColor={
+                            isActive ? BRAND_GOLD_LIGHT : '$outlineSubtle'
+                          }
+                          borderWidth={1}
+                          borderRadius="$10"
+                          paddingHorizontal="$2.5"
+                          animation="quick"
+                          pressStyle={{ scale: 0.96 }}
+                        >
+                          <Text
+                            fontSize="$2"
+                            fontWeight={isActive ? '700' : '400'}
+                            color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
+                          >
+                            {label}
+                          </Text>
+                        </Button>
+                      );
+                    })}
+                  </XStack>
+                </ScrollView>
+
+                {/* Team filter — only shown when multiple teams appear in history */}
+                {historyTeams.length > 1 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <XStack gap="$1.5" paddingBottom="$1">
+                      {([null, ...historyTeams] as Array<string | null>).map(
+                        (name) => {
+                          const isActive = historyTeamFilter === name;
+                          const label = name ?? 'All Teams';
+                          return (
+                            <Button
+                              key={name ?? 'all-teams'}
+                              size="$2"
+                              onPress={() => setHistoryTeamFilter(name)}
+                              backgroundColor={
+                                isActive
+                                  ? withAlpha(BRAND_NAVY_LIGHT, 0.2)
+                                  : '$surfaceSubtle'
+                              }
+                              borderColor={
+                                isActive ? BRAND_GOLD_LIGHT : '$outlineSubtle'
+                              }
+                              borderWidth={1}
+                              borderRadius="$10"
+                              paddingHorizontal="$2.5"
+                              animation="quick"
+                              pressStyle={{ scale: 0.96 }}
+                            >
+                              <Text
+                                fontSize="$2"
+                                fontWeight={isActive ? '700' : '400'}
+                                color={
+                                  isActive ? BRAND_GOLD_LIGHT : '$textMuted'
+                                }
+                              >
+                                {label}
+                              </Text>
+                            </Button>
+                          );
+                        },
+                      )}
+                    </XStack>
+                  </ScrollView>
+                )}
+
+                {/* Date filter */}
+                <XStack gap="$1.5">
+                  {HISTORY_DATE_OPTIONS.map(({ value, label }) => {
+                    const isActive = historyDateFilter === value;
+                    return (
+                      <Button
+                        key={value}
+                        size="$2"
+                        onPress={() => setHistoryDateFilter(value)}
+                        backgroundColor={
+                          isActive
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.2)
+                            : '$surfaceSubtle'
+                        }
+                        borderColor={
+                          isActive ? BRAND_GOLD_LIGHT : '$outlineSubtle'
+                        }
+                        borderWidth={1}
+                        borderRadius="$10"
+                        paddingHorizontal="$2.5"
+                        animation="quick"
+                        pressStyle={{ scale: 0.96 }}
+                      >
+                        <Text
+                          fontSize="$2"
+                          fontWeight={isActive ? '700' : '400'}
+                          color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
+                        >
+                          {label}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </XStack>
+              </YStack>
+            )}
+
             {allLoading ? (
               <YStack alignItems="center" paddingVertical="$4">
                 <Spinner size="small" />
@@ -1742,8 +1922,20 @@ export function TradingCenter({
                   No trade history yet.
                 </Text>
               </Card>
+            ) : filteredHistoryTrades.length === 0 ? (
+              <Card
+                backgroundColor="$surfacePanel"
+                borderColor="$surfacePanelBorder"
+                borderWidth={1}
+                padding="$4"
+                borderRadius="$5"
+              >
+                <Text color="$textMuted" fontSize="$3" textAlign="center">
+                  No trades match your filters.
+                </Text>
+              </Card>
             ) : (
-              historyTrades.map((trade) => (
+              filteredHistoryTrades.map((trade) => (
                 <TradeOfferCard
                   key={trade.id}
                   trade={trade}
