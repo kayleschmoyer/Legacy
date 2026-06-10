@@ -23,8 +23,10 @@ let capturedOnSubscribeRefresh:
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+let mockSearchParams: Record<string, string> = {};
+
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockSearchParams,
   Redirect: () => null,
 }));
 
@@ -58,11 +60,21 @@ jest.mock('@legacy-sports/shared-components', () => {
     TradingCenter: (props: {
       leagueId: number;
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
+      deepLinkOfferId?: number;
       [key: string]: unknown;
     }) => {
       capturedNativeProps = props;
       capturedOnSubscribeRefresh = props.onSubscribeRefresh;
-      return <View testID={`trading-center-${props.leagueId}`} />;
+      return (
+        <View
+          testID={`trading-center-${props.leagueId}`}
+          accessibilityHint={
+            props.deepLinkOfferId != null
+              ? String(props.deepLinkOfferId)
+              : undefined
+          }
+        />
+      );
     },
     useWebSocket: jest.fn().mockReturnValue({ connected: false }),
   };
@@ -140,6 +152,7 @@ beforeEach(() => {
   mockUserTeamId = null;
   mockLeague = undefined;
   capturedNativeProps = null;
+  mockSearchParams = {};
   const sharedMocks: { useWebSocket: jest.Mock } = jest.requireMock(
     '@legacy-sports/shared-components',
   );
@@ -210,6 +223,31 @@ describe('TradeCenterPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/not a member/i)).toBeTruthy();
+    });
+  });
+
+  it('pre-selects league from ?leagueId= deep-link param', async () => {
+    mockSearchParams = { leagueId: '5' };
+    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep-Link League' }] };
+    mockUserTeamId = 10;
+    mockLeague = { league: { id: 5, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-center-5')).toBeTruthy();
+    });
+  });
+
+  it('passes tradeOfferId to TradingCenter when ?tradeOfferId= param is present', async () => {
+    mockSearchParams = { leagueId: '5', tradeOfferId: '42' };
+    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep-Link League' }] };
+    mockUserTeamId = 10;
+    mockLeague = { league: { id: 5, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    await waitFor(() => {
+      const tc = screen.getByTestId('trading-center-5');
+      expect(tc.props.accessibilityHint).toBe('42');
     });
   });
 });

@@ -2545,6 +2545,7 @@ export type NotificationHistoryItem = {
   readAt?: Maybe<Scalars['String']['output']>;
   sentAt?: Maybe<Scalars['String']['output']>;
   title?: Maybe<Scalars['String']['output']>;
+  tradeOfferId?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
@@ -6217,6 +6218,7 @@ export type NotificationHistoryItemFragment = {
   channel?: string | null;
   matchupId?: number | null;
   leagueId?: number | null;
+  tradeOfferId?: number | null;
   title?: string | null;
   message?: string | null;
   metadata?: string | null;
@@ -6263,6 +6265,7 @@ export type GetNotificationHistoryQuery = {
     channel?: string | null;
     matchupId?: number | null;
     leagueId?: number | null;
+    tradeOfferId?: number | null;
     title?: string | null;
     message?: string | null;
     metadata?: string | null;
@@ -7767,6 +7770,7 @@ export const NotificationHistoryItemFragmentDoc = gql`
     channel
     matchupId
     leagueId
+    tradeOfferId
     title
     message
     metadata

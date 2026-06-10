@@ -382,7 +382,7 @@ export function TradeCenterPage(): React.JSX.Element {
 
   const leagues = data?.userLeagues ?? [];
 
-  // Pre-select league from ?leagueId= query param for notification deep links
+  // Pre-select league from ?leagueId=[&offerId=] query params for notification deep links
   const leagueIdParam = searchParams.get('leagueId');
   const offerIdParam = searchParams.get('offerId');
   const deepLinkOfferId = useMemo(() => {
@@ -406,6 +406,7 @@ export function TradeCenterPage(): React.JSX.Element {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('leagueId', String(id));
+      next.delete('offerId');
       return next;
     });
   }
@@ -415,6 +416,7 @@ export function TradeCenterPage(): React.JSX.Element {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('leagueId');
+      next.delete('offerId');
       return next;
     });
   }

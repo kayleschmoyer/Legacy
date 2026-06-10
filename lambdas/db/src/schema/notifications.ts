@@ -133,6 +133,14 @@ NotificationHistoryItemRef.implement({
         return typeof data.leagueId === 'number' ? data.leagueId : null;
       },
     }),
+    tradeOfferId: t.int({
+      nullable: true,
+      resolve: (parent) => {
+        if (!parent.data || typeof parent.data !== 'object') return null;
+        const data = parent.data as Record<string, unknown>;
+        return typeof data.tradeOfferId === 'number' ? data.tradeOfferId : null;
+      },
+    }),
     title: t.exposeString('title'),
     message: t.string({ resolve: (parent) => parent.body }), // Map body to message
     body: t.exposeString('body'),

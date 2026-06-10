@@ -105,6 +105,7 @@ export interface TradingCenterProps {
    * When set (e.g. from a notification deep link `?offerId=`), the component
    * fetches the specific offer and surfaces a "no longer available" or
    * "not found" banner when the offer is expired, vetoed, cancelled, or absent.
+   * The matching offer card is also highlighted with a gold border.
    */
   deepLinkOfferId?: number;
 }
@@ -208,6 +209,7 @@ interface TradeOfferCardProps {
   trade: TradeOfferFragment;
   userTeamId: number;
   isCommissioner?: boolean;
+  highlighted?: boolean;
   onAccept?: (id: number) => void;
   onReject?: (id: number) => void;
   onCancel?: (id: number) => void;
@@ -219,6 +221,7 @@ function TradeOfferCard({
   trade,
   userTeamId,
   isCommissioner,
+  highlighted = false,
   onAccept,
   onReject,
   onCancel,
@@ -292,7 +295,8 @@ function TradeOfferCard({
   return (
     <GlassCard
       backgroundColor={withAlpha(SURFACE_PANEL, 0.65)}
-      borderColor={badge.border}
+      borderColor={highlighted ? BRAND_GOLD_LIGHT : badge.border}
+      borderWidth={highlighted ? 2 : 1}
     >
       {/* Status accent bar */}
       <YStack height={2} width="100%" backgroundColor={statusBarColor} />
@@ -1610,6 +1614,9 @@ export function TradingCenter({
               trade={trade}
               userTeamId={userTeamId}
               isCommissioner={isCommissioner}
+              highlighted={
+                deepLinkOfferId != null && trade.id === deepLinkOfferId
+              }
               onAccept={(id) =>
                 void handleAction(id, (tradeId) =>
                   acceptTrade({ variables: { tradeId } }),
@@ -1675,6 +1682,9 @@ export function TradingCenter({
               trade={trade}
               userTeamId={userTeamId}
               isCommissioner={isCommissioner}
+              highlighted={
+                deepLinkOfferId != null && trade.id === deepLinkOfferId
+              }
               onCancel={(id) =>
                 void handleAction(id, (tradeId) =>
                   cancelTrade({ variables: { tradeId } }),
@@ -1739,6 +1749,9 @@ export function TradingCenter({
                   trade={trade}
                   userTeamId={userTeamId}
                   isCommissioner={isCommissioner}
+                  highlighted={
+                    deepLinkOfferId != null && trade.id === deepLinkOfferId
+                  }
                   onVeto={
                     isCommissioner
                       ? (id) =>

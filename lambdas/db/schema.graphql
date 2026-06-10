@@ -2626,6 +2626,7 @@ type NotificationHistoryItem {
   readAt: String
   sentAt: String
   title: String
+  tradeOfferId: Int
   updatedAt: String
   userId: Int
 }

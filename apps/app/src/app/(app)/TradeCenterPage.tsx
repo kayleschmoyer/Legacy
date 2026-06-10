@@ -31,10 +31,16 @@ import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 interface LeagueTradesProps {
   leagueId: number;
   leagueName: string;
+  tradeOfferId?: number;
   onBack: () => void;
 }
 
-function LeagueTrades({ leagueId, leagueName, onBack }: LeagueTradesProps) {
+function LeagueTrades({
+  leagueId,
+  leagueName,
+  tradeOfferId,
+  onBack,
+}: LeagueTradesProps) {
   const userInfo = useAuthorizedUserInfo();
   const [wsToken, setWsToken] = useState<string | undefined>();
 
@@ -157,6 +163,7 @@ function LeagueTrades({ leagueId, leagueName, onBack }: LeagueTradesProps) {
           leagueId={leagueId}
           userTeamId={userTeamId}
           isCommissioner={isCommissioner}
+          deepLinkOfferId={tradeOfferId}
           onSubscribeRefresh={onSubscribeRefresh}
         />
       </ScrollView>
@@ -167,14 +174,17 @@ function LeagueTrades({ leagueId, leagueName, onBack }: LeagueTradesProps) {
 // ── TradeCenterPage ───────────────────────────────────────────────────────────
 
 export default function TradeCenterPage() {
-  const { leagueId: leagueIdParam } = useLocalSearchParams<{
-    leagueId?: string;
-  }>();
+  const { leagueId: leagueIdParam, tradeOfferId: tradeOfferIdParam } =
+    useLocalSearchParams<{
+      leagueId?: string;
+      tradeOfferId?: string;
+    }>();
   const userInfo = useAuthorizedUserInfo();
 
   const [selectedLeague, setSelectedLeague] = useState<{
     id: number;
     name: string;
+    tradeOfferId?: number;
   } | null>(null);
 
   const { data, loading, error, refetch } = useGetUserLeaguesQuery({
@@ -182,7 +192,7 @@ export default function TradeCenterPage() {
     fetchPolicy: 'cache-first',
   });
 
-  // Pre-select a league when arriving via deep link with ?leagueId=X
+  // Pre-select a league when arriving via deep link with ?leagueId=X[&tradeOfferId=Y]
   const leagues = useMemo(() => data?.userLeagues ?? [], [data?.userLeagues]);
   useEffect(() => {
     if (!leagueIdParam || selectedLeague != null) return;
@@ -190,15 +200,26 @@ export default function TradeCenterPage() {
     if (isNaN(id)) return;
     const matched = leagues.find((l) => l.id === id);
     if (matched?.id != null) {
-      setSelectedLeague({ id: matched.id, name: matched.name ?? 'League' });
+      const parsedTradeOfferId = tradeOfferIdParam
+        ? parseInt(tradeOfferIdParam, 10)
+        : undefined;
+      setSelectedLeague({
+        id: matched.id,
+        name: matched.name ?? 'League',
+        tradeOfferId:
+          parsedTradeOfferId && !isNaN(parsedTradeOfferId)
+            ? parsedTradeOfferId
+            : undefined,
+      });
     }
-  }, [leagueIdParam, leagues, selectedLeague]);
+  }, [leagueIdParam, tradeOfferIdParam, leagues, selectedLeague]);
 
   if (selectedLeague != null) {
     return (
       <LeagueTrades
         leagueId={selectedLeague.id}
         leagueName={selectedLeague.name}
+        tradeOfferId={selectedLeague.tradeOfferId}
         onBack={() => setSelectedLeague(null)}
       />
     );

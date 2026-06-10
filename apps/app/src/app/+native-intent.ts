@@ -55,6 +55,14 @@ export function redirectSystemPath({
       return `${base}?${query}`;
     }
 
+    // Match `/trade-center` deep links — passes leagueId and tradeOfferId
+    // through to the standalone TradeCenterPage (LS-7518).
+    const tradeCenterMatch = pathname.match(/^\/trade-center\/?$/);
+    if (tradeCenterMatch) {
+      const query = existingQuery ? `?${existingQuery}` : '';
+      return `/TradeCenterPage${query}`;
+    }
+
     return path;
   } catch (error) {
     LOGGER.error(

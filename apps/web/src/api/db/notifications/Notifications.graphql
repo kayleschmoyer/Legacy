@@ -31,6 +31,7 @@ fragment NotificationHistoryItem on NotificationHistoryItem {
   channel
   matchupId
   leagueId
+  tradeOfferId
   title
   message
   metadata

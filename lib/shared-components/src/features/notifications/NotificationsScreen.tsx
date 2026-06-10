@@ -35,7 +35,7 @@ export interface NotificationsScreenProps {
   websocketToken?: string;
   onNavigateToMatchup?: (matchupId: number, leagueId: number) => void;
   onNavigateToLeague?: (leagueId: number) => void;
-  onNavigateToTrades?: (leagueId: number) => void;
+  onNavigateToTrades?: (leagueId: number, tradeOfferId?: number) => void;
 }
 
 export function NotificationsScreen({
@@ -86,7 +86,10 @@ export function NotificationsScreen({
       .includes('trade');
 
     if (isTradeNotification && notification.leagueId && onNavigateToTrades) {
-      onNavigateToTrades(notification.leagueId);
+      onNavigateToTrades(
+        notification.leagueId,
+        notification.tradeOfferId ?? undefined,
+      );
       return;
     }
 
