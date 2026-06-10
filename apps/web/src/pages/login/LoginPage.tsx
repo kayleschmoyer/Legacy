@@ -402,16 +402,23 @@ export function LoginPage(): React.JSX.Element {
       const customEvent = event as CustomEvent<{
         authResponse: { credential?: string };
       }>;
+      // Capture the deep-link before auth so resolvePostLoginRedirect returns
+      // the user to the page they were trying to reach (LS-7523). storeCameFrom
+      // is a no-op on non-meaningful paths (root, /login) so this is safe for
+      // all callers.
+      storeCameFrom();
       setIsLoading(true);
       setErrorMessage('');
       clearError();
       try {
         await loginWithOAuth(customEvent.detail.authResponse);
-        // Send returning users back to their last-opened league. The auth-guard
-        // swaps in the Router after the auth state flips; rewriting the URL here
-        // (before that re-render commits) makes the Router mount on the target
-        // route. LoginPage renders outside the Router, so navigate() is not
-        // available — replaceState mirrors the Discord callback path (LS-6694).
+        // Redirect to the deep-link the user came from, their last-opened
+        // league, or the app root (resolvePostLoginRedirect precedence). The
+        // auth-guard swaps in the Router after the auth state flips; rewriting
+        // the URL here (before that re-render commits) makes the Router mount
+        // on the target route. LoginPage renders outside the Router, so
+        // navigate() is not available — replaceState mirrors the Discord
+        // callback path (LS-6694).
         if (typeof window !== 'undefined') {
           window.history.replaceState(null, '', resolvePostLoginRedirect());
         }

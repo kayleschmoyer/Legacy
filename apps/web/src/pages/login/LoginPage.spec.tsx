@@ -815,6 +815,82 @@ describe('LoginPage clearError on new sign-in attempt (LS-6681)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-7523 — Google One Tap deep-link preservation
+// Unauthenticated deep links must bounce through login and return to the
+// original URL after One Tap auth — storeCameFrom() must be called before
+// loginWithOAuth so resolvePostLoginRedirect returns the correct path.
+// ---------------------------------------------------------------------------
+
+describe('LoginPage Google One Tap deep-link preservation (LS-7523)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    setBrowserUrl('/login');
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  it('returns to a trade-center deep link after One Tap sign-in', async () => {
+    setBrowserUrl('/trade-center?leagueId=42');
+
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    // Simulate Google One Tap success event (fired by the GSI script).
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('gsi-one-tap-success', {
+          detail: { authResponse: { credential: 'fake-id-token' } },
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        null,
+        '',
+        '/trade-center?leagueId=42',
+      );
+    });
+
+    // The came-from entry is single-use — consumed by resolvePostLoginRedirect.
+    expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it('does not overwrite a root URL with a came-from entry after One Tap sign-in', async () => {
+    setBrowserUrl('/');
+
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('gsi-one-tap-success', {
+          detail: { authResponse: { credential: 'fake-id-token' } },
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      // Falls back to env.baseUrl ('/') — not a came-from entry.
+      expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/');
+    });
+    expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
+
+    replaceStateSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-7520 — Google sign-in deep-link preservation
 // Unauthenticated deep links must bounce through login and return to the
 // original URL after auth — storeCameFrom() must be called before the popup.

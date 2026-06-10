@@ -1,18 +1,22 @@
 /**
- * Deep-link / "came-from" preservation across the Discord OAuth round-trip.
+ * Deep-link / "came-from" preservation across auth flows.
  *
- * The Discord sign-in flow navigates the browser away to the OAuth proxy and
- * back to `/auth/discord/callback`, so the path the user originally requested
- * (e.g. `/league/123`) is gone from the URL by the time we exchange the code.
- * We stash it in `sessionStorage` before leaving and consume it on return so
- * the user lands back where they started instead of at the app root (LGN-037).
+ * When an unauthenticated user navigates to a protected route (e.g.
+ * `/trade-center?leagueId=42`), the auth guard renders the LoginPage at that
+ * URL. After sign-in, `resolvePostLoginRedirect` consumes this value so the
+ * user lands back where they started instead of at the app root.
  *
- * Google web sign-in does NOT need this: it authenticates in-memory without a
- * full-page navigation, so `EnhancedAuthGuard` simply swaps in the app at the
- * unchanged URL. This module is therefore Discord-specific.
+ * Used by three sign-in paths:
+ *   - Discord (LGN-037): full-page OAuth redirect wipes the URL, so we stash
+ *     the path before navigating to Discord and restore it on callback.
+ *   - Google popup (LS-7520): `resolvePostLoginRedirect` calls `replaceState`
+ *     after auth; without a stored came-from it would fall back to the
+ *     last-visited league instead of the original deep-link.
+ *   - Google One Tap (LS-7523): same issue as the popup path — the One Tap
+ *     handler calls `resolvePostLoginRedirect` and needs the stored value.
  *
- * The stored value is always re-validated through `getSafeRedirectTarget` by the
- * caller before it is used for navigation, so this module never opens an
+ * The stored value is always re-validated through `getSafeRedirectTarget` by
+ * the caller before it is used for navigation, so this module never opens an
  * open-redirect hole on its own — it only persists a candidate path.
  */
 
