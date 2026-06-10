@@ -1371,4 +1371,63 @@ describe('TradingCenter — ProposeTradeDialog (LS-5678)', () => {
     const proposeBtn = (await findByText('Propose Trade')).closest('button');
     expect(proposeBtn).toBeDisabled();
   });
+
+  it('deselects an offering player when clicked a second time — no duplicate in payload (TC-014-P)', async () => {
+    const { getByText, findByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    // First click — selects Aaron Judge; "Next" button should appear
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    expect(await findByText(/next.*select their players/i)).toBeTruthy();
+    // Second click — deselects Aaron Judge; "Next" button must disappear
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await waitFor(() => {
+      expect(queryByText(/next.*select their players/i)).toBeNull();
+    });
+  });
+
+  it('deselects a requesting player when clicked a second time — no duplicate in payload (TC-014-P)', async () => {
+    const { getByText, findByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    // First click — selects Mike Trout; "Review Trade" button should appear
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    expect(await findByText(/review trade/i)).toBeTruthy();
+    // Second click — deselects Mike Trout; "Review Trade" button must disappear
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    await waitFor(() => {
+      expect(queryByText(/review trade/i)).toBeNull();
+    });
+  });
 });
