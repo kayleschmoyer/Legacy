@@ -79,6 +79,10 @@ export const usersInAppInternal = appInternal.table(
     canonicalEmailSource: identityProviderInAppInternal(
       'canonical_email_source',
     ),
+    passwordResetToken: varchar('password_reset_token', { length: 128 }),
+    passwordResetExpiresAt: timestamp('password_reset_expires_at', {
+      withTimezone: true,
+    }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

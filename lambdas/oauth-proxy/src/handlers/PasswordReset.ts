@@ -89,9 +89,11 @@ export const handleForgotPassword = async (
   try {
     await withDbClient(async (db) => {
       const user = await getUserByEmail(db, email);
-      if (!user) {
-        // Unknown email: do nothing but fall through to the uniform response.
-        LOGGER.info('Forgot-password requested for unknown email');
+      if (!user || !user.passwordHash) {
+        // Unknown email or OAuth-only account: do nothing but fall through to the uniform response.
+        LOGGER.info(
+          'Forgot-password requested for non-local-auth or unknown account — skipping',
+        );
         return;
       }
 

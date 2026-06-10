@@ -607,10 +607,15 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
   test('football hub and baseball hub render distinct content', async ({
     page,
   }) => {
+    // Assert on the page-wrapper data-testid rather than the
+    // "… fantasy landing page" aria-label: since the shared MLBHome extraction
+    // (LS-7716) the baseball aria-label is present on both the BaseballScreen
+    // wrapper and the inner shared component, so an aria-label locator resolves
+    // to two elements and trips Playwright strict mode. The testid is unique.
     await page.goto('/football');
-    await expect(
-      page.locator('[aria-label="Football fantasy landing page"]').first(),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('football-screen')).toBeVisible({
+      timeout: 10000,
+    });
 
     await page.goto('/baseball');
     await expect(page.getByTestId('baseball-screen')).toBeVisible({
