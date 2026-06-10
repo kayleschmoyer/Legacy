@@ -183,17 +183,19 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
 /**
  * Shape the POST body for `/baseball-game-logs`. Exported so unit tests can
  * assert opponent expansion + venue serialization without mocking fetch.
- * (LS-7466, LS-7478)
+ * (LS-7466, LS-7473, LS-7478)
  */
 export function buildGameLogsRequestBody(
   filters: FilterState,
   sport: GameLogSport,
+  options?: { limit?: number },
 ): {
   player_id: string;
   game_date: string;
   opponent_franchise_ids?: string[];
   opponent_abbrs?: string[];
   venue?: 'home' | 'away';
+  limit?: number;
 } {
   const expand =
     sport === 'nfl' ? expandNflFranchiseAbbrs : expandMlbFranchiseAbbrs;
@@ -216,8 +218,12 @@ export function buildGameLogsRequestBody(
         }
       : {}),
     ...(filters.venue !== 'all' ? { venue: filters.venue } : {}),
+    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
   };
 }
+
+/** Maximum game logs returned per request for non-premium users (LS-7473). */
+export const DEFAULT_GAME_LOGS_LIMIT = 50;
 
 // Strict format guards applied before sending to the API (defense-in-depth;
 // backend must still use parameterized queries — see LS-5704 follow-up).
@@ -382,12 +388,17 @@ function GameLogsTable({
     setLoading(true);
     try {
       // Use fetch for cross-platform compatibility
+      // Non-premium requests cap results server-side to avoid large payloads
+      // and slow renders for users who haven't unlocked full history. (LS-7473)
+      const limit = isPremium ? undefined : DEFAULT_GAME_LOGS_LIMIT;
       const response = await fetch(resolvedEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(buildGameLogsRequestBody(filters, sport)),
+        body: JSON.stringify(
+          buildGameLogsRequestBody(filters, sport, { limit }),
+        ),
       });
 
       if (!response.ok) {

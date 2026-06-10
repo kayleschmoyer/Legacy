@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
-import { buildGameLogsRequestBody, GameLogsTable } from './GameLogsTable';
+import {
+  buildGameLogsRequestBody,
+  DEFAULT_GAME_LOGS_LIMIT,
+  GameLogsTable,
+} from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
 
 // Mock fetch globally
@@ -120,7 +124,7 @@ describe('Team reference data (LS-7477)', () => {
   });
 });
 
-describe('buildGameLogsRequestBody (LS-7466, LS-7478)', () => {
+describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478)', () => {
   const baseFilters = {
     player: 'mlb-1234',
     date: '',
@@ -131,6 +135,16 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7478)', () => {
   it('omits opponent + venue keys when filters are inactive', () => {
     const body = buildGameLogsRequestBody(baseFilters, 'mlb');
     expect(body).toEqual({ player_id: 'mlb-1234', game_date: '' });
+  });
+
+  it('includes limit when provided (LS-7473)', () => {
+    const body = buildGameLogsRequestBody(baseFilters, 'mlb', { limit: 50 });
+    expect(body.limit).toBe(50);
+  });
+
+  it('omits limit when not provided (LS-7473)', () => {
+    const body = buildGameLogsRequestBody(baseFilters, 'mlb');
+    expect(body.limit).toBeUndefined();
   });
 
   it('serializes the venue toggle as "home" or "away"', () => {
@@ -203,6 +217,10 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7478)', () => {
 });
 
 describe('GameLogsTable filter controls', () => {
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockClear();
+  });
+
   it('renders opponent dropdown with all 30 MLB teams (LS-7479)', () => {
     const { queryByTestId } = render(<GameLogsTable sport="mlb" />);
     const select = queryByTestId('opponent-filter') as HTMLSelectElement | null;
@@ -223,6 +241,58 @@ describe('GameLogsTable filter controls', () => {
     const select = queryByTestId('opponent-filter') as HTMLSelectElement | null;
     if (!select) return; // opponent filter is web-only — skip on native
     expect(select.multiple).toBe(true);
+  });
+
+  it('sends DEFAULT_GAME_LOGS_LIMIT in the request body for non-premium users (LS-7473)', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    const { getByPlaceholderText, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const body = JSON.parse(calls[0][1].body as string) as { limit?: number };
+    expect(body.limit).toBe(DEFAULT_GAME_LOGS_LIMIT);
+  });
+
+  it('omits limit from the request body for premium users (LS-7473)', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    const { getByPlaceholderText, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" isPremium />,
+    );
+
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const body = JSON.parse(calls[0][1].body as string) as { limit?: number };
+    expect(body.limit).toBeUndefined();
   });
 
   it('venue toggle changes the outgoing payload (LS-7467)', () => {
