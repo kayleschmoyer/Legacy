@@ -295,6 +295,90 @@ describe('TradeCenterPage', () => {
     expect(screen.queryByLabelText(/pending offer/i)).not.toBeInTheDocument();
   });
 
+  describe('cross-league pending summary', () => {
+    it('shows a summary banner when any league has pending offers', async () => {
+      mockUserLeagues = {
+        userLeagues: [
+          { id: 1, name: 'League A' },
+          { id: 2, name: 'League B' },
+        ],
+      };
+      mockUserTeamId = 7;
+      mockTeamTradeOffers = [{ id: 10 }, { id: 11 }];
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toBeInTheDocument();
+      });
+    });
+
+    it('aggregates pending offers from all leagues in the summary', async () => {
+      // Mock returns 2 offers per league; 2 leagues = 4 total
+      mockUserLeagues = {
+        userLeagues: [
+          { id: 1, name: 'League A' },
+          { id: 2, name: 'League B' },
+        ],
+      };
+      mockUserTeamId = 7;
+      mockTeamTradeOffers = [{ id: 10 }, { id: 11 }];
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '4 pending trade offers across 2 leagues',
+        );
+      });
+    });
+
+    it('uses singular form when only one offer exists across all leagues', async () => {
+      mockUserLeagues = { userLeagues: [{ id: 1, name: 'League A' }] };
+      mockUserTeamId = 7;
+      mockTeamTradeOffers = [{ id: 10 }];
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '1 pending trade offer across 1 league',
+        );
+      });
+    });
+
+    it('does not show summary banner when there are no pending offers', async () => {
+      mockUserLeagues = {
+        userLeagues: [
+          { id: 1, name: 'League A' },
+          { id: 2, name: 'League B' },
+        ],
+      };
+      mockUserTeamId = 7;
+      mockTeamTradeOffers = [];
+      renderPage();
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not show summary banner when no leagues are loaded', () => {
+      mockUserLeagues = { userLeagues: [] };
+      renderPage();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('does not show summary banner when a league is selected', async () => {
+      mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+      mockUserTeamId = 42;
+      mockLeague = { league: { id: 1, owner: 99 } };
+      mockTeamTradeOffers = [{ id: 10 }];
+      renderPage();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /View trades for My League/i }),
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe('TradeAnalyzerCard', () => {
     it('renders the Trade Analyzer heading on the landing screen', () => {
       mockUserLeagues = { userLeagues: [] };

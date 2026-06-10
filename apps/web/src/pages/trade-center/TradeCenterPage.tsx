@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
@@ -208,7 +208,13 @@ function TradeAnalyzerCard(): React.JSX.Element {
 
 // ── League pending-offers badge ───────────────────────────────────────────────
 
-function LeaguePendingBadge({ leagueId }: { leagueId: number }) {
+function LeaguePendingBadge({
+  leagueId,
+  onCount,
+}: {
+  leagueId: number;
+  onCount?: (leagueId: number, count: number) => void;
+}) {
   const { data: teamData } = useGetUserTeamIdQuery({
     variables: { leagueId },
   });
@@ -220,6 +226,11 @@ function LeaguePendingBadge({ leagueId }: { leagueId: number }) {
   });
 
   const count = offersData?.teamTradeOffers?.length ?? 0;
+
+  useEffect(() => {
+    onCount?.(leagueId, count);
+  }, [leagueId, count, onCount]);
+
   if (count === 0) return null;
 
   return (
@@ -374,6 +385,26 @@ export function TradeCenterPage(): React.JSX.Element {
     id: number;
     name: string;
   } | null>(null);
+
+  const [pendingCounts, setPendingCounts] = useState<Record<number, number>>(
+    {},
+  );
+
+  const handlePendingCount = useCallback((leagueId: number, count: number) => {
+    setPendingCounts((prev) => {
+      if (prev[leagueId] === count) return prev;
+      return { ...prev, [leagueId]: count };
+    });
+  }, []);
+
+  const totalPending = useMemo(
+    () => Object.values(pendingCounts).reduce((sum, n) => sum + n, 0),
+    [pendingCounts],
+  );
+  const leaguesWithPending = useMemo(
+    () => Object.values(pendingCounts).filter((n) => n > 0).length,
+    [pendingCounts],
+  );
 
   const { data, loading, error, refetch } = useGetUserLeaguesQuery({
     skip: !user,
@@ -539,6 +570,47 @@ export function TradeCenterPage(): React.JSX.Element {
               </YStack>
             )}
 
+            {totalPending > 0 && (
+              <div
+                role="status"
+                aria-label={`${totalPending} pending trade offer${totalPending !== 1 ? 's' : ''} across ${leaguesWithPending} league${leaguesWithPending !== 1 ? 's' : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 14px',
+                  backgroundColor: withAlpha(BRAND_SEAM_RED, 0.08),
+                  border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.25)}`,
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    backgroundColor: BRAND_SEAM_RED,
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingLeft: 5,
+                    paddingRight: 5,
+                    flexShrink: 0,
+                  }}
+                >
+                  {totalPending}
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>
+                  {totalPending} pending trade offer
+                  {totalPending !== 1 ? 's' : ''} across {leaguesWithPending}{' '}
+                  league{leaguesWithPending !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+
             {!error &&
               leagues.map((league) => {
                 if (!league.id) return null;
@@ -639,7 +711,10 @@ export function TradeCenterPage(): React.JSX.Element {
                         )}
                       </div>
                     </div>
-                    <LeaguePendingBadge leagueId={league.id} />
+                    <LeaguePendingBadge
+                      leagueId={league.id}
+                      onCount={handlePendingCount}
+                    />
                   </div>
                 );
               })}
