@@ -715,6 +715,26 @@ builder.mutationField('proposeTrade', (t) =>
               },
             );
           }
+
+          if (context.notificationPublisher) {
+            try {
+              await context.notificationPublisher.publish({
+                userId: receivingMember.userId,
+                notificationType: 'TRADE_OFFER',
+                title: 'New Trade Offer',
+                body: `${proposingTeamName} sent you a trade offer.`,
+                data: {
+                  leagueId,
+                  tradeOfferId: newTrade.id,
+                },
+              });
+            } catch (pushErr) {
+              LOGGER.warn('Failed to send push notification (non-fatal)', {
+                error: pushErr,
+                tradeId: newTrade.id,
+              });
+            }
+          }
         }
       } catch (notifyErr) {
         LOGGER.warn('Failed to send trade proposal notification (non-fatal)', {

@@ -36,6 +36,7 @@ type NotificationData = {
   notificationType?: string;
   leagueId?: number;
   matchupId?: number;
+  tradeOfferId?: number;
   [key: string]: unknown;
 };
 
@@ -190,6 +191,8 @@ function isNotificationData(value: unknown): value is NotificationData {
     return false;
   if ('leagueId' in obj && typeof obj['leagueId'] !== 'number') return false;
   if ('matchupId' in obj && typeof obj['matchupId'] !== 'number') return false;
+  if ('tradeOfferId' in obj && typeof obj['tradeOfferId'] !== 'number')
+    return false;
   return true;
 }
 
@@ -197,7 +200,7 @@ function navigateFromNotification(
   router: ReturnType<typeof useRouter>,
   data: NotificationData,
 ) {
-  const { notificationType, leagueId, matchupId } = data;
+  const { notificationType, leagueId, matchupId, tradeOfferId } = data;
 
   if (
     (notificationType === 'DRAFT_STARTED' ||
@@ -210,6 +213,17 @@ function navigateFromNotification(
 
   if (notificationType === 'DRAFT_COMPLETED' && leagueId) {
     router.navigate(`/baseball/league/${leagueId}`);
+    return;
+  }
+
+  if (notificationType === 'TRADE_OFFER' && leagueId) {
+    router.navigate({
+      pathname: '/TradeCenterPage',
+      params: {
+        leagueId: String(leagueId),
+        ...(tradeOfferId != null && { tradeOfferId: String(tradeOfferId) }),
+      },
+    });
     return;
   }
 

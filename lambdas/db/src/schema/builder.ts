@@ -8,7 +8,10 @@ import {
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
-import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
+import type {
+  NotificationPublisher,
+  WebSocketNotificationService,
+} from '@legacy-sports/aws-utils';
 import { type Loaders } from './dataloaders';
 
 // Initialize database service
@@ -30,6 +33,7 @@ export interface Context {
   loaders: Loaders; // DataLoaders for batching queries
   db: GenericDatabase<typeof PublicSchema>; // Shared database connection for this request
   notificationService?: WebSocketNotificationService | null; // WebSocket notification service
+  notificationPublisher?: NotificationPublisher | null; // Push notification publisher (SQS)
   /** True when the request was authenticated via the system API key (EventBridge / admin CLI). */
   isSystemRequest: boolean;
   /** Which auth path resolved this request: 'bearer' (Authorization header), 'cookie' (HttpOnly JWT+CSRF), or null (unauthenticated/system). */

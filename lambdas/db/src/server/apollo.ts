@@ -4,7 +4,10 @@ import {
   startServerAndCreateLambdaHandler,
 } from '@as-integrations/aws-lambda';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
-import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
+import type {
+  NotificationPublisher,
+  WebSocketNotificationService,
+} from '@legacy-sports/aws-utils';
 import type { GenericDatabase } from '@legacy-sports/db-client';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import { LOGGER } from '@legacy-sports/logging';
@@ -104,6 +107,7 @@ export const server = new ApolloServer({
 export function createApolloHandler(
   dbService: { getDb: () => Promise<GenericDatabase<typeof PublicSchema>> },
   notificationService: WebSocketNotificationService | null,
+  notificationPublisher?: NotificationPublisher | null,
 ) {
   return startServerAndCreateLambdaHandler(
     server,
@@ -152,6 +156,7 @@ export function createApolloHandler(
 
         return {
           notificationService, // WebSocket notification service
+          notificationPublisher, // Push notification publisher (SQS)
           user,
           authSource,
           isSystemRequest,

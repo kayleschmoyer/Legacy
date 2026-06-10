@@ -3,7 +3,10 @@ import {
   initRollbar,
   withRollbar,
 } from '@legacy-sports/rollbar';
-import { createNotificationService } from '@legacy-sports/aws-utils';
+import {
+  createNotificationPublisher,
+  createNotificationService,
+} from '@legacy-sports/aws-utils';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -37,8 +40,15 @@ void getJwtSecret().catch((err: unknown) => {
 // Create notification service (module-level singleton)
 const notificationService = createNotificationService();
 
+// Create push notification publisher (module-level singleton)
+const notificationPublisher = createNotificationPublisher();
+
 // Create Apollo handler with authentication context
-const baseHandler = createApolloHandler(dbService, notificationService);
+const baseHandler = createApolloHandler(
+  dbService,
+  notificationService,
+  notificationPublisher,
+);
 
 // Wrap with CORS, health checks, and error handling
 const baseGraphQLHandler = createLambdaHandler(baseHandler);
