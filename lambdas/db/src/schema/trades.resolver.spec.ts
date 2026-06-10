@@ -78,6 +78,7 @@ describe('Trades Resolver', () => {
           id: 'id',
           name: 'name',
           leagueId: 'leagueId',
+          isLocked: 'isLocked',
         },
         leagueMembers: {
           leagueId: 'leagueId',
@@ -644,7 +645,30 @@ describe('Trades Resolver', () => {
       });
     });
 
-    it('throws FORBIDDEN when user permissionLevel is not an active management role', async () => {
+    it('throws when league phase is not active (e.g. draft or offseason)', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'draft', sport: 'baseball' },
+      ]);
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toThrow(
+        'Trade offers are only available during the active season',
+      );
+    });
+
+    it('throws FORBIDDEN when user permissionLevel is not the general_manager role', async () => {
       // League check passes (active phase)
       mockDb.limit.mockResolvedValueOnce([
         { leaguePhase: 'active', sport: 'baseball' },
@@ -670,7 +694,121 @@ describe('Trades Resolver', () => {
         ),
       ).rejects.toMatchObject({
         extensions: { code: 'FORBIDDEN' },
-        message: expect.stringContaining('active manager'),
+        message: expect.stringContaining('general manager'),
+      });
+    });
+
+    it('throws FORBIDDEN when user is a co-manager (assistant_manager)', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]);
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'assistant_manager' },
+      ]);
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+        message: expect.stringContaining('general manager'),
+      });
+    });
+
+    it('throws FORBIDDEN when user is a commissioner (not the active team owner)', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]);
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'commissioner' },
+      ]);
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+        message: expect.stringContaining('general manager'),
+      });
+    });
+
+    it('throws FORBIDDEN when the proposing team no longer exists (abandoned-team guard)', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]);
+      // resolveUserTeam membership — valid GM
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'general_manager' },
+      ]);
+      // teams query returns empty (team deleted / abandoned)
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+        message: expect.stringContaining('no longer exists'),
+      });
+    });
+
+    it('throws FORBIDDEN when the proposing team is locked by the commissioner', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]);
+      // resolveUserTeam membership — valid GM
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'general_manager' },
+      ]);
+      // teams query — team exists but is locked
+      mockDb.limit.mockResolvedValueOnce([{ isLocked: true }]);
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+        message: expect.stringContaining('locked'),
       });
     });
 
@@ -747,7 +885,8 @@ describe('Trades Resolver', () => {
       ]); // league check
       mockDb.limit.mockResolvedValueOnce([
         { teamId: 1, permissionLevel: 'general_manager' },
-      ]); // resolveUserTeam
+      ]); // resolveUserTeam membership
+      mockDb.limit.mockResolvedValueOnce([{ isLocked: false }]); // resolveUserTeam teams check
       mockDb.limit.mockResolvedValueOnce([{ id: 2 }]); // receiving team exists
       // Rate limit query: select({ total: count() }).from().where() — awaited via then
       mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>

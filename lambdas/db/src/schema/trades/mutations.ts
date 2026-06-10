@@ -130,13 +130,31 @@ async function resolveUserTeam(
     throw ForbiddenError('You do not have a team in this league');
   }
 
-  if (
-    membership.permissionLevel !== 'general_manager' &&
-    membership.permissionLevel !== 'assistant_manager' &&
-    membership.permissionLevel !== 'commissioner'
-  ) {
+  // Only the primary team owner (general_manager) may propose trades.
+  // Co-managers (assistant_manager) and league commissioners cannot initiate trades.
+  if (membership.permissionLevel !== 'general_manager') {
+    throw ForbiddenError("Only the team's general manager can propose a trade");
+  }
+
+  // Verify the team still exists and has not been locked by the commissioner.
+  const [team] = await db
+    .select({ isLocked: PublicSchema.teams.isLocked })
+    .from(PublicSchema.teams)
+    .where(
+      and(
+        eq(PublicSchema.teams.id, membership.teamId),
+        eq(PublicSchema.teams.leagueId, leagueId),
+      ),
+    )
+    .limit(1);
+
+  if (!team) {
+    throw ForbiddenError('Your team no longer exists in this league');
+  }
+
+  if (team.isLocked) {
     throw ForbiddenError(
-      'You are not an active manager of a team in this league',
+      'Your team has been locked by the commissioner and cannot make roster moves',
     );
   }
 
