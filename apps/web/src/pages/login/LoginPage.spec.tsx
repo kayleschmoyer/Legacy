@@ -813,3 +813,77 @@ describe('LoginPage clearError on new sign-in attempt (LS-6681)', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-7520 — Google sign-in deep-link preservation
+// Unauthenticated deep links must bounce through login and return to the
+// original URL after auth — storeCameFrom() must be called before the popup.
+// ---------------------------------------------------------------------------
+
+describe('LoginPage Google sign-in deep-link preservation (LS-7520)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    setBrowserUrl('/login');
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  it('returns to a trade-center deep link after Google sign-in', async () => {
+    // Simulate the auth-guard in-place scenario: LoginPage is rendered while
+    // the browser URL is still the protected deep-link.
+    setBrowserUrl('/trade-center?leagueId=42');
+
+    signInSpy.mockResolvedValueOnce({});
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    await act(async () => {
+      fireEvent.click(btn);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        null,
+        '',
+        '/trade-center?leagueId=42',
+      );
+    });
+
+    // The came-from entry is single-use — consumed by resolvePostLoginRedirect.
+    expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it('does not overwrite a root URL with a came-from entry after Google sign-in', async () => {
+    // When the LoginPage is rendered at the root (non-meaningful destination),
+    // storeCameFrom() should be a no-op and the fallback redirect applies.
+    setBrowserUrl('/');
+
+    signInSpy.mockResolvedValueOnce({});
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+    const btn = await waitForSignInButton();
+
+    await act(async () => {
+      fireEvent.click(btn);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      // Falls back to env.baseUrl ('/') — not a came-from entry.
+      expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/');
+    });
+    expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
+
+    replaceStateSpy.mockRestore();
+  });
+});

@@ -435,6 +435,10 @@ export function LoginPage(): React.JSX.Element {
   const handleSignIn = useCallback(async () => {
     if (!isConfigured || isConfiguring || signInInFlightRef.current) return;
     signInInFlightRef.current = true;
+    // Capture the deep-link before the popup opens so resolvePostLoginRedirect
+    // can return the user here after auth (LS-7520). storeCameFrom is a no-op
+    // on non-meaningful paths (root, /login) so this is safe for all callers.
+    storeCameFrom();
     setIsLoading(true);
     setErrorMessage('');
     clearError();
