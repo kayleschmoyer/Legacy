@@ -11,6 +11,7 @@
     }
   ],
   "compilerOptions": {
-    "module": "CommonJS"
+    "module": "CommonJS",
+    "moduleResolution": "node10"
   }
 }

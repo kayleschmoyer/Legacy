@@ -4,7 +4,8 @@
     "allowSyntheticDefaultImports": true,
     "lib": ["dom", "esnext"],
     "resolveJsonModule": true,
-    "module": "CommonJS"
+    "module": "CommonJS",
+    "moduleResolution": "node10"
   },
   "files": [],
   "include": [],
