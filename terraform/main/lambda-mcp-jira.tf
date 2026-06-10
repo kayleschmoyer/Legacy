@@ -104,6 +104,12 @@ resource "aws_lambda_function" "mcp_jira" {
       # When set, jira_claim_ticket will auto-assign the claimed ticket to this
       # Jira user. Value is the Jira account email; leave empty to disable.
       JIRA_ASSIGNEE_EMAIL = var.jira_assignee_email
+      # Fallback assignee when no email is configured: a pre-resolved Jira
+      # accountId assigned directly, with no user-lookup API call. Needed
+      # because the service account's client-credentials token only carries
+      # read:jira-work/write:jira-work — /rest/api/3/myself and
+      # /rest/api/3/user/search both require read:jira-user (LS-7891).
+      JIRA_ASSIGNEE_ACCOUNT_ID = var.jira_assignee_account_id
     }
   }
 

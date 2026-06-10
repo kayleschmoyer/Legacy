@@ -10,7 +10,8 @@ interface ClaimTicketParams {
   /**
    * Email of the user to assign the ticket to. Overrides the
    * `JIRA_ASSIGNEE_EMAIL` env var. When neither is provided, the ticket is
-   * assigned to the authenticated service account.
+   * assigned to the `JIRA_ASSIGNEE_ACCOUNT_ID` env var if set, else to the
+   * authenticated service account resolved via `GET /rest/api/3/myself`.
    */
   assignee?: string;
 }
@@ -204,8 +205,10 @@ export async function claimTicket(
 
     // --- Assign the ticket ---
     // Precedence: explicit `assignee` param > JIRA_ASSIGNEE_EMAIL env var >
-    // the authenticated service account (self).
+    // JIRA_ASSIGNEE_ACCOUNT_ID env var > the authenticated service account
+    // (self).
     const assigneeEmail = assignee ?? process.env['JIRA_ASSIGNEE_EMAIL'];
+    const configuredAccountId = process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
     try {
       let accountId: string | undefined;
 
@@ -225,8 +228,16 @@ export async function claimTicket(
             `Could not assign ticket: no Jira user found for email "${assigneeEmail}".`,
           );
         }
+      } else if (configuredAccountId) {
+        // Pre-resolved accountId — assign directly without any user-lookup
+        // API call. Both /rest/api/3/myself and /rest/api/3/user/search
+        // require the read:jira-user scope, which the hosted Lambda's
+        // client-credentials token (read:jira-work write:jira-work) lacks
+        // (LS-7891).
+        accountId = configuredAccountId;
       } else {
-        // No email configured — default to the authenticated service account.
+        // No email or accountId configured — default to the authenticated
+        // service account. Requires read:jira-user; works under basic auth.
         const self = await jiraRequest<{ accountId: string }>({
           method: 'GET',
           path: '/rest/api/3/myself',

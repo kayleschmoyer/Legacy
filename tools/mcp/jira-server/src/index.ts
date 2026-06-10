@@ -445,7 +445,7 @@ server.tool(
   'Atomically read, validate, and claim a Jira ticket. ' +
     'Fetches ticket details, checks blockers, warns on open children, then transitions to "In Progress". ' +
     'Returns action: "PROCEED" (claimed), "STOP" (blocked/done/in-review/no-transition), or "ALREADY_CLAIMED" (already In Progress). ' +
-    'On a successful claim the ticket is assigned to the `assignee` email if provided, else the JIRA_ASSIGNEE_EMAIL env var, else the authenticated service account. ' +
+    'On a successful claim the ticket is assigned to the `assignee` email if provided, else the JIRA_ASSIGNEE_EMAIL env var, else the JIRA_ASSIGNEE_ACCOUNT_ID env var, else the authenticated service account. ' +
     'Use this instead of separate jira_view + jira_transition calls at the start of a ticket workflow.',
   {
     key: z
@@ -460,7 +460,7 @@ server.tool(
       .email()
       .optional()
       .describe(
-        'Email of the user to assign the ticket to. Overrides the JIRA_ASSIGNEE_EMAIL env var. Defaults to the service account when neither is set.',
+        'Email of the user to assign the ticket to. Overrides the JIRA_ASSIGNEE_EMAIL env var. Defaults to JIRA_ASSIGNEE_ACCOUNT_ID, then the service account, when unset.',
       ),
   },
   async (params) => claimTicket(params),

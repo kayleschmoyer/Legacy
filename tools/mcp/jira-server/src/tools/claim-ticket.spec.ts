@@ -57,6 +57,7 @@ const makeTransitions = () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
+  delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
 
   // Default happy-path mock sequence:
   // 1. GET /issue/:key   → issue details
@@ -228,6 +229,114 @@ describe('claimTicket — auto-assign behaviour', () => {
     const warnings = data['warnings'] as string[];
     expect(warnings.length).toBe(1);
     expect(warnings[0]).toContain('no Jira user found');
+  });
+
+  it('assigns directly from JIRA_ASSIGNEE_ACCOUNT_ID without any user-lookup API call', async () => {
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = '712020:abcd-1234';
+
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+
+    // Neither /myself nor /user/search should be called — both require the
+    // read:jira-user scope, which the Lambda's token lacks (LS-7891).
+    const lookupCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        opts.path === '/rest/api/3/myself' ||
+        opts.path === '/rest/api/3/user/search',
+    );
+    expect(lookupCalls).toHaveLength(0);
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0][0].body).toEqual({ accountId: '712020:abcd-1234' });
+    expect((data['warnings'] as string[]).length).toBe(0);
+  });
+
+  it('prefers JIRA_ASSIGNEE_EMAIL over JIRA_ASSIGNEE_ACCOUNT_ID', async () => {
+    process.env['JIRA_ASSIGNEE_EMAIL'] = 'agent@example.com';
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'env-account-id';
+
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          return Promise.resolve([{ accountId: 'from-email-lookup' }]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0][0].body).toEqual({ accountId: 'from-email-lookup' });
+  });
+
+  it('adds a warning and proceeds when /myself fails with a 401 scope error', async () => {
+    // No email or accountId configured — falls through to /myself, which
+    // 401s under the Lambda's client-credentials token (LS-7891).
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
+          return Promise.reject(
+            new Error(
+              'Jira API GET /rest/api/3/myself failed (401): {"code":401,"message":"Unauthorized; scope does not match"}',
+            ),
+          );
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putCalls).toHaveLength(0);
+
+    const warnings = data['warnings'] as string[];
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain('Assignee update failed');
+    expect(warnings[0]).toContain('scope does not match');
   });
 
   it('adds a warning and proceeds when the assignee PUT call throws', async () => {
