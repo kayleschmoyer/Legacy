@@ -6,6 +6,7 @@ import { TradeCenterPage } from './TradeCenterPage';
 
 // ── Configurable mock state ──────────────────────────────────────────────────
 let mockUserLeagues: unknown;
+let mockLeaguesLoading = false;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
@@ -20,7 +21,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetUserLeaguesQuery: () => ({
     data: mockUserLeagues,
-    loading: false,
+    loading: mockLeaguesLoading,
     error: undefined,
     refetch: jest.fn(),
   }),
@@ -134,6 +135,7 @@ function renderPage(initialPath = '/trade-center') {
 
 beforeEach(() => {
   mockUserLeagues = undefined;
+  mockLeaguesLoading = false;
   mockUserTeamId = null;
   mockLeague = undefined;
   mockTeamTradeOffers = [];
@@ -153,6 +155,18 @@ describe('TradeCenterPage', () => {
   it('renders the league selection prompt', () => {
     renderPage();
     expect(screen.getByText(/Select a league/i)).toBeInTheDocument();
+  });
+
+  it('does not show a spinner when stale league data exists during a background refetch', () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'Alpha League' }],
+    };
+    mockLeaguesLoading = true;
+    renderPage();
+    expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /View trades for Alpha League/i }),
+    ).toBeInTheDocument();
   });
 
   it('shows an empty state with CTAs when user has no leagues', () => {

@@ -374,6 +374,7 @@ export function TradeCenterPage(): React.JSX.Element {
 
   const { data, loading, error, refetch } = useGetUserLeaguesQuery({
     skip: !user,
+    fetchPolicy: 'cache-first',
   });
 
   const leagues = data?.userLeagues ?? [];
@@ -441,7 +442,7 @@ export function TradeCenterPage(): React.JSX.Element {
               Select a league to view and manage trade offers.
             </Text>
 
-            {loading && (
+            {loading && leagues.length === 0 && (
               <YStack alignItems="center" padding="$6">
                 <Spinner size="large" color="$color" />
               </YStack>
@@ -525,8 +526,7 @@ export function TradeCenterPage(): React.JSX.Element {
               </YStack>
             )}
 
-            {!loading &&
-              !error &&
+            {!error &&
               leagues.map((league) => {
                 if (!league.id) return null;
                 const phaseChip = getPhaseChip(

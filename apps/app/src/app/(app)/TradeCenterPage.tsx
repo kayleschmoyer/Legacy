@@ -179,6 +179,7 @@ export default function TradeCenterPage() {
 
   const { data, loading, error, refetch } = useGetUserLeaguesQuery({
     skip: !userInfo?.id,
+    fetchPolicy: 'cache-first',
   });
 
   // Pre-select a league when arriving via deep link with ?leagueId=X
@@ -217,7 +218,7 @@ export default function TradeCenterPage() {
           Select a league to view and manage trade offers.
         </Text>
 
-        {loading && (
+        {loading && leagues.length === 0 && (
           <YStack alignItems="center" padding="$6">
             <Spinner size="large" color="$color" />
           </YStack>

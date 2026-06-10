@@ -10,6 +10,7 @@ import TradeCenterPage from './TradeCenterPage';
 
 // ── Configurable mock state ──────────────────────────────────────────────────
 let mockUserLeagues: unknown;
+let mockLeaguesLoading = false;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
 
@@ -32,7 +33,7 @@ jest.mock('../../common/auth/AuthHooks', () => ({
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetUserLeaguesQuery: () => ({
     data: mockUserLeagues,
-    loading: false,
+    loading: mockLeaguesLoading,
     error: undefined,
     refetch: jest.fn(),
   }),
@@ -120,6 +121,7 @@ jest.mock('./_screenErrorBoundary', () => ({
 
 beforeEach(() => {
   mockUserLeagues = undefined;
+  mockLeaguesLoading = false;
   mockUserTeamId = null;
   mockLeague = undefined;
 });
@@ -137,6 +139,14 @@ describe('TradeCenterPage', () => {
   it('renders the league selection prompt', () => {
     render(<TradeCenterPage />);
     expect(screen.getByText(/Select a league/i)).toBeTruthy();
+  });
+
+  it('does not show a spinner when stale league data exists during a background refetch', () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Alpha League' }] };
+    mockLeaguesLoading = true;
+    render(<TradeCenterPage />);
+    expect(screen.queryByTestId('spinner')).toBeNull();
+    expect(screen.getByLabelText('View trades for Alpha League')).toBeTruthy();
   });
 
   it('renders an empty state when no leagues are returned', () => {
