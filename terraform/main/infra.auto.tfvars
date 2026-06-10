@@ -51,6 +51,12 @@ discord_client_id = "1493368154972487800"
 # the Discord Developer Portal under OAuth2 → Redirects.
 discord_redirect_uri = "https://legacy-fantasy.com/auth/discord/callback"
 
+# Native (mobile) Discord redirect URI allow-list — the custom app scheme the
+# mobile client supplies on the native PKCE code exchange. Must match the value
+# in apps/app/src/common/auth/discordAuth.ts and be registered in the Discord
+# Developer Portal under OAuth2 → Redirects. Comma-separated for multiple URIs.
+discord_native_redirect_uris = "legacysports://auth/discord/callback"
+
 # ── MCP IAM Identity Center SAML federation (LS-4473) ────────────────────────
 # IdP metadata URL for the IAM Identity Center SAML application that federates
 # into the MCP Cognito user pool. Leave empty until the one-time IC SAML app

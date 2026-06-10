@@ -276,6 +276,12 @@ resource "aws_lambda_function" "oauth_proxy" {
       DISCORD_CLIENT_ID          = var.discord_client_id
       DISCORD_CLIENT_SECRET_PATH = var.discord_client_secret != "" ? aws_secretsmanager_secret.discord_client_secret[0].name : ""
       DISCORD_REDIRECT_URI       = var.discord_redirect_uri
+
+      # Native (mobile) Discord PKCE flow — comma-separated allow-list of custom-scheme
+      # redirect URIs the device may supply on the native code exchange. Validated by
+      # handleDiscordAuthNative before forwarding to Discord's token endpoint; unset means
+      # no native redirect URI is permitted (native exchange returns 400 Invalid redirect_uri).
+      DISCORD_NATIVE_REDIRECT_URIS = var.discord_native_redirect_uris
     }
   }
 

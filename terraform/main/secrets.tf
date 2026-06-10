@@ -82,6 +82,12 @@ variable "discord_redirect_uri" {
   default     = ""
 }
 
+variable "discord_native_redirect_uris" {
+  description = "Comma-separated allow-list of native custom-scheme Discord redirect URIs accepted on the mobile PKCE flow (e.g. legacysports://auth/discord/callback)"
+  type        = string
+  default     = ""
+}
+
 # Cloudflare Workers AI credentials for image NSFW classification
 variable "cloudflare_account_id" {
   description = "Cloudflare account ID for Workers AI API calls"
