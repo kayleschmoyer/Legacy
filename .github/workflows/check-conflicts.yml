@@ -178,6 +178,22 @@ jobs:
                   owner, repo, issue_number: prNumber, labels: [label],
                 }));
                 core.info(`Label added: ${label}`);
+                // Comment only when the label transitions from absent to
+                // present, so repeated pushes on a still-conflicted PR don't
+                // spam the thread. Non-fatal: the step still reports the
+                // conflict via core.setFailed below even if this fails.
+                try {
+                  await withRetry(() => github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body:
+                      '⚠️ This PR has merge conflicts with the base branch. ' +
+                      'Rebase or merge the base branch into your branch to resolve them. ' +
+                      'The `CI: Conflicts` label will be removed automatically once the conflicts are resolved.',
+                  }));
+                  core.info('Conflict comment posted.');
+                } catch (e) {
+                  core.warning(`Failed to post conflict comment on PR #${prNumber}: ${e.message}`);
+                }
               }
               core.setFailed(
                 'This PR has merge conflicts with the base branch. ' +

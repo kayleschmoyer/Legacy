@@ -147,6 +147,14 @@ jobs:
               printf '{"labels":["CI: Conflicts"]}' \
                 | gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" -X POST --input - > /dev/null \
                 || echo "::warning::Failed to add 'CI: Conflicts' label to PR #${PR_NUM}"
+              # Comment only on the absent→present label transition so a PR
+              # that stays conflicted across multiple sweeps isn't re-commented.
+              BODY="⚠️ This PR has merge conflicts with \`${BASE_REF}\` after ${BASE_SHA:0:7} landed."
+              BODY="$BODY Rebase or merge \`${BASE_REF}\` into your branch to resolve them."
+              BODY="$BODY The \`CI: Conflicts\` label will be removed automatically once the conflicts are resolved."
+              printf '%s' "$BODY" | jq -R '{"body": .}' \
+                | gh api "repos/${GH_REPO}/issues/${PR_NUM}/comments" -X POST --input - > /dev/null \
+                || echo "::warning::Failed to post conflict comment on PR #${PR_NUM}"
             elif [ "$CONCLUSION" = "success" ] && [ "$HAS_CONFLICT_LABEL" = "true" ]; then
               gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels/CI%3A%20Conflicts" \
                 -X DELETE > /dev/null 2>&1 \
