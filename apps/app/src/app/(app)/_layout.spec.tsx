@@ -137,6 +137,8 @@ const EXPECTED_SCREENS = [
   'index',
   'baseball/index',
   'football/index',
+  'league/create',
+  'league/join',
   'baseball/league/create',
   'football/league/create',
   'baseball/league/join',

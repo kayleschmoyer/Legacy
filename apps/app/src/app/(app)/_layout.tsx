@@ -73,25 +73,22 @@ export default function Layout() {
             name="league/join"
             options={{ title: 'Join a League' }}
           />
-          {/* Sport-specific create/join (reachable from league/create and direct deep-links) */}
+          {/* Legacy sport-specific routes redirect to the unified screens */}
           <Stack.Screen
             name="baseball/league/create"
-            options={{ headerShown: true, headerTitle: 'Create League' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="football/league/create"
-            options={{
-              headerShown: true,
-              headerTitle: 'Create Football League',
-            }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="baseball/league/join"
-            options={{ title: 'Join League' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="football/league/join"
-            options={{ title: 'Join Football League' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="league-discovery"

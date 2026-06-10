@@ -19,13 +19,67 @@ import {
   type ValidateInviteCodeQuery,
 } from '../../../api/db/graphql.generated';
 
-const BRAND_NAVY_LIGHT = '#2C4A7C';
+type SportChoice = 'baseball' | 'football';
+
+function SportSelector({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: SportChoice;
+  onChange: (s: SportChoice) => void;
+  disabled: boolean;
+}): React.JSX.Element {
+  return (
+    <YStack space="$2">
+      <Text color="$gray12" fontWeight="600" fontSize="$4">
+        Sport *
+      </Text>
+      <XStack space="$3">
+        {(
+          [
+            { sport: 'baseball' as const, label: '⚾ Baseball' },
+            { sport: 'football' as const, label: '🏈 Football' },
+          ] as const
+        ).map(({ sport, label }) => {
+          const selected = value === sport;
+          return (
+            <Button
+              key={sport}
+              flex={1}
+              size="$4"
+              onPress={() => onChange(sport)}
+              disabled={disabled}
+              backgroundColor={selected ? '$blue8' : '$color2'}
+              borderColor={selected ? '$blue8' : '$borderColor'}
+              borderWidth={selected ? 2 : 1}
+              elevation={selected ? 3 : 1}
+              pressStyle={{ scale: 0.95 }}
+              testID={`sport-selector-${sport}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Select ${label}`}
+            >
+              <Text
+                color={selected ? '$blue12' : '$color'}
+                fontWeight={selected ? '700' : '500'}
+                fontSize="$4"
+              >
+                {label}
+              </Text>
+            </Button>
+          );
+        })}
+      </XStack>
+    </YStack>
+  );
+}
 
 export default function JoinLeagueScreen(): React.JSX.Element {
   const router = useRouter();
   const params = useLocalSearchParams();
   const urlInviteCode = params.inviteCode as string | undefined;
 
+  const [sport, setSport] = useState<SportChoice>('baseball');
   const [inviteCode, setInviteCode] = useState('');
   const [teamName, setTeamName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +154,12 @@ export default function JoinLeagueScreen(): React.JSX.Element {
       });
 
       if (result.data?.joinLeagueByCode?.leagueId) {
-        router.navigate(`/league/${result.data.joinLeagueByCode.leagueId}`);
+        const leagueId = result.data.joinLeagueByCode.leagueId;
+        router.navigate(
+          sport === 'football'
+            ? `/football/league/${leagueId}`
+            : `/baseball/league/${leagueId}`,
+        );
       }
     } catch (err) {
       LOGGER.error(
@@ -122,7 +181,7 @@ export default function JoinLeagueScreen(): React.JSX.Element {
         width="100%"
       >
         <YStack space="$2">
-          <H1 size="$9" color="$color">
+          <H1 size="$9" color="$brandGold">
             🎟️ Join League
           </H1>
           <Text color="$gray11" fontSize="$5">
@@ -149,6 +208,13 @@ export default function JoinLeagueScreen(): React.JSX.Element {
           padding="$5"
         >
           <YStack space="$4">
+            {/* Sport Selector */}
+            <SportSelector
+              value={sport}
+              onChange={setSport}
+              disabled={loading}
+            />
+
             {/* Invite Code Input */}
             <YStack space="$2">
               <Text color="$gray12" fontWeight="600" fontSize="$4">
@@ -175,7 +241,7 @@ export default function JoinLeagueScreen(): React.JSX.Element {
 
               {validating && (
                 <XStack gap="$2" alignItems="center">
-                  <Spinner size="small" color={BRAND_NAVY_LIGHT} />
+                  <Spinner size="small" color="$brandNavyLight" />
                   <Text color="$gray10" fontSize="$2">
                     Checking code...
                   </Text>
@@ -256,7 +322,7 @@ export default function JoinLeagueScreen(): React.JSX.Element {
                 Cancel
               </Button>
               <Button
-                backgroundColor={BRAND_NAVY_LIGHT}
+                backgroundColor="$brandNavyLight"
                 color="white"
                 onPress={() => void handleSubmit()}
                 disabled={
