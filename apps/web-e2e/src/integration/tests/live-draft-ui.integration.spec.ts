@@ -983,19 +983,6 @@ test.describe
     });
 
     await test.step('Verify roster has drafted players', async () => {
-      // Section headers prove roster structure loaded.
-      // Fresh browser context means positions + team members must all load
-      // from scratch — allow up to 30s for the roster to fully render.
-      await expect(
-        page.getByText('Pitching', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
-      await expect(
-        page.getByText('Infield', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
-      await expect(
-        page.getByText('Outfield', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
-
       // After a live draft, autoPopulateFirstMatchupLineup (LS-445) places
       // drafted fielders into starter slots first. draftCompletedAt is
       // committed inside the final pick transaction, so the UI can show
@@ -1060,6 +1047,22 @@ test.describe
       // helpers/reload-until-visible.ts file warns about (reload-in-poll is).
       await page.reload();
       await page.waitForLoadState('load');
+
+      // Section headers prove the roster structure rendered. The roster route
+      // (LeagueDetailPage → features/roster/LeagueRosterManagement) groups slots
+      // under "Starting Hitters" / "Starting Pitchers" (RosterSection `title`).
+      // The previous assertions used "Pitching" / "Infield" / "Outfield" — stale
+      // strings from a long-replaced roster UI that never matched the current
+      // page, so this step failed reliably regardless of timing (LS-7876: runs
+      // 27253153489 and 27255138902, "Pitching" element not found within 30s).
+      // Assert the real headers, after the backend confirmed positionId
+      // population above and a fresh reload flushed Apollo's cache.
+      await expect(
+        page.getByText('Starting Pitchers', { exact: false }).first(),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByText('Starting Hitters', { exact: false }).first(),
+      ).toBeVisible({ timeout: 30_000 });
 
       const lineupParent = page
         .getByText('Lineup', { exact: true })

@@ -252,24 +252,40 @@ test.describe
       await page.getByLabel('Search players to compare').fill(PLAYER_SEARCH_1);
     });
 
-    await test.step('Dropdown results appear within 15 s', async () => {
-      // The dropdown lists up to 8 results. Any visible list item means the API responded.
-      // We scope to the listbox so we don't accidentally match other UI text (the
-      // <input>'s value is not matched by getByText, but other on-page text may be).
-      const dropdown = page.getByRole('listbox', {
-        name: /Player suggestions/i,
-      });
-      await expect(
-        dropdown.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).first(),
-      ).toBeVisible({ timeout: 15_000 });
+    await test.step('Dropdown results appear', async () => {
+      // The dropdown renders each result as a `role="option"` Pressable whose
+      // accessible name is the player's full name (PlayerComparison.tsx:486).
+      // The container has `aria-label="Player suggestions"` but NO `role="listbox"`,
+      // so the previous `getByRole('listbox', { name: /Player suggestions/i })`
+      // locator never matched and this step failed regardless of timing (LS-7876:
+      // runs 27253153489 and 27255138902, listbox result not found). Target the
+      // option directly by role + accessible name — the stable selector that
+      // matches the rendered DOM.
+      //
+      // The dropdown is fed by the browser-side `useGetPlayersWithStatsQuery`,
+      // which does NOT go through the integration suite's fetchWithBackoff, and
+      // the production Apollo RetryLink retries only network-level failures — NOT
+      // HTTP 429 (apps/web/src/lib/apollo-client.ts:213). So a transient throttle
+      // on the shared live backend can leave the dropdown empty with no client
+      // retry. Re-issue the search (clear + re-type flips the `search` variable
+      // from skip→active, firing a fresh request) until a real result renders.
+      // This stays backend-authoritative — it only passes once the live search
+      // actually returns PLAYER_SEARCH_1 — and is bounded, so a genuinely empty
+      // result still fails.
+      const input = page.getByLabel('Search players to compare');
+      const firstResult = page
+        .getByRole('option', { name: new RegExp(PLAYER_SEARCH_1, 'i') })
+        .first();
+      await expect(async () => {
+        await input.fill('');
+        await input.fill(PLAYER_SEARCH_1);
+        await expect(firstResult).toBeVisible({ timeout: 10_000 });
+      }).toPass({ timeout: 60_000, intervals: [1_000, 2_000, 5_000] });
     });
 
     await test.step('Click the first result to add the player', async () => {
-      const dropdown = page.getByRole('listbox', {
-        name: /Player suggestions/i,
-      });
-      await dropdown
-        .getByText(new RegExp(PLAYER_SEARCH_1, 'i'))
+      await page
+        .getByRole('option', { name: new RegExp(PLAYER_SEARCH_1, 'i') })
         .first()
         .click();
     });

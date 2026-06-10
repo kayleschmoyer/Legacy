@@ -444,7 +444,11 @@ test.describe
     api,
     apiCommissioner,
   }) => {
-    test.setTimeout(240_000);
+    // Two games per matchup, each waiting up to 180s for the live stats
+    // pipeline to finish (see 4.Nb below). Budget the test envelope to cover
+    // both worst-case waits plus the surrounding mutation/verification
+    // round-trips. (LS-7876)
+    test.setTimeout(480_000);
 
     for (let game = 1; game <= GAMES_PER_MATCHUP; game++) {
       await test.step(`4.${game}a Auto-select games (game ${game} of ${GAMES_PER_MATCHUP})`, async () => {
@@ -460,11 +464,17 @@ test.describe
       });
 
       await test.step(`4.${game}b Wait for stats to load (game ${game})`, async () => {
+        // The stats pipeline (autoSelectGames → Lambda/SQS → matchup_player_games
+        // → statsLoadingStatus: completed) runs on the shared live backend. Under
+        // the 3-shard integration ceiling it can stay in `loading` past 120s
+        // (LS-7876: run 27253153489 timed out at 122s with matchup 48423 still
+        // loading). The poll is already backend-authoritative; the deadline was
+        // simply tighter than the observed completion time, so widen it to 180s.
         const matchups = await waitForAllMatchupsStatsLoaded(
           api,
           state.leagueId,
           1,
-          { timeoutMs: 120_000 },
+          { timeoutMs: 180_000 },
         );
         expect(matchups.length).toBeGreaterThan(0);
       });
@@ -696,7 +706,11 @@ test.describe
     api,
     apiCommissioner,
   }) => {
-    test.setTimeout(240_000);
+    // Two games per matchup, each waiting up to 180s for the live stats
+    // pipeline to finish (see 5.Nb below). Budget the test envelope to cover
+    // both worst-case waits plus the surrounding mutation/verification
+    // round-trips. (LS-7876)
+    test.setTimeout(480_000);
 
     for (let game = 1; game <= GAMES_PER_MATCHUP; game++) {
       await test.step(`5.${game}a Auto-select games (game ${game} of ${GAMES_PER_MATCHUP})`, async () => {
@@ -712,11 +726,14 @@ test.describe
       });
 
       await test.step(`5.${game}b Wait for stats to load (game ${game})`, async () => {
+        // Same live-backend stats-pipeline latency as week 1 (4.Nb): widen the
+        // already-backend-authoritative poll to 180s so a slow-but-progressing
+        // `loading` matchup under the 3-shard ceiling is not cut off. (LS-7876)
         const matchups = await waitForAllMatchupsStatsLoaded(
           api,
           state.leagueId,
           2,
-          { timeoutMs: 120_000 },
+          { timeoutMs: 180_000 },
         );
         expect(matchups.length).toBeGreaterThan(0);
       });
