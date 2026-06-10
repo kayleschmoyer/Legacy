@@ -6,14 +6,14 @@ import React, {
   useState,
 } from 'react';
 import { ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ArrowLeftRight,
   ChevronLeft,
   RefreshCw,
   Users,
 } from '@tamagui/lucide-icons';
-import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { config } from '@legacy-sports/app-config/native';
 import { TradingCenter, useWebSocket } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -174,6 +174,7 @@ function LeagueTrades({
 // ── TradeCenterPage ───────────────────────────────────────────────────────────
 
 export default function TradeCenterPage() {
+  const router = useRouter();
   const { leagueId: leagueIdParam, tradeOfferId: tradeOfferIdParam } =
     useLocalSearchParams<{
       leagueId?: string;
@@ -272,6 +273,13 @@ export default function TradeCenterPage() {
             <Text color="$textMuted" fontSize="$3" textAlign="center">
               Join or create a league to start trading.
             </Text>
+            <Button
+              size="$3"
+              onPress={() => router.navigate('/league-discovery')}
+              accessibilityRole="button"
+            >
+              Browse Leagues
+            </Button>
           </YStack>
         )}
 

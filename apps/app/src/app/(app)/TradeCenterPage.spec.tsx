@@ -25,8 +25,11 @@ let capturedOnSubscribeRefresh:
 
 let mockSearchParams: Record<string, string> = {};
 
+const mockNavigate = jest.fn();
+
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams,
+  useRouter: () => ({ navigate: mockNavigate }),
   Redirect: () => null,
 }));
 
@@ -92,6 +95,19 @@ jest.mock('tamagui', () => {
   const { View, Text, Pressable } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
+    Button: ({
+      children,
+      onPress,
+      ...rest
+    }: {
+      children: React.ReactNode;
+      onPress?: () => void;
+      [key: string]: unknown;
+    }) => (
+      <Pressable onPress={onPress} {...(rest as object)}>
+        <Text>{children}</Text>
+      </Pressable>
+    ),
     Card: ({
       children,
       onPress,
@@ -153,6 +169,7 @@ beforeEach(() => {
   mockLeague = undefined;
   capturedNativeProps = null;
   mockSearchParams = {};
+  mockNavigate.mockReset();
   const sharedMocks: { useWebSocket: jest.Mock } = jest.requireMock(
     '@legacy-sports/shared-components',
   );
@@ -186,6 +203,19 @@ describe('TradeCenterPage', () => {
     mockUserLeagues = { userLeagues: [] };
     render(<TradeCenterPage />);
     expect(screen.getByText(/No leagues found/i)).toBeTruthy();
+  });
+
+  it('renders a Browse Leagues CTA button in the empty state', () => {
+    mockUserLeagues = { userLeagues: [] };
+    render(<TradeCenterPage />);
+    expect(screen.getByText(/Browse Leagues/i)).toBeTruthy();
+  });
+
+  it('navigates to league-discovery when Browse Leagues is pressed', () => {
+    mockUserLeagues = { userLeagues: [] };
+    render(<TradeCenterPage />);
+    fireEvent.press(screen.getByText(/Browse Leagues/i));
+    expect(mockNavigate).toHaveBeenCalledWith('/league-discovery');
   });
 
   it('renders league cards when leagues are returned', () => {
