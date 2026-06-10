@@ -1,11 +1,6 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import {
   ArrowLeftRight,
   BarChart2,
@@ -425,30 +420,6 @@ export function TradeCenterPage(): React.JSX.Element {
   const allLeagues = (data ?? previousData)?.userLeagues ?? [];
   const leagues = allLeagues.filter((l) => l.leaguePhase === 'active');
 
-  // Capture a stable correlation ID and error code when an error first occurs.
-  // The correlation ID changes on each new error occurrence (e.g. after retry),
-  // giving support a short reference token to match user reports.
-  const errorMetaRef = useRef<{
-    correlationId: string;
-    errorCode: string | undefined;
-  } | null>(null);
-  if (error && !errorMetaRef.current) {
-    const gqlError = error as {
-      graphQLErrors?: Array<{ extensions?: Record<string, unknown> }>;
-      networkError?: Error | null;
-    };
-    const code =
-      (gqlError.graphQLErrors?.[0]?.extensions?.['code'] as
-        | string
-        | undefined) ?? (gqlError.networkError ? 'NETWORK_ERROR' : undefined);
-    errorMetaRef.current = {
-      correlationId: Date.now().toString(36).slice(-6).toUpperCase(),
-      errorCode: code,
-    };
-  } else if (!error) {
-    errorMetaRef.current = null;
-  }
-
   // Pre-select league from ?leagueId=[&offerId=] query params for notification deep links
   const leagueIdParam = searchParams.get('leagueId');
   const offerIdParam = searchParams.get('offerId');
@@ -543,31 +514,43 @@ export function TradeCenterPage(): React.JSX.Element {
                 <Text color="$colorPress" fontSize="$4" textAlign="center">
                   Failed to load leagues.
                 </Text>
-                {errorMetaRef.current && (
-                  <Text
-                    fontSize="$1"
-                    color="$colorPress"
-                    opacity={0.6}
-                    fontFamily="$mono"
-                    textAlign="center"
-                    testID="error-triage-info"
-                  >
-                    {[
-                      errorMetaRef.current.errorCode
-                        ? `Code: ${errorMetaRef.current.errorCode}`
-                        : null,
-                      `ID: ${errorMetaRef.current.correlationId}`,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                )}
+                {(() => {
+                  const graphqlError = CombinedGraphQLErrors.is(error)
+                    ? error.errors[0]
+                    : undefined;
+                  const correlationId =
+                    (graphqlError?.extensions?.['correlationId'] as
+                      | string
+                      | undefined) ??
+                    (graphqlError?.extensions?.['requestId'] as
+                      | string
+                      | undefined);
+                  const diagLine = [
+                    'Code: LOAD_LEAGUES_FAILED',
+                    correlationId ? `Ref: ${correlationId}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join('  ·  ');
+                  return (
+                    <Text
+                      color="$colorPress"
+                      fontSize="$2"
+                      textAlign="center"
+                      data-testid="load-leagues-error-diag"
+                      style={
+                        {
+                          fontFamily: 'monospace',
+                          opacity: 0.7,
+                        } as React.CSSProperties
+                      }
+                    >
+                      {diagLine}
+                    </Text>
+                  );
+                })()}
                 <Text
                   tag="button"
-                  onPress={() => {
-                    errorMetaRef.current = null;
-                    void refetch();
-                  }}
+                  onPress={() => void refetch()}
                   color="$blue10"
                   fontSize="$3"
                   pressStyle={{ opacity: 0.7 }}

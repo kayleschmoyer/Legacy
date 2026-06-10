@@ -13,9 +13,9 @@ export interface ErrorStateProps {
   onRetry?: () => void;
   /** Custom retry button label. Defaults to "Retry". */
   retryLabel?: string;
-  /** Optional error code shown for support triage (e.g. "INTERNAL_SERVER_ERROR"). */
+  /** Machine-readable error code shown to the user for support triage (e.g. "LOAD_LEAGUES_FAILED"). */
   errorCode?: string;
-  /** Optional correlation ID shown for support triage. */
+  /** Server-supplied correlation / request ID shown to the user so support can locate the trace. */
   correlationId?: string;
 }
 
@@ -31,10 +31,12 @@ export function ErrorState({
       ? error
       : (error?.message ?? 'An unexpected error occurred');
 
-  const hasTriageInfo = Boolean(errorCode ?? correlationId);
-  const triageParts: string[] = [];
-  if (errorCode) triageParts.push(`Code: ${errorCode}`);
-  if (correlationId) triageParts.push(`ID: ${correlationId}`);
+  const diagLine = [
+    errorCode ? `Code: ${errorCode}` : null,
+    correlationId ? `Ref: ${correlationId}` : null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
 
   return (
     <YStack
@@ -50,14 +52,15 @@ export function ErrorState({
         {message}
       </Text>
 
-      {hasTriageInfo ? (
+      {diagLine ? (
         <Text
           fontSize="$1"
           color="$red9"
-          fontFamily="$mono"
-          testID="error-triage-info"
+          fontWeight="400"
+          testID="error-state-diag"
+          style={{ fontFamily: 'monospace' } as React.CSSProperties}
         >
-          {triageParts.join(' · ')}
+          {diagLine}
         </Text>
       ) : null}
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 
 import { TradeCenterPage } from './TradeCenterPage';
 
@@ -8,7 +9,7 @@ import { TradeCenterPage } from './TradeCenterPage';
 let mockUserLeagues: unknown;
 let mockUserLeaguesPreviousData: unknown;
 let mockLeaguesLoading = false;
-let mockUserLeaguesError: unknown;
+let mockLeaguesError: unknown = undefined;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
@@ -32,7 +33,7 @@ jest.mock('../../api/db/graphql.generated', () => ({
     data: mockUserLeagues,
     previousData: mockUserLeaguesPreviousData,
     loading: mockLeaguesLoading,
-    error: mockUserLeaguesError,
+    error: mockLeaguesError,
     refetch: jest.fn(),
   }),
   useGetUserTeamIdQuery: () => ({
@@ -171,7 +172,7 @@ beforeEach(() => {
   mockUserLeagues = undefined;
   mockUserLeaguesPreviousData = undefined;
   mockLeaguesLoading = false;
-  mockUserLeaguesError = undefined;
+  mockLeaguesError = undefined;
   mockUserTeamId = null;
   mockLeague = undefined;
   mockTeamTradeOffers = [];
@@ -182,44 +183,6 @@ beforeEach(() => {
 describe('TradeCenterPage', () => {
   it('renders without crashing', () => {
     renderPage();
-  });
-
-  describe('error state', () => {
-    it('shows "Failed to load leagues" when useGetUserLeaguesQuery returns an error', () => {
-      mockUserLeaguesError = new Error('Network error');
-      renderPage();
-      expect(screen.getByText(/Failed to load leagues/i)).toBeInTheDocument();
-    });
-
-    it('shows triage info with correlation ID when an error occurs', () => {
-      mockUserLeaguesError = new Error('Network error');
-      renderPage();
-      const triageEl = screen.getByTestId('error-triage-info');
-      expect(triageEl).toBeInTheDocument();
-      expect(triageEl.textContent).toMatch(/ID:/);
-    });
-
-    it('shows the GraphQL error code in triage info when available', () => {
-      mockUserLeaguesError = {
-        message: 'GraphQL error',
-        graphQLErrors: [{ extensions: { code: 'INTERNAL_SERVER_ERROR' } }],
-        networkError: null,
-      };
-      renderPage();
-      const triageEl = screen.getByTestId('error-triage-info');
-      expect(triageEl.textContent).toMatch(/Code: INTERNAL_SERVER_ERROR/);
-    });
-
-    it('shows NETWORK_ERROR code when only a network error is present', () => {
-      mockUserLeaguesError = {
-        message: 'Network error',
-        graphQLErrors: [],
-        networkError: new Error('Failed to fetch'),
-      };
-      renderPage();
-      const triageEl = screen.getByTestId('error-triage-info');
-      expect(triageEl.textContent).toMatch(/Code: NETWORK_ERROR/);
-    });
   });
 
   it('renders the Trade Center heading', () => {
@@ -255,6 +218,38 @@ describe('TradeCenterPage', () => {
     expect(
       screen.getByRole('button', { name: /View trades for Alpha League/i }),
     ).toBeInTheDocument();
+  });
+
+  it('shows error state with diagnostic code when leagues fail to load', () => {
+    mockLeaguesError = new Error('Network error');
+    renderPage();
+    expect(screen.getByText(/Failed to load leagues/i)).toBeInTheDocument();
+    expect(screen.getByTestId('load-leagues-error-diag')).toHaveTextContent(
+      'Code: LOAD_LEAGUES_FAILED',
+    );
+  });
+
+  it('includes server correlation id in the diagnostic line when present', () => {
+    mockLeaguesError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          {
+            message: 'Internal error',
+            extensions: { correlationId: 'corr-abc-123' },
+          },
+        ],
+      },
+      [
+        {
+          message: 'Internal error',
+          extensions: { correlationId: 'corr-abc-123' },
+        },
+      ],
+    );
+    renderPage();
+    expect(screen.getByTestId('load-leagues-error-diag')).toHaveTextContent(
+      'Ref: corr-abc-123',
+    );
   });
 
   it('shows an empty state with CTAs when user has no leagues', () => {

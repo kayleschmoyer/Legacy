@@ -59,22 +59,22 @@ export const NullError: Story = {
 export const WithErrorCode: Story = {
   args: {
     error: 'Failed to load leagues.',
-    errorCode: 'INTERNAL_SERVER_ERROR',
+    errorCode: 'LOAD_LEAGUES_FAILED',
   },
 };
 
 export const WithCorrelationId: Story = {
   args: {
     error: 'Failed to load leagues.',
-    correlationId: 'A3F9D1',
+    correlationId: 'abc123xyz',
   },
 };
 
 export const WithErrorCodeAndCorrelationId: Story = {
   args: {
     error: 'Failed to load leagues.',
-    errorCode: 'INTERNAL_SERVER_ERROR',
-    correlationId: 'A3F9D1',
+    errorCode: 'LOAD_LEAGUES_FAILED',
+    correlationId: 'abc123xyz',
     onRetry: fn(),
   },
 };
