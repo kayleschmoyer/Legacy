@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
@@ -252,12 +252,14 @@ interface LeagueTradesViewProps {
   leagueId: number;
   leagueName: string;
   onBack: () => void;
+  deepLinkOfferId?: number;
 }
 
 function LeagueTradesView({
   leagueId,
   leagueName,
   onBack,
+  deepLinkOfferId,
 }: LeagueTradesViewProps) {
   const { data: teamData, loading: teamLoading } = useGetUserTeamIdQuery({
     variables: { leagueId },
@@ -355,6 +357,7 @@ function LeagueTradesView({
           leagueId={leagueId}
           userTeamId={userTeamId}
           isCommissioner={isCommissioner}
+          deepLinkOfferId={deepLinkOfferId}
         />
       )}
     </YStack>
@@ -381,6 +384,13 @@ export function TradeCenterPage(): React.JSX.Element {
 
   // Pre-select league from ?leagueId= query param for notification deep links
   const leagueIdParam = searchParams.get('leagueId');
+  const offerIdParam = searchParams.get('offerId');
+  const deepLinkOfferId = useMemo(() => {
+    if (!offerIdParam) return undefined;
+    const id = parseInt(offerIdParam, 10);
+    return isNaN(id) ? undefined : id;
+  }, [offerIdParam]);
+
   useEffect(() => {
     if (!leagueIdParam || selectedLeague != null) return;
     const id = parseInt(leagueIdParam, 10);
@@ -435,6 +445,7 @@ export function TradeCenterPage(): React.JSX.Element {
             leagueId={selectedLeague.id}
             leagueName={selectedLeague.name}
             onBack={handleBack}
+            deepLinkOfferId={deepLinkOfferId}
           />
         ) : (
           <YStack gap="$4">

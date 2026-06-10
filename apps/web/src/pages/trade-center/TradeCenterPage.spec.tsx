@@ -37,8 +37,17 @@ jest.mock('../../api/db/graphql.generated', () => ({
 }));
 
 jest.mock('../../features/baseball/TradingCenter', () => ({
-  TradingCenter: ({ leagueId }: { leagueId: number }) => (
-    <div data-testid={`trading-center-${leagueId}`} />
+  TradingCenter: ({
+    leagueId,
+    deepLinkOfferId,
+  }: {
+    leagueId: number;
+    deepLinkOfferId?: number;
+  }) => (
+    <div
+      data-testid={`trading-center-${leagueId}`}
+      data-deep-link-offer-id={deepLinkOfferId ?? ''}
+    />
   ),
 }));
 
@@ -232,6 +241,33 @@ describe('TradeCenterPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('trading-center-5')).toBeInTheDocument();
+    });
+  });
+
+  it('passes deepLinkOfferId to TradingCenter when ?offerId= is present', async () => {
+    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep Linked League' }] };
+    mockUserTeamId = 10;
+    mockLeague = { league: { id: 5, owner: 99 } };
+
+    renderPage('/trade-center?leagueId=5&offerId=42');
+
+    await waitFor(() => {
+      const el = screen.getByTestId('trading-center-5');
+      expect(el).toBeInTheDocument();
+      expect(el.getAttribute('data-deep-link-offer-id')).toBe('42');
+    });
+  });
+
+  it('ignores non-numeric ?offerId= param', async () => {
+    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep Linked League' }] };
+    mockUserTeamId = 10;
+    mockLeague = { league: { id: 5, owner: 99 } };
+
+    renderPage('/trade-center?leagueId=5&offerId=abc');
+
+    await waitFor(() => {
+      const el = screen.getByTestId('trading-center-5');
+      expect(el.getAttribute('data-deep-link-offer-id')).toBe('');
     });
   });
 

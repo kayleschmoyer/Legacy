@@ -28,6 +28,16 @@ let mockLeagueTradesReturn: {
   refetch: jest.fn(),
 };
 
+let mockDeepLinkReturn: {
+  data: GetTeamTradeOffersQuery | undefined;
+  loading: boolean;
+  refetch: jest.Mock;
+} = {
+  data: undefined,
+  loading: false,
+  refetch: jest.fn(),
+};
+
 let mockProposerRosterReturn: {
   data: GetTeamMembersQuery | undefined;
   error?: Error;
@@ -44,7 +54,13 @@ const mockRefetch = jest.fn().mockResolvedValue({});
 
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetLeagueByIdQuery: () => ({ data: undefined }),
-  useGetTeamTradeOffersQuery: jest.fn(() => mockPendingReturn),
+  useGetTeamTradeOffersQuery: jest.fn(
+    (options: { variables?: { status?: string } }) => {
+      // Pending query uses status: 'pending'; deep-link lookup omits status
+      if (options?.variables?.status === 'pending') return mockPendingReturn;
+      return mockDeepLinkReturn;
+    },
+  ),
   useGetLeagueTradeOffersQuery: jest.fn(() => mockLeagueTradesReturn),
   useGetLeagueTeamsQuery: () => ({ data: undefined }),
   useGetTeamMembersLazyQuery: jest.fn(() => [
@@ -793,5 +809,134 @@ describe('TradingCenter — Completed Trade History', () => {
     expect(getAllByText('ACCEPTED')).toHaveLength(1);
     expect(getAllByText('REJECTED')).toHaveLength(1);
     expect(getAllByText('VETOED')).toHaveLength(1);
+  });
+});
+
+describe('TradingCenter — deep-link expired/not-found handling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProposerRosterReturn = { data: undefined };
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockLeagueTradesReturn = {
+      data: undefined,
+      loading: false,
+      refetch: jest.fn(),
+    };
+    mockDeepLinkReturn = {
+      data: undefined,
+      loading: false,
+      refetch: jest.fn(),
+    };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+  });
+
+  it('shows no banner when deepLinkOfferId is not provided', () => {
+    mockDeepLinkReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { queryByTestId } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(queryByTestId('deep-link-unavailable-banner')).toBeNull();
+    expect(queryByTestId('deep-link-not-found-banner')).toBeNull();
+  });
+
+  it('shows "no longer available" banner for an expired deep-linked offer', async () => {
+    const expiredOffer = makeOffer({ id: 500, status: 'expired' });
+    mockDeepLinkReturn = {
+      data: { teamTradeOffers: [expiredOffer] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByTestId, queryByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        deepLinkOfferId={500}
+      />,
+    );
+    expect(await findByTestId('deep-link-unavailable-banner')).toBeTruthy();
+    expect(queryByTestId('deep-link-not-found-banner')).toBeNull();
+  });
+
+  it('shows "no longer available" banner for a vetoed deep-linked offer', async () => {
+    const vetoedOffer = makeOffer({ id: 501, status: 'vetoed' });
+    mockDeepLinkReturn = {
+      data: { teamTradeOffers: [vetoedOffer] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        deepLinkOfferId={501}
+      />,
+    );
+    expect(await findByTestId('deep-link-unavailable-banner')).toBeTruthy();
+  });
+
+  it('shows "no longer available" banner for a cancelled deep-linked offer', async () => {
+    const cancelledOffer = makeOffer({ id: 502, status: 'cancelled' });
+    mockDeepLinkReturn = {
+      data: { teamTradeOffers: [cancelledOffer] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        deepLinkOfferId={502}
+      />,
+    );
+    expect(await findByTestId('deep-link-unavailable-banner')).toBeTruthy();
+  });
+
+  it('shows "trade not found" banner when the offer ID is not in the team trades', async () => {
+    mockDeepLinkReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { findByTestId, queryByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        deepLinkOfferId={999}
+      />,
+    );
+    expect(await findByTestId('deep-link-not-found-banner')).toBeTruthy();
+    expect(queryByTestId('deep-link-unavailable-banner')).toBeNull();
+  });
+
+  it('shows no banner when the deep-linked offer is still pending', async () => {
+    const pendingOffer = makeOffer({ id: 503, status: 'pending' });
+    mockDeepLinkReturn = {
+      data: { teamTradeOffers: [pendingOffer] },
+      loading: false,
+      refetch: jest.fn(),
+    };
+    const { queryByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        deepLinkOfferId={503}
+      />,
+    );
+    await waitFor(() => {
+      expect(queryByTestId('deep-link-unavailable-banner')).toBeNull();
+      expect(queryByTestId('deep-link-not-found-banner')).toBeNull();
+    });
   });
 });

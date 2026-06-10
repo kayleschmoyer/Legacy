@@ -101,6 +101,12 @@ export interface TradingCenterProps {
    * works — users just need to manually refresh.
    */
   onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
+  /**
+   * When set (e.g. from a notification deep link `?offerId=`), the component
+   * fetches the specific offer and surfaces a "no longer available" or
+   * "not found" banner when the offer is expired, vetoed, cancelled, or absent.
+   */
+  deepLinkOfferId?: number;
 }
 
 type ProposeStep = 'team' | 'offer' | 'request' | 'confirm';
@@ -1307,6 +1313,7 @@ export function TradingCenter({
   isPremium = false,
   onUpgradePremium,
   onSubscribeRefresh,
+  deepLinkOfferId,
 }: TradingCenterProps): React.JSX.Element {
   const [showProposeDialog, setShowProposeDialog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -1344,6 +1351,16 @@ export function TradingCenter({
     fetchPolicy: 'cache-and-network',
     skip: !isCommissioner && !showHistory,
   });
+
+  // Deep-link lookup: fetch all statuses for the user's team when an offerId is
+  // provided (e.g. from a push-notification link) so we can detect expired /
+  // vetoed / cancelled offers and surface a clear "no longer available" state.
+  const { data: deepLinkTradesData, loading: deepLinkLoading } =
+    useGetTeamTradeOffersQuery({
+      variables: { teamId: userTeamId },
+      skip: deepLinkOfferId == null,
+      fetchPolicy: 'cache-and-network',
+    });
 
   const [acceptTrade] = useAcceptTradeMutation();
   const [rejectTrade] = useRejectTradeMutation();
@@ -1396,6 +1413,27 @@ export function TradingCenter({
     const all = allTradesData?.leagueTradeOffers ?? [];
     return all.filter((t) => t.status !== 'pending');
   }, [allTradesData]);
+
+  // Deep-link banner state
+  const deepLinkOffer = useMemo(() => {
+    if (deepLinkOfferId == null) return undefined;
+    return deepLinkTradesData?.teamTradeOffers?.find(
+      (t) => t.id === deepLinkOfferId,
+    );
+  }, [deepLinkOfferId, deepLinkTradesData]);
+
+  // "unavailable" = found but not pending; "not-found" = loaded but absent
+  const deepLinkUnavailable =
+    deepLinkOfferId != null &&
+    !deepLinkLoading &&
+    deepLinkOffer != null &&
+    deepLinkOffer.status !== 'pending';
+
+  const deepLinkNotFound =
+    deepLinkOfferId != null &&
+    !deepLinkLoading &&
+    deepLinkTradesData != null &&
+    deepLinkOffer == null;
 
   return (
     <YStack
@@ -1475,6 +1513,53 @@ export function TradingCenter({
         >
           <Text color="$red11" fontSize="$3">
             {actionError}
+          </Text>
+        </Card>
+      )}
+
+      {/* Deep-link: offer no longer available */}
+      {deepLinkUnavailable && (
+        <Card
+          testID="deep-link-unavailable-banner"
+          backgroundColor="$amber2"
+          borderColor="$amber6"
+          borderWidth={1}
+          padding="$3"
+          borderRadius="$4"
+          gap="$1"
+        >
+          <XStack alignItems="center" gap="$2">
+            <AlertTriangle size={16} color="$amber9" />
+            <Text color="$amber11" fontSize="$3" fontWeight="600">
+              This trade is no longer available.
+            </Text>
+          </XStack>
+          <Text color="$amber10" fontSize="$2">
+            The trade offer you were directed to has been{' '}
+            {deepLinkOffer?.status ?? 'resolved'} and can no longer be acted on.
+          </Text>
+        </Card>
+      )}
+
+      {/* Deep-link: offer not found */}
+      {deepLinkNotFound && (
+        <Card
+          testID="deep-link-not-found-banner"
+          backgroundColor="$gray2"
+          borderColor="$gray6"
+          borderWidth={1}
+          padding="$3"
+          borderRadius="$4"
+          gap="$1"
+        >
+          <XStack alignItems="center" gap="$2">
+            <AlertTriangle size={16} color="$gray9" />
+            <Text color="$gray11" fontSize="$3" fontWeight="600">
+              Trade not found.
+            </Text>
+          </XStack>
+          <Text color="$gray10" fontSize="$2">
+            This trade offer does not exist or you no longer have access to it.
           </Text>
         </Card>
       )}
