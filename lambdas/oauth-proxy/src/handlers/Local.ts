@@ -4,8 +4,10 @@ import {
   createUser,
   getSubscriptionByUserId,
   getUserByEmail,
+  getUserMfa,
   updateLastLoginAt,
 } from '@legacy-sports/db-client';
+import { authenticator } from 'otplib';
 import { z, ZodError } from 'zod';
 import { hashPassword, testPassword } from '../Users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
@@ -35,6 +37,10 @@ export const MIN_LOGIN_PASSWORD_LENGTH = 8;
 const LoginRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(MIN_LOGIN_PASSWORD_LENGTH),
+  // Optional TOTP code for the MFA second-factor step (LGN-022 / LS-7832).
+  // Absent on the first call → triggers the MFA challenge response.
+  // Present on the follow-up call → validated before a JWT is issued.
+  code: z.string().optional(),
 });
 
 const RegisterRequestSchema = z.object({
@@ -66,8 +72,9 @@ export const handleLogin = async (
 ): Promise<APIGatewayProxyResult> => {
   let email: string;
   let password: string;
+  let code: string | undefined;
   try {
-    ({ email, password } = parseEventBody(event, LoginRequestSchema));
+    ({ email, password, code } = parseEventBody(event, LoginRequestSchema));
   } catch (err) {
     if (err instanceof ZodError) return zodErrorToResponse(err);
     return errorResponse(400, 'Invalid request body');
@@ -128,6 +135,43 @@ export const handleLogin = async (
         reason: 'invalid_password',
       });
       return errorResponse(401, 'Invalid credentials');
+    }
+
+    // MFA second-factor enforcement (LGN-022 / LS-7832). Password is correct at
+    // this point. If the user has enrolled TOTP, they must also supply a valid
+    // code before a JWT is issued. Users who have not enrolled (mfaEnabled=false)
+    // are never affected — 2FA remains strictly optional (LGN-029 invariant).
+    if (user.mfaEnabled) {
+      if (!code) {
+        // First factor passed — signal that a second factor is required.
+        // No JWT or auth cookies are set; the caller must re-POST with a code.
+        LOGGER.debug('login.mfa_challenge', { userId: user.id });
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ mfaRequired: true }),
+        };
+      }
+
+      const mfa = await getUserMfa(db, user.id);
+      if (!mfa?.totpSecret) {
+        LOGGER.error(
+          'login.mfa_state_inconsistent: mfa_enabled but no TOTP secret',
+          new Error('MFA state inconsistent: mfa_enabled but no TOTP secret'),
+          { userId: user.id },
+        );
+        return errorResponse(500, 'Internal server error');
+      }
+
+      if (!authenticator.verify({ token: code, secret: mfa.totpSecret })) {
+        await recordFailedLogin(email);
+        LOGGER.warn('login.failed', {
+          audit: true,
+          email: maskedEmail,
+          ip,
+          reason: 'invalid_totp',
+        });
+        return errorResponse(401, 'Invalid credentials');
+      }
     }
 
     // Successful login: clear the failed-attempt counter (LGN-020), stamp

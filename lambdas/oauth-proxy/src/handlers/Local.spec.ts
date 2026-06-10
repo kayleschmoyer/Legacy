@@ -3,8 +3,10 @@ import {
   createUser,
   getSubscriptionByUserId,
   getUserByEmail,
+  getUserMfa,
   updateLastLoginAt,
 } from '@legacy-sports/db-client';
+import { authenticator } from 'otplib';
 import { handleLogin, handleRegister } from './Local';
 import { notifyNewUserSignup } from '../util/discord';
 import { hashPassword, testPassword } from '../Users';
@@ -34,8 +36,13 @@ const { LOGGER: mockLogger }: { LOGGER: { info: jest.Mock; warn: jest.Mock } } =
 jest.mock('@legacy-sports/db-client', () => ({
   createUser: jest.fn(),
   getUserByEmail: jest.fn(),
+  getUserMfa: jest.fn(),
   getSubscriptionByUserId: jest.fn(),
   updateLastLoginAt: jest.fn(),
+}));
+
+jest.mock('otplib', () => ({
+  authenticator: { verify: jest.fn() },
 }));
 
 jest.mock('../util/db', () => ({
@@ -82,6 +89,8 @@ jest.mock('../util/login-throttle', () => ({
 const mockGetUserByEmail = getUserByEmail as jest.MockedFunction<
   typeof getUserByEmail
 >;
+const mockGetUserMfa = getUserMfa as jest.MockedFunction<typeof getUserMfa>;
+const mockAuthenticator = jest.mocked(authenticator);
 const mockGetSubscriptionByUserId =
   getSubscriptionByUserId as jest.MockedFunction<
     typeof getSubscriptionByUserId
@@ -372,6 +381,101 @@ describe('handleLogin', () => {
       expect(result.statusCode).toBe(200);
       expect(mockClearFailedLogins).toHaveBeenCalledWith(validBody.email);
       expect(mockRecordFailedLogin).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('TOTP second-factor enforcement (LGN-022 / LS-7832)', () => {
+    const mfaUser = {
+      id: 7,
+      email: 'mfa@example.com',
+      passwordHash: 'stored-hash',
+      mfaEnabled: true,
+    };
+    const validBody = { email: 'mfa@example.com', password: 'correct-pass' };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockIsLoginLocked.mockResolvedValue({
+        locked: false,
+        retryAfterSeconds: 0,
+      });
+      mockGetUserByEmail.mockResolvedValue(
+        mfaUser as unknown as Awaited<ReturnType<typeof getUserByEmail>>,
+      );
+      mockTestPassword.mockResolvedValue(true);
+    });
+
+    it('returns mfaRequired:true with no JWT when the correct password is submitted without a code', async () => {
+      const result = await handleLogin(makeEvent(validBody));
+
+      expect(result.statusCode).toBe(200);
+      const parsed = JSON.parse(result.body) as Record<string, unknown>;
+      expect(parsed.mfaRequired).toBe(true);
+      expect(parsed).not.toHaveProperty('jwt');
+      expect(result.multiValueHeaders).toBeUndefined();
+      // Partial login — counters are not cleared until the second factor passes.
+      expect(mockClearFailedLogins).not.toHaveBeenCalled();
+      expect(mockUpdateLastLoginAt).not.toHaveBeenCalled();
+    });
+
+    it('issues a JWT when the correct password and valid TOTP code are both provided', async () => {
+      mockGetUserMfa.mockResolvedValue({
+        mfaEnabled: true,
+        totpSecret: 'SECRET123',
+      });
+      mockAuthenticator.verify.mockReturnValue(true);
+      mockGetSubscriptionByUserId.mockResolvedValue(null);
+
+      const result = await handleLogin(
+        makeEvent({ ...validBody, code: '123456' }),
+      );
+
+      expect(result.statusCode).toBe(200);
+      const parsed = JSON.parse(result.body) as { jwt: string };
+      expect(parsed.jwt).toBe('mock-jwt');
+      expect(mockAuthenticator.verify.mock.calls[0]?.[0]).toEqual({
+        token: '123456',
+        secret: 'SECRET123',
+      });
+      expect(mockClearFailedLogins).toHaveBeenCalledWith(validBody.email);
+      expect(mockUpdateLastLoginAt).toHaveBeenCalledWith(expect.anything(), 7);
+    });
+
+    it('returns 401 and records a failed attempt when the TOTP code is invalid', async () => {
+      mockGetUserMfa.mockResolvedValue({
+        mfaEnabled: true,
+        totpSecret: 'SECRET123',
+      });
+      mockAuthenticator.verify.mockReturnValue(false);
+
+      const result = await handleLogin(
+        makeEvent({ ...validBody, code: '000000' }),
+      );
+
+      expect(result.statusCode).toBe(401);
+      expect(mockRecordFailedLogin).toHaveBeenCalledWith(validBody.email);
+      expect(mockClearFailedLogins).not.toHaveBeenCalled();
+      expect(mockUpdateLastLoginAt).not.toHaveBeenCalled();
+    });
+
+    it('does not require MFA for users who have not enrolled (mfaEnabled=false)', async () => {
+      mockGetUserByEmail.mockResolvedValue({
+        id: 8,
+        email: 'nomfa@example.com',
+        passwordHash: 'stored-hash',
+        mfaEnabled: false,
+      } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
+      mockTestPassword.mockResolvedValue(true);
+      mockGetSubscriptionByUserId.mockResolvedValue(null);
+
+      const result = await handleLogin(
+        makeEvent({ email: 'nomfa@example.com', password: 'correct-pass' }),
+      );
+
+      expect(result.statusCode).toBe(200);
+      const parsed = JSON.parse(result.body) as { jwt: string };
+      expect(parsed.jwt).toBe('mock-jwt');
+      expect(mockGetUserMfa).not.toHaveBeenCalled();
     });
   });
 });
