@@ -10,7 +10,7 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, count, eq, gte, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import {
@@ -34,6 +34,8 @@ const TRADE_EXPIRATION_MIN_DAYS = 1;
 const TRADE_EXPIRATION_FREE_LIMIT_DAYS = 7;
 const TRADE_EXPIRATION_MAX_DAYS = 30;
 const TRADE_MESSAGE_MAX_LENGTH = 500;
+const TRADE_PROPOSAL_RATE_LIMIT = 3;
+const TRADE_PROPOSAL_RATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function sanitizeTradeMessage(raw: string): string {
   // Strip HTML tags to prevent XSS when the message is rendered or embedded in notifications
@@ -476,6 +478,26 @@ builder.mutationField('proposeTrade', (t) =>
 
       if (!receivingTeam) {
         throw new Error('The receiving team does not exist in this league');
+      }
+
+      // 2b. Rate-limit: prevent spam flooding a receiver with DMs + push notifications
+      const [rateRow] = await db
+        .select({ total: count() })
+        .from(PublicSchema.tradeOffers)
+        .where(
+          and(
+            eq(PublicSchema.tradeOffers.proposingTeamId, proposingTeamId),
+            eq(PublicSchema.tradeOffers.receivingTeamId, receivingTeamId),
+            gte(
+              PublicSchema.tradeOffers.createdAt,
+              new Date(Date.now() - TRADE_PROPOSAL_RATE_WINDOW_MS),
+            ),
+          ),
+        );
+      if ((rateRow?.total ?? 0) >= TRADE_PROPOSAL_RATE_LIMIT) {
+        throw UserInputError(
+          'You have sent too many trade proposals to this team. Please wait before sending another.',
+        );
       }
 
       // 3. Verify the offering players are on the proposing team

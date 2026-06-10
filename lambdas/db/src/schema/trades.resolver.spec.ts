@@ -597,6 +597,38 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('League not found');
       // If the HTML length check had fired instead, the error would contain "500 characters"
     });
+
+    it('throws BAD_USER_INPUT when rate limit is exceeded', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]); // league check
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'general_manager' },
+      ]); // resolveUserTeam
+      mockDb.limit.mockResolvedValueOnce([{ id: 2 }]); // receiving team exists
+      // Rate limit query: select({ total: count() }).from().where() — awaited via then
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([{ total: 3 }]),
+      );
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [1],
+            requestingPlayerIds: [2],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('too many trade proposals'),
+      });
+    });
   });
 
   // ── acceptTrade ────────────────────────────────────────────────────────────
