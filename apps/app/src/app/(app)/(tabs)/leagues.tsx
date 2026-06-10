@@ -34,33 +34,11 @@ export default function LeaguesTab() {
       },
       {
         text: 'Join a League',
-        onPress: () =>
-          Alert.alert('Select Sport', '', [
-            {
-              text: 'Baseball',
-              onPress: () => router.navigate('/baseball/league/join'),
-            },
-            {
-              text: 'Football',
-              onPress: () => router.navigate('/football/league/join'),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]),
+        onPress: () => router.navigate('/league/join'),
       },
       {
         text: 'Create a League',
-        onPress: () =>
-          Alert.alert('Select Sport', '', [
-            {
-              text: 'Baseball',
-              onPress: () => router.navigate('/baseball/league/create'),
-            },
-            {
-              text: 'Football',
-              onPress: () => router.navigate('/football/league/create'),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]),
+        onPress: () => router.navigate('/league/create'),
       },
       { text: 'Cancel', style: 'cancel' },
     ]);

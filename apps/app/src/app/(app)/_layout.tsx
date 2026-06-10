@@ -64,7 +64,16 @@ export default function Layout() {
             options={{ title: 'MLB Scoreboard' }}
           />
 
-          {/* League onboarding */}
+          {/* League onboarding — unified sport-aware entry points */}
+          <Stack.Screen
+            name="league/create"
+            options={{ headerShown: true, headerTitle: 'Create a League' }}
+          />
+          <Stack.Screen
+            name="league/join"
+            options={{ title: 'Join a League' }}
+          />
+          {/* Sport-specific create/join (reachable from league/create and direct deep-links) */}
           <Stack.Screen
             name="baseball/league/create"
             options={{ headerShown: true, headerTitle: 'Create League' }}
