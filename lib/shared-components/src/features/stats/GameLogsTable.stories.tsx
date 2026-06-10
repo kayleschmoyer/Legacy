@@ -35,3 +35,27 @@ export const CustomEndpoint: Story = {
     apiEndpoint: 'https://api.example.com/game-logs',
   },
 };
+
+/** AC4 (LS-7865): native screen routing deferred; picker verified here.
+ *  Non-premium single-select opponent picker (Tamagui Select on native). */
+export const NativeOpponentPickerSingleSelect: Story = {
+  args: {
+    sport: 'mlb',
+    isPremium: false,
+  },
+};
+
+/** AC4 (LS-7865): premium multi-select opponent picker (Sheet on native). */
+export const NativeOpponentPickerMultiSelect: Story = {
+  args: {
+    sport: 'mlb',
+    isPremium: true,
+  },
+};
+
+export const NFLSingleSelect: Story = {
+  args: {
+    sport: 'nfl',
+    isPremium: false,
+  },
+};

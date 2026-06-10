@@ -1,6 +1,17 @@
 import React, { useMemo, useReducer, useState } from 'react';
-import { Button, Input, ScrollView, Spinner, Text, YStack } from 'tamagui';
+import {
+  Button,
+  Input,
+  ScrollView,
+  Sheet,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import { Check } from '@tamagui/lucide-icons';
 import { Platform, Table } from '../../platform-components';
+import { Select as OpponentSelect } from '../../components/Select';
 import { handleError } from '../../utils/ErrorHandler';
 import {
   expandMlbFranchiseAbbrs,
@@ -317,6 +328,7 @@ function GameLogsTable({
   const [stats, setStats] = useState<Array<string>>([]);
   const [loading, setLoading] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [opponentSheetOpen, setOpponentSheetOpen] = useState(false);
 
   const teamOptions = useMemo(() => {
     if (sport === 'nfl') {
@@ -496,9 +508,10 @@ function GameLogsTable({
         />
       </YStack>
 
-      {/* Opponent filter (LS-7476/77/80). Native renders nothing here today —
-          a follow-up will add a cross-platform picker; meanwhile native users
-          keep the player + date set without an opponent restriction. */}
+      {/* Opponent filter (LS-7865). Web: native <select> preserved so existing
+          tests remain green. Native: Tamagui Select (non-premium single-select)
+          or Sheet with checkmarks (premium multi-select). Native screen routing
+          is deferred; the picker is verified via GameLogsTable.stories.tsx. */}
       {Platform.OS === 'web' ? (
         <YStack marginBottom="$4">
           <Text fontSize="$4" fontWeight="600" marginBottom="$2">
@@ -533,7 +546,89 @@ function GameLogsTable({
             ))}
           </select>
         </YStack>
-      ) : null}
+      ) : isPremium ? (
+        <YStack marginBottom="$4">
+          <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+            Opponent:
+          </Text>
+          <Button
+            borderWidth={1}
+            borderColor="$gray8"
+            borderRadius="$3"
+            paddingHorizontal="$3"
+            paddingVertical="$3"
+            backgroundColor="$white"
+            onPress={() => setOpponentSheetOpen(true)}
+            disabled={loading}
+            opacity={loading ? 0.5 : 1}
+            justifyContent="flex-start"
+          >
+            <Text fontSize="$4" color="$gray11">
+              {filters.opponentFranchiseIds.length === 0
+                ? 'All opponents'
+                : `${filters.opponentFranchiseIds.length} selected`}
+            </Text>
+          </Button>
+          <Sheet
+            open={opponentSheetOpen}
+            onOpenChange={setOpponentSheetOpen}
+            modal
+            snapPointsMode="fit"
+          >
+            <Sheet.Frame>
+              <Sheet.Handle />
+              <Sheet.ScrollView>
+                {teamOptions.map((t) => {
+                  const checked = filters.opponentFranchiseIds.includes(t.id);
+                  return (
+                    <XStack
+                      key={t.id}
+                      role="checkbox"
+                      aria-checked={checked}
+                      onPress={() => {
+                        const next = checked
+                          ? filters.opponentFranchiseIds.filter(
+                              (id) => id !== t.id,
+                            )
+                          : [...filters.opponentFranchiseIds, t.id];
+                        dispatch({ type: 'setOpponents', value: next });
+                      }}
+                      padding="$3"
+                      alignItems="center"
+                      borderBottomWidth={1}
+                      borderBottomColor="$gray4"
+                    >
+                      <Text flex={1} fontSize="$4">
+                        {t.label}
+                      </Text>
+                      {checked ? <Check size={16} color="$blue10" /> : null}
+                    </XStack>
+                  );
+                })}
+              </Sheet.ScrollView>
+            </Sheet.Frame>
+            <Sheet.Overlay />
+          </Sheet>
+        </YStack>
+      ) : (
+        <YStack marginBottom="$4">
+          <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+            Opponent:
+          </Text>
+          <OpponentSelect
+            value={filters.opponentFranchiseIds[0] ?? ''}
+            onValueChange={(id) =>
+              dispatch({ type: 'setOpponents', value: id ? [id] : [] })
+            }
+            options={[
+              { value: '', label: 'All opponents' },
+              ...teamOptions.map((t) => ({ value: t.id, label: t.label })),
+            ]}
+            placeholder="All opponents"
+            disabled={loading}
+          />
+        </YStack>
+      )}
 
       {/* Home/Away tri-state (LS-7465). Buttons rather than radio so the
           control styles consistently across web + native via tamagui. */}
