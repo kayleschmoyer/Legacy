@@ -7,8 +7,22 @@ import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
 global.fetch = jest.fn();
 
 describe('GameLogsTable', () => {
+  const originalEnv = process.env.VITE_STATS_API_URL;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Pin a configured URL so the prod-guard tests are opt-in.
+    process.env.VITE_STATS_API_URL = 'https://stats.example.com/game-logs';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.VITE_STATS_API_URL;
+    } else {
+      process.env.VITE_STATS_API_URL = originalEnv;
+    }
+    delete (globalThis as { __DEV__?: boolean }).__DEV__;
   });
 
   it('renders correctly with default props', () => {
@@ -239,5 +253,59 @@ describe('GameLogsTable filter controls', () => {
     };
     expect(body.venue).toBe('home');
     expect(body.player_id).toBe('mlb-1234');
+  });
+});
+
+describe('GameLogsTable production endpoint guard (LS-7691)', () => {
+  const originalEnv = process.env.VITE_STATS_API_URL;
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.VITE_STATS_API_URL;
+    } else {
+      process.env.VITE_STATS_API_URL = originalEnv;
+    }
+    delete (globalThis as { __DEV__?: boolean }).__DEV__;
+  });
+
+  it('allows the localhost fallback in dev builds when env is unset', () => {
+    delete process.env.VITE_STATS_API_URL;
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+
+    const { getByText, queryByText } = render(<GameLogsTable />);
+    expect(getByText('Get Player Data')).toBeTruthy();
+    expect(queryByText(/VITE_STATS_API_URL is not configured/)).toBeNull();
+  });
+
+  it('renders an error state in production when env is unset', () => {
+    delete process.env.VITE_STATS_API_URL;
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+
+    const { getByText, queryByText } = render(<GameLogsTable />);
+
+    expect(getByText(/VITE_STATS_API_URL is not configured/)).toBeTruthy();
+    expect(getByText('Game logs unavailable')).toBeTruthy();
+    // The fetch form must not be rendered.
+    expect(queryByText('Get Player Data')).toBeNull();
+  });
+
+  it('renders an error state in production when env points at localhost', () => {
+    process.env.VITE_STATS_API_URL = 'http://localhost:5000/baseball-game-logs';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+
+    const { getByText } = render(<GameLogsTable />);
+
+    expect(getByText(/VITE_STATS_API_URL is not configured/)).toBeTruthy();
+  });
+
+  it('respects an explicit apiEndpoint prop even in production', () => {
+    delete process.env.VITE_STATS_API_URL;
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+
+    const { getByText, queryByText } = render(
+      <GameLogsTable apiEndpoint="https://prod.example.com/game-logs" />,
+    );
+    expect(getByText('Get Player Data')).toBeTruthy();
+    expect(queryByText(/VITE_STATS_API_URL is not configured/)).toBeNull();
   });
 });

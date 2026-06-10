@@ -215,8 +215,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
 
 export interface GameLogsTableProps {
   /**
-   * API endpoint for fetching game logs
-   * @default 'http://localhost:5000/baseball-game-logs'
+   * API endpoint for fetching game logs.
+   *
+   * When omitted, the endpoint is resolved from `VITE_STATS_API_URL` (web) or
+   * `EXPO_PUBLIC_STATS_API_URL` (native). In a production build the resolver
+   * REFUSES to fall back to localhost — see {@link resolveStatsApiEndpoint}
+   * and the wire-up note above it. (LS-7691)
    */
   apiEndpoint?: string;
   /**
@@ -237,11 +241,75 @@ export interface GameLogsTableProps {
   isPremium?: boolean;
 }
 
+// React Native injects `__DEV__` globally; on web it is defined via Vite's
+// `define` block. May be undefined under Jest, so we treat that as "not prod".
+declare const __DEV__: boolean | undefined;
+
+const LOCALHOST_RE = /(?:localhost|127\.0\.0\.1)/;
+const DEV_FALLBACK_URL = 'http://localhost:5000/baseball-game-logs';
+const LOCALHOST_BUILD_HINT =
+  'This typically means VITE_STATS_API_URL was not injected at build time.';
+
+/**
+ * Resolve the stats API endpoint at component mount.
+ *
+ * Production wire-up (must be set per build target — otherwise this throws
+ * in prod):
+ *   - Web (Vite): `VITE_STATS_API_URL` in the workspace `.env` consumed by
+ *     `apps/web/vite.config.mts` (envDir points at the repo root). Vite reads
+ *     it via `import.meta.env` in `lib/app-config/src/lib/config.web.ts`; for
+ *     this shared component we read `process.env.VITE_STATS_API_URL`, which
+ *     Vite replaces at build time alongside `import.meta.env.VITE_*`.
+ *   - Native (Expo): `EXPO_PUBLIC_STATS_API_URL` in `apps/app/.env`, picked up
+ *     by `babel-preset-expo` (see `lib/app-config/src/lib/statsApiUrl.ts` and
+ *     the LS-6402 RFC). The native screens use that helper directly.
+ *
+ * Mirrors the native-side `resolveStatsApiUrl` pattern (LS-6402): refuse the
+ * localhost fallback in release builds so a misconfigured deploy fails loudly
+ * instead of silently rendering an empty table. (LS-7691, same bug class as
+ * LS-7585 / Google Sign-In redirect loop.)
+ */
+export function resolveStatsApiEndpoint(): string {
+  const fromEnv = process.env.VITE_STATS_API_URL;
+  const candidate = fromEnv && fromEnv.length > 0 ? fromEnv : DEV_FALLBACK_URL;
+  const isProd =
+    typeof __DEV__ !== 'undefined'
+      ? __DEV__ === false
+      : process.env.NODE_ENV === 'production';
+  if (isProd && LOCALHOST_RE.test(candidate)) {
+    throw new Error(
+      'VITE_STATS_API_URL is not configured for this build. Set it in eas.json / vite config before deploying.',
+    );
+  }
+  return candidate;
+}
+
 function GameLogsTable({
-  apiEndpoint = 'http://localhost:5000/baseball-game-logs',
+  apiEndpoint,
   sport = 'mlb',
   isPremium = false,
 }: GameLogsTableProps) {
+  // Resolve once per mount. If we're in a production build and the env var
+  // is unset (or pinned to localhost), this throws — we render an error state
+  // instead of attempting the fetch. (LS-7691)
+  const resolution = useMemo<{
+    url: string | null;
+    error: Error | null;
+  }>(() => {
+    try {
+      return { url: apiEndpoint ?? resolveStatsApiEndpoint(), error: null };
+    } catch (err) {
+      return {
+        url: null,
+        error: err instanceof Error ? err : new Error(String(err)),
+      };
+    }
+  }, [apiEndpoint]);
+  if (resolution.error) {
+    handleError(resolution.error);
+  }
+  const resolvedEndpoint = resolution.url;
+
   const [filters, dispatch] = useReducer(filterReducer, INITIAL_FILTERS);
   const [data, setData] = useState<
     Record<string, Record<string, string | number>> | undefined
@@ -297,10 +365,12 @@ function GameLogsTable({
       return;
     }
 
+    if (!resolvedEndpoint) return;
+
     setLoading(true);
     try {
       // Use fetch for cross-platform compatibility
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch(resolvedEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -337,7 +407,15 @@ function GameLogsTable({
       setData(games);
       setStats(Array.from(gameStats));
     } catch (error) {
-      handleError(error);
+      // If the URL was localhost when fetch blew up, the network error is
+      // almost always a missing build-time env var rather than a server fault.
+      // Surface that explicitly so support tickets don't sit at "no data". (LS-7691)
+      if (LOCALHOST_RE.test(resolvedEndpoint)) {
+        const message = error instanceof Error ? error.message : String(error);
+        handleError(new Error(`${message} — ${LOCALHOST_BUILD_HINT}`));
+      } else {
+        handleError(error);
+      }
     } finally {
       setLoading(false);
     }
@@ -350,6 +428,24 @@ function GameLogsTable({
   const tableData: Array<Array<CellValue>> = gameIds.map((gameId) =>
     stats.map((s) => data?.[gameId]?.[s] ?? null),
   );
+
+  if (resolution.error) {
+    return (
+      <ScrollView flex={1} padding="$4">
+        <Text
+          fontSize="$5"
+          fontWeight="bold"
+          marginBottom="$4"
+          textAlign="center"
+        >
+          Game logs unavailable
+        </Text>
+        <Text color="$red10" fontSize="$4">
+          {resolution.error.message}
+        </Text>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView flex={1} padding="$4">
