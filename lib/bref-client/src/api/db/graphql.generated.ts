@@ -2545,6 +2545,7 @@ export type NotificationHistoryItem = {
   readAt?: Maybe<Scalars['String']['output']>;
   sentAt?: Maybe<Scalars['String']['output']>;
   title?: Maybe<Scalars['String']['output']>;
+  tradeOfferId?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
