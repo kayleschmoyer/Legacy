@@ -555,6 +555,12 @@
       "apps/web/src/pages/pricing/**",
       "apps/web/src/pages/donate/**"
     ],
+    "apps/web-e2e/src/tests/submit-new-trade.spec.ts": [
+      "apps/web/src/pages/baseball/**",
+      "apps/web/src/features/roster/**",
+      "apps/web/src/components/roster/**",
+      "apps/web/src/components/league/**"
+    ],
     "apps/web-e2e/src/tests/tab-navigation-a11y.spec.ts": [
       "apps/web/src/pages/players/**",
       "apps/web/src/components/baseball/**",

@@ -1,7 +1,8 @@
 import React from 'react';
 import { TradingCenter } from './TradingCenter';
-import { fireEvent, render, waitFor } from '../../test-utils';
+import { act, fireEvent, render, waitFor } from '../../test-utils';
 import type {
+  GetLeagueTeamsQuery,
   GetLeagueTradeOffersQuery,
   GetTeamMembersQuery,
   GetTeamTradeOffersQuery,
@@ -49,11 +50,26 @@ let mockTradeBlockReturn: {
   error: Error | undefined;
 };
 
+let mockLeagueTeamsReturn: { data: GetLeagueTeamsQuery | undefined };
+
+let mockLeagueByIdReturn: {
+  data:
+    | {
+        league: {
+          tradeDeadlineWeek?: number | null;
+          currentWeekNumber?: number | null;
+        };
+      }
+    | undefined;
+};
+
+let mockProposeTradeFn: jest.Mock;
+
 const mockLoadProposerRoster = jest.fn();
 const mockRefetch = jest.fn().mockResolvedValue({});
 
 jest.mock('../../api/db/graphql.generated', () => ({
-  useGetLeagueByIdQuery: () => ({ data: undefined }),
+  useGetLeagueByIdQuery: jest.fn(() => mockLeagueByIdReturn),
   useGetTeamTradeOffersQuery: jest.fn(
     (options: { variables?: { status?: string } }) => {
       // Pending query uses status: 'pending'; deep-link lookup omits status
@@ -62,7 +78,7 @@ jest.mock('../../api/db/graphql.generated', () => ({
     },
   ),
   useGetLeagueTradeOffersQuery: jest.fn(() => mockLeagueTradesReturn),
-  useGetLeagueTeamsQuery: () => ({ data: undefined }),
+  useGetLeagueTeamsQuery: jest.fn(() => mockLeagueTeamsReturn),
   useGetTeamMembersLazyQuery: jest.fn(() => [
     mockLoadProposerRoster,
     mockProposerRosterReturn,
@@ -71,7 +87,7 @@ jest.mock('../../api/db/graphql.generated', () => ({
   useRejectTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useVetoTradeMutation: () => [jest.fn().mockResolvedValue({})],
-  useProposeTradeMutation: () => [jest.fn().mockResolvedValue({})],
+  useProposeTradeMutation: jest.fn(() => [mockProposeTradeFn]),
   useGetLeagueTradeBlockQuery: jest.fn(() => mockTradeBlockReturn),
   useSetTradeBlockMutation: () => [
     jest.fn().mockResolvedValue({}),
@@ -170,6 +186,9 @@ describe('TradingCenter — LeagueTradeBlock integration', () => {
       loading: false,
       error: undefined,
     };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
   });
 
   it('renders the Trade Block section label', async () => {
@@ -225,6 +244,9 @@ describe('TradingCenter — PremiumTradeTools integration', () => {
       loading: false,
       error: undefined,
     };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
   });
 
   it('renders the Premium Trade Tools section', async () => {
@@ -340,6 +362,9 @@ describe('TradingCenter — stale player detection', () => {
       loading: false,
       error: undefined,
     };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
   });
 
   it('does not show stale warning when offered player is still on the roster', async () => {
@@ -515,6 +540,9 @@ describe('TradingCenter — Completed Trade History', () => {
       loading: false,
       error: undefined,
     };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
   });
 
   it('renders the Trade History toggle button', async () => {
@@ -938,5 +966,409 @@ describe('TradingCenter — deep-link expired/not-found handling', () => {
       expect(queryByTestId('deep-link-unavailable-banner')).toBeNull();
       expect(queryByTestId('deep-link-not-found-banner')).toBeNull();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ProposeTradeDialog (LS-5678) — Submit New Trade Offer
+// ---------------------------------------------------------------------------
+
+const RECEIVING_TEAM_ID = 2; // distinct from USER_TEAM_ID (1)
+
+function makeMockTeam(id: number, name: string) {
+  return {
+    __typename: 'Team' as const,
+    id,
+    name,
+    leagueId: LEAGUE_ID,
+    waiverOrder: null,
+    faabBudget: null,
+    isLocked: false,
+    logoUrl: null,
+    primaryColor: null,
+    secondaryColor: null,
+    avatarUrl: null,
+    bannerUrl: null,
+    managerId: null,
+  };
+}
+
+function makeMockPlayer(id: number, firstName: string, lastName: string) {
+  return {
+    __typename: 'TeamMember' as const,
+    id,
+    playerId: id,
+    positionId: 1,
+    teamId: USER_TEAM_ID,
+    leagueId: LEAGUE_ID,
+    onTradeBlock: false,
+    player: {
+      __typename: 'Player' as const,
+      firstName,
+      lastName,
+    },
+  };
+}
+
+describe('TradingCenter — ProposeTradeDialog (LS-5678)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProposeTradeFn = jest.fn().mockResolvedValue({ data: {} });
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueByIdReturn = { data: undefined };
+    mockLeagueTeamsReturn = {
+      data: {
+        leagueTeams: [makeMockTeam(RECEIVING_TEAM_ID, 'Sluggers')],
+      },
+    };
+    mockProposerRosterReturn = {
+      data: {
+        teamMembers: [
+          makeMockPlayer(10, 'Aaron', 'Judge'),
+          makeMockPlayer(20, 'Mike', 'Trout'),
+        ],
+      },
+    };
+  });
+
+  it('renders the "Propose Trade" button', () => {
+    const { getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(getByText('Propose Trade')).toBeTruthy();
+  });
+
+  it('"Propose Trade" button is enabled when the trade deadline is not past', () => {
+    const { getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    const btn = getByText('Propose Trade').closest('button');
+    expect(btn).not.toBeDisabled();
+  });
+
+  it('"Propose Trade" button is disabled when the trade deadline has passed', () => {
+    mockLeagueByIdReturn = {
+      data: { league: { tradeDeadlineWeek: 14, currentWeekNumber: 15 } },
+    };
+    const { getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    const btn = getByText('Propose Trade').closest('button');
+    expect(btn).toBeDisabled();
+  });
+
+  it('opens the dialog when "Propose Trade" is clicked', () => {
+    const { getByText, queryByRole } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(queryByRole('dialog')).toBeNull();
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    expect(queryByRole('dialog')).not.toBeNull();
+  });
+
+  it('dialog shows the team-selection step first', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    expect(
+      await findByText(/select the team you want to trade with/i),
+    ).toBeTruthy();
+  });
+
+  it('dialog lists other teams for selection', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    expect(await findByText('Sluggers')).toBeTruthy();
+  });
+
+  it('advances to the offer step after selecting a team', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    expect(await findByText(/you will give/i)).toBeTruthy();
+  });
+
+  it('shows user roster players in the offer step', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    expect(await findByText('Aaron Judge')).toBeTruthy();
+  });
+
+  it('shows the "Next" button after selecting an offering player', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    expect(await findByText(/next.*select their players/i)).toBeTruthy();
+  });
+
+  it('advances to the request step and shows target roster', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    expect(await findByText(/give you/i)).toBeTruthy();
+  });
+
+  it('advances to the confirm step after selecting both player sets', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    // Select a requesting player (Mike Trout appears again as "their" roster since
+    // the mock returns the same data for both lazy queries)
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    await act(async () => {
+      const reviewBtn = await findByText(/review trade/i);
+      fireEvent.click(reviewBtn.closest('button') ?? reviewBtn);
+    });
+    expect(await findByText(/send trade offer/i)).toBeTruthy();
+  });
+
+  it('calls useProposeTradeMutation when "Send Trade Offer" is clicked', async () => {
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    // Navigate through all 4 steps
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    await act(async () => {
+      const reviewBtn = await findByText(/review trade/i);
+      fireEvent.click(reviewBtn.closest('button') ?? reviewBtn);
+    });
+    await act(async () => {
+      const sendBtn = await findByText(/send trade offer/i);
+      fireEvent.click(sendBtn.closest('button') ?? sendBtn);
+      await Promise.resolve();
+    });
+    expect(mockProposeTradeFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          leagueId: LEAGUE_ID,
+          receivingTeamId: RECEIVING_TEAM_ID,
+          offeringPlayerIds: [10],
+          requestingPlayerIds: [20],
+          message: null,
+          expiresInDays: 3,
+        },
+      }),
+    );
+  });
+
+  it('closes the dialog on successful submission', async () => {
+    const { getByText, findByText, queryByRole } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    await act(async () => {
+      const reviewBtn = await findByText(/review trade/i);
+      fireEvent.click(reviewBtn.closest('button') ?? reviewBtn);
+    });
+    await act(async () => {
+      const sendBtn = await findByText(/send trade offer/i);
+      fireEvent.click(sendBtn.closest('button') ?? sendBtn);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('shows an error message when the mutation fails', async () => {
+    mockProposeTradeFn = jest.fn().mockRejectedValue(new Error('Server error'));
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    await act(async () => {
+      const reviewBtn = await findByText(/review trade/i);
+      fireEvent.click(reviewBtn.closest('button') ?? reviewBtn);
+    });
+    await act(async () => {
+      const sendBtn = await findByText(/send trade offer/i);
+      fireEvent.click(sendBtn.closest('button') ?? sendBtn);
+      await Promise.resolve();
+    });
+    expect(await findByText('Server error')).toBeTruthy();
+  });
+
+  it('shows an UNAUTHENTICATED error when the mutation rejects with an auth error', async () => {
+    mockProposeTradeFn = jest
+      .fn()
+      .mockRejectedValue(new Error('UNAUTHENTICATED'));
+    const { getByText, findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    await act(async () => {
+      const reviewBtn = await findByText(/review trade/i);
+      fireEvent.click(reviewBtn.closest('button') ?? reviewBtn);
+    });
+    await act(async () => {
+      const sendBtn = await findByText(/send trade offer/i);
+      fireEvent.click(sendBtn.closest('button') ?? sendBtn);
+      await Promise.resolve();
+    });
+    expect(await findByText('UNAUTHENTICATED')).toBeTruthy();
+  });
+
+  it('"Send Trade Offer" is disabled past the trade deadline in the confirm step', async () => {
+    mockLeagueByIdReturn = {
+      data: { league: { tradeDeadlineWeek: 14, currentWeekNumber: 15 } },
+    };
+    const { findByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    // Button is disabled at top level — cannot open dialog — verify button is disabled
+    const proposeBtn = (await findByText('Propose Trade')).closest('button');
+    expect(proposeBtn).toBeDisabled();
   });
 });

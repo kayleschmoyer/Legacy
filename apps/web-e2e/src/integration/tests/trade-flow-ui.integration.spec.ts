@@ -597,6 +597,7 @@ test.describe
           message: 'Propose Trade dialog never populated with team buttons',
         })
         .toBeGreaterThan(1);
+
       const teamCount = await teamButtons.count();
       let teamClicked = false;
       for (let i = 0; i < teamCount; i++) {
