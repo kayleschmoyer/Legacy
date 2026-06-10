@@ -41,7 +41,6 @@ function LeagueTrades({
   tradeOfferId,
   onBack,
 }: LeagueTradesProps) {
-  const userInfo = useAuthorizedUserInfo();
   const [wsToken, setWsToken] = useState<string | undefined>();
 
   useEffect(() => {
@@ -53,7 +52,7 @@ function LeagueTrades({
       } catch (err) {
         LOGGER.error(
           'TradeCenterPage: failed to read keychain token',
-          String(err),
+          err instanceof Error ? err : String(err),
         );
       }
     })();
@@ -71,9 +70,11 @@ function LeagueTrades({
     variables: { id: leagueId },
   });
   const league = leagueData?.league;
-  const isCommissioner = Boolean(
-    league && userInfo && league.owner === userInfo.id,
-  );
+  const permissionLevel = league?.userMembership?.permissionLevel;
+  const isCommissioner =
+    permissionLevel === 'general_manager' ||
+    permissionLevel === 'assistant_manager' ||
+    permissionLevel === 'commissioner';
 
   const tradeRefetchRef = useRef<(() => void) | null>(null);
   const onSubscribeRefresh = useCallback((refetch: () => void) => {

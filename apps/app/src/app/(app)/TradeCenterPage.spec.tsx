@@ -62,6 +62,7 @@ jest.mock('@legacy-sports/shared-components', () => {
   return {
     TradingCenter: (props: {
       leagueId: number;
+      isCommissioner?: boolean;
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
       deepLinkOfferId?: number;
       [key: string]: unknown;
@@ -282,42 +283,40 @@ describe('TradeCenterPage', () => {
   });
 });
 
-// ── Parity assertions (LS-7513 — TC-019) ─────────────────────────────────────
-// Verify the native surface satisfies the same TradingCenter contract as the
-// web /trade-center route and the in-league Trades tab.  Key differences that
-// are intentional and must stay stable:
-//   - Commissioner: derived from `league.owner === userInfo.id` (owner-based),
-//     NOT from userMembership.permissionLevel (that is the web surface's model).
-//   - Real-time: wired via useWebSocket + keychain JWT + onSubscribeRefresh
-//     (not via the shared LeagueWebSocketContext used by web).
+// ── Parity assertions (LS-7485 — TC-002-P) ───────────────────────────────────
+// Verify the native surface uses permissionLevel (not league.owner) to match
+// the web surface and the server's vetoTrade authorisation logic.
 
 describe('TradeCenterPage — surface contract (parity assertions)', () => {
-  it('derives isCommissioner=true when league.owner matches the logged-in user id', async () => {
-    // userInfo.id is 1 (from the useAuthorizedUserInfo mock above)
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
-    mockUserTeamId = 42;
-    mockLeague = { league: { id: 1, owner: 1 } }; // owner === user id
-    render(<TradeCenterPage />);
+  it.each([
+    ['commissioner', true],
+    ['general_manager', true],
+    ['assistant_manager', true],
+    ['player', false],
+    [undefined, false],
+  ])(
+    'derives isCommissioner=%s from permissionLevel=%s (not league.owner)',
+    async (permissionLevel, expected) => {
+      // league.owner (999) intentionally does NOT match userInfo.id (1)
+      // so the old owner-based check would always return false here.
+      mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+      mockUserTeamId = 42;
+      mockLeague = {
+        league: {
+          id: 1,
+          owner: 999,
+          userMembership: permissionLevel ? { permissionLevel } : null,
+        },
+      };
+      render(<TradeCenterPage />);
 
-    fireEvent.press(screen.getByLabelText('View trades for My League'));
+      fireEvent.press(screen.getByLabelText('View trades for My League'));
 
-    await waitFor(() => {
-      expect(capturedNativeProps?.isCommissioner).toBe(true);
-    });
-  });
-
-  it('derives isCommissioner=false when league.owner does not match the logged-in user id', async () => {
-    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
-    mockUserTeamId = 42;
-    mockLeague = { league: { id: 1, owner: 99 } }; // owner !== user id
-    render(<TradeCenterPage />);
-
-    fireEvent.press(screen.getByLabelText('View trades for My League'));
-
-    await waitFor(() => {
-      expect(capturedNativeProps?.isCommissioner).toBe(false);
-    });
-  });
+      await waitFor(() => {
+        expect(capturedNativeProps?.isCommissioner).toBe(expected);
+      });
+    },
+  );
 
   it('passes onSubscribeRefresh as a function to TradingCenter for real-time wiring', async () => {
     mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
