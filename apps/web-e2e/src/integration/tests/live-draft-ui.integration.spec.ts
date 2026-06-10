@@ -1064,19 +1064,28 @@ test.describe
         page.getByText('Starting Hitters', { exact: false }).first(),
       ).toBeVisible({ timeout: 30_000 });
 
-      const lineupParent = page
-        .getByText('Lineup', { exact: true })
-        .first()
-        .locator('..');
-      await expect(page.getByText('Lineup').first()).toBeVisible({
-        timeout: 30_000,
+      // The live `/baseball/league/:id/roster` route renders LeagueDetailPageV2
+      // → RosterTab → the shared-components <RosterBoard> (app.tsx maps
+      // `/baseball/league/:id/:tab` to LeagueDetailPageV2), NOT the legacy
+      // apps/web `LeagueRosterManagement`. RosterBoard has no "Lineup" QuickStat
+      // pill — that element only ever existed in the legacy roster UI — so the
+      // previous `getByText('Lineup')` assertion targeted an element that never
+      // renders on this route and failed reliably regardless of timing
+      // (LS-7878). The "Starting Pitchers"/"Starting Hitters" SectionCards above
+      // DID match (RosterBoard renders them), which is exactly why this was the
+      // first failing line.
+      //
+      // Assert a filled roster slot directly instead: RosterBoard renders each
+      // assigned lineup slot as a button with aria-label "{Player Name} at
+      // {POS}". The backend poll above already confirmed positionId > 0, and
+      // autoPopulateFirstMatchupLineup places drafted players into starter
+      // slots, so at least one such slot must render after the cache-flushing
+      // reload — the same backend-authoritative roster signal that
+      // roster-management-ui.integration.spec.ts uses (LS-5053).
+      const filledSlot = page.getByRole('button', {
+        name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
       });
-      // Single deterministic assertion — the backend already confirmed
-      // positionId > 0 above, so the QuickStat must read "Lineup N/M" with
-      // N ≥ 1 once Apollo finishes the in-flight refetch.
-      await expect(lineupParent).toContainText(/Lineup\s*[1-9]\d*\s*\/\s*\d+/, {
-        timeout: 30_000,
-      });
+      await expect(filledSlot.first()).toBeVisible({ timeout: 30_000 });
     });
 
     await test.step('Verify commissioner-drafted players appear on roster', async () => {
@@ -1141,24 +1150,17 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 7: Manager verifies their roster', async ({ managerPage1 }) => {
-    // Phase 7 previously failed with a misleading "My Roster tab not visible
-    // in 271 ms" error (LS-4320). The polling loop reloaded every ~5 s and
-    // read `Lineup N/M` immediately after the "Lineup" label became visible —
-    // but RosterTab's QuickStat renders "Lineup0/0" while
-    // useGetPositionsForLeagueQuery and useGetTeamMembersQuery are in flight.
-    // Each reload cancelled both queries before they could resolve, so the
-    // value stayed "0/0" for 21 consecutive iterations even though the
-    // server-side lineup data was already populated. After 60 s elapsed, the
-    // loop's per-operation timeouts (also derived from the shrinking
-    // lineupDeadline) decayed to 271 ms and the tab visibility check failed
-    // — the misleading symptom on which the original ticket was filed.
-    //
-    // Fix: a single toContainText wait that gates on the QuickStat denominator
-    // becoming > 0 (positions resolved), then read the filled count. With no
-    // reloads the queries run to completion and Phase 7 passes in ~3 s.
+    // The manager verifies their own roster after the draft. Navigate to
+    // /overview first, then click the My Roster tab (client-side nav) to avoid
+    // the LeagueDetailPageV2 membership-gate redirect race: a direct /roster hit
+    // from a fresh context can fire the access gate before the getUserTeamId
+    // lazy query returns, so isMember=false briefly and the app redirects to
+    // /overview (LS-4320). The My Roster tab renders LeagueDetailPageV2 →
+    // RosterTab → the shared-components <RosterBoard>; verification asserts a
+    // filled roster slot directly rather than a "Lineup" QuickStat that
+    // RosterBoard never renders (LS-7878 — same root cause as Phase 6).
     test.setTimeout(240_000);
 
-    const PER_OP_TIMEOUT = 10_000;
     const LINEUP_BUDGET_MS = 120_000;
 
     await test.step('Navigate to Manager 1 roster', async () => {
@@ -1185,43 +1187,30 @@ test.describe
     });
 
     await test.step('Verify manager roster has players', async () => {
-      // Root cause of the original Phase 7 failure (LS-4320): the previous
-      // implementation reloaded every ~5 s and read `Lineup N/M` immediately
-      // after the "Lineup" label became visible — but the QuickStat renders
-      // "Lineup0/0" while `useGetPositionsForLeagueQuery` and
-      // `useGetTeamMembersQuery` are still in flight. Each reload cancelled
-      // both queries before they could resolve, so the value stayed "0/0"
-      // across 21+ iterations even though the underlying server data was
-      // populated. The final post-deadline read showed "Lineup16/17",
-      // confirming the data was there all along.
+      // The My Roster tab renders LeagueDetailPageV2 → RosterTab → the
+      // shared-components <RosterBoard>, which has NO "Lineup" QuickStat pill —
+      // that element only existed in the legacy apps/web roster UI. The prior
+      // `getByText('Lineup')` assertion therefore targeted an element that never
+      // renders on this surface and failed reliably regardless of timing. It was
+      // masked in CI before LS-7878 because Phase 6 (same root cause) failed
+      // first in the serial suite and skipped Phase 7; fixing Phase 6 unmasked
+      // it.
       //
-      // Fix: stop reloading. After the initial /overview → My Roster click,
-      // wait for the QuickStat denominator to be > 0 (positions resolved),
-      // then read the filled count. A single navigation lets both queries
-      // run to completion.
-      const lineupParent = managerPage1
-        .getByText('Lineup', { exact: true })
-        .first()
-        .locator('..');
-      await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
-        timeout: PER_OP_TIMEOUT,
+      // Assert a filled roster slot directly instead: RosterBoard renders each
+      // assigned lineup slot as a button with aria-label "{Player Name} at
+      // {POS}". After a completed draft autoPopulateFirstMatchupLineup fills the
+      // manager's starter slots, so at least one such slot must render once the
+      // tab's positions + teamMembers queries resolve — the same
+      // backend-authoritative roster signal Phase 6 and
+      // roster-management-ui.integration.spec.ts use. No reloads: the original
+      // LS-4320 failure was a reload loop that cancelled both queries before
+      // they could resolve, so a single client-side navigation is correct.
+      const filledSlot = managerPage1.getByRole('button', {
+        name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
       });
-      // Wait for positions+teamMembers to fully resolve (denominator > 0).
-      // The "Lineup0/0" loading state matches `/Lineup\s*\d+\s*\/\s*\d+/`,
-      // so the assertion uses [1-9] for the denominator's first digit.
-      await expect(lineupParent).toContainText(/Lineup\s*\d+\s*\/\s*[1-9]\d*/, {
+      await expect(filledSlot.first()).toBeVisible({
         timeout: LINEUP_BUDGET_MS,
       });
-      const lineupText = await lineupParent.textContent().catch(() => null);
-      const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*(\d+)/);
-      const lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
-      const lineupTotal = lineupMatch ? parseInt(lineupMatch[2], 10) : 0;
-      LOGGER.info(
-        `[live-draft] Phase 7 lineup resolved: ${lineupCount}/${lineupTotal} text=${JSON.stringify(
-          lineupText?.slice(0, 80) ?? null,
-        )}`,
-      );
-      expect(lineupCount).toBeGreaterThan(0);
     });
 
     await test.step('Verify manager 1-drafted players appear on roster', async () => {

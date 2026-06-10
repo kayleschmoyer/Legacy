@@ -14,10 +14,12 @@
  *      - Pitching-specific columns present (ERA, W, SO)
  *      - At least one pitcher row visible
  *   3. Player comparison tool  (/players/compare)
- *      - Search for a player and add to comparison
- *      - Add a second player
- *      - Comparison table displays career batting rows
- *      - Removing a player from the comparison works
+ *      - Page loads with the player search control
+ *      - Live player search round-trips to the real backend
+ *      - The comparison tool is premium-gated for free-tier users (the live
+ *        integration identity), so the interactive add/compare/remove flow is
+ *        covered hermetically against a mocked premium user in
+ *        apps/web-e2e/src/tests/player-comparison.spec.ts
  *
  * Run:
  *   cd D:\code\legacy-sports-worktrees\LS-754-integration-test-player-search-stats
@@ -33,11 +35,10 @@ import { test } from '../fixtures/ui';
 // ---------------------------------------------------------------------------
 
 /**
- * Well-known players expected to be in the MLB history dataset.
- * These names are used as search terms in the comparison tool.
+ * Well-known player expected to be in the MLB history dataset, used as the
+ * search term for the live comparison-search round-trip.
  */
 const PLAYER_SEARCH_1 = 'Bonds'; // Barry Bonds — all-time HR leader (batter)
-const PLAYER_SEARCH_2 = 'Johnson'; // Randy Johnson — hall of fame pitcher
 
 // ---------------------------------------------------------------------------
 // Serial test suite — phases share state and must run in order.
@@ -234,10 +235,10 @@ test.describe
   });
 
   // -------------------------------------------------------------------------
-  // PHASE 5 — COMPARISON: ADD FIRST PLAYER
+  // PHASE 5 — COMPARISON: LIVE SEARCH + PREMIUM GATE (FREE-TIER USER)
   // -------------------------------------------------------------------------
 
-  test('Phase 5: Searching for a player shows results and adds a chip', async ({
+  test('Phase 5: Player search returns live results; comparison is premium-gated', async ({
     commissionerPage: page,
   }) => {
     await page.goto('/players/compare');
@@ -248,29 +249,40 @@ test.describe
       timeout: 20_000,
     });
 
-    await test.step(`Type "${PLAYER_SEARCH_1}" into the search input`, async () => {
-      await page.getByLabel('Search players to compare').fill(PLAYER_SEARCH_1);
-    });
-
-    await test.step('Dropdown results appear', async () => {
+    // The /players/compare comparison tool is wrapped in <PremiumGate>
+    // (apps/web/src/pages/players/PlayerComparisonPage.tsx). The live
+    // integration identity is a per-spec, freshly-registered FREE-tier user
+    // (fixtures/ui.ts → getSpecUserJwt('COMMISSIONER', …)) with no Stripe
+    // subscription and accessLevel 'none', so useIsPremium() resolves false
+    // and the gate renders a full-bleed `premium-feature-gate` overlay with
+    // pointer-events disabled on the comparison children. A free user
+    // therefore CANNOT click a search result to add a chip, build a 2-player
+    // comparison, or remove a chip — the click is intercepted by the overlay
+    // and hangs until the test times out (LS-7878; the prior assertion clicked
+    // the dropdown option and blocked for the full 120s test timeout because
+    // the premium-feature-gate subtree intercepted the pointer event).
+    //
+    // The full interactive comparison flow (add / compare table / remove) is
+    // covered hermetically against a mocked premium user in
+    // apps/web-e2e/src/tests/player-comparison.spec.ts, and the live GraphQL
+    // premium gating is covered in subscription-gating.integration.spec.ts. So
+    // the live UI suite asserts the two things that ARE true for a free user:
+    // live search still round-trips to the real backend, and the premium gate
+    // is shown.
+    await test.step(`Live search for "${PLAYER_SEARCH_1}" returns results from the real backend`, async () => {
       // The dropdown renders each result as a `role="option"` Pressable whose
-      // accessible name is the player's full name (PlayerComparison.tsx:486).
-      // The container has `aria-label="Player suggestions"` but NO `role="listbox"`,
-      // so the previous `getByRole('listbox', { name: /Player suggestions/i })`
-      // locator never matched and this step failed regardless of timing (LS-7876:
-      // runs 27253153489 and 27255138902, listbox result not found). Target the
-      // option directly by role + accessible name — the stable selector that
-      // matches the rendered DOM.
-      //
-      // The dropdown is fed by the browser-side `useGetPlayersWithStatsQuery`,
-      // which does NOT go through the integration suite's fetchWithBackoff, and
-      // the production Apollo RetryLink retries only network-level failures — NOT
-      // HTTP 429 (apps/web/src/lib/apollo-client.ts:213). So a transient throttle
-      // on the shared live backend can leave the dropdown empty with no client
-      // retry. Re-issue the search (clear + re-type flips the `search` variable
-      // from skip→active, firing a fresh request) until a real result renders.
-      // This stays backend-authoritative — it only passes once the live search
-      // actually returns PLAYER_SEARCH_1 — and is bounded, so a genuinely empty
+      // accessible name is the player's full name (PlayerComparison.tsx). The
+      // browser-side `useGetPlayersWithStatsQuery` does NOT go through the
+      // integration suite's fetchWithBackoff, and the production Apollo
+      // RetryLink retries only network-level failures — NOT HTTP 429
+      // (apps/web/src/lib/apollo-client.ts). So a transient throttle on the
+      // shared live backend can leave the dropdown empty with no client retry.
+      // Re-issue the search (clear + re-type flips the `search` variable from
+      // skip→active, firing a fresh request) until a real result renders. The
+      // option renders behind the gate (blurred, pointer-events: none) but is
+      // still DOM-visible, so `fill()` (no pointer hit-test) and `toBeVisible`
+      // both work. Backend-authoritative — only passes once the live search
+      // actually returns PLAYER_SEARCH_1 — and bounded, so a genuinely empty
       // result still fails.
       const input = page.getByLabel('Search players to compare');
       const firstResult = page
@@ -283,149 +295,17 @@ test.describe
       }).toPass({ timeout: 60_000, intervals: [1_000, 2_000, 5_000] });
     });
 
-    await test.step('Click the first result to add the player', async () => {
-      await page
-        .getByRole('option', { name: new RegExp(PLAYER_SEARCH_1, 'i') })
-        .first()
-        .click();
-    });
-
-    await test.step('A player chip appears with the player name', async () => {
-      // PlayerChip renders the player name inside the chip area
-      await expect(
-        page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).first(),
-      ).toBeVisible({ timeout: 10_000 });
-
-      // The remove button for the chip is present
-      await expect(
-        page.getByRole('button', {
-          name: new RegExp(`Remove.*${PLAYER_SEARCH_1}`, 'i'),
-        }),
-      ).toBeVisible({ timeout: 10_000 });
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // PHASE 6 — COMPARISON: ADD SECOND PLAYER → TABLE RENDERS
-  // -------------------------------------------------------------------------
-
-  test('Phase 6: Adding a second player shows the comparison table', async ({
-    commissionerPage: page,
-  }) => {
-    await page.goto('/players/compare');
-    await page.waitForLoadState('domcontentloaded');
-
-    const searchInput = page.getByLabel('Search players to compare');
-    await expect(searchInput).toBeVisible({ timeout: 20_000 });
-
-    // Add player 1
-    await test.step(`Add first player: "${PLAYER_SEARCH_1}"`, async () => {
-      await searchInput.fill(PLAYER_SEARCH_1);
-      await expect(
-        page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).nth(1),
-      ).toBeVisible({ timeout: 15_000 });
-      await page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).nth(1).click();
-      // Wait for chip to appear
-      await expect(
-        page.getByRole('button', {
-          name: new RegExp(`Remove.*${PLAYER_SEARCH_1}`, 'i'),
-        }),
-      ).toBeVisible({ timeout: 10_000 });
-    });
-
-    // Add player 2
-    await test.step(`Add second player: "${PLAYER_SEARCH_2}"`, async () => {
-      // After adding player 1, the input resets to empty
-      await expect(searchInput).toBeVisible({ timeout: 10_000 });
-      // Wait for any previous search dropdown to clear
-      await searchInput.clear();
-      await searchInput.fill(PLAYER_SEARCH_2);
-      await expect(
-        page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1),
-      ).toBeVisible({ timeout: 30_000 });
-      await page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1).click();
-      await expect(
-        page.getByRole('button', {
-          name: new RegExp(`Remove.*${PLAYER_SEARCH_2}`, 'i'),
-        }),
-      ).toBeVisible({ timeout: 10_000 });
-    });
-
-    // Comparison table must now be visible
-    await test.step('Career Batting comparison section is visible', async () => {
-      await expect(page.getByText(/Career Batting/i).first()).toBeVisible({
-        timeout: 20_000,
-      });
-    });
-
-    await test.step('Comparison table shows stat row labels', async () => {
-      await expect(page.getByText('Home Runs').first()).toBeVisible({
-        timeout: 15_000,
-      });
-      await expect(page.getByText('Hits').first()).toBeVisible({
+    await test.step('Premium gate overlay blocks the comparison tool for a free-tier user', async () => {
+      const gate = page.getByTestId('premium-feature-gate');
+      await expect(gate).toBeVisible({ timeout: 15_000 });
+      // Lock card copy + upgrade CTA confirm it is the real gate, not a
+      // transient loading shell (PremiumGate.tsx).
+      await expect(gate.getByText('Premium Feature').first()).toBeVisible({
         timeout: 10_000,
       });
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // PHASE 7 — COMPARISON: REMOVING A PLAYER COLLAPSES THE TABLE
-  // -------------------------------------------------------------------------
-
-  test('Phase 7: Removing a player from comparison collapses the table', async ({
-    commissionerPage: page,
-  }) => {
-    await page.goto('/players/compare');
-    await page.waitForLoadState('domcontentloaded');
-
-    const searchInput = page.getByLabel('Search players to compare');
-    await expect(searchInput).toBeVisible({ timeout: 20_000 });
-
-    // Add both players
-    await searchInput.fill(PLAYER_SEARCH_1);
-    await expect(
-      page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).nth(1),
-    ).toBeVisible({ timeout: 15_000 });
-    await page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).nth(1).click();
-    await expect(
-      page.getByRole('button', {
-        name: new RegExp(`Remove.*${PLAYER_SEARCH_1}`, 'i'),
-      }),
-    ).toBeVisible({ timeout: 10_000 });
-
-    // Clear before the second search; the next `expect(...).toBeVisible`
-    // auto-waits up to 30s for the new player row, so no separate sleep
-    // is required (LS-4457).
-    await searchInput.clear();
-    await searchInput.fill(PLAYER_SEARCH_2);
-    await expect(
-      page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1),
-    ).toBeVisible({ timeout: 30_000 });
-    await page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1).click();
-    await expect(page.getByText(/Career Batting/i).first()).toBeVisible({
-      timeout: 20_000,
-    });
-
-    await test.step('Remove first player — table should collapse or show empty state', async () => {
-      await page
-        .getByRole('button', {
-          name: new RegExp(`Remove.*${PLAYER_SEARCH_1}`, 'i'),
-        })
-        .click();
-
-      // With only 1 player the comparison table (which needs ≥2) should disappear
-      // or the Career Batting heading should not be present
-      await expect(page.getByText(/Career Batting/i).first()).not.toBeVisible({
-        timeout: 10_000,
-      });
-    });
-
-    await test.step('Second player chip is still present', async () => {
       await expect(
-        page.getByRole('button', {
-          name: new RegExp(`Remove.*${PLAYER_SEARCH_2}`, 'i'),
-        }),
-      ).toBeVisible({ timeout: 5_000 });
+        gate.getByRole('button', { name: /upgrade to premium/i }),
+      ).toBeVisible({ timeout: 10_000 });
     });
   });
 });
