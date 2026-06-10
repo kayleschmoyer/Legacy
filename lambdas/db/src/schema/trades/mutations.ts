@@ -10,11 +10,12 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, gte, inArray, or } from 'drizzle-orm';
+import { and, count, eq, gte, inArray, ne, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import {
   assertCapSpace,
+  computeTeamPayroll,
   computeTeamPayrollExcluding,
   fetchPlayerSalaries,
 } from '../../services/cap-service';
@@ -950,6 +951,28 @@ builder.mutationField('acceptTrade', (t) =>
           }
         }
 
+        // Re-validate salary cap inside the transaction using the post-swap
+        // payroll, so a concurrent trade that also adds players to the same
+        // team cannot slip through the pre-transaction cap check with stale
+        // payroll data (TC-024-P premium race condition).
+        if (leagueCapRow?.salaryCapEnabled && leagueCapRow.salaryCap != null) {
+          const [postSwapReceivingPayroll, postSwapProposingPayroll] =
+            await Promise.all([
+              computeTeamPayroll(tx, receivingTeamId, trade.leagueId),
+              computeTeamPayroll(tx, proposingTeamId, trade.leagueId),
+            ]);
+          if (postSwapReceivingPayroll > leagueCapRow.salaryCap) {
+            throw UserInputError(
+              `This trade would put the receiving team $${postSwapReceivingPayroll - leagueCapRow.salaryCap} over the salary cap`,
+            );
+          }
+          if (postSwapProposingPayroll > leagueCapRow.salaryCap) {
+            throw UserInputError(
+              `This trade would put the proposing team $${postSwapProposingPayroll - leagueCapRow.salaryCap} over the salary cap`,
+            );
+          }
+        }
+
         await Promise.all([
           syncMatchupPlayersForTradeLeg(
             tx,
@@ -976,7 +999,50 @@ builder.mutationField('acceptTrade', (t) =>
         legsSwapped: playerLegs.length,
       });
 
-      // 6. Notify the whole league that rosters changed
+      // 6. Best-effort: cancel all other pending trade offers that involve
+      //    any of the same players.  Once this trade has committed, those
+      //    offers are stale — their source team no longer owns the player —
+      //    so they can never succeed.  We run this outside the main
+      //    transaction to avoid a deadlock with a concurrent acceptTrade
+      //    that already claimed one of those rows; the rowCount guards inside
+      //    the transaction remain the correctness backstop.
+      try {
+        const allTradedPlayerIds = [
+          ...new Set([...toReceiving, ...toProposing]),
+        ];
+        if (allTradedPlayerIds.length > 0) {
+          await db
+            .update(PublicSchema.tradeOffers)
+            .set({ status: 'cancelled', respondedAt: new Date() })
+            .where(
+              and(
+                eq(PublicSchema.tradeOffers.leagueId, trade.leagueId),
+                ne(PublicSchema.tradeOffers.id, args.tradeId),
+                eq(PublicSchema.tradeOffers.status, 'pending'),
+                inArray(
+                  PublicSchema.tradeOffers.id,
+                  db
+                    .select({ id: PublicSchema.tradeOfferPlayers.tradeOfferId })
+                    .from(PublicSchema.tradeOfferPlayers)
+                    .where(
+                      inArray(
+                        PublicSchema.tradeOfferPlayers.playerId,
+                        allTradedPlayerIds,
+                      ),
+                    ),
+                ),
+              ),
+            );
+        }
+      } catch (cancelErr) {
+        LOGGER.warn(
+          'Failed to cancel overlapping pending trades after accept (non-fatal)',
+          cancelErr instanceof Error ? cancelErr : undefined,
+          { tradeId: args.tradeId },
+        );
+      }
+
+      // 7. Notify the whole league that rosters changed
       try {
         if (context.notificationService) {
           await context.notificationService.notifyRosterUpdate(trade.leagueId);

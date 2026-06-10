@@ -148,6 +148,7 @@ describe('Trades Resolver', () => {
     // Mock the cap-service imported by trades mutations
     jest.doMock('../services/cap-service', () => ({
       assertCapSpace: jest.fn(),
+      computeTeamPayroll: jest.fn().mockResolvedValue(0),
       computeTeamPayrollExcluding: jest.fn().mockResolvedValue(0),
       fetchPlayerSalaries: jest.fn().mockResolvedValue(new Map()),
     }));
@@ -1040,6 +1041,185 @@ describe('Trades Resolver', () => {
       await expect(
         resolver({}, { tradeId: 5 }, mockContext, undefined as never),
       ).rejects.toThrow('Trade integrity violation');
+    });
+
+    it('[TC-024-P] throws when post-swap payroll exceeds salary cap (premium race condition)', async () => {
+      const trade = {
+        id: 5,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'pending',
+        message: null,
+        expiresAt: null,
+        respondedAt: null,
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const legs = [
+        { tradeOfferId: 5, playerId: 42, fromTeamId: 1 },
+        { tradeOfferId: 5, playerId: 99, fromTeamId: 2 },
+      ];
+
+      // trade fetch → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // membership check → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // player legs → where resolves directly (no .limit)
+      mockDb.where.mockResolvedValueOnce(legs);
+      // league settings → where returns mockDb so .limit(1) can be called
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          salaryCapEnabled: true,
+          salaryCap: 100_000_000,
+          minSalary: 500_000,
+          sport: 'baseball',
+        },
+      ]);
+      // sport-compatibility check → players query (no .limit)
+      mockDb.where.mockResolvedValueOnce([
+        { playerId: 42, sport: 'baseball' },
+        { playerId: 99, sport: 'baseball' },
+      ]);
+
+      // Pre-transaction cap checks pass (stale payroll data from outside the tx)
+      const { computeTeamPayrollExcluding, computeTeamPayroll } =
+        jest.requireMock<{
+          computeTeamPayrollExcluding: jest.Mock;
+          computeTeamPayroll: jest.Mock;
+        }>('../services/cap-service');
+      computeTeamPayrollExcluding
+        .mockResolvedValueOnce(96_000_000) // receiving payroll excluding outgoing (pre-tx)
+        .mockResolvedValueOnce(94_000_000); // proposing payroll excluding outgoing (pre-tx)
+
+      // Transaction: claim succeeds, both roster legs succeed (different player
+      // from a concurrent trade already swapped the cap; the only check that
+      // catches this is the in-transaction post-swap re-validation).
+      const mockTx = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest
+          .fn()
+          .mockResolvedValueOnce({ rowCount: 1 }) // claim trade offer
+          .mockResolvedValueOnce({ rowCount: 1 }) // toReceiving teamMembers
+          .mockResolvedValueOnce({ rowCount: 1 }), // toProposing teamMembers
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+      };
+      mockDb.transaction = jest.fn(
+        async (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      // Post-swap payroll inside transaction — receiving team is now over cap
+      // because a concurrent trade (accepted in parallel) added more salary
+      // before this transaction's cap check runs.
+      computeTeamPayroll
+        .mockResolvedValueOnce(103_000_000) // receiving team post-swap: over $100M cap
+        .mockResolvedValueOnce(92_000_000); // proposing team post-swap: within cap
+
+      const resolver = getResolver('mutation', 'acceptTrade');
+      await expect(
+        resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+      ).rejects.toThrow('salary cap');
+    });
+
+    it('cancels other pending trades involving the same players after a successful accept', async () => {
+      const trade = {
+        id: 5,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'pending',
+        message: null,
+        expiresAt: null,
+        respondedAt: null,
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const legs = [{ tradeOfferId: 5, playerId: 42, fromTeamId: 1 }];
+
+      // trade fetch → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // membership check → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // player legs → where resolves directly (no .limit)
+      mockDb.where.mockResolvedValueOnce(legs);
+      // league settings → where returns mockDb for .limit(1); empty = no cap
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      // Transaction: all steps succeed.
+      // The mockTx.where uses mockImplementation as fallback so that
+      // syncMatchupPlayersForTradeLeg's internal queries (subquery building
+      // and destMatchups select) resolve to [] without throwing.
+      const mockTx = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest
+          .fn()
+          .mockResolvedValueOnce({ rowCount: 1 }) // claim
+          .mockResolvedValueOnce({ rowCount: 1 }) // toReceiving
+          .mockImplementation(() => Promise.resolve([])), // sync & remainder
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      };
+      mockDb.transaction = jest.fn(
+        async (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      // Post-transaction auto-cancel: two where() calls fire — inner subquery
+      // and outer UPDATE. The inner subquery where is consumed first, then the
+      // outer update where falls to the next Once value.
+      mockDb.where.mockResolvedValueOnce({ rowCount: 1 }); // subquery inner where
+      mockDb.where.mockReturnValueOnce(mockDb); // outer update where → await → []
+
+      // postTradeSystemMessage fires before enrichTrade and runs two
+      // team-name queries via Promise.all (proposing + receiving).
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Receiving Team' }]);
+
+      // enrichTrade calls after accept
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team 1' }]);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team 2' }]);
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const resolver = getResolver('mutation', 'acceptTrade');
+      const result = await resolver(
+        {},
+        { tradeId: 5 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBeDefined();
+      // Verify auto-cancel fired: update called on the main db (not just mockTx)
+      // after the transaction — the cancel is the first post-transaction update.
+      expect(mockDb.update).toHaveBeenCalled();
+      const setCalls = mockDb.set.mock.calls;
+      const cancelCall = setCalls.find(
+        (args: unknown[]) =>
+          typeof args[0] === 'object' &&
+          args[0] !== null &&
+          (args[0] as Record<string, unknown>).status === 'cancelled',
+      );
+      expect(cancelCall).toBeDefined();
     });
   });
 
