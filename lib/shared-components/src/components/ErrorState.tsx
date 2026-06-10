@@ -13,17 +13,28 @@ export interface ErrorStateProps {
   onRetry?: () => void;
   /** Custom retry button label. Defaults to "Retry". */
   retryLabel?: string;
+  /** Optional error code shown for support triage (e.g. "INTERNAL_SERVER_ERROR"). */
+  errorCode?: string;
+  /** Optional correlation ID shown for support triage. */
+  correlationId?: string;
 }
 
 export function ErrorState({
   error,
   onRetry,
   retryLabel = 'Retry',
+  errorCode,
+  correlationId,
 }: ErrorStateProps): React.JSX.Element {
   const message =
     typeof error === 'string'
       ? error
       : (error?.message ?? 'An unexpected error occurred');
+
+  const hasTriageInfo = Boolean(errorCode ?? correlationId);
+  const triageParts: string[] = [];
+  if (errorCode) triageParts.push(`Code: ${errorCode}`);
+  if (correlationId) triageParts.push(`ID: ${correlationId}`);
 
   return (
     <YStack
@@ -38,6 +49,17 @@ export function ErrorState({
       <Text fontSize="$3" color="$red11" fontWeight="600">
         {message}
       </Text>
+
+      {hasTriageInfo ? (
+        <Text
+          fontSize="$1"
+          color="$red9"
+          fontFamily="$mono"
+          testID="error-triage-info"
+        >
+          {triageParts.join(' · ')}
+        </Text>
+      ) : null}
 
       {onRetry ? (
         <Button

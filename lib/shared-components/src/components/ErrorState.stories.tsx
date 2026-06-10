@@ -56,6 +56,29 @@ export const NullError: Story = {
   },
 };
 
+export const WithErrorCode: Story = {
+  args: {
+    error: 'Failed to load leagues.',
+    errorCode: 'INTERNAL_SERVER_ERROR',
+  },
+};
+
+export const WithCorrelationId: Story = {
+  args: {
+    error: 'Failed to load leagues.',
+    correlationId: 'A3F9D1',
+  },
+};
+
+export const WithErrorCodeAndCorrelationId: Story = {
+  args: {
+    error: 'Failed to load leagues.',
+    errorCode: 'INTERNAL_SERVER_ERROR',
+    correlationId: 'A3F9D1',
+    onRetry: fn(),
+  },
+};
+
 export const WithRetryInteraction: Story = {
   args: {
     error: 'Connection lost.',

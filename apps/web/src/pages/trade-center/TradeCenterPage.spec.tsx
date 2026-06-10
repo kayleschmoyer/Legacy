@@ -7,6 +7,7 @@ import { TradeCenterPage } from './TradeCenterPage';
 // ── Configurable mock state ──────────────────────────────────────────────────
 let mockUserLeagues: unknown;
 let mockLeaguesLoading = false;
+let mockUserLeaguesError: unknown;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
@@ -22,7 +23,7 @@ jest.mock('../../api/db/graphql.generated', () => ({
   useGetUserLeaguesQuery: () => ({
     data: mockUserLeagues,
     loading: mockLeaguesLoading,
-    error: undefined,
+    error: mockUserLeaguesError,
     refetch: jest.fn(),
   }),
   useGetUserTeamIdQuery: () => ({
@@ -96,13 +97,15 @@ jest.mock('tamagui', () => {
     Text: ({
       children,
       onPress,
+      testID,
       ...rest
     }: {
       children: React.ReactNode;
       onPress?: () => void;
+      testID?: string;
       [key: string]: unknown;
     }) => (
-      <span onClick={onPress} {...(rest as object)}>
+      <span onClick={onPress} data-testid={testID} {...(rest as object)}>
         {children}
       </span>
     ),
@@ -145,6 +148,7 @@ function renderPage(initialPath = '/trade-center') {
 beforeEach(() => {
   mockUserLeagues = undefined;
   mockLeaguesLoading = false;
+  mockUserLeaguesError = undefined;
   mockUserTeamId = null;
   mockLeague = undefined;
   mockTeamTradeOffers = [];
@@ -154,6 +158,44 @@ beforeEach(() => {
 describe('TradeCenterPage', () => {
   it('renders without crashing', () => {
     renderPage();
+  });
+
+  describe('error state', () => {
+    it('shows "Failed to load leagues" when useGetUserLeaguesQuery returns an error', () => {
+      mockUserLeaguesError = new Error('Network error');
+      renderPage();
+      expect(screen.getByText(/Failed to load leagues/i)).toBeInTheDocument();
+    });
+
+    it('shows triage info with correlation ID when an error occurs', () => {
+      mockUserLeaguesError = new Error('Network error');
+      renderPage();
+      const triageEl = screen.getByTestId('error-triage-info');
+      expect(triageEl).toBeInTheDocument();
+      expect(triageEl.textContent).toMatch(/ID:/);
+    });
+
+    it('shows the GraphQL error code in triage info when available', () => {
+      mockUserLeaguesError = {
+        message: 'GraphQL error',
+        graphQLErrors: [{ extensions: { code: 'INTERNAL_SERVER_ERROR' } }],
+        networkError: null,
+      };
+      renderPage();
+      const triageEl = screen.getByTestId('error-triage-info');
+      expect(triageEl.textContent).toMatch(/Code: INTERNAL_SERVER_ERROR/);
+    });
+
+    it('shows NETWORK_ERROR code when only a network error is present', () => {
+      mockUserLeaguesError = {
+        message: 'Network error',
+        graphQLErrors: [],
+        networkError: new Error('Failed to fetch'),
+      };
+      renderPage();
+      const triageEl = screen.getByTestId('error-triage-info');
+      expect(triageEl.textContent).toMatch(/Code: NETWORK_ERROR/);
+    });
   });
 
   it('renders the Trade Center heading', () => {
