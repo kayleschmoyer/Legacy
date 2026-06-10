@@ -704,6 +704,17 @@ export function LoginPage(): React.JSX.Element {
               onDiscordSignIn={
                 config.discordClientId ? handleDiscordSignIn : undefined
               }
+              onForgotPassword={
+                config.oauthProxyUrl
+                  ? () => {
+                      window.open(
+                        `${config.oauthProxyUrl}/forgot-password`,
+                        '_blank',
+                        'noopener,noreferrer',
+                      );
+                    }
+                  : undefined
+              }
               isEmailPasswordLoading={isEmailLoading}
               isGoogleLoading={isLoading}
               isDiscordLoading={isDiscordLoading}
@@ -712,13 +723,8 @@ export function LoginPage(): React.JSX.Element {
               onDismissError={handleDismissError}
             />
 
-            {/* LGN-024: account-recovery affordance. The app is OAuth-only
-                (Google/Discord) — there are no passwords and therefore no
-                password-reset flow, which makes a literal "Forgot password?"
-                link a dead end. Mirroring the OAuth-only signup adaptation
-                (LS-6689), users who cannot get in are given a real recovery
-                path — a support contact — using the same mailto convention the
-                homepage error state uses. */}
+            {/* LGN-024: account-recovery affordance for users who can't sign in
+                via OAuth or the email/password form. */}
             <p className="ll-card-recovery">
               Trouble signing in?{' '}
               <a

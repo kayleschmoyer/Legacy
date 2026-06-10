@@ -53,6 +53,12 @@ export interface LoginPageProps {
    * Omit to keep the banner persistent (no close button, no timer).
    */
   onDismissError?: () => void;
+  /**
+   * Called when the user presses "Forgot password?". Omit to hide the link.
+   * Only rendered when `onEmailPasswordSignIn` is also provided — email/password
+   * accounts are the only accounts that support password reset (LS-5521).
+   */
+  onForgotPassword?: () => void;
   /** Extra style forwarded to the card container */
   style?: React.CSSProperties | Record<string, unknown>;
 }
@@ -69,6 +75,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   isConfiguring = false,
   errorMessage,
   onDismissError,
+  onForgotPassword,
   style,
 }) => {
   const anyLoading =
@@ -236,6 +243,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 fontSize={14}
               />
             </YStack>
+
+            {!!onForgotPassword && !!onEmailPasswordSignIn && (
+              <Button
+                testID="login-forgot-password"
+                aria-label="Forgot password"
+                onPress={onForgotPassword}
+                unstyled
+                alignSelf="flex-end"
+                paddingVertical="$1"
+              >
+                <Text fontSize={12} color="#C5A55A">
+                  Forgot password?
+                </Text>
+              </Button>
+            )}
 
             <Button
               testID="login-email-password-submit"

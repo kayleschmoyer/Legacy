@@ -204,6 +204,49 @@ describe('LoginPage email/password form (LGN-017)', () => {
   });
 });
 
+describe('LoginPage forgot-password link (LS-5521)', () => {
+  it('renders "Forgot password?" when both onEmailPasswordSignIn and onForgotPassword are provided', () => {
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+        onForgotPassword={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('login-forgot-password')).toBeTruthy();
+  });
+
+  it('does not render "Forgot password?" when onForgotPassword is omitted', () => {
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('login-forgot-password')).toBeNull();
+  });
+
+  it('does not render "Forgot password?" when onEmailPasswordSignIn is omitted', () => {
+    render(
+      <LoginPage onGoogleSignIn={jest.fn()} onForgotPassword={jest.fn()} />,
+    );
+    expect(screen.queryByTestId('login-forgot-password')).toBeNull();
+  });
+
+  it('calls onForgotPassword when the link is pressed', () => {
+    const onForgotPassword = jest.fn();
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+        onForgotPassword={onForgotPassword}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('login-forgot-password'));
+    expect(onForgotPassword).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('LoginPage error banner (LGN-027)', () => {
   it('shows a dismiss control that clears the error when onDismissError is provided', () => {
     const onDismissError = jest.fn();

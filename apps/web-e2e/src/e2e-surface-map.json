@@ -304,6 +304,10 @@
       "apps/web/src/components/leagues/**",
       "apps/web/src/features/baseball/**"
     ],
+    "apps/web-e2e/src/tests/forgot-password.spec.ts": [
+      "apps/web/src/pages/login/**",
+      "lib/shared-components/src/features/auth/**"
+    ],
     "apps/web-e2e/src/tests/login-completion.spec.ts": [
       "apps/web/src/pages/auth/**",
       "apps/web/src/pages/login/**",
