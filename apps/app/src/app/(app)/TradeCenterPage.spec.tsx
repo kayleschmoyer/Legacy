@@ -13,6 +13,7 @@ let mockUserLeagues: unknown;
 let mockLeaguesLoading = false;
 let mockUserTeamId: number | null;
 let mockLeague: unknown;
+let capturedNativeProps: Record<string, unknown> | null = null;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -48,9 +49,10 @@ jest.mock('@legacy-sports/shared-components', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    TradingCenter: ({ leagueId }: { leagueId: number }) => (
-      <View testID={`trading-center-${leagueId}`} />
-    ),
+    TradingCenter: (props: { leagueId: number; [key: string]: unknown }) => {
+      capturedNativeProps = props;
+      return <View testID={`trading-center-${props.leagueId}`} />;
+    },
     useWebSocket: jest.fn().mockReturnValue({ connected: false }),
   };
 });
@@ -124,6 +126,7 @@ beforeEach(() => {
   mockLeaguesLoading = false;
   mockUserTeamId = null;
   mockLeague = undefined;
+  capturedNativeProps = null;
 });
 
 describe('TradeCenterPage', () => {
@@ -190,6 +193,57 @@ describe('TradeCenterPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/not a member/i)).toBeTruthy();
+    });
+  });
+});
+
+// ── Parity assertions (LS-7513 — TC-019) ─────────────────────────────────────
+// Verify the native surface satisfies the same TradingCenter contract as the
+// web /trade-center route and the in-league Trades tab.  Key differences that
+// are intentional and must stay stable:
+//   - Commissioner: derived from `league.owner === userInfo.id` (owner-based),
+//     NOT from userMembership.permissionLevel (that is the web surface's model).
+//   - Real-time: wired via useWebSocket + keychain JWT + onSubscribeRefresh
+//     (not via the shared LeagueWebSocketContext used by web).
+
+describe('TradeCenterPage — surface contract (parity assertions)', () => {
+  it('derives isCommissioner=true when league.owner matches the logged-in user id', async () => {
+    // userInfo.id is 1 (from the useAuthorizedUserInfo mock above)
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 1 } }; // owner === user id
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(capturedNativeProps?.isCommissioner).toBe(true);
+    });
+  });
+
+  it('derives isCommissioner=false when league.owner does not match the logged-in user id', async () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } }; // owner !== user id
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(capturedNativeProps?.isCommissioner).toBe(false);
+    });
+  });
+
+  it('passes onSubscribeRefresh as a function to TradingCenter for real-time wiring', async () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(typeof capturedNativeProps?.onSubscribeRefresh).toBe('function');
     });
   });
 });
