@@ -141,10 +141,12 @@ If no worktree exists, there are two paths depending on where the session starte
   ```
   git fetch origin <headRefName>
   git checkout <headRefName>
+  worktree_set(key: "<headRefName>")   # establishes CI event routing for this session
   ```
 - **Starting from the main repo** (parallel/batch flow): create a sibling worktree via `worktree_attach`:
   ```
   worktree_attach(branch: "<headRefName>")
+  worktree_set(key: "<headRefName>")   # establishes CI event routing for this session
   ```
 
 Then set up node_modules (required in both cases):
@@ -276,6 +278,7 @@ Summarize:
 
 ## Gotchas
 
+- **`worktree_set` is required for native CI event routing** — Claude Code Desktop routes CI/PR push notifications to the session whose active worktree matches the branch. Without calling `worktree_set` after any checkout or attach, the session enters the Step 6 event loop but never receives events and spins indefinitely. Note: `worktree_set` requires a local worktree entry to exist; for sessions that cannot create a local checkout, native events are unavailable — `worktree_watch_pr` (LS-7904) will close this gap when shipped.
 - **Don't stop after the first fix** — the event loop is the core of this skill. A PR often needs multiple rounds (fix CI → new review → fix review → CI again → merge).
 - **`mergeable: UNKNOWN` is not a blocker** — GitHub may still be computing. Wait for the next event rather than treating it as an error.
 - **Check Runs vs. Commit Statuses** — `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API. If "check not found", use `github_list_commit_statuses({ number: <PR#> })` instead. See pr-lifecycle SKILL.md Critical Rule 8.
