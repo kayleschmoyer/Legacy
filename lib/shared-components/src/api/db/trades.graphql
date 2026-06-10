@@ -1,11 +1,31 @@
-query GetTeamTradeOffers($teamId: Int!, $status: String) {
-  teamTradeOffers(teamId: $teamId, status: $status) {
+query GetTeamTradeOffers(
+  $teamId: Int!
+  $status: String
+  $limit: Int
+  $offset: Int
+) {
+  teamTradeOffers(
+    teamId: $teamId
+    status: $status
+    limit: $limit
+    offset: $offset
+  ) {
     ...TradeOffer
   }
 }
 
-query GetLeagueTradeOffers($leagueId: Int!, $status: String) {
-  leagueTradeOffers(leagueId: $leagueId, status: $status) {
+query GetLeagueTradeOffers(
+  $leagueId: Int!
+  $status: String
+  $limit: Int
+  $offset: Int
+) {
+  leagueTradeOffers(
+    leagueId: $leagueId
+    status: $status
+    limit: $limit
+    offset: $offset
+  ) {
     ...TradeOffer
   }
 }

@@ -8893,6 +8893,8 @@ export type TradeOfferFragment = {
 export type GetTeamTradeOffersQueryVariables = Exact<{
   teamId: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetTeamTradeOffersQuery = {
@@ -8927,6 +8929,8 @@ export type GetTeamTradeOffersQuery = {
 export type GetLeagueTradeOffersQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetLeagueTradeOffersQuery = {
@@ -20258,8 +20262,18 @@ export type CreateTiebreakerRulesMutationOptions = BaseMutationOptions<
   CreateTiebreakerRulesMutationVariables
 >;
 export const GetTeamTradeOffers = gql`
-  query GetTeamTradeOffers($teamId: Int!, $status: String) {
-    teamTradeOffers(teamId: $teamId, status: $status) {
+  query GetTeamTradeOffers(
+    $teamId: Int!
+    $status: String
+    $limit: Int
+    $offset: Int
+  ) {
+    teamTradeOffers(
+      teamId: $teamId
+      status: $status
+      limit: $limit
+      offset: $offset
+    ) {
       ...TradeOffer
     }
   }
@@ -20280,6 +20294,8 @@ export const GetTeamTradeOffers = gql`
  *   variables: {
  *      teamId: // value for 'teamId'
  *      status: // value for 'status'
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
  *   },
  * });
  */
@@ -20350,8 +20366,18 @@ export type GetTeamTradeOffersQueryResult = Apollo.QueryResult<
   GetTeamTradeOffersQueryVariables
 >;
 export const GetLeagueTradeOffers = gql`
-  query GetLeagueTradeOffers($leagueId: Int!, $status: String) {
-    leagueTradeOffers(leagueId: $leagueId, status: $status) {
+  query GetLeagueTradeOffers(
+    $leagueId: Int!
+    $status: String
+    $limit: Int
+    $offset: Int
+  ) {
+    leagueTradeOffers(
+      leagueId: $leagueId
+      status: $status
+      limit: $limit
+      offset: $offset
+    ) {
       ...TradeOffer
     }
   }
@@ -20372,6 +20398,8 @@ export const GetLeagueTradeOffers = gql`
  *   variables: {
  *      leagueId: // value for 'leagueId'
  *      status: // value for 'status'
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
  *   },
  * });
  */

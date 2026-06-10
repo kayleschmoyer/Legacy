@@ -23,10 +23,12 @@ let mockLeagueTradesReturn: {
   data: GetLeagueTradeOffersQuery | undefined;
   loading: boolean;
   refetch: jest.Mock;
+  fetchMore?: jest.Mock;
 } = {
   data: undefined,
   loading: false,
   refetch: jest.fn(),
+  fetchMore: jest.fn().mockResolvedValue({ data: { leagueTradeOffers: [] } }),
 };
 
 let mockDeepLinkReturn: {
@@ -852,6 +854,76 @@ describe('TradingCenter — Completed Trade History', () => {
     expect(getAllByText('ACCEPTED')).toHaveLength(1);
     expect(getAllByText('REJECTED')).toHaveLength(1);
     expect(getAllByText('VETOED')).toHaveLength(1);
+  });
+
+  it('shows Load more button when first page is full', async () => {
+    const fullPage = Array.from({ length: 25 }, (_, i) =>
+      makeOffer({ id: 300 + i, status: 'accepted' }),
+    );
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: fullPage },
+      loading: false,
+      refetch: jest.fn(),
+      fetchMore: jest
+        .fn()
+        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
+    };
+    const { findByText, getByText, queryByTestId } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    expect(await findByText('Load more')).toBeTruthy();
+    expect(queryByTestId('load-more-history')).toBeTruthy();
+  });
+
+  it('does not show Load more button when fewer than a full page returned', async () => {
+    mockLeagueTradesReturn = {
+      data: {
+        leagueTradeOffers: [makeOffer({ id: 400, status: 'accepted' })],
+      },
+      loading: false,
+      refetch: jest.fn(),
+      fetchMore: jest
+        .fn()
+        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
+    };
+    const { findByText, getByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    await findByText('ACCEPTED');
+    expect(queryByText('Load more')).toBeNull();
+  });
+
+  it('appends next page when Load more is clicked', async () => {
+    const firstPage = Array.from({ length: 25 }, (_, i) =>
+      makeOffer({ id: 500 + i, status: 'accepted' }),
+    );
+    const secondPage = [makeOffer({ id: 600, status: 'rejected' })];
+    const mockFetchMore = jest
+      .fn()
+      .mockResolvedValue({ data: { leagueTradeOffers: secondPage } });
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: firstPage },
+      loading: false,
+      refetch: jest.fn(),
+      fetchMore: mockFetchMore,
+    };
+    const { findByText, getByText, getAllByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByText('Trade History');
+    fireEvent.click(getByText('Trade History'));
+    const loadMoreBtn = await findByText('Load more');
+    fireEvent.click(loadMoreBtn);
+    // Second page trade should appear
+    await findByText('REJECTED');
+    expect(getAllByText('ACCEPTED').length).toBe(25);
+    // No more pages — button gone
+    await waitFor(() => expect(queryByText('Load more')).toBeNull());
+    expect(mockFetchMore).toHaveBeenCalledWith({ variables: { offset: 25 } });
   });
 });
 

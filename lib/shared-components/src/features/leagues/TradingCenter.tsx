@@ -771,7 +771,10 @@ function ProposeTradeDialog({
             GetLeagueTradeOffersQuery,
             GetLeagueTradeOffersQueryVariables
           >(
-            { query: GetLeagueTradeOffers, variables: { leagueId } },
+            {
+              query: GetLeagueTradeOffers,
+              variables: { leagueId, limit: HISTORY_PAGE_SIZE, offset: 0 },
+            },
             (existing) => {
               const list = existing?.leagueTradeOffers ?? [];
               if (list.some((t) => t.id === created.id)) return existing;
@@ -1327,6 +1330,8 @@ function ProposeTradeDialog({
 
 // ── TradingCenter (main component) ────────────────────────────────────────────
 
+const HISTORY_PAGE_SIZE = 25;
+
 export function TradingCenter({
   leagueId,
   userTeamId,
@@ -1349,6 +1354,11 @@ export function TradingCenter({
   const [historyDateFilter, setHistoryDateFilter] = useState<
     'all' | '30d' | '90d'
   >('all');
+  const [allHistoryTrades, setAllHistoryTrades] = useState<
+    TradeOfferFragment[]
+  >([]);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historyFetchingMore, setHistoryFetchingMore] = useState(false);
 
   const { data: leagueData } = useGetLeagueByIdQuery({
     variables: { id: leagueId },
@@ -1371,13 +1381,14 @@ export function TradingCenter({
     fetchPolicy: 'cache-and-network',
   });
 
-  // All league trades for commissioner + history view
+  // All league trades for commissioner + history view (paginated)
   const {
     data: allTradesData,
     loading: allLoading,
     refetch: refetchAll,
+    fetchMore: fetchMoreHistory,
   } = useGetLeagueTradeOffersQuery({
-    variables: { leagueId },
+    variables: { leagueId, limit: HISTORY_PAGE_SIZE, offset: 0 },
     fetchPolicy: 'cache-and-network',
     skip: !isCommissioner && !showHistory,
   });
@@ -1430,6 +1441,28 @@ export function TradingCenter({
     return cleanup ?? undefined;
   }, [onSubscribeRefresh, handleRefetch]);
 
+  // Sync first page of history from the query into accumulated state.
+  // On refetch (e.g. after a trade action) this resets to page 1.
+  useEffect(() => {
+    const fresh = allTradesData?.leagueTradeOffers ?? [];
+    setAllHistoryTrades(fresh);
+    setHasMoreHistory(fresh.length >= HISTORY_PAGE_SIZE);
+  }, [allTradesData?.leagueTradeOffers]);
+
+  const handleLoadMoreHistory = useCallback(async () => {
+    setHistoryFetchingMore(true);
+    try {
+      const result = await fetchMoreHistory({
+        variables: { offset: allHistoryTrades.length },
+      });
+      const next = result.data?.leagueTradeOffers ?? [];
+      setAllHistoryTrades((prev) => [...prev, ...next]);
+      setHasMoreHistory(next.length >= HISTORY_PAGE_SIZE);
+    } finally {
+      setHistoryFetchingMore(false);
+    }
+  }, [fetchMoreHistory, allHistoryTrades.length]);
+
   const pendingTrades = pendingData?.teamTradeOffers ?? [];
   const incomingPending = pendingTrades.filter(
     (t) => t.receivingTeamId === userTeamId && t.proposingTeamId !== userTeamId,
@@ -1438,11 +1471,11 @@ export function TradingCenter({
     (t) => t.proposingTeamId === userTeamId,
   );
 
-  // History: completed trades from the league view
-  const historyTrades = useMemo(() => {
-    const all = allTradesData?.leagueTradeOffers ?? [];
-    return all.filter((t) => t.status !== 'pending');
-  }, [allTradesData]);
+  // History: completed trades from the accumulated paginated league view
+  const historyTrades = useMemo(
+    () => allHistoryTrades.filter((t) => t.status !== 'pending'),
+    [allHistoryTrades],
+  );
 
   // Deep-link banner state
   const deepLinkOffer = useMemo(() => {
@@ -1935,26 +1968,45 @@ export function TradingCenter({
                 </Text>
               </Card>
             ) : (
-              filteredHistoryTrades.map((trade) => (
-                <TradeOfferCard
-                  key={trade.id}
-                  trade={trade}
-                  userTeamId={userTeamId}
-                  isCommissioner={isCommissioner}
-                  highlighted={
-                    deepLinkOfferId != null && trade.id === deepLinkOfferId
-                  }
-                  onVeto={
-                    isCommissioner
-                      ? (id) =>
-                          void handleAction(id, (tradeId) =>
-                            vetoTrade({ variables: { tradeId } }),
-                          )
-                      : undefined
-                  }
-                  actionLoading={actionLoading}
-                />
-              ))
+              <>
+                {filteredHistoryTrades.map((trade) => (
+                  <TradeOfferCard
+                    key={trade.id}
+                    trade={trade}
+                    userTeamId={userTeamId}
+                    isCommissioner={isCommissioner}
+                    highlighted={
+                      deepLinkOfferId != null && trade.id === deepLinkOfferId
+                    }
+                    onVeto={
+                      isCommissioner
+                        ? (id) =>
+                            void handleAction(id, (tradeId) =>
+                              vetoTrade({ variables: { tradeId } }),
+                            )
+                        : undefined
+                    }
+                    actionLoading={actionLoading}
+                  />
+                ))}
+                {hasMoreHistory && (
+                  <Button
+                    data-testid="load-more-history"
+                    size="$3"
+                    backgroundColor="$surfacePanel"
+                    borderColor="$surfacePanelBorder"
+                    borderWidth={1}
+                    borderRadius="$4"
+                    onPress={() => void handleLoadMoreHistory()}
+                    disabled={historyFetchingMore}
+                    alignSelf="center"
+                  >
+                    <Text fontSize="$3" color="$textMuted">
+                      {historyFetchingMore ? 'Loading...' : 'Load more'}
+                    </Text>
+                  </Button>
+                )}
+              </>
             )}
           </YStack>
         )}
