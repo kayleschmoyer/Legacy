@@ -208,6 +208,14 @@ Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance poli
 
 **Precedent**: [PR #3763](https://github.com/bkrupa/legacy-sports/pull/3763) (LS-4289) — the reviewer bot incorrectly flagged `page.request.post` in a live-draft integration spec across 3 review cycles, requiring `CANNOT-COMPLY` escalation each time. This rule split was created to prevent that from recurring.
 
+## Integration Regression Detection (nightly backstop)
+
+Per [ADR 0014](../../../docs/decisions/0014-integration-nightly-bisect.md), there is **no per-merge integration validation** and the merge queue does not gate on integration runs:
+
+- A PR-branch `run:integration` run still in flight at merge time is **orphaned** (cancelled / result never consumed) by the merge-queue squash + branch deletion. This is **accepted by design** — do not propose per-merge or merge-gated integration validation (LS-7880, Won't Do).
+- The **nightly full Playwright run on `main`** is the backstop; it catches any integration regression that merged that day (accepted residual window: up to ~24h).
+- **Agent guidance:** when a `run:integration` result matters to a merge decision, confirm the run **completed** before merging, or re-validate on `main` afterward. On a nightly failure, bisect the day's merges — see the runbook in the ADR.
+
 ## Integration with Workflow
 
 Testing is part of the pre-commit sequence: typecheck -> lint -> test -> build. Run the full suite with `make pc`. See [repo-tooling](../repo-tooling/SKILL.md) for all targets.

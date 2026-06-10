@@ -66,6 +66,8 @@ Claude Code surfaces CI results and review events **as push notifications**. Aft
 
 See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table.
 
+> **`run:integration` runs can be orphaned by merge — accepted by design.** A PR-branch integration run still in flight when the PR merges (merge-queue squash + branch deletion) is cancelled or its result never consumed; the nightly full Playwright run on `main` is the backstop ([ADR 0014](../../../docs/decisions/0014-integration-nightly-bisect.md)). When a `run:integration` result matters to the merge decision, **confirm the run completed before merging**, or re-validate on `main` afterward. Do not treat an in-flight run as a green signal (this bit LS-7876 / #5023).
+
 ### Phase 3: Fix Copilot Review Comments
 
 Fetch unresolved threads, apply fixes, validate, commit, push, and resolve threads. Cap at 2 fix-review rounds -- after round 2, resolve remaining threads as "acknowledged" and proceed. After re-requesting review, use `mcp__github__subscribe_pr_activity` to receive the next review event — do **not** use `sleep N && gh api .../reviews` polling (see Critical Rule 13).

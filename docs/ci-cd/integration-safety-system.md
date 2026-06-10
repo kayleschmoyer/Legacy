@@ -1,6 +1,6 @@
 # Integration-Safety System
 
-> Status: Phase 1 implemented (contract gate, terraform plan gate, selective integration + advisory). Phase 2 designed (per-merge attribution + stop-the-line). This document is both the design rationale and the operator reference.
+> Status: Phase 1 implemented (contract gate, terraform plan gate, selective integration + advisory). Phase 2: per-merge attribution **rejected** ([ADR 0014](../decisions/0014-integration-nightly-bisect.md), LS-7880 Won't Do); stop-the-line designed. This document is both the design rationale and the operator reference.
 
 ## Problem
 
@@ -119,11 +119,13 @@ This implements the "Plan job" that `.agents/skills/terraform-permission-plannin
 
 ---
 
-## Phase 2 — Per-merge attribution + stop-the-line (designed)
+## Phase 2 — Per-merge attribution + stop-the-line (per-merge rejected; stop-the-line designed)
 
-Even with shift-left, some breaks only manifest live. To make those non-cascading:
+> **Decision update (2026-06-10):** the per-merge half of this phase was **rejected** — LS-7880 closed Won't Do. The nightly run is the backstop and nightly failures are attributed by bisecting the day's merges; see [ADR 0014](../decisions/0014-integration-nightly-bisect.md) for the cost rationale, the bisect runbook, and the accepted residual risk (including orphaned `run:integration` PR runs). Stop-the-line remains open design space.
 
-- **Per-merge affected integration** — after each merge to `main`, run only the affected subset (same selector) so attribution is automatic. The full suite still runs nightly as a backstop.
+Even with shift-left, some breaks only manifest live. The original design to make those non-cascading:
+
+- **Per-merge affected integration** (rejected, see above) — after each merge to `main`, run only the affected subset (same selector) so attribution is automatic. The full suite still runs nightly as a backstop.
 - **Stop-the-line** — when a post-merge/nightly run goes red, auto-file an issue/Jira tagged with the implicated commit + owner (Discord webhook already exists in `run-playwright-tests.yml`) and warn/block further PRs touching the broken area until green.
 
 These require main-branch automation and are intentionally not implemented in Phase 1.
