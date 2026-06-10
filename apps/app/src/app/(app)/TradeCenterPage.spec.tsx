@@ -15,6 +15,12 @@ let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let capturedNativeProps: Record<string, unknown> | null = null;
 
+// Captures the onSubscribeRefresh prop passed to the TradingCenter mock so
+// WebSocket-subscription tests can register a refetch and verify it fires.
+let capturedOnSubscribeRefresh:
+  | ((refetch: () => void) => (() => void) | void)
+  | undefined;
+
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock('expo-router', () => ({
@@ -49,8 +55,13 @@ jest.mock('@legacy-sports/shared-components', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    TradingCenter: (props: { leagueId: number; [key: string]: unknown }) => {
+    TradingCenter: (props: {
+      leagueId: number;
+      onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
+      [key: string]: unknown;
+    }) => {
       capturedNativeProps = props;
+      capturedOnSubscribeRefresh = props.onSubscribeRefresh;
       return <View testID={`trading-center-${props.leagueId}`} />;
     },
     useWebSocket: jest.fn().mockReturnValue({ connected: false }),
@@ -122,11 +133,17 @@ jest.mock('./_screenErrorBoundary', () => ({
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
+  capturedOnSubscribeRefresh = undefined;
+  jest.clearAllMocks();
   mockUserLeagues = undefined;
   mockLeaguesLoading = false;
   mockUserTeamId = null;
   mockLeague = undefined;
   capturedNativeProps = null;
+  const sharedMocks: { useWebSocket: jest.Mock } = jest.requireMock(
+    '@legacy-sports/shared-components',
+  );
+  sharedMocks.useWebSocket.mockReturnValue({ connected: false });
 });
 
 describe('TradeCenterPage', () => {
@@ -245,5 +262,79 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
     await waitFor(() => {
       expect(typeof capturedNativeProps?.onSubscribeRefresh).toBe('function');
     });
+  });
+});
+
+// ── TC-026 regression: real-time WebSocket subscription ───────────────────────
+
+describe('real-time WebSocket subscription (TC-026)', () => {
+  const wsShared: { useWebSocket: jest.Mock } = jest.requireMock(
+    '@legacy-sports/shared-components',
+  );
+  const { useWebSocket } = wsShared;
+
+  const setup = async () => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'My League' }] };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-center-1')).toBeTruthy();
+    });
+  };
+
+  const findWsArgs = (): {
+    onTradeOffer?: () => void;
+    onRosterUpdate?: () => void;
+  } => {
+    const calls = useWebSocket.mock.calls as unknown[][];
+    for (const call of calls) {
+      if ((call[0] as { leagueId?: number })?.leagueId === 1) {
+        return call[0] as {
+          onTradeOffer?: () => void;
+          onRosterUpdate?: () => void;
+        };
+      }
+    }
+    return {};
+  };
+
+  it('calls useWebSocket with onTradeOffer and onRosterUpdate handlers', async () => {
+    await setup();
+    const opts = findWsArgs();
+    expect(typeof opts.onTradeOffer).toBe('function');
+    expect(typeof opts.onRosterUpdate).toBe('function');
+  });
+
+  it('passes onSubscribeRefresh to TradingCenter', async () => {
+    await setup();
+    expect(typeof capturedOnSubscribeRefresh).toBe('function');
+  });
+
+  it('invokes the registered refetch when onTradeOffer fires', async () => {
+    await setup();
+    const { onTradeOffer } = findWsArgs();
+    if (!onTradeOffer || !capturedOnSubscribeRefresh) {
+      expect(onTradeOffer).toBeDefined();
+      return;
+    }
+    const mockRefetch = jest.fn();
+    capturedOnSubscribeRefresh(mockRefetch);
+    onTradeOffer();
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('invokes the registered refetch when onRosterUpdate fires', async () => {
+    await setup();
+    const { onRosterUpdate } = findWsArgs();
+    if (!onRosterUpdate || !capturedOnSubscribeRefresh) {
+      expect(onRosterUpdate).toBeDefined();
+      return;
+    }
+    const mockRefetch = jest.fn();
+    capturedOnSubscribeRefresh(mockRefetch);
+    onRosterUpdate();
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 });
