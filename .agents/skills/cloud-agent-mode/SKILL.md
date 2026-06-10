@@ -58,6 +58,7 @@ The "cloud agent" label covers three distinct configurations with very different
 > The flow below assumes the full hosted-Lambda toolchain is connected (custom MCP servers all reached via OAuth connectors on local/CC web, or Cognito machine-grant bearer on Copilot). On default Claude Code on the web sessions where these servers do **not** auto-load, follow [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) instead.
 
 1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_claim_ticket({ key: "LS-####" })` (atomically checks blockers, validates status, and transitions to In Progress)
+   - **Before claiming, check the job environment for `JIRA_ASSIGNEE_EMAIL`** (`echo "$JIRA_ASSIGNEE_EMAIL"`; on Copilot it is exported from the repo variable by `copilot-setup-steps.yml`). If non-empty, pass it: `jira_claim_ticket({ key: "LS-####", assignee: "<email>" })` so the claim is attributed to a real user instead of the service account. If unset, omit the param.
    - `action: "PROCEED"` → claimed; use `branchRecommendation` to decide git base (main vs a blocker branch)
    - `action: "STOP"` → read `reason` and halt; do not proceed
    - `action: "ALREADY_CLAIMED"` → call `github_list_prs(search: "LS-####")`; **STOP** if an open PR exists. If no PR exists, inspect the `ticket.updated` timestamp: **STOP** if within the last 60 minutes (assume another agent just claimed it); only proceed if older than 60 minutes (orphaned ticket — note it in the PR body and continue without re-transitioning)

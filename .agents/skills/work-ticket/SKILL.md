@@ -207,6 +207,7 @@ Then continue to Step 2 with the enriched description.
 Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
 1.  **Claim ticket**: `jira_claim_ticket(key: "LS-####")` — atomically checks blockers, validates status, and transitions to In Progress
+    - **Before calling, resolve the assignee from the session environment**: check `JIRA_ASSIGNEE_EMAIL` (Bash: `echo "$JIRA_ASSIGNEE_EMAIL"`). If non-empty, pass it: `jira_claim_ticket(key: "LS-####", assignee: "<email>")`. The hosted Jira server runs in a shared Lambda, so its server-side default cannot identify the session user — the per-call `assignee` param is the only way the claim is attributed to the person running this session. If the env var is unset or empty, omit the param (the server falls back to its configured default, then the service account).
     - `action: "PROCEED"` → claimed; use `branchRecommendation` to decide git base (main vs a blocker branch)
     - `action: "STOP"` → read `reason` and halt; do not proceed
     - `action: "ALREADY_CLAIMED"` → call `github_pr_dashboard(state: "all", limit: 50)` and filter by ticket key in-context; **STOP** if an open PR for this ticket exists. If no PR, inspect `ticket.updated`: **STOP** if within the last 60 minutes; only proceed if older than 60 minutes (orphaned ticket — note in the PR body and continue without re-transitioning)
