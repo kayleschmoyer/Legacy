@@ -208,6 +208,17 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
+    // TC-004-P regression: authenticated user must be a league member
+    it('throws ForbiddenError when authenticated user is not a member of the league (LS-7491)', async () => {
+      // verifyLeagueMembership: select().from().where().limit(1) → no rows = not a member
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      const resolver = getResolver('query', 'leagueTradeOffers');
+      await expect(
+        resolver({}, { leagueId: 99 }, mockContext, undefined as never),
+      ).rejects.toThrow('not a member of this league');
+    });
+
     it('returns empty array when no trades exist', async () => {
       // verifyLeagueMembership: select().from().where().limit(1)
       // .where() returns mockDb so .limit() can chain; .limit(1) resolves to membership
