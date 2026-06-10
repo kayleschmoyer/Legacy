@@ -25,7 +25,7 @@ const path = require('path');
 const REPO = 'github-aws-runners/terraform-aws-github-runner';
 // runners.zip (the control-plane bundle) is NOT downloaded here — it is built
 // from patched source by scripts/build-runner-control-plane-lambda.sh so it
-// carries the scale-down idle-strike debounce (LS-7870). See
+// carries the scale-down job-heartbeat override (LS-7874/LS-7877). See
 // terraform/runners/lambda-patches/README.md. Only the two unpatched bundles
 // are fetched from the upstream release.
 const ZIPS = ['webhook.zip', 'runner-binaries-syncer.zip'];

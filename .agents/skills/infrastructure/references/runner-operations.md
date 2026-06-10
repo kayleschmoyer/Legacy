@@ -13,14 +13,15 @@ Runners are event-driven, not ASG-based. When a `workflow_job` webhook fires:
 
 The SSM path `/github-action-runners/legacy-sports-dev-runner/` holds all runtime config. The GitHub App credentials under `.../app/` are what the scale-up Lambda uses to register new runner instances.
 
-### Scale-down: idle debounce & job heartbeat
+### Scale-down: job heartbeat
 
-The `scale-down` Lambda is a **patched** build of the upstream control-plane bundle (see `terraform/runners/lambda-patches/`). Two guards stop it from reclaiming a runner that is mid-job when GitHub's `busy` flag intermittently reads false:
+The `scale-down` Lambda is a **patched** build of the upstream control-plane bundle (see `terraform/runners/lambda-patches/`). The design and its evolution are recorded in [ADR 0013 — Runner survival via a runner-level job heartbeat](../../../../docs/decisions/0013-runner-job-heartbeat.md). A single guard stops it from reclaiming a runner that is mid-job when GitHub's `busy` flag intermittently reads false:
 
-- **Idle-strike debounce (LS-7870)** — a runner must read idle for `SCALE_DOWN_IDLE_STRIKES` (default 3) consecutive minute-spaced polls before removal; the count lives in the `ghr:idle_strikes` EC2 tag and resets on any busy reading.
-- **Job heartbeat (LS-7874)** — a running integration shard tags **its own** instance `ghr:job_heartbeat=<unix-seconds>` once a minute (the "Start runner heartbeat" step in `run-playwright-tests.yml`). While that tag is fresher than `SCALE_DOWN_HEARTBEAT_TTL_SECONDS` (default 180) the Lambda treats the runner as active and skips removal.
+- **Job heartbeat (LS-7874 / LS-7877)** — while **any** self-hosted job runs, the runner-level job hooks (`ACTIONS_RUNNER_HOOK_JOB_STARTED`/`COMPLETED`, wired through the runner userdata in `terraform/runners/github-runners.tf`) tag **its own** instance `ghr:job_heartbeat=<unix-seconds>` once a minute and delete the tag when the job ends. While that tag is fresher than `SCALE_DOWN_HEARTBEAT_TTL_SECONDS` (default 180) the Lambda treats the runner as active and skips removal. Because the heartbeat lives at the runner level it covers every self-hosted job (integration, e2e shards, the android build) automatically — no per-workflow steps. A genuinely idle runner emits no heartbeat (the hooks only run during a job), so scale-to-zero still works.
 
-**On-call note:** if an instance **won't scale down** after its job finished, check for a stale `ghr:job_heartbeat` (or stuck `ghr:idle_strikes`) tag — `aws ec2 describe-tags --filters "Name=resource-id,Values=<i-…>"`. A genuinely-finished runner's heartbeat goes stale within the TTL and is then reaped normally; the workflow's `always()` "Stop runner heartbeat" step also deletes the tag on job exit. Both knobs default in the Lambda code (the upstream module's env block is fixed); set `SCALE_DOWN_HEARTBEAT_TTL_SECONDS=0` to disable the heartbeat override.
+> The earlier **idle-strike debounce** (LS-7870, `ghr:idle_strikes` / `SCALE_DOWN_IDLE_STRIKES`) was retired in LS-7877 once the runner-level heartbeat covered every self-hosted job. There is no longer an `idle_strikes` tag.
+
+**On-call note:** if an instance **won't scale down** after its job finished, check for a stale `ghr:job_heartbeat` tag — `aws ec2 describe-tags --filters "Name=resource-id,Values=<i-…>"`. A genuinely-finished runner's heartbeat goes stale within the TTL and is then reaped normally; the `job_completed` hook also deletes the tag on job exit. The TTL defaults in the Lambda code (the upstream module's env block is fixed); set `SCALE_DOWN_HEARTBEAT_TTL_SECONDS=0` to disable the heartbeat override.
 
 ## Diagnosing Runners Offline
 

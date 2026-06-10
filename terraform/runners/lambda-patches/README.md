@@ -9,14 +9,19 @@ release matching the pinned module version (see `terraform/runners/.gitignore`).
 `scripts/build-runner-control-plane-lambda.sh` builds a **patched** `runners.zip`
 from source.
 
-## scale-down-idle-debounce.patch (LS-7870)
+## scale-down-heartbeat.patch (LS-7874 / LS-7877)
+
+> **Design decision:** see [ADR 0013 — Runner survival via a runner-level job
+> heartbeat (single mechanism)](../../../docs/decisions/0013-runner-job-heartbeat.md)
+> for the full rationale, the LS-7870 → LS-7874 → LS-7877 evolution, and the
+> alternatives considered.
 
 ### Problem
 
 The control-plane **scale-down** Lambda runs every minute and de-registers +
 terminates any non-ephemeral runner whose GitHub API `busy` flag reads `false`
 (once past `minimum_running_time_in_minutes`). It acts on a **single** reading
-with no debounce (`removeRunner` in `scale-runners/scale-down.ts`).
+with no busy-recheck (`removeRunner` in `scale-runners/scale-down.ts`).
 
 The GitHub `busy` flag is eventually consistent and intermittently returns a
 **false-negative** for a runner that is actively executing a job. A long job is
@@ -29,70 +34,66 @@ consecutive minutes then a single `Busy: false` immediately before termination.
 
 ### Why a source patch
 
-The module exposes no debounce / busy-recheck knob, and the only busy-independent
-protection (`minimum_running_time_in_minutes`, purely age-based) cannot cover the
-integration job's 120-minute `timeout-minutes` without keeping every short-job
-runner alive for ~2 hours — pricing out scale-to-zero and reversing LS-3572.
-Ephemeral mode does not gate the busy-poll path either. The decision logic lives
-in the Lambda, so the fix lives in a patch to the Lambda.
+The module exposes no busy-recheck knob, and the only busy-independent protection
+(`minimum_running_time_in_minutes`, purely age-based) cannot cover a job's
+`timeout-minutes` (120 for integration, 360 for the android build) without
+keeping every short-job runner alive for hours — pricing out scale-to-zero and
+reversing LS-3572. Ephemeral mode does not gate the busy-poll path either. The
+decision logic lives in the Lambda, so the fix lives in a patch to the Lambda.
 
-### What the patch does
+### What the patch does — job-heartbeat override
 
-Requires `SCALE_DOWN_IDLE_STRIKES` (default **3**) consecutive idle observations
-before a runner is removed, persisting the count in the `ghr:idle_strikes` EC2
-tag:
+The patch removes the dependency on the flaky `busy` flag entirely: a runner
+**actively executing a job** marks itself active. The runner-level job hooks
+(`ACTIONS_RUNNER_HOOK_JOB_STARTED` / `ACTIONS_RUNNER_HOOK_JOB_COMPLETED`, wired
+through the runner userdata in `terraform/runners/github-runners.tf`) tag the
+instance with `ghr:job_heartbeat=<unix-seconds>` once a minute while a job runs
+and delete the tag when the job completes. Because this lives at the runner
+level, it covers **every** self-hosted job automatically (integration, e2e
+shards, the android build) with no per-workflow steps.
+
+The patched Lambda treats any runner whose heartbeat is fresher than
+`SCALE_DOWN_HEARTBEAT_TTL_SECONDS` (default **180**) as active — skipping removal
+— regardless of the GitHub flag. The check sits at the top of the idle branch in
+`removeRunner`. The three edits:
 
 - `scale-runners/scale-down.ts` — in `removeRunner`, when the runner reads idle,
-  first honor a fresh `ghr:job_heartbeat` tag (LS-7874, see below); otherwise
-  increment the strike tag and defer removal until the count reaches the
-  threshold; when the runner reads busy, clear the tag so the streak restarts.
-- `aws/runners.ts` / `aws/runners.d.ts` — surface the `ghr:idle_strikes` and
-  `ghr:job_heartbeat` tags on the runner object (mirrors the existing
-  `ghr:bypass-removal` / `ghr:orphan` handling).
-- `scale-runners/scale-down.test.ts` — pins `SCALE_DOWN_IDLE_STRIKES=1` for the
-  existing single-shot assertions and adds the debounce + heartbeat tests.
+  honor a fresh `ghr:job_heartbeat` tag and defer removal; otherwise fall through
+  to upstream's normal de-register + terminate.
+- `aws/runners.ts` / `aws/runners.d.ts` — surface the `ghr:job_heartbeat` tag on
+  the runner object (mirrors the existing `ghr:bypass-removal` / `ghr:orphan`
+  handling).
+- `scale-runners/scale-down.test.ts` — adds two tests: a fresh heartbeat defers
+  removal; a stale heartbeat is reaped by the normal idle path.
 
-The threshold defaults to 3 in code because the module's scale-down Lambda
-environment block is fixed and cannot pass a new env var from our Terraform. With
-the every-minute schedule, a genuinely idle runner is still reclaimed within ~3
-minutes; a transient one-poll `busy:false` blip never triggers removal. No IAM
-change is required — `tag`/`untag` (`ec2:CreateTags`/`DeleteTags`) are already
-granted to the scale-down role for orphan marking.
+The TTL is **self-healing**: when the job ends the `job_completed` hook deletes
+the tag (immediate eligibility for normal scale-down), and if the runner dies
+uncleanly the tag simply goes stale within the TTL and ordinary scale-down
+resumes — so a forgotten heartbeat can never leak an instance the way a sticky
+`ghr:bypass-removal` tag would. A genuinely **idle** runner emits no heartbeat at
+all (the hooks only run while a job executes), so **scale-to-zero is preserved**.
 
-### Job-heartbeat override (LS-7874)
+Because the module's scale-down Lambda environment block is fixed and cannot pass
+a new env var from our Terraform, `SCALE_DOWN_HEARTBEAT_TTL_SECONDS` defaults in
+code; set it to `0` to disable the override.
 
-The strike debounce alone proved **insufficient** for the heaviest integration
-shard. `live-draft-ui` (~1400 s) has multi-minute quiet polling phases
-(`[live-draft] +236.1s miss #1 …`) during which the GitHub `busy` flag stays
-false long enough to accrue `SCALE_DOWN_IDLE_STRIKES` consecutive idle readings,
-so the runner was still terminated mid-run (`Client.UserInitiatedShutdown`) even
-on `main` after LS-7870.
+Unlike a control-plane-only change, the heartbeat is written by the **runner
+instance**, so it needs `ec2:CreateTags`/`DeleteTags` on itself. That grant lives
+in `terraform/runners/runner-self-tag.tf` and is constrained (via an
+`aws:TagKeys` condition) to the single `ghr:job_heartbeat` key, so a compromised
+runner cannot set `ghr:bypass-removal` or rewrite `ghr:environment`. The
+permissions boundary already allows these actions, so no boundary change is
+needed.
 
-The robust fix removes the dependency on the flaky `busy` flag entirely: a
-running integration job marks its own runner active. While the shard runs it
-tags its instance with `ghr:job_heartbeat=<unix-seconds>` once a minute (see the
-"Start runner heartbeat" step in `.github/workflows/run-playwright-tests.yml`),
-and the patched Lambda treats any runner whose heartbeat is fresher than
-`SCALE_DOWN_HEARTBEAT_TTL_SECONDS` (default **180**) as busy — skipping removal
-and clearing any accrued idle strikes — regardless of the GitHub flag. The check
-sits at the top of the idle branch in `removeRunner`, ahead of the strike logic.
-
-The TTL is **self-healing**: when the job ends the always() "Stop runner
-heartbeat" step deletes the tag (immediate eligibility for normal scale-down),
-and if the runner dies uncleanly the tag simply goes stale within the TTL and
-ordinary scale-down resumes — so a forgotten heartbeat can never leak an
-instance the way a sticky `ghr:bypass-removal` tag would.
-
-Unlike the strike tag, the heartbeat is written by the **runner instance**, so it
-needs `ec2:CreateTags`/`DeleteTags` on itself. That grant lives in
-`terraform/runners/runner-self-tag.tf` and is constrained (via an `aws:TagKeys`
-condition) to the single `ghr:job_heartbeat` key, so a compromised runner cannot
-set `ghr:bypass-removal` or rewrite `ghr:environment`. The permissions boundary
-already allows these actions, so no boundary change is needed.
-
-Because the module's Lambda environment block is fixed, both
-`SCALE_DOWN_IDLE_STRIKES` and `SCALE_DOWN_HEARTBEAT_TTL_SECONDS` default in code;
-set `SCALE_DOWN_HEARTBEAT_TTL_SECONDS=0` to disable the override.
+> **History (LS-7870, retired in LS-7877).** An earlier iteration of this patch
+> added a generic _idle-strike debounce_ (`ghr:idle_strikes` tag,
+> `SCALE_DOWN_IDLE_STRIKES` env) requiring N consecutive idle reads before
+> removal. The strike debounce proved insufficient on its own — `live-draft-ui`'s
+> multi-minute quiet phases accrued enough consecutive idle readings to still
+> trip removal — so the job-heartbeat override was added alongside it (LS-7874).
+> Once the heartbeat moved to a runner-level daemon covering every self-hosted
+> job (LS-7877), the debounce became redundant and was removed, shrinking the
+> patch to the single heartbeat-TTL check documented above.
 
 ## Maintenance contract
 
@@ -103,7 +104,7 @@ version in `terraform/runners/github-runners.tf`:
    longer applies, the build **fails loudly**.
 2. Re-base the patch on the new source: clone the new tag, re-apply the three
    edits described above, and regenerate the patch with `git diff >
-terraform/runners/lambda-patches/scale-down-idle-debounce.patch`.
+terraform/runners/lambda-patches/scale-down-heartbeat.patch`.
 3. Re-run the build and the upstream control-plane tests.
 
 Regenerate locally with:

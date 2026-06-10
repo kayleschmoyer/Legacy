@@ -122,11 +122,13 @@ jobs:
       - name: Download runner Lambda zips
         run: node scripts/download-runner-lambdas.js
 
-      - name: Build patched control-plane Lambda (scale-down debounce, LS-7870)
-        # runners.zip is built from upstream source with the idle-strike debounce
+      - name: Build patched control-plane Lambda (scale-down job heartbeat, LS-7874/LS-7877)
+        # runners.zip is built from upstream source with the job-heartbeat override
         # patch applied (see terraform/runners/lambda-patches/README.md) rather than
-        # downloaded, so the deployed scale-down Lambda tolerates transient GitHub
-        # busy:false readings instead of killing long jobs mid-run.
+        # downloaded, so the deployed scale-down Lambda treats a runner that is
+        # actively executing a job (which self-tags ghr:job_heartbeat via the
+        # runner-level job hooks) as active instead of killing it mid-run on a
+        # transient GitHub busy:false reading.
         run: bash scripts/build-runner-control-plane-lambda.sh
 
       - name: Bootstrap IAM permissions

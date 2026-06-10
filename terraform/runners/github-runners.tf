@@ -42,9 +42,11 @@ module "github_runners" {
   # webhook.zip and runner-binaries-syncer.zip are pre-downloaded from the module
   # release (scripts/download-runner-lambdas.js). runners.zip (the control-plane
   # bundle) is built from PATCHED upstream source — it carries the scale-down
-  # idle-strike debounce (LS-7870) so a transient GitHub busy:false reading cannot
-  # terminate a long-running job mid-run. See terraform/runners/lambda-patches/
-  # README.md and scripts/build-runner-control-plane-lambda.sh.
+  # job-heartbeat override (LS-7874/LS-7877) so a runner actively executing a job
+  # (which self-tags ghr:job_heartbeat via the runner-level job hooks) is never
+  # terminated mid-run by a transient GitHub busy:false reading. See
+  # terraform/runners/lambda-patches/README.md and
+  # scripts/build-runner-control-plane-lambda.sh.
   webhook_lambda_zip                = "${path.module}/lambdas/webhook.zip"
   runners_lambda_zip                = "${path.module}/lambdas/runners.zip"
   runner_binaries_syncer_lambda_zip = "${path.module}/lambdas/runner-binaries-syncer.zip"
@@ -104,9 +106,9 @@ module "github_runners" {
   # role also needs an attached policy granting them (LS-1663):
   #   - runner_cache:    read/write the pnpm store tarball in the cache bucket.
   #   - runner_self_tag: manage ONLY the ghr:job_heartbeat tag on the runner's
-  #                      own instance so a long integration job can mark itself
-  #                      active and survive scale-down (LS-7874, see
-  #                      runner-self-tag.tf).
+  #                      own instance so any executing job (via the runner-level
+  #                      job hooks) can mark itself active and survive scale-down
+  #                      (LS-7874/LS-7877, see runner-self-tag.tf).
   runner_iam_role_managed_policy_arns = [
     aws_iam_policy.runner_cache.arn,
     aws_iam_policy.runner_self_tag.arn,
@@ -304,6 +306,52 @@ module "github_runners" {
       [[ -n "$${ANDROID_HOME:-}" ]] && echo "$ANDROID_HOME/cmdline-tools/latest/bin"
       [[ -n "$${ANDROID_HOME:-}" ]] && echo "$ANDROID_HOME/platform-tools"
     } >> "$GITHUB_PATH"
+
+    # ── Runner job heartbeat (LS-7877) ──────────────────────────────────────
+    # While a job executes, tag this instance ghr:job_heartbeat=<unix-seconds>
+    # once a minute so the patched scale-down Lambda treats the runner as active
+    # and never reclaims it mid-job. Running from the runner's own job_started
+    # hook covers EVERY self-hosted job automatically (integration, e2e shards,
+    # the android build) — superseding the per-workflow heartbeat steps this
+    # replaces (LS-7874) and the idle-strike debounce (LS-7870). The
+    # job_completed hook stops the loop and deletes the tag, so the heartbeat
+    # only ever runs WHILE a job executes — a genuinely idle runner emits NO
+    # heartbeat and scale-to-zero keeps working. Best-effort and IMDSv2-only: on
+    # a GitHub-hosted fallback runner (no AWS IMDS) every metadata/AWS call
+    # fails quietly and this is a no-op. The scoped ec2:CreateTags/DeleteTags
+    # grant lives in runner-self-tag.tf.
+    HB_TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 600" 2>/dev/null) || HB_TOKEN=""
+    if [[ -n "$HB_TOKEN" ]]; then
+      HB_IID=$(curl -sf -H "X-aws-ec2-metadata-token: $HB_TOKEN" \
+        http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null) || HB_IID=""
+      HB_REGION=$(curl -sf -H "X-aws-ec2-metadata-token: $HB_TOKEN" \
+        http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null) || HB_REGION=""
+      if [[ -n "$HB_IID" && -n "$HB_REGION" ]]; then
+        echo "[heartbeat] tagging $HB_IID in $HB_REGION every 60s (ghr:job_heartbeat)"
+        # Synchronous first beat so a scale-down poll landing between job start
+        # and the first loop tick already sees the runner as active.
+        aws ec2 create-tags --region "$HB_REGION" --resources "$HB_IID" \
+          --tags "Key=ghr:job_heartbeat,Value=$(date +%s)" >/dev/null 2>&1 || true
+        # Bounded loop (~370 min, just past the longest self-hosted job — the
+        # android build's 360-min default timeout) so a missed stop can never
+        # leak the instance: once the loop exits the tag goes stale within the
+        # TTL and normal scale-down resumes. The job_completed hook is the
+        # primary stop; this bound is only a backstop for an unclean exit.
+        nohup bash -c '
+          for _ in $(seq 1 370); do
+            sleep 60
+            aws ec2 create-tags --region "'"$HB_REGION"'" --resources "'"$HB_IID"'" \
+              --tags "Key=ghr:job_heartbeat,Value=$(date +%s)" >/dev/null 2>&1 || true
+          done
+        ' >/tmp/runner-heartbeat.log 2>&1 &
+        # Record the loop PID + instance/region so the job_completed hook can
+        # stop it. Guarded so a bookkeeping write can never fail the job (set -e);
+        # a missed file just falls back to the loop's bounded self-expiry.
+        echo "$!" > /opt/actions-runner/.job-heartbeat.pid || true
+        printf '%s\n%s\n' "$HB_IID" "$HB_REGION" > /opt/actions-runner/.job-heartbeat.meta || true
+      fi
+    fi
   EOT
 
   # ── Inter-job cleanup hook (non-ephemeral isolation) ───────────────────────
@@ -315,6 +363,25 @@ module "github_runners" {
     set -euo pipefail
 
     echo "[cleanup] Post-job cleanup started at $(date -u)"
+
+    # ── Stop runner job heartbeat (LS-7877) ─────────────────────────────────
+    # Kill the heartbeat loop started by the job_started hook and delete the tag
+    # so this reusable non-ephemeral runner is immediately eligible for normal
+    # idle scale-down once the job ends. Best-effort: if anything here fails the
+    # tag goes stale within the TTL and scale-down resumes anyway.
+    if [[ -f /opt/actions-runner/.job-heartbeat.pid ]]; then
+      kill "$(cat /opt/actions-runner/.job-heartbeat.pid)" 2>/dev/null || true
+      rm -f /opt/actions-runner/.job-heartbeat.pid
+    fi
+    if [[ -f /opt/actions-runner/.job-heartbeat.meta ]]; then
+      HB_IID=$(sed -n '1p' /opt/actions-runner/.job-heartbeat.meta)
+      HB_REGION=$(sed -n '2p' /opt/actions-runner/.job-heartbeat.meta)
+      if [[ -n "$HB_IID" && -n "$HB_REGION" ]]; then
+        aws ec2 delete-tags --region "$HB_REGION" --resources "$HB_IID" \
+          --tags "Key=ghr:job_heartbeat" >/dev/null 2>&1 || true
+      fi
+      rm -f /opt/actions-runner/.job-heartbeat.meta
+    fi
 
     # Derive the runner workspace root from the environment, falling back to the
     # default GitHub Actions runner path if RUNNER_WORKSPACE is not set.

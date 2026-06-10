@@ -642,7 +642,7 @@ endif
 runner-lambdas-sync: ## Sync runner Lambda zips (downloads webhook + syncer, builds patched control-plane runners.zip) matching the github-aws-runners version in terraform/runners/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
 	@$(call echo_blue,Syncing runner Lambda zips...)
 	node scripts$(PATH_SEP)download-runner-lambdas.js $(VERSION)
-	@$(call echo_blue,Building patched control-plane runners.zip (LS-7870 scale-down debounce)...)
+	@$(call echo_blue,Building patched control-plane runners.zip (LS-7874/LS-7877 scale-down job heartbeat)...)
 	bash scripts/build-runner-control-plane-lambda.sh $(VERSION)
 
 # Environment Management

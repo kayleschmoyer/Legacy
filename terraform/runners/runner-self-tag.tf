@@ -1,20 +1,20 @@
 # =============================================================================
 # IAM policy: let a runner EC2 instance heartbeat-tag ITSELF (LS-7874)
 # =============================================================================
-# A long-running integration shard (live-draft-ui) has multi-minute quiet
-# phases during which the GitHub API `busy` flag intermittently reads false.
-# The LS-7870 idle-strike debounce reduced — but did not eliminate — the
-# scale-down Lambda terminating such a runner mid-job once enough consecutive
-# idle readings accrue.
+# A long-running self-hosted job (e.g. the live-draft-ui integration shard) has
+# multi-minute quiet phases during which the GitHub API `busy` flag
+# intermittently reads false, so the scale-down Lambda can terminate such a
+# runner mid-job on a single stray reading.
 #
-# The robust fix is a job-driven heartbeat: while the integration job runs, it
-# tags its own instance with `ghr:job_heartbeat=<unix-seconds>` every minute
-# (see .github/workflows/run-playwright-tests.yml). The patched scale-down
+# The robust fix is a job-driven heartbeat: while ANY job runs, the runner-level
+# job hooks (ACTIONS_RUNNER_HOOK_JOB_STARTED/COMPLETED, wired in
+# github-runners.tf) tag the instance with `ghr:job_heartbeat=<unix-seconds>`
+# every minute and delete the tag when the job ends. The patched scale-down
 # Lambda treats any runner with a heartbeat fresher than
 # SCALE_DOWN_HEARTBEAT_TTL_SECONDS as active and skips removal, regardless of
 # the flaky GitHub flag. The TTL is self-healing: when the job ends (the tag is
 # deleted) or the runner dies (the tag goes stale) the override lapses and
-# normal scale-down resumes.
+# normal scale-down resumes, so a genuinely idle runner still scales to zero.
 #
 # For the runner to write that tag it needs ec2:CreateTags/DeleteTags on
 # itself. The module's runner instance role only carries the cache policy, so

@@ -22,3 +22,4 @@ for authoring guidance and the immutability rule.
 | 0009                                          | Dev-process 13-entrypoint 6-phase framework                 | Planned  |
 | [0010](0010-terraform-state-lock-watchdog.md) | Terraform state lock watchdog on a GitHub-hosted runner     | Accepted |
 | [0011](0011-draft-board-sport-toggle.md)      | Draft Board: sport-agnostic surface (baseball + football)   | Accepted |
+| [0013](0013-runner-job-heartbeat.md)          | Runner survival via a runner-level job heartbeat            | Accepted |

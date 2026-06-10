@@ -466,59 +466,6 @@ jobs:
           fi
 
       # =======================================================================
-      # Runner self-heartbeat (LS-7874) — integration shards only
-      # =======================================================================
-      # The integration suite's heaviest spec (live-draft-ui) has multi-minute
-      # quiet phases during which the GitHub `busy` flag intermittently reads
-      # false. The idle-strike debounce (LS-7870) narrowed but did not close the
-      # window in which the scale-down Lambda reclaims the runner mid-job. While
-      # this job runs we tag our own EC2 instance with ghr:job_heartbeat=<epoch>
-      # once a minute; the patched scale-down Lambda treats a runner whose
-      # heartbeat is fresher than SCALE_DOWN_HEARTBEAT_TTL_SECONDS (default 180)
-      # as active and skips removal. The IAM grant
-      # (terraform/runners/runner-self-tag.tf) restricts the runner to this one
-      # tag key. No-op on a GitHub-hosted fallback runner (AWS IMDS/credentials
-      # absent) — every metadata and AWS call is best-effort.
-      - name: "Start runner heartbeat"
-        if: matrix.suite == 'integration'
-        shell: bash
-        run: |
-          set -uo pipefail
-          # IMDSv2: fetch a token, then this instance's id and region. Bail
-          # quietly if metadata is unreachable (e.g. ubuntu-latest fallback).
-          TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
-            -H "X-aws-ec2-metadata-token-ttl-seconds: 600" 2>/dev/null) \
-            || { echo "No AWS IMDS — skipping runner heartbeat"; exit 0; }
-          IID=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
-            http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null) \
-            || { echo "No instance-id — skipping runner heartbeat"; exit 0; }
-          REGION=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
-            http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null) \
-            || { echo "No region — skipping runner heartbeat"; exit 0; }
-          echo "Heartbeating $IID in $REGION every 60s (tag ghr:job_heartbeat)."
-          # Write one heartbeat synchronously so a scale-down poll landing between
-          # job start and the first loop tick already sees the runner as active.
-          aws ec2 create-tags --region "$REGION" --resources "$IID" \
-            --tags "Key=ghr:job_heartbeat,Value=$(date +%s)" >/dev/null 2>&1 || true
-          # Bounded loop (~130 min, just past the 120-min integration timeout) so
-          # the heartbeat can never outlive the job and leak the instance, even if
-          # the "Stop runner heartbeat" kill is somehow missed on this reusable
-          # non-ephemeral runner. Once it exits, the tag goes stale within the TTL
-          # and normal scale-down resumes.
-          nohup bash -c '
-            for _ in $(seq 1 130); do
-              sleep 60
-              aws ec2 create-tags --region "'"$REGION"'" --resources "'"$IID"'" \
-                --tags "Key=ghr:job_heartbeat,Value=$(date +%s)" >/dev/null 2>&1 || true
-            done
-          ' >/tmp/runner-heartbeat.log 2>&1 &
-          {
-            echo "HEARTBEAT_PID=$!"
-            echo "HEARTBEAT_INSTANCE_ID=$IID"
-            echo "HEARTBEAT_REGION=$REGION"
-          } >> "$GITHUB_ENV"
-
-      # =======================================================================
       # Run Playwright tests
       # =======================================================================
       - name: "Run Playwright Tests"
@@ -693,22 +640,6 @@ jobs:
         if: always() && matrix.suite == 'e2e'
         shell: bash
         run: kill $SERVER_PID 2>/dev/null || true
-
-      - name: "Stop runner heartbeat"
-        if: always() && matrix.suite == 'integration'
-        shell: bash
-        run: |
-          set -uo pipefail
-          if [ -n "${HEARTBEAT_PID:-}" ]; then
-            kill "$HEARTBEAT_PID" 2>/dev/null || true
-          fi
-          # Delete the heartbeat tag so the runner is immediately eligible for
-          # normal idle scale-down instead of waiting out the TTL. Best-effort:
-          # if it fails the tag simply goes stale within the TTL window.
-          if [ -n "${HEARTBEAT_INSTANCE_ID:-}" ] && [ -n "${HEARTBEAT_REGION:-}" ]; then
-            aws ec2 delete-tags --region "$HEARTBEAT_REGION" --resources "$HEARTBEAT_INSTANCE_ID" \
-              --tags "Key=ghr:job_heartbeat" >/dev/null 2>&1 || true
-          fi
 
       # =======================================================================
       # Artifacts — blob reports uploaded to S3 for merge+deploy
