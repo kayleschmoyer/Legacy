@@ -871,37 +871,66 @@ builder.mutationField('acceptTrade', (t) =>
       // propagate to scheduled-week matchup_players, and flip the trade to
       // accepted. A partial failure would otherwise leave rosters swapped
       // while the trade offer is still pending.
+      //
+      // Race-condition guard: the tradeOffers status update runs FIRST inside
+      // the transaction, gated on status='pending'. Only one concurrent accept
+      // can claim the row (rowCount=1); the other sees rowCount=0 and aborts
+      // before touching rosters. After the claim we also verify each roster leg
+      // moved the expected number of rows — a shortfall means a concurrent trade
+      // involving overlapping players already moved one of the shared players,
+      // which would corrupt roster integrity.
       await db.transaction(async (tx) => {
-        await Promise.all([
-          ...(toReceiving.length > 0
-            ? [
-                tx
-                  .update(PublicSchema.teamMembers)
-                  .set({ teamId: receivingTeamId, positionId: null })
-                  .where(
-                    and(
-                      eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-                      inArray(PublicSchema.teamMembers.playerId, toReceiving),
-                      eq(PublicSchema.teamMembers.teamId, proposingTeamId),
-                    ),
-                  ),
-              ]
-            : []),
-          ...(toProposing.length > 0
-            ? [
-                tx
-                  .update(PublicSchema.teamMembers)
-                  .set({ teamId: proposingTeamId, positionId: null })
-                  .where(
-                    and(
-                      eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-                      inArray(PublicSchema.teamMembers.playerId, toProposing),
-                      eq(PublicSchema.teamMembers.teamId, receivingTeamId),
-                    ),
-                  ),
-              ]
-            : []),
-        ]);
+        const claimResult = await tx
+          .update(PublicSchema.tradeOffers)
+          .set({ status: 'accepted', respondedAt: new Date() })
+          .where(
+            and(
+              eq(PublicSchema.tradeOffers.id, args.tradeId),
+              eq(PublicSchema.tradeOffers.status, 'pending'),
+            ),
+          );
+
+        if ((claimResult.rowCount ?? 0) === 0) {
+          throw UserInputError(
+            'This trade offer has already been processed and cannot be accepted',
+          );
+        }
+
+        if (toReceiving.length > 0) {
+          const result = await tx
+            .update(PublicSchema.teamMembers)
+            .set({ teamId: receivingTeamId, positionId: null })
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                inArray(PublicSchema.teamMembers.playerId, toReceiving),
+                eq(PublicSchema.teamMembers.teamId, proposingTeamId),
+              ),
+            );
+          if ((result.rowCount ?? 0) < toReceiving.length) {
+            throw UserInputError(
+              'Trade integrity violation: one or more players were no longer on the proposing team',
+            );
+          }
+        }
+
+        if (toProposing.length > 0) {
+          const result = await tx
+            .update(PublicSchema.teamMembers)
+            .set({ teamId: proposingTeamId, positionId: null })
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                inArray(PublicSchema.teamMembers.playerId, toProposing),
+                eq(PublicSchema.teamMembers.teamId, receivingTeamId),
+              ),
+            );
+          if ((result.rowCount ?? 0) < toProposing.length) {
+            throw UserInputError(
+              'Trade integrity violation: one or more players were no longer on the receiving team',
+            );
+          }
+        }
 
         await Promise.all([
           syncMatchupPlayersForTradeLeg(
@@ -919,11 +948,6 @@ builder.mutationField('acceptTrade', (t) =>
             toProposing,
           ),
         ]);
-
-        await tx
-          .update(PublicSchema.tradeOffers)
-          .set({ status: 'accepted', respondedAt: new Date() })
-          .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
       });
 
       LOGGER.info('Trade accepted — players swapped', {

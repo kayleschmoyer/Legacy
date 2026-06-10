@@ -792,6 +792,95 @@ describe('Trades Resolver', () => {
         resolver({}, { tradeId: 999 }, mockContext, undefined as never),
       ).rejects.toThrow('Trade offer not found');
     });
+
+    it('throws when a concurrent request already accepted the trade (rowCount=0 on status claim)', async () => {
+      const trade = {
+        id: 5,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'pending',
+        message: null,
+        expiresAt: null,
+        respondedAt: null,
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const legs = [{ tradeOfferId: 5, playerId: 42, fromTeamId: 1 }];
+
+      // trade fetch → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // membership check → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // player legs → where resolves directly
+      mockDb.where.mockResolvedValueOnce(legs);
+      // league settings → limit(1) returns empty → leagueCapRow undefined (skips cap/sport checks)
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      // Transaction: first update (claim trade) returns rowCount=0 → another request beat us
+      const mockTx = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValueOnce({ rowCount: 0 }),
+      };
+      mockDb.transaction = jest.fn(
+        async (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      const resolver = getResolver('mutation', 'acceptTrade');
+      await expect(
+        resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+      ).rejects.toThrow('already been processed');
+    });
+
+    it('throws when an overlapping concurrent trade already moved a shared player (rowCount shortfall)', async () => {
+      const trade = {
+        id: 5,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'pending',
+        message: null,
+        expiresAt: null,
+        respondedAt: null,
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const legs = [{ tradeOfferId: 5, playerId: 42, fromTeamId: 1 }];
+
+      // trade fetch → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // membership check → limit(1)
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // player legs → where resolves directly
+      mockDb.where.mockResolvedValueOnce(legs);
+      // league settings → limit(1) returns empty → leagueCapRow undefined
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      // Transaction: claim succeeds (rowCount=1) but roster update finds 0 rows (player moved away)
+      const mockTx = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest
+          .fn()
+          .mockResolvedValueOnce({ rowCount: 1 }) // tradeOffers status claim → success
+          .mockResolvedValueOnce({ rowCount: 0 }), // teamMembers update → player already gone
+      };
+      mockDb.transaction = jest.fn(
+        async (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      const resolver = getResolver('mutation', 'acceptTrade');
+      await expect(
+        resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+      ).rejects.toThrow('Trade integrity violation');
+    });
   });
 
   // ── rejectTrade ────────────────────────────────────────────────────────────
