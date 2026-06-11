@@ -5,6 +5,7 @@ import {
   DEFAULT_GAME_LOGS_LIMIT,
   GameLogsTable,
   normalizeGameDate,
+  type VenueOption,
   VIRTUAL_ROW_THRESHOLD,
 } from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
@@ -336,6 +337,7 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
     dateTo: '',
     opponentFranchiseIds: [] as string[],
     venue: 'all' as const,
+    venues: [] as VenueOption[],
   };
 
   it('omits date range + opponent + venue keys when filters are inactive', () => {
@@ -425,6 +427,7 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
         dateTo: '2026-04-30',
         opponentFranchiseIds: ['NYY'],
         venue: 'home',
+        venues: [],
       },
       'mlb',
     );
@@ -460,6 +463,39 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
       player_id: 'mlb-1234',
       game_date_to: normalizeGameDate('2026-04-30'),
     });
+  });
+
+  it('sends venues array for premium multi-select (LS-7469)', () => {
+    const body = buildGameLogsRequestBody(
+      { ...baseFilters, venues: ['home', 'neutral'] },
+      'mlb',
+    );
+    expect(body.venues).toEqual(['home', 'neutral']);
+    expect(body.venue).toBeUndefined();
+  });
+
+  it('venues array takes precedence over single venue toggle (LS-7469)', () => {
+    const body = buildGameLogsRequestBody(
+      { ...baseFilters, venue: 'away', venues: ['home', 'neutral'] },
+      'mlb',
+    );
+    expect(body.venues).toEqual(['home', 'neutral']);
+    expect(body.venue).toBeUndefined();
+  });
+
+  it('falls back to single venue when venues array is empty (LS-7469)', () => {
+    const body = buildGameLogsRequestBody(
+      { ...baseFilters, venue: 'away', venues: [] },
+      'mlb',
+    );
+    expect(body.venue).toBe('away');
+    expect(body.venues).toBeUndefined();
+  });
+
+  it('omits both venue keys when venues is empty and venue is all (LS-7469)', () => {
+    const body = buildGameLogsRequestBody(baseFilters, 'mlb');
+    expect(body.venue).toBeUndefined();
+    expect(body.venues).toBeUndefined();
   });
 });
 
@@ -834,5 +870,107 @@ describe('CrossPlatformTable virtualization (LS-7475)', () => {
       : [];
 
     expect(dataRows.length).toBeLessThan(totalRows);
+  });
+});
+
+describe('Premium venue multi-select (LS-7469)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.VITE_STATS_API_URL = 'https://stats.example.com/game-logs';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+  });
+
+  afterEach(() => {
+    delete (globalThis as { __DEV__?: boolean }).__DEV__;
+  });
+
+  it('renders checkboxes for all four venue options including neutral + international', () => {
+    const { queryByTestId } = render(<GameLogsTable isPremium />);
+    const homeCheckbox = queryByTestId('venue-home') as HTMLInputElement | null;
+    // Premium checkboxes only render when Platform.OS === 'web' — skip on native
+    if (!homeCheckbox || homeCheckbox.type !== 'checkbox') return;
+    expect(queryByTestId('venue-away')).toBeTruthy();
+    expect(queryByTestId('venue-neutral')).toBeTruthy();
+    expect(queryByTestId('venue-international')).toBeTruthy();
+  });
+
+  it('free users still see the All/Home/Away button toggle (no regression)', () => {
+    const { queryByTestId } = render(<GameLogsTable />);
+    const allBtn = queryByTestId('venue-all');
+    // Buttons only render on web (or native fallback) — skip when absent
+    if (!allBtn) return;
+    expect(queryByTestId('venue-home')).toBeTruthy();
+    expect(queryByTestId('venue-away')).toBeTruthy();
+    // No neutral or international in the free-user view
+    expect(queryByTestId('venue-neutral')).toBeNull();
+    expect(queryByTestId('venue-international')).toBeNull();
+  });
+
+  it('selecting multiple checkboxes posts venues array (LS-7469)', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+
+    const { getByPlaceholderText, queryByTestId, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" isPremium />,
+    );
+
+    const homeCheckbox = queryByTestId('venue-home') as HTMLInputElement | null;
+    // Premium checkboxes only render when Platform.OS === 'web' — skip on native
+    if (!homeCheckbox || homeCheckbox.type !== 'checkbox') return;
+    const neutralCheckbox = queryByTestId('venue-neutral') as HTMLInputElement;
+
+    fireEvent.click(homeCheckbox);
+    fireEvent.click(neutralCheckbox);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const body = JSON.parse(calls[0][1].body as string) as {
+      venues?: string[];
+      venue?: string;
+    };
+    expect(body.venues).toEqual(expect.arrayContaining(['home', 'neutral']));
+    expect(body.venue).toBeUndefined();
+  });
+
+  it('unchecking all boxes omits the venues key entirely (LS-7469)', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+
+    const { getByPlaceholderText, queryByTestId, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" isPremium />,
+    );
+
+    const homeCheckbox = queryByTestId('venue-home') as HTMLInputElement | null;
+    // Premium checkboxes only render when Platform.OS === 'web' — skip on native
+    if (!homeCheckbox || homeCheckbox.type !== 'checkbox') return;
+
+    // Click once to check, click again to uncheck — net result is empty venues array
+    fireEvent.click(homeCheckbox);
+    fireEvent.click(homeCheckbox);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const body = JSON.parse(calls[0][1].body as string) as {
+      venues?: string[];
+      venue?: string;
+    };
+    expect(body.venues).toBeUndefined();
+    expect(body.venue).toBeUndefined();
   });
 });

@@ -225,6 +225,9 @@ const CrossPlatformTable: React.FC<TableProps> = ({
 // ---------------------------------------------------------------------------
 
 export type GameLogSport = 'mlb' | 'nfl';
+/** Premium multi-select venue option (LS-7469). */
+export type VenueOption = 'home' | 'away' | 'neutral' | 'international';
+/** Free-user single-select toggle (unchanged from LS-7465). */
 export type Venue = 'all' | 'home' | 'away';
 
 export interface FilterState {
@@ -233,6 +236,8 @@ export interface FilterState {
   dateTo: string;
   opponentFranchiseIds: string[];
   venue: Venue;
+  /** Premium multi-select: empty array means no venue filter applied. (LS-7469) */
+  venues: VenueOption[];
 }
 
 type FilterAction =
@@ -241,6 +246,9 @@ type FilterAction =
   | { type: 'setDateTo'; value: string }
   | { type: 'setOpponents'; value: string[] }
   | { type: 'setVenue'; value: Venue }
+  | { type: 'setVenues'; value: VenueOption[] }
+  | { type: 'addVenue'; value: VenueOption }
+  | { type: 'removeVenue'; value: VenueOption }
   | { type: 'reset' };
 
 const INITIAL_FILTERS: FilterState = {
@@ -249,6 +257,7 @@ const INITIAL_FILTERS: FilterState = {
   dateTo: '',
   opponentFranchiseIds: [],
   venue: 'all',
+  venues: [],
 };
 
 function filterReducer(state: FilterState, action: FilterAction): FilterState {
@@ -263,6 +272,20 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
       return { ...state, opponentFranchiseIds: action.value };
     case 'setVenue':
       return { ...state, venue: action.value };
+    case 'setVenues':
+      return { ...state, venues: action.value };
+    // addVenue/removeVenue operate on the reducer's own current state so
+    // rapid-fire dispatches (e.g. clicking two checkboxes before re-render)
+    // accumulate correctly without stale-closure issues. (LS-7469)
+    case 'addVenue':
+      return state.venues.includes(action.value)
+        ? state
+        : { ...state, venues: [...state.venues, action.value] };
+    case 'removeVenue':
+      return {
+        ...state,
+        venues: state.venues.filter((v) => v !== action.value),
+      };
     case 'reset':
       return INITIAL_FILTERS;
   }
@@ -308,6 +331,7 @@ export function buildGameLogsRequestBody(
   opponent_abbrs?: string[];
   venue?: 'home' | 'away';
   limit?: number;
+  venues?: VenueOption[];
 } {
   const expand =
     sport === 'nfl' ? expandNflFranchiseAbbrs : expandMlbFranchiseAbbrs;
@@ -336,7 +360,13 @@ export function buildGameLogsRequestBody(
           opponent_abbrs: opponentAbbrs,
         }
       : {}),
-    ...(filters.venue !== 'all' ? { venue: filters.venue } : {}),
+    // Premium multi-select (LS-7469): venues array takes precedence over the
+    // single-select toggle. When the array is empty no venue filter is applied.
+    ...(filters.venues.length > 0
+      ? { venues: filters.venues }
+      : filters.venue !== 'all'
+        ? { venue: filters.venue }
+        : {}),
     ...(options?.limit !== undefined ? { limit: options.limit } : {}),
   };
 }
@@ -376,6 +406,14 @@ export interface GameLogsTableProps {
    */
   isPremium?: boolean;
 }
+
+/** Venue options shown in the premium multi-select. (LS-7469) */
+const PREMIUM_VENUE_OPTIONS: Array<{ value: VenueOption; label: string }> = [
+  { value: 'home', label: 'Home' },
+  { value: 'away', label: 'Away' },
+  { value: 'neutral', label: 'Neutral Site' },
+  { value: 'international', label: 'International Series' },
+];
 
 // React Native injects `__DEV__` globally; on web it is defined via Vite's
 // `define` block. May be undefined under Jest, so we treat that as "not prod".
@@ -840,32 +878,65 @@ function GameLogsTable({
         </YStack>
       )}
 
-      {/* Home/Away tri-state (LS-7465). Buttons rather than radio so the
-          control styles consistently across web + native via tamagui. */}
+      {/* Venue filter.
+          - Free users: tri-state button group (All / Home / Away) — web + native.
+          - Premium users (web only): checkboxes for all four venue types including
+            Neutral Site and International Series (LS-7469). When no box is checked
+            no venue filter is applied (equivalent to "All"). */}
       <YStack marginBottom="$4">
         <Text fontSize="$4" fontWeight="600" marginBottom="$2">
           Venue:
         </Text>
-        <YStack flexDirection="row" gap="$2">
-          {(['all', 'home', 'away'] as const).map((v) => (
-            <Button
-              key={v}
-              data-testid={`venue-${v}`}
-              backgroundColor={filters.venue === v ? '$blue10' : '$gray4'}
-              onPress={() => dispatch({ type: 'setVenue', value: v })}
-              disabled={loading}
-              paddingHorizontal="$4"
-              paddingVertical="$2"
-            >
-              <Text
-                color={filters.venue === v ? '$white' : '$gray12'}
-                fontWeight="600"
+        {isPremium && Platform.OS === 'web' ? (
+          <YStack gap="$2">
+            {PREMIUM_VENUE_OPTIONS.map(({ value, label }) => (
+              <label
+                key={value}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
               >
-                {v === 'all' ? 'All' : v === 'home' ? 'Home' : 'Away'}
-              </Text>
-            </Button>
-          ))}
-        </YStack>
+                <input
+                  type="checkbox"
+                  data-testid={`venue-${value}`}
+                  checked={filters.venues.includes(value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    dispatch({
+                      type: e.target.checked ? 'addVenue' : 'removeVenue',
+                      value,
+                    });
+                  }}
+                  disabled={loading}
+                />
+                <Text fontSize="$4">{label}</Text>
+              </label>
+            ))}
+          </YStack>
+        ) : (
+          <YStack flexDirection="row" gap="$2">
+            {(['all', 'home', 'away'] as const).map((v) => (
+              <Button
+                key={v}
+                data-testid={`venue-${v}`}
+                backgroundColor={filters.venue === v ? '$blue10' : '$gray4'}
+                onPress={() => dispatch({ type: 'setVenue', value: v })}
+                disabled={loading}
+                paddingHorizontal="$4"
+                paddingVertical="$2"
+              >
+                <Text
+                  color={filters.venue === v ? '$white' : '$gray12'}
+                  fontWeight="600"
+                >
+                  {v === 'all' ? 'All' : v === 'home' ? 'Home' : 'Away'}
+                </Text>
+              </Button>
+            ))}
+          </YStack>
+        )}
       </YStack>
 
       <Button
