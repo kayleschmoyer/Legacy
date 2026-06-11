@@ -1,5 +1,5 @@
 import React from 'react';
-import { Spinner, Text, XStack, YStack } from 'tamagui';
+import { H1, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft } from '@tamagui/lucide-icons';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import {
@@ -499,6 +499,12 @@ export function FootballPlayerDetail({
     player?.position === 'DL' ||
     player?.position === 'LB' ||
     player?.position === 'DB';
+  // Accessible name for the team-color swatch so screen readers announce the
+  // full franchise ("Kansas City Chiefs") rather than the bare abbreviation
+  // ("KC") rendered inside it (LS-6240).
+  const teamBadgeLabel = player?.nflTeam
+    ? (teamData?.fullName ?? player.nflTeam)
+    : 'Free Agent';
 
   return (
     <YStack flex={1} backgroundColor={BG_DARK}>
@@ -553,6 +559,9 @@ export function FootballPlayerDetail({
               width={56}
               height={56}
               borderRadius={10}
+              accessibilityRole="image"
+              aria-label={teamBadgeLabel}
+              accessibilityLabel={teamBadgeLabel}
               backgroundColor={
                 player.nflTeam
                   ? (teamData?.primaryColor ?? BRAND_NAVY)
@@ -583,15 +592,16 @@ export function FootballPlayerDetail({
             </YStack>
 
             <YStack flex={1} gap={4}>
-              <Text
+              <H1
                 fontSize={22}
                 fontWeight="800"
                 color={TEXT_PRIMARY}
                 fontFamily={FONT_DISPLAY}
                 letterSpacing={-0.3}
+                margin={0}
               >
                 {[player.firstName, player.lastName].filter(Boolean).join(' ')}
-              </Text>
+              </H1>
               <XStack gap={8} alignItems="center">
                 <YStack
                   paddingHorizontal={8}

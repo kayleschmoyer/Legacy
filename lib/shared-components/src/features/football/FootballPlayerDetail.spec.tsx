@@ -161,6 +161,37 @@ describe('FootballPlayerDetail', () => {
     expect(screen.getByText(/Kansas City/)).toBeTruthy();
   });
 
+  describe('LS-6240 — header accessibility', () => {
+    it('renders the player name as a level-1 heading for screen-reader navigation', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Patrick Mahomes' }),
+      ).toBeTruthy();
+    });
+
+    it('labels the team-color badge with the full franchise name', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      // The badge renders the abbreviation "KC" but must announce the full
+      // team name so screen readers do not read a bare, undifferentiated code.
+      expect(screen.getByLabelText('Kansas City Chiefs')).toBeTruthy();
+    });
+
+    it('labels the badge "Free Agent" when the player has no team', () => {
+      const FREE_AGENT: FootballPlayerDetailPlayer = {
+        id: 99,
+        firstName: 'Odell',
+        lastName: 'Beckham',
+        position: 'WR',
+        isDst: false,
+        nflTeam: null,
+        previousTeams: [],
+        careerStats: null,
+      };
+      render(<FootballPlayerDetail player={FREE_AGENT} />);
+      expect(screen.getByLabelText('Free Agent')).toBeTruthy();
+    });
+  });
+
   it('renders position-specific passing stats for a QB', () => {
     render(<FootballPlayerDetail player={QB_PLAYER} />);
     expect(screen.getByText('Career Passing')).toBeTruthy();
