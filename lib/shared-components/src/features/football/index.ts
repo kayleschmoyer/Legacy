@@ -10,4 +10,8 @@ export {
   type FootballPlayerDetailProps,
   type FootballPlayerDetailPlayer,
   type FootballPlayerDetailStats,
+  type FootballPlayerDetailSeasonStats,
+  type FootballSeasonPassingRow,
+  type FootballSeasonRushingRow,
+  type FootballSeasonReceivingRow,
 } from './FootballPlayerDetail';

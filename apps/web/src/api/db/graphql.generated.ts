@@ -5279,6 +5279,42 @@ export type FootballPlayerQuery = {
         ff?: number | null;
       } | null;
     } | null;
+    seasonStats?: {
+      __typename?: 'FootballPlayerSeasonStats';
+      passing?: Array<{
+        __typename?: 'FootballSeasonPassing';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        cmp?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        int?: number | null;
+        rating?: number | null;
+      }> | null;
+      rushing?: Array<{
+        __typename?: 'FootballSeasonRushing';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        ydsPerAtt?: number | null;
+      }> | null;
+      receiving?: Array<{
+        __typename?: 'FootballSeasonReceiving';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        tgt?: number | null;
+        rec?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        ydsPerRec?: number | null;
+      }> | null;
+    } | null;
   } | null;
 };
 
@@ -12763,6 +12799,38 @@ export const FootballPlayer = gql`
           sacks
           int
           ff
+        }
+      }
+      seasonStats {
+        passing {
+          season
+          team
+          g
+          cmp
+          att
+          yds
+          td
+          int
+          rating
+        }
+        rushing {
+          season
+          team
+          g
+          att
+          yds
+          td
+          ydsPerAtt
+        }
+        receiving {
+          season
+          team
+          g
+          tgt
+          rec
+          yds
+          td
+          ydsPerRec
         }
       }
     }

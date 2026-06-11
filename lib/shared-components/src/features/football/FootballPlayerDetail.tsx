@@ -58,6 +58,45 @@ export interface FootballPlayerDetailStats {
   } | null;
 }
 
+export interface FootballSeasonPassingRow {
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  cmp?: number | null;
+  att?: number | null;
+  yds?: number | null;
+  td?: number | null;
+  int?: number | null;
+  rating?: number | null;
+}
+
+export interface FootballSeasonRushingRow {
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  att?: number | null;
+  yds?: number | null;
+  td?: number | null;
+  ydsPerAtt?: number | null;
+}
+
+export interface FootballSeasonReceivingRow {
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  tgt?: number | null;
+  rec?: number | null;
+  yds?: number | null;
+  td?: number | null;
+  ydsPerRec?: number | null;
+}
+
+export interface FootballPlayerDetailSeasonStats {
+  passing?: FootballSeasonPassingRow[] | null;
+  rushing?: FootballSeasonRushingRow[] | null;
+  receiving?: FootballSeasonReceivingRow[] | null;
+}
+
 export interface FootballPlayerDetailPlayer {
   id: number;
   firstName?: string | null;
@@ -66,6 +105,7 @@ export interface FootballPlayerDetailPlayer {
   nflTeam?: string | null;
   isDst?: boolean | null;
   careerStats?: FootballPlayerDetailStats | null;
+  seasonStats?: FootballPlayerDetailSeasonStats | null;
 }
 
 function fmt(n: number | null | undefined): string {
@@ -156,6 +196,221 @@ function DstStatsTable({ stats }: { stats: FootballPlayerDetailStats }) {
     </StatGroup>
   );
 }
+
+// ── Season breakdown table helpers ───────────────────────────────────────────
+
+const TABLE_HEADER_STYLE: React.CSSProperties = {
+  textAlign: 'left' as const,
+  padding: '4px 8px',
+  fontSize: 11,
+  fontWeight: 600,
+  color: TEXT_MUTED,
+  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+  whiteSpace: 'nowrap' as const,
+};
+
+const TABLE_CELL_STYLE: React.CSSProperties = {
+  textAlign: 'right' as const,
+  padding: '6px 8px',
+  fontSize: 13,
+  color: TEXT_PRIMARY,
+  fontVariantNumeric: 'tabular-nums',
+  borderBottom: `1px solid ${withAlpha(OUTLINE_SUBTLE, 0.5)}`,
+};
+
+const TABLE_CELL_LEFT_STYLE: React.CSSProperties = {
+  ...TABLE_CELL_STYLE,
+  textAlign: 'left' as const,
+};
+
+const TABLE_WRAP_STYLE: React.CSSProperties = {
+  overflowX: 'auto' as const,
+  WebkitOverflowScrolling: 'touch' as const,
+};
+
+function SeasonTableWrap({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <YStack gap={8}>
+      <Text
+        fontSize={13}
+        color={TEXT_MUTED}
+        fontFamily={FONT_BODY}
+        fontWeight="600"
+      >
+        {title}
+      </Text>
+      <YStack
+        backgroundColor={SURFACE_CARD}
+        borderWidth={1}
+        borderColor={OUTLINE_SUBTLE}
+        borderRadius={8}
+        style={TABLE_WRAP_STYLE}
+      >
+        {children}
+      </YStack>
+    </YStack>
+  );
+}
+
+function PassingSeasonTable({ rows }: { rows: FootballSeasonPassingRow[] }) {
+  return (
+    <SeasonTableWrap title="Passing — Season Breakdown">
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}
+      >
+        <thead>
+          <tr>
+            {['YEAR', 'TEAM', 'G', 'CMP', 'ATT', 'YDS', 'TD', 'INT', 'RTG'].map(
+              (h) => (
+                <th
+                  key={h}
+                  style={
+                    h === 'YEAR' || h === 'TEAM'
+                      ? TABLE_HEADER_STYLE
+                      : { ...TABLE_HEADER_STYLE, textAlign: 'right' }
+                  }
+                >
+                  {h}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.season}-${r.team}-${i}`}>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.season ?? '—'}</td>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.team ?? '—'}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.g)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.cmp)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.att)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.yds)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.td)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.int)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmtFloat(r.rating)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SeasonTableWrap>
+  );
+}
+
+function RushingSeasonTable({ rows }: { rows: FootballSeasonRushingRow[] }) {
+  return (
+    <SeasonTableWrap title="Rushing — Season Breakdown">
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', minWidth: 380 }}
+      >
+        <thead>
+          <tr>
+            {['YEAR', 'TEAM', 'G', 'ATT', 'YDS', 'TD', 'YDS/ATT'].map((h) => (
+              <th
+                key={h}
+                style={
+                  h === 'YEAR' || h === 'TEAM'
+                    ? TABLE_HEADER_STYLE
+                    : { ...TABLE_HEADER_STYLE, textAlign: 'right' }
+                }
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.season}-${r.team}-${i}`}>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.season ?? '—'}</td>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.team ?? '—'}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.g)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.att)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.yds)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.td)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmtFloat(r.ydsPerAtt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SeasonTableWrap>
+  );
+}
+
+function ReceivingSeasonTable({
+  rows,
+}: {
+  rows: FootballSeasonReceivingRow[];
+}) {
+  return (
+    <SeasonTableWrap title="Receiving — Season Breakdown">
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}
+      >
+        <thead>
+          <tr>
+            {['YEAR', 'TEAM', 'G', 'TGT', 'REC', 'YDS', 'TD', 'YDS/REC'].map(
+              (h) => (
+                <th
+                  key={h}
+                  style={
+                    h === 'YEAR' || h === 'TEAM'
+                      ? TABLE_HEADER_STYLE
+                      : { ...TABLE_HEADER_STYLE, textAlign: 'right' }
+                  }
+                >
+                  {h}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.season}-${r.team}-${i}`}>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.season ?? '—'}</td>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.team ?? '—'}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.g)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.tgt)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.rec)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.yds)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.td)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmtFloat(r.ydsPerRec)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SeasonTableWrap>
+  );
+}
+
+function SeasonBreakdowns({ player }: { player: FootballPlayerDetailPlayer }) {
+  const ss = player.seasonStats;
+  if (!ss) return null;
+
+  const passing = ss.passing ?? [];
+  const rushing = ss.rushing ?? [];
+  const receiving = ss.receiving ?? [];
+
+  if (passing.length === 0 && rushing.length === 0 && receiving.length === 0) {
+    return null;
+  }
+
+  return (
+    <YStack gap={20}>
+      {passing.length > 0 && <PassingSeasonTable rows={passing} />}
+      {rushing.length > 0 && <RushingSeasonTable rows={rushing} />}
+      {receiving.length > 0 && <ReceivingSeasonTable rows={receiving} />}
+    </YStack>
+  );
+}
+
+// ── Career stat tables ────────────────────────────────────────────────────────
 
 function OffenseStatsTable({
   pos,
@@ -347,7 +602,7 @@ export function FootballPlayerDetail({
             </YStack>
           </XStack>
 
-          {/* Stats */}
+          {/* Career stats summary */}
           {!player.careerStats ? (
             <YStack
               backgroundColor={SURFACE_CARD}
@@ -371,6 +626,9 @@ export function FootballPlayerDetail({
               stats={player.careerStats}
             />
           ) : null}
+
+          {/* Season-by-season breakdown tables */}
+          <SeasonBreakdowns player={player} />
         </YStack>
       )}
     </YStack>

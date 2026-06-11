@@ -1,6 +1,6 @@
 /**
- * Tests for FootballPlayerDetail (LS-7805) — the cross-platform NFL player
- * detail view shared by web and mobile.
+ * Tests for FootballPlayerDetail (LS-7805, LS-5435) — the cross-platform NFL
+ * player detail view shared by web and mobile.
  */
 import React from 'react';
 import {
@@ -18,6 +18,96 @@ const QB_PLAYER: FootballPlayerDetailPlayer = {
   nflTeam: 'KC',
   careerStats: {
     passing: { yds: 5000, td: 37, int: 14, rating: 105.2 },
+  },
+  seasonStats: {
+    passing: [
+      {
+        season: 2023,
+        team: 'KC',
+        g: 16,
+        cmp: 401,
+        att: 597,
+        yds: 4839,
+        td: 41,
+        int: 12,
+        rating: 105.2,
+      },
+      {
+        season: 2022,
+        team: 'KC',
+        g: 17,
+        cmp: 435,
+        att: 648,
+        yds: 5250,
+        td: 37,
+        int: 14,
+        rating: 105.2,
+      },
+    ],
+  },
+};
+
+const RB_PLAYER: FootballPlayerDetailPlayer = {
+  id: 4,
+  firstName: 'Christian',
+  lastName: 'McCaffrey',
+  position: 'RB',
+  isDst: false,
+  nflTeam: 'SF',
+  careerStats: {
+    rushing: { yds: 1459, td: 14 },
+    receiving: { rec: 67, yds: 564, td: 7 },
+  },
+  seasonStats: {
+    rushing: [
+      {
+        season: 2023,
+        team: 'SF',
+        g: 16,
+        att: 272,
+        yds: 1459,
+        td: 14,
+        ydsPerAtt: 5.4,
+      },
+    ],
+    receiving: [
+      {
+        season: 2023,
+        team: 'SF',
+        g: 16,
+        tgt: 85,
+        rec: 67,
+        yds: 564,
+        td: 7,
+        ydsPerRec: 8.4,
+      },
+    ],
+  },
+};
+
+const WR_PLAYER: FootballPlayerDetailPlayer = {
+  id: 5,
+  firstName: 'Davante',
+  lastName: 'Adams',
+  position: 'WR',
+  isDst: false,
+  nflTeam: 'LV',
+  careerStats: {
+    receiving: { rec: 100, yds: 1144, td: 8 },
+  },
+  seasonStats: {
+    receiving: [
+      {
+        season: 2023,
+        team: 'LV',
+        g: 17,
+        tgt: 154,
+        rec: 103,
+        yds: 1144,
+        td: 8,
+        ydsPerRec: 11.1,
+      },
+    ],
   },
 };
 
@@ -57,8 +147,8 @@ describe('FootballPlayerDetail', () => {
     render(<FootballPlayerDetail player={QB_PLAYER} />);
     expect(screen.getByText('Career Passing')).toBeTruthy();
     expect(screen.getByText('5,000')).toBeTruthy();
-    expect(screen.getByText('RTG')).toBeTruthy();
-    expect(screen.getByText('105.2')).toBeTruthy();
+    expect(screen.getAllByText('RTG').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('105.2').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders DST stats for a defense', () => {
@@ -98,5 +188,67 @@ describe('FootballPlayerDetail', () => {
   it('hides the back affordance when onBack is not provided', () => {
     render(<FootballPlayerDetail player={QB_PLAYER} />);
     expect(screen.queryByText('Back to Players')).toBeNull();
+  });
+
+  describe('LS-5435 — Passing / Rushing / Receiving Stat Breakdowns', () => {
+    it('renders passing season breakdown table for a QB', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(screen.getByText('Passing — Season Breakdown')).toBeTruthy();
+      expect(screen.getByText('CMP')).toBeTruthy();
+      expect(screen.getAllByText('ATT').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('RTG').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('2023')).toBeTruthy();
+      expect(screen.getByText('2022')).toBeTruthy();
+    });
+
+    it('shows team column in passing breakdown rows', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      const kcs = screen.getAllByText('KC');
+      expect(kcs.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('renders rushing season breakdown table for an RB', () => {
+      render(<FootballPlayerDetail player={RB_PLAYER} />);
+      expect(screen.getByText('Rushing — Season Breakdown')).toBeTruthy();
+      expect(screen.getByText('YDS/ATT')).toBeTruthy();
+      expect(screen.getByText('5.4')).toBeTruthy();
+    });
+
+    it('renders receiving season breakdown table for an RB with receptions', () => {
+      render(<FootballPlayerDetail player={RB_PLAYER} />);
+      expect(screen.getByText('Receiving — Season Breakdown')).toBeTruthy();
+      expect(screen.getByText('TGT')).toBeTruthy();
+      expect(screen.getByText('YDS/REC')).toBeTruthy();
+    });
+
+    it('renders receiving season breakdown table for a WR', () => {
+      render(<FootballPlayerDetail player={WR_PLAYER} />);
+      expect(screen.getByText('Receiving — Season Breakdown')).toBeTruthy();
+      expect(screen.getByText('103')).toBeTruthy();
+      expect(screen.getByText('11.1')).toBeTruthy();
+    });
+
+    it('shows NFL team context in each receiving breakdown row', () => {
+      render(<FootballPlayerDetail player={WR_PLAYER} />);
+      expect(screen.getAllByText('LV').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('does not render breakdown tables when seasonStats is null', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        seasonStats: null,
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.queryByText('Passing — Season Breakdown')).toBeNull();
+    });
+
+    it('does not render breakdown tables when all season arrays are empty', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        seasonStats: { passing: [], rushing: [], receiving: [] },
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.queryByText('Passing — Season Breakdown')).toBeNull();
+    });
   });
 });

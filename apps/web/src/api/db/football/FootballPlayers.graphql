@@ -101,5 +101,37 @@ query FootballPlayer($id: Int!) {
         ff
       }
     }
+    seasonStats {
+      passing {
+        season
+        team
+        g
+        cmp
+        att
+        yds
+        td
+        int
+        rating
+      }
+      rushing {
+        season
+        team
+        g
+        att
+        yds
+        td
+        ydsPerAtt
+      }
+      receiving {
+        season
+        team
+        g
+        tgt
+        rec
+        yds
+        td
+        ydsPerRec
+      }
+    }
   }
 }
