@@ -48,7 +48,10 @@ function getDiscordWebhookUrl(): Promise<string> {
   if (!discordUrlPromise) {
     discordUrlPromise = retrieveSecretParameterValue(
       DISCORD_WEBHOOK_URL_SECRET_NAME,
-    );
+    ).catch((err: unknown) => {
+      discordUrlPromise = null;
+      throw err;
+    });
   }
   return discordUrlPromise;
 }
@@ -57,9 +60,19 @@ function getWebhookSecret(): Promise<string> {
   if (!webhookSecretPromise) {
     webhookSecretPromise = retrieveSecretParameterValue(
       ROLLBAR_WEBHOOK_SECRET_NAME,
-    );
+    ).catch((err: unknown) => {
+      webhookSecretPromise = null;
+      throw err;
+    });
   }
   return webhookSecretPromise;
+}
+
+// Exported for unit tests: resets memoised secret promises so tests can
+// simulate cold-start retries without module isolation.
+export function _resetSecretCacheForTesting(): void {
+  discordUrlPromise = null;
+  webhookSecretPromise = null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

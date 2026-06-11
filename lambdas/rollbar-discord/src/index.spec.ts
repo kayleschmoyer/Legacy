@@ -35,6 +35,7 @@ process.env['DISCORD_WEBHOOK_URL_SECRET_NAME'] = 'discord-webhook-url';
 process.env['ROLLBAR_WEBHOOK_SECRET_SECRET_NAME'] = 'rollbar-webhook-secret';
 
 import {
+  _resetSecretCacheForTesting,
   baseHandler,
   parsePlainTextBudgetNotification,
   redactMessage,
@@ -142,6 +143,84 @@ describe('parsePlainTextBudgetNotification', () => {
 
   it('returns null for empty string', () => {
     expect(parsePlainTextBudgetNotification('')).toBeNull();
+  });
+});
+
+describe('secret caching — rejected promise reset', () => {
+  const retrieve = () =>
+    jest.requireMock<{ retrieveSecretParameterValue: jest.Mock }>(
+      '@legacy-sports/aws-utils',
+    ).retrieveSecretParameterValue;
+
+  beforeEach(() => {
+    // Start each test with a clean secret cache and a clean fetch mock so the
+    // handler actually calls retrieveSecretParameterValue on the first invocation.
+    _resetSecretCacheForTesting();
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+  });
+
+  afterEach(() => {
+    // Restore the default implementation so other tests see a successful fetch.
+    retrieve().mockImplementation((name: string) => {
+      if (name === 'discord-webhook-url')
+        return Promise.resolve('https://discord.com/api/webhooks/test');
+      if (name === 'rollbar-webhook-secret')
+        return Promise.resolve('test-rollbar-webhook-secret');
+      return Promise.reject(new Error(`Unknown secret: ${name}`));
+    });
+    _resetSecretCacheForTesting();
+  });
+
+  it('retries Discord webhook URL secret on the next invocation after a rejection', async () => {
+    // Queue: first call rejects, second call resolves.
+    retrieve()
+      .mockRejectedValueOnce(new Error('Secrets Manager unavailable'))
+      .mockResolvedValueOnce('https://discord.com/api/webhooks/test');
+
+    const alarmMessage = JSON.stringify({
+      AlarmName: 'retry-alarm',
+      NewStateValue: 'ALARM',
+      NewStateReason: 'Threshold crossed',
+      StateChangeTime: '2024-01-15T10:30:00Z',
+      Region: 'us-east-1',
+      Trigger: { MetricName: 'Errors', Namespace: 'AWS/Lambda' },
+    });
+    const makeSns = (id: string) => ({
+      Records: [
+        {
+          EventSource: 'aws:sns',
+          EventVersion: '1.0',
+          EventSubscriptionArn: 'arn:aws:sns:us-east-1:123:topic:sub',
+          Sns: {
+            Type: 'Notification',
+            MessageId: id,
+            TopicArn: 'arn:aws:sns:us-east-1:123:topic',
+            Subject: 'ALARM',
+            Message: alarmMessage,
+            Timestamp: '2024-01-15T10:30:00Z',
+            SignatureVersion: '1',
+            Signature: '',
+            SigningCertUrl: '',
+            UnsubscribeUrl: '',
+            MessageAttributes: {},
+          },
+        },
+      ],
+    });
+
+    // First invocation — secret fetch rejects; handler propagates the error.
+    await expect(baseHandler(makeSns('id-1'))).rejects.toThrow(
+      'Secrets Manager unavailable',
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(retrieve()).toHaveBeenCalledTimes(1);
+
+    // Second invocation — cache was reset by the catch clause; secret is retried
+    // and resolves; Discord receives the alarm embed.
+    await baseHandler(makeSns('id-2'));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(retrieve()).toHaveBeenCalledTimes(2);
   });
 });
 
