@@ -2,7 +2,9 @@ import {
   DEFAULT_GOOGLE_CLIENT_ID,
   getMobileOAuthConfig,
   PLACEHOLDER_GOOGLE_CLIENT_ID,
+  PLACEHOLDER_OAUTH_PROXY_URL,
   resolveGoogleClientId,
+  resolveOAuthProxyUrl,
 } from './mobileOAuthConfig';
 
 // Control config values via the native adapter mock.
@@ -25,6 +27,22 @@ describe('mobileOAuthConfig', () => {
     setConfig({});
   });
 
+  describe('resolveOAuthProxyUrl', () => {
+    it('returns the real URL when configured', () => {
+      setConfig({ oauthProxy: 'https://api.example.com/dev/oauth' });
+      expect(resolveOAuthProxyUrl()).toBe('https://api.example.com/dev/oauth');
+    });
+
+    it('returns undefined when oauthProxy is not set', () => {
+      expect(resolveOAuthProxyUrl()).toBeUndefined();
+    });
+
+    it('returns undefined for the app.json placeholder (prevents localhost leak)', () => {
+      setConfig({ oauthProxy: PLACEHOLDER_OAUTH_PROXY_URL });
+      expect(resolveOAuthProxyUrl()).toBeUndefined();
+    });
+  });
+
   describe('getMobileOAuthConfig oauthProxyUrl', () => {
     it('returns config.oauthProxy as oauthProxyUrl', () => {
       setConfig({ oauthProxy: 'https://api.example.com/dev/oauth' });
@@ -34,6 +52,11 @@ describe('mobileOAuthConfig', () => {
     });
 
     it('returns undefined when oauthProxy is not set', () => {
+      expect(getMobileOAuthConfig().oauthProxyUrl).toBeUndefined();
+    });
+
+    it('returns undefined for the app.json placeholder', () => {
+      setConfig({ oauthProxy: PLACEHOLDER_OAUTH_PROXY_URL });
       expect(getMobileOAuthConfig().oauthProxyUrl).toBeUndefined();
     });
   });

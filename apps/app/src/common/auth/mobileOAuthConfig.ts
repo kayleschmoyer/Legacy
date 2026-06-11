@@ -20,6 +20,15 @@ export const DEFAULT_GOOGLE_CLIENT_ID =
 export const PLACEHOLDER_GOOGLE_CLIENT_ID = 'placeholder-google-client-id';
 
 /**
+ * `app.json` ships this non-empty placeholder for `extra.oauthProxy`. It must
+ * be treated as "unset": a build that reaches production without
+ * `EXPO_PUBLIC_OAUTH_PROXY` set would otherwise POST the Google serverAuthCode
+ * to a URL that doesn't reach the real proxy. Callers compare against this
+ * constant explicitly rather than relying on a plain truthiness check.
+ */
+export const PLACEHOLDER_OAUTH_PROXY_URL = 'placeholder-oauth-proxy-url';
+
+/**
  * Resolve the Google OAuth `webClientId`, treating the `app.json` placeholder as
  * unset and falling back to the project default. This is the only place that
  * decides which client ID the mobile app signs in with — keep it that way.
@@ -29,6 +38,19 @@ export function resolveGoogleClientId(): string {
   return configured && configured !== PLACEHOLDER_GOOGLE_CLIENT_ID
     ? configured
     : DEFAULT_GOOGLE_CLIENT_ID;
+}
+
+/**
+ * Resolve the OAuth proxy URL, treating the `app.json` placeholder as unset.
+ * Returns `undefined` when the proxy is not configured so callers (AuthHooks)
+ * surface a clear "OAuth proxy URL is not configured" error rather than sending
+ * auth codes to a placeholder address.
+ */
+export function resolveOAuthProxyUrl(): string | undefined {
+  const configured = config.oauthProxy;
+  return configured && configured !== PLACEHOLDER_OAUTH_PROXY_URL
+    ? configured
+    : undefined;
 }
 
 /**
@@ -42,7 +64,7 @@ export function getMobileOAuthConfig(): OAuthConfig {
     // Discord is optional — when unset the login screen hides the Discord
     // button, mirroring the web app's `config.discordClientId` gating.
     discordClientId: config.discordClientId,
-    oauthProxyUrl: config.oauthProxy,
+    oauthProxyUrl: resolveOAuthProxyUrl(),
     additionalScopes: ['openid', 'profile', 'email'],
     offlineAccess: true,
   };
