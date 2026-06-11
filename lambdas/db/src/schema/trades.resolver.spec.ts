@@ -846,13 +846,19 @@ describe('Trades Resolver', () => {
       });
     });
 
-    it('throws FORBIDDEN when user is a commissioner (not the active team owner)', async () => {
+    it('allows a team-owning commissioner past the permission gate (LS-7917)', async () => {
       mockDb.limit.mockResolvedValueOnce([
         { leaguePhase: 'active', sport: 'baseball' },
       ]);
+      // resolveUserTeam membership — commissioner who owns a team (league
+      // creators are stored this way) must NOT be rejected by the
+      // permission gate. The next mock returns no team row, so the resolver
+      // fails at the abandoned-team guard instead — proving the permission
+      // gate passed.
       mockDb.limit.mockResolvedValueOnce([
         { teamId: 1, permissionLevel: 'commissioner' },
       ]);
+      mockDb.limit.mockResolvedValueOnce([]);
 
       const resolver = getResolver('mutation', 'proposeTrade');
       await expect(
@@ -869,7 +875,7 @@ describe('Trades Resolver', () => {
         ),
       ).rejects.toMatchObject({
         extensions: { code: 'FORBIDDEN' },
-        message: expect.stringContaining('general manager'),
+        message: expect.stringContaining('no longer exists'),
       });
     });
 

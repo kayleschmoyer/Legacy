@@ -135,9 +135,16 @@ async function resolveUserTeam(
     throw ForbiddenError('You do not have a team in this league');
   }
 
-  // Only the primary team owner (general_manager) may propose trades.
-  // Co-managers (assistant_manager) and league commissioners cannot initiate trades.
-  if (membership.permissionLevel !== 'general_manager') {
+  // Only an active team owner may propose trades: the primary owner
+  // (general_manager) or a commissioner who owns a team. League creators are
+  // stored with permissionLevel 'commissioner' on their own team's membership
+  // row, so excluding them blocked every commissioner from trading (LS-7917).
+  // Co-managers (assistant_manager) and demoted/spectator levels cannot
+  // initiate trades (LS-7498).
+  if (
+    membership.permissionLevel !== 'general_manager' &&
+    membership.permissionLevel !== 'commissioner'
+  ) {
     throw ForbiddenError("Only the team's general manager can propose a trade");
   }
 
