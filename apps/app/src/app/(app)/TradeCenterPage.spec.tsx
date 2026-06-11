@@ -294,7 +294,9 @@ describe('TradeCenterPage', () => {
 
   it('ignores non-numeric ?tradeOfferId= param', async () => {
     mockSearchParams = { leagueId: '5', tradeOfferId: 'abc' };
-    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep-Link League' }] };
+    mockUserLeagues = {
+      userLeagues: [{ id: 5, name: 'Deep-Link League', leaguePhase: 'active' }],
+    };
     mockUserTeamId = 10;
     mockLeague = { league: { id: 5, owner: 99 } };
     render(<TradeCenterPage />);

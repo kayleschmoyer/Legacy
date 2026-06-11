@@ -126,7 +126,9 @@ describe('GameLogsTable input validation', () => {
     const body = JSON.parse(calls[0][1].body as string) as {
       game_date_from: string;
     };
-    expect(body.game_date_from).toBe('2024-06-01');
+    // LS-7453: dates carry the local tz offset; use normalizeGameDate so
+    // the assertion is timezone-independent across CI environments.
+    expect(body.game_date_from).toBe(normalizeGameDate('2024-06-01'));
   });
 
   it('shows inline error when date is in the future (LS-7452)', () => {
