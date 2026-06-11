@@ -18,6 +18,9 @@ export default function TabsLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
         },
+        // expo-router defaults allowFontScaling=false on iOS 13+ (LS-7573).
+        // Explicitly re-enable so Dynamic Type / Android font scaling is respected.
+        tabBarAllowFontScaling: true,
       }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
