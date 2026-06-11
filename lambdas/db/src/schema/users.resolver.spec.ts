@@ -1093,3 +1093,291 @@ describe('myIdentities query', () => {
     expect(result).toEqual([]);
   });
 });
+
+describe('setCanonicalEmail mutation', () => {
+  let schema: GraphQLSchema;
+  let mockContext: {
+    user: {
+      id: number;
+      email: string;
+      username: string;
+      isAdmin: boolean;
+    } | null;
+  };
+  let mockSetCanonicalEmail: jest.Mock;
+  let mockLogger: {
+    error: jest.Mock;
+    info: jest.Mock;
+    warn: jest.Mock;
+    debug: jest.Mock;
+  };
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockSetCanonicalEmail = jest.fn();
+    mockLogger = {
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+    };
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/logging', () => ({ LOGGER: mockLogger }));
+
+    jest.doMock('jsonwebtoken', () => ({
+      sign: jest.fn(),
+      verify: jest.fn(),
+      decode: jest.fn(),
+    }));
+
+    jest.doMock('../server/context', () => ({
+      getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(() => ({
+        users: {
+          getUserById: jest.fn(),
+          getUserIdentities: jest.fn(),
+          setCanonicalEmail: mockSetCanonicalEmail,
+        },
+        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
+      })),
+      runWithPublicClient: jest.fn(),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+      PublicSchema: {
+        leagues: {
+          id: 'id',
+          name: 'name',
+          currentWeek: 'cw',
+          currentMatchup: 'cm',
+        },
+        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'l',
+          userId: 'u',
+          teamId: 't',
+          permissionLevel: 'p',
+        },
+        teamMembers: {
+          id: 'id',
+          teamId: 't',
+          leagueId: 'l',
+          playerId: 'p',
+          positionId: 'pos',
+        },
+        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+        matchups: {
+          id: 'id',
+          leagueId: 'l',
+          weekNumber: 'w',
+          status: 's',
+          team1Id: 't1',
+          team2Id: 't2',
+        },
+        matchupPlayers: {
+          id: 'id',
+          matchupId: 'm',
+          playerId: 'p',
+          teamId: 't',
+        },
+        leagueWeekPlayerSeasons: {
+          playerId: 'p',
+          season: 's',
+          leagueId: 'l',
+          weekNumber: 'w',
+        },
+        leagueSeasonAwards: {
+          id: 'id',
+          leagueId: 'l',
+          season: 's',
+          playerId: 'p',
+          awardType: 'a',
+          notes: 'n',
+          createdAt: 'c',
+          updatedAt: 'u',
+        },
+        leagueActivityLog: {
+          id: 'id',
+          leagueId: 'l',
+          eventType: 'e',
+          occurredAt: 'o',
+        },
+        leagueActivityEventType: { enumValues: [] },
+      },
+      InternalSchema: {
+        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
+      },
+      PublicDb: {},
+    }));
+
+    jest.doMock('../services/standings-service', () => ({
+      StandingsService: {
+        getHeadToHead: jest.fn(),
+        getSeasonSummary: jest.fn(),
+        getStandings: jest.fn(),
+        getMatchupStats: jest.fn(),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+    const schemaModule = require('../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: {
+        id: 42,
+        email: 'user@example.com',
+        username: 'user42',
+        isAdmin: false,
+      },
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver() {
+    const mutationType = schema.getMutationType();
+    const field = mutationType?.getFields().setCanonicalEmail;
+    if (!field?.resolve) {
+      throw new Error('setCanonicalEmail resolver not found');
+    }
+    return field.resolve.bind(field);
+  }
+
+  it('throws UNAUTHENTICATED when not logged in', async () => {
+    const resolve = getResolver();
+    await expect(
+      resolve({}, { identityId: 1 }, { user: null }, undefined as never),
+    ).rejects.toThrow(/Authentication required|UNAUTHENTICATED/i);
+    expect(mockSetCanonicalEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns { user, changed: true } on a successful canonical email change', async () => {
+    const updatedUser = {
+      id: 42,
+      canonicalEmail: 'new@google.example',
+      username: 'user42',
+      accessLevel: 'user',
+      avatarUrl: null,
+      discordId: null,
+      discordUsername: null,
+      discordAvatar: null,
+      themePreference: null,
+    };
+    mockSetCanonicalEmail.mockResolvedValue({
+      user: updatedUser,
+      changed: true,
+    });
+    const resolve = getResolver();
+
+    const result = (await resolve(
+      {},
+      { identityId: 7 },
+      mockContext,
+      undefined as never,
+    )) as { user: Record<string, unknown>; changed: boolean };
+
+    expect(mockSetCanonicalEmail).toHaveBeenCalledWith(42, 7);
+    expect(result.changed).toBe(true);
+    expect(result.user.email).toBe('new@google.example');
+    expect(result.user.id).toBe(42);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Canonical email updated',
+      expect.objectContaining({
+        audit: true,
+        actor: { id: 42 },
+        changed: true,
+      }),
+    );
+  });
+
+  it('returns { user, changed: false } when email was already canonical (no-op)', async () => {
+    const currentUser = {
+      id: 42,
+      canonicalEmail: 'already@example.com',
+      username: 'user42',
+      accessLevel: 'user',
+      avatarUrl: null,
+      discordId: null,
+      discordUsername: null,
+      discordAvatar: null,
+      themePreference: null,
+    };
+    mockSetCanonicalEmail.mockResolvedValue({
+      user: currentUser,
+      changed: false,
+    });
+    const resolve = getResolver();
+
+    const result = (await resolve(
+      {},
+      { identityId: 5 },
+      mockContext,
+      undefined as never,
+    )) as { user: Record<string, unknown>; changed: boolean };
+
+    expect(result.changed).toBe(false);
+    expect(result.user.email).toBe('already@example.com');
+  });
+
+  it('surfaces a UserInputError when the identity does not belong to the caller', async () => {
+    const err = Object.assign(
+      new Error('Identity not found or does not belong to this user'),
+      {
+        userInput: true,
+      },
+    );
+    mockSetCanonicalEmail.mockRejectedValue(err);
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { identityId: 999 }, mockContext, undefined as never),
+    ).rejects.toThrow('Identity not found');
+  });
+
+  it('surfaces a UserInputError when the provider email is unverified', async () => {
+    const err = Object.assign(
+      new Error('Only verified provider emails can be set as canonical'),
+      { userInput: true },
+    );
+    mockSetCanonicalEmail.mockRejectedValue(err);
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { identityId: 3 }, mockContext, undefined as never),
+    ).rejects.toThrow('Only verified provider emails');
+  });
+
+  it('re-throws unknown errors without modification', async () => {
+    const internalErr = new Error('DB connection lost');
+    mockSetCanonicalEmail.mockRejectedValue(internalErr);
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { identityId: 1 }, mockContext, undefined as never),
+    ).rejects.toThrow('DB connection lost');
+  });
+});

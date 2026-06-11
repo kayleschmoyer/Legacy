@@ -2378,6 +2378,11 @@ type Mutation {
     """
     leagueIds: [Int!]!
   ): Boolean
+
+  """
+  Set the authenticated user's canonical email from one of their linked, verified provider identities.
+  """
+  setCanonicalEmail(identityId: Int!): SetCanonicalEmailResult!
   setDraftOrder(draftId: Int!, teamIds: [Int!]!): Draft
 
   """
@@ -3991,6 +3996,11 @@ type SendDuesRemindersResult {
   errors: [String!]
   leaguesChecked: Int
   remindersSent: Int
+}
+
+type SetCanonicalEmailResult {
+  changed: Boolean!
+  user: User!
 }
 
 input SetTeamLockInput {

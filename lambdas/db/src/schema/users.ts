@@ -666,3 +666,94 @@ builder.mutationField('impersonateUser', (t) =>
     },
   }),
 );
+
+// ─── setCanonicalEmail (LS-7825) ─────────────────────────────────────────────
+
+const SetCanonicalEmailResultRef = builder.objectRef<{
+  user: {
+    id: number;
+    email?: string | null;
+    username?: string | null;
+    accessLevel?: string | null;
+    avatarUrl?: string | null;
+    subscriptionTier?: string | null;
+    discordId?: string | null;
+    discordUsername?: string | null;
+    discordAvatar?: string | null;
+    themePreference?: string | null;
+  };
+  changed: boolean;
+}>('SetCanonicalEmailResult');
+
+SetCanonicalEmailResultRef.implement({
+  fields: (t) => ({
+    user: t.field({
+      type: UserRef,
+      nullable: false,
+      resolve: (parent) => parent.user,
+    }),
+    changed: t.exposeBoolean('changed', { nullable: false }),
+  }),
+});
+
+/**
+ * Authenticated mutation: set the caller's canonical email from one of their
+ * already-linked, verified provider identities.  Enforces the canonical-email
+ * policy in `docs/architecture/multi-provider-identity.md` §4.
+ */
+builder.mutationField('setCanonicalEmail', (t) =>
+  t.field({
+    type: SetCanonicalEmailResultRef,
+    nullable: false,
+    description:
+      "Set the authenticated user's canonical email from one of their linked, verified provider identities.",
+    args: {
+      identityId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, { identityId }, context) => {
+      const authedUser = requireAuth(context);
+
+      let result: {
+        user: import('@legacy-sports/db-client').User | null;
+        changed: boolean;
+      };
+      try {
+        result = await dbService.users.setCanonicalEmail(
+          Number(authedUser.id),
+          identityId,
+        );
+      } catch (error) {
+        const e = error as { userInput?: boolean; message?: string };
+        if (e.userInput) {
+          throw UserInputError(e.message ?? 'Invalid request');
+        }
+        throw error;
+      }
+
+      if (!result.user) {
+        throw new Error('User not found after canonical email update');
+      }
+
+      LOGGER.error('Canonical email updated', {
+        audit: true,
+        actor: { id: Number(authedUser.id) },
+        changed: result.changed,
+      });
+
+      return {
+        user: {
+          id: Number(result.user.id),
+          email: result.user.canonicalEmail,
+          username: result.user.username,
+          accessLevel: result.user.accessLevel,
+          avatarUrl: result.user.avatarUrl ?? null,
+          discordId: result.user.discordId ?? null,
+          discordUsername: result.user.discordUsername ?? null,
+          discordAvatar: result.user.discordAvatar ?? null,
+          themePreference: result.user.themePreference ?? null,
+        },
+        changed: result.changed,
+      };
+    },
+  }),
+);

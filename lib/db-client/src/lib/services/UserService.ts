@@ -17,6 +17,7 @@ import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithInternalClient, runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
 import * as InternalSchema from '../../drizzle/internal/schema';
+import { type IdentityProvider } from '../client/InternalDbClient';
 import { User, UserIdentity } from '../../types/DatabaseTypes';
 
 export interface UserFilters {
@@ -286,6 +287,79 @@ export class UserService {
     });
 
     return this.getUserById(userId);
+  }
+
+  /**
+   * Set the authenticated user's canonical email from one of their already-linked,
+   * verified provider identities. Enforces the AC checks from LS-7825:
+   * - identity must exist and belong to userId
+   * - providerEmail must be non-null
+   * - providerEmailVerified must be true
+   * - uniqueness via users_canonical_email_uk (throws with code 23505 on collision)
+   *
+   * Returns `{ user, changed: false }` when the identity's email is already canonical
+   * (no-op); `{ user, changed: true }` after a successful update.
+   */
+  async setCanonicalEmail(
+    userId: number,
+    identityId: number,
+  ): Promise<{ user: User | null; changed: boolean }> {
+    // Use the public view to validate ownership + verified status (no providerAccountId needed)
+    const identities = await this.getUserIdentities(userId);
+    const identity = identities.find((i) => Number(i.id) === identityId);
+
+    if (!identity) {
+      throw Object.assign(
+        new Error('Identity not found or does not belong to this user'),
+        { userInput: true },
+      );
+    }
+    if (!identity.providerEmail) {
+      throw Object.assign(
+        new Error('This identity has no associated email address'),
+        { userInput: true },
+      );
+    }
+    if (!identity.providerEmailVerified) {
+      throw Object.assign(
+        new Error('Only verified provider emails can be set as canonical'),
+        { userInput: true },
+      );
+    }
+
+    // No-op when email is already canonical
+    const currentUser = await this.getUserById(userId);
+    if (currentUser?.canonicalEmail === identity.providerEmail) {
+      return { user: currentUser, changed: false };
+    }
+
+    try {
+      await runWithInternalClient(this.options, async (db) => {
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({
+            canonicalEmail: identity.providerEmail!,
+            canonicalEmailSource: identity.provider as IdentityProvider,
+            updatedAt: new Date(),
+          })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      });
+    } catch (error) {
+      const pgError = error as { code?: string; constraint?: string };
+      if (
+        pgError.code === '23505' &&
+        pgError.constraint === 'users_canonical_email_uk'
+      ) {
+        throw Object.assign(
+          new Error('Email is already in use by another account'),
+          { userInput: true },
+        );
+      }
+      throw error;
+    }
+
+    const updatedUser = await this.getUserById(userId);
+    return { user: updatedUser, changed: true };
   }
 
   /**

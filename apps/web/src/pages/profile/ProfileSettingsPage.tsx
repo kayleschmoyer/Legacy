@@ -20,6 +20,8 @@ import { Monitor, Moon, Sun } from '@tamagui/lucide-icons';
 import { PageMeta } from '../../components/PageMeta';
 import {
   useGetUserByIdQuery,
+  useMyIdentitiesQuery,
+  useSetCanonicalEmailMutation,
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '../../api/db/graphql.generated';
@@ -270,20 +272,32 @@ const ProfileSettingsPage: React.FC = () => {
     variables: { id: user?.id ?? 0 },
     skip: !user?.id,
   });
+  const {
+    data: identitiesData,
+    loading: identitiesLoading,
+    refetch: refetchIdentities,
+  } = useMyIdentitiesQuery({ skip: !user?.id });
   const [updateUserAvatar, { loading: avatarLoading }] =
     useUpdateUserAvatarMutation();
   const [updateUsername, { loading: usernameLoading }] =
     useUpdateUsernameMutation();
+  const [setCanonicalEmail, { loading: canonicalEmailLoading }] =
+    useSetCanonicalEmailMutation();
 
   const currentAvatarUrl = userData?.user?.avatarUrl ?? null;
   const dbUsername = userData?.user?.username ?? userName;
-  const discordUsername = userData?.user?.discordUsername ?? null;
 
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [discordError, setDiscordError] = useState<string | null>(null);
   const [editedUsername, setEditedUsername] = useState(dbUsername);
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [canonicalEmailError, setCanonicalEmailError] = useState<string | null>(
+    null,
+  );
+  const [unlinkLoadingProvider, setUnlinkLoadingProvider] = useState<
+    string | null
+  >(null);
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isEditingUsername) {
@@ -370,26 +384,50 @@ const ProfileSettingsPage: React.FC = () => {
     window.location.href = `${oauthProxyUrl}/discord/authorize?link=1`;
   }, [auth.config.oauthProxyUrl]);
 
-  const handleDisconnectDiscord = useCallback(async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to disconnect your Discord account?',
+  const handleSetCanonicalEmail = useCallback(
+    async (identityId: number) => {
+      setCanonicalEmailError(null);
+      try {
+        await setCanonicalEmail({
+          variables: { identityId },
+          onCompleted: () => {
+            void refetchUser();
+          },
+        });
+      } catch (err) {
+        setCanonicalEmailError(
+          err instanceof Error ? err.message : 'Failed to update email',
+        );
+      }
+    },
+    [setCanonicalEmail, refetchUser],
+  );
+
+  const handleUnlinkProvider = useCallback(
+    async (provider: 'discord' | 'google' | 'apple') => {
+      if (
+        !window.confirm(
+          `Are you sure you want to disconnect your ${provider.charAt(0).toUpperCase() + provider.slice(1)} account?`,
+        )
       )
-    )
-      return;
-    setIsDiscordLoading(true);
-    setDiscordError(null);
-    try {
-      await authService.unlinkDiscordAccount();
-      await refetchUser();
-    } catch (err) {
-      setDiscordError(
-        err instanceof Error ? err.message : 'Failed to disconnect Discord',
-      );
-    } finally {
-      setIsDiscordLoading(false);
-    }
-  }, [authService, refetchUser]);
+        return;
+      setUnlinkLoadingProvider(provider);
+      setUnlinkError(null);
+      try {
+        await authService.unlinkProvider(provider);
+        await Promise.all([refetchUser(), refetchIdentities()]);
+      } catch (err) {
+        setUnlinkError(
+          err instanceof Error
+            ? err.message
+            : `Failed to disconnect ${provider}`,
+        );
+      } finally {
+        setUnlinkLoadingProvider(null);
+      }
+    },
+    [authService, refetchUser, refetchIdentities],
+  );
 
   if (!user) {
     return null;
@@ -823,87 +861,257 @@ const ProfileSettingsPage: React.FC = () => {
               </SectionBody>
             </SectionCard>
 
-            {/* ── Connected Accounts ── */}
-            {auth.config.discordClientId ? (
-              <SectionCard
-                style={{
-                  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-                }}
-              >
-                <SectionHeader>
-                  <SectionIconBox>
-                    <BrandIcon name="discord" size={20} />
-                  </SectionIconBox>
-                  <YStack flex={1}>
-                    <Paragraph size="$4" color="$color" fontWeight="600">
-                      Connected Accounts
-                    </Paragraph>
-                    <Paragraph size="$2" color="$colorPress">
-                      Link third-party accounts for additional sign-in options
-                    </Paragraph>
-                  </YStack>
-                </SectionHeader>
+            {/* ── Linked Identities ── */}
+            <SectionCard
+              data-testid="profile-linked-identities-section"
+              style={{
+                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
+              }}
+            >
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={16} lineHeight={18}>
+                    <span role="img" aria-label="linked accounts">
+                      🔗
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    Linked Identities
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Manage your connected sign-in providers and canonical email
+                  </Paragraph>
+                </YStack>
+              </SectionHeader>
 
-                <SectionBody>
+              <SectionBody>
+                {identitiesLoading ? (
                   <XStack
+                    justifyContent="center"
+                    paddingVertical="$4"
                     alignItems="center"
-                    justifyContent="space-between"
-                    gap="$4"
-                    $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
+                    gap="$2"
                   >
-                    <XStack alignItems="center" gap="$3" flex={1}>
-                      <BrandIcon name="discord" size={24} />
-                      <YStack gap="$0.5">
-                        <Paragraph size="$4" color="$color" fontWeight="500">
-                          Discord
-                        </Paragraph>
-                        <Paragraph size="$3" color="$colorPress">
-                          {discordUsername
-                            ? `Connected as ${discordUsername}`
-                            : 'Not connected'}
-                        </Paragraph>
-                      </YStack>
-                    </XStack>
+                    <Spinner size="small" color="$colorPress" />
+                    <Paragraph size="$3" color="$colorPress">
+                      Loading…
+                    </Paragraph>
+                  </XStack>
+                ) : identitiesData?.myIdentities.length === 0 ? (
+                  <Paragraph size="$3" color="$colorPress">
+                    No linked providers found.
+                  </Paragraph>
+                ) : (
+                  <YStack gap="$3">
+                    {identitiesData?.myIdentities.map((identity) => {
+                      const isCanonical =
+                        identity.providerEmail !== null &&
+                        identity.providerEmail === userEmail;
+                      const canSetCanonical =
+                        identity.providerEmailVerified &&
+                        identity.providerEmail !== null &&
+                        !isCanonical;
+                      const providerLabel =
+                        identity.provider.charAt(0).toUpperCase() +
+                        identity.provider.slice(1);
+                      const isUnlinkLoading =
+                        unlinkLoadingProvider === identity.provider;
 
-                    {discordUsername ? (
-                      <EditButton
-                        onPress={() => void handleDisconnectDiscord()}
-                        disabled={isDiscordLoading}
-                        opacity={isDiscordLoading ? 0.6 : 1}
-                        style={{
-                          backgroundColor: withAlpha(BRAND_SEAM_RED, 0.8),
-                        }}
-                      >
-                        {isDiscordLoading ? (
-                          <Spinner size="small" color="white" />
-                        ) : (
-                          <Paragraph size="$2" fontWeight="600" color="white">
-                            Disconnect
+                      return (
+                        <XStack
+                          key={identity.id}
+                          alignItems="center"
+                          justifyContent="space-between"
+                          gap="$4"
+                          paddingVertical="$2"
+                          $sm={{
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                          }}
+                        >
+                          <XStack alignItems="center" gap="$3" flex={1}>
+                            {identity.provider === 'discord' ? (
+                              <BrandIcon name="discord" size={24} />
+                            ) : (
+                              <Paragraph fontSize={22} lineHeight={24}>
+                                {identity.provider === 'google'
+                                  ? '🌐'
+                                  : identity.provider === 'apple'
+                                    ? '🍎'
+                                    : '🔑'}
+                              </Paragraph>
+                            )}
+                            <YStack gap="$0.5">
+                              <XStack alignItems="center" gap="$2">
+                                <Paragraph
+                                  size="$4"
+                                  color="$color"
+                                  fontWeight="500"
+                                >
+                                  {providerLabel}
+                                </Paragraph>
+                                {isCanonical ? (
+                                  <XStack
+                                    paddingHorizontal="$2"
+                                    paddingVertical="$0.5"
+                                    borderRadius="$10"
+                                    style={{
+                                      backgroundColor: withAlpha(
+                                        BRAND_GOLD,
+                                        0.18,
+                                      ),
+                                      borderWidth: 1,
+                                      borderColor: withAlpha(BRAND_GOLD, 0.45),
+                                    }}
+                                  >
+                                    <Paragraph
+                                      size="$1"
+                                      fontWeight="600"
+                                      style={{ color: BRAND_GOLD_LIGHT }}
+                                    >
+                                      Primary email
+                                    </Paragraph>
+                                  </XStack>
+                                ) : null}
+                              </XStack>
+                              <Paragraph size="$3" color="$colorPress">
+                                {identity.providerEmail ?? 'No email'}
+                                {identity.providerEmail &&
+                                !identity.providerEmailVerified
+                                  ? ' (unverified)'
+                                  : null}
+                              </Paragraph>
+                            </YStack>
+                          </XStack>
+
+                          <XStack gap="$2" alignItems="center">
+                            {canSetCanonical ? (
+                              <EditButton
+                                onPress={() =>
+                                  void handleSetCanonicalEmail(identity.id)
+                                }
+                                disabled={canonicalEmailLoading}
+                                opacity={canonicalEmailLoading ? 0.6 : 1}
+                                data-testid={`set-canonical-email-${identity.id}`}
+                              >
+                                <Paragraph
+                                  size="$2"
+                                  fontWeight="600"
+                                  color="white"
+                                >
+                                  {canonicalEmailLoading
+                                    ? '…'
+                                    : 'Set as primary'}
+                                </Paragraph>
+                              </EditButton>
+                            ) : null}
+                            {identity.provider !== 'local' ? (
+                              <EditButton
+                                onPress={() =>
+                                  void handleUnlinkProvider(
+                                    identity.provider as
+                                      | 'discord'
+                                      | 'google'
+                                      | 'apple',
+                                  )
+                                }
+                                disabled={isUnlinkLoading}
+                                opacity={isUnlinkLoading ? 0.6 : 1}
+                                style={{
+                                  backgroundColor: withAlpha(
+                                    BRAND_SEAM_RED,
+                                    0.8,
+                                  ),
+                                }}
+                                data-testid={`unlink-provider-${identity.provider}`}
+                              >
+                                {isUnlinkLoading ? (
+                                  <Spinner size="small" color="white" />
+                                ) : (
+                                  <Paragraph
+                                    size="$2"
+                                    fontWeight="600"
+                                    color="white"
+                                  >
+                                    Disconnect
+                                  </Paragraph>
+                                )}
+                              </EditButton>
+                            ) : null}
+                          </XStack>
+                        </XStack>
+                      );
+                    })}
+                  </YStack>
+                )}
+
+                {canonicalEmailError ? (
+                  <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
+                    {canonicalEmailError}
+                  </Paragraph>
+                ) : null}
+                {unlinkError ? (
+                  <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
+                    {unlinkError}
+                  </Paragraph>
+                ) : null}
+
+                {/* Legacy Discord connect button when no identities loaded yet */}
+                {auth.config.discordClientId &&
+                !identitiesData?.myIdentities.some(
+                  (i) => i.provider === 'discord',
+                ) ? (
+                  <YStack
+                    gap="$3"
+                    paddingTop={
+                      (identitiesData?.myIdentities.length ?? 0) > 0
+                        ? '$3'
+                        : '$0'
+                    }
+                  >
+                    {(identitiesData?.myIdentities.length ?? 0) > 0 ? (
+                      <Separator />
+                    ) : null}
+                    <XStack
+                      alignItems="center"
+                      justifyContent="space-between"
+                      gap="$4"
+                      $sm={{
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <XStack alignItems="center" gap="$3" flex={1}>
+                        <BrandIcon name="discord" size={24} />
+                        <YStack gap="$0.5">
+                          <Paragraph size="$4" color="$color" fontWeight="500">
+                            Discord
                           </Paragraph>
-                        )}
-                      </EditButton>
-                    ) : (
+                          <Paragraph size="$3" color="$colorPress">
+                            Not connected
+                          </Paragraph>
+                        </YStack>
+                      </XStack>
                       <EditButton
                         onPress={handleConnectDiscord}
-                        disabled={isDiscordLoading}
-                        opacity={isDiscordLoading ? 0.6 : 1}
                         style={{ backgroundColor: DISCORD_BLURPLE }}
                       >
                         <Paragraph size="$2" fontWeight="600" color="white">
                           Connect Discord
                         </Paragraph>
                       </EditButton>
-                    )}
-                  </XStack>
-
-                  {discordError ? (
-                    <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
-                      {discordError}
-                    </Paragraph>
-                  ) : null}
-                </SectionBody>
-              </SectionCard>
-            ) : null}
+                    </XStack>
+                    {discordError ? (
+                      <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
+                        {discordError}
+                      </Paragraph>
+                    ) : null}
+                  </YStack>
+                ) : null}
+              </SectionBody>
+            </SectionCard>
 
             {/* ── Danger Zone ── */}
             <SectionCard

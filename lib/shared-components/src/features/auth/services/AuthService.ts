@@ -276,6 +276,44 @@ export class AuthService {
   }
 
   /**
+   * Unlink a provider account (discord | google | apple) from the currently
+   * authenticated user.  Sends the CSRF double-submit token required for
+   * cookie-authenticated requests.
+   */
+  async unlinkProvider(
+    provider: 'discord' | 'google' | 'apple',
+  ): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/${provider}/unlink`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let message = `${provider} unlink failed: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText) as {
+          message?: string;
+          error?: string;
+        };
+        if (errorData.message || errorData.error) {
+          message = errorData.message ?? errorData.error ?? message;
+        }
+      } catch {
+        // keep default message
+      }
+      throw new Error(message);
+    }
+  }
+
+  /**
    * Authenticate user with email/password through local authentication
    */
   async authenticateWithEmail(email: string, password: string): Promise<User> {

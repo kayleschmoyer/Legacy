@@ -1831,6 +1831,8 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
   setActiveLeagues?: Maybe<Scalars['Boolean']['output']>;
+  /** Set the authenticated user's canonical email from one of their linked, verified provider identities. */
+  setCanonicalEmail: SetCanonicalEmailResult;
   setDraftOrder?: Maybe<Draft>;
   /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -2316,6 +2318,10 @@ export type MutationSendMatchupMessageArgs = {
 
 export type MutationSetActiveLeaguesArgs = {
   leagueIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetCanonicalEmailArgs = {
+  identityId: Scalars['Int']['input'];
 };
 
 export type MutationSetDraftOrderArgs = {
@@ -4011,6 +4017,12 @@ export type SendDuesRemindersResult = {
   errors?: Maybe<Array<Scalars['String']['output']>>;
   leaguesChecked?: Maybe<Scalars['Int']['output']>;
   remindersSent?: Maybe<Scalars['Int']['output']>;
+};
+
+export type SetCanonicalEmailResult = {
+  __typename?: 'SetCanonicalEmailResult';
+  changed: Scalars['Boolean']['output'];
+  user: User;
 };
 
 export type SetTeamLockInput = {

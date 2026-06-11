@@ -77,3 +77,24 @@ mutation ImpersonateUser($userId: Int!) {
     token
   }
 }
+
+query MyIdentities {
+  myIdentities {
+    id
+    provider
+    providerEmail
+    providerEmailVerified
+    providerUsername
+    providerAvatar
+    linkedAt
+  }
+}
+
+mutation SetCanonicalEmail($identityId: Int!) {
+  setCanonicalEmail(identityId: $identityId) {
+    user {
+      ...User
+    }
+    changed
+  }
+}

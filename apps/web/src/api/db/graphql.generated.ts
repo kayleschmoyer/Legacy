@@ -1831,6 +1831,8 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
   setActiveLeagues?: Maybe<Scalars['Boolean']['output']>;
+  /** Set the authenticated user's canonical email from one of their linked, verified provider identities. */
+  setCanonicalEmail: SetCanonicalEmailResult;
   setDraftOrder?: Maybe<Draft>;
   /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -2316,6 +2318,10 @@ export type MutationSendMatchupMessageArgs = {
 
 export type MutationSetActiveLeaguesArgs = {
   leagueIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetCanonicalEmailArgs = {
+  identityId: Scalars['Int']['input'];
 };
 
 export type MutationSetDraftOrderArgs = {
@@ -4011,6 +4017,12 @@ export type SendDuesRemindersResult = {
   errors?: Maybe<Array<Scalars['String']['output']>>;
   leaguesChecked?: Maybe<Scalars['Int']['output']>;
   remindersSent?: Maybe<Scalars['Int']['output']>;
+};
+
+export type SetCanonicalEmailResult = {
+  __typename?: 'SetCanonicalEmailResult';
+  changed: Scalars['Boolean']['output'];
+  user: User;
 };
 
 export type SetTeamLockInput = {
@@ -10005,6 +10017,46 @@ export type ImpersonateUserMutation = {
     __typename?: 'ImpersonateUserResult';
     token?: string | null;
   } | null;
+};
+
+export type MyIdentitiesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type MyIdentitiesQuery = {
+  __typename?: 'Query';
+  myIdentities: Array<{
+    __typename?: 'UserIdentity';
+    id: number;
+    provider: string;
+    providerEmail?: string | null;
+    providerEmailVerified: boolean;
+    providerUsername?: string | null;
+    providerAvatar?: string | null;
+    linkedAt: string;
+  }>;
+};
+
+export type SetCanonicalEmailMutationVariables = Exact<{
+  identityId: Scalars['Int']['input'];
+}>;
+
+export type SetCanonicalEmailMutation = {
+  __typename?: 'Mutation';
+  setCanonicalEmail: {
+    __typename?: 'SetCanonicalEmailResult';
+    changed: boolean;
+    user: {
+      __typename?: 'User';
+      id?: number | null;
+      email?: string | null;
+      username?: string | null;
+      accessLevel?: string | null;
+      avatarUrl?: string | null;
+      subscriptionTier?: string | null;
+      discordId?: string | null;
+      discordUsername?: string | null;
+      themePreference?: string | null;
+    };
+  };
 };
 
 export const AchievementRestrictionFragmentDoc = gql`
@@ -23610,4 +23662,146 @@ export type ImpersonateUserMutationResult =
 export type ImpersonateUserMutationOptions = BaseMutationOptions<
   ImpersonateUserMutation,
   ImpersonateUserMutationVariables
+>;
+export const MyIdentities = gql`
+  query MyIdentities {
+    myIdentities {
+      id
+      provider
+      providerEmail
+      providerEmailVerified
+      providerUsername
+      providerAvatar
+      linkedAt
+    }
+  }
+`;
+
+/**
+ * __useMyIdentitiesQuery__
+ *
+ * To run a query within a React component, call `useMyIdentitiesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMyIdentitiesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMyIdentitiesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useMyIdentitiesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    MyIdentitiesQuery,
+    MyIdentitiesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<MyIdentitiesQuery, MyIdentitiesQueryVariables>(
+    MyIdentities,
+    options,
+  );
+}
+export function useMyIdentitiesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    MyIdentitiesQuery,
+    MyIdentitiesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<MyIdentitiesQuery, MyIdentitiesQueryVariables>(
+    MyIdentities,
+    options,
+  );
+}
+export function useMyIdentitiesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        MyIdentitiesQuery,
+        MyIdentitiesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<MyIdentitiesQuery, MyIdentitiesQueryVariables>(
+    MyIdentities,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          MyIdentitiesQuery,
+          MyIdentitiesQueryVariables
+        >,
+  );
+}
+export type MyIdentitiesQueryHookResult = ReturnType<
+  typeof useMyIdentitiesQuery
+>;
+export type MyIdentitiesLazyQueryHookResult = ReturnType<
+  typeof useMyIdentitiesLazyQuery
+>;
+export type MyIdentitiesSuspenseQueryHookResult = ReturnType<
+  typeof useMyIdentitiesSuspenseQuery
+>;
+export type MyIdentitiesQueryResult = Apollo.QueryResult<
+  MyIdentitiesQuery,
+  MyIdentitiesQueryVariables
+>;
+export const SetCanonicalEmail = gql`
+  mutation SetCanonicalEmail($identityId: Int!) {
+    setCanonicalEmail(identityId: $identityId) {
+      user {
+        ...User
+      }
+      changed
+    }
+  }
+  ${UserFragmentDoc}
+`;
+export type SetCanonicalEmailMutationFn = MutationFunction<
+  SetCanonicalEmailMutation,
+  SetCanonicalEmailMutationVariables
+>;
+
+/**
+ * __useSetCanonicalEmailMutation__
+ *
+ * To run a mutation, you first call `useSetCanonicalEmailMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetCanonicalEmailMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setCanonicalEmailMutation, { data, loading, error }] = useSetCanonicalEmailMutation({
+ *   variables: {
+ *      identityId: // value for 'identityId'
+ *   },
+ * });
+ */
+export function useSetCanonicalEmailMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetCanonicalEmailMutation,
+    SetCanonicalEmailMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SetCanonicalEmailMutation,
+    SetCanonicalEmailMutationVariables
+  >(SetCanonicalEmail, options);
+}
+export type SetCanonicalEmailMutationHookResult = ReturnType<
+  typeof useSetCanonicalEmailMutation
+>;
+export type SetCanonicalEmailMutationResult =
+  Apollo.MutationResult<SetCanonicalEmailMutation>;
+export type SetCanonicalEmailMutationOptions = BaseMutationOptions<
+  SetCanonicalEmailMutation,
+  SetCanonicalEmailMutationVariables
 >;

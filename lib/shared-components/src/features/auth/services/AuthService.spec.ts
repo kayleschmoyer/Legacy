@@ -100,6 +100,92 @@ describe('AuthService.refreshJwt', () => {
   });
 });
 
+describe('AuthService.unlinkProvider', () => {
+  let service: AuthService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new AuthService(testConfig);
+  });
+
+  it('calls the correct URL for each provider', async () => {
+    for (const provider of ['discord', 'google', 'apple'] as const) {
+      global.fetch = jest.fn().mockResolvedValue({ ok: true });
+      await service.unlinkProvider(provider);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://localhost:5001/${provider}/unlink`,
+        expect.objectContaining({ method: 'POST' }),
+      );
+    }
+  });
+
+  it('includes Content-Type and credentials in the request', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    await service.unlinkProvider('google');
+    const [[, init]] = (global.fetch as jest.Mock).mock.calls as [
+      [string, RequestInit],
+    ];
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('include');
+    expect(init.headers).toMatchObject({ 'Content-Type': 'application/json' });
+  });
+
+  it('resolves without a value on a 200 response', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    await expect(service.unlinkProvider('apple')).resolves.toBeUndefined();
+  });
+
+  it('throws with provider name and status code when response is not ok', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: jest.fn().mockResolvedValue(''),
+    });
+    await expect(service.unlinkProvider('google')).rejects.toThrow(
+      'google unlink failed: 500',
+    );
+  });
+
+  it('uses the message field from a JSON error body', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: jest
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({ message: 'Account is your only sign-in' }),
+        ),
+    });
+    await expect(service.unlinkProvider('discord')).rejects.toThrow(
+      'Account is your only sign-in',
+    );
+  });
+
+  it('uses the error field from a JSON body when message is absent', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ error: 'Unprocessable' })),
+    });
+    await expect(service.unlinkProvider('google')).rejects.toThrow(
+      'Unprocessable',
+    );
+  });
+
+  it('falls back to the default message when the error body is not JSON', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: jest.fn().mockResolvedValue('Service Unavailable'),
+    });
+    await expect(service.unlinkProvider('apple')).rejects.toThrow(
+      'apple unlink failed: 503',
+    );
+  });
+});
+
 describe('AuthService.persistSession', () => {
   let service: AuthService;
 

@@ -301,6 +301,215 @@ test.describe('Profile Settings Page — appearance @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-7825: Linked Identities section — canonical email management
+// ---------------------------------------------------------------------------
+
+const MOCK_IDENTITIES_GOOGLE_CANONICAL = [
+  {
+    __typename: 'UserIdentity',
+    id: 1,
+    provider: 'google',
+    providerEmail: 'testuser@example.com',
+    providerEmailVerified: true,
+    providerUsername: null,
+    providerAvatar: null,
+    linkedAt: '2026-01-01T00:00:00Z',
+  },
+];
+
+const MOCK_IDENTITIES_MULTI = [
+  {
+    __typename: 'UserIdentity',
+    id: 1,
+    provider: 'google',
+    providerEmail: 'testuser@example.com',
+    providerEmailVerified: true,
+    providerUsername: null,
+    providerAvatar: null,
+    linkedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    __typename: 'UserIdentity',
+    id: 2,
+    provider: 'discord',
+    providerEmail: 'testuser@discord.example.com',
+    providerEmailVerified: true,
+    providerUsername: 'testuser#1234',
+    providerAvatar: null,
+    linkedAt: '2026-02-01T00:00:00Z',
+  },
+];
+
+async function setupProfileGraphQLWithIdentities(
+  page: import('@playwright/test').Page,
+  identities = MOCK_IDENTITIES_GOOGLE_CANONICAL,
+) {
+  await page.route(
+    (url) => isGraphQLEndpoint(url),
+    async (route, request) => {
+      const body = request.postDataJSON() as { operationName?: string };
+
+      if (body.operationName === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: MOCK_USER_DATA }),
+        });
+        return;
+      }
+
+      if (body.operationName === 'MyIdentities') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { myIdentities: identities } }),
+        });
+        return;
+      }
+
+      if (body.operationName === 'SetCanonicalEmail') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              setCanonicalEmail: {
+                __typename: 'SetCanonicalEmailResult',
+                changed: true,
+                user: {
+                  __typename: 'User',
+                  id: 1,
+                  email: 'testuser@discord.example.com',
+                  username: 'testuser',
+                  avatarUrl: null,
+                  accessLevel: 'none',
+                  subscriptionTier: null,
+                  discordId: null,
+                  discordUsername: null,
+                  themePreference: null,
+                },
+              },
+            },
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    },
+  );
+}
+
+test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression', () => {
+  test('renders the Linked Identities section', async ({ page }) => {
+    await setupProfileGraphQLWithIdentities(page);
+    await page.goto('/profile/settings');
+    await expect(
+      page.getByTestId('profile-linked-identities-section'),
+    ).toBeVisible();
+    await expect(page.getByText('Linked Identities')).toBeVisible();
+  });
+
+  test('shows the canonical identity with a "Primary email" badge', async ({
+    page,
+  }) => {
+    await setupProfileGraphQLWithIdentities(page);
+    await page.goto('/profile/settings');
+    await expect(page.getByText('Primary email')).toBeVisible();
+    await expect(page.getByText('Google')).toBeVisible();
+  });
+
+  test('shows "Set as primary" button for a verified non-canonical identity', async ({
+    page,
+  }) => {
+    await setupProfileGraphQLWithIdentities(page, MOCK_IDENTITIES_MULTI);
+    await page.goto('/profile/settings');
+    await expect(page.getByText('Set as primary')).toBeVisible();
+  });
+
+  test('shows "Disconnect" button for non-local providers', async ({
+    page,
+  }) => {
+    await setupProfileGraphQLWithIdentities(page, MOCK_IDENTITIES_MULTI);
+    await page.goto('/profile/settings');
+    const disconnectButtons = page.getByText('Disconnect');
+    await expect(disconnectButtons.first()).toBeVisible();
+  });
+
+  test('clicking "Set as primary" calls SetCanonicalEmail mutation', async ({
+    page,
+  }) => {
+    let mutationCalled = false;
+    await page.route(
+      (url) => isGraphQLEndpoint(url),
+      async (route, request) => {
+        const body = request.postDataJSON() as {
+          operationName?: string;
+          variables?: { identityId?: number };
+        };
+
+        if (body.operationName === 'GetUserById') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: MOCK_USER_DATA }),
+          });
+          return;
+        }
+
+        if (body.operationName === 'MyIdentities') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: { myIdentities: MOCK_IDENTITIES_MULTI },
+            }),
+          });
+          return;
+        }
+
+        if (body.operationName === 'SetCanonicalEmail') {
+          mutationCalled = true;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: {
+                setCanonicalEmail: {
+                  __typename: 'SetCanonicalEmailResult',
+                  changed: true,
+                  user: {
+                    ...MOCK_USER_DATA.user,
+                    email: 'testuser@discord.example.com',
+                  },
+                },
+              },
+            }),
+          });
+          return;
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: {} }),
+        });
+      },
+    );
+
+    await page.goto('/profile/settings');
+    const setAsPrimaryBtn = page.getByTestId('set-canonical-email-2');
+    await expect(setAsPrimaryBtn).toBeVisible();
+    await setAsPrimaryBtn.click();
+    await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-3507: Accessibility regression — /profile/settings
 //
 // An automated scan flagged an empty alt attribute on the logo image and
