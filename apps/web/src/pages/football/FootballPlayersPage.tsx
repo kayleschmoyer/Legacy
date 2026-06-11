@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Search } from '@tamagui/lucide-icons';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
-import type { FootballPlayer } from '../../api/db/graphql.generated';
-import { useFootballPlayersQuery } from '../../api/db/graphql.generated';
+import {
+  type FootballPlayersQuery,
+  useFootballPlayersQuery,
+} from '../../api/db/graphql.generated';
 import type { FootballPosition } from '../../components/football/FootballPositionFilter';
 import { FootballPositionFilter } from '../../components/football/FootballPositionFilter';
 import type { TeamFilter } from '../../components/football/FootballTeamFilter';
@@ -23,6 +25,10 @@ import {
 } from '../../constants/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
+type PlayerListItem = NonNullable<
+  FootballPlayersQuery['footballPlayers']
+>['nodes'][number];
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -38,7 +44,7 @@ export function FootballPlayersPage() {
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [allNodes, setAllNodes] = useState<FootballPlayer[]>([]);
+  const [allNodes, setAllNodes] = useState<PlayerListItem[]>([]);
 
   const debouncedSearch = useDebounce(searchInput, 300);
 

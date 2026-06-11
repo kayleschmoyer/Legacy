@@ -1076,6 +1076,11 @@ type FootballPlayer {
   pfrId: String
   position: String
   seasonStats(season: Int): FootballPlayerSeasonStats
+
+  """
+  Per-week game log for the given season (LS-6233). Bye weeks appear as explicit rows with isBye:true — never a gap.
+  """
+  weeklyGameLogs(season: Int!): [FootballWeeklyGameLog!]!
 }
 
 """
@@ -1235,6 +1240,23 @@ type FootballStatsRefreshResult {
   Whether the stats refresh was actually triggered (false when out of season or handler not yet available)
   """
   triggered: Boolean
+}
+
+"""
+One row in a football player game log for a given NFL week (LS-6233). When isBye is true the row is a bye-week sentinel — all stat fields are null and the row must be rendered explicitly rather than hidden.
+"""
+type FootballWeeklyGameLog {
+  defense: FootballGameDefenseStats
+  fantasyPoints: Float
+  gameDate: String
+  idp: FootballGameIDPStats
+  isBye: Boolean!
+  kicking: FootballGameKickingStats
+  opponent: String
+  passing: FootballGamePassingStats
+  receiving: FootballGameReceivingStats
+  rushing: FootballGameRushingStats
+  week: Int!
 }
 
 input ForceAddPlayerInput {

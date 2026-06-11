@@ -1,4 +1,8 @@
-import type { GraphQLSchema } from 'graphql';
+import {
+  type GraphQLObjectType,
+  type GraphQLSchema,
+  isNonNullType,
+} from 'graphql';
 
 type FootballPlayersResult = {
   nodes: Array<{
@@ -266,7 +270,7 @@ describe('football resolvers', () => {
             position: 'QB',
           },
         ],
-        pageInfo: { hasNextPage: false, endCursor: null },
+        pageInfo: { hasNextPage: false, endCursor: '1' },
       });
     });
 
@@ -420,6 +424,59 @@ describe('football resolvers', () => {
         nflTeam: 'KC',
         position: 'TE',
       });
+    });
+  });
+
+  // ── FootballWeeklyGameLog (LS-6233) ─────────────────────────────────────────
+
+  describe('FootballWeeklyGameLog type', () => {
+    it('exists in schema with isBye and week fields', () => {
+      const type = schema.getType('FootballWeeklyGameLog');
+      expect(type).toBeDefined();
+
+      const fields = (type as GraphQLObjectType).getFields();
+      expect(fields.week).toBeDefined();
+      expect(fields.isBye).toBeDefined();
+      expect(fields.opponent).toBeDefined();
+      expect(fields.gameDate).toBeDefined();
+      expect(fields.fantasyPoints).toBeDefined();
+      expect(fields.passing).toBeDefined();
+      expect(fields.rushing).toBeDefined();
+      expect(fields.receiving).toBeDefined();
+      expect(fields.kicking).toBeDefined();
+      expect(fields.defense).toBeDefined();
+      expect(fields.idp).toBeDefined();
+    });
+
+    it('week and isBye are non-nullable', () => {
+      const type = schema.getType('FootballWeeklyGameLog') as GraphQLObjectType;
+      const fields = type.getFields();
+
+      expect(isNonNullType(fields.week.type)).toBe(true);
+      expect(isNonNullType(fields.isBye.type)).toBe(true);
+    });
+
+    it('weeklyGameLogs field exists on FootballPlayer and returns empty array stub', async () => {
+      const type = schema.getType('FootballPlayer') as GraphQLObjectType;
+      const field = type.getFields().weeklyGameLogs;
+      expect(field).toBeDefined();
+      expect(field?.resolve).toBeDefined();
+
+      const result = await field.resolve!(
+        {
+          id: 1,
+          firstName: 'Travis',
+          lastName: 'Kelce',
+          pfrId: null,
+          isDst: false,
+          nflTeam: 'KC',
+          position: 'TE',
+        },
+        { season: 2024 },
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toEqual([]);
     });
   });
 });

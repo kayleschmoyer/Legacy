@@ -649,6 +649,106 @@ FootballCareerStatsRef.implement({
   }),
 });
 
+// ── Weekly game log type (LS-6233) ───────────────────────────────────────────
+// isBye: true rows are explicit sentinels for a player's bye week.
+// All stat fields are null on a bye row; the week field is always populated so
+// the UI can never silently shift week numbers by treating gaps as absent data.
+
+export interface FootballWeeklyGameLogShape {
+  week: number;
+  isBye: boolean;
+  opponent: string | null;
+  gameDate: string | null;
+  passing: {
+    cmp: number | null;
+    att: number | null;
+    yds: number | null;
+    td: number | null;
+    int: number | null;
+  } | null;
+  rushing: { att: number | null; yds: number | null; td: number | null } | null;
+  receiving: {
+    rec: number | null;
+    tgt: number | null;
+    yds: number | null;
+    td: number | null;
+  } | null;
+  kicking: {
+    fgm: number | null;
+    fga: number | null;
+    xpm: number | null;
+    xpa: number | null;
+  } | null;
+  defense: {
+    sacks: number | null;
+    int: number | null;
+    fumRec: number | null;
+    defTd: number | null;
+    safeties: number | null;
+    ptsAllowed: number | null;
+    ydsAllowed: number | null;
+  } | null;
+  idp: {
+    soloTkl: number | null;
+    astTkl: number | null;
+    sacks: number | null;
+    int: number | null;
+    pd: number | null;
+    ff: number | null;
+    fr: number | null;
+    defTd: number | null;
+    safeties: number | null;
+  } | null;
+  fantasyPoints: number | null;
+}
+
+export const FootballWeeklyGameLogRef =
+  builder.objectRef<FootballWeeklyGameLogShape>('FootballWeeklyGameLog');
+
+FootballWeeklyGameLogRef.implement({
+  description:
+    'One row in a football player game log for a given NFL week (LS-6233). ' +
+    'When isBye is true the row is a bye-week sentinel — all stat fields are null ' +
+    'and the row must be rendered explicitly rather than hidden.',
+  fields: (t) => ({
+    week: t.exposeInt('week', { nullable: false }),
+    isBye: t.exposeBoolean('isBye', { nullable: false }),
+    opponent: t.exposeString('opponent', { nullable: true }),
+    gameDate: t.exposeString('gameDate', { nullable: true }),
+    passing: t.field({
+      type: FootballGamePassingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.passing ?? null,
+    }),
+    rushing: t.field({
+      type: FootballGameRushingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.rushing ?? null,
+    }),
+    receiving: t.field({
+      type: FootballGameReceivingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.receiving ?? null,
+    }),
+    kicking: t.field({
+      type: FootballGameKickingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.kicking ?? null,
+    }),
+    defense: t.field({
+      type: FootballGameDefenseStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.defense ?? null,
+    }),
+    idp: t.field({
+      type: FootballGameIDPStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.idp ?? null,
+    }),
+    fantasyPoints: t.exposeFloat('fantasyPoints', { nullable: true }),
+  }),
+});
+
 // ── FootballPlayer type ───────────────────────────────────────────────────────
 
 interface FootballPlayerShape {
@@ -967,6 +1067,22 @@ FootballPlayerRef.implement({
             : null,
           idp: idp ? { ...idp, sacks: toFloat(idp.sacks) } : null,
         };
+      },
+    }),
+    weeklyGameLogs: t.field({
+      type: [FootballWeeklyGameLogRef],
+      nullable: false,
+      description:
+        'Per-week game log for the given season (LS-6233). ' +
+        'Bye weeks appear as explicit rows with isBye:true — never a gap.',
+      args: {
+        season: t.arg.int({ required: true }),
+      },
+      resolve: (_parent, _args, _context) => {
+        // TODO (LS-6233): implement when weeklyStats data source exists.
+        // Contract: inject an explicit { isBye: true } sentinel row for every
+        // bye week — never omit weeks, as gaps silently shift week numbers in UI.
+        return [];
       },
     }),
   }),

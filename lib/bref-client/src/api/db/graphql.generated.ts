@@ -948,11 +948,18 @@ export type FootballPlayer = {
   pfrId?: Maybe<Scalars['String']['output']>;
   position?: Maybe<Scalars['String']['output']>;
   seasonStats?: Maybe<FootballPlayerSeasonStats>;
+  /** Per-week game log for the given season (LS-6233). Bye weeks appear as explicit rows with isBye:true — never a gap. */
+  weeklyGameLogs: Array<FootballWeeklyGameLog>;
 };
 
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
 export type FootballPlayerSeasonStatsArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
+export type FootballPlayerWeeklyGameLogsArgs = {
+  season: Scalars['Int']['input'];
 };
 
 /** All season stats across stat categories for a football player (LS-255) */
@@ -1098,6 +1105,22 @@ export type FootballStatsRefreshResult = {
   reason?: Maybe<Scalars['String']['output']>;
   /** Whether the stats refresh was actually triggered (false when out of season or handler not yet available) */
   triggered?: Maybe<Scalars['Boolean']['output']>;
+};
+
+/** One row in a football player game log for a given NFL week (LS-6233). When isBye is true the row is a bye-week sentinel — all stat fields are null and the row must be rendered explicitly rather than hidden. */
+export type FootballWeeklyGameLog = {
+  __typename?: 'FootballWeeklyGameLog';
+  defense?: Maybe<FootballGameDefenseStats>;
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  gameDate?: Maybe<Scalars['String']['output']>;
+  idp?: Maybe<FootballGameIdpStats>;
+  isBye: Scalars['Boolean']['output'];
+  kicking?: Maybe<FootballGameKickingStats>;
+  opponent?: Maybe<Scalars['String']['output']>;
+  passing?: Maybe<FootballGamePassingStats>;
+  receiving?: Maybe<FootballGameReceivingStats>;
+  rushing?: Maybe<FootballGameRushingStats>;
+  week: Scalars['Int']['output'];
 };
 
 export type ForceAddPlayerInput = {
