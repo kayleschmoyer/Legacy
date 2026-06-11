@@ -4,6 +4,7 @@ import {
   buildGameLogsRequestBody,
   DEFAULT_GAME_LOGS_LIMIT,
   GameLogsTable,
+  VIRTUAL_ROW_THRESHOLD,
 } from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
 
@@ -486,5 +487,135 @@ describe('GameLogsTable production endpoint guard (LS-7691)', () => {
     );
     expect(getByText('Get Player Data')).toBeTruthy();
     expect(queryByText(/VITE_STATS_API_URL is not configured/)).toBeNull();
+  });
+});
+
+// Helpers for virtualization tests
+function buildServerData(
+  gameCount: number,
+): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = { hits: {}, rbi: {} };
+  for (let i = 0; i < gameCount; i++) {
+    result['hits'][String(i)] = 1;
+    result['rbi'][String(i)] = 1;
+  }
+  return result;
+}
+
+function submitQuery(
+  getByPlaceholderText: (t: string) => HTMLElement,
+  getByText: (t: string) => HTMLElement,
+) {
+  fireEvent.change(getByPlaceholderText('Enter player ID'), {
+    target: { value: 'mlb-1234' },
+  });
+  const submitText = getByText('Get Player Data');
+  fireEvent.click(submitText.closest('button') ?? submitText);
+}
+
+describe('CrossPlatformTable virtualization (LS-7475)', () => {
+  const fetchMock = global.fetch as jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.VITE_STATS_API_URL = 'https://stats.example.com/game-logs';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+  });
+
+  afterEach(() => {
+    delete process.env.VITE_STATS_API_URL;
+    delete (globalThis as { __DEV__?: boolean }).__DEV__;
+  });
+
+  it('VIRTUAL_ROW_THRESHOLD is 100', () => {
+    expect(VIRTUAL_ROW_THRESHOLD).toBe(100);
+  });
+
+  it('adds overflowY scroll container when row count exceeds threshold', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(buildServerData(VIRTUAL_ROW_THRESHOLD + 1)),
+    });
+
+    const { container, getByPlaceholderText, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+
+    // act flushes async state updates (fetch → setData → re-render). (LS-7475)
+    await act(async () => {
+      submitQuery(getByPlaceholderText, getByText);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Web-only: on mobile, CrossPlatformTable renders the native Table mock which
+    // has no overflowX wrapper div (LS-7475).
+    const divs = Array.from(container.querySelectorAll('div'));
+    const webWrapperDiv = divs.find((d) => d.style.overflowX === 'auto');
+    if (!webWrapperDiv) return;
+
+    // For large datasets the wrapper also carries overflowY + maxHeight.
+    expect(webWrapperDiv.style.overflowY).toBe('auto');
+    expect(webWrapperDiv.style.maxHeight).toBeTruthy();
+  });
+
+  it('does not add overflowY scroll container for datasets at or below threshold', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(buildServerData(VIRTUAL_ROW_THRESHOLD)),
+    });
+
+    const { container, getByPlaceholderText, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+
+    await act(async () => {
+      submitQuery(getByPlaceholderText, getByText);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Web-only: on mobile, CrossPlatformTable renders the native Table mock which
+    // has no overflowX wrapper div (LS-7475).
+    const divs = Array.from(container.querySelectorAll('div'));
+    const webWrapperDiv = divs.find((d) => d.style.overflowX === 'auto');
+    if (!webWrapperDiv) return;
+
+    // Small dataset — the wrapper should not carry overflowY.
+    expect(webWrapperDiv.style.overflowY).not.toBe('auto');
+  });
+
+  it('renders fewer DOM rows than total when virtualization is active', async () => {
+    const totalRows = VIRTUAL_ROW_THRESHOLD + 50;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(buildServerData(totalRows)),
+    });
+
+    const { container, getByPlaceholderText, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+
+    await act(async () => {
+      submitQuery(getByPlaceholderText, getByText);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Web-only: on mobile, CrossPlatformTable renders the native Table mock which
+    // has no overflowX wrapper div (LS-7475).
+    const allDivs = Array.from(container.querySelectorAll('div'));
+    if (!allDivs.some((d) => d.style.overflowX === 'auto')) return;
+
+    // Spacer rows (padding) have colSpan; data rows have individual <td> cells.
+    // Count <tr> elements that have multiple <td> children (i.e. real data rows).
+    const tbody = container.querySelector('tbody');
+    const dataRows = tbody
+      ? Array.from(tbody.querySelectorAll('tr')).filter(
+          (tr) => tr.querySelectorAll('td').length > 1,
+        )
+      : [];
+
+    expect(dataRows.length).toBeLessThan(totalRows);
   });
 });

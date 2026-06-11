@@ -1,4 +1,11 @@
-import React, { startTransition, useMemo, useReducer, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import React, {
+  startTransition,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import {
   Button,
   Input,
@@ -49,22 +56,85 @@ interface TableProps {
   rowKeys?: string[];
 }
 
+/**
+ * Activate row virtualization once the result set crosses this threshold.
+ * Below it the DOM is small enough that virtualizing adds no value. (LS-7475)
+ */
+export const VIRTUAL_ROW_THRESHOLD = 100;
+
+/** Visible height (px) of the scroll window when virtualization is active. */
+const VIRTUAL_CONTAINER_HEIGHT = 600;
+
+/** Pixel height used by the virtualizer to estimate each row before measuring. */
+const ESTIMATED_ROW_HEIGHT = 37;
+
 const CrossPlatformTable: React.FC<TableProps> = ({
   headers,
   data,
   title,
   rowKeys,
 }) => {
+  // Ref for the scrollable container. Attached to the DOM element only when
+  // virtualization is active; the virtualizer reads scroll position from it.
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Always call the hook (rules-of-hooks). The virtualizer is inactive when
+  // the container ref is null (i.e. for small datasets or native), so it
+  // computes zero virtual items without side effects.
+  const rowVirtualizer = useVirtualizer({
+    count: data.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 5,
+  });
+
   if (Platform.OS === 'web') {
+    // LS-7475 — virtualise rows for large (premium career) result sets so that
+    // only the rows in the viewport are in the DOM, keeping rendering O(1) with
+    // respect to career length.
+    const shouldVirtualize = data.length > VIRTUAL_ROW_THRESHOLD;
+
+    const virtualItems = shouldVirtualize
+      ? rowVirtualizer.getVirtualItems()
+      : null;
+    const totalVirtualSize = rowVirtualizer.getTotalSize();
+
+    const firstVirtual =
+      virtualItems !== null && virtualItems.length > 0
+        ? virtualItems[0]
+        : undefined;
+    const lastVirtual =
+      virtualItems !== null && virtualItems.length > 0
+        ? virtualItems[virtualItems.length - 1]
+        : undefined;
+
+    // Padding rows stand in for the off-screen rows so the scrollbar reflects
+    // the true total height without rendering every <tr>. (LS-7475)
+    const paddingTop = firstVirtual !== undefined ? firstVirtual.start : 0;
+    const paddingBottom =
+      lastVirtual !== undefined ? totalVirtualSize - lastVirtual.end : 0;
+
+    // Indices of rows to render: all of them when small, virtual slice when large.
+    const rowIndices: number[] =
+      virtualItems !== null
+        ? virtualItems.map((vi) => vi.index)
+        : data.map((_, i) => i);
+
     return (
       <div
         // LS-7459 — wrap the table in a horizontally-scrollable container so
         // wide stat tables don't overflow the viewport on narrow screens.
         // `minWidth` on the inner table keeps columns from collapsing.
+        // LS-7475 — also the vertical scroll anchor for the virtualizer when
+        // shouldVirtualize is true.
+        ref={shouldVirtualize ? scrollRef : undefined}
         style={{
           overflowX: 'auto',
           maxWidth: '100%',
           marginTop: 16,
+          ...(shouldVirtualize
+            ? { overflowY: 'auto', maxHeight: VIRTUAL_CONTAINER_HEIGHT }
+            : {}),
         }}
       >
         <table
@@ -102,23 +172,44 @@ const CrossPlatformTable: React.FC<TableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {data.map((row, rowIndex) => (
-              // LS-7460 — prefer the explicit row key (e.g. gameId) so React
-              // re-uses the right <tr> across sort/filter changes.
-              <tr key={rowKeys?.[rowIndex] ?? rowIndex}>
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    style={{
-                      padding: 8,
-                      border: '1px solid #ddd',
-                    }}
-                  >
-                    {renderCell(cell)}
-                  </td>
-                ))}
+            {/* Top spacer row — represents the off-screen rows above the viewport */}
+            {paddingTop > 0 ? (
+              <tr>
+                <td
+                  colSpan={headers.length}
+                  style={{ height: paddingTop, padding: 0, border: 'none' }}
+                />
               </tr>
-            ))}
+            ) : null}
+            {rowIndices.map((rowIndex) => {
+              const row = data[rowIndex];
+              return (
+                // LS-7460 — prefer the explicit row key (e.g. gameId) so React
+                // re-uses the right <tr> across sort/filter changes.
+                <tr key={rowKeys?.[rowIndex] ?? rowIndex}>
+                  {(row ?? []).map((cell, cellIndex) => (
+                    <td
+                      key={cellIndex}
+                      style={{
+                        padding: 8,
+                        border: '1px solid #ddd',
+                      }}
+                    >
+                      {renderCell(cell)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+            {/* Bottom spacer row — represents the off-screen rows below the viewport */}
+            {paddingBottom > 0 ? (
+              <tr>
+                <td
+                  colSpan={headers.length}
+                  style={{ height: paddingBottom, padding: 0, border: 'none' }}
+                />
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
