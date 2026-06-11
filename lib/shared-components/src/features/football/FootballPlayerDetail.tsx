@@ -551,20 +551,32 @@ export function FootballPlayerDetail({
               width={56}
               height={56}
               borderRadius={10}
-              backgroundColor={teamData?.primaryColor ?? BRAND_NAVY}
+              backgroundColor={
+                player.nflTeam
+                  ? (teamData?.primaryColor ?? BRAND_NAVY)
+                  : withAlpha(TEXT_MUTED, 0.2)
+              }
               borderWidth={2}
-              borderColor={teamData?.secondaryColor ?? BRAND_GOLD}
+              borderColor={
+                player.nflTeam
+                  ? (teamData?.secondaryColor ?? BRAND_GOLD)
+                  : TEXT_MUTED
+              }
               alignItems="center"
               justifyContent="center"
             >
               <Text
                 fontSize={isDst ? 9 : 13}
                 fontWeight="800"
-                color={teamData?.secondaryColor ?? BRAND_GOLD}
+                color={
+                  player.nflTeam
+                    ? (teamData?.secondaryColor ?? BRAND_GOLD)
+                    : TEXT_MUTED
+                }
                 fontFamily={FONT_DISPLAY}
                 textAlign="center"
               >
-                {player.nflTeam ?? '?'}
+                {player.nflTeam ?? 'FA'}
               </Text>
             </YStack>
 
@@ -591,11 +603,15 @@ export function FootballPlayerDetail({
                     {isDst ? 'DST' : (player.position ?? '?')}
                   </Text>
                 </YStack>
-                {player.nflTeam && (
+                {player.nflTeam ? (
                   <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
                     {teamData
-                      ? `${teamData.city} · ${player.nflTeam ?? ''}`
-                      : (player.nflTeam ?? '')}
+                      ? `${teamData.city} · ${player.nflTeam}`
+                      : player.nflTeam}
+                  </Text>
+                ) : (
+                  <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+                    Free Agent
                   </Text>
                 )}
               </XStack>

@@ -251,4 +251,20 @@ describe('FootballPlayerDetail', () => {
       expect(screen.queryByText('Passing — Season Breakdown')).toBeNull();
     });
   });
+
+  it('renders FA badge and Free Agent subtitle when nflTeam is null', () => {
+    const FREE_AGENT: FootballPlayerDetailPlayer = {
+      id: 99,
+      firstName: 'Odell',
+      lastName: 'Beckham',
+      position: 'WR',
+      isDst: false,
+      nflTeam: null,
+      careerStats: null,
+    };
+    render(<FootballPlayerDetail player={FREE_AGENT} />);
+    expect(screen.getByText('FA')).toBeTruthy();
+    expect(screen.getByText('Free Agent')).toBeTruthy();
+    expect(screen.queryByText('?')).toBeNull();
+  });
 });
