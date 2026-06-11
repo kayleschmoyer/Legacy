@@ -72,6 +72,7 @@ async function enrichTrade(tradeId: number, context: Context) {
       tradeOfferId: PublicSchema.tradeOfferPlayers.tradeOfferId,
       playerId: PublicSchema.tradeOfferPlayers.playerId,
       fromTeamId: PublicSchema.tradeOfferPlayers.fromTeamId,
+      playerName: PublicSchema.tradeOfferPlayers.playerName,
       firstName: PublicSchema.players.firstName,
       lastName: PublicSchema.players.lastName,
     })
@@ -84,14 +85,17 @@ async function enrichTrade(tradeId: number, context: Context) {
 
   return {
     ...trade,
-    proposingTeamName: proposingTeam?.name ?? null,
-    receivingTeamName: receivingTeam?.name ?? null,
+    // Use snapshot captured at proposal time; fall back to current name for
+    // older rows that predate these columns.
+    proposingTeamName: trade.proposingTeamName ?? proposingTeam?.name ?? null,
+    receivingTeamName: trade.receivingTeamName ?? receivingTeam?.name ?? null,
     players: rawPlayers.map(
       (p: {
         id: number;
         tradeOfferId: number;
         playerId: number;
         fromTeamId: number;
+        playerName: string | null;
         firstName: string;
         lastName: string;
       }) => ({
@@ -99,7 +103,7 @@ async function enrichTrade(tradeId: number, context: Context) {
         tradeOfferId: p.tradeOfferId,
         playerId: p.playerId,
         fromTeamId: p.fromTeamId,
-        playerName: `${p.firstName} ${p.lastName}`.trim(),
+        playerName: p.playerName ?? `${p.firstName} ${p.lastName}`.trim(),
         playerPosition: null,
       }),
     ),
@@ -492,7 +496,7 @@ builder.mutationField('proposeTrade', (t) =>
         throw new Error('League not found');
       }
       if (leagueCheck.leaguePhase !== 'active') {
-        throw new Error(
+        throw UserInputError(
           'Trade offers are only available during the active season',
         );
       }
@@ -506,7 +510,7 @@ builder.mutationField('proposeTrade', (t) =>
 
       // 2. Verify the receiving team exists in this league
       const [receivingTeam] = await db
-        .select({ id: PublicSchema.teams.id })
+        .select({ id: PublicSchema.teams.id, name: PublicSchema.teams.name })
         .from(PublicSchema.teams)
         .where(
           and(
@@ -517,8 +521,19 @@ builder.mutationField('proposeTrade', (t) =>
         .limit(1);
 
       if (!receivingTeam) {
-        throw new Error('The receiving team does not exist in this league');
+        throw UserInputError(
+          'The receiving team does not exist in this league',
+        );
       }
+
+      // 2c. Snapshot the proposing team name for historical trade accuracy
+      const [proposingTeamRow] = await db
+        .select({ name: PublicSchema.teams.name })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, proposingTeamId))
+        .limit(1);
+      const proposingTeamNameSnapshot = proposingTeamRow?.name ?? null;
+      const receivingTeamNameSnapshot = receivingTeam.name ?? null;
 
       // 2b. Rate-limit: prevent spam flooding a receiver with DMs + push notifications
       const [rateRow] = await db
@@ -576,16 +591,25 @@ builder.mutationField('proposeTrade', (t) =>
         );
       }
 
-      // 4b. Sport-compatibility guard: all players must match the league's sport
+      // 4b. Sport-compatibility guard: all players must match the league's sport.
+      // Also capture names here for the trade history snapshot (LS-7524).
       const allTradePlayerIds = [...offeringPlayerIds, ...requestingPlayerIds];
-      const tradePlayerSports = await db
+      const tradePlayers = await db
         .select({
           playerId: PublicSchema.players.id,
           sport: PublicSchema.players.sport,
+          firstName: PublicSchema.players.firstName,
+          lastName: PublicSchema.players.lastName,
         })
         .from(PublicSchema.players)
         .where(inArray(PublicSchema.players.id, allTradePlayerIds));
-      assertSportCompatibility(tradePlayerSports, leagueCheck.sport);
+      assertSportCompatibility(tradePlayers, leagueCheck.sport);
+      const playerNameMap = new Map(
+        tradePlayers.map((p) => [
+          p.playerId,
+          `${p.firstName} ${p.lastName}`.trim(),
+        ]),
+      );
 
       // 5. Create the trade offer
       const expiresAt = expiresInDays
@@ -600,21 +624,25 @@ builder.mutationField('proposeTrade', (t) =>
           receivingTeamId,
           status: 'pending',
           message: message ?? null,
+          proposingTeamName: proposingTeamNameSnapshot,
+          receivingTeamName: receivingTeamNameSnapshot,
           expiresAt,
         })
         .returning();
 
-      // 6. Insert player legs
+      // 6. Insert player legs with name snapshots for historical accuracy
       const playerRows = [
         ...offeringPlayerIds.map((playerId) => ({
           tradeOfferId: newTrade.id,
           playerId,
           fromTeamId: proposingTeamId,
+          playerName: playerNameMap.get(playerId) ?? null,
         })),
         ...requestingPlayerIds.map((playerId) => ({
           tradeOfferId: newTrade.id,
           playerId,
           fromTeamId: receivingTeamId,
+          playerName: playerNameMap.get(playerId) ?? null,
         })),
       ];
 

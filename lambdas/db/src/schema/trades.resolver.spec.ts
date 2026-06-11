@@ -62,6 +62,8 @@ describe('Trades Resolver', () => {
           receivingTeamId: 'receivingTeamId',
           status: 'status',
           message: 'message',
+          proposingTeamName: 'proposingTeamName',
+          receivingTeamName: 'receivingTeamName',
           expiresAt: 'expiresAt',
           respondedAt: 'respondedAt',
           vetoedAt: 'vetoedAt',
@@ -73,6 +75,7 @@ describe('Trades Resolver', () => {
           tradeOfferId: 'tradeOfferId',
           playerId: 'playerId',
           fromTeamId: 'fromTeamId',
+          playerName: 'playerName',
         },
         teams: {
           id: 'id',
@@ -410,6 +413,102 @@ describe('Trades Resolver', () => {
         status: 'pending',
         proposingTeamName: 'Manager Team',
         receivingTeamName: 'Commissioner Team',
+      });
+    });
+  });
+
+  // ── snapshot name hydration ────────────────────────────────────────────────
+
+  describe('trade name snapshot hydration', () => {
+    it('uses snapshot team names from trade row instead of current team names', async () => {
+      // verifyLeagueMembership
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
+
+      const rawTrade = {
+        id: 30,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'accepted',
+        message: null,
+        // Snapshots recorded at proposal time — these are the historical names
+        proposingTeamName: 'Old Proposing Name',
+        receivingTeamName: 'Old Receiving Name',
+        expiresAt: null,
+        respondedAt: new Date(),
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.offset.mockResolvedValueOnce([rawTrade]);
+      // Teams JOIN returns *current* (renamed) team names — should NOT be used
+      mockDb.where.mockResolvedValueOnce([
+        { id: 1, name: 'New Proposing Name' },
+        { id: 2, name: 'New Receiving Name' },
+      ]);
+      // Players lookup: falls back to then: resolve([])
+
+      const resolver = getResolver('query', 'leagueTradeOffers');
+      const result = (await resolver(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        proposingTeamName: 'Old Proposing Name',
+        receivingTeamName: 'Old Receiving Name',
+      });
+    });
+
+    it('falls back to JOIN team names when snapshot columns are null (pre-migration rows)', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 1 },
+      ]);
+
+      const rawTrade = {
+        id: 31,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'pending',
+        message: null,
+        proposingTeamName: null,
+        receivingTeamName: null,
+        expiresAt: null,
+        respondedAt: null,
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.offset.mockResolvedValueOnce([rawTrade]);
+      mockDb.where.mockResolvedValueOnce([
+        { id: 1, name: 'Current Team A' },
+        { id: 2, name: 'Current Team B' },
+      ]);
+
+      const resolver = getResolver('query', 'leagueTradeOffers');
+      const result = (await resolver(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        proposingTeamName: 'Current Team A',
+        receivingTeamName: 'Current Team B',
       });
     });
   });
@@ -909,7 +1008,8 @@ describe('Trades Resolver', () => {
         { teamId: 1, permissionLevel: 'general_manager' },
       ]); // resolveUserTeam membership
       mockDb.limit.mockResolvedValueOnce([{ isLocked: false }]); // resolveUserTeam teams check
-      mockDb.limit.mockResolvedValueOnce([{ id: 2 }]); // receiving team exists
+      mockDb.limit.mockResolvedValueOnce([{ id: 2, name: 'Receiving Team' }]); // receiving team exists
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]); // step 2c: proposing team name snapshot
       // Rate limit query: select({ total: count() }).from().where() — awaited via then
       mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
         resolve([{ total: 3 }]),

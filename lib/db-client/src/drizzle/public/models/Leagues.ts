@@ -639,6 +639,8 @@ export const tradeOffers = pgTable(
     receivingTeamId: integer('receiving_team_id').notNull(),
     status: tradeOfferStatus('status').notNull().default('pending'),
     message: varchar('message', { length: 500 }),
+    proposingTeamName: varchar('proposing_team_name', { length: 255 }),
+    receivingTeamName: varchar('receiving_team_name', { length: 255 }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     respondedAt: timestamp('responded_at', { withTimezone: true }),
     vetoedAt: timestamp('vetoed_at', { withTimezone: true }),
@@ -690,6 +692,7 @@ export const tradeOfferPlayers = pgTable(
     tradeOfferId: integer('trade_offer_id').notNull(),
     playerId: integer('player_id').notNull(),
     fromTeamId: integer('from_team_id').notNull(),
+    playerName: varchar('player_name', { length: 255 }),
   },
   (table) => {
     return {

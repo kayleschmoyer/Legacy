@@ -43,13 +43,14 @@ async function hydrateTrades(
     teamsResult.map((t: { id: number; name: string }) => [t.id, t.name]),
   );
 
-  // Fetch trade players with player name lookup
+  // Fetch trade players — include snapshot playerName and fallback JOIN columns
   const rawPlayers = await context.db
     .select({
       id: PublicSchema.tradeOfferPlayers.id,
       tradeOfferId: PublicSchema.tradeOfferPlayers.tradeOfferId,
       playerId: PublicSchema.tradeOfferPlayers.playerId,
       fromTeamId: PublicSchema.tradeOfferPlayers.fromTeamId,
+      playerName: PublicSchema.tradeOfferPlayers.playerName,
       firstName: PublicSchema.players.firstName,
       lastName: PublicSchema.players.lastName,
     })
@@ -82,17 +83,25 @@ async function hydrateTrades(
       tradeOfferId: p.tradeOfferId,
       playerId: p.playerId,
       fromTeamId: p.fromTeamId,
-      playerName: `${p.firstName} ${p.lastName}`.trim(),
+      // Use snapshot captured at proposal time; fall back to current name for
+      // older rows that predate this column.
+      playerName: p.playerName ?? `${p.firstName} ${p.lastName}`.trim(),
       playerPosition: null,
     });
   }
 
   return rawTrades.map((trade) => ({
     ...trade,
+    // Use snapshot captured at proposal time; fall back to current team name
+    // for older rows that predate these columns.
     proposingTeamName:
-      (teamNameMap[trade.proposingTeamId] as string | undefined) ?? null,
+      trade.proposingTeamName ??
+      (teamNameMap[trade.proposingTeamId] as string | undefined) ??
+      null,
     receivingTeamName:
-      (teamNameMap[trade.receivingTeamId] as string | undefined) ?? null,
+      trade.receivingTeamName ??
+      (teamNameMap[trade.receivingTeamId] as string | undefined) ??
+      null,
     players: playersByTrade[trade.id] ?? [],
   }));
 }
