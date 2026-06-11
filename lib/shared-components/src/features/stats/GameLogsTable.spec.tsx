@@ -124,6 +124,25 @@ describe('GameLogsTable input validation', () => {
     ).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('shows inline error when date is in the future (LS-7452)', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
+      target: { value: '2099-12-31' },
+    });
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+    expect(getByText('Start date cannot be in the future')).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('Team reference data (LS-7477)', () => {

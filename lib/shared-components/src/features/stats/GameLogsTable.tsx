@@ -334,6 +334,8 @@ function GameLogsTable({
   }
   const resolvedEndpoint = resolution.url;
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
   const [filters, dispatch] = useReducer(filterReducer, INITIAL_FILTERS);
   // Store the raw server payload (stat → gameNum → value). The O(stats*games)
   // reshape is done lazily in useMemo below so the fetch callback never blocks
@@ -419,6 +421,22 @@ function GameLogsTable({
     }
     if (filters.dateTo && !DATE_RE.test(filters.dateTo)) {
       setInputError('End date must be in YYYY-MM-DD format (e.g. 2024-06-01)');
+      return;
+    }
+    if (
+      filters.dateFrom &&
+      DATE_RE.test(filters.dateFrom) &&
+      filters.dateFrom > todayStr
+    ) {
+      setInputError('Start date cannot be in the future');
+      return;
+    }
+    if (
+      filters.dateTo &&
+      DATE_RE.test(filters.dateTo) &&
+      filters.dateTo > todayStr
+    ) {
+      setInputError('End date cannot be in the future');
       return;
     }
 
