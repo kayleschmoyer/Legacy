@@ -62,6 +62,23 @@ let cachedTokenSource: TokenSource | null = null;
 let cachedRepo: { owner: string; name: string } | null = null;
 
 /**
+ * The error message from the most recent failed GitHub App token exchange in
+ * tryResolveToken(). Reset at the start of each tryResolveToken() call.
+ * Used by github_auth_status to surface Lambda-specific failure context.
+ */
+let lastTokenResolutionFailureReason: string | null = null;
+
+/**
+ * Returns the error message from the last failed GitHub App token exchange
+ * attempt inside tryResolveToken(), or null if the last call succeeded or
+ * no exchange was attempted. Intended for use by github_auth_status to build
+ * actionable Lambda-mode fallback messages.
+ */
+export function getLastTokenResolutionFailureReason(): string | null {
+  return lastTokenResolutionFailureReason;
+}
+
+/**
  * True when the server is running inside AWS Lambda (URL-based MCP deployment).
  * Interactive sources (.netrc, gh CLI, OAuth device flow) are never valid in
  * Lambda — there is no user terminal and no shell tools — so we short-circuit
@@ -569,6 +586,8 @@ export async function tryResolveToken(): Promise<{
   token: string;
   source: TokenSource;
 } | null> {
+  lastTokenResolutionFailureReason = null;
+
   // Validate in-memory cached token — it may have expired since it was first resolved
   // (e.g. GitHub App tokens expire after 1 hour, PATs can be revoked mid-session).
   // Without this check, an expired in-memory token causes github_auth_status to
@@ -637,8 +656,10 @@ export async function tryResolveToken(): Promise<{
       return { token: appResult.token, source: 'github-app' };
     }
   } catch (err) {
-    process.stderr.write(
-      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}\n`,
+    const errMsg = err instanceof Error ? err.message : String(err);
+    lastTokenResolutionFailureReason = errMsg;
+    LOGGER.warn(
+      `GitHub App token generation failed in tryResolveToken: ${errMsg}`,
     );
   }
 

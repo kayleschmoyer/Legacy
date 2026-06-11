@@ -2,7 +2,13 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getToken, getRepoOwnerName, tryResolveToken } from './auth.js';
+import {
+  getToken,
+  getRepoOwnerName,
+  tryResolveToken,
+  isLambda,
+  getLastTokenResolutionFailureReason,
+} from './auth.js';
 import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
 import { closePR } from './tools/close-pr.js';
@@ -285,6 +291,27 @@ export function createServer(): McpServer {
       const auth = await tryGetGitHubAuth();
 
       if (!auth) {
+        let fallback: string;
+        if (isLambda()) {
+          const reason = getLastTokenResolutionFailureReason();
+          if (reason) {
+            fallback =
+              `GitHub App token exchange failed: ${reason}. ` +
+              'Verify the GITHUB_TOKEN_SECRET_NAME Secrets Manager secret contains valid ' +
+              'private_key, app_id, and installation_id fields for an installation that covers this repo. ' +
+              'Interactive sources (gh auth login, .netrc, device flow) are not available in Lambda.';
+          } else {
+            fallback =
+              'No GitHub token found in Lambda. AGENT_AUTHOR_APP_PRIVATE_KEY was not set — ' +
+              'check that the GITHUB_TOKEN_SECRET_NAME Secrets Manager secret exists and contains ' +
+              'a private_key field (plus optional app_id and installation_id). ' +
+              'Interactive sources (gh auth login, .netrc, device flow) are not available in Lambda; ' +
+              'the remedy is server-side: rotate the secret or reinstall the GitHub App.';
+          }
+        } else {
+          fallback =
+            'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, AGENT_AUTHOR_APP_PRIVATE_KEY for GitHub App auth, or run `gh auth login`.';
+        }
         return {
           content: [
             {
@@ -294,8 +321,7 @@ export function createServer(): McpServer {
                   configured: false,
                   source: null,
                   user: null,
-                  fallback:
-                    'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, AGENT_AUTHOR_APP_PRIVATE_KEY for GitHub App auth, or run `gh auth login`.',
+                  fallback,
                 },
                 null,
                 2,

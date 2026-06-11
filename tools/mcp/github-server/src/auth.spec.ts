@@ -88,6 +88,151 @@ describe('github-server auth token cache (LS-5982)', () => {
     });
   });
 
+  describe('getLastTokenResolutionFailureReason (LS-5098)', () => {
+    it('returns null before any tryResolveToken call', async () => {
+      const { getLastTokenResolutionFailureReason } = await import('./auth');
+      expect(getLastTokenResolutionFailureReason()).toBeNull();
+    });
+
+    it('returns null when tryResolveToken succeeds via GitHub App', async () => {
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      delete process.env['GH_TOKEN'];
+      delete process.env['GITHUB_TOKEN'];
+
+      const { privateKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+      });
+      process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = privateKey
+        .export({ type: 'pkcs1', format: 'pem' })
+        .toString();
+
+      const fsp = freshFsPromisesMock();
+      fsp.readFile.mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
+      fsp.mkdir.mockResolvedValue(undefined);
+      fsp.writeFile.mockResolvedValue(undefined);
+      fsp.chmod.mockResolvedValue(undefined);
+
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          token: 'ghs_minted_token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      })) as unknown as typeof fetch;
+
+      const { tryResolveToken, getLastTokenResolutionFailureReason } =
+        await import('./auth');
+      const result = await tryResolveToken();
+
+      expect(result).not.toBeNull();
+      expect(getLastTokenResolutionFailureReason()).toBeNull();
+    });
+
+    it('captures the exchange error when GitHub App token exchange fails', async () => {
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      delete process.env['GH_TOKEN'];
+      delete process.env['GITHUB_TOKEN'];
+
+      const { privateKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+      });
+      process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = privateKey
+        .export({ type: 'pkcs1', format: 'pem' })
+        .toString();
+
+      const fsp = freshFsPromisesMock();
+      fsp.readFile.mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
+
+      // The installation-token exchange fails with a 401.
+      global.fetch = jest.fn(async () => ({
+        ok: false,
+        status: 401,
+        text: async () => '{"message":"Bad credentials"}',
+      })) as unknown as typeof fetch;
+
+      const { tryResolveToken, getLastTokenResolutionFailureReason } =
+        await import('./auth');
+      const result = await tryResolveToken();
+
+      expect(result).toBeNull();
+      const reason = getLastTokenResolutionFailureReason();
+      expect(reason).not.toBeNull();
+      expect(reason).toContain('401');
+    });
+
+    it('returns null (not the exchange error) when AGENT_AUTHOR_APP_PRIVATE_KEY is unset', async () => {
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      delete process.env['GH_TOKEN'];
+      delete process.env['GITHUB_TOKEN'];
+      delete process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
+
+      const fsp = freshFsPromisesMock();
+      fsp.readFile.mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
+
+      global.fetch = jest.fn() as unknown as typeof fetch;
+
+      const { tryResolveToken, getLastTokenResolutionFailureReason } =
+        await import('./auth');
+      const result = await tryResolveToken();
+
+      expect(result).toBeNull();
+      // No exchange was attempted — reason is null; github_auth_status uses the
+      // "no credentials configured" Lambda fallback in this case.
+      expect(getLastTokenResolutionFailureReason()).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('resets the reason on each new tryResolveToken call', async () => {
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      delete process.env['GH_TOKEN'];
+      delete process.env['GITHUB_TOKEN'];
+
+      const { privateKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+      });
+      process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = privateKey
+        .export({ type: 'pkcs1', format: 'pem' })
+        .toString();
+
+      const fsp = freshFsPromisesMock();
+      fsp.readFile.mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
+      fsp.mkdir.mockResolvedValue(undefined);
+      fsp.writeFile.mockResolvedValue(undefined);
+      fsp.chmod.mockResolvedValue(undefined);
+
+      const { tryResolveToken, getLastTokenResolutionFailureReason } =
+        await import('./auth');
+
+      // First call — exchange fails.
+      global.fetch = jest.fn(async () => ({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      })) as unknown as typeof fetch;
+      await tryResolveToken();
+      expect(getLastTokenResolutionFailureReason()).not.toBeNull();
+
+      // Second call — exchange succeeds; reason should be reset.
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          token: 'ghs_second_token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      })) as unknown as typeof fetch;
+      await tryResolveToken();
+      expect(getLastTokenResolutionFailureReason()).toBeNull();
+    });
+  });
+
   describe('getToken with an unwritable cache dir', () => {
     it('returns the freshly-minted GitHub App token even when the cache write fails', async () => {
       // Reproduce the Lambda sandbox: $HOME is not writable, so mkdir throws
