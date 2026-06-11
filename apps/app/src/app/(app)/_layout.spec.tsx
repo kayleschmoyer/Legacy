@@ -162,6 +162,8 @@ const EXPECTED_SCREENS = [
   'season-draft/index',
   'season-draft/[gameId]',
   'season-draft/create',
+  'season-draft/join',
+  'baseball/scoreboard',
   'about',
   'help',
   'profile-settings',
