@@ -476,10 +476,26 @@ export function createServer(): McpServer {
   // --- github_create_pr ---
   server.tool(
     'github_create_pr',
-    'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key.',
+    'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key. Automatically prepends the structured `<!-- jira-link -->` marker (the source of truth for ticket linkage) to the body: primary key from jiraPrimary, else the first LS-#### in the title, else "none".',
     {
       title: z.string().describe('PR title with Jira key'),
       body: z.string().describe('PR body (markdown)'),
+      jiraPrimary: z
+        .string()
+        .regex(
+          /^(LS-\d+|none)$/,
+          'Must be a single LS-#### key or the literal "none"',
+        )
+        .optional()
+        .describe(
+          'Primary Jira key for the jira-link marker (exactly one, the ticket this PR works on), or "none" for bot/dependabot PRs. Defaults to the first LS-#### key found in the title, falling back to "none".',
+        ),
+      jiraRelated: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe(
+          'Optional related Jira keys (array or comma/space-separated string). Informational only — never auto-transitioned by jira-branch-sync.',
+        ),
       base: z.string().default('main').describe('Base branch (default: main)'),
       draft: coercedBoolean.default(false).describe('Create as draft'),
       head: z

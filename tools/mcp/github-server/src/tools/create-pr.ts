@@ -4,6 +4,12 @@ import { isAbsolute, resolve } from 'node:path';
 import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import {
+  ensureJiraLinkMarker,
+  extractPrimaryKey,
+  isValidPrimary,
+  parseRelatedKeys,
+} from './jira-link.js';
 
 interface CreatePRParams {
   title: string;
@@ -12,6 +18,8 @@ interface CreatePRParams {
   draft?: boolean;
   head?: string;
   worktreePath?: string;
+  jiraPrimary?: string;
+  jiraRelated?: string | string[];
 }
 
 interface GitHubPRResponse {
@@ -105,6 +113,39 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
     }
   }
 
+  // Declared ticket linkage (LS-7895): every new PR body carries the
+  // structured jira-link marker. Explicit jiraPrimary wins; otherwise the
+  // primary is derived from the first LS-#### key in the title; bot/keyless
+  // PRs get `primary: none`.
+  if (params.jiraPrimary && !isValidPrimary(params.jiraPrimary)) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Invalid jiraPrimary "${params.jiraPrimary}" — expected a single LS-#### key or "none".`,
+        },
+      ],
+    };
+  }
+  let related: string[];
+  try {
+    related = parseRelatedKeys(params.jiraRelated);
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: error instanceof Error ? error.message : String(error),
+        },
+      ],
+    };
+  }
+  const primary =
+    params.jiraPrimary ?? extractPrimaryKey(params.title) ?? 'none';
+  const body = ensureJiraLinkMarker(params.body, { primary, related });
+
   try {
     const repo = await getRepoOwnerName();
 
@@ -161,7 +202,7 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
       path: `/repos/${repo.owner}/${repo.name}/pulls`,
       body: {
         title: params.title,
-        body: params.body,
+        body,
         head: `${repo.owner}:${head}`,
         base,
         draft: params.draft ?? false,

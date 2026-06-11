@@ -42,6 +42,8 @@ Build a triage list:
 | CI checks failing             | Fix CI (Step 3)      |
 | All green                     | Skip to Step 4       |
 
+**Jira-link marker check (do this during assessment)**: the PR body must carry the structured `<!-- jira-link -->` marker — the source of truth for ticket linkage (see [create-pr reference](../pr-lifecycle/references/create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage)). If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number: <PR#>, body: "<marker block>\n\n<existing body>" })` with `primary:` set to the PR's ticket key (from title/branch), or `primary: none` for ticket-less bot PRs. Editing the body is the supported correction path — never force-push or rename the branch to fix linkage.
+
 **Order matters**: always rebase first (Step 1), then fix reviews (Step 2), then fix CI (Step 3). Rebasing can resolve outdated review comments and change CI results.
 
 **Single-round batching rule**: before touching code, take a complete snapshot of the PR's current blockers. If unresolved review threads and CI failures coexist, read **all** unresolved threads and collect CI evidence **before** deciding what to edit. Batch all addressable fixes into one remediation pass and one push; only split pushes when the first push is strictly required to surface the next blocker.

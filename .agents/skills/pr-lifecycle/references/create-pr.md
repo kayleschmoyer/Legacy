@@ -33,7 +33,8 @@ github_create_pr(
   title: "LS-#### type(scope): Brief description",
   body: <PR body markdown>,
   draft: true,
-  head: <branch-name>    # from worktree_status().headRefName
+  head: <branch-name>,   # from worktree_status().headRefName
+  jiraPrimary: "LS-####" # session's ticket — drives the jira-link marker; omit to derive from title
 )
 ```
 
@@ -45,11 +46,34 @@ LS-#### type(scope): Brief description
 
 Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 
+### Jira-Link Marker (source of truth for ticket linkage)
+
+Every new PR body **must** carry the structured `jira-link` marker (RFC: `docs/rfcs/draft-declared-ticket-linkage.md`, LS-7893). The HTML comment is the machine parse target consumed by jira-branch-sync and the audit; the visible `**Jira:**` line is for humans:
+
+```markdown
+<!-- jira-link
+primary: LS-####
+-->
+
+**Jira:** [LS-####](https://bkrupa.atlassian.net/browse/LS-####)
+```
+
+- `primary` — **exactly one** key: the ticket this PR works on (the session's ticket). The only key automation transitions on.
+- `related` — optional comma/space-separated keys (`related: LS-####, LS-####`) — informational only, **never auto-transitioned**.
+- Bot/Dependabot PRs (no ticket) use `primary: none` and omit the visible line.
+- Correcting linkage = **edit the PR body** — no force-push or branch rename.
+
+`github_create_pr` injects the marker automatically when the body lacks one: it uses the `jiraPrimary` param if passed, else the first `LS-####` in the title, else `none`. Pass `jiraRelated` for related keys. Bodies that already contain a marker are left untouched, and a body that already has a visible `**Jira:**` line gets only the HTML comment (no duplicate link).
+
 ### PR Body Template
 
 > **This description is read by Copilot as a prompt — not just by humans.** When reviewers use "Fix with Copilot" or `@copilot` on a review comment, Copilot's entire context is the PR title, this description, and the diff. A thin description produces repeated, incomplete, or misaligned fixes. Write it as if you are briefing an engineer who has never seen the ticket.
 
 ```markdown
+<!-- jira-link
+primary: LS-####
+-->
+
 ## Context
 
 **Jira:** [LS-####](https://bkrupa.atlassian.net/browse/LS-####)
@@ -72,6 +96,10 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 If the branch name contains `fix(` or the Jira ticket type is Bug, use this extended template instead. The `## Verification` section is **required** — do not create the PR without it.
 
 ```markdown
+<!-- jira-link
+primary: LS-####
+-->
+
 ## Context
 
 **Jira:** [LS-####](https://bkrupa.atlassian.net/browse/LS-####)
@@ -120,6 +148,7 @@ If the branch name contains `fix(` or the Jira ticket type is Bug, use this exte
 - **Never** create a PR from the `main` branch
 - **Never** skip `make pc` — each CI failure costs 40-60 min. It must pass before **mark-ready** (Gate B), but run it **after** the draft PR is open, not before — see the draft-PR-first note under [Prerequisites](#prerequisites). Running `make pc` before the draft PR exists is the dominant cloud-agent timeout failure mode.
 - **Never** inline `--body` in PowerShell — always use `--body-file` or MCP tool
+- **Never** create a PR body without the `<!-- jira-link -->` marker — it is the source of truth for ticket linkage. `github_create_pr` injects it automatically; if you create a PR any other way (e.g. `gh pr create` fallback), include the marker block manually with exactly one `primary` (or `primary: none` for ticket-less bot PRs)
 - **Never** create a PR body without a `## Context` section that includes a Jira link and problem statement — Copilot reads the PR description when fixing review comments; omitting context causes repeated, misaligned fixes
 - **Never** create a bug-fix PR without a `## Verification` section — `make pc` passing does not prove the bug is fixed
 - **Batch review comments** via "Start a review" before clicking "Fix with Copilot" — submitting each comment individually spawns a separate Copilot agent session per comment, causing duplicate or conflicting fixes

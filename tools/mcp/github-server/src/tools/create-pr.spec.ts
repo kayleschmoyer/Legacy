@@ -166,3 +166,109 @@ describe('createPR Lambda behavior (LS-4881)', () => {
     });
   });
 });
+
+describe('createPR jira-link marker emission (LS-7895)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsLambda.mockReturnValue(true);
+    mockGetRepoOwnerName.mockResolvedValue({
+      owner: 'bkrupa',
+      name: 'legacy-sports',
+    });
+    mockGithubRest.mockResolvedValue({
+      number: 42,
+      html_url: 'https://example/pr/42',
+    });
+  });
+
+  function sentBody(): string {
+    return mockGithubRest.mock.calls[0][0].body.body as string;
+  }
+
+  it('derives primary from the title and prepends the marker', async () => {
+    const result = await createPR({
+      title: 'LS-7895 feat(mcp): emit jira-link marker',
+      body: '## Summary\n\n- stuff',
+      head: 'claude/some-branch',
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(sentBody()).toContain('<!-- jira-link\nprimary: LS-7895\n-->');
+    expect(sentBody()).toContain(
+      '**Jira:** [LS-7895](https://bkrupa.atlassian.net/browse/LS-7895)',
+    );
+  });
+
+  it('explicit jiraPrimary overrides the title-derived key', async () => {
+    await createPR({
+      title: 'LS-1111 feat: something',
+      body: 'body',
+      head: 'claude/some-branch',
+      jiraPrimary: 'LS-2222',
+    });
+
+    expect(sentBody()).toContain('primary: LS-2222');
+    expect(sentBody()).not.toContain('primary: LS-1111');
+  });
+
+  it('falls back to primary: none when neither param nor title carries a key', async () => {
+    await createPR({
+      title: 'chore(deps): bump lodash',
+      body: 'body',
+      head: 'dependabot/npm_and_yarn/lodash-4.17.21',
+    });
+
+    expect(sentBody()).toContain('primary: none');
+    expect(sentBody()).not.toContain('**Jira:**');
+  });
+
+  it('includes related keys without transition semantics', async () => {
+    await createPR({
+      title: 'LS-1 feat: something',
+      body: 'body',
+      head: 'claude/some-branch',
+      jiraRelated: 'LS-2, LS-3',
+    });
+
+    expect(sentBody()).toContain('related: LS-2, LS-3');
+  });
+
+  it('leaves a body that already carries a marker untouched', async () => {
+    const body = '<!-- jira-link\nprimary: LS-5\n-->\n\nexisting body';
+    await createPR({
+      title: 'LS-6 feat: something',
+      body,
+      head: 'claude/some-branch',
+    });
+
+    expect(sentBody()).toBe(body);
+  });
+
+  it('rejects an invalid jiraPrimary before calling GitHub', async () => {
+    const result = await createPR({
+      title: 'LS-1 feat: something',
+      body: 'body',
+      head: 'claude/some-branch',
+      jiraPrimary: 'not-a-key',
+    });
+
+    expect(result.isError).toBe(true);
+    const text = result.content?.[0];
+    expect(text && 'text' in text ? text.text : '').toMatch(
+      /Invalid jiraPrimary/,
+    );
+    expect(mockGithubRest).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid related keys before calling GitHub', async () => {
+    const result = await createPR({
+      title: 'LS-1 feat: something',
+      body: 'body',
+      head: 'claude/some-branch',
+      jiraRelated: 'LS-2, garbage',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockGithubRest).not.toHaveBeenCalled();
+  });
+});
