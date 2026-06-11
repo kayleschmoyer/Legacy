@@ -761,6 +761,53 @@ interface FootballPlayerShape {
   position: string | null;
 }
 
+/**
+ * Career-stat categories the ingestion pipeline can write for a player at a
+ * given position. The `careerStats` resolver issues one DB read per category,
+ * so skipping the categories a position can never accumulate avoids wasted
+ * round trips on every player-detail load (LS-6245).
+ *
+ * This mirrors the position routing in
+ * `lib/data-loaders/src/lib/load-football-career-stats.ts`:
+ *   - DST (synthetic team defense) → `career_football_defense` only
+ *   - IDP individual defenders (DL/LB/DB) → `career_football_defense_idp` only
+ *   - everyone else, including unknown/null positions → the offensive/kicking
+ *     group (passing/rushing/receiving/kicking)
+ *
+ * Keeping the null/unknown case on the offensive path matches the ingestion
+ * fallback, so no populated table is ever skipped (no data regression).
+ */
+type CareerStatCategory =
+  | 'passing'
+  | 'rushing'
+  | 'receiving'
+  | 'kicking'
+  | 'defense'
+  | 'idp';
+
+/** Positions whose career stats live in `career_football_defense_idp`. */
+const IDP_CAREER_POSITIONS: ReadonlySet<string> = new Set(['DL', 'LB', 'DB']);
+
+const OFFENSIVE_CAREER_CATEGORIES: ReadonlySet<CareerStatCategory> = new Set([
+  'passing',
+  'rushing',
+  'receiving',
+  'kicking',
+]);
+
+function careerStatCategoriesForPlayer(player: {
+  isDst: boolean;
+  position: string | null;
+}): ReadonlySet<CareerStatCategory> {
+  if (player.isDst) {
+    return new Set(['defense']);
+  }
+  if (player.position !== null && IDP_CAREER_POSITIONS.has(player.position)) {
+    return new Set(['idp']);
+  }
+  return OFFENSIVE_CAREER_CATEGORIES;
+}
+
 const FootballPlayerRef =
   builder.objectRef<FootballPlayerShape>('FootballPlayer');
 
@@ -1051,6 +1098,14 @@ FootballPlayerRef.implement({
         const db = context.db;
         const playerId = parent.id;
 
+        // Only read the career tables the ingestion path can populate for this
+        // player's position — a QB never has IDP rows, a kicker never has
+        // passing rows, etc. Skipping guaranteed-empty reads turns the fixed
+        // six round trips per detail load into 1 (DST/IDP) or 4 (offensive)
+        // (LS-6245).
+        const categories = careerStatCategoriesForPlayer(parent);
+        const skip = Promise.resolve([] as never[]);
+
         const [
           passingRows,
           rushingRows,
@@ -1059,36 +1114,60 @@ FootballPlayerRef.implement({
           defenseRows,
           idpRows,
         ] = await Promise.all([
-          db
-            .select()
-            .from(PublicSchema.careerFootballPassing)
-            .where(eq(PublicSchema.careerFootballPassing.playerId, playerId))
-            .limit(1),
-          db
-            .select()
-            .from(PublicSchema.careerFootballRushing)
-            .where(eq(PublicSchema.careerFootballRushing.playerId, playerId))
-            .limit(1),
-          db
-            .select()
-            .from(PublicSchema.careerFootballReceiving)
-            .where(eq(PublicSchema.careerFootballReceiving.playerId, playerId))
-            .limit(1),
-          db
-            .select()
-            .from(PublicSchema.careerFootballKicking)
-            .where(eq(PublicSchema.careerFootballKicking.playerId, playerId))
-            .limit(1),
-          db
-            .select()
-            .from(PublicSchema.careerFootballDefense)
-            .where(eq(PublicSchema.careerFootballDefense.playerId, playerId))
-            .limit(1),
-          db
-            .select()
-            .from(PublicSchema.careerFootballDefenseIdp)
-            .where(eq(PublicSchema.careerFootballDefenseIdp.playerId, playerId))
-            .limit(1),
+          categories.has('passing')
+            ? db
+                .select()
+                .from(PublicSchema.careerFootballPassing)
+                .where(
+                  eq(PublicSchema.careerFootballPassing.playerId, playerId),
+                )
+                .limit(1)
+            : skip,
+          categories.has('rushing')
+            ? db
+                .select()
+                .from(PublicSchema.careerFootballRushing)
+                .where(
+                  eq(PublicSchema.careerFootballRushing.playerId, playerId),
+                )
+                .limit(1)
+            : skip,
+          categories.has('receiving')
+            ? db
+                .select()
+                .from(PublicSchema.careerFootballReceiving)
+                .where(
+                  eq(PublicSchema.careerFootballReceiving.playerId, playerId),
+                )
+                .limit(1)
+            : skip,
+          categories.has('kicking')
+            ? db
+                .select()
+                .from(PublicSchema.careerFootballKicking)
+                .where(
+                  eq(PublicSchema.careerFootballKicking.playerId, playerId),
+                )
+                .limit(1)
+            : skip,
+          categories.has('defense')
+            ? db
+                .select()
+                .from(PublicSchema.careerFootballDefense)
+                .where(
+                  eq(PublicSchema.careerFootballDefense.playerId, playerId),
+                )
+                .limit(1)
+            : skip,
+          categories.has('idp')
+            ? db
+                .select()
+                .from(PublicSchema.careerFootballDefenseIdp)
+                .where(
+                  eq(PublicSchema.careerFootballDefenseIdp.playerId, playerId),
+                )
+                .limit(1)
+            : skip,
         ]);
 
         const p = passingRows[0] ?? null;

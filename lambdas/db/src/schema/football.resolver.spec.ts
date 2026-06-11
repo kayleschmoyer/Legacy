@@ -479,4 +479,98 @@ describe('football resolvers', () => {
       expect(result).toEqual([]);
     });
   });
+
+  // ── FootballPlayer.careerStats position-aware reads (LS-6245) ────────────────
+
+  describe('FootballPlayer.careerStats', () => {
+    function getResolver() {
+      const type = schema.getType('FootballPlayer') as GraphQLObjectType;
+      const field = type.getFields().careerStats;
+      if (!field?.resolve) throw new Error('careerStats resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    const basePlayer = {
+      id: 1,
+      firstName: 'Patrick',
+      lastName: 'Mahomes',
+      pfrId: 'MahoP00',
+      isDst: false,
+      nflTeam: 'KC',
+      position: 'QB',
+    };
+
+    // The IDP career table is the only mocked career table with a distinct
+    // shape; the four offensive tables and the team-defense table share the
+    // `{ playerId }` mock, so we assert on `from` call counts for those.
+    const idpTableMatcher = expect.objectContaining({ soloTkl: 'soloTkl' });
+
+    it('throws UNAUTHENTICATED when no user in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(basePlayer, {}, mockContext, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('reads only the four offensive/kicking tables for a QB', async () => {
+      await getResolver()(
+        { ...basePlayer, position: 'QB' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.from).toHaveBeenCalledTimes(4);
+      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+    });
+
+    it('reads only the four offensive/kicking tables for a kicker', async () => {
+      await getResolver()(
+        { ...basePlayer, position: 'K' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.from).toHaveBeenCalledTimes(4);
+      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+    });
+
+    it('reads only the team-defense table for a DST', async () => {
+      await getResolver()(
+        { ...basePlayer, isDst: true, position: 'DST' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.from).toHaveBeenCalledTimes(1);
+      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+    });
+
+    it('reads only the IDP table for an individual defender', async () => {
+      await getResolver()(
+        { ...basePlayer, position: 'DL' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.from).toHaveBeenCalledTimes(1);
+      expect(mockDb.from).toHaveBeenCalledWith(idpTableMatcher);
+    });
+
+    it('falls back to the offensive/kicking tables when position is null', async () => {
+      await getResolver()(
+        { ...basePlayer, position: null },
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.from).toHaveBeenCalledTimes(4);
+      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+    });
+  });
 });
