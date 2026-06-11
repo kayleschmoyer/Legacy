@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { YStack } from 'tamagui';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
+import { storeCameFrom } from '../../lib/came-from';
 
 export function FootballPlayerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +16,20 @@ export function FootballPlayerDetailPage() {
     variables: { id: playerId },
     skip: !playerId,
   });
+
+  const isAuthError =
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'UNAUTHENTICATED',
+    );
+
+  useEffect(() => {
+    if (isAuthError) {
+      storeCameFrom();
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthError, navigate]);
 
   const player = data?.footballPlayer;
 
@@ -29,7 +45,7 @@ export function FootballPlayerDetailPage() {
       <FootballPlayerDetail
         player={player}
         loading={loading}
-        error={!!error}
+        error={!!error && !isAuthError}
         onBack={() => navigate(-1)}
       />
     </YStack>
