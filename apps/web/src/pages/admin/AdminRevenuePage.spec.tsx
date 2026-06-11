@@ -146,7 +146,7 @@ describe('AdminRevenuePage', () => {
     expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
   });
 
-  it('skips the query for an authenticated non-admin user (ARV-001/ARV-004)', () => {
+  it('skips the query for an authenticated non-admin user (ARV-001)', () => {
     mockUseAuth.mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
@@ -154,6 +154,52 @@ describe('AdminRevenuePage', () => {
     });
     mockUseGetUserByIdQuery.mockReturnValue({
       data: { user: { accessLevel: 'none' } },
+      loading: false,
+    });
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(mockUseAdminRevenueStatsQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('skips the query on initial render before server user data loads (ARV-001)', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: 2, accessLevel: 'premium' },
+    });
+    mockUseGetUserByIdQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+    });
+    mockUseAdminRevenueStatsQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    renderPage();
+
+    expect(mockUseAdminRevenueStatsQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('skips the query for an unauthenticated user (ARV-001)', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      isLoading: false,
+      user: undefined,
+    });
+    mockUseGetUserByIdQuery.mockReturnValue({
+      data: undefined,
       loading: false,
     });
     mockUseAdminRevenueStatsQuery.mockReturnValue({

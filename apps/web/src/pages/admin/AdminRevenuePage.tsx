@@ -188,15 +188,14 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
   );
 
   const currentUserId = auth.user?.id ?? 0;
-  const { data: serverUserData, loading: serverUserLoading } =
-    useGetUserByIdQuery({
-      variables: { id: currentUserId },
-      skip: !auth.isAuthenticated || currentUserId === 0,
-      fetchPolicy: 'network-only',
-    });
+  const { loading: serverUserLoading } = useGetUserByIdQuery({
+    variables: { id: currentUserId },
+    skip: !auth.isAuthenticated || currentUserId === 0,
+    fetchPolicy: 'network-only',
+  });
 
   const { data, loading, error } = useAdminRevenueStatsQuery({
-    skip: serverUserData?.user?.accessLevel !== 'admin',
+    skip: !auth.isAuthenticated || auth.user?.accessLevel !== 'admin',
     fetchPolicy: 'no-cache',
   });
 
