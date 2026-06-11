@@ -99,7 +99,7 @@ The hook is registered under `hooks.PreToolUse` in `.claude/settings.json` next 
 - **No `console.*`** -- use `LOGGER` from `@legacy-sports/logging`
 - **Run typecheck before lint** -- type errors can cause false lint positives
 - **If `make pc` reformats files**, commit them and re-run `make pc`
-- **Always use `make` targets** over raw `pnpm exec nx` commands
+- **Always use `make` targets** over raw `pnpm exec nx` commands; **never run `pnpm exec nx reset` directly** — it destroys the pooled `node_modules` symlink in worktrees (LS-5242). Use `make clean-cache` (or `make reset`) instead, which re-links the symlink afterward. If you already ran `pnpm exec nx reset`, restore with `node scripts/modules-pool/link.mjs`.
 - **Always use `-w` flag** when installing packages (`pnpm add -w`)
 - **Avoid `node -e` on Windows for multi-line scripts** — complex quoting (backslashes, embedded quotes, `$`-expansion) is fragile in PowerShell. For any Node script longer than a trivial expression, write it to `scratch/<name>.js` and run `node scratch/<name>.js` instead
 - **Run `print-schema` before codegen** when Pothos resolvers have changed
