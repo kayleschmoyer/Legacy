@@ -330,7 +330,7 @@ describe('Team reference data (LS-7477)', () => {
   });
 });
 
-describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => {
+describe('buildGameLogsRequestBody (LS-7456, LS-7466, LS-7473, LS-7478, LS-7451)', () => {
   const baseFilters = {
     player: 'mlb-1234',
     dateFrom: '',
