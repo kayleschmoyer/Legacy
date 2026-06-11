@@ -106,17 +106,28 @@ describe('MobileOAuthProvider.signIn', () => {
 
   // DEVELOPER_ERROR (status code 10) means the app's package name + signing
   // SHA-1 are not registered as an Android OAuth client in the Google project.
-  // It must surface as a CONFIGURATION_ERROR (actionable) rather than being
-  // swallowed by the default branch as a generic UNKNOWN_ERROR "Sign-in failed".
-  it('maps DEVELOPER_ERROR to a CONFIGURATION_ERROR with an actionable message', async () => {
+  // It must surface as OAuthErrorCode.DEVELOPER_ERROR with a user-friendly
+  // message rather than a technical developer string or a generic UNKNOWN_ERROR.
+  it('maps DEVELOPER_ERROR to OAuthErrorCode.DEVELOPER_ERROR with a user-friendly message', async () => {
     mockedSignIn.mockRejectedValue({
       code: 'DEVELOPER_ERROR',
       message: 'DEVELOPER_ERROR',
     });
 
     await expect(provider.signIn()).rejects.toMatchObject({
-      code: OAuthErrorCode.CONFIGURATION_ERROR,
+      code: OAuthErrorCode.DEVELOPER_ERROR,
+      message:
+        'Google Sign-In is currently unavailable. Please try again later.',
     });
-    await expect(provider.signIn()).rejects.toThrow(/DEVELOPER_ERROR/);
+  });
+
+  it('also maps numeric code 10 (Android DEVELOPER_ERROR) to OAuthErrorCode.DEVELOPER_ERROR', async () => {
+    mockedSignIn.mockRejectedValue({ code: '10', message: 'DEVELOPER_ERROR' });
+
+    await expect(provider.signIn()).rejects.toMatchObject({
+      code: OAuthErrorCode.DEVELOPER_ERROR,
+      message:
+        'Google Sign-In is currently unavailable. Please try again later.',
+    });
   });
 });

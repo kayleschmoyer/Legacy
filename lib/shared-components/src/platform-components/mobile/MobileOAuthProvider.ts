@@ -189,11 +189,8 @@ export class MobileOAuthProvider implements OAuthProvider {
                 error instanceof Error ? error : new Error(String(error)),
               );
               throw this.createOAuthError(
-                OAuthErrorCode.CONFIGURATION_ERROR,
-                'Google Sign-In is not configured for this app ' +
-                  '(DEVELOPER_ERROR): the signing certificate SHA-1 / package ' +
-                  'name is not registered as an Android OAuth client in the ' +
-                  'Google project.',
+                OAuthErrorCode.DEVELOPER_ERROR,
+                'Google Sign-In is currently unavailable. Please try again later.',
                 error,
               );
             }

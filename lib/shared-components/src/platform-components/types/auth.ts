@@ -59,6 +59,11 @@ export enum OAuthErrorCode {
   NETWORK_ERROR = 'NETWORK_ERROR',
   CONFIGURATION_ERROR = 'CONFIGURATION_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+  // Google SDK status code 10: the app's package name + signing-certificate
+  // SHA-1 are not registered as an Android OAuth client in the Google Cloud /
+  // Firebase project. Surfaces as a distinct code so callers can capture it
+  // to error tracking with build-config context (build-config-issue: true).
+  DEVELOPER_ERROR = 'DEVELOPER_ERROR',
 }
 
 /**

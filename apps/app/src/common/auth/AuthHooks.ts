@@ -8,13 +8,14 @@ import {
   exchangeGoogleCode,
   ISecureStorage,
   OAuthError,
+  OAuthErrorCode,
   OAuthProvider,
   OAuthResponse,
   SecureStorageProvider,
 } from '@legacy-sports/shared-components';
-import type { OAuthErrorCode } from '@legacy-sports/shared-components';
 import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar/native';
 import { getMobileOAuthConfig } from './mobileOAuthConfig';
 import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
 import { DISCORD_SIGN_IN_CANCELLED, signInWithDiscord } from './discordAuth';
@@ -249,8 +250,22 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         'code' in error &&
         'message' in error
       ) {
-        trackGoogleSignInFailure(String((error as OAuthError).code));
-        failureHandler(error as OAuthError);
+        const oauthError = error as OAuthError;
+        // DEVELOPER_ERROR means the app's signing cert SHA-1 / package name is
+        // not registered in the Google Cloud project. Capture to Rollbar with
+        // build-config context so it's searchable by the config-issues label.
+        if (oauthError.code === OAuthErrorCode.DEVELOPER_ERROR) {
+          const errorToCapture =
+            oauthError.originalError instanceof Error
+              ? oauthError.originalError
+              : new Error(
+                  `Google Sign-In DEVELOPER_ERROR: build config mismatch. Original message: ${oauthError.message}`,
+                  { cause: oauthError.originalError as Error },
+                );
+          captureError(errorToCapture, { 'build-config-issue': true });
+        }
+        trackGoogleSignInFailure(String(oauthError.code));
+        failureHandler(oauthError);
       } else {
         // Unexpected, non-OAuthError failure: surface a generic message to the
         // UI while preserving the original error on `originalError` (logged by

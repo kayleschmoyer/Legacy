@@ -60,6 +60,12 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Mock Rollbar to assert DEVELOPER_ERROR is captured with build-config context
+const mockCaptureError = jest.fn();
+jest.mock('@legacy-sports/rollbar/native', () => ({
+  captureError: (...args: unknown[]): unknown => mockCaptureError(...args),
+}));
+
 // Mock secure storage
 const mockSecureStorage: Record<string, string> = {};
 const mockGetItem = jest.fn((key: string) =>
@@ -99,11 +105,15 @@ jest.mock('@legacy-sports/shared-components', () => {
   >(
     '../../../../../lib/shared-components/src/features/auth/services/discordAuthExchange',
   );
+  const { OAuthErrorCode } = jest.requireActual<
+    typeof import('@legacy-sports/shared-components')
+  >('../../../../../lib/shared-components/src/platform-components/types/auth');
   return {
     buildGoogleAuthPayload,
     exchangeGoogleCode,
     exchangeAppleCode,
     exchangeDiscordCode,
+    OAuthErrorCode,
     OAuthProvider: {
       configure: (...args: unknown[]): unknown => mockConfigure(...args),
       signIn: (...args: unknown[]): unknown => mockSignIn(...args),
@@ -481,6 +491,49 @@ describe('AuthHooks', () => {
       expect(mockTrackGoogleSignInFailure).toHaveBeenCalledWith(
         'UNKNOWN_ERROR',
       );
+    });
+
+    // MOB-020: DEVELOPER_ERROR (Google status code 10) means the signing cert
+    // SHA-1 / package name is not registered in the Google Cloud project.
+    // It must surface a user-friendly message AND be captured to Rollbar with
+    // build-config-issue: true so the config gap is searchable.
+    it('shows a user-friendly message and captures to Rollbar when DEVELOPER_ERROR fires', async () => {
+      const developerError = {
+        code: 'DEVELOPER_ERROR',
+        message:
+          'Google Sign-In is currently unavailable. Please try again later.',
+        originalError: { code: 'DEVELOPER_ERROR' },
+      };
+      mockSignIn.mockRejectedValue(developerError);
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(
+        'Google Sign-In is currently unavailable. Please try again later.',
+      );
+      expect(mockCaptureError).toHaveBeenCalledWith(expect.any(Error), {
+        'build-config-issue': true,
+      });
+    });
+
+    it('does not capture to Rollbar for non-DEVELOPER_ERROR OAuthErrors', async () => {
+      mockSignIn.mockRejectedValue({
+        code: 'SIGN_IN_CANCELLED',
+        message: 'User cancelled the sign-in flow',
+      });
+
+      const { result } = renderHook(() => useAuthHandlers());
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(mockCaptureError).not.toHaveBeenCalled();
     });
   });
 

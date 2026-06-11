@@ -39,9 +39,11 @@ export type {
   OAuthConfig,
   OAuthResponse,
   OAuthError,
-  OAuthErrorCode,
   ISecureStorage,
 } from './platform-components/types';
+// OAuthErrorCode is an enum (value + type); export as a value so callers can
+// compare against its members at runtime (e.g. OAuthErrorCode.DEVELOPER_ERROR).
+export { OAuthErrorCode } from './platform-components/types';
 
 // IconButton types
 export type {
