@@ -26,6 +26,7 @@ import {
   MLB_TEAMS,
   NFL_FRANCHISES,
 } from '../../constants/teams';
+import { DatePicker } from '../../components/DatePicker';
 
 // Platform-agnostic React components (no React Native imports)
 // Using CSS-in-JS for styling instead of StyleSheet
@@ -650,34 +651,50 @@ function GameLogsTable({
           Date range (optional):
         </Text>
         <YStack gap="$2">
-          <Input
-            borderWidth={1}
-            borderColor="$gray8"
-            borderRadius="$3"
-            padding="$3"
-            fontSize="$4"
-            backgroundColor="$white"
-            value={filters.dateFrom}
-            onChangeText={(v: string) =>
-              dispatch({ type: 'setDateFrom', value: v })
+          <DatePicker
+            value={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
+            onChange={(date) =>
+              dispatch({
+                type: 'setDateFrom',
+                value: date.toISOString().split('T')[0],
+              })
             }
             placeholder="Start date (YYYY-MM-DD)"
-            editable={!loading}
+            disabled={loading}
           />
-          <Input
-            borderWidth={1}
-            borderColor="$gray8"
-            borderRadius="$3"
-            padding="$3"
-            fontSize="$4"
-            backgroundColor="$white"
-            value={filters.dateTo}
-            onChangeText={(v: string) =>
-              dispatch({ type: 'setDateTo', value: v })
+          {filters.dateFrom ? (
+            <Button
+              size="$2"
+              chromeless
+              onPress={() => dispatch({ type: 'setDateFrom', value: '' })}
+            >
+              <Text fontSize="$3" color="$gray10">
+                Clear start date
+              </Text>
+            </Button>
+          ) : null}
+          <DatePicker
+            value={filters.dateTo ? new Date(filters.dateTo) : undefined}
+            onChange={(date) =>
+              dispatch({
+                type: 'setDateTo',
+                value: date.toISOString().split('T')[0],
+              })
             }
             placeholder="End date (YYYY-MM-DD)"
-            editable={!loading}
+            disabled={loading}
           />
+          {filters.dateTo ? (
+            <Button
+              size="$2"
+              chromeless
+              onPress={() => dispatch({ type: 'setDateTo', value: '' })}
+            >
+              <Text fontSize="$3" color="$gray10">
+                Clear end date
+              </Text>
+            </Button>
+          ) : null}
         </YStack>
       </YStack>
 

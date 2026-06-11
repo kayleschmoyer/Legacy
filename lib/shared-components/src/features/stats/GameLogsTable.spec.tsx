@@ -11,6 +11,11 @@ import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
 // Mock fetch globally
 global.fetch = jest.fn();
 
+// Use the manual mock from src/components/__mocks__/DatePicker.tsx so
+// GameLogsTable tests stay focused on filter-state behavior without depending
+// on Tamagui's Popover (which varies by Platform.OS in the test envs).
+jest.mock('../../components/DatePicker');
+
 describe('GameLogsTable', () => {
   const originalEnv = process.env.VITE_STATS_API_URL;
 
@@ -90,44 +95,37 @@ describe('GameLogsTable input validation', () => {
     ).toBeTruthy();
   });
 
-  it('shows inline error for invalid start date format (LS-7451)', () => {
+  it('date picker rejects invalid strings and valid date is forwarded to API (LS-7454)', () => {
     const fetchMock = global.fetch as jest.Mock;
     fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
+    const { getByPlaceholderText, getByText, queryByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+    // Invalid date string — the mock DatePicker ignores it; filters.dateFrom stays empty.
     fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
       target: { value: 'not-a-date' },
     });
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-    expect(
-      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('shows inline error for invalid end date format (LS-7451)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    // Valid start date — fires onChange with the parsed Date object.
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
+      target: { value: '2024-06-01' },
+    });
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
-    fireEvent.change(getByPlaceholderText('End date (YYYY-MM-DD)'), {
-      target: { value: 'bad-end' },
-    });
     const submit =
       getByText('Get Player Data').closest('button') ??
       getByText('Get Player Data');
     fireEvent.click(submit);
+    // No date-format error (bad input was rejected by picker; valid date passed through).
     expect(
-      getByText('End date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const body = JSON.parse(calls[0][1].body as string) as {
+      game_date_from: string;
+    };
+    expect(body.game_date_from).toBe('2024-06-01');
   });
 
   it('shows inline error when date is in the future (LS-7452)', () => {
