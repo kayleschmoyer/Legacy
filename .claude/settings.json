@@ -138,6 +138,11 @@
           {
             "type": "command",
             "command": ".claude/hooks/guard-main-repo.sh"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/inject-skill-reminder.js",
+            "windowsHide": true
           }
         ]
       },
