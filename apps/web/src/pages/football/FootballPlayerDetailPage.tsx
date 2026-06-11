@@ -46,7 +46,10 @@ export function FootballPlayerDetailPage() {
         player={player}
         loading={loading}
         error={!!error && !isAuthError}
-        onBack={() => navigate(-1)}
+        onBack={() => {
+          if (window.history.length > 1) navigate(-1);
+          else navigate('/football/players');
+        }}
       />
     </YStack>
   );

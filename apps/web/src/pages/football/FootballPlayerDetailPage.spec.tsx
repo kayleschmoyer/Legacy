@@ -1,13 +1,16 @@
 /**
  * LS-6227 — footballPlayer UNAUTHENTICATED error handling.
+ * LS-6228 — back-button cold-start deep-link fallback.
  *
  * Covers:
  *   1. UNAUTHENTICATED GraphQL error → storeCameFrom + navigate to /login (no error banner).
  *   2. Non-auth GraphQL error → error banner rendered, no redirect.
  *   3. Successful load → player detail rendered, no error.
+ *   4. Back press with in-app history → navigate(-1).
+ *   5. Back press on cold-start deep link (empty history) → navigate('/football/players').
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
@@ -29,13 +32,16 @@ jest.mock('@legacy-sports/shared-components/football', () => ({
   FootballPlayerDetail: ({
     error,
     player,
+    onBack,
   }: {
     error?: boolean;
     player?: { firstName: string } | null;
+    onBack?: () => void;
   }) => (
     <div>
       {error && <span>Failed to load player. Please try again.</span>}
       {player && <span>{player.firstName}</span>}
+      <button onClick={onBack}>Back to Players</button>
     </div>
   ),
 }));
@@ -126,5 +132,49 @@ describe('FootballPlayerDetailPage', () => {
 
     expect(screen.getByText('Patrick')).toBeTruthy();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // ── Back navigation (LS-6228) ──────────────────────────────────────────────
+
+  describe('back navigation', () => {
+    const realHistoryLength = window.history.length;
+
+    function setHistoryLength(length: number): void {
+      Object.defineProperty(window.history, 'length', {
+        configurable: true,
+        value: length,
+      });
+    }
+
+    afterEach(() => {
+      setHistoryLength(realHistoryLength);
+    });
+
+    function renderWithPlayer(): void {
+      mockUseFootballPlayerQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof useFootballPlayerQuery>);
+      render(<FootballPlayerDetailPage />);
+    }
+
+    it('navigates back in-app when history exists', () => {
+      setHistoryLength(3);
+      renderWithPlayer();
+
+      fireEvent.click(screen.getByText('Back to Players'));
+
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
+    });
+
+    it('falls back to the players list on a cold-start deep link', () => {
+      setHistoryLength(1);
+      renderWithPlayer();
+
+      fireEvent.click(screen.getByText('Back to Players'));
+
+      expect(mockNavigate).toHaveBeenCalledWith('/football/players');
+    });
   });
 });
