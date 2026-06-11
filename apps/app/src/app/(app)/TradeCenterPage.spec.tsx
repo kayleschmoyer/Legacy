@@ -291,6 +291,19 @@ describe('TradeCenterPage', () => {
       expect(tc.props.accessibilityHint).toBe('42');
     });
   });
+
+  it('ignores non-numeric ?tradeOfferId= param', async () => {
+    mockSearchParams = { leagueId: '5', tradeOfferId: 'abc' };
+    mockUserLeagues = { userLeagues: [{ id: 5, name: 'Deep-Link League' }] };
+    mockUserTeamId = 10;
+    mockLeague = { league: { id: 5, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    await waitFor(() => {
+      const tc = screen.getByTestId('trading-center-5');
+      expect(tc.props.accessibilityHint).toBeUndefined();
+    });
+  });
 });
 
 // ── Parity assertions (LS-7485 — TC-002-P) ───────────────────────────────────
