@@ -618,7 +618,7 @@ export function FootballPlayerDetail({
               justifyContent="center"
             >
               <Text
-                fontSize={isDst ? 9 : 13}
+                fontSize={13}
                 fontWeight="800"
                 color={
                   player.nflTeam
