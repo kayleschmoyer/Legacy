@@ -1,4 +1,4 @@
-import React, { useMemo, useReducer, useState } from 'react';
+import React, { startTransition, useMemo, useReducer, useState } from 'react';
 import {
   Button,
   Input,
@@ -335,11 +335,37 @@ function GameLogsTable({
   const resolvedEndpoint = resolution.url;
 
   const [filters, dispatch] = useReducer(filterReducer, INITIAL_FILTERS);
-  const [data, setData] = useState<
+  // Store the raw server payload (stat → gameNum → value). The O(stats*games)
+  // reshape is done lazily in useMemo below so the fetch callback never blocks
+  // the main thread. startTransition defers the resulting render. (LS-7472)
+  const [rawData, setRawData] = useState<
     Record<string, Record<string, string | number>> | undefined
   >(undefined);
-  const [stats, setStats] = useState<Array<string>>([]);
   const [loading, setLoading] = useState(false);
+
+  // Reshape raw payload from { stat: { gameNum: value } } to
+  // { gameNum: { stat: value } } and collect the stat-key list.
+  // Memoised so it only re-runs when the server response changes. (LS-7472)
+  const { games, stats } = useMemo(() => {
+    if (!rawData) return { games: undefined, stats: [] as string[] };
+
+    const reshapedGames: Record<string, Record<string, string | number>> = {};
+    const gameStats: Set<string> = new Set();
+
+    for (const key of Object.keys(rawData)) {
+      gameStats.add(key);
+      const statData = rawData[key];
+
+      for (const gameNum of Object.keys(statData)) {
+        if (!(gameNum in reshapedGames)) {
+          reshapedGames[gameNum] = {};
+        }
+        reshapedGames[gameNum][key] = statData[gameNum];
+      }
+    }
+
+    return { games: reshapedGames, stats: Array.from(gameStats) };
+  }, [rawData]);
   const [inputError, setInputError] = useState<string | null>(null);
   const [opponentSheetOpen, setOpponentSheetOpen] = useState(false);
 
@@ -424,24 +450,11 @@ function GameLogsTable({
         Record<string, string | number>
       > = await response.json();
 
-      const games: Record<string, Record<string, string | number>> = {};
-      const gameStats: Set<string> = new Set();
-
-      for (const key of Object.keys(serverData)) {
-        gameStats.add(key);
-        const statData = serverData[key];
-
-        for (const gameNum of Object.keys(statData)) {
-          if (!(gameNum in games)) {
-            games[gameNum] = {};
-          }
-
-          games[gameNum][key] = statData[gameNum];
-        }
-      }
-
-      setData(games);
-      setStats(Array.from(gameStats));
+      // Store the raw payload; the reshape runs in useMemo, deferred by
+      // startTransition so the main thread yields before the re-render. (LS-7472)
+      startTransition(() => {
+        setRawData(serverData);
+      });
     } catch (error) {
       // If the URL was localhost when fetch blew up, the network error is
       // almost always a missing build-time env var rather than a server fault.
@@ -460,9 +473,9 @@ function GameLogsTable({
   // Prepare table data + stable row identifiers (gameIds) so the table can use
   // them as React keys. Use `??` (not `||`) so a real `0` stat is preserved as
   // `0`, not coerced to the missing-value sentinel. (LS-7460, LS-7461)
-  const gameIds: string[] = data ? Object.keys(data) : [];
+  const gameIds: string[] = games ? Object.keys(games) : [];
   const tableData: Array<Array<CellValue>> = gameIds.map((gameId) =>
-    stats.map((s) => data?.[gameId]?.[s] ?? null),
+    stats.map((s) => games?.[gameId]?.[s] ?? null),
   );
 
   if (resolution.error) {
@@ -726,7 +739,7 @@ function GameLogsTable({
         </Text>
       ) : null}
 
-      {data && stats.length > 0 ? (
+      {games && stats.length > 0 ? (
         <YStack marginTop="$4">
           <CrossPlatformTable
             headers={stats}

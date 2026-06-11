@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import {
   buildGameLogsRequestBody,
   DEFAULT_GAME_LOGS_LIMIT,
@@ -368,6 +368,51 @@ describe('GameLogsTable filter controls', () => {
     };
     expect(body.venue).toBe('home');
     expect(body.player_id).toBe('mlb-1234');
+  });
+});
+
+describe('GameLogsTable reshape deferred off main thread (LS-7472)', () => {
+  it('renders table headers and cells from a multi-stat multi-game payload', async () => {
+    // Simulate a season payload: two stat keys each mapping to two game entries.
+    // The raw shape is { stat: { gameNum: value } }; the component must
+    // transpose it to { gameNum: { stat: value } } via useMemo + startTransition.
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          HR: { '1': 1, '2': 0 },
+          RBI: { '1': 3, '2': 0 },
+        }),
+    });
+
+    const { getByPlaceholderText, getByText } = render(
+      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    );
+
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+
+    act(() => {
+      fireEvent.click(
+        getByText('Get Player Data').closest('button') ??
+          getByText('Get Player Data'),
+      );
+    });
+
+    // waitFor drains microtasks and flushes the startTransition render.
+    await waitFor(() => {
+      expect(document.querySelector('table')).toBeTruthy();
+    });
+
+    // Cross-platform: on web the headers are <th> text inside innerHTML;
+    // on native the Table mock renders them as a "headers" attribute.
+    const tableEl = document.querySelector('table');
+    const tableContent =
+      tableEl?.getAttribute('headers') ?? tableEl?.innerHTML ?? '';
+    expect(tableContent).toContain('HR');
+    expect(tableContent).toContain('RBI');
   });
 });
 
