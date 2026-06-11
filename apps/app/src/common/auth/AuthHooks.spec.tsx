@@ -547,7 +547,10 @@ describe('AuthHooks', () => {
         await result.current.discordLogin();
       });
 
-      expect(onFailure).toHaveBeenCalledWith('Network Error');
+      // Generic UI message for an unexpected exchange failure (LS-6657).
+      expect(onFailure).toHaveBeenCalledWith(
+        'Authentication failed. Please try again.',
+      );
       expect(mockSetItem).not.toHaveBeenCalled();
     });
 
@@ -564,8 +567,10 @@ describe('AuthHooks', () => {
         await result.current.discordLogin();
       });
 
+      // Misconfiguration is not a user-actionable error; surface the generic
+      // message rather than leaking the internal config detail (LS-6657).
       expect(onFailure).toHaveBeenCalledWith(
-        'OAuth proxy URL is not configured',
+        'Authentication failed. Please try again.',
       );
       expect(mockSignInWithDiscord).not.toHaveBeenCalled();
       expect(mockFetch).not.toHaveBeenCalled();
@@ -587,8 +592,10 @@ describe('AuthHooks', () => {
         await result.current.discordLogin();
       });
 
+      // Misconfiguration is not a user-actionable error; surface the generic
+      // message rather than leaking the internal config detail (LS-6657).
       expect(onFailure).toHaveBeenCalledWith(
-        'Discord client ID is not configured',
+        'Authentication failed. Please try again.',
       );
       expect(mockSignInWithDiscord).not.toHaveBeenCalled();
       expect(mockFetch).not.toHaveBeenCalled();

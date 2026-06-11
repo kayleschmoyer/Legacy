@@ -333,9 +333,8 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         error instanceof Error ? error : new Error(String(error)),
       );
       if (onFailure) {
-        onFailure(
-          error instanceof Error ? error.message : 'Authentication failed',
-        );
+        // Generic UI message; the full error is logged above (LS-6657).
+        onFailure(GENERIC_AUTH_ERROR);
       }
     }
   }, [onSuccess, onFailure]);

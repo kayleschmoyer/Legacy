@@ -1,6 +1,6 @@
 /**
  * Coverage for the mobile Login screen (`login.tsx`) — the only mobile auth
- * surface. Two concerns share one set of mocks:
+ * surface. Three concerns share one set of mocks:
  *
  * - Deep-link preservation: a successful login returns the user to their
  *   deep-linked route, falling back to home from the bare /login route
@@ -8,6 +8,8 @@
  * - Google sign-in wiring: button press invokes googleLogin, the loading state
  *   surfaces while in flight, errors are displayed, and the error clears on
  *   retry (LS-6657).
+ * - Discord sign-in wiring: onDiscordSignIn is passed to LoginPage when
+ *   discordClientId is configured, and omitted when it is not (LS-7766).
  *
  * The native auth layer (`useAuthHandlers`) is exercised directly by
  * AuthHooks.spec.tsx and the LoginPage UI by shared-components/LoginPage.spec;
@@ -40,13 +42,19 @@ jest.mock('expo-router', () => ({
 // jest fns for the sign-in actions.
 const mockGoogleLogin = jest.fn();
 const mockAppleLogin = jest.fn();
+const mockDiscordLogin = jest.fn();
 const mockAuthCallbacks: { current: AuthCallbacks | undefined } = {
   current: undefined,
 };
 jest.mock('../common/auth/AuthHooks', () => ({
   useAuthHandlers: (callbacks: AuthCallbacks) => {
     mockAuthCallbacks.current = callbacks;
-    return { googleLogin: mockGoogleLogin, appleLogin: mockAppleLogin };
+    return {
+      googleLogin: mockGoogleLogin,
+      appleLogin: mockAppleLogin,
+      discordLogin: mockDiscordLogin,
+      logout: jest.fn(),
+    };
   },
 }));
 
@@ -54,6 +62,13 @@ jest.mock('../common/auth/AuthHooks', () => ({
 // the Apple button stays hidden and the useEffect settles to a stable state.
 jest.mock('../common/auth/appleAuth', () => ({
   isAppleAuthAvailable: jest.fn().mockResolvedValue(false),
+}));
+
+// Control Discord availability by toggling discordClientId in the config mock.
+const mockGetMobileOAuthConfig = jest.fn();
+jest.mock('../common/auth/mobileOAuthConfig', () => ({
+  getMobileOAuthConfig: (...args: unknown[]): unknown =>
+    mockGetMobileOAuthConfig(...args),
 }));
 
 // tamagui's Theme/YStack are layout-only wrappers in login.tsx; render children
@@ -80,11 +95,15 @@ jest.mock('@legacy-sports/shared-components', () => {
   return {
     LoginPage: ({
       onGoogleSignIn,
+      onDiscordSignIn,
       isGoogleLoading,
+      isDiscordLoading,
       errorMessage,
     }: {
       onGoogleSignIn: () => void;
+      onDiscordSignIn?: () => void;
       isGoogleLoading?: boolean;
+      isDiscordLoading?: boolean;
       errorMessage?: string;
     }) =>
       ReactActual.createElement(
@@ -95,10 +114,24 @@ jest.mock('@legacy-sports/shared-components', () => {
           disabled: isGoogleLoading,
           onPress: onGoogleSignIn,
         }),
+        onDiscordSignIn
+          ? ReactActual.createElement(Pressable, {
+              testID: 'discord-login-button',
+              disabled: isDiscordLoading,
+              onPress: onDiscordSignIn,
+            })
+          : null,
         isGoogleLoading
           ? ReactActual.createElement(
               Text,
               { testID: 'login-loading' },
+              'loading',
+            )
+          : null,
+        isDiscordLoading
+          ? ReactActual.createElement(
+              Text,
+              { testID: 'discord-login-loading' },
               'loading',
             )
           : null,
@@ -131,6 +164,12 @@ describe('Mobile Login screen — deep-link preservation (LGN-037)', () => {
     jest.clearAllMocks();
     mockAuthCallbacks.current = undefined;
     mockPathname = '/';
+    // Discord unavailable by default in deep-link tests — keeps them focused.
+    mockGetMobileOAuthConfig.mockReturnValue({
+      oauthProxyUrl: 'https://oauth-proxy.example.com',
+      googleClientId: 'test-google-client-id',
+      discordClientId: undefined,
+    });
   });
 
   it('returns to the deep-linked route on successful login', async () => {
@@ -164,6 +203,11 @@ describe('Mobile Login screen — Google sign-in flow (LS-6657)', () => {
     jest.clearAllMocks();
     mockAuthCallbacks.current = undefined;
     mockPathname = '/';
+    mockGetMobileOAuthConfig.mockReturnValue({
+      oauthProxyUrl: 'https://oauth-proxy.example.com',
+      googleClientId: 'test-google-client-id',
+      discordClientId: undefined,
+    });
   });
 
   it('calls googleLogin when the Google button is pressed', async () => {
@@ -214,5 +258,88 @@ describe('Mobile Login screen — Google sign-in flow (LS-6657)', () => {
 
     expect(screen.queryByTestId('login-error')).toBeNull();
     expect(mockGoogleLogin).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Mobile Login screen — Discord sign-in wiring (LS-7766)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAuthCallbacks.current = undefined;
+    mockPathname = '/';
+    // Default: Discord available (discordClientId present).
+    mockGetMobileOAuthConfig.mockReturnValue({
+      oauthProxyUrl: 'https://oauth-proxy.example.com',
+      googleClientId: 'test-google-client-id',
+      discordClientId: 'test-discord-client-id',
+    });
+  });
+
+  it('renders the Discord button when discordClientId is configured', async () => {
+    await renderLogin();
+
+    expect(screen.getByTestId('discord-login-button')).toBeTruthy();
+  });
+
+  it('does not render the Discord button when discordClientId is absent', async () => {
+    mockGetMobileOAuthConfig.mockReturnValue({
+      oauthProxyUrl: 'https://oauth-proxy.example.com',
+      googleClientId: 'test-google-client-id',
+      discordClientId: undefined,
+    });
+    await renderLogin();
+
+    expect(screen.queryByTestId('discord-login-button')).toBeNull();
+  });
+
+  it('calls discordLogin when the Discord button is pressed', async () => {
+    await renderLogin();
+
+    fireEvent.press(screen.getByTestId('discord-login-button'));
+
+    expect(mockDiscordLogin).toHaveBeenCalledTimes(1);
+    // Google is unaffected.
+    expect(mockGoogleLogin).not.toHaveBeenCalled();
+  });
+
+  it('shows the Discord loading state while sign-in is in flight', async () => {
+    await renderLogin();
+
+    expect(screen.queryByTestId('discord-login-loading')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('discord-login-button'));
+
+    expect(screen.getByTestId('discord-login-loading')).toBeTruthy();
+  });
+
+  it('displays an error message when Discord sign-in fails', async () => {
+    await renderLogin();
+
+    fireEvent.press(screen.getByTestId('discord-login-button'));
+
+    await act(() => {
+      mockAuthCallbacks.current?.onFailure?.(
+        'Authentication failed. Please try again.',
+      );
+    });
+
+    expect(
+      screen.getByText('Authentication failed. Please try again.'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('discord-login-loading')).toBeNull();
+  });
+
+  it('clears the Discord loading state on a silent cancel (onFailure with undefined)', async () => {
+    await renderLogin();
+
+    fireEvent.press(screen.getByTestId('discord-login-button'));
+    expect(screen.getByTestId('discord-login-loading')).toBeTruthy();
+
+    // A user-dismissed browser fires onFailure(undefined) — no error banner.
+    await act(() => {
+      mockAuthCallbacks.current?.onFailure?.(undefined);
+    });
+
+    expect(screen.queryByTestId('discord-login-loading')).toBeNull();
+    expect(screen.queryByTestId('login-error')).toBeNull();
   });
 });
