@@ -1,21 +1,35 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { YStack } from 'tamagui';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
+import { UpgradeModal } from '../../components/UpgradeModal';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
+import { trackPremiumFeatureClick } from '../../utils/analytics';
+
+const PROJECTIONS_FEATURE_NAME = 'Projections';
+const PROJECTIONS_FEATURE_DESCRIPTION =
+  'Unlock weekly projections, matchup ratings, and strength-of-schedule for every player with Premium.';
 
 export function FootballPlayerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const playerId = id ? parseInt(id, 10) : 0;
+  const isPremium = useIsPremium();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const { data, loading, error } = useFootballPlayerQuery({
     variables: { id: playerId },
     skip: !playerId,
   });
+
+  function handleUpgrade() {
+    trackPremiumFeatureClick(PROJECTIONS_FEATURE_NAME);
+    setShowUpgradeModal(true);
+  }
 
   const isAuthError =
     CombinedGraphQLErrors.is(error) &&
@@ -50,7 +64,17 @@ export function FootballPlayerDetailPage() {
           if (window.history.length > 1) navigate(-1);
           else navigate('/football/players');
         }}
+        isPremium={isPremium}
+        onUpgrade={handleUpgrade}
       />
+      {!isPremium && (
+        <UpgradeModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          featureName={PROJECTIONS_FEATURE_NAME}
+          featureDescription={PROJECTIONS_FEATURE_DESCRIPTION}
+        />
+      )}
     </YStack>
   );
 }

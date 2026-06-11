@@ -14,6 +14,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 
 // ── Router ───────────────────────────────────────────────────────────────────
@@ -33,18 +34,42 @@ jest.mock('@legacy-sports/shared-components/football', () => ({
     error,
     player,
     onBack,
+    isPremium,
+    onUpgrade,
   }: {
     error?: boolean;
     player?: { firstName: string } | null;
     onBack?: () => void;
+    isPremium?: boolean;
+    onUpgrade?: () => void;
   }) => (
     <div>
       {error && <span>Failed to load player. Please try again.</span>}
       {player && <span>{player.firstName}</span>}
       <button onClick={onBack}>Back to Players</button>
+      {!isPremium && (
+        <button type="button" onClick={onUpgrade}>
+          teaser-upgrade
+        </button>
+      )}
     </div>
   ),
 }));
+
+jest.mock('../../components/UpgradeModal', () => ({
+  UpgradeModal: ({ open }: { open: boolean }) =>
+    open ? <span>upgrade-modal-open</span> : null,
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({ useIsPremium: jest.fn() }));
+
+jest.mock('../../utils/analytics', () => ({
+  trackPremiumFeatureClick: jest.fn(),
+}));
+
+const mockUseIsPremium = useIsPremium as jest.MockedFunction<
+  typeof useIsPremium
+>;
 
 // ── came-from ────────────────────────────────────────────────────────────────
 
@@ -74,6 +99,7 @@ function makeCombinedError(code: string): CombinedGraphQLErrors {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseIsPremium.mockReturnValue(false);
 });
 
 describe('FootballPlayerDetailPage', () => {
@@ -175,6 +201,47 @@ describe('FootballPlayerDetailPage', () => {
       fireEvent.click(screen.getByText('Back to Players'));
 
       expect(mockNavigate).toHaveBeenCalledWith('/football/players');
+    });
+  });
+
+  describe('LS-6249 — Projections premium upsell wiring', () => {
+    function mockSuccessfulLoad() {
+      mockUseFootballPlayerQuery.mockReturnValue({
+        data: {
+          footballPlayer: {
+            id: 1,
+            firstName: 'Patrick',
+            lastName: 'Mahomes',
+            position: 'QB',
+            nflTeam: 'KC',
+            isDst: false,
+          },
+        },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof useFootballPlayerQuery>);
+    }
+
+    it('opens the UpgradeModal when a free user presses the teaser CTA', () => {
+      mockUseIsPremium.mockReturnValue(false);
+      mockSuccessfulLoad();
+
+      render(<FootballPlayerDetailPage />);
+
+      expect(screen.queryByText('upgrade-modal-open')).toBeNull();
+      fireEvent.click(screen.getByText('teaser-upgrade'));
+      expect(screen.getByText('upgrade-modal-open')).toBeTruthy();
+    });
+
+    it('does not render the UpgradeModal for premium users', () => {
+      mockUseIsPremium.mockReturnValue(true);
+      mockSuccessfulLoad();
+
+      render(<FootballPlayerDetailPage />);
+
+      // Premium users get no teaser CTA and no modal in the tree.
+      expect(screen.queryByText('teaser-upgrade')).toBeNull();
+      expect(screen.queryByText('upgrade-modal-open')).toBeNull();
     });
   });
 });

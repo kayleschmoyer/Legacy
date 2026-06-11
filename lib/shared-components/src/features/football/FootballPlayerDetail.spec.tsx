@@ -453,4 +453,37 @@ describe('FootballPlayerDetail', () => {
     render(<FootballPlayerDetail player={QB_PLAYER} />);
     expect(screen.queryByText(/previously:/)).toBeNull();
   });
+
+  describe('LS-6249 — Projections premium upsell', () => {
+    it('renders the "Projections (Premium)" teaser card for free users by default', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(screen.getByText('Projections (Premium)')).toBeTruthy();
+      expect(screen.getByText('Upgrade to Premium')).toBeTruthy();
+    });
+
+    it('mentions matchup ratings and strength-of-schedule in the upsell copy', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(
+        screen.getByText(/matchup ratings, and strength-of-schedule/),
+      ).toBeTruthy();
+    });
+
+    it('fires onUpgrade when the Upgrade CTA is pressed', () => {
+      const onUpgrade = jest.fn();
+      render(<FootballPlayerDetail player={QB_PLAYER} onUpgrade={onUpgrade} />);
+      fireEvent.click(screen.getByText('Upgrade to Premium'));
+      expect(onUpgrade).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides the teaser for premium users', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} isPremium />);
+      expect(screen.queryByText('Projections (Premium)')).toBeNull();
+      expect(screen.queryByText('Upgrade to Premium')).toBeNull();
+    });
+
+    it('does not render the teaser while loading (no player yet)', () => {
+      render(<FootballPlayerDetail player={null} loading />);
+      expect(screen.queryByText('Projections (Premium)')).toBeNull();
+    });
+  });
 });

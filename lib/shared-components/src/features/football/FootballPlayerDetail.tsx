@@ -1,10 +1,11 @@
 import React from 'react';
-import { H1, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ArrowLeft } from '@tamagui/lucide-icons';
+import { Button, H1, Spinner, Text, XStack, YStack } from 'tamagui';
+import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import {
   BG_DARK,
   BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_SEAM_RED_LIGHT,
   OUTLINE_SUBTLE,
@@ -590,6 +591,112 @@ function OffenseStatsTable({
   );
 }
 
+// ── Projections premium upsell ────────────────────────────────────────────────
+
+/**
+ * Placeholder teaser rows shown behind the blur. The values are intentionally
+ * fabricated — this is a marketing upsell, not real projection data — so a free
+ * user gets a sense of what Premium unlocks without exposing anything real.
+ */
+const PROJECTION_TEASER_ROWS: { label: string; value: string }[] = [
+  { label: 'Proj. Fantasy Pts', value: '21.4' },
+  { label: 'Matchup Rating', value: 'A−' },
+  { label: 'Strength of Schedule', value: '6th' },
+];
+
+/**
+ * "Projections (Premium)" upsell card. Renders a blurred teaser of the locked
+ * projections / matchup-rating / strength-of-schedule content with a lock badge
+ * and an "Upgrade to Premium" CTA. The blur (`filter`) is a web-only CSS effect
+ * and is ignored on React Native, where the reduced opacity alone dims the
+ * teaser — mirroring the cross-platform PremiumGate treatment.
+ */
+function ProjectionsTeaser({ onUpgrade }: { onUpgrade?: () => void }) {
+  return (
+    <YStack
+      position="relative"
+      overflow="hidden"
+      borderRadius={8}
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_GOLD, 0.45)}
+    >
+      {/* Blurred teaser content */}
+      <YStack
+        gap={8}
+        padding={16}
+        backgroundColor={SURFACE_CARD}
+        pointerEvents="none"
+        opacity={0.5}
+        style={{ filter: 'blur(5px)', userSelect: 'none' }}
+      >
+        <Text
+          fontSize={13}
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          fontWeight="600"
+        >
+          Projections
+        </Text>
+        <XStack gap={20} flexWrap="wrap">
+          {PROJECTION_TEASER_ROWS.map((r) => (
+            <StatCell key={r.label} label={r.label} value={r.value} />
+          ))}
+        </XStack>
+      </YStack>
+
+      {/* Lock overlay + upgrade CTA */}
+      <YStack
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        alignItems="center"
+        justifyContent="center"
+        gap={8}
+        padding={16}
+        style={{
+          background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.7)} 0%, ${BRAND_NAVY} 100%)`,
+        }}
+      >
+        <Lock size={24} color={BRAND_GOLD_LIGHT} />
+        <Text
+          fontSize={15}
+          fontWeight="800"
+          color={BRAND_GOLD}
+          fontFamily={FONT_DISPLAY}
+          textAlign="center"
+        >
+          Projections (Premium)
+        </Text>
+        <Text
+          fontSize={12}
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          textAlign="center"
+          maxWidth={300}
+        >
+          Unlock weekly projections, matchup ratings, and strength-of-schedule
+          with Premium.
+        </Text>
+        <Button
+          size="$3"
+          onPress={onUpgrade}
+          color={BRAND_NAVY}
+          fontWeight="700"
+          pressStyle={{ opacity: 0.85 }}
+          hoverStyle={{ opacity: 0.92 }}
+          style={{
+            background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD_LIGHT} 100%)`,
+          }}
+        >
+          Upgrade to Premium
+        </Button>
+      </YStack>
+    </YStack>
+  );
+}
+
 export interface FootballPlayerDetailProps {
   player: FootballPlayerDetailPlayer | null | undefined;
   loading?: boolean;
@@ -600,6 +707,19 @@ export interface FootballPlayerDetailProps {
    * stays platform-agnostic. The back row is hidden when omitted.
    */
   onBack?: () => void;
+  /**
+   * Whether the current user has premium access. When `false` (the default),
+   * the "Projections (Premium)" upsell teaser is shown. When `true`, the teaser
+   * is hidden — premium projection data is not yet available, so there is
+   * nothing to render for premium users.
+   */
+  isPremium?: boolean;
+  /**
+   * Called when the Projections upsell CTA is pressed. Apps supply their own
+   * upgrade flow (UpgradeModal on web). When omitted, the teaser still renders
+   * but the CTA is inert.
+   */
+  onUpgrade?: () => void;
 }
 
 /**
@@ -613,6 +733,8 @@ export function FootballPlayerDetail({
   loading,
   error,
   onBack,
+  isPremium = false,
+  onUpgrade,
 }: FootballPlayerDetailProps) {
   const teamData = player?.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
   const isDst = player?.isDst ?? false;
@@ -784,6 +906,9 @@ export function FootballPlayerDetail({
 
           {/* Season-by-season breakdown tables */}
           <SeasonBreakdowns player={player} />
+
+          {/* Projections premium upsell — shown to free users only */}
+          {!isPremium && <ProjectionsTeaser onUpgrade={onUpgrade} />}
         </YStack>
       )}
     </YStack>
