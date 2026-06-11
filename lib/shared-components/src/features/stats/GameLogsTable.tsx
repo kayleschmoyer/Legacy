@@ -6,16 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  Button,
-  Input,
-  ScrollView,
-  Sheet,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Button, Input, Sheet, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons';
 import { Platform, Table } from '../../platform-components';
 import { Select as OpponentSelect } from '../../components/Select';
@@ -148,7 +139,7 @@ const CrossPlatformTable: React.FC<TableProps> = ({
           <thead
             // LS-7458 — keep column labels in view as the user scrolls a
             // 162-game MLB season. `position: sticky` resolves against the
-            // nearest scrollable ancestor (the page's outer ScrollView).
+            // nearest scrollable ancestor (the document on web).
             style={{
               position: 'sticky',
               top: 0,
@@ -599,7 +590,7 @@ function GameLogsTable({
 
   if (resolution.error) {
     return (
-      <ScrollView flex={1} padding="$4">
+      <YStack flex={1} padding="$4">
         <Text
           fontSize="$5"
           fontWeight="bold"
@@ -611,12 +602,12 @@ function GameLogsTable({
         <Text color="$red10" fontSize="$4">
           {resolution.error.message}
         </Text>
-      </ScrollView>
+      </YStack>
     );
   }
 
   return (
-    <ScrollView flex={1} padding="$4">
+    <YStack flex={1} padding="$4">
       <Text
         fontSize="$5"
         fontWeight="bold"
@@ -883,7 +874,7 @@ function GameLogsTable({
           />
         </YStack>
       ) : null}
-    </ScrollView>
+    </YStack>
   );
 }
 

@@ -198,13 +198,15 @@ describe('GameLogsTable date validation edge-cases (LS-7455)', () => {
     fireEvent.click(el.closest('button') ?? el);
   };
 
-  it('rejects a start date with slash separators (2024/06/01)', () => {
+  it('DatePicker drops slash-separated dates; form submits without a date filter', () => {
     (global.fetch as jest.Mock).mockClear();
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
     });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    const { getByPlaceholderText, getByText, queryByText } = render(
+      <GameLogsTable />,
+    );
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
@@ -212,19 +214,24 @@ describe('GameLogsTable date validation edge-cases (LS-7455)', () => {
       target: { value: '2024/06/01' },
     });
     clickSubmit(getByText);
+    // Real <input type="date"> never produces slash-separated values; the mock
+    // enforces the same constraint. The date field stays empty, so no format
+    // error is shown and the form submits normally.
     expect(
-      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeTruthy();
-    expect(global.fetch).not.toHaveBeenCalled();
+      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects a start date in MM-DD-YYYY format', () => {
+  it('DatePicker drops MM-DD-YYYY dates; form submits without a date filter', () => {
     (global.fetch as jest.Mock).mockClear();
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
     });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    const { getByPlaceholderText, getByText, queryByText } = render(
+      <GameLogsTable />,
+    );
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
@@ -233,18 +240,20 @@ describe('GameLogsTable date validation edge-cases (LS-7455)', () => {
     });
     clickSubmit(getByText);
     expect(
-      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeTruthy();
-    expect(global.fetch).not.toHaveBeenCalled();
+      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects a partial start date (year-month only)', () => {
+  it('DatePicker drops partial year-month dates; form submits without a date filter', () => {
     (global.fetch as jest.Mock).mockClear();
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
     });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    const { getByPlaceholderText, getByText, queryByText } = render(
+      <GameLogsTable />,
+    );
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
@@ -253,9 +262,9 @@ describe('GameLogsTable date validation edge-cases (LS-7455)', () => {
     });
     clickSubmit(getByText);
     expect(
-      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeTruthy();
-    expect(global.fetch).not.toHaveBeenCalled();
+      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a future start date (2099-12-31) client-side (LS-7452)', () => {

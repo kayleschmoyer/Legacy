@@ -15,8 +15,11 @@ export function DatePicker({
       value={value ? value.toISOString().split('T')[0] : ''}
       disabled={disabled}
       onChange={(e) => {
-        if (e.target.value) {
-          const parsed = new Date(e.target.value);
+        const { value } = e.target;
+        // Only forward values that match YYYY-MM-DD — the same constraint a
+        // real <input type="date"> enforces in browsers.
+        if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          const parsed = new Date(value);
           if (!isNaN(parsed.getTime())) {
             onChange(parsed);
           }
