@@ -405,6 +405,15 @@ test.describe('GIF Picker — GIF grid @regression', () => {
     await goToLeagueChatTab(page);
     await page.getByRole('button', { name: /open gif picker/i }).click();
     await expect(page.getByText('GIF Search')).toBeVisible();
+    // Wait for the GIF grid to populate before individual tests start asserting.
+    // GifPicker fires two trending fetches on mount (Effect 1 immediately, Effect 2
+    // after a 400 ms debounce). The debounced re-fetch sets loading=true, which
+    // temporarily removes GIF buttons from the DOM. Waiting here ensures beforeEach
+    // only returns once at least one GIF button is visible, so the test body never
+    // races against the loading window (LS-5987).
+    await expect(
+      page.getByRole('button', { name: /^Send GIF:/i }).first(),
+    ).toBeVisible();
   });
 
   test('shows GIF buttons with "Send GIF:" aria-label after Giphy load', async ({
