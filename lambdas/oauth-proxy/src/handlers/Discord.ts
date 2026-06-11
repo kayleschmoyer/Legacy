@@ -23,7 +23,7 @@ import { withDbClient } from '../util/db';
 import { notifyNewUserSignup } from '../util/discord';
 import { DiscordEnv, Secret, SECRET_CONFIG } from '../util';
 
-// ── Discord OAuth2 constants ─────────────────────────────────────────────────
+// ── Discord OAuth2 constants ────────────────────────────────────────────────────────────────────────────
 
 const DISCORD_TOKEN_URL = 'https://discord.com/api/v10/oauth2/token';
 const DISCORD_USER_URL = 'https://discord.com/api/v10/users/@me';
@@ -36,13 +36,17 @@ interface DiscordUser {
   verified: boolean;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────────────────────
 
 function errorResponse(
   statusCode: number,
   message: string,
+  code?: string,
 ): APIGatewayProxyResult {
-  return { statusCode, body: JSON.stringify({ error: message }) };
+  return {
+    statusCode,
+    body: JSON.stringify(code ? { error: message, code } : { error: message }),
+  };
 }
 
 /**
@@ -267,7 +271,7 @@ async function exchangeCodeForUser(
   return (await userRes.json()) as DiscordUser;
 }
 
-// ── Public handlers ──────────────────────────────────────────────────────────
+// ── Public handlers ───────────────────────────────────────────────────────────────────────────────
 
 /**
  * GET /oauth/discord/authorize
@@ -342,11 +346,16 @@ async function completeDiscordSignIn(
     return errorResponse(
       400,
       'Discord account does not have a verified email address',
+      'email_unverified',
     );
   }
 
   if (!discordUser.verified) {
-    return errorResponse(400, 'Discord email is not verified');
+    return errorResponse(
+      400,
+      'Discord email is not verified',
+      'email_unverified',
+    );
   }
 
   LOGGER.info('Discord OAuth user authenticated', {
@@ -457,7 +466,11 @@ async function handleDiscordAuthNative(body: {
       'Discord native OAuth exchange failed',
       error instanceof Error ? error : new Error(String(error)),
     );
-    return errorResponse(401, 'Discord authentication failed');
+    return errorResponse(
+      401,
+      'Discord authentication failed',
+      'exchange_failed',
+    );
   }
 
   return completeDiscordSignIn(discordUser);
@@ -516,7 +529,11 @@ export const handleDiscordAuth = async (
   ) {
     LOGGER.warn('Discord OAuth rejected: state mismatch');
     return withClearStateCookie(
-      errorResponse(400, 'Invalid OAuth state — please retry sign-in'),
+      errorResponse(
+        400,
+        'Invalid OAuth state — please retry sign-in',
+        'invalid_state',
+      ),
       clearState,
     );
   }
@@ -530,7 +547,7 @@ export const handleDiscordAuth = async (
       error instanceof Error ? error : new Error(String(error)),
     );
     return withClearStateCookie(
-      errorResponse(401, 'Discord authentication failed'),
+      errorResponse(401, 'Discord authentication failed', 'exchange_failed'),
       clearState,
     );
   }
@@ -581,7 +598,11 @@ export const handleDiscordLink = async (
   ) {
     LOGGER.warn('Discord link rejected: state mismatch');
     return withClearStateCookie(
-      errorResponse(400, 'Invalid OAuth state — please retry linking'),
+      errorResponse(
+        400,
+        'Invalid OAuth state — please retry linking',
+        'invalid_state',
+      ),
       clearState,
     );
   }
@@ -595,7 +616,7 @@ export const handleDiscordLink = async (
       error instanceof Error ? error.message : String(error),
     );
     return withClearStateCookie(
-      errorResponse(401, 'Discord authentication failed'),
+      errorResponse(401, 'Discord authentication failed', 'exchange_failed'),
       clearState,
     );
   }

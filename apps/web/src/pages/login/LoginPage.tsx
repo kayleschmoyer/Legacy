@@ -141,6 +141,13 @@ function humanizeOAuthError(error: unknown): string {
   }
 }
 
+const DISCORD_SERVER_ERROR_MESSAGES: Record<string, string> = {
+  exchange_failed: 'Discord sign-in failed. Please try again.',
+  email_unverified:
+    'Your Discord account does not have a verified email address.',
+  invalid_state: 'Discord sign-in failed: invalid state. Please try again.',
+};
+
 /* ── Component ── */
 export function LoginPage(): React.JSX.Element {
   const {
@@ -300,14 +307,14 @@ export function LoginPage(): React.JSX.Element {
 
         if (!response.ok) {
           const errorText = await response.text();
-          let message = `Discord sign-in failed (${response.status})`;
+          let message = 'Discord sign-in failed. Please try again.';
           try {
-            const errorData = JSON.parse(errorText) as {
-              message?: string;
-              error?: string;
-            };
-            if (errorData.message ?? errorData.error) {
-              message = (errorData.message ?? errorData.error) as string;
+            const errorData = JSON.parse(errorText) as { code?: string };
+            if (
+              errorData.code &&
+              errorData.code in DISCORD_SERVER_ERROR_MESSAGES
+            ) {
+              message = DISCORD_SERVER_ERROR_MESSAGES[errorData.code]!;
             }
           } catch {
             /* keep default */

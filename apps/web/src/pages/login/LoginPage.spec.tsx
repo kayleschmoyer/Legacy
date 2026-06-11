@@ -718,23 +718,133 @@ describe('LoginPage Discord callback progress screen (LS-6667)', () => {
     ).toBeTruthy();
   });
 
-  it('falls back to the login form with an error when the code exchange fails', async () => {
+  it('falls back to the login form with a generic error when the server returns an unknown code (LGN-008)', async () => {
+    // Server returns an unrecognised code — the raw error string must never
+    // reach the DOM; the client falls back to generic copy (LGN-008 / LS-6663).
     global.fetch = jest.fn(() =>
       Promise.resolve({
         ok: false,
         status: 400,
-        text: () => Promise.resolve('{"message":"bad code"}'),
-        json: () => Promise.resolve({ message: 'bad code' }),
+        text: () =>
+          Promise.resolve(
+            '{"error":"internal_exception_detail","code":"unknown_future_code"}',
+          ),
+        json: () =>
+          Promise.resolve({
+            error: 'internal_exception_detail',
+            code: 'unknown_future_code',
+          }),
       }),
     ) as unknown as typeof fetch;
 
     renderPage();
 
-    // After the failed exchange the progress screen is replaced by the form
-    // (Google button present) and the error banner is shown.
     await waitForSignInButton();
     expect(screen.queryByText(/signing in with discord/i)).toBeNull();
-    expect(await screen.findByText('bad code')).toBeTruthy();
+    expect(
+      await screen.findByText('Discord sign-in failed. Please try again.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/internal_exception_detail/)).toBeNull();
+  });
+
+  it('translates exchange_failed code to friendly copy without leaking server text (LGN-008)', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        text: () =>
+          Promise.resolve(
+            '{"error":"Discord authentication failed","code":"exchange_failed"}',
+          ),
+        json: () =>
+          Promise.resolve({
+            error: 'Discord authentication failed',
+            code: 'exchange_failed',
+          }),
+      }),
+    ) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitForSignInButton();
+    expect(
+      await screen.findByText('Discord sign-in failed. Please try again.'),
+    ).toBeTruthy();
+  });
+
+  it('translates email_unverified code to email-specific copy (LGN-008)', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 400,
+        text: () =>
+          Promise.resolve(
+            '{"error":"Discord email is not verified","code":"email_unverified"}',
+          ),
+        json: () =>
+          Promise.resolve({
+            error: 'Discord email is not verified',
+            code: 'email_unverified',
+          }),
+      }),
+    ) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitForSignInButton();
+    expect(
+      await screen.findByText(
+        'Your Discord account does not have a verified email address.',
+      ),
+    ).toBeTruthy();
+    // The raw server error string must not reach the DOM.
+    expect(screen.queryByText(/Discord email is not verified/)).toBeNull();
+  });
+
+  it('translates invalid_state code to state-error copy (LGN-008)', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 400,
+        text: () =>
+          Promise.resolve(
+            '{"error":"Invalid OAuth state — please retry sign-in","code":"invalid_state"}',
+          ),
+        json: () =>
+          Promise.resolve({
+            error: 'Invalid OAuth state — please retry sign-in',
+            code: 'invalid_state',
+          }),
+      }),
+    ) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitForSignInButton();
+    expect(
+      await screen.findByText(
+        'Discord sign-in failed: invalid state. Please try again.',
+      ),
+    ).toBeTruthy();
+    // The raw server error string must not reach the DOM.
+    expect(screen.queryByText(/Invalid OAuth state/)).toBeNull();
+  });
+
+  it('falls back to generic copy when the server response is not JSON (LGN-008)', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('Internal Server Error'),
+      }),
+    ) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitForSignInButton();
+    expect(
+      await screen.findByText('Discord sign-in failed. Please try again.'),
+    ).toBeTruthy();
   });
 });
 

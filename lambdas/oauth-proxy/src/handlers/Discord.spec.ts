@@ -323,6 +323,63 @@ describe('handleDiscordAuth', () => {
     expect(mockNotifyNewUserSignup).not.toHaveBeenCalled();
   });
 
+  it('includes code: invalid_state on OAuth state mismatch (LGN-008 / LS-6663)', async () => {
+    mockVerifyOauthState.mockReturnValue(false);
+
+    const result = await handleDiscordAuth(
+      makeEvent({ code: 'auth-code', state: 'bad-state' }),
+    );
+
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'invalid_state' });
+  });
+
+  it('includes code: exchange_failed when the Discord token exchange throws (LGN-008 / LS-6663)', async () => {
+    fetchSpy.mockReset();
+    fetchSpy.mockRejectedValueOnce(new Error('network error'));
+
+    const result = await handleDiscordAuth(
+      makeEvent({ code: 'auth-code', state: 'good-state' }),
+    );
+
+    expect(result.statusCode).toBe(401);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'exchange_failed' });
+  });
+
+  it('includes code: email_unverified when the Discord profile has no email (LGN-008 / LS-6663)', async () => {
+    fetchSpy.mockReset();
+    fetchSpy
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'discord-123',
+            username: 'DiscordUser',
+            email: null,
+            avatar: null,
+            verified: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'email_unverified' });
+  });
+
+  it('includes code: email_unverified when the Discord profile email is unverified (LGN-008 / LS-6663)', async () => {
+    fetchSpy.mockReset();
+    fetchSpy
+      .mockResolvedValueOnce(makeDiscordTokenResponse())
+      .mockResolvedValueOnce(makeDiscordUserResponse({ verified: false }));
+
+    const result = await handleDiscordAuth(makeEvent({ code: 'auth-code' }));
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'email_unverified' });
+  });
+
   it('clears the OAuth state cookie on success (single-use)', async () => {
     const result = await handleDiscordAuth(
       makeEvent({ code: 'auth-code', state: 'good-state' }),
