@@ -1,33 +1,40 @@
 name: "Jira Branch Sync"
 
 # Keeps Jira ticket statuses in sync with branch/PR activity.
-# Only runs when there is actual activity on LS-* branches or their PRs —
-# no unnecessary polling; each trigger is scoped to a real change.
 #
-# Transitions applied:
-#   push to LS-*/...   (no open PR yet)  → In Progress
-#   PR opened / reopened                 → In Review
-#   PR closed + merged                   → Done
-#   PR closed without merging            → In Progress
+# This workflow is a thin event adapter: all decisions (which keys to
+# transition, to what status, and whether a move is allowed) live in the
+# unit-tested tools/jira-sync/ package (see its README and
+# docs/rfcs/draft-declared-ticket-linkage.md). The package is executed with
+# the runner's bare node — no pnpm install — from a sparse checkout of main.
 #
-# Ticket key extraction (from branch/title/body, combined and deduped):
-#   - Branch name — all LS-#### matches (e.g. LS-1234/description → LS-1234)
-#   - PR title — all LS-#### matches (PR events only)
-#   - PR body — only LS-#### matches preceded by a closing keyword on the same
-#     line: closes/close/closed, fixes/fix/fixed, resolves/resolve/resolved,
-#     completes/complete/completed (case-insensitive). Bare references such as
-#     "unblocks LS-1791" or "blocked by LS-1791" are intentionally excluded to
-#     prevent accidentally transitioning tickets that are merely mentioned.
-#   All discovered keys are merged, normalized, sorted, and deduplicated
-#   before transitions are applied.
+# Event → transition table (tools/jira-sync/src/state-machine.js):
+#   PR opened / reopened / ready_for_review → In Review
+#   PR converted_to_draft                   → In Progress
+#   PR closed + merged                      → Done
+#   PR closed without merging               → In Progress
+#   push, no open PR for the branch         → In Progress (branch-name keys only)
+#   push, open PR exists                    → no-op
 #
-# Multi-ticket branches (e.g. claude/ls818-wvV62) are supported via branch
-# name and PR title/body parsing. Include all LS-#### keys in any of these
-# locations to ensure every associated ticket is transitioned automatically.
+# Ticket key selection (tools/jira-sync/src/plan.js):
+#   - PR events: the `primary` key from the PR body's `<!-- jira-link -->`
+#     marker. When no marker exists, fall back to PR-title key parsing.
+#     `primary: none` and invalid markers transition nothing.
+#   - Push events: branch-name keys only, gated on the branch having no
+#     open PR. Commit-message sweeping was deliberately removed — after a
+#     rebase the push payload contains main's commits, so it transitioned
+#     foreign (often already-Done) tickets (run 27291997543).
 #
-# Independently of whether the child ticket transition succeeded or was
-# skipped, the workflow also syncs the parent epic status (if any) based
-# on the aggregate state of all its children:
+# Monotonic guard: before each transition the ticket's current status is
+# read and tools/jira-sync `guard` consulted. Automation only moves tickets
+# forward (To Do → In Progress → In Review → Done); the only permitted
+# downgrades are In Review → In Progress on closed-unmerged or
+# converted_to_draft. A push can never demote anything; a merged PR can
+# never un-Done a ticket.
+#
+# Independently of the child ticket transitions, the workflow also syncs
+# the parent epic status (if any) based on the aggregate state of all its
+# children:
 #   All children Done                         → Epic "Done"
 #   All children In Review or Done            → Epic "In Review"
 #   Any child In Progress or In Review        → Epic "In Progress"
@@ -50,7 +57,7 @@ on:
       - "LS-*/*"
       - "claude/**"
   pull_request:
-    types: [opened, reopened, closed]
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
 
 concurrency:
   group: jira-branch-sync-${{ github.event.pull_request.number || github.ref }}
@@ -67,10 +74,34 @@ jobs:
 
     steps:
       # -----------------------------------------------------------------------
-      # 1. Determine the branch name regardless of trigger type
+      # 1. Check out the sync engine from main — never from the PR head, so
+      #    PR-authored code is not executed in a job with access to
+      #    JIRA_CREDENTIALS. Sparse checkout keeps this fast.
+      # -----------------------------------------------------------------------
+      - name: Check out jira-sync engine (from main)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+          sparse-checkout: tools/jira-sync
+          sparse-checkout-cone-mode: true
+
+      - name: Verify engine is available
+        id: engine
+        run: |
+          if [[ -f tools/jira-sync/src/cli.js ]]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            # Happens only for runs triggered before tools/jira-sync lands on main.
+            echo "⏭️  tools/jira-sync is not on main yet — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 2. Determine the branch name regardless of trigger type
       # -----------------------------------------------------------------------
       - name: Resolve branch name
         id: branch
+        if: steps.engine.outputs.skip != 'true'
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BRANCH="${{ github.head_ref }}"
@@ -81,115 +112,68 @@ jobs:
           echo "Branch: $BRANCH"
 
       # -----------------------------------------------------------------------
-      # 2. Extract Jira ticket keys (LS-####) from branch name and PR metadata
+      # 3. Open-PR gate (push events only): a push to a branch with an open
+      #    PR never changes ticket status — review-fix pushes used to knock
+      #    in-review tickets back to In Progress.
       # -----------------------------------------------------------------------
-      - name: Extract ticket keys
-        id: ticket
+      - name: Count open PRs for branch
+        id: gate
+        if: steps.engine.outputs.skip != 'true' && github.event_name == 'push'
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          # Commit messages from the push payload (newline-separated).
-          # Only populated on push events; empty string on pull_request events.
-          COMMIT_MESSAGES: ${{ join(github.event.commits.*.message, '\n') }}
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
         run: |
-          BRANCH="${{ steps.branch.outputs.name }}"
-
-          # Extract all LS-#### keys from branch name
-          BRANCH_KEYS=$(echo "$BRANCH" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
-
-          # For PR events, also extract from PR title and body.
-          # Title: all LS-#### matches (titles are terse and primary).
-          # Body: only LS-#### matches preceded by a closing keyword on the same
-          # line (closes/fixes/resolves/completes). Bare references such as
-          # "unblocks LS-1791" are intentionally excluded to prevent accidentally
-          # transitioning tickets that are merely mentioned.
-          PR_KEYS=""
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            TITLE_KEYS=$(echo "$PR_TITLE" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
-            BODY_KEYS=$(echo "$PR_BODY" \
-              | grep -ioP '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?)\s+LS-\d+' \
-              | grep -oiP 'LS-\d+' \
-              | tr '[:lower:]' '[:upper:]' || true)
-            PR_KEYS=$(printf '%s\n%s' "$TITLE_KEYS" "$BODY_KEYS")
+          COUNT=""
+          if RESPONSE=$(curl -sf \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls?head=${GITHUB_REPOSITORY_OWNER}:${BRANCH}&state=open&per_page=10"); then
+            COUNT=$(echo "$RESPONSE" | jq 'length' 2>/dev/null || true)
           fi
 
-          # For push events on agent branches (claude/*) where the branch name
-          # contains no ticket key, fall back to scanning commit messages.
-          # Agents always include LS-#### in commit messages per AGENTS.md.
-          COMMIT_KEYS=""
-          if [[ "${{ github.event_name }}" == "push" && -z "$BRANCH_KEYS" && -n "$COMMIT_MESSAGES" ]]; then
-            COMMIT_KEYS=$(echo "$COMMIT_MESSAGES" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
-            if [[ -n "$COMMIT_KEYS" ]]; then
-              echo "Extracted keys from commit messages: $(echo "$COMMIT_KEYS" | tr '\n' ' ')"
-            fi
+          # Fail closed: if we cannot determine PR state, do not transition.
+          if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
+            echo "⚠️  Could not query open PRs for $BRANCH — treating as gated."
+            COUNT=1
           fi
 
-          # Combine and deduplicate all keys
-          ALL_KEYS=$(printf '%s\n%s\n%s' "$BRANCH_KEYS" "$PR_KEYS" "$COMMIT_KEYS" \
-            | grep -E '^LS-[0-9]+$' | sort -u | tr '\n' ' ' | xargs)
+          echo "open_pr_count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Open PRs for $BRANCH: $COUNT"
 
-          if [[ -z "$ALL_KEYS" ]]; then
-            echo "⏭️  No Jira ticket keys found in branch '$BRANCH', PR metadata, or commit messages — skipping."
+      # -----------------------------------------------------------------------
+      # 4. Plan: which keys, which target status (tools/jira-sync `plan`)
+      # -----------------------------------------------------------------------
+      - name: Plan transitions
+        id: plan
+        if: steps.engine.outputs.skip != 'true'
+        env:
+          OPEN_PR_COUNT: ${{ steps.gate.outputs.open_pr_count || '0' }}
+        run: |
+          PLAN=$(node tools/jira-sync/src/cli.js plan \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --open-pr-count "$OPEN_PR_COUNT")
+          echo "Plan: $PLAN"
+
+          SKIP=$(echo "$PLAN" | jq -r '.skip')
+          if [[ "$SKIP" == "true" ]]; then
+            echo "⏭️  $(echo "$PLAN" | jq -r '.reason')"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "keys=$ALL_KEYS" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Tickets: $ALL_KEYS"
+            {
+              echo "skip=false"
+              echo "keys=$(echo "$PLAN" | jq -r '.keys | join(" ")')"
+              echo "target=$(echo "$PLAN" | jq -r '.target')"
+            } >> "$GITHUB_OUTPUT"
+            echo "Tickets: $(echo "$PLAN" | jq -r '.keys | join(" ")') → $(echo "$PLAN" | jq -r '.target')"
           fi
 
       # -----------------------------------------------------------------------
-      # 3. Determine the desired Jira transition name
-      # -----------------------------------------------------------------------
-      - name: Determine target status
-        id: target
-        if: steps.ticket.outputs.skip != 'true'
-        env:
-          EVENT: ${{ github.event_name }}
-          ACTION: ${{ github.event.action }}
-          MERGED: ${{ github.event.pull_request.merged }}
-        run: |
-          if [[ "$EVENT" == "push" ]]; then
-            # Only transition to In Progress on push when the branch has no
-            # associated open PR (GitHub sets GITHUB_BASE_REF for PRs; for
-            # plain pushes it is empty).
-            echo "transition=In Progress" >> "$GITHUB_OUTPUT"
-
-          elif [[ "$EVENT" == "pull_request" ]]; then
-            if [[ "$ACTION" == "opened" || "$ACTION" == "reopened" ]]; then
-              echo "transition=In Review" >> "$GITHUB_OUTPUT"
-            elif [[ "$ACTION" == "closed" && "$MERGED" == "true" ]]; then
-              echo "transition=Done" >> "$GITHUB_OUTPUT"
-            elif [[ "$ACTION" == "closed" && "$MERGED" != "true" ]]; then
-              # PR was closed without merging — move ticket back to In Progress
-              echo "transition=In Progress" >> "$GITHUB_OUTPUT"
-            else
-              echo "transition=" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-
-          echo "Transition: $(cat "$GITHUB_OUTPUT" | grep transition | cut -d= -f2-)"
-
-      # -----------------------------------------------------------------------
-      # 4. Skip if there is nothing to transition (e.g. PR synchronize)
-      # -----------------------------------------------------------------------
-      - name: Check if transition is needed
-        id: guard
-        if: steps.ticket.outputs.skip != 'true'
-        run: |
-          TARGET="${{ steps.target.outputs.transition }}"
-          if [[ -z "$TARGET" ]]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "⏭️  No transition needed for this event — skipping."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # -----------------------------------------------------------------------
-      # 4b. Obtain Jira OAuth access token
+      # 5. Obtain Jira OAuth access token
       # -----------------------------------------------------------------------
       - name: Authenticate with Jira (OAuth 2.0)
         id: auth
-        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        if: steps.engine.outputs.skip != 'true' && steps.plan.outputs.skip != 'true'
         env:
           JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
         run: |
@@ -261,10 +245,10 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
-      # 4c. Define reusable retry wrapper for Jira API calls
+      # 6. Define reusable retry wrapper for Jira API calls
       # -----------------------------------------------------------------------
       - name: Define Jira API helper
-        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        if: steps.engine.outputs.skip != 'true' && steps.plan.outputs.skip != 'true'
         run: |
           # Write a reusable retry function to a sourceable script.
           # Retries 3 times with exponential backoff (2s, 4s, 8s).
@@ -349,20 +333,47 @@ jobs:
           echo "✅ Jira API retry helper defined"
 
       # -----------------------------------------------------------------------
-      # 5. Transition all extracted ticket keys to the target status
+      # 7. Transition the planned ticket keys, consulting the monotonic guard
+      #    against each ticket's *current* status first.
       # -----------------------------------------------------------------------
       - name: Apply Jira transitions
         id: apply
-        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        if: steps.engine.outputs.skip != 'true' && steps.plan.outputs.skip != 'true'
         env:
-          KEYS: ${{ steps.ticket.outputs.keys }}
-          TARGET: ${{ steps.target.outputs.transition }}
+          KEYS: ${{ steps.plan.outputs.keys }}
+          TARGET: ${{ steps.plan.outputs.target }}
+          ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
         run: |
           source /tmp/jira-api.sh
 
           FAILED_TICKETS=""
           for TICKET in $KEYS; do
             echo "--- $TICKET → $TARGET ---"
+
+            # Read the current status. A failure here (e.g. a nonexistent key
+            # 404ing after merge) is logged and skipped rather than failing
+            # the run — there is nothing actionable post-merge.
+            STATUS_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET?fields=status") || {
+              echo "⚠️  Could not fetch $TICKET (nonexistent key?) — skipping."
+              continue
+            }
+            CURRENT=$(echo "$STATUS_RESPONSE" | jq -r '.fields.status.name')
+
+            GUARD=$(node tools/jira-sync/src/cli.js guard \
+              --current "$CURRENT" \
+              --target "$TARGET" \
+              --event-name "$GITHUB_EVENT_NAME" \
+              --action "${ACTION:-none}" \
+              --merged "${MERGED:-false}")
+            ALLOWED=$(echo "$GUARD" | jq -r '.allowed')
+            REASON=$(echo "$GUARD" | jq -r '.reason')
+
+            if [[ "$ALLOWED" != "true" ]]; then
+              echo "⏭️  $TICKET: $REASON"
+              continue
+            fi
+            echo "✓ Guard: $REASON"
 
             RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions") || {
               echo "❌ Failed to fetch transitions for $TICKET"
@@ -394,12 +405,12 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
-      # 6. Sync parent epics for all transitioned tickets
+      # 8. Sync parent epics for all transitioned tickets
       # -----------------------------------------------------------------------
       - name: Sync parent epics
-        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        if: steps.engine.outputs.skip != 'true' && steps.plan.outputs.skip != 'true'
         env:
-          KEYS: ${{ steps.ticket.outputs.keys }}
+          KEYS: ${{ steps.plan.outputs.keys }}
         run: |
           source /tmp/jira-api.sh
 

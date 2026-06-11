@@ -354,20 +354,35 @@ The `recheck` job can be triggered via `workflow_dispatch` with a `pr_number` in
 
 ## Phase 5: Jira Branch Sync (`jira-branch-sync.yml`)
 
-Automatically keeps Jira ticket statuses in sync with branch/PR activity.
+Automatically keeps Jira ticket statuses in sync with branch/PR activity. The
+workflow is a thin adapter over the unit-tested `tools/jira-sync/` package
+(LS-7894, phase 1 of `docs/rfcs/draft-declared-ticket-linkage.md`), executed
+with bare `node` from a sparse checkout of `main`.
 
 ### Transition Table
 
-| Event                               | Action                                                                   | Jira Transition |
-| ----------------------------------- | ------------------------------------------------------------------------ | --------------- |
-| `push` to `LS-*/...` branch         | --                                                                       | In Progress     |
-| `push` to `claude/**` branch        | ticket key extracted from commit messages (branch name has no `LS-####`) | In Progress     |
-| `pull_request` opened               | ticket key extracted from PR title + body                                | In Review       |
-| `pull_request` reopened             | --                                                                       | In Review       |
-| `pull_request` closed + merged      | --                                                                       | Done            |
-| `pull_request` closed without merge | --                                                                       | In Progress     |
+| Event                                               | Keys used                             | Jira Transition |
+| --------------------------------------------------- | ------------------------------------- | --------------- |
+| `push`, no open PR for the branch                   | branch-name keys only                 | In Progress     |
+| `push`, open PR exists for the branch               | --                                    | no-op           |
+| `pull_request` opened / reopened / ready_for_review | `primary` from the `jira-link` marker | In Review       |
+| `pull_request` converted_to_draft                   | `primary`                             | In Progress     |
+| `pull_request` closed + merged                      | `primary`                             | Done            |
+| `pull_request` closed without merge                 | `primary`                             | In Progress     |
 
-> **Ticket key extraction priority (push events on `claude/**`):** commit messages in the push payload are scanned for `LS-####`keys. Agents must include the ticket key in every commit message (enforced by AGENTS.md). PR title/body extraction applies only to`pull_request` events.
+> **Ticket key selection (PR events):** the `<!-- jira-link -->` marker in the
+> PR body is the source of truth; when no marker exists, the sync falls back to
+> PR-title key parsing. `primary: none` and invalid markers transition nothing.
+> **Commit-message key sweeping no longer exists** — it swept foreign keys from
+> main's commits after rebases (run 27291997543). Pushes to `claude/**` branches
+> with no key in the branch name are a no-op; the `work-ticket` skill already
+> transitions on claim.
+
+> **Monotonic guard:** every transition first reads the ticket's current status
+> and consults the allowed-moves table (`To Do → In Progress → In Review → Done`).
+> The only permitted downgrades are `In Review → In Progress` on closed-unmerged
+> or converted_to_draft. A push can never demote a ticket; a merged PR can never
+> un-Done one.
 
 ### Epic Sync
 

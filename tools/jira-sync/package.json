@@ -1,0 +1,6 @@
+{
+  "name": "legacy-sports-jira-sync",
+  "private": true,
+  "description": "Jira branch-sync transition engine: jira-link marker parsing, forward-only state machine, and push-event planning. Zero runtime dependencies so .github/workflows/jira-branch-sync.yml can execute it with bare node (no pnpm install) on every push.",
+  "main": "src/index.js"
+}

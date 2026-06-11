@@ -1797,6 +1797,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1
 
+  tools/jira-sync: {}
+
 packages:
 
   '@adobe/css-tools@4.4.4':
