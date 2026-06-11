@@ -45,6 +45,8 @@ function sanitizeTradeMessage(raw: string): string {
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
 
+/** Fetch a trade offer by ID and attach its player legs. Team and player names
+ *  are read from stored snapshot columns — no live JOIN to teams/players. */
 async function enrichTrade(tradeId: number, context: Context) {
   const [trade] = await context.db
     .select()
@@ -435,15 +437,15 @@ builder.mutationField('proposeTrade', (t) =>
       }
 
       if (offeringPlayerIds.length === 0 && requestingPlayerIds.length === 0) {
-        throw new Error(
+        throw UserInputError(
           'A trade must include at least one player on each side',
         );
       }
       if (offeringPlayerIds.length === 0) {
-        throw new Error('You must offer at least one player');
+        throw UserInputError('You must offer at least one player');
       }
       if (requestingPlayerIds.length === 0) {
-        throw new Error(
+        throw UserInputError(
           'You must request at least one player from the other team',
         );
       }
@@ -512,7 +514,7 @@ builder.mutationField('proposeTrade', (t) =>
       const proposingTeamId = await resolveUserTeam(userId, leagueId, db);
 
       if (proposingTeamId === receivingTeamId) {
-        throw new Error('You cannot trade with yourself');
+        throw UserInputError('You cannot trade with yourself');
       }
 
       // 2. Verify the receiving team exists in this league
@@ -575,7 +577,7 @@ builder.mutationField('proposeTrade', (t) =>
         );
 
       if (offeringMembers.length !== offeringPlayerIds.length) {
-        throw new Error(
+        throw UserInputError(
           'One or more players you are offering are not on your roster',
         );
       }
@@ -593,7 +595,7 @@ builder.mutationField('proposeTrade', (t) =>
         );
 
       if (requestingMembers.length !== requestingPlayerIds.length) {
-        throw new Error(
+        throw UserInputError(
           "One or more players you are requesting are not on the other team's roster",
         );
       }
