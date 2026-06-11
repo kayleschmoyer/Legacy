@@ -1075,6 +1075,11 @@ type FootballPlayer {
   nflTeam: String
   pfrId: String
   position: String
+
+  """
+  Distinct team codes from season-stats records that differ from the current nflTeam. Non-empty when the player was traded mid-season or changed teams across seasons (LS-6238).
+  """
+  previousTeams: [String!]!
   seasonStats(season: Int): FootballPlayerSeasonStats
 
   """

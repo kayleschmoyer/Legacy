@@ -16,6 +16,7 @@ const QB_PLAYER: FootballPlayerDetailPlayer = {
   position: 'QB',
   isDst: false,
   nflTeam: 'KC',
+  previousTeams: [],
   careerStats: {
     passing: { yds: 5000, td: 37, int: 14, rating: 105.2 },
   },
@@ -54,6 +55,7 @@ const RB_PLAYER: FootballPlayerDetailPlayer = {
   position: 'RB',
   isDst: false,
   nflTeam: 'SF',
+  previousTeams: [],
   careerStats: {
     rushing: { yds: 1459, td: 14 },
     receiving: { rec: 67, yds: 564, td: 7 },
@@ -92,6 +94,7 @@ const WR_PLAYER: FootballPlayerDetailPlayer = {
   position: 'WR',
   isDst: false,
   nflTeam: 'LV',
+  previousTeams: [],
   careerStats: {
     receiving: { rec: 100, yds: 1144, td: 8 },
   },
@@ -111,6 +114,19 @@ const WR_PLAYER: FootballPlayerDetailPlayer = {
   },
 };
 
+const TRADED_PLAYER: FootballPlayerDetailPlayer = {
+  id: 6,
+  firstName: 'Davante',
+  lastName: 'Adams',
+  position: 'WR',
+  isDst: false,
+  nflTeam: 'LV',
+  previousTeams: ['GB', 'KC'],
+  careerStats: {
+    receiving: { rec: 102, yds: 1516, td: 14 },
+  },
+};
+
 const DST_PLAYER: FootballPlayerDetailPlayer = {
   id: 2,
   firstName: 'Kansas City',
@@ -118,6 +134,7 @@ const DST_PLAYER: FootballPlayerDetailPlayer = {
   position: 'DST',
   isDst: true,
   nflTeam: 'KC',
+  previousTeams: [],
   careerStats: {
     defense: { sacks: 45.5, int: 18, ptsAllowedPerG: 19.3 },
   },
@@ -130,6 +147,7 @@ const LB_PLAYER: FootballPlayerDetailPlayer = {
   position: 'LB',
   isDst: false,
   nflTeam: 'DAL',
+  previousTeams: [],
   careerStats: {
     idp: { soloTkl: 48, astTkl: 12, sacks: 13.0, int: 1, ff: 4 },
   },
@@ -260,11 +278,22 @@ describe('FootballPlayerDetail', () => {
       position: 'WR',
       isDst: false,
       nflTeam: null,
+      previousTeams: [],
       careerStats: null,
     };
     render(<FootballPlayerDetail player={FREE_AGENT} />);
     expect(screen.getByText('FA')).toBeTruthy();
     expect(screen.getByText('Free Agent')).toBeTruthy();
     expect(screen.queryByText('?')).toBeNull();
+  });
+
+  it('shows "previously: X" when previousTeams is non-empty', () => {
+    render(<FootballPlayerDetail player={TRADED_PLAYER} />);
+    expect(screen.getByText('previously: GB, KC')).toBeTruthy();
+  });
+
+  it('hides the "previously" indicator when previousTeams is empty', () => {
+    render(<FootballPlayerDetail player={QB_PLAYER} />);
+    expect(screen.queryByText(/previously:/)).toBeNull();
   });
 });

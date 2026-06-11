@@ -106,6 +106,7 @@ export interface FootballPlayerDetailPlayer {
   isDst?: boolean | null;
   careerStats?: FootballPlayerDetailStats | null;
   seasonStats?: FootballPlayerDetailSeasonStats | null;
+  previousTeams: string[];
 }
 
 function fmt(n: number | null | undefined): string {
@@ -493,6 +494,7 @@ export function FootballPlayerDetail({
 }: FootballPlayerDetailProps) {
   const teamData = player?.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
   const isDst = player?.isDst ?? false;
+  const previousTeams = player?.previousTeams ?? [];
   const isIdp =
     player?.position === 'DL' ||
     player?.position === 'LB' ||
@@ -612,6 +614,11 @@ export function FootballPlayerDetail({
                 ) : (
                   <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
                     Free Agent
+                  </Text>
+                )}
+                {previousTeams.length > 0 && (
+                  <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+                    {`previously: ${previousTeams.join(', ')}`}
                   </Text>
                 )}
               </XStack>

@@ -947,6 +947,8 @@ export type FootballPlayer = {
   nflTeam?: Maybe<Scalars['String']['output']>;
   pfrId?: Maybe<Scalars['String']['output']>;
   position?: Maybe<Scalars['String']['output']>;
+  /** Distinct team codes from season-stats records that differ from the current nflTeam. Non-empty when the player was traded mid-season or changed teams across seasons (LS-6238). */
+  previousTeams: Array<Scalars['String']['output']>;
   seasonStats?: Maybe<FootballPlayerSeasonStats>;
   /** Per-week game log for the given season (LS-6233). Bye weeks appear as explicit rows with isBye:true — never a gap. */
   weeklyGameLogs: Array<FootballWeeklyGameLog>;
@@ -5198,6 +5200,7 @@ export type FootballPlayersQuery = {
       isDst: boolean;
       nflTeam?: string | null;
       pfrId?: string | null;
+      previousTeams: Array<string>;
       careerStats?: {
         __typename?: 'FootballCareerStats';
         passing?: {
@@ -5262,6 +5265,7 @@ export type FootballPlayerQuery = {
     isDst: boolean;
     nflTeam?: string | null;
     pfrId?: string | null;
+    previousTeams: Array<string>;
     careerStats?: {
       __typename?: 'FootballCareerStats';
       passing?: {
@@ -12658,6 +12662,7 @@ export const FootballPlayers = gql`
         isDst
         nflTeam
         pfrId
+        previousTeams
         careerStats {
           passing {
             yds
@@ -12791,6 +12796,7 @@ export const FootballPlayer = gql`
       isDst
       nflTeam
       pfrId
+      previousTeams
       careerStats {
         passing {
           yds

@@ -6,4 +6,5 @@ fragment FootballPlayer on FootballPlayer {
   isDst
   nflTeam
   pfrId
+  previousTeams
 }

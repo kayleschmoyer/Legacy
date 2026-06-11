@@ -775,6 +775,53 @@ FootballPlayerRef.implement({
     isDst: t.exposeBoolean('isDst', { nullable: false }),
     nflTeam: t.exposeString('nflTeam', { nullable: true }),
     position: t.exposeString('position', { nullable: true }),
+    previousTeams: t.field({
+      type: ['String'],
+      nullable: false,
+      description:
+        'Distinct team codes from season-stats records that differ from the current nflTeam. Non-empty when the player was traded mid-season or changed teams across seasons (LS-6238).',
+      resolve: async (parent, _args, context) => {
+        const db = context.db;
+        const playerId = parent.id;
+
+        const [p, ru, re, k, d, idp] = await Promise.all([
+          db
+            .selectDistinct({ team: PublicSchema.footballSeasonPassing.team })
+            .from(PublicSchema.footballSeasonPassing)
+            .where(eq(PublicSchema.footballSeasonPassing.playerId, playerId)),
+          db
+            .selectDistinct({ team: PublicSchema.footballSeasonRushing.team })
+            .from(PublicSchema.footballSeasonRushing)
+            .where(eq(PublicSchema.footballSeasonRushing.playerId, playerId)),
+          db
+            .selectDistinct({ team: PublicSchema.footballSeasonReceiving.team })
+            .from(PublicSchema.footballSeasonReceiving)
+            .where(eq(PublicSchema.footballSeasonReceiving.playerId, playerId)),
+          db
+            .selectDistinct({ team: PublicSchema.footballSeasonKicking.team })
+            .from(PublicSchema.footballSeasonKicking)
+            .where(eq(PublicSchema.footballSeasonKicking.playerId, playerId)),
+          db
+            .selectDistinct({ team: PublicSchema.footballSeasonDefense.team })
+            .from(PublicSchema.footballSeasonDefense)
+            .where(eq(PublicSchema.footballSeasonDefense.playerId, playerId)),
+          db
+            .selectDistinct({
+              team: PublicSchema.footballSeasonDefenseIdp.team,
+            })
+            .from(PublicSchema.footballSeasonDefenseIdp)
+            .where(
+              eq(PublicSchema.footballSeasonDefenseIdp.playerId, playerId),
+            ),
+        ]);
+
+        const currentTeam = parent.nflTeam;
+        const allTeams = [...p, ...ru, ...re, ...k, ...d, ...idp].map(
+          (r) => r.team,
+        );
+        return [...new Set(allTeams)].filter((team) => team !== currentTeam);
+      },
+    }),
     seasonStats: t.field({
       type: FootballPlayerSeasonStatsRef,
       nullable: true,
