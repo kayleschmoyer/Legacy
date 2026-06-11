@@ -25,7 +25,10 @@ export function extractPrimaryKey(text: string): string | null {
 }
 
 export function hasJiraLinkMarker(body: string): boolean {
-  return MARKER_RE.test(body);
+  const scannableBody = body
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`\n]+`/g, '');
+  return MARKER_RE.test(scannableBody);
 }
 
 /**

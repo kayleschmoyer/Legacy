@@ -130,6 +130,55 @@ describe('jira-link marker (LS-7895)', () => {
       const result = ensureJiraLinkMarker(body, { primary: 'LS-9' });
       expect(result).toContain('primary: LS-9');
     });
+
+    it('prepends marker when body mentions the marker only in a backtick code span (LS-7914)', () => {
+      const body =
+        'Use `<!-- jira-link -->` in your PR body to link a ticket.\n\n## Summary\n\n- did things';
+      const result = ensureJiraLinkMarker(body, { primary: 'LS-7914' });
+      expect(result.startsWith('<!-- jira-link\nprimary: LS-7914\n-->')).toBe(
+        true,
+      );
+      expect(result).toContain('Use `<!-- jira-link -->`');
+    });
+
+    it('prepends marker when body mentions the marker only in a fenced code block (LS-7914)', () => {
+      const body =
+        '```\n<!-- jira-link\nprimary: LS-1\n-->\n```\n\n## Summary\n\n- did things';
+      const result = ensureJiraLinkMarker(body, { primary: 'LS-7914' });
+      expect(result.startsWith('<!-- jira-link\nprimary: LS-7914\n-->')).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('hasJiraLinkMarker (LS-7914)', () => {
+    it('returns false when marker appears only inside a backtick code span', () => {
+      expect(
+        hasJiraLinkMarker('Use `<!-- jira-link -->` in your PR body.'),
+      ).toBe(false);
+    });
+
+    it('returns false when marker appears only inside a fenced code block', () => {
+      expect(
+        hasJiraLinkMarker(
+          '```\n<!-- jira-link\nprimary: LS-1\n-->\n```\n\nSome prose.',
+        ),
+      ).toBe(false);
+    });
+
+    it('returns true when a real marker is present (no-op preserved)', () => {
+      expect(
+        hasJiraLinkMarker(
+          '<!-- jira-link\nprimary: LS-1\n-->\n\n**Jira:** [LS-1](https://bkrupa.atlassian.net/browse/LS-1)',
+        ),
+      ).toBe(true);
+    });
+
+    it('returns true when a real marker is present alongside a quoted decoy (no-op preserved)', () => {
+      const body =
+        '<!-- jira-link\nprimary: LS-1\n-->\n\nMentions `<!-- jira-link -->` in prose.';
+      expect(hasJiraLinkMarker(body)).toBe(true);
+    });
   });
 
   describe('buildJiraLinkComment', () => {
