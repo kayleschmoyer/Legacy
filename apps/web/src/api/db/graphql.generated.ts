@@ -5293,9 +5293,13 @@ export type FootballPlayerQuery = {
       } | null;
       defense?: {
         __typename?: 'FootballCareerDefense';
+        g?: number | null;
         sacks?: number | null;
         int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
         ptsAllowedPerG?: number | null;
+        ydsAllowedPerG?: number | null;
       } | null;
       idp?: {
         __typename?: 'FootballCareerIdp';
@@ -5340,6 +5344,17 @@ export type FootballPlayerQuery = {
         yds?: number | null;
         td?: number | null;
         ydsPerRec?: number | null;
+      }> | null;
+      defense?: Array<{
+        __typename?: 'FootballSeasonDefense';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
+        ptsAllowed?: number | null;
       }> | null;
     } | null;
   } | null;
@@ -12818,9 +12833,13 @@ export const FootballPlayer = gql`
           fga
         }
         defense {
+          g
           sacks
           int
+          fumRec
+          defTd
           ptsAllowedPerG
+          ydsAllowedPerG
         }
         idp {
           soloTkl
@@ -12860,6 +12879,16 @@ export const FootballPlayer = gql`
           yds
           td
           ydsPerRec
+        }
+        defense {
+          season
+          team
+          g
+          sacks
+          int
+          fumRec
+          defTd
+          ptsAllowed
         }
       }
     }

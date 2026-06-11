@@ -136,7 +136,39 @@ const DST_PLAYER: FootballPlayerDetailPlayer = {
   nflTeam: 'KC',
   previousTeams: [],
   careerStats: {
-    defense: { sacks: 45.5, int: 18, ptsAllowedPerG: 19.3 },
+    defense: {
+      g: 34,
+      sacks: 45.5,
+      int: 18,
+      fumRec: 11,
+      defTd: 4,
+      ptsAllowedPerG: 19.3,
+      ydsAllowedPerG: 318.7,
+    },
+  },
+  seasonStats: {
+    defense: [
+      {
+        season: 2023,
+        team: 'KC',
+        g: 17,
+        sacks: 25.0,
+        int: 10,
+        fumRec: 6,
+        defTd: 3,
+        ptsAllowed: 294,
+      },
+      {
+        season: 2022,
+        team: 'KC',
+        g: 17,
+        sacks: 20.5,
+        int: 8,
+        fumRec: 5,
+        defTd: 1,
+        ptsAllowed: 369,
+      },
+    ],
   },
 };
 
@@ -204,6 +236,41 @@ describe('FootballPlayerDetail', () => {
     render(<FootballPlayerDetail player={DST_PLAYER} />);
     expect(screen.getByText('Career DST Stats')).toBeTruthy();
     expect(screen.getByText('Pts Allowed/G')).toBeTruthy();
+  });
+
+  it('renders per-game DST rate metrics and additional career fields (LS-6247)', () => {
+    render(<FootballPlayerDetail player={DST_PLAYER} />);
+    // Per-game rates derived from career games (g = 34)
+    expect(screen.getByText('Sacks/G')).toBeTruthy();
+    expect(screen.getByText('1.3')).toBeTruthy(); // 45.5 / 34
+    expect(screen.getByText('INT/G')).toBeTruthy();
+    expect(screen.getByText('0.53')).toBeTruthy(); // 18 / 34
+    // Additional career fields beyond the original three
+    expect(screen.getByText('Def TD')).toBeTruthy();
+    expect(screen.getByText('Fum Rec')).toBeTruthy();
+    expect(screen.getByText('Yds Allowed/G')).toBeTruthy();
+    expect(screen.getByText('318.7')).toBeTruthy();
+  });
+
+  it('falls back to em dash for per-game rates when career games is absent (LS-6247)', () => {
+    const player: FootballPlayerDetailPlayer = {
+      ...DST_PLAYER,
+      careerStats: { defense: { sacks: 45.5, int: 18, ptsAllowedPerG: 19.3 } },
+    };
+    render(<FootballPlayerDetail player={player} />);
+    expect(screen.getByText('Sacks/G')).toBeTruthy();
+    // Both Sacks/G and INT/G render an em dash when g is undefined
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders a DST season breakdown table with recent-season defense numbers (LS-6247)', () => {
+    render(<FootballPlayerDetail player={DST_PLAYER} />);
+    expect(screen.getByText('Defense — Season Breakdown')).toBeTruthy();
+    expect(screen.getByText('DEF TD')).toBeTruthy();
+    expect(screen.getByText('PTS')).toBeTruthy();
+    expect(screen.getByText('2023')).toBeTruthy();
+    expect(screen.getByText('2022')).toBeTruthy();
+    expect(screen.getByText('294')).toBeTruthy();
   });
 
   it('renders IDP stats including assisted tackles for a linebacker', () => {

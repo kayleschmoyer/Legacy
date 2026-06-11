@@ -91,9 +91,13 @@ query FootballPlayer($id: Int!) {
         fga
       }
       defense {
+        g
         sacks
         int
+        fumRec
+        defTd
         ptsAllowedPerG
+        ydsAllowedPerG
       }
       idp {
         soloTkl
@@ -133,6 +137,16 @@ query FootballPlayer($id: Int!) {
         yds
         td
         ydsPerRec
+      }
+      defense {
+        season
+        team
+        g
+        sacks
+        int
+        fumRec
+        defTd
+        ptsAllowed
       }
     }
   }

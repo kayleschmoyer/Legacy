@@ -6520,9 +6520,13 @@ export type FootballPlayerQuery = {
       } | null;
       defense?: {
         __typename?: 'FootballCareerDefense';
+        g?: number | null;
         sacks?: number | null;
         int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
         ptsAllowedPerG?: number | null;
+        ydsAllowedPerG?: number | null;
       } | null;
       idp?: {
         __typename?: 'FootballCareerIdp';
@@ -11694,9 +11698,13 @@ export const FootballPlayer = gql`
           fga
         }
         defense {
+          g
           sacks
           int
+          fumRec
+          defTd
           ptsAllowedPerG
+          ydsAllowedPerG
         }
         idp {
           soloTkl

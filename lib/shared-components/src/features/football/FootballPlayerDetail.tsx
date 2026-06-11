@@ -45,9 +45,13 @@ export interface FootballPlayerDetailStats {
     fga?: number | null;
   } | null;
   defense?: {
+    g?: number | null;
     sacks?: number | null;
     int?: number | null;
+    fumRec?: number | null;
+    defTd?: number | null;
     ptsAllowedPerG?: number | null;
+    ydsAllowedPerG?: number | null;
   } | null;
   idp?: {
     soloTkl?: number | null;
@@ -91,10 +95,22 @@ export interface FootballSeasonReceivingRow {
   ydsPerRec?: number | null;
 }
 
+export interface FootballSeasonDefenseRow {
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  sacks?: number | null;
+  int?: number | null;
+  fumRec?: number | null;
+  defTd?: number | null;
+  ptsAllowed?: number | null;
+}
+
 export interface FootballPlayerDetailSeasonStats {
   passing?: FootballSeasonPassingRow[] | null;
   rushing?: FootballSeasonRushingRow[] | null;
   receiving?: FootballSeasonReceivingRow[] | null;
+  defense?: FootballSeasonDefenseRow[] | null;
 }
 
 export interface FootballPlayerDetailPlayer {
@@ -187,13 +203,28 @@ function IdpStatsTable({ stats }: { stats: FootballPlayerDetailStats }) {
   );
 }
 
+/** Per-game rate from a career total and games played; null when games is unknown/zero. */
+function perGame(
+  total: number | null | undefined,
+  games: number | null | undefined,
+): number | null {
+  if (total == null || games == null || games <= 0) return null;
+  return total / games;
+}
+
 function DstStatsTable({ stats }: { stats: FootballPlayerDetailStats }) {
   const d = stats.defense;
+  const g = d?.g;
   return (
     <StatGroup title="Career DST Stats">
       <StatCell label="Sacks" value={fmtFloat(d?.sacks)} />
+      <StatCell label="Sacks/G" value={fmtFloat(perGame(d?.sacks, g))} />
       <StatCell label="INT" value={fmt(d?.int)} />
+      <StatCell label="INT/G" value={fmtFloat(perGame(d?.int, g), 2)} />
+      <StatCell label="Def TD" value={fmt(d?.defTd)} />
+      <StatCell label="Fum Rec" value={fmt(d?.fumRec)} />
       <StatCell label="Pts Allowed/G" value={fmtFloat(d?.ptsAllowedPerG)} />
+      <StatCell label="Yds Allowed/G" value={fmtFloat(d?.ydsAllowedPerG)} />
     </StatGroup>
   );
 }
@@ -390,6 +421,49 @@ function ReceivingSeasonTable({
   );
 }
 
+function DefenseSeasonTable({ rows }: { rows: FootballSeasonDefenseRow[] }) {
+  return (
+    <SeasonTableWrap title="Defense — Season Breakdown">
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}
+      >
+        <thead>
+          <tr>
+            {['YEAR', 'TEAM', 'G', 'SACKS', 'INT', 'FUM', 'DEF TD', 'PTS'].map(
+              (h) => (
+                <th
+                  key={h}
+                  style={
+                    h === 'YEAR' || h === 'TEAM'
+                      ? TABLE_HEADER_STYLE
+                      : { ...TABLE_HEADER_STYLE, textAlign: 'right' }
+                  }
+                >
+                  {h}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.season}-${r.team}-${i}`}>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.season ?? '—'}</td>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.team ?? '—'}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.g)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmtFloat(r.sacks)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.int)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.fumRec)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.defTd)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.ptsAllowed)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SeasonTableWrap>
+  );
+}
+
 function SeasonBreakdowns({ player }: { player: FootballPlayerDetailPlayer }) {
   const ss = player.seasonStats;
   if (!ss) return null;
@@ -397,8 +471,14 @@ function SeasonBreakdowns({ player }: { player: FootballPlayerDetailPlayer }) {
   const passing = ss.passing ?? [];
   const rushing = ss.rushing ?? [];
   const receiving = ss.receiving ?? [];
+  const defense = ss.defense ?? [];
 
-  if (passing.length === 0 && rushing.length === 0 && receiving.length === 0) {
+  if (
+    passing.length === 0 &&
+    rushing.length === 0 &&
+    receiving.length === 0 &&
+    defense.length === 0
+  ) {
     return null;
   }
 
@@ -407,6 +487,7 @@ function SeasonBreakdowns({ player }: { player: FootballPlayerDetailPlayer }) {
       {passing.length > 0 && <PassingSeasonTable rows={passing} />}
       {rushing.length > 0 && <RushingSeasonTable rows={rushing} />}
       {receiving.length > 0 && <ReceivingSeasonTable rows={receiving} />}
+      {defense.length > 0 && <DefenseSeasonTable rows={defense} />}
     </YStack>
   );
 }
