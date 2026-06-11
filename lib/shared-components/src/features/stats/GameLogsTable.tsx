@@ -269,6 +269,29 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
 }
 
 /**
+ * Normalize a bare YYYY-MM-DD string to an ISO 8601 date-time with an
+ * explicit timezone offset so the server resolves the correct calendar day
+ * for every user regardless of their locale. (LS-7453)
+ *
+ * `timezoneOffsetMinutes` defaults to the host's local offset
+ * (`Date.prototype.getTimezoneOffset` semantics: UTC-7 → 420, UTC+5 → -300).
+ * Pass an explicit value in tests to make assertions timezone-independent.
+ *
+ * An empty string is returned as-is (no date filter active).
+ */
+export function normalizeGameDate(
+  dateStr: string,
+  timezoneOffsetMinutes: number = new Date().getTimezoneOffset(),
+): string {
+  if (!dateStr) return dateStr;
+  const sign = timezoneOffsetMinutes <= 0 ? '+' : '-';
+  const absMinutes = Math.abs(timezoneOffsetMinutes);
+  const hh = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+  const mm = String(absMinutes % 60).padStart(2, '0');
+  return `${dateStr}T00:00:00${sign}${hh}:${mm}`;
+}
+
+/**
  * Shape the POST body for `/baseball-game-logs`. Exported so unit tests can
  * assert opponent expansion + venue serialization without mocking fetch.
  * (LS-7466, LS-7473, LS-7478, LS-7451)
@@ -299,8 +322,14 @@ export function buildGameLogsRequestBody(
 
   return {
     player_id: filters.player,
-    ...(filters.dateFrom ? { game_date_from: filters.dateFrom } : {}),
-    ...(filters.dateTo ? { game_date_to: filters.dateTo } : {}),
+    // LS-7453: attach the local timezone offset so the server resolves the
+    // correct calendar date for cross-coast users who enter YYYY-MM-DD.
+    ...(filters.dateFrom
+      ? { game_date_from: normalizeGameDate(filters.dateFrom) }
+      : {}),
+    ...(filters.dateTo
+      ? { game_date_to: normalizeGameDate(filters.dateTo) }
+      : {}),
     ...(filters.opponentFranchiseIds.length > 0
       ? {
           opponent_franchise_ids: filters.opponentFranchiseIds,

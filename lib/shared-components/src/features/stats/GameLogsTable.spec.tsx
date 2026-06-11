@@ -4,6 +4,7 @@ import {
   buildGameLogsRequestBody,
   DEFAULT_GAME_LOGS_LIMIT,
   GameLogsTable,
+  normalizeGameDate,
   VIRTUAL_ROW_THRESHOLD,
 } from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
@@ -355,8 +356,8 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
       { ...baseFilters, dateFrom: '2026-04-01', dateTo: '2026-04-30' },
       'mlb',
     );
-    expect(body.game_date_from).toBe('2026-04-01');
-    expect(body.game_date_to).toBe('2026-04-30');
+    expect(body.game_date_from).toBe(normalizeGameDate('2026-04-01'));
+    expect(body.game_date_to).toBe(normalizeGameDate('2026-04-30'));
   });
 
   it('omits game_date_from and game_date_to when both are empty (LS-7451)', () => {
@@ -427,8 +428,10 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
     );
     expect(body).toEqual({
       player_id: 'mlb-1234',
-      game_date_from: '2026-04-01',
-      game_date_to: '2026-04-30',
+      // LS-7453: dates carry the local tz offset; use normalizeGameDate so
+      // assertions are timezone-independent across CI environments.
+      game_date_from: normalizeGameDate('2026-04-01'),
+      game_date_to: normalizeGameDate('2026-04-30'),
       opponent_franchise_ids: ['NYY'],
       opponent_abbrs: ['NYY'],
       venue: 'home',
@@ -442,7 +445,7 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
     );
     expect(body).toEqual({
       player_id: 'mlb-1234',
-      game_date_from: '2026-04-01',
+      game_date_from: normalizeGameDate('2026-04-01'),
     });
   });
 
@@ -451,7 +454,10 @@ describe('buildGameLogsRequestBody (LS-7466, LS-7473, LS-7478, LS-7451)', () => 
       { ...baseFilters, dateTo: '2026-04-30' },
       'mlb',
     );
-    expect(body).toEqual({ player_id: 'mlb-1234', game_date_to: '2026-04-30' });
+    expect(body).toEqual({
+      player_id: 'mlb-1234',
+      game_date_to: normalizeGameDate('2026-04-30'),
+    });
   });
 });
 
@@ -607,6 +613,41 @@ describe('GameLogsTable reshape deferred off main thread (LS-7472)', () => {
       tableEl?.getAttribute('headers') ?? tableEl?.innerHTML ?? '';
     expect(tableContent).toContain('HR');
     expect(tableContent).toContain('RBI');
+  });
+});
+
+describe('normalizeGameDate (LS-7453)', () => {
+  it('returns empty string unchanged', () => {
+    expect(normalizeGameDate('', 420)).toBe('');
+  });
+
+  it('appends UTC-7 offset (PDT) — offset=420', () => {
+    expect(normalizeGameDate('2024-06-01', 420)).toBe(
+      '2024-06-01T00:00:00-07:00',
+    );
+  });
+
+  it('appends UTC+5 offset — offset=-300', () => {
+    expect(normalizeGameDate('2024-06-01', -300)).toBe(
+      '2024-06-01T00:00:00+05:00',
+    );
+  });
+
+  it('appends UTC offset — offset=0', () => {
+    expect(normalizeGameDate('2024-06-01', 0)).toBe(
+      '2024-06-01T00:00:00+00:00',
+    );
+  });
+
+  it('handles half-hour offsets (e.g. IST UTC+5:30 — offset=-330)', () => {
+    expect(normalizeGameDate('2024-06-01', -330)).toBe(
+      '2024-06-01T00:00:00+05:30',
+    );
+  });
+
+  it('uses the host timezone by default (output matches expected pattern)', () => {
+    const result = normalizeGameDate('2024-06-01');
+    expect(result).toMatch(/^2024-06-01T00:00:00[+-]\d{2}:\d{2}$/);
   });
 });
 
