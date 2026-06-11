@@ -647,8 +647,8 @@ export const handleDeviceCompleteLocal = async (
         jwt: internalJwt,
         user: {
           id: user.id,
-          email: user.email,
-          username: user.username || user.email,
+          email: user.canonicalEmail,
+          username: user.username || user.canonicalEmail,
           accessLevel: user.accessLevel || 'none',
         },
       };
@@ -660,7 +660,7 @@ export const handleDeviceCompleteLocal = async (
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        body: getAuthSuccessHtml(user.email),
+        body: getAuthSuccessHtml(user.canonicalEmail),
       };
     });
   } catch (error) {

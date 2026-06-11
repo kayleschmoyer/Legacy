@@ -203,7 +203,7 @@ export const handleRefreshJwt = async (
         ) {
           const refreshedImpPayload = {
             id: Number(impUser.id),
-            email: impUser.email,
+            email: impUser.canonicalEmail,
             username: impUser.username ?? '',
             accessLevel: impUser.accessLevel ?? 'none',
             impersonatedBy: impPayload.impersonatedBy,

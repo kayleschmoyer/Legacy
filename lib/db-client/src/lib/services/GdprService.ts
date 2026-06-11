@@ -239,7 +239,7 @@ export class GdprService {
       this.options,
       async (db) => {
         const result = await db.execute(
-          sql`SELECT id, email, username, created_at, privacy_policy_accepted_at
+          sql`SELECT id, canonical_email AS email, username, created_at, privacy_policy_accepted_at
               FROM app_internal.users WHERE id = ${userId} LIMIT 1`,
         );
         return result.rows[0] as
@@ -339,7 +339,7 @@ export class GdprService {
       // Anonymize user record
       await db.execute(
         sql`UPDATE app_internal.users
-            SET email = ${anonymizedEmail},
+            SET canonical_email = ${anonymizedEmail},
                 username = ${anonymizedUsername},
                 password_hash = NULL,
                 privacy_policy_accepted_at = NULL

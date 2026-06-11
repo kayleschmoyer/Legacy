@@ -34,7 +34,7 @@ export async function createUser(
   password?: string,
 ): Promise<InternalUser> {
   const internalUser = {
-    email: email,
+    canonicalEmail: email,
     passwordHash: password,
     username: email,
   };
@@ -53,7 +53,7 @@ export async function getUserByEmail(
   return await db
     .select()
     .from(Schema.usersInAppInternal)
-    .where(() => eq(Schema.usersInAppInternal.email, email))
+    .where(() => eq(Schema.usersInAppInternal.canonicalEmail, email))
     .then(TakeUniqueOrNull);
 }
 
@@ -241,8 +241,8 @@ export interface EmailOwnerLookup {
  * Find the user who "owns" an email, with the precedence the multi-provider
  * design mandates: canonical email first, identity email second.
  *
- * 1. Canonical match — `users.email` is unique, so at most one row. A canonical
- *    match always wins.
+ * 1. Canonical match — `users.canonical_email` is unique, so at most one row. A
+ *    canonical match always wins.
  * 2. Identity-email fallback — only when there is no canonical match, look for a
  *    `user_identities.provider_email` match. `LIMIT 2` lets us detect the
  *    ambiguous case (the same email on two different users, only possible via
@@ -276,9 +276,7 @@ export async function getUserByCanonicalEmailOrIdentityEmail(
 
 /**
  * Set a user's canonical email and the identity it tracks together, after the
- * caller has confirmed the new email is free of the unique constraint. In this
- * phase the canonical email is still stored in `users.email` (the rename to
- * `users.canonical_email` is the later Phase 2 cutover).
+ * caller has confirmed the new email is free of the unique constraint.
  */
 export async function setCanonicalEmail(
   db: InternalDb,
@@ -288,7 +286,11 @@ export async function setCanonicalEmail(
 ): Promise<InternalUser> {
   return await db
     .update(Schema.usersInAppInternal)
-    .set({ email, canonicalEmailSource: source, updatedAt: new Date() })
+    .set({
+      canonicalEmail: email,
+      canonicalEmailSource: source,
+      updatedAt: new Date(),
+    })
     .where(eq(Schema.usersInAppInternal.id, userId))
     .returning()
     .then(TakeUniqueOrThrow);
@@ -401,8 +403,8 @@ export async function unlinkIdentity(
       rederived = true;
     } else {
       // No remaining identity has a verified email to anchor canonical on.
-      // Leave users.email untouched (the account is still reachable via it /
-      // the local password) and drop the source to the manual-override state.
+      // Leave users.canonical_email untouched (the account is still reachable
+      // via the local password) and drop the source to the manual-override state.
       await setCanonicalEmailSource(db, userId, null);
     }
   }
@@ -447,27 +449,6 @@ export async function linkDiscordAccount(
       discordAvatar,
       updatedAt: new Date(),
     })
-    .where(eq(Schema.usersInAppInternal.id, userId))
-    .returning()
-    .then(TakeUniqueOrThrow);
-}
-
-/**
- * Updates a user's email address.
- *
- * The email column carries a unique constraint (users_email_uk), so callers
- * must ensure no other account already owns `email` before invoking this —
- * otherwise the update throws on the constraint. Used to refresh the stored
- * email when an OAuth provider reports a changed verified email (LS-6660).
- */
-export async function updateUserEmail(
-  db: InternalDb,
-  userId: number,
-  email: string,
-): Promise<InternalUser> {
-  return await db
-    .update(Schema.usersInAppInternal)
-    .set({ email, updatedAt: new Date() })
     .where(eq(Schema.usersInAppInternal.id, userId))
     .returning()
     .then(TakeUniqueOrThrow);

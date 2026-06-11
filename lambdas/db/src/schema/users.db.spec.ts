@@ -16,19 +16,19 @@ const { usersInAppInternal } = integrationTestInternalSchema;
 const CRUD_USERS = [
   {
     id: 200,
-    email: 'user-200@users-spec.example.com',
+    canonicalEmail: 'user-200@users-spec.example.com',
     username: 'specuser200',
     accessLevel: 'none' as const,
   },
   {
     id: 201,
-    email: 'user-201@users-spec.example.com',
+    canonicalEmail: 'user-201@users-spec.example.com',
     username: 'specuser201',
     accessLevel: 'admin' as const,
   },
   {
     id: 202,
-    email: 'user-202@users-spec.example.com',
+    canonicalEmail: 'user-202@users-spec.example.com',
     username: 'specuser202',
     accessLevel: 'none' as const,
   },
@@ -45,14 +45,14 @@ describe('Users - DB Integration Tests', () => {
     await cleanupTestData();
     // Remove any leftover CRUD test users from a previous run
     await db.execute(
-      sql`DELETE FROM app_internal.users WHERE email LIKE '%@users-spec.example.com'`,
+      sql`DELETE FROM app_internal.users WHERE canonical_email LIKE '%@users-spec.example.com'`,
     );
   });
 
   afterEach(async () => {
     await cleanupTestData();
     await db.execute(
-      sql`DELETE FROM app_internal.users WHERE email LIKE '%@users-spec.example.com'`,
+      sql`DELETE FROM app_internal.users WHERE canonical_email LIKE '%@users-spec.example.com'`,
     );
   });
 
@@ -64,7 +64,7 @@ describe('Users - DB Integration Tests', () => {
         .insert(usersInAppInternal)
         .values({
           id: user.id,
-          email: user.email,
+          canonicalEmail: user.canonicalEmail,
           username: user.username,
           accessLevel: user.accessLevel,
         })
@@ -72,7 +72,7 @@ describe('Users - DB Integration Tests', () => {
 
       expect(inserted).toMatchObject({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -83,12 +83,12 @@ describe('Users - DB Integration Tests', () => {
         .insert(usersInAppInternal)
         .values([
           {
-            email: 'auto1@users-spec.example.com',
+            canonicalEmail: 'auto1@users-spec.example.com',
             username: 'autospec1',
             accessLevel: 'none' as const,
           },
           {
-            email: 'auto2@users-spec.example.com',
+            canonicalEmail: 'auto2@users-spec.example.com',
             username: 'autospec2',
             accessLevel: 'none' as const,
           },
@@ -107,13 +107,13 @@ describe('Users - DB Integration Tests', () => {
       await db.insert(usersInAppInternal).values([
         {
           id: admin1.id,
-          email: admin1.email,
+          canonicalEmail: admin1.canonicalEmail,
           username: admin1.username,
           accessLevel: admin1.accessLevel,
         },
         {
           id: admin2.id,
-          email: admin2.email,
+          canonicalEmail: admin2.canonicalEmail,
           username: admin2.username,
           accessLevel: admin2.accessLevel,
         },
@@ -135,7 +135,7 @@ describe('Users - DB Integration Tests', () => {
 
       await db.insert(usersInAppInternal).values({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -153,7 +153,7 @@ describe('Users - DB Integration Tests', () => {
 
       await db.insert(usersInAppInternal).values({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -165,7 +165,7 @@ describe('Users - DB Integration Tests', () => {
 
       expect(result).toMatchObject({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -183,7 +183,7 @@ describe('Users - DB Integration Tests', () => {
 
       await db.insert(usersInAppInternal).values({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -191,11 +191,11 @@ describe('Users - DB Integration Tests', () => {
       const [result] = await db
         .select()
         .from(users)
-        .where(eq(users.email, user.email));
+        .where(eq(users.canonicalEmail, user.canonicalEmail));
 
       expect(result).toMatchObject({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -205,7 +205,7 @@ describe('Users - DB Integration Tests', () => {
       const result = await db
         .select()
         .from(users)
-        .where(eq(users.email, 'nonexistent@example.com'));
+        .where(eq(users.canonicalEmail, 'nonexistent@example.com'));
       expect(result).toHaveLength(0);
     });
   });
@@ -216,7 +216,7 @@ describe('Users - DB Integration Tests', () => {
 
       await db.insert(usersInAppInternal).values({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -228,7 +228,7 @@ describe('Users - DB Integration Tests', () => {
 
       expect(result).toMatchObject({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -248,19 +248,19 @@ describe('Users - DB Integration Tests', () => {
       await db.insert(usersInAppInternal).values([
         {
           id: CRUD_USERS[0].id,
-          email: CRUD_USERS[0].email,
+          canonicalEmail: CRUD_USERS[0].canonicalEmail,
           username: CRUD_USERS[0].username,
           accessLevel: CRUD_USERS[0].accessLevel,
         },
         {
           id: CRUD_USERS[1].id,
-          email: CRUD_USERS[1].email,
+          canonicalEmail: CRUD_USERS[1].canonicalEmail,
           username: CRUD_USERS[1].username,
           accessLevel: CRUD_USERS[1].accessLevel,
         },
         {
           id: CRUD_USERS[2].id,
-          email: CRUD_USERS[2].email,
+          canonicalEmail: CRUD_USERS[2].canonicalEmail,
           username: CRUD_USERS[2].username,
           accessLevel: CRUD_USERS[2].accessLevel,
         },
@@ -279,7 +279,7 @@ describe('Users - DB Integration Tests', () => {
       expect(result).toHaveLength(3);
       result.forEach((user) => {
         expect(user.id).toBeDefined();
-        expect(user.email).toBeDefined();
+        expect(user.canonicalEmail).toBeDefined();
         expect(user.username).toBeDefined();
         expect(user.accessLevel).toBeDefined();
       });
@@ -299,19 +299,19 @@ describe('Users - DB Integration Tests', () => {
       await db.insert(usersInAppInternal).values([
         {
           id: CRUD_USERS[0].id,
-          email: CRUD_USERS[0].email,
+          canonicalEmail: CRUD_USERS[0].canonicalEmail,
           username: CRUD_USERS[0].username,
           accessLevel: 'none' as const,
         },
         {
           id: CRUD_USERS[1].id,
-          email: CRUD_USERS[1].email,
+          canonicalEmail: CRUD_USERS[1].canonicalEmail,
           username: CRUD_USERS[1].username,
           accessLevel: 'admin' as const,
         },
         {
           id: CRUD_USERS[2].id,
-          email: CRUD_USERS[2].email,
+          canonicalEmail: CRUD_USERS[2].canonicalEmail,
           username: CRUD_USERS[2].username,
           accessLevel: 'admin' as const,
         },
@@ -338,7 +338,7 @@ describe('Users - DB Integration Tests', () => {
 
       await db.insert(usersInAppInternal).values({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -351,7 +351,7 @@ describe('Users - DB Integration Tests', () => {
 
       expect(updated.username).toBe('updateduser');
       expect(updated.accessLevel).toBe('admin');
-      expect(updated.email).toBe(user.email);
+      expect(updated.canonicalEmail).toBe(user.canonicalEmail);
     });
   });
 
@@ -361,7 +361,7 @@ describe('Users - DB Integration Tests', () => {
 
       await db.insert(usersInAppInternal).values({
         id: user.id,
-        email: user.email,
+        canonicalEmail: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
       });
@@ -429,7 +429,7 @@ describe('Users - DB Integration Tests', () => {
 
       expect(resultUser).toMatchObject({
         id: userId,
-        email: 'league.owner@example.com',
+        canonicalEmail: 'league.owner@example.com',
         username: 'leagueowner',
       });
     });

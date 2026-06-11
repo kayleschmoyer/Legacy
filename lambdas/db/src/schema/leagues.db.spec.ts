@@ -638,7 +638,7 @@ describe('Leagues - DB Integration Tests', () => {
     it('should handle bulk inserts', async () => {
       const bulkUsers = Array.from({ length: 10 }, (_, i) => ({
         id: 100 + i,
-        email: `bulk-user-${i}@example.com`,
+        canonicalEmail: `bulk-user-${i}@example.com`,
         username: `bulkuser${i}`,
         accessLevel: 'none' as const,
       }));

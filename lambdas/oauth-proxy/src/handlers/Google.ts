@@ -828,7 +828,11 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
 
       userInfo = resolved.user;
       if (resolved.outcome === 'new_user') {
-        await notifyNewUserSignup(userInfo.email, userInfo.id, 'google');
+        await notifyNewUserSignup(
+          userInfo.canonicalEmail,
+          userInfo.id,
+          'google',
+        );
       }
       internalJwt = await createJwt(userInfo, {
         picture: googlePicture,
@@ -871,8 +875,8 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         jwt: internalJwt,
         user: {
           id: userInfo.id,
-          email: userInfo.email,
-          username: userInfo.username || userInfo.email,
+          email: userInfo.canonicalEmail,
+          username: userInfo.username || userInfo.canonicalEmail,
           accessLevel: userInfo.accessLevel || 'none',
         },
       };
@@ -886,7 +890,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
         },
-        body: getAuthSuccessHtml(userInfo.email),
+        body: getAuthSuccessHtml(userInfo.canonicalEmail),
       };
     } catch (error) {
       LOGGER.warn(

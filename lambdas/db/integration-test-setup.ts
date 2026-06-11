@@ -99,13 +99,13 @@ const MIN_TEST_PLAYERS = 8;
 // schema — this seed makes the suite self-sufficient there.
 async function ensureTestFixtures(): Promise<void> {
   await db!.execute(sql`
-    INSERT INTO app_internal.users (id, email, username, access_level)
+    INSERT INTO app_internal.users (id, canonical_email, username, access_level)
     VALUES
       (1, 'test.user@example.com', 'testuser', 'none'),
       (2, 'admin@example.com', 'admin', 'admin'),
       (3, 'league.owner@example.com', 'leagueowner', 'none')
     ON CONFLICT (id) DO UPDATE SET
-      email = EXCLUDED.email,
+      canonical_email = EXCLUDED.canonical_email,
       username = EXCLUDED.username,
       access_level = EXCLUDED.access_level
   `);

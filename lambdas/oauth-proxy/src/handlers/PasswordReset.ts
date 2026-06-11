@@ -107,7 +107,7 @@ export const handleForgotPassword = async (
       );
 
       await sendPasswordResetEmail(
-        user.email,
+        user.canonicalEmail,
         `${resetUrl}?token=${encodeURIComponent(rawToken)}`,
       );
     });

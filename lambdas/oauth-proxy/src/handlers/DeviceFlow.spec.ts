@@ -62,7 +62,7 @@ function parseBody<T>(body: string): T {
 function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
   return {
     id: 1,
-    email: 'test@example.com',
+    canonicalEmail: 'test@example.com',
     username: 'testuser',
     accessLevel: 'none',
     passwordHash: null,

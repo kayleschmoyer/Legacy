@@ -25,7 +25,7 @@ export async function handleSetUserType(args: SetUserTypeArgs): Promise<void> {
       const existingUser = await db
         .select()
         .from(InternalSchema.usersInAppInternal)
-        .where(eq(InternalSchema.usersInAppInternal.email, email))
+        .where(eq(InternalSchema.usersInAppInternal.canonicalEmail, email))
         .limit(1);
 
       if (existingUser.length === 0) {
@@ -43,7 +43,7 @@ export async function handleSetUserType(args: SetUserTypeArgs): Promise<void> {
       await db.execute(
         sql`UPDATE "app_internal"."users" 
             SET "access_level" = ${type}::app_internal.access_level 
-            WHERE "email" = ${email} 
+            WHERE "canonical_email" = ${email}
             RETURNING *`,
       );
 
@@ -51,7 +51,7 @@ export async function handleSetUserType(args: SetUserTypeArgs): Promise<void> {
       const updatedUsers = await db
         .select()
         .from(InternalSchema.usersInAppInternal)
-        .where(eq(InternalSchema.usersInAppInternal.email, email))
+        .where(eq(InternalSchema.usersInAppInternal.canonicalEmail, email))
         .limit(1);
 
       if (updatedUsers.length === 0) {
@@ -61,7 +61,7 @@ export async function handleSetUserType(args: SetUserTypeArgs): Promise<void> {
 
       const updatedUser = updatedUsers[0];
       LOGGER.info(`✅ Successfully updated user access level`);
-      LOGGER.info(`📧 User: ${updatedUser.email}`);
+      LOGGER.info(`📧 User: ${updatedUser.canonicalEmail}`);
       LOGGER.info(`🆔 ID: ${updatedUser.id}`);
       LOGGER.info(`👤 Username: ${updatedUser.username || 'No username'}`);
       LOGGER.info(`🔐 New access level: ${updatedUser.accessLevel}`);

@@ -21,12 +21,12 @@ import { User, UserIdentity } from '../../types/DatabaseTypes';
 
 export interface UserFilters {
   ids?: number[];
-  email?: string;
-  emailLike?: string;
+  canonicalEmail?: string;
+  canonicalEmailLike?: string;
   username?: string;
   usernameLike?: string;
   accessLevel?: 'none' | 'admin';
-  hasEmail?: boolean;
+  hasCanonicalEmail?: boolean;
 }
 
 export interface UserQueryOptions {
@@ -35,7 +35,7 @@ export interface UserQueryOptions {
   searchTerm?: string;
   limit?: number;
   offset?: number;
-  orderBy?: 'id' | 'email' | 'username';
+  orderBy?: 'id' | 'canonicalEmail' | 'username';
   orderDirection?: 'asc' | 'desc';
 }
 
@@ -61,7 +61,10 @@ export class UserService {
       if (queryOptions.searchTerm) {
         conditions.push(
           or(
-            ilike(PublicSchema.users.email, `%${queryOptions.searchTerm}%`),
+            ilike(
+              PublicSchema.users.canonicalEmail,
+              `%${queryOptions.searchTerm}%`,
+            ),
             ilike(PublicSchema.users.username, `%${queryOptions.searchTerm}%`),
           ) as SQL,
         );
@@ -122,7 +125,7 @@ export class UserService {
       const results = await db
         .select()
         .from(PublicSchema.users)
-        .where(eq(PublicSchema.users.email, email))
+        .where(eq(PublicSchema.users.canonicalEmail, email))
         .limit(1);
 
       return results[0] || null;
@@ -179,7 +182,7 @@ export class UserService {
       if (options?.searchTerm) {
         conditions.push(
           or(
-            ilike(PublicSchema.users.email, `%${options.searchTerm}%`),
+            ilike(PublicSchema.users.canonicalEmail, `%${options.searchTerm}%`),
             ilike(PublicSchema.users.username, `%${options.searchTerm}%`),
           ) as SQL,
         );
@@ -207,7 +210,7 @@ export class UserService {
         .from(PublicSchema.users)
         .where(
           or(
-            ilike(PublicSchema.users.email, `%${searchTerm}%`),
+            ilike(PublicSchema.users.canonicalEmail, `%${searchTerm}%`),
             ilike(PublicSchema.users.username, `%${searchTerm}%`),
           ),
         )
@@ -305,9 +308,9 @@ export class UserService {
     dryRun: boolean;
     now?: Date;
   }): Promise<{
-    matched: Array<{ id: number; email: string; createdAt: Date }>;
+    matched: Array<{ id: number; canonicalEmail: string; createdAt: Date }>;
     deleted: number;
-    errors: Array<{ id: number; email: string; message: string }>;
+    errors: Array<{ id: number; canonicalEmail: string; message: string }>;
   }> {
     const now = opts.now ?? new Date();
     const cutoff = new Date(now.getTime() - opts.minAgeMs);
@@ -316,14 +319,14 @@ export class UserService {
       const matched = await db
         .select({
           id: InternalSchema.usersInAppInternal.id,
-          email: InternalSchema.usersInAppInternal.email,
+          canonicalEmail: InternalSchema.usersInAppInternal.canonicalEmail,
           createdAt: InternalSchema.usersInAppInternal.createdAt,
         })
         .from(InternalSchema.usersInAppInternal)
         .where(
           and(
             like(
-              InternalSchema.usersInAppInternal.email,
+              InternalSchema.usersInAppInternal.canonicalEmail,
               opts.emailLikePattern,
             ),
             lt(InternalSchema.usersInAppInternal.createdAt, cutoff),
@@ -334,7 +337,11 @@ export class UserService {
         return { matched, deleted: 0, errors: [] };
       }
 
-      const errors: Array<{ id: number; email: string; message: string }> = [];
+      const errors: Array<{
+        id: number;
+        canonicalEmail: string;
+        message: string;
+      }> = [];
       let deleted = 0;
       for (const row of matched) {
         try {
@@ -345,7 +352,7 @@ export class UserService {
         } catch (err) {
           errors.push({
             id: row.id,
-            email: row.email,
+            canonicalEmail: row.canonicalEmail,
             message: err instanceof Error ? err.message : String(err),
           });
         }
@@ -364,13 +371,18 @@ export class UserService {
       conditions.push(inArray(PublicSchema.users.id, filters.ids));
     }
 
-    if (filters.email) {
-      conditions.push(eq(PublicSchema.users.email, filters.email));
+    if (filters.canonicalEmail) {
+      conditions.push(
+        eq(PublicSchema.users.canonicalEmail, filters.canonicalEmail),
+      );
     }
 
-    if (filters.emailLike) {
+    if (filters.canonicalEmailLike) {
       conditions.push(
-        ilike(PublicSchema.users.email, `%${filters.emailLike}%`),
+        ilike(
+          PublicSchema.users.canonicalEmail,
+          `%${filters.canonicalEmailLike}%`,
+        ),
       );
     }
 
@@ -388,10 +400,10 @@ export class UserService {
       conditions.push(eq(PublicSchema.users.accessLevel, filters.accessLevel));
     }
 
-    if (filters.hasEmail === true) {
-      conditions.push(isNotNull(PublicSchema.users.email));
-    } else if (filters.hasEmail === false) {
-      conditions.push(isNull(PublicSchema.users.email));
+    if (filters.hasCanonicalEmail === true) {
+      conditions.push(isNotNull(PublicSchema.users.canonicalEmail));
+    } else if (filters.hasCanonicalEmail === false) {
+      conditions.push(isNull(PublicSchema.users.canonicalEmail));
     }
 
     return conditions;

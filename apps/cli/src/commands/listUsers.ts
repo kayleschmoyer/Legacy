@@ -24,7 +24,7 @@ export async function handleListUsers(args: ListUsersArgs): Promise<void> {
       const users = await db
         .select({
           id: InternalSchema.usersInAppInternal.id,
-          email: InternalSchema.usersInAppInternal.email,
+          email: InternalSchema.usersInAppInternal.canonicalEmail,
           username: InternalSchema.usersInAppInternal.username,
           accessLevel: InternalSchema.usersInAppInternal.accessLevel,
         })

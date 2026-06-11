@@ -20,7 +20,7 @@ describe('createJwt — algorithm pinning (LS-2544)', () => {
   const user = {
     id: 42,
     accessLevel: 'none',
-    email: 'u@example.com',
+    canonicalEmail: 'u@example.com',
     username: 'u',
     avatarUrl: null,
     passwordHash: null,

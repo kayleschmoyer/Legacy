@@ -152,7 +152,7 @@ describe('handleLogin', () => {
   it('accepts a password at the login minimum length', async () => {
     mockGetUserByEmail.mockResolvedValue({
       id: 7,
-      email: 'test@example.com',
+      canonicalEmail: 'test@example.com',
       passwordHash: 'stored-hash',
     } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
     mockTestPassword.mockResolvedValue(true);
@@ -179,7 +179,7 @@ describe('handleLogin', () => {
       jest.clearAllMocks();
       mockGetUserByEmail.mockResolvedValue({
         id: 7,
-        email: validBody.email,
+        canonicalEmail: validBody.email,
         passwordHash: 'stored-hash',
       } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
       mockTestPassword.mockResolvedValue(true);
@@ -344,7 +344,7 @@ describe('handleLogin', () => {
     it('records a failed attempt when the password is wrong', async () => {
       mockGetUserByEmail.mockResolvedValue({
         id: 7,
-        email: validBody.email,
+        canonicalEmail: validBody.email,
         passwordHash: 'stored-hash',
       } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
       mockTestPassword.mockResolvedValue(false);
@@ -370,7 +370,7 @@ describe('handleLogin', () => {
     it('clears the counter on a successful login', async () => {
       mockGetUserByEmail.mockResolvedValue({
         id: 7,
-        email: validBody.email,
+        canonicalEmail: validBody.email,
         passwordHash: 'stored-hash',
       } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
       mockTestPassword.mockResolvedValue(true);

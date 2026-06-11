@@ -70,7 +70,7 @@ function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
   return {
     id: 1,
     username: 'user',
-    email: 'user@example.com',
+    canonicalEmail: 'user@example.com',
     passwordHash: null,
     accessLevel: 'none',
     privacyPolicyAcceptedAt: null,
@@ -147,12 +147,12 @@ describe('resolveOrCreateUser truth table', () => {
     it('brand-new user → creates user + identity, sets canonical source', async () => {
       mockGetIdentity.mockResolvedValue(null);
       mockEmailOwner.mockResolvedValue({ user: null, ambiguous: false });
-      const created = makeUser({ id: 42, email: 'new@example.com' });
+      const created = makeUser({ id: 42, canonicalEmail: 'new@example.com' });
       mockCreateUser.mockResolvedValue(created);
       mockSetCanonicalEmail.mockResolvedValue(
         makeUser({
           id: 42,
-          email: 'new@example.com',
+          canonicalEmail: 'new@example.com',
           canonicalEmailSource: provider,
         }),
       );
@@ -280,7 +280,7 @@ describe('canonical-email rule #3', () => {
   it('refreshes canonical email when the source provider reports a new verified email', async () => {
     const user = makeUser({
       id: 7,
-      email: 'old@example.com',
+      canonicalEmail: 'old@example.com',
       canonicalEmailSource: 'google',
     });
     mockGetIdentity.mockResolvedValue(
@@ -291,7 +291,7 @@ describe('canonical-email rule #3', () => {
     mockSetCanonicalEmail.mockResolvedValue(
       makeUser({
         id: 7,
-        email: 'new@example.com',
+        canonicalEmail: 'new@example.com',
         canonicalEmailSource: 'google',
       }),
     );
@@ -315,7 +315,7 @@ describe('canonical-email rule #3', () => {
   it('does NOT refresh when the reporting provider is not the canonical source', async () => {
     const user = makeUser({
       id: 7,
-      email: 'old@example.com',
+      canonicalEmail: 'old@example.com',
       canonicalEmailSource: 'discord', // canonical tracks Discord, not Google
     });
     mockGetIdentity.mockResolvedValue(
@@ -336,7 +336,7 @@ describe('canonical-email rule #3', () => {
   it('skips the refresh when another account already owns the new email', async () => {
     const user = makeUser({
       id: 7,
-      email: 'old@example.com',
+      canonicalEmail: 'old@example.com',
       canonicalEmailSource: 'google',
     });
     mockGetIdentity.mockResolvedValue(
@@ -360,7 +360,7 @@ describe('Discord legacy-column dual-write', () => {
   it('syncs users.discord_* on a new Discord user', async () => {
     mockGetIdentity.mockResolvedValue(null);
     mockEmailOwner.mockResolvedValue({ user: null, ambiguous: false });
-    const created = makeUser({ id: 3, email: 'd@example.com' });
+    const created = makeUser({ id: 3, canonicalEmail: 'd@example.com' });
     mockCreateUser.mockResolvedValue(created);
     mockSetCanonicalEmail.mockResolvedValue(
       makeUser({ id: 3, canonicalEmailSource: 'discord' }),

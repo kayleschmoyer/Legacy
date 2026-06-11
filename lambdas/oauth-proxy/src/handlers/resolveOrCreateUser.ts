@@ -58,9 +58,8 @@ export type ResolveOrCreateUserResult =
  *
  * Keyed on `(provider, providerAccountId)` with a guarded email-owner fallback,
  * exactly as `docs/architecture/multi-provider-identity.md` (Authentication
- * flow) specifies. In this phase the canonical email is still stored in
- * `users.email` (the rename to `users.canonical_email` is the later Phase 2
- * cutover), so "canonical email" below maps to `users.email`.
+ * flow) specifies. The canonical email is stored in `users.canonical_email`
+ * (renamed from `users.email` by the Phase 2b migration, LS-7824).
  */
 export async function resolveOrCreateUser(
   db: InternalDb,
@@ -162,7 +161,7 @@ export async function resolveOrCreateUser(
   // 4. Brand-new user. The canonical email is the creating provider's email.
   if (!providerEmail) {
     // Callers (the sign-in handlers) reject no-email sign-ups before reaching
-    // here; guard defensively since users.email is NOT NULL.
+    // here; guard defensively since users.canonical_email is NOT NULL.
     throw new Error(
       `Cannot create a ${provider} user without a provider email`,
     );
@@ -185,10 +184,11 @@ export async function resolveOrCreateUser(
 
 /**
  * Canonical-email rule #3: when a provider reports a (verified) email that
- * differs from the stored one, refresh `users.email` **only if** the canonical
- * email currently tracks that same provider (`canonical_email_source`). This is
- * the explicit reversal of LS-6660's unconditional last-writer-wins overwrite —
- * a change from a non-source provider never rewrites the canonical email.
+ * differs from the stored one, refresh `users.canonical_email` **only if** the
+ * canonical email currently tracks that same provider (`canonical_email_source`).
+ * This is the explicit reversal of LS-6660's unconditional last-writer-wins
+ * overwrite — a change from a non-source provider never rewrites the canonical
+ * email.
  *
  * Returns the (possibly updated) user row.
  */
@@ -201,7 +201,7 @@ async function applyCanonicalEmailRule(
 
   if (!providerEmail || !emailVerified) return user;
   if (user.canonicalEmailSource !== provider) return user;
-  if (user.email === providerEmail) return user;
+  if (user.canonicalEmail === providerEmail) return user;
 
   // Guard the unique constraint (users_email_uk): if another account already
   // owns the incoming email, keep the existing one rather than failing sign-in.

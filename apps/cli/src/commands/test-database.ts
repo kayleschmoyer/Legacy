@@ -25,7 +25,7 @@ async function main() {
     console.log(`Found ${users.length} users:`);
     users.forEach((user) => {
       console.log(
-        `  - ID: ${user.id}, Email: ${user.email || 'N/A'}, Username: ${
+        `  - ID: ${user.id}, Email: ${user.canonicalEmail || 'N/A'}, Username: ${
           user.username || 'N/A'
         }`,
       );

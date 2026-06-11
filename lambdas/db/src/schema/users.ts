@@ -18,7 +18,7 @@ const dbService = createDatabaseService(getDbOptions());
 // User type
 export const UserRef = builder.objectRef<{
   id: number;
-  email?: string | null;
+  email?: string | null; // mapped from users.canonical_email
   username?: string | null;
   accessLevel?: string | null;
   avatarUrl?: string | null;
@@ -130,7 +130,14 @@ builder.queryField('users', (t) =>
         throw ForbiddenError('Admin access required to list all users');
       }
 
-      const orderBy = args.orderBy as 'id' | 'email' | 'username' | undefined;
+      const rawOrderBy = args.orderBy as
+        | 'id'
+        | 'email'
+        | 'canonicalEmail'
+        | 'username'
+        | undefined;
+      // 'email' is kept as a backward-compat alias for GraphQL clients
+      const orderBy = rawOrderBy === 'email' ? 'canonicalEmail' : rawOrderBy;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
       const accessLevelFilter = args.accessLevel as
         | 'none'
@@ -140,7 +147,7 @@ builder.queryField('users', (t) =>
       const users = await dbService.users.getUsers({
         limit: args.limit || undefined,
         offset: args.offset || undefined,
-        orderBy: orderBy || 'email',
+        orderBy: orderBy || 'canonicalEmail',
         orderDirection: orderDirection || 'asc',
         searchTerm: args.search || undefined,
         filters: accessLevelFilter
@@ -156,7 +163,7 @@ builder.queryField('users', (t) =>
 
       return users.map((u) => ({
         id: Number(u.id),
-        email: u.email,
+        email: u.canonicalEmail,
         username: u.username,
         accessLevel: u.accessLevel,
         avatarUrl: u.avatarUrl ?? null,
@@ -222,7 +229,7 @@ builder.queryField('user', (t) =>
 
       return {
         id: Number(user.id),
-        email: user.email,
+        email: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
@@ -257,7 +264,7 @@ builder.queryField('userByEmail', (t) =>
 
       return {
         id: Number(foundUser.id),
-        email: foundUser.email,
+        email: foundUser.canonicalEmail,
         username: foundUser.username,
         accessLevel: foundUser.accessLevel,
         avatarUrl: foundUser.avatarUrl ?? null,
@@ -290,7 +297,7 @@ builder.queryField('searchUsers', (t) =>
 
       return users.map((user) => ({
         id: Number(user.id),
-        email: user.email,
+        email: user.canonicalEmail,
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
@@ -328,7 +335,7 @@ builder.mutationField('updateUserRole', (t) =>
 
       return {
         id: Number(updated.id),
-        email: updated.email,
+        email: updated.canonicalEmail,
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
@@ -374,7 +381,7 @@ builder.mutationField('updateUsername', (t) =>
 
         return {
           id: Number(updated.id),
-          email: updated.email,
+          email: updated.canonicalEmail,
           username: updated.username,
           accessLevel: updated.accessLevel,
           avatarUrl: updated.avatarUrl ?? null,
@@ -425,7 +432,7 @@ builder.mutationField('updateUserAvatar', (t) =>
 
       return {
         id: Number(updated.id),
-        email: updated.email,
+        email: updated.canonicalEmail,
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
@@ -473,7 +480,7 @@ builder.mutationField('updateUserTheme', (t) =>
 
       return {
         id: Number(updated.id),
-        email: updated.email,
+        email: updated.canonicalEmail,
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
@@ -569,9 +576,9 @@ builder.mutationField('cleanupLeakedTestUsers', (t) =>
         deleted: result.deleted,
         dryRun,
         minAgeDays: ageDays,
-        sampleEmails: result.matched.slice(0, 10).map((u) => u.email),
+        sampleEmails: result.matched.slice(0, 10).map((u) => u.canonicalEmail),
         errors: result.errors.map(
-          (e) => `user ${e.id} (${e.email}): ${e.message}`,
+          (e) => `user ${e.id} (${e.canonicalEmail}): ${e.message}`,
         ),
       };
     },
@@ -621,7 +628,7 @@ builder.mutationField('impersonateUser', (t) =>
 
       const payload = {
         id: Number(targetUser.id),
-        email: targetUser.email,
+        email: targetUser.canonicalEmail,
         username: targetUser.username ?? '',
         accessLevel: targetUser.accessLevel ?? 'none',
         impersonatedBy: {

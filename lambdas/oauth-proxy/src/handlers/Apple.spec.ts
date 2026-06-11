@@ -32,7 +32,7 @@ jest.mock('./resolveOrCreateUser', () => ({
     outcome: 'new_user',
     user: {
       id: 42,
-      email: 'jane@example.com',
+      canonicalEmail: 'jane@example.com',
       username: 'jane',
       accessLevel: 'none',
     },

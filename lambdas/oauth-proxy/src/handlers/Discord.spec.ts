@@ -127,7 +127,7 @@ const mockRequireCsrf = requireCsrf as jest.MockedFunction<typeof requireCsrf>;
 
 const mockUser = {
   id: 99,
-  email: 'discord@example.com',
+  canonicalEmail: 'discord@example.com',
   username: 'discorduser',
   accessLevel: 'none' as const,
   passwordHash: null,

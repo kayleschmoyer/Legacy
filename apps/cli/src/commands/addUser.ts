@@ -26,7 +26,7 @@ export async function handleAddUser(args: AddUserArgs): Promise<void> {
       const existingUsers = await db
         .select()
         .from(InternalSchema.usersInAppInternal)
-        .where(eq(InternalSchema.usersInAppInternal.email, email))
+        .where(eq(InternalSchema.usersInAppInternal.canonicalEmail, email))
         .limit(1);
 
       if (existingUsers.length > 0) {
@@ -70,7 +70,7 @@ export async function handleAddUser(args: AddUserArgs): Promise<void> {
       LOGGER.info('');
       LOGGER.info('📋 User Details:');
       LOGGER.info(`   ID: ${newUser.id}`);
-      LOGGER.info(`   Email: ${newUser.email}`);
+      LOGGER.info(`   Email: ${newUser.canonicalEmail}`);
       LOGGER.info(`   Username: ${newUser.username || 'N/A'}`);
       LOGGER.info(`   Access Level: ${accessLevel}`);
       LOGGER.info('');

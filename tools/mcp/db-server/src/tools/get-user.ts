@@ -11,7 +11,7 @@ interface GetUserParams {
 /** Fields returned from the users view. */
 interface UserRow {
   id: number;
-  email: string | null;
+  canonical_email: string | null;
   username: string | null;
   access_level: string | null;
   avatar_url: string | null;
@@ -22,7 +22,7 @@ interface UserRow {
 }
 
 const USER_SELECT =
-  'SELECT id, email, username, access_level, avatar_url, subscription_tier, discord_id, discord_username, discord_avatar FROM public.users';
+  'SELECT id, canonical_email, username, access_level, avatar_url, subscription_tier, discord_id, discord_username, discord_avatar FROM public.users';
 
 export async function getUser(params: GetUserParams): Promise<ToolResult> {
   const { identifier, by = 'username' } = params;
@@ -64,7 +64,7 @@ export async function getUser(params: GetUserParams): Promise<ToolResult> {
     } else if (by === 'email') {
       rows = await sql.begin('READ ONLY', (tx) =>
         tx.unsafe<UserRow[]>(
-          `${USER_SELECT} WHERE lower(email) = lower($1) LIMIT 1`,
+          `${USER_SELECT} WHERE lower(canonical_email) = lower($1) LIMIT 1`,
           [normalizedIdentifier],
         ),
       );
@@ -92,7 +92,7 @@ export async function getUser(params: GetUserParams): Promise<ToolResult> {
     const user = rows[0];
     const result = {
       id: user.id,
-      email: user.email,
+      email: user.canonical_email,
       username: user.username,
       accessLevel: user.access_level,
       avatarUrl: user.avatar_url,

@@ -87,7 +87,8 @@ function makeEvent(
 
 const user = {
   id: 7,
-  email: 'user@example.com',
+  canonicalEmail: 'user@example.com',
+  passwordHash: 'hash',
 } as unknown as NonNullable<Awaited<ReturnType<typeof getUserByEmail>>>;
 
 beforeEach(() => {
@@ -120,7 +121,9 @@ describe('handleForgotPassword', () => {
   it('issues a token and emails a reset link for a known email', async () => {
     mockGetUserByEmail.mockResolvedValueOnce(user);
 
-    const result = await handleForgotPassword(makeEvent({ email: user.email }));
+    const result = await handleForgotPassword(
+      makeEvent({ email: user.canonicalEmail }),
+    );
 
     expect(result.statusCode).toBe(200);
     expect(mockDeleteTokens).toHaveBeenCalledWith(expect.anything(), 7);
@@ -140,7 +143,9 @@ describe('handleForgotPassword', () => {
     );
 
     mockGetUserByEmail.mockResolvedValueOnce(user);
-    const known = await handleForgotPassword(makeEvent({ email: user.email }));
+    const known = await handleForgotPassword(
+      makeEvent({ email: user.canonicalEmail }),
+    );
 
     expect(unknown.statusCode).toBe(known.statusCode);
     expect(unknown.body).toBe(known.body);
@@ -150,7 +155,9 @@ describe('handleForgotPassword', () => {
     mockGetUserByEmail.mockResolvedValueOnce(user);
     mockCreateToken.mockRejectedValueOnce(new Error('db down'));
 
-    const result = await handleForgotPassword(makeEvent({ email: user.email }));
+    const result = await handleForgotPassword(
+      makeEvent({ email: user.canonicalEmail }),
+    );
 
     expect(result.statusCode).toBe(200);
     // The uniform 200 must not swallow the failure silently — operators still

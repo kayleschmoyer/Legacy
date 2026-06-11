@@ -22,7 +22,7 @@ import { accessLevel } from './Enums';
 
 export const users = pgView('users', {
   id: integer('id'),
-  email: varchar('email', { length: 100 }),
+  canonicalEmail: varchar('canonical_email', { length: 255 }),
   username: varchar('username', { length: 50 }),
   accessLevel: accessLevel('access_level'),
   avatarUrl: text('avatar_url'),
@@ -33,7 +33,7 @@ export const users = pgView('users', {
   themePreference: varchar('theme_preference', { length: 10 }),
   canonicalEmailSource: text('canonical_email_source'),
 }).as(sql`SELECT id,
-       email,
+       canonical_email,
        username,
        access_level::character varying::access_level AS access_level,
        avatar_url,

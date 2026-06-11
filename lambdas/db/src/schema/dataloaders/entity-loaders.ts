@@ -109,7 +109,7 @@ export const createUsersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
     const allUsers = await db
       .select({
         id: PublicSchema.users.id,
-        email: PublicSchema.users.email,
+        email: PublicSchema.users.canonicalEmail,
         username: PublicSchema.users.username,
         accessLevel: PublicSchema.users.accessLevel,
       })

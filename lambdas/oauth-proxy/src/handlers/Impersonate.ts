@@ -168,7 +168,7 @@ export const handleImpersonate = async (
     // Generate impersonation JWT
     const impersonationPayload = {
       id: Number(targetUser.id),
-      email: targetUser.email,
+      email: targetUser.canonicalEmail,
       username: targetUser.username ?? '',
       accessLevel: targetUser.accessLevel ?? 'none',
       impersonatedBy: {
@@ -210,7 +210,7 @@ export const handleImpersonate = async (
       body: JSON.stringify({
         user: {
           id: Number(targetUser.id),
-          email: targetUser.email,
+          email: targetUser.canonicalEmail,
           username: targetUser.username ?? '',
           accessLevel: targetUser.accessLevel ?? 'none',
         },

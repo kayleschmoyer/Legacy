@@ -135,11 +135,11 @@ describe('unlinkIdentity', () => {
     const result = await unlinkIdentity(db, 1, 'discord');
 
     expect(result).toEqual({ ok: true, rederived: true });
-    // setCanonicalEmail writes the email + source together.
+    // setCanonicalEmail writes the canonicalEmail + source together.
     expect(capture.updates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          email: 'g@example.com',
+          canonicalEmail: 'g@example.com',
           canonicalEmailSource: 'google',
         }),
       ]),
@@ -165,8 +165,8 @@ describe('unlinkIdentity', () => {
     const result = await unlinkIdentity(db, 1, 'discord');
 
     expect(result).toEqual({ ok: true, rederived: false });
-    // setCanonicalEmailSource clears the source without touching the email.
-    const sourceUpdate = capture.updates.find((u) => !('email' in u));
+    // setCanonicalEmailSource clears the source without touching the canonicalEmail.
+    const sourceUpdate = capture.updates.find((u) => !('canonicalEmail' in u));
     expect(sourceUpdate).toMatchObject({ canonicalEmailSource: null });
   });
 });

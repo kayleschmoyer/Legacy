@@ -244,7 +244,7 @@ describe('impersonateUser mutation', () => {
   it('should reject impersonation of another admin', async () => {
     mockGetUserById.mockResolvedValue({
       id: 5,
-      email: 'other-admin@example.com',
+      canonicalEmail: 'other-admin@example.com',
       username: 'otheradmin',
       accessLevel: 'admin',
     });
@@ -258,7 +258,7 @@ describe('impersonateUser mutation', () => {
   it('should issue a token with the IMPERSONATION_TTL and log an audit event at error level', async () => {
     mockGetUserById.mockResolvedValue({
       id: 10,
-      email: 'target@example.com',
+      canonicalEmail: 'target@example.com',
       username: 'targetuser',
       accessLevel: 'user',
     });
@@ -554,7 +554,7 @@ describe('cleanupLeakedTestUsers mutation', () => {
   it('returns matched/deleted counts and truncates sample emails to 10', async () => {
     const matched = Array.from({ length: 15 }, (_, i) => ({
       id: i + 1,
-      email: `int-commissioner-x${i}@test.legacysports.dev`,
+      canonicalEmail: `int-commissioner-x${i}@test.legacysports.dev`,
       createdAt: new Date(),
     }));
     mockDeleteLeakedTestUsers.mockResolvedValue({
@@ -563,7 +563,7 @@ describe('cleanupLeakedTestUsers mutation', () => {
       errors: [
         {
           id: 99,
-          email: 'int-commissioner-bad@test.legacysports.dev',
+          canonicalEmail: 'int-commissioner-bad@test.legacysports.dev',
           message: 'fk fail',
         },
       ],
@@ -598,7 +598,11 @@ describe('cleanupLeakedTestUsers mutation', () => {
   it('emits an audit log without PII', async () => {
     mockDeleteLeakedTestUsers.mockResolvedValue({
       matched: [
-        { id: 1, email: 'int-x@test.legacysports.dev', createdAt: new Date() },
+        {
+          id: 1,
+          canonicalEmail: 'int-x@test.legacysports.dev',
+          createdAt: new Date(),
+        },
       ],
       deleted: 1,
       errors: [],
@@ -813,7 +817,7 @@ describe('updateUserTheme mutation', () => {
     async (theme) => {
       mockUpdateUserTheme.mockResolvedValue({
         id: 42,
-        email: 'user@example.com',
+        canonicalEmail: 'user@example.com',
         username: 'user42',
         accessLevel: 'none',
         avatarUrl: null,

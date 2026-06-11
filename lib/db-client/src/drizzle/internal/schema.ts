@@ -59,7 +59,7 @@ export const usersInAppInternal = appInternal.table(
   {
     id: serial('id').primaryKey().notNull(),
     username: varchar('username', { length: 50 }),
-    email: varchar('email', { length: 100 }).notNull(),
+    canonicalEmail: varchar('canonical_email', { length: 255 }).notNull(),
     passwordHash: varchar('password_hash', { length: 128 }),
     accessLevel: accessLevelInAppInternal('access_level').default('none'),
     privacyPolicyAcceptedAt: timestamp('privacy_policy_accepted_at', {
@@ -96,9 +96,14 @@ export const usersInAppInternal = appInternal.table(
         'btree',
         table.username.asc().nullsLast(),
       ),
-      emailIdx: index().using('btree', table.email.asc().nullsLast()),
+      canonicalEmailIdx: index().using(
+        'btree',
+        table.canonicalEmail.asc().nullsLast(),
+      ),
       usersUsernameUk: unique('users_username_uk').on(table.username),
-      usersEmailUk: unique('users_email_uk').on(table.email),
+      usersCanonicalEmailUk: unique('users_canonical_email_uk').on(
+        table.canonicalEmail,
+      ),
     };
   },
 );

@@ -76,7 +76,7 @@ builder.mutationField('mergeAccounts', (t) =>
         const [sourceUser] = await context.db
           .select({
             id: sql<number>`id`,
-            email: sql<string>`email`,
+            canonicalEmail: sql<string>`canonical_email`,
           })
           .from(sql`app_internal.users`)
           .where(sql`id = ${sourceUserId}`);
@@ -84,7 +84,7 @@ builder.mutationField('mergeAccounts', (t) =>
         const [targetUser] = await context.db
           .select({
             id: sql<number>`id`,
-            email: sql<string>`email`,
+            canonicalEmail: sql<string>`canonical_email`,
           })
           .from(sql`app_internal.users`)
           .where(sql`id = ${targetUserId}`);
@@ -97,8 +97,8 @@ builder.mutationField('mergeAccounts', (t) =>
         LOGGER.info('Starting account merge', {
           targetUserId,
           sourceUserId,
-          targetEmail: targetUser.email,
-          sourceEmail: sourceUser.email,
+          targetEmail: targetUser.canonicalEmail,
+          sourceEmail: sourceUser.canonicalEmail,
         });
 
         // ── Transfer all references in a single transaction ──
@@ -284,7 +284,7 @@ builder.mutationField('mergeAccounts', (t) =>
           await tx.execute(
             sql`INSERT INTO app_internal.account_merge_log
                 (target_user_id, source_user_id, source_email, target_email, merged_by_user_id, tables_updated)
-                VALUES (${targetUserId}, ${sourceUserId}, ${sourceUser.email}, ${targetUser.email}, ${targetUserId}, ${JSON.stringify(tablesUpdated)}::jsonb)`,
+                VALUES (${targetUserId}, ${sourceUserId}, ${sourceUser.canonicalEmail}, ${targetUser.canonicalEmail}, ${targetUserId}, ${JSON.stringify(tablesUpdated)}::jsonb)`,
           );
 
           // ── Deactivate source account ──
@@ -292,7 +292,7 @@ builder.mutationField('mergeAccounts', (t) =>
           const anonymizedEmail = `merged-${sourceUserId}@deactivated.local`;
           await tx.execute(
             sql`UPDATE app_internal.users
-                SET email = ${anonymizedEmail},
+                SET canonical_email = ${anonymizedEmail},
                     username = ${`merged-${sourceUserId}`},
                     password_hash = NULL,
                     updated_at = NOW()
