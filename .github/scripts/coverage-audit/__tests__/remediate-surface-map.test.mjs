@@ -15,6 +15,8 @@ import {
   renderPrBody,
   serializeMap,
   serializeMapFile,
+  MAX_PR_BODY_CHARS,
+  MAX_GLOBS_PER_SPEC,
 } from '../remediate-surface-map.mjs';
 
 const REAL_MAPS = [
@@ -294,6 +296,24 @@ describe('renderPrBody', () => {
     assert.match(body, /actions\/runs\/1/);
   });
 
+  it('does not emit an omission note when everything fits', () => {
+    const body = renderPrBody(
+      {
+        e2e: [
+          {
+            spec: 'apps/web-e2e/src/tests/billing.spec.ts',
+            onboarded: false,
+            added: ['apps/web/src/pages/billing/**'],
+          },
+        ],
+        integration: [],
+      },
+      { runUrl: 'https://github.com/x/y/actions/runs/1' },
+    );
+    assert.doesNotMatch(body, /omitted/i);
+    assert.doesNotMatch(body, /truncated/i);
+  });
+
   it('omits both map sections but keeps the contract structure when summary is empty', () => {
     const body = renderPrBody({ e2e: [], integration: [] }, {});
     // No per-map sections...
@@ -303,6 +323,101 @@ describe('renderPrBody', () => {
     assert.match(body, /additive-only/i);
     assert.match(body, /Never auto-merged/i);
     assert.match(body, /Review notes/);
+  });
+});
+
+describe('renderPrBody size cap (LS-7908)', () => {
+  // GitHub's createPullRequest rejects bodies over 65,536 chars; the first
+  // audit's backlog (103 specs / 2578 globs) rendered far past it and the bot
+  // PR could never be opened.
+  const RUN_URL = 'https://github.com/x/y/actions/runs/27253240347';
+
+  /** A synthetic backlog summary with realistically long spec/glob paths. */
+  const bigSummary = (specCount, globsPerSpec) => ({
+    e2e: Array.from({ length: specCount }, (_, i) => ({
+      spec: `apps/web-e2e/src/tests/some/deeply/nested/area-${String(i).padStart(4, '0')}.spec.ts`,
+      onboarded: i % 3 === 0,
+      added: Array.from(
+        { length: globsPerSpec },
+        (_, j) =>
+          `apps/web/src/pages/some/deeply/nested/area-${i}/widget-${j}/**`,
+      ),
+    })),
+    integration: [],
+  });
+
+  it('stays under the hard ceiling (and GitHub limit) on a huge backlog', () => {
+    const body = renderPrBody(bigSummary(400, 30), { runUrl: RUN_URL });
+    assert.ok(
+      body.length <= MAX_PR_BODY_CHARS,
+      `body is ${body.length} chars, ceiling is ${MAX_PR_BODY_CHARS}`,
+    );
+    assert.ok(body.length < 65536);
+    // The contract footer must survive capping.
+    assert.match(body, /additive-only/i);
+    assert.match(body, /Never auto-merged/i);
+    assert.match(body, /Review notes/);
+    // The remainder is summarised with a pointer to the run.
+    assert.match(body, /omitted/i);
+    assert.match(body, /actions\/runs\/27253240347/);
+  });
+
+  it('respects a custom maxChars budget', () => {
+    const body = renderPrBody(bigSummary(50, 10), {
+      runUrl: RUN_URL,
+      maxChars: 5000,
+    });
+    assert.ok(body.length <= 5000, `body is ${body.length} chars`);
+    assert.match(body, /Review notes/);
+  });
+
+  it('accounts for every spec: listed + omitted equals the total', () => {
+    const summary = bigSummary(40, 8);
+    const body = renderPrBody(summary, { runUrl: RUN_URL, maxChars: 6000 });
+    // Match spec entry bullets only (the footer also has `- **…**` bullets).
+    const listed = (body.match(/^- \*\*apps\//gm) ?? []).length;
+    const note = body.match(
+      /\*\*(\d+) more spec\(s\) \((\d+) glob\(s\)\) omitted\*\*/,
+    );
+    assert.ok(note, 'expected an omission note');
+    const omittedSpecs = Number(note[1]);
+    const omittedGlobs = Number(note[2]);
+    assert.equal(listed + omittedSpecs, 40);
+    // Entries are dropped strictly from the tail, so the omitted glob count is
+    // the sum over the unlisted suffix.
+    const expectedGlobs = summary.e2e
+      .slice(listed)
+      .reduce((n, c) => n + c.added.length, 0);
+    assert.equal(omittedGlobs, expectedGlobs);
+  });
+
+  it('caps the globs listed per spec and notes the elision', () => {
+    const body = renderPrBody(
+      {
+        e2e: [
+          {
+            spec: 'apps/web-e2e/src/tests/wide.spec.ts',
+            onboarded: false,
+            added: Array.from(
+              { length: MAX_GLOBS_PER_SPEC + 5 },
+              (_, j) => `apps/web/src/pages/area-${j}/**`,
+            ),
+          },
+        ],
+        integration: [],
+      },
+      { runUrl: RUN_URL },
+    );
+    const globLines = (body.match(/^ {4}- `\+ /gm) ?? []).length;
+    assert.equal(globLines, MAX_GLOBS_PER_SPEC);
+    assert.match(body, /plus 5 more glob\(s\)/);
+  });
+
+  it('keeps the blank line between the listing and the footer rule', () => {
+    // Without it, `---` directly under a text line parses as a setext heading
+    // instead of a thematic break.
+    const body = renderPrBody({ e2e: [], integration: [] }, {});
+    assert.match(body, /\n\n---\n/);
   });
 });
 

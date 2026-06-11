@@ -1079,7 +1079,10 @@ jobs:
 
           EXISTING=$(gh pr list --head "$REMEDIATION_BRANCH" --state open --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
-            echo "Refreshed existing remediation PR #$EXISTING (force-pushed branch)."
+            # Keep the description in sync with the night's findings — the body
+            # file is capped under GitHub's 64 KB body limit by the generator.
+            gh pr edit "$EXISTING" --body-file remediation-pr-body.md
+            echo "Refreshed existing remediation PR #$EXISTING (force-pushed branch + body)."
           else
             gh pr create \
               --title "$COMMIT_MSG" \

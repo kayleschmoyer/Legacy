@@ -97,6 +97,7 @@ The surface maps are only as good as their globs. A stale or missing glob silent
   - **Additive-only:** it never removes or narrows a glob. Dead-glob pruning stays a deliberate human decision (removal risks silently reintroducing under-selection).
   - **Never auto-merges:** the PR is reviewed and merged by a human like any other; no merge label is applied.
   - A hand-rolled serializer reproduces the committed prettier-clean JSON byte-for-byte (round-trip unit-tested), so each diff touches only the specs that changed.
+  - **PR body is size-capped (LS-7908):** GitHub rejects PR bodies over 65,536 chars, so `renderPrBody` lists findings within a 60,000-char budget (max 20 globs per spec) and summarises the remainder as a count with a link to the nightly run; the standing PR's body is re-synced via `gh pr edit` on each force-refresh.
 
 ---
 

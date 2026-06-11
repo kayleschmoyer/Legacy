@@ -268,58 +268,142 @@ const MAP_LABELS = {
   integration: 'integration (live-backend)',
 };
 
-/** Human-reviewable PR body. Make the additive-only / never-auto-merge contract explicit. */
-export function renderPrBody(summary, { runUrl } = {}) {
-  const lines = [];
-  lines.push(
+/**
+ * GitHub rejects PR bodies over 65,536 characters (createPullRequest GraphQL
+ * error: "Body is too long"). A large under-selection backlog (the first audit
+ * flagged 103 specs / 2578 globs) renders far past that, so the body never
+ * lists more than fits this ceiling — chosen with margin so wrapper text added
+ * by `gh` or future edits can't tip it over the API limit.
+ */
+export const MAX_PR_BODY_CHARS = 60000;
+
+/** A spec entry lists at most this many of its added globs before eliding. */
+export const MAX_GLOBS_PER_SPEC = 20;
+
+/** Reserved room for the omission note appended when entries are dropped. */
+const OMISSION_NOTE_RESERVE = 400;
+
+/** Render one spec's bullet block (spec line + capped glob lines). */
+function renderSpecEntry(c) {
+  const lines = [
+    `- **${c.spec}**${c.onboarded ? ' _(new entry — onboarded)_' : ''}`,
+  ];
+  for (const g of c.added.slice(0, MAX_GLOBS_PER_SPEC)) {
+    lines.push(`    - \`+ ${g}\``);
+  }
+  if (c.added.length > MAX_GLOBS_PER_SPEC) {
+    lines.push(
+      `    - _…plus ${c.added.length - MAX_GLOBS_PER_SPEC} more glob(s) — see the map diff._`,
+    );
+  }
+  return lines;
+}
+
+/**
+ * Human-reviewable PR body. Makes the additive-only / never-auto-merge contract
+ * explicit, and caps itself at `maxChars` (default safely under GitHub's 64 KB
+ * body limit): entries are listed in order until the budget is spent, then the
+ * remainder is summarised as a count with a pointer to the nightly run — the
+ * full proposal is always in the PR's map diff itself.
+ */
+export function renderPrBody(
+  summary,
+  { runUrl, maxChars = MAX_PR_BODY_CHARS } = {},
+) {
+  const headerLines = [
     'Automated, **additive-only** surface-map update proposed by the ' +
       'auto-remediation bot (LS-7851), closing the loop on the nightly drift ' +
       'auditor (LS-7850).',
-  );
-  lines.push('');
-  lines.push(
+    '',
     'The auditor observed specs exercising source files that **no surface glob ' +
       'accounted for** (under-selection — the new-source-file onboarding ' +
       'signal). This PR adds the missing globs, broadened to directory level, so ' +
       'affected specs are selected when those areas change.',
-  );
-  lines.push('');
+    '',
+  ];
 
-  for (const name of MAP_NAMES) {
-    const changes = summary[name] ?? [];
-    if (changes.length === 0) continue;
-    lines.push(`### \`${MAP_FILES[name]}\` — ${MAP_LABELS[name]}`);
-    lines.push('');
-    for (const c of changes) {
-      lines.push(
-        `- **${c.spec}**${c.onboarded ? ' _(new entry — onboarded)_' : ''}`,
-      );
-      for (const g of c.added) lines.push(`    - \`+ ${g}\``);
-    }
-    lines.push('');
-  }
-
-  lines.push('---');
-  lines.push('');
-  lines.push('**Review notes**');
-  lines.push(
+  // Leading '' keeps a blank line between the listing and the `---` rule (a
+  // dash line directly under text would parse as a setext heading instead).
+  const footerLines = ['', '---', '', '**Review notes**'];
+  footerLines.push(
     '- This bot is **additive-only**: it never removes or narrows a glob. ' +
       'Dead-glob pruning stays a manual human decision (removing a glob risks ' +
       'silently reintroducing under-selection).',
   );
-  lines.push(
+  footerLines.push(
     '- **Never auto-merged.** Review the proposed globs and merge like any PR; ' +
       'narrow them by hand first if a directory glob is broader than warranted.',
   );
-  lines.push(
+  footerLines.push(
     '- Idempotent: this single standing PR is refreshed each night while the ' +
       'under-selection persists, not duplicated.',
   );
   if (runUrl) {
-    lines.push(`- Source nightly run: ${runUrl}`);
+    footerLines.push(`- Source nightly run: ${runUrl}`);
   }
-  lines.push('');
-  return lines.join('\n') + '\n';
+  footerLines.push('');
+  const footer = footerLines.join('\n') + '\n';
+
+  const lines = [...headerLines];
+  const used = () => lines.join('\n').length + 1; // +1: '\n' before footer join
+
+  let budgetSpent = false;
+  let omittedSpecs = 0;
+  let omittedGlobs = 0;
+
+  for (const name of MAP_NAMES) {
+    const changes = summary[name] ?? [];
+    if (changes.length === 0) continue;
+    const headingLines = [
+      `### \`${MAP_FILES[name]}\` — ${MAP_LABELS[name]}`,
+      '',
+    ];
+    let headingEmitted = false;
+    for (const c of changes) {
+      if (!budgetSpent) {
+        const entryLines = renderSpecEntry(c);
+        const pending = headingEmitted
+          ? entryLines
+          : [...headingLines, ...entryLines];
+        const pendingLen = pending.join('\n').length + 1;
+        if (
+          used() + pendingLen + OMISSION_NOTE_RESERVE + footer.length <=
+          maxChars
+        ) {
+          lines.push(...pending);
+          headingEmitted = true;
+          continue;
+        }
+        // First entry that doesn't fit — everything from here on is summarised
+        // as a count, so the listing reads as "first N, remainder omitted".
+        budgetSpent = true;
+      }
+      omittedSpecs += 1;
+      omittedGlobs += c.added.length;
+    }
+    if (headingEmitted) lines.push('');
+  }
+
+  if (omittedSpecs > 0) {
+    const fullReport = runUrl
+      ? `the nightly run for the full report: ${runUrl}`
+      : "the nightly run's coverage-audit log for the full report";
+    lines.push(
+      `> ⚠️ **${omittedSpecs} more spec(s) (${omittedGlobs} glob(s)) omitted** ` +
+        "to keep this description under GitHub's 64 KB PR-body limit. " +
+        `Every proposed glob is still in this PR's diff; see ${fullReport}`,
+    );
+    lines.push('');
+  }
+
+  let body = lines.join('\n') + footer;
+  // Defensive last resort — unreachable with the default budget, but the
+  // ceiling is the contract: never hand GitHub a too-long body.
+  if (body.length > maxChars) {
+    const marker = '\n…(truncated)\n';
+    body = body.slice(0, maxChars - marker.length) + marker;
+  }
+  return body;
 }
 
 // ---------------------------------------------------------------------------
