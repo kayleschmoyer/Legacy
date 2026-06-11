@@ -129,3 +129,48 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
     expect(body).not.toHaveProperty('venue');
   });
 });
+
+test.describe('View Game Logs — Date input validation (LS-7455) @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('load');
+  });
+
+  test('invalid start date format shows inline error without sending a request (LS-7455)', async ({
+    page,
+  }) => {
+    let postCalled = false;
+    await page.route('**/baseball-game-logs', async (route) => {
+      postCalled = true;
+      await route.fulfill({ status: 200, body: '{}' });
+    });
+
+    await page.getByPlaceholder('Enter player ID').fill('mlb-1234');
+    await page.getByPlaceholder('Start date (YYYY-MM-DD)').fill('not-a-date');
+    await page.getByRole('button', { name: 'Get Player Data' }).click();
+
+    await expect(page.getByRole('alert')).toContainText(
+      'Start date must be in YYYY-MM-DD format',
+    );
+    expect(postCalled).toBe(false);
+  });
+
+  test('future start date (2099-12-31) is rejected client-side (LS-7452, LS-7455)', async ({
+    page,
+  }) => {
+    let postCalled = false;
+    await page.route('**/baseball-game-logs', async (route) => {
+      postCalled = true;
+      await route.fulfill({ status: 200, body: '{}' });
+    });
+
+    await page.getByPlaceholder('Enter player ID').fill('mlb-1234');
+    await page.getByPlaceholder('Start date (YYYY-MM-DD)').fill('2099-12-31');
+    await page.getByRole('button', { name: 'Get Player Data' }).click();
+
+    await expect(page.getByRole('alert')).toContainText(
+      'Start date cannot be in the future',
+    );
+    expect(postCalled).toBe(false);
+  });
+});

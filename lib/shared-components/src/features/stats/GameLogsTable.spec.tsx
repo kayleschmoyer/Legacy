@@ -192,6 +192,110 @@ describe('GameLogsTable input validation', () => {
   });
 });
 
+describe('GameLogsTable date validation edge-cases (LS-7455)', () => {
+  const clickSubmit = (getByText: (text: string) => HTMLElement): void => {
+    const el = getByText('Get Player Data');
+    fireEvent.click(el.closest('button') ?? el);
+  };
+
+  it('rejects a start date with slash separators (2024/06/01)', () => {
+    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
+      target: { value: '2024/06/01' },
+    });
+    clickSubmit(getByText);
+    expect(
+      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeTruthy();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a start date in MM-DD-YYYY format', () => {
+    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
+      target: { value: '06-01-2024' },
+    });
+    clickSubmit(getByText);
+    expect(
+      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeTruthy();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a partial start date (year-month only)', () => {
+    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
+      target: { value: '2024-06' },
+    });
+    clickSubmit(getByText);
+    expect(
+      getByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
+    ).toBeTruthy();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a future start date (2099-12-31) client-side (LS-7452)', () => {
+    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
+      target: { value: '2099-12-31' },
+    });
+    clickSubmit(getByText);
+    expect(getByText('Start date cannot be in the future')).toBeTruthy();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('omits game_date_from and game_date_to when both date fields are blank', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const body = JSON.parse(calls[0][1].body as string) as Record<
+      string,
+      unknown
+    >;
+    expect(body).not.toHaveProperty('game_date_from');
+    expect(body).not.toHaveProperty('game_date_to');
+  });
+});
+
 describe('Team reference data (LS-7477)', () => {
   it('MLB list contains all 30 franchises with unique ids', () => {
     expect(MLB_TEAMS).toHaveLength(30);
