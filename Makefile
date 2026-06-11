@@ -16,6 +16,7 @@
 	fix-windows-locks diagnose kill-stale \
 	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
+	pc-db-prep pc-typecheck pc-format pc-lint pc-workflows pc-test pc-build \
 	wt-setup modules-link modules-gc \
 	stabilize-after-rebase lint-review-patterns ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
 	ship-pr
@@ -890,50 +891,106 @@ else
 _PC_CODEGEN_CMD = GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx run-many -t codegen
 endif
 
+# Individual pre-commit step commands. Shared by the `pre-commit` pipeline and the
+# standalone pc-* step targets (stepwise validation for timeout-prone agent sessions,
+# LS-7906). Keep these in sync with nothing — they ARE the single source of truth.
+_PC_MIGRATION_CMD = node scripts/check-migration-immutability.js --branch
+_PC_SCHEMA_CMD = pnpm exec nx run db:print-schema
+_PC_TYPECHECK_CMD = pnpm exec nx affected -t typecheck --base=$(NX_BASE)
+_PC_LINT_CMD = pnpm exec nx affected -t lint --fix --base=$(NX_BASE)
+_PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
+_PC_TEST_CMD = pnpm exec nx affected -t test --base=$(NX_BASE)
+_PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
+
+# Formatting step (prettier + auto-amend of formatter rewrites). Canned recipe so the
+# `pre-commit` pipeline and the standalone `pc-format` target share one implementation.
+ifeq ($(DETECTED_OS),Windows)
+define _PC_FORMAT_RECIPE
+@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec prettier --write --ignore-unknown .; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
+endef
+else
+define _PC_FORMAT_RECIPE
+@pre_state=$$(git status --porcelain -uno); \
+pnpm exec prettier --write --ignore-unknown .; \
+post_state=$$(git status --porcelain -uno); \
+changed=$$(comm -13 <(echo "$$pre_state" | sort) <(echo "$$post_state" | sort)); \
+if [ -z "$$changed" ]; then \
+	diff_files=$$(git diff --name-only); \
+	if [ -n "$$diff_files" ]; then changed="$$diff_files"; fi; \
+fi; \
+if [ -n "$$changed" ]; then \
+	if [ -n "$$pre_state" ]; then \
+		echo ""; \
+		echo "ERROR: Formatting rewrote the following files:"; \
+		echo "$$changed" | sed 's/^.../  /'; \
+		echo ""; \
+		echo "You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc."; \
+		exit 1; \
+	else \
+		echo "  Formatting changed files; auto-amending last commit..."; \
+		git add -A; \
+		git commit --amend --no-edit; \
+		echo "  ✓ Format fixes folded into previous commit."; \
+	fi; \
+fi
+endef
+endif
+
 pre-commit: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
 	@$(call echo_plain,Classifying changed files...)
 	@node scripts/classify-changes.js --print-summary --base $(NX_BASE)
-	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && node scripts/check-migration-immutability.js --branch,@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
-	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && pnpm exec nx run db:print-schema,@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && $(_PC_MIGRATION_CMD),@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD),@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
 	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD),@$(call echo_yellow,3/9 Code generation... SKIPPED (no db changes)))
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && pnpm exec nx affected -t typecheck --base=$(NX_BASE),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec prettier --write --ignore-unknown .; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
-else
-	@pre_state=$$(git status --porcelain -uno); \
-	pnpm exec prettier --write --ignore-unknown .; \
-	post_state=$$(git status --porcelain -uno); \
-	changed=$$(comm -13 <(echo "$$pre_state" | sort) <(echo "$$post_state" | sort)); \
-	if [ -z "$$changed" ]; then \
-		diff_files=$$(git diff --name-only); \
-		if [ -n "$$diff_files" ]; then changed="$$diff_files"; fi; \
-	fi; \
-	if [ -n "$$changed" ]; then \
-		if [ -n "$$pre_state" ]; then \
-			echo ""; \
-			echo "ERROR: Formatting rewrote the following files:"; \
-			echo "$$changed" | sed 's/^.../  /'; \
-			echo ""; \
-			echo "You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc."; \
-			exit 1; \
-		else \
-			echo "  Formatting changed files; auto-amending last commit..."; \
-			git add -A; \
-			git commit --amend --no-edit; \
-			echo "  ✓ Format fixes folded into previous commit."; \
-		fi; \
-	fi
-endif
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && pnpm exec nx affected -t lint --fix --base=$(NX_BASE),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
-	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && node scripts/validate-workflows.js,@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && pnpm exec nx affected -t test --base=$(NX_BASE),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && pnpm exec nx affected -t build --base=$(NX_BASE),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
+	$(_PC_FORMAT_RECIPE)
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && $(_PC_BUILD_CMD),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
 pc: pre-commit ## Alias for pre-commit
+
+# --- Stepwise pre-commit (timeout-resilient agent validation, LS-7906) --------------
+# The same nine steps as `make pc`, runnable one target at a time so ephemeral/cloud
+# agent sessions can checkpoint progress between steps instead of holding a single
+# 10+ minute process. Equivalent to `make pc` ONLY when ALL steps run in order:
+#   pc-db-prep -> pc-typecheck -> pc-format -> pc-lint -> pc-workflows -> pc-test -> pc-build
+# Each target applies the same change-classification gating as the full pipeline.
+
+pc-db-prep: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
+pc-db-prep: ## pc steps 1-3: migration immutability + schema + codegen (db changes only)
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && $(_PC_MIGRATION_CMD),@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD),@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD),@$(call echo_yellow,3/9 Code generation... SKIPPED (no db changes)))
+
+pc-typecheck: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
+pc-typecheck: ## pc step 4: typecheck affected projects
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
+
+pc-format: ## pc step 5: prettier + auto-amend formatter rewrites
+	@$(call echo_plain,5/9 Formatting...)
+	$(_PC_FORMAT_RECIPE)
+
+pc-lint: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
+pc-lint: ## pc step 6: lint affected projects
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
+
+pc-workflows: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
+pc-workflows: ## pc step 7: GitHub workflow validation
+	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
+
+pc-test: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
+pc-test: ## pc step 8: test affected projects
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
+
+pc-build: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
+pc-build: ## pc step 9: build affected projects
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && $(_PC_BUILD_CMD),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
 
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)

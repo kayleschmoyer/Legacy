@@ -75,8 +75,15 @@ export function startMakeInBackground(
   };
   jobRegistry.set(jobId, record);
 
-  child.stdout?.pipe(logStream);
-  child.stderr?.pipe(logStream);
+  // end: false on both pipes — stdout and stderr share one destination, and the
+  // default end-on-source-end would close the stream when the first source
+  // finishes while the other may still write ("write after end"). The stream is
+  // ended explicitly in the 'close' handler / timeout path instead.
+  child.stdout?.pipe(logStream, { end: false });
+  child.stderr?.pipe(logStream, { end: false });
+  // Late writes after an explicit end() (e.g. a killed child flushing) must not
+  // crash the server process via an unhandled 'error' event.
+  logStream.on('error', () => {});
 
   // Enforce a process-level timeout independent of the MCP client transport.
   const timer = setTimeout(() => {

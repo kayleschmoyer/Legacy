@@ -35,8 +35,12 @@ describe('background execution lifecycle', () => {
 
   beforeAll(() => {
     workDir = mkdtempSync(join(tmpdir(), 'make-bg-test-'));
-    // Makefile recipes require a leading TAB.
-    writeFileSync(join(workDir, 'Makefile'), 'noop:\n\t@true\n');
+    // Makefile recipes require a leading TAB. Use `echo` (not `true`): when these
+    // tests run as a descendant of `make pc` on Windows, the child make finds no
+    // sh.exe in PATH and execs simple commands directly via CreateProcess — `true`
+    // is not a Windows executable and fails with e=2, while `echo` routes through
+    // the cmd.exe fallback shell and works under both sh and cmd.
+    writeFileSync(join(workDir, 'Makefile'), 'noop:\n\t@echo ok\n');
   });
 
   afterAll(() => {

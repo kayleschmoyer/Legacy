@@ -51,6 +51,17 @@ const ALLOWED_TARGETS = new Set([
   'pre-commit',
   'quick-check',
 
+  // Stepwise pre-commit (timeout-resilient validation for cloud/ephemeral
+  // sessions, LS-7906). Equivalent to `pc` only when ALL steps run in order:
+  // pc-db-prep -> pc-typecheck -> pc-format -> pc-lint -> pc-workflows -> pc-test -> pc-build
+  'pc-db-prep',
+  'pc-typecheck',
+  'pc-format',
+  'pc-lint',
+  'pc-workflows',
+  'pc-test',
+  'pc-build',
+
   // Build / compile
   'build',
   'build-all',
@@ -170,6 +181,11 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const heavyTargets = new Set([
     'pc',
     'pre-commit',
+    // Heavy pc step targets — nx affected typecheck/test/build can each exceed
+    // the 5-minute default on a cold cache.
+    'pc-typecheck',
+    'pc-test',
+    'pc-build',
     'build-all',
     'test-all',
     'install',

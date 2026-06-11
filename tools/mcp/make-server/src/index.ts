@@ -28,6 +28,8 @@ const server = new McpServer({
 server.tool(
   'make_run',
   'Prefer this over `make <target>` via shell. Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. ' +
+    'Stepwise validation (timeout-prone cloud/ephemeral sessions): the pc pipeline is also runnable as checkpointed chunks — ' +
+    'pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, pc-test, pc-build — equivalent to `pc` ONLY when ALL steps run in that order. ' +
     'NOTE: runner-apply has an interactive confirmation prompt — always pass variables="NO_CONFIRM=1" when invoking it, ' +
     'otherwise the process will block waiting for stdin. runner-apply also runs terraform plan+apply and may take 10+ minutes.',
   {
