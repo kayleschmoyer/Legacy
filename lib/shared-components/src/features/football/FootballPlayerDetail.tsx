@@ -413,59 +413,100 @@ function SeasonBreakdowns({ player }: { player: FootballPlayerDetailPlayer }) {
 
 // ── Career stat tables ────────────────────────────────────────────────────────
 
+/** True when `obj` exists and at least one of its fields is non-null. */
+function hasAnyValue(obj: object | null | undefined): boolean {
+  return obj != null && Object.values(obj).some((v) => v != null);
+}
+
+function PassingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
+  const p = stats.passing;
+  return (
+    <StatGroup title="Career Passing">
+      <StatCell label="YDS" value={fmt(p?.yds)} />
+      <StatCell label="TD" value={fmt(p?.td)} />
+      <StatCell label="INT" value={fmt(p?.int)} />
+      <StatCell label="RTG" value={fmtFloat(p?.rating)} />
+    </StatGroup>
+  );
+}
+
+function RushingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
+  const r = stats.rushing;
+  return (
+    <StatGroup title="Career Rushing">
+      <StatCell label="YDS" value={fmt(r?.yds)} />
+      <StatCell label="TD" value={fmt(r?.td)} />
+    </StatGroup>
+  );
+}
+
+function ReceivingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
+  const r = stats.receiving;
+  return (
+    <StatGroup title="Career Receiving">
+      <StatCell label="REC" value={fmt(r?.rec)} />
+      <StatCell label="YDS" value={fmt(r?.yds)} />
+      <StatCell label="TD" value={fmt(r?.td)} />
+    </StatGroup>
+  );
+}
+
+function KickingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
+  const k = stats.kicking;
+  const fgPct = k?.fga && k.fga > 0 ? ((k.fgm ?? 0) / k.fga) * 100 : null;
+  return (
+    <StatGroup title="Career Kicking">
+      <StatCell label="FGM" value={fmt(k?.fgm)} />
+      <StatCell label="FGA" value={fmt(k?.fga)} />
+      <StatCell label="FG%" value={fmtFloat(fgPct)} />
+    </StatGroup>
+  );
+}
+
 function OffenseStatsTable({
   pos,
   stats,
 }: {
-  pos: string;
+  pos: string | null | undefined;
   stats: FootballPlayerDetailStats;
 }) {
-  if (pos === 'QB') {
-    const p = stats.passing;
-    return (
-      <StatGroup title="Career Passing">
-        <StatCell label="YDS" value={fmt(p?.yds)} />
-        <StatCell label="TD" value={fmt(p?.td)} />
-        <StatCell label="INT" value={fmt(p?.int)} />
-        <StatCell label="RTG" value={fmtFloat(p?.rating)} />
-      </StatGroup>
-    );
+  if (pos === 'QB') return <PassingStatGroup stats={stats} />;
+  if (pos === 'RB') return <RushingStatGroup stats={stats} />;
+  if (pos === 'WR' || pos === 'TE') return <ReceivingStatGroup stats={stats} />;
+  if (pos === 'K') return <KickingStatGroup stats={stats} />;
+
+  // Unknown or missing position (e.g. FB, OL, or null). Rather than render
+  // nothing — leaving a silently empty page below the header — fall back to
+  // showing whatever career categories actually have data, and an explanatory
+  // message when none do (LS-6243 / FPD-019).
+  const groups: React.ReactNode[] = [];
+  if (hasAnyValue(stats.passing))
+    groups.push(<PassingStatGroup key="passing" stats={stats} />);
+  if (hasAnyValue(stats.rushing))
+    groups.push(<RushingStatGroup key="rushing" stats={stats} />);
+  if (hasAnyValue(stats.receiving))
+    groups.push(<ReceivingStatGroup key="receiving" stats={stats} />);
+  if (hasAnyValue(stats.kicking))
+    groups.push(<KickingStatGroup key="kicking" stats={stats} />);
+
+  if (groups.length > 0) {
+    return <YStack gap={20}>{groups}</YStack>;
   }
 
-  if (pos === 'RB') {
-    const r = stats.rushing;
-    return (
-      <StatGroup title="Career Rushing">
-        <StatCell label="YDS" value={fmt(r?.yds)} />
-        <StatCell label="TD" value={fmt(r?.td)} />
-      </StatGroup>
-    );
-  }
-
-  if (pos === 'WR' || pos === 'TE') {
-    const r = stats.receiving;
-    return (
-      <StatGroup title="Career Receiving">
-        <StatCell label="REC" value={fmt(r?.rec)} />
-        <StatCell label="YDS" value={fmt(r?.yds)} />
-        <StatCell label="TD" value={fmt(r?.td)} />
-      </StatGroup>
-    );
-  }
-
-  if (pos === 'K') {
-    const k = stats.kicking;
-    const fgPct = k?.fga && k.fga > 0 ? ((k.fgm ?? 0) / k.fga) * 100 : null;
-    return (
-      <StatGroup title="Career Kicking">
-        <StatCell label="FGM" value={fmt(k?.fgm)} />
-        <StatCell label="FGA" value={fmt(k?.fga)} />
-        <StatCell label="FG%" value={fmtFloat(fgPct)} />
-      </StatGroup>
-    );
-  }
-
-  return null;
+  return (
+    <YStack
+      backgroundColor={SURFACE_CARD}
+      borderWidth={1}
+      borderColor={OUTLINE_SUBTLE}
+      borderRadius={8}
+      padding={20}
+      alignItems="center"
+    >
+      <Text fontSize={14} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+        No supported stats for this position
+      </Text>
+    </YStack>
+  );
 }
 
 export interface FootballPlayerDetailProps {
@@ -653,12 +694,12 @@ export function FootballPlayerDetail({
             <DstStatsTable stats={player.careerStats} />
           ) : isIdp ? (
             <IdpStatsTable stats={player.careerStats} />
-          ) : player.position ? (
+          ) : (
             <OffenseStatsTable
               pos={player.position}
               stats={player.careerStats}
             />
-          ) : null}
+          )}
 
           {/* Season-by-season breakdown tables */}
           <SeasonBreakdowns player={player} />

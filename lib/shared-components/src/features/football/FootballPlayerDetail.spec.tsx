@@ -301,6 +301,65 @@ describe('FootballPlayerDetail', () => {
     });
   });
 
+  describe('LS-6243 / FPD-019 — unknown or missing position fallback', () => {
+    const FB_PLAYER: FootballPlayerDetailPlayer = {
+      id: 7,
+      firstName: 'Kyle',
+      lastName: 'Juszczyk',
+      position: 'FB',
+      isDst: false,
+      nflTeam: 'SF',
+      previousTeams: [],
+      careerStats: {
+        rushing: { yds: 145, td: 2 },
+        receiving: { rec: 180, yds: 1500, td: 9 },
+      },
+    };
+
+    it('renders the categories that have data for an unsupported position (FB)', () => {
+      render(<FootballPlayerDetail player={FB_PLAYER} />);
+      expect(screen.getByText('Career Rushing')).toBeTruthy();
+      expect(screen.getByText('Career Receiving')).toBeTruthy();
+      expect(
+        screen.queryByText('No supported stats for this position'),
+      ).toBeNull();
+    });
+
+    it('renders available stats even when position is null', () => {
+      const player: FootballPlayerDetailPlayer = {
+        id: 8,
+        firstName: 'Mystery',
+        lastName: 'Player',
+        position: null,
+        isDst: false,
+        nflTeam: 'NYJ',
+        previousTeams: [],
+        careerStats: { receiving: { rec: 10, yds: 100, td: 1 } },
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.getByText('Career Receiving')).toBeTruthy();
+    });
+
+    it('shows an explanatory message when an unsupported position has no usable stats (OL)', () => {
+      const player: FootballPlayerDetailPlayer = {
+        id: 9,
+        firstName: 'Trent',
+        lastName: 'Williams',
+        position: 'OL',
+        isDst: false,
+        nflTeam: 'SF',
+        previousTeams: [],
+        careerStats: {},
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(
+        screen.getByText('No supported stats for this position'),
+      ).toBeTruthy();
+      // careerStats is present (just empty), so this is NOT the null-stats path
+      expect(screen.queryByText('No stats available')).toBeNull();
+    });
+  });
+
   it('renders FA badge and Free Agent subtitle when nflTeam is null', () => {
     const FREE_AGENT: FootballPlayerDetailPlayer = {
       id: 99,
