@@ -66,6 +66,8 @@ import { handleGetPlayerFootballRushing } from './commands/getPlayerFootballRush
 import { handleGetPlayerFootballReceiving } from './commands/getPlayerFootballReceiving';
 import { handleGetPlayerFootballKicking } from './commands/getPlayerFootballKicking';
 import { handleGetPlayerFootballDefense } from './commands/getPlayerFootballDefense';
+import { handleFindDuplicateAccounts } from './commands/findDuplicateAccounts';
+import { handleMergeAccounts } from './commands/mergeAccounts';
 
 // Initialize Rollbar for CLI
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -866,6 +868,57 @@ export function buildProgram(): Command {
     .option('--yes', 'Skip confirmation prompt and proceed with deletion')
     .action((options: { id?: number; yes?: boolean }) =>
       handleDeleteLeague(options),
+    );
+
+  program
+    .command('find-duplicate-accounts')
+    .description(
+      'Detect candidate duplicate user account pairs by overlapping provider emails or ' +
+        'identity emails. Duplicate pairs arise when the same person signed in with two ' +
+        'different email addresses before the multi-provider identity migration (LS-7821).',
+    )
+    .option(
+      '-l, --limit <number>',
+      'Maximum number of pairs to return (default: 100)',
+      parseInt,
+    )
+    .option(
+      '-f, --format <format>',
+      'Output format: table or json (default: table)',
+      'table',
+    )
+    .action((options: { limit?: number; format?: 'table' | 'json' }) =>
+      handleFindDuplicateAccounts(options),
+    );
+
+  program
+    .command('merge-accounts')
+    .description(
+      'Guided merge of a secondary user account into a primary account. ' +
+        'Transfers all leagues, memberships, identities, subscriptions, and history. ' +
+        'The secondary account is anonymised after the merge. ' +
+        'Dry-run mode (--dry-run) previews changes without committing. ' +
+        'Use find-duplicate-accounts to identify candidate pairs (LS-7827).',
+    )
+    .requiredOption(
+      '--primary-id <id>',
+      'ID of the primary (kept) user account',
+      parseInt,
+    )
+    .requiredOption(
+      '--secondary-id <id>',
+      'ID of the secondary (merged-away) user account',
+      parseInt,
+    )
+    .option('--dry-run', 'Preview what would happen without making any changes')
+    .option('--yes', 'Confirm the merge (required unless --dry-run is set)')
+    .action(
+      (options: {
+        primaryId: number;
+        secondaryId: number;
+        dryRun?: boolean;
+        yes?: boolean;
+      }) => handleMergeAccounts(options),
     );
 
   return program;
