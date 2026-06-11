@@ -562,6 +562,9 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
       search: debouncedSearch || undefined,
     },
     fetchPolicy: 'cache-and-network',
+    // Handle the query error in-page (EmptyState below) rather than via the
+    // global error toast, so the error is accessible and persistent.
+    context: { suppressGlobalError: true },
   });
 
   const handleSort = useCallback(

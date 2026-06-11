@@ -217,6 +217,7 @@ async function setupGraphQL(
           contentType: 'application/json',
           body: JSON.stringify({
             errors: [{ message: 'Unable to load players' }],
+            data: { players: null },
           }),
         });
         return;
@@ -508,7 +509,7 @@ test.describe('Free Agents — empty state @regression', () => {
     await page.waitForLoadState('load');
 
     await expect(
-      page.getByTestId('main-content').getByText('Unable to load players'),
+      page.getByTestId('main-content').getByText('Unable to Load Players'),
     ).toBeVisible();
   });
 });
