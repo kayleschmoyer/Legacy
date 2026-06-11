@@ -21,6 +21,9 @@ import { DISCORD_SIGN_IN_CANCELLED, signInWithDiscord } from './discordAuth';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 import { clearApolloCache } from '../ApolloClientContext';
+import { trackGoogleSignInFailure } from '../../utils/analytics';
+
+declare const __DEV__: boolean;
 
 export interface AuthHandlers {
   googleLogin: () => Promise<void>;
@@ -212,8 +215,30 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   }, [router]);
 
   const googleLogin = useCallback(async () => {
+    const oauthConfig = getMobileOAuthConfig();
+    const { oauthProxyUrl } = oauthConfig;
+
+    // Reject missing or whitespace-only proxy URL before starting the Google
+    // sign-in flow — mirrors the identical guard in appleLogin/discordLogin.
+    // In production builds a localhost URL is unreachable from a real device
+    // and causes the OAuth callback to silently loop back to login (MOB-019).
+    const isLocalhostInProd =
+      !__DEV__ &&
+      !!oauthProxyUrl &&
+      /^https?:\/\/localhost/i.test(oauthProxyUrl);
+    if (!oauthProxyUrl?.trim() || isLocalhostInProd) {
+      const configError: OAuthError = {
+        code: 'CONFIGURATION_ERROR' as OAuthErrorCode,
+        message:
+          'Google Sign-In is not configured for this build (missing OAUTH_PROXY).',
+      };
+      trackGoogleSignInFailure(configError.code);
+      failureHandler(configError);
+      return;
+    }
+
     try {
-      await OAuthProvider.configure(getMobileOAuthConfig());
+      await OAuthProvider.configure(oauthConfig);
       const response = await OAuthProvider.signIn();
       await successHandler(response);
     } catch (error) {
@@ -224,11 +249,13 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         'code' in error &&
         'message' in error
       ) {
+        trackGoogleSignInFailure(String((error as OAuthError).code));
         failureHandler(error as OAuthError);
       } else {
         // Unexpected, non-OAuthError failure: surface a generic message to the
         // UI while preserving the original error on `originalError` (logged by
         // failureHandler) so no detail is lost internally (LS-6657).
+        trackGoogleSignInFailure('UNKNOWN_ERROR');
         const oauthError: OAuthError = {
           code: 'UNKNOWN_ERROR' as OAuthErrorCode,
           message: GENERIC_AUTH_ERROR,

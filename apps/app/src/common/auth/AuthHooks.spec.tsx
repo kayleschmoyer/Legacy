@@ -165,6 +165,13 @@ jest.mock('./mobileOAuthConfig', () => ({
     mockGetMobileOAuthConfig(...args),
 }));
 
+// Mock analytics so failure-tracking calls don't hit Firebase in tests
+const mockTrackGoogleSignInFailure = jest.fn();
+jest.mock('../../utils/analytics', () => ({
+  trackGoogleSignInFailure: (...args: unknown[]): unknown =>
+    mockTrackGoogleSignInFailure(...args),
+}));
+
 // Mock env utilities (still used by AuthHooks for BYPASS_AUTH)
 const mockEnvVars: Record<string, string> = {};
 
@@ -403,6 +410,76 @@ describe('AuthHooks', () => {
       expect(mockFetch).not.toHaveBeenCalled();
       expect(onFailure).toHaveBeenCalledWith(
         'Authentication failed. Please try again.',
+      );
+    });
+
+    it('calls onFailure without starting sign-in when oauthProxyUrl is not configured', async () => {
+      mockGetMobileOAuthConfig.mockReturnValue({
+        ...DEFAULT_MOBILE_OAUTH_CONFIG,
+        oauthProxyUrl: undefined,
+      });
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(
+        'Google Sign-In is not configured for this build (missing OAUTH_PROXY).',
+      );
+      expect(mockConfigure).not.toHaveBeenCalled();
+      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('tracks failure with CONFIGURATION_ERROR when oauthProxyUrl is missing', async () => {
+      mockGetMobileOAuthConfig.mockReturnValue({
+        ...DEFAULT_MOBILE_OAUTH_CONFIG,
+        oauthProxyUrl: undefined,
+      });
+
+      const { result } = renderHook(() => useAuthHandlers());
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(mockTrackGoogleSignInFailure).toHaveBeenCalledWith(
+        'CONFIGURATION_ERROR',
+      );
+    });
+
+    it('tracks failure mode on sign-in error', async () => {
+      const oauthError = {
+        code: 'SIGN_IN_CANCELLED',
+        message: 'User cancelled the sign-in flow',
+      };
+      mockSignIn.mockRejectedValue(oauthError);
+
+      const { result } = renderHook(() => useAuthHandlers());
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(mockTrackGoogleSignInFailure).toHaveBeenCalledWith(
+        'SIGN_IN_CANCELLED',
+      );
+    });
+
+    it('tracks UNKNOWN_ERROR for non-OAuthError failures', async () => {
+      mockSignIn.mockRejectedValue(new Error('Network timeout'));
+
+      const { result } = renderHook(() => useAuthHandlers());
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(mockTrackGoogleSignInFailure).toHaveBeenCalledWith(
+        'UNKNOWN_ERROR',
       );
     });
   });

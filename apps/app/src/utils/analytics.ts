@@ -116,3 +116,10 @@ export function trackSubscriptionRenewed(tier: 'premium'): void {
 export function trackMinigameTap(gameId: string): void {
   void trackEvent('minigame_tap', { game_id: gameId, category: 'engagement' });
 }
+
+export function trackGoogleSignInFailure(failureMode: string): void {
+  void trackEvent('google_sign_in_failure', {
+    failure_mode: failureMode,
+    category: 'auth',
+  });
+}
