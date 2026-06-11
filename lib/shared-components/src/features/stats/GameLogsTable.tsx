@@ -279,7 +279,7 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
 /**
  * Shape the POST body for `/baseball-game-logs`. Exported so unit tests can
  * assert opponent expansion + venue serialization without mocking fetch.
- * (LS-7466, LS-7473, LS-7478)
+ * (LS-7466, LS-7473, LS-7478, LS-7451)
  */
 export function buildGameLogsRequestBody(
   filters: FilterState,
@@ -528,6 +528,15 @@ function GameLogsTable({
       filters.dateTo > todayStr
     ) {
       setInputError('End date cannot be in the future');
+      return;
+    }
+    // AC1 (LS-7451): guard inverted ranges before they reach the API.
+    if (
+      filters.dateFrom &&
+      filters.dateTo &&
+      filters.dateFrom > filters.dateTo
+    ) {
+      setInputError('Start date must be on or before end date');
       return;
     }
 
