@@ -687,9 +687,14 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          # The merge config written in the "Merge Reports" step registers
+          # apps/web-e2e/src/reporters/agent-md-reporter.ts (LS-7838), so the
+          # reporter source must be present in this sparse checkout or
+          # merge-reports fails with "Cannot find module" (LS-7928).
           sparse-checkout: |
             .github/actions/s3-artifact
             scripts/rewrite-pw-attachment-paths.py
+            apps/web-e2e/src/reporters/agent-md-reporter.ts
           sparse-checkout-cone-mode: false
           fetch-depth: 1
 
