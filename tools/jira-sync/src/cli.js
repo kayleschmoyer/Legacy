@@ -2,11 +2,12 @@
 'use strict';
 
 /**
- * CLI adapter for .github/workflows/jira-branch-sync.yml. Prints a single
- * JSON object to stdout; the workflow parses it with jq. Output goes through
+ * CLI adapter for .github/workflows/jira-branch-sync.yml and
+ * .github/workflows/jira-status-audit.yml. Prints a single JSON object to
+ * stdout; the workflows parse it with jq. Output goes through
  * process.stdout so it stays copy-paste-clean (no logger prefixes) — this
- * package is dependency-free by design so the workflow can run it with bare
- * node, without a pnpm install.
+ * package is dependency-free by design so the workflows can run it with
+ * bare node, without a pnpm install.
  *
  * Commands:
  *   plan  --event-name <push|pull_request> --event-path <github-event.json>
@@ -16,10 +17,22 @@
  *   guard --current <status> --target <status> --event-name <name>
  *         [--action <action>] [--merged <true|false>]
  *     → { allowed, noop, reason }
+ *
+ *   audit --pr-file <pr.json>
+ *     → { skip, reason, key, source, expected }
+ *     The file holds one PR object from `gh pr list --json
+ *     number,title,body,isDraft,headRefName,state` (state "MERGED" marks a
+ *     merged PR).
+ *
+ *   audit-action --current <status> --expected <status>
+ *         --guard-allowed <true|false> --auto-repair <true|false>
+ *         --has-label <true|false>
+ *     → { action, addLabel, removeLabel, reason }
  */
 
 const fs = require('node:fs');
 
+const { decideAuditAction, planAudit } = require('./audit');
 const { planSync } = require('./plan');
 const { isAllowedMove } = require('./state-machine');
 
@@ -94,6 +107,51 @@ function runGuard(flags) {
   });
 }
 
+/** @param {Record<string, string>} flags */
+function runAudit(flags) {
+  const prFile = flags['pr-file'];
+  if (!prFile) {
+    throw new Error('audit requires --pr-file');
+  }
+  /** @type {any} */
+  const pr = JSON.parse(fs.readFileSync(prFile, 'utf8'));
+
+  return planAudit({
+    merged: pr.state === 'MERGED' || Boolean(pr.mergedAt),
+    isDraft: pr.isDraft === true,
+    title: pr.title ?? '',
+    body: pr.body ?? '',
+    branch: pr.headRefName ?? '',
+  });
+}
+
+/** @param {Record<string, string>} flags */
+function runAuditAction(flags) {
+  const { current, expected } = flags;
+  if (!current || !expected) {
+    throw new Error('audit-action requires --current and --expected');
+  }
+  /** @param {string} name */
+  const bool = (name) => {
+    const value = flags[name];
+    if (value !== 'true' && value !== 'false') {
+      // Fail closed: a malformed boolean must never silently enable repairs.
+      throw new Error(
+        `--${name} must be "true" or "false", got "${value ?? ''}"`,
+      );
+    }
+    return value === 'true';
+  };
+
+  return decideAuditAction({
+    current,
+    expected,
+    guardAllowed: bool('guard-allowed'),
+    autoRepair: bool('auto-repair'),
+    hasLabel: bool('has-label'),
+  });
+}
+
 function main() {
   const [command, ...rest] = process.argv.slice(2);
   const flags = parseFlags(rest);
@@ -103,9 +161,13 @@ function main() {
     result = runPlan(flags);
   } else if (command === 'guard') {
     result = runGuard(flags);
+  } else if (command === 'audit') {
+    result = runAudit(flags);
+  } else if (command === 'audit-action') {
+    result = runAuditAction(flags);
   } else {
     throw new Error(
-      `unknown command "${command ?? ''}" — expected plan or guard`,
+      `unknown command "${command ?? ''}" — expected plan, guard, audit, or audit-action`,
     );
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
@@ -122,4 +184,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseFlags, runPlan, runGuard };
+module.exports = { parseFlags, runPlan, runGuard, runAudit, runAuditAction };

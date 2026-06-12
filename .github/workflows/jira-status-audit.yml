@@ -1,9 +1,23 @@
 name: "Jira Status Audit"
 
-# Detects mismatches between Jira ticket statuses and GitHub PR states,
-# and audits epic statuses against their children's aggregate state.
+# Detects and repairs drift between Jira ticket statuses and GitHub PR
+# states, and audits epic statuses against their children's aggregate state.
 #
-# PR audit: checks open PRs against Jira ticket status, labels mismatches.
+# PR audit (declared-ticket-linkage RFC §4, LS-7897): reads each PR's
+# declared `<!-- jira-link -->` marker via tools/jira-sync (PR-title key
+# fallback for pre-marker PRs, branch-name fallback for pre-convention
+# PRs), computes the expected Jira status from the PR state
+# (merged → Done, open draft → In Progress, open ready → In Review), and
+# auto-repairs drift. Repairs are forward-only: the monotonic guard is
+# consulted with a non-pull_request event, under which downgrades are
+# never permitted; anything the guard refuses gets the jira-mismatch
+# label plus a comment stating the proposed action.
+#
+# Dry-run by default: auto-repair writes are gated on the repo var
+# JIRA_AUDIT_AUTO_REPAIR being 'true'. Until then, allowed repairs are
+# labeled with the proposed action instead of applied (per the RFC open
+# question — flip the var after a clean week of dry-run proposals).
+#
 # Epic audit: applies rollup logic (same as jira-branch-sync.yml) to all
 # epics — recalculates expected status from children and transitions.
 # Done epics are included so they can be demoted when a child is reopened.
@@ -79,12 +93,17 @@ jobs:
           echo "::error::Unauthorized repository_dispatch sender: '$SENDER'. Allowed: $ALLOWED"
           exit 1
 
-      - name: Checkout (for workflow context)
+      # The audit only ever runs from the default branch (schedule /
+      # repository_dispatch / workflow_dispatch), so this checks out the
+      # same commit the workflow file came from — the jira-sync engine and
+      # this workflow always move together.
+      - name: Checkout (workflow context + jira-sync engine)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: |
             .github
-          sparse-checkout-cone-mode: false
+            tools/jira-sync
+          sparse-checkout-cone-mode: true
 
       - name: Authenticate with Jira (OAuth 2.0)
         id: auth
@@ -214,87 +233,232 @@ jobs:
           echo "✅ Jira API retry helper defined"
 
       # -------------------------------------------------------------------
-      # Audit PR ↔ Jira Status
+      # Audit PR ↔ Jira Status (marker-first, forward-only auto-repair)
+      #
+      # Scans open PRs plus recently merged PRs (the two observed drift
+      # classes: open-PR tickets demoted to In Progress, merged-PR tickets
+      # stuck In Progress). Key + expected status come from
+      # `tools/jira-sync audit`; repairs go through the monotonic guard.
       # -------------------------------------------------------------------
       - name: Audit PR ↔ Jira Status
         id: pr-audit
         if: steps.auth.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          AUTO_REPAIR: ${{ vars.JIRA_AUDIT_AUTO_REPAIR || 'false' }}
         run: |
           source /tmp/jira-api.sh
-          echo "🔍 Fetching open PRs with LS-* branch pattern..."
+          echo "🔍 Fetching open PRs and recently merged PRs..."
 
-          PRS=$(gh pr list --state open --json number,headRefName,isDraft,labels --limit 200)
+          # Fail closed: anything other than the literal 'true' means dry-run.
+          if [[ "$AUTO_REPAIR" != "true" ]]; then
+            AUTO_REPAIR=false
+          fi
+
+          # gh pr list paginates the GitHub API internally (pages of 100) up
+          # to --limit, so no manual cursor handling is needed below the cap.
+          # A cap hit is made loud (::warning + step summary) instead of
+          # silently truncating the audit.
+          FIELDS="number,title,body,isDraft,headRefName,state,labels"
+          LIMIT=500
+          OPEN_PRS=$(gh pr list --state open --json "$FIELDS" --limit "$LIMIT")
+          MERGED_SINCE=$(date -u -d '14 days ago' +%Y-%m-%d)
+          MERGED_PRS=$(gh pr list --state merged --search "merged:>=$MERGED_SINCE" --json "$FIELDS" --limit "$LIMIT")
+
+          CAPPED=""
+          if [[ "$(echo "$OPEN_PRS" | jq 'length')" -ge "$LIMIT" ]]; then
+            echo "::warning::open-PR list hit the $LIMIT cap — some open PRs were not audited; raise LIMIT in jira-status-audit.yml"
+            CAPPED="$CAPPED open"
+          fi
+          if [[ "$(echo "$MERGED_PRS" | jq 'length')" -ge "$LIMIT" ]]; then
+            echo "::warning::merged-PR list hit the $LIMIT cap — some merged PRs were not audited; raise LIMIT or shorten the merged window"
+            CAPPED="$CAPPED merged"
+          fi
+
+          # Open PRs first: when a ticket has both an open PR and an older
+          # merged PR, the open PR's expectation wins (see SEEN_KEYS below).
+          PRS=$(jq -c -n --argjson open "$OPEN_PRS" --argjson merged "$MERGED_PRS" '$open + $merged')
           TOTAL=$(echo "$PRS" | jq 'length')
-          echo "Found $TOTAL open PRs"
+          echo "Scanning $TOTAL PRs (open + merged since $MERGED_SINCE), auto-repair: $AUTO_REPAIR"
 
-          MISMATCHES=0
-          FIXED=0
+          SKIPPED=0
+          IN_SYNC=0
+          REPAIRED=0
+          PROPOSED=0
+          REFUSED=0
+          ERRORS=0
+          LABELS_CLEARED=0
+          DRIFT_LOG=""
+          declare -A SEEN_KEYS
 
+          PR_FILE=$(mktemp)
           while read -r PR; do
+            printf '%s' "$PR" > "$PR_FILE"
             NUMBER=$(echo "$PR" | jq -r '.number')
-            BRANCH=$(echo "$PR" | jq -r '.headRefName')
-            IS_DRAFT=$(echo "$PR" | jq -r '.isDraft')
 
-            KEY=$(echo "$BRANCH" | grep -oP 'LS-\d+' | head -1 || true)
-            if [[ -z "$KEY" ]]; then
-              continue
-            fi
-
-            JIRA_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$KEY?fields=status") || {
-              echo "  ⚠️  Could not fetch $KEY — skipping"
+            AUDIT=$(node tools/jira-sync/src/cli.js audit --pr-file "$PR_FILE") || {
+              echo "  ⚠️  PR #$NUMBER: audit planning failed — skipping"
+              ERRORS=$((ERRORS + 1))
               continue
             }
 
-            JIRA_STATUS=$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name')
-
-            EXPECTED="In Review"
-            if [[ "$IS_DRAFT" == "true" ]]; then
-              EXPECTED="In Progress"
+            if [[ "$(echo "$AUDIT" | jq -r '.skip')" == "true" ]]; then
+              echo "  ⏭️  PR #$NUMBER: $(echo "$AUDIT" | jq -r '.reason')"
+              SKIPPED=$((SKIPPED + 1))
+              continue
             fi
+
+            KEY=$(echo "$AUDIT" | jq -r '.key')
+            EXPECTED=$(echo "$AUDIT" | jq -r '.expected')
+            SOURCE=$(echo "$AUDIT" | jq -r '.source')
+
+            # One verdict per ticket: the first PR declaring a key wins, and
+            # open PRs are processed before merged ones.
+            if [[ -n "${SEEN_KEYS[$KEY]:-}" ]]; then
+              echo "  ⏭️  PR #$NUMBER: $KEY already audited via PR #${SEEN_KEYS[$KEY]} — skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+            SEEN_KEYS[$KEY]=$NUMBER
+
+            JIRA_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$KEY?fields=status") || {
+              echo "  ⚠️  PR #$NUMBER: could not fetch $KEY — skipping"
+              ERRORS=$((ERRORS + 1))
+              continue
+            }
+            CURRENT=$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name')
 
             # Check label presence from already-fetched PR data (no extra API call needed).
             HAS_LABEL=$(echo "$PR" | jq -r '[.labels[].name] | map(select(. == "jira-mismatch")) | length // 0')
+            HAS_LABEL_BOOL=false
+            if [[ "$HAS_LABEL" != "0" ]]; then
+              HAS_LABEL_BOOL=true
+            fi
 
-            if [[ "$JIRA_STATUS" != "$EXPECTED" && "$JIRA_STATUS" != "In Progress" ]]; then
-              echo "  ❌ PR #$NUMBER ($KEY): Jira='$JIRA_STATUS' but expected='$EXPECTED'"
-              MISMATCHES=$((MISMATCHES + 1))
+            # Repairs are forward-only: the guard sees a non-pull_request
+            # event (schedule / repository_dispatch / workflow_dispatch),
+            # under which no downgrade is ever permitted. In-sync tickets
+            # short-circuit past the guard.
+            ALLOWED=false
+            GUARD_REASON=""
+            if [[ "$CURRENT" != "$EXPECTED" ]]; then
+              GUARD=$(node tools/jira-sync/src/cli.js guard \
+                --current "$CURRENT" \
+                --target "$EXPECTED" \
+                --event-name "$GITHUB_EVENT_NAME")
+              ALLOWED=$(echo "$GUARD" | jq -r '.allowed')
+              GUARD_REASON=$(echo "$GUARD" | jq -r '.reason')
+            fi
 
-              if [[ "$HAS_LABEL" == "0" ]]; then
-                gh pr edit "$NUMBER" --add-label "jira-mismatch" 2>/dev/null || true
-                COMMENT_BODY_FILE=$(mktemp)
-                ESCAPED_KEY=$(printf '%s' "$KEY" | sed 's/[\\`"$]/\\&/g')
-                cat > "$COMMENT_BODY_FILE" <<COMMENT_EOF
+            # All label/repair branching is decided by the unit-tested
+            # engine (tools/jira-sync decideAuditAction); this loop only
+            # executes the returned actions.
+            ACTION_JSON=$(node tools/jira-sync/src/cli.js audit-action \
+              --current "$CURRENT" --expected "$EXPECTED" \
+              --guard-allowed "$ALLOWED" --auto-repair "$AUTO_REPAIR" \
+              --has-label "$HAS_LABEL_BOOL")
+            ACTION=$(echo "$ACTION_JSON" | jq -r '.action')
+            ADD_LABEL=$(echo "$ACTION_JSON" | jq -r '.addLabel')
+            REMOVE_LABEL=$(echo "$ACTION_JSON" | jq -r '.removeLabel')
+
+            if [[ "$ACTION" == "in-sync" ]]; then
+              IN_SYNC=$((IN_SYNC + 1))
+              if [[ "$REMOVE_LABEL" == "true" ]]; then
+                gh pr edit "$NUMBER" --remove-label "jira-mismatch" 2>/dev/null || true
+                LABELS_CLEARED=$((LABELS_CLEARED + 1))
+                echo "  ✅ PR #$NUMBER ($KEY): drift resolved, label removed"
+              fi
+              continue
+            fi
+
+            echo "  ❌ PR #$NUMBER ($KEY via $SOURCE): Jira='$CURRENT', expected='$EXPECTED'"
+
+            if [[ "$ACTION" == "repair" ]]; then
+              TRANS_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$KEY/transitions") || {
+                echo "     ⚠️  could not fetch transitions for $KEY"
+                ERRORS=$((ERRORS + 1))
+                continue
+              }
+              TRANSITION_ID=$(echo "$TRANS_RESPONSE" | jq -r --arg t "$EXPECTED" \
+                '.transitions[] | select(.name == $t or .to.name == $t) | .id' | head -1)
+              if [[ -z "$TRANSITION_ID" ]]; then
+                echo "     ⚠️  transition '$EXPECTED' not available for $KEY"
+                ERRORS=$((ERRORS + 1))
+                continue
+              fi
+              if jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$KEY/transitions" \
+                "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null; then
+                echo "     ✅ repaired: $KEY '$CURRENT' → '$EXPECTED'"
+                REPAIRED=$((REPAIRED + 1))
+                DRIFT_LOG="${DRIFT_LOG}"$'\n'"| #$NUMBER | $KEY | $CURRENT | $EXPECTED | repaired |"
+                # removeLabel is applied only after the transition succeeded.
+                if [[ "$REMOVE_LABEL" == "true" ]]; then
+                  gh pr edit "$NUMBER" --remove-label "jira-mismatch" 2>/dev/null || true
+                fi
+              else
+                echo "     ❌ failed to transition $KEY after retries"
+                ERRORS=$((ERRORS + 1))
+              fi
+              continue
+            fi
+
+            # Dry-run proposal or guard-refused drift: jira-mismatch label
+            # plus a comment stating the proposed action.
+            if [[ "$ACTION" == "propose" ]]; then
+              VERDICT="proposed (dry-run)"
+              DETAIL="The audit would transition **${KEY}** \`${CURRENT}\` → \`${EXPECTED}\`,"
+              DETAIL+=" but auto-repair is in its dry-run period"
+              DETAIL+=" (repo var \`JIRA_AUDIT_AUTO_REPAIR\` is not \`true\`)."
+              PROPOSED=$((PROPOSED + 1))
+            else
+              VERDICT="guard-refused"
+              DETAIL="The audit proposes transitioning **${KEY}** \`${CURRENT}\` → \`${EXPECTED}\`,"
+              DETAIL+=" but the monotonic guard refuses (${GUARD_REASON})."
+              DETAIL+=" Manual review needed — automation never moves tickets backward."
+              REFUSED=$((REFUSED + 1))
+            fi
+            DRIFT_LOG="${DRIFT_LOG}"$'\n'"| #$NUMBER | $KEY | $CURRENT | $EXPECTED | $VERDICT |"
+
+            if [[ "$ADD_LABEL" == "true" ]]; then
+              gh pr edit "$NUMBER" --add-label "jira-mismatch" 2>/dev/null || true
+              COMMENT_BODY_FILE=$(mktemp)
+              cat > "$COMMENT_BODY_FILE" <<COMMENT_EOF
           ⚠️ **Jira Status Mismatch**
 
-          **${ESCAPED_KEY}** is \`${JIRA_STATUS}\` in Jira, but this PR is open (expected: \`${EXPECTED}\`).
-
-          This usually means someone manually changed the ticket status in Jira. Please verify the correct status.
+          ${DETAIL}
 
           _Detected by the Jira Status Audit workflow._
           COMMENT_EOF
-                gh pr comment "$NUMBER" --body-file "$COMMENT_BODY_FILE" 2>/dev/null || true
-                rm -f "$COMMENT_BODY_FILE"
-              fi
-            else
-              if [[ "$HAS_LABEL" != "0" ]]; then
-                gh pr edit "$NUMBER" --remove-label "jira-mismatch" 2>/dev/null || true
-                FIXED=$((FIXED + 1))
-                echo "  ✅ PR #$NUMBER ($KEY): mismatch resolved, label removed"
-              fi
+              gh pr comment "$NUMBER" --body-file "$COMMENT_BODY_FILE" 2>/dev/null || true
+              rm -f "$COMMENT_BODY_FILE"
             fi
           done < <(echo "$PRS" | jq -c '.[]')
+          rm -f "$PR_FILE"
 
           echo ""
           echo "## 🔍 PR Status Audit" >> $GITHUB_STEP_SUMMARY
-          echo "- **Open PRs scanned**: $TOTAL" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mismatches found**: $MISMATCHES" >> $GITHUB_STEP_SUMMARY
-          echo "- **Previously mismatched, now fixed**: $FIXED" >> $GITHUB_STEP_SUMMARY
-
-          if [[ "$MISMATCHES" -gt 0 ]]; then
+          echo "- **PRs scanned**: $TOTAL (open + merged since $MERGED_SINCE)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auto-repair enabled**: $AUTO_REPAIR" >> $GITHUB_STEP_SUMMARY
+          echo "- **In sync**: $IN_SYNC" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repaired**: $REPAIRED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Proposed (dry-run)**: $PROPOSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Guard-refused**: $REFUSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Skipped (no declared ticket / duplicate key)**: $SKIPPED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stale labels cleared**: $LABELS_CLEARED" >> $GITHUB_STEP_SUMMARY
+          if [[ "$ERRORS" -gt 0 ]]; then
+            echo "- **Errors**: $ERRORS" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ -n "$CAPPED" ]]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ PRs with \`jira-mismatch\` label need attention." >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **List cap hit** ($LIMIT) for:$CAPPED — some PRs were not audited. Raise LIMIT in jira-status-audit.yml." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [[ -n "$DRIFT_LOG" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Drift detected" >> $GITHUB_STEP_SUMMARY
+            echo "| PR | Ticket | Was | Expected | Action |" >> $GITHUB_STEP_SUMMARY
+            echo "|----|--------|-----|----------|--------|" >> $GITHUB_STEP_SUMMARY
+            printf '%s\n' "$DRIFT_LOG" >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ All PR ↔ Jira statuses match." >> $GITHUB_STEP_SUMMARY

@@ -397,6 +397,24 @@ After transitioning the child ticket, the workflow also syncs the parent epic st
 
 A Done child alone does NOT pull an epic out of To Do / Backlog — only In Progress / In Review children count as "active work" (LS-4683).
 
+### Status Audit (`jira-status-audit.yml`)
+
+The reconciliation audit (weekly cron + `jira-issue-updated` repository_dispatch
+
+- manual dispatch) reads the same `jira-link` marker via `tools/jira-sync audit`
+  (LS-7897, phase 4 of the RFC) and **auto-repairs** drift instead of only
+  labeling it. It scans open PRs plus PRs merged in the last 14 days, computes
+  the expected status from PR state (merged → Done, open draft → In Progress,
+  open ready → In Review; key selection marker → PR-title → branch-name), and
+  applies corrections through the same monotonic guard with a non-`pull_request`
+  event — so the audit can never demote a ticket. Guard-refused drift gets the
+  `jira-mismatch` label plus a comment stating the proposed action. Auto-repair
+  writes are gated on the repo var `JIRA_AUDIT_AUTO_REPAIR` being `'true'`
+  (default: dry-run — label + proposed action only). Note: the audit's label
+  add/remove and Jira API orchestration live in the workflow bash, not in
+  `tools/jira-sync/` — the package's unit tests cover planning (`planAudit`) and
+  the guard only.
+
 Epics with the Jira label `pinned-status` are excluded from automatic transitions.
 
 **Authentication:** Atlassian OAuth 2.0 (client credentials grant) via `JIRA_CREDENTIALS` secret.

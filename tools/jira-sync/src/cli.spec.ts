@@ -135,11 +135,90 @@ describe('cli guard', () => {
   });
 });
 
+describe('cli audit', () => {
+  it('audits a merged PR from a gh pr JSON file (marker-first)', () => {
+    const prPath = writeEvent({
+      number: 5000,
+      title: 'LS-1111 feat: x',
+      body: '<!-- jira-link\nprimary: LS-7523\n-->',
+      isDraft: false,
+      headRefName: 'claude/some-branch',
+      state: 'MERGED',
+    });
+    const result = run(['audit', '--pr-file', prPath]);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      skip: false,
+      key: 'LS-7523',
+      source: 'marker',
+      expected: 'Done',
+    });
+  });
+
+  it('decides label/repair actions via audit-action', () => {
+    const result = run([
+      'audit-action',
+      '--current',
+      'In Review',
+      '--expected',
+      'In Review',
+      '--guard-allowed',
+      'false',
+      '--auto-repair',
+      'false',
+      '--has-label',
+      'true',
+    ]);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      action: 'in-sync',
+      removeLabel: true,
+    });
+  });
+
+  it('fails closed on malformed audit-action booleans', () => {
+    const result = run([
+      'audit-action',
+      '--current',
+      'To Do',
+      '--expected',
+      'Done',
+      '--guard-allowed',
+      'yes',
+      '--auto-repair',
+      'false',
+      '--has-label',
+      'false',
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('guard-allowed');
+  });
+
+  it('audits an open draft PR with title fallback', () => {
+    const prPath = writeEvent({
+      number: 5001,
+      title: 'LS-1111 feat: x',
+      body: 'no marker',
+      isDraft: true,
+      headRefName: 'claude/some-branch',
+      state: 'OPEN',
+    });
+    const result = run(['audit', '--pr-file', prPath]);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      skip: false,
+      key: 'LS-1111',
+      source: 'title',
+      expected: 'In Progress',
+    });
+  });
+});
+
 describe('cli errors', () => {
   it('fails with a message on unknown commands and missing flags', () => {
     expect(run(['bogus']).status).toBe(1);
     expect(run(['plan']).status).toBe(1);
     expect(run(['guard', '--current', 'To Do']).status).toBe(1);
+    expect(run(['audit']).status).toBe(1);
   });
 
   it('fails closed on a malformed --open-pr-count instead of bypassing the gate', () => {

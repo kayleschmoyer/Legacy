@@ -1,9 +1,10 @@
 # jira-sync
 
-Transition engine for `.github/workflows/jira-branch-sync.yml` — phase 1 of
-the declared-ticket-linkage RFC (`docs/rfcs/draft-declared-ticket-linkage.md`,
-LS-7893/LS-7894). The workflow is a thin event adapter; all decisions live
-here, unit-tested:
+Transition engine for `.github/workflows/jira-branch-sync.yml` (phase 1 of
+the declared-ticket-linkage RFC, `docs/rfcs/draft-declared-ticket-linkage.md`,
+LS-7893/LS-7894) and `.github/workflows/jira-status-audit.yml` (phase 4,
+LS-7897). The workflows are thin event adapters; all decisions live here,
+unit-tested:
 
 - **`src/marker.js`** — parses the `<!-- jira-link -->` PR-body marker
   (`primary` / `related`); decoy `LS-####` keys in prose are never matched.
@@ -17,8 +18,17 @@ here, unit-tested:
   no marker exists); push events use branch-name keys only and are gated on
   the branch having **no open PR**. Commit-message key sweeping is gone — it
   swept foreign keys from main's commits after rebases (run 27291997543).
-- **`src/cli.js`** — `plan` / `guard` subcommands emitting JSON for the
-  workflow to parse with jq.
+- **`src/audit.js`** — maps a PR snapshot to `{ key, expected }` for the
+  status audit: merged → Done, open draft → In Progress, open ready →
+  In Review. Key selection is marker-first, then PR-title, then branch-name
+  (the audit's historical key source). Repairs stay forward-only: the audit
+  consults the guard with a non-`pull_request` event, so no downgrade is
+  ever permitted; refused drift is labeled instead. `decideAuditAction`
+  owns the per-PR verdict (in-sync / repair / propose / refuse) and the
+  jira-mismatch label add/remove decision, so the workflow bash only
+  executes returned actions.
+- **`src/cli.js`** — `plan` / `guard` / `audit` / `audit-action`
+  subcommands emitting JSON for the workflows to parse with jq.
 
 ## Why plain CommonJS with zero dependencies
 
