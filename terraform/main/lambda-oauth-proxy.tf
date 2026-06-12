@@ -162,8 +162,15 @@ resource "aws_dynamodb_table" "oauth_login_throttle" {
 # IAM policy granting the OAuth Lambda read/write access to the device-flow and
 # login-throttle tables
 resource "aws_iam_policy" "oauth_proxy_lambda_dynamodb" {
-  name        = "${local.name_prefix}-oauth-proxy-lambda-dynamodb"
-  description = "IAM policy for OAuth Lambda to access the device-flow and login-throttle DynamoDB tables"
+  name = "${local.name_prefix}-oauth-proxy-lambda-dynamodb"
+  # NOTE: An IAM policy `description` is immutable in AWS (no update API), so the
+  # provider treats any change as ForceNew. Editing this string triggers a
+  # destroy+recreate of a same-named global IAM policy, which races into a 409
+  # EntityAlreadyExists and aborts every Lambda apply (see LS-6675 regression).
+  # The grants below are updated in-place via new policy versions; keep this
+  # description text frozen at the original value. Document new tables in the
+  # comment above the resource, not here.
+  description = "IAM policy for OAuth Lambda to access the device-flow DynamoDB table"
 
   policy = jsonencode({
     Version = "2012-10-17"
