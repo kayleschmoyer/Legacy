@@ -7,7 +7,7 @@ import {
   FootballPlayerDetail,
   type FootballPlayerDetailPlayer,
 } from './FootballPlayerDetail';
-import { fireEvent, render, screen } from '../../test-utils';
+import { fireEvent, render, screen, within } from '../../test-utils';
 
 jest.mock('../stats/GameLogsTable', () => ({
   GameLogsTable: ({
@@ -294,6 +294,141 @@ describe('FootballPlayerDetail', () => {
     expect(screen.getByText('Career IDP Stats')).toBeTruthy();
     expect(screen.getByText('Ast')).toBeTruthy();
     expect(screen.getByText('48')).toBeTruthy();
+  });
+
+  describe('LS-7637 — IDP (DL/LB/DB) defensive stats coverage', () => {
+    // Distinct, non-overlapping values so a per-column assertion fails if the
+    // table wires a label to the wrong field (e.g. the "wrong column for FF"
+    // defect called out in the gap finding).
+    const DL_PLAYER: FootballPlayerDetailPlayer = {
+      id: 10,
+      firstName: 'Aaron',
+      lastName: 'Donald',
+      position: 'DL',
+      isDst: false,
+      nflTeam: 'LAR',
+      previousTeams: [],
+      careerStats: {
+        idp: { soloTkl: 87, astTkl: 34, sacks: 12.5, int: 5, ff: 9 },
+      },
+    };
+
+    const DB_PLAYER: FootballPlayerDetailPlayer = {
+      id: 11,
+      firstName: 'Sauce',
+      lastName: 'Gardner',
+      position: 'DB',
+      isDst: false,
+      nflTeam: 'NYJ',
+      previousTeams: [],
+      careerStats: {
+        idp: { soloTkl: 61, astTkl: 14, sacks: 0, int: 2, ff: 1 },
+      },
+    };
+
+    // Reads the value rendered inside a StatCell by scoping the lookup to the
+    // label's containing cell — guarding against a value bleeding in from an
+    // adjacent column.
+    function idpCellValue(label: string): HTMLElement {
+      const cell = screen.getByText(label).parentElement;
+      if (!cell) throw new Error(`No containing cell for IDP label "${label}"`);
+      return cell;
+    }
+
+    it.each([
+      ['DL', DL_PLAYER],
+      ['LB', LB_PLAYER],
+      ['DB', DB_PLAYER],
+    ] as const)(
+      'renders the IDP stats table for the %s position',
+      (_pos, player) => {
+        render(<FootballPlayerDetail player={player} />);
+        expect(screen.getByText('Career IDP Stats')).toBeTruthy();
+        // All five IDP columns are present and labelled.
+        for (const label of ['Solo', 'Ast', 'Sacks', 'INT', 'FF']) {
+          expect(screen.getByText(label)).toBeTruthy();
+        }
+        // DST/offense tables must not render for an IDP position.
+        expect(screen.queryByText('Career DST Stats')).toBeNull();
+        expect(screen.queryByText('Career Passing')).toBeNull();
+      },
+    );
+
+    it('maps each IDP column to the correct stat field (guards FF/INT mix-ups)', () => {
+      render(<FootballPlayerDetail player={DL_PLAYER} />);
+      const expected: [string, string][] = [
+        ['Solo', '87'],
+        ['Ast', '34'],
+        ['Sacks', '12.5'],
+        ['INT', '5'],
+        ['FF', '9'],
+      ];
+      for (const [label, value] of expected) {
+        expect(within(idpCellValue(label)).getByText(value)).toBeTruthy();
+      }
+    });
+
+    it('formats Sacks as a decimal (fmtFloat) for an IDP player', () => {
+      render(<FootballPlayerDetail player={DL_PLAYER} />);
+      // Sacks runs through fmtFloat → one decimal place.
+      expect(within(idpCellValue('Sacks')).getByText('12.5')).toBeTruthy();
+    });
+
+    it('keeps a trailing decimal on whole-number sack totals', () => {
+      render(<FootballPlayerDetail player={LB_PLAYER} />);
+      expect(within(idpCellValue('Sacks')).getByText('13.0')).toBeTruthy();
+    });
+
+    it('renders em dashes for an IDP player whose stat fields are all null', () => {
+      const NULL_IDP: FootballPlayerDetailPlayer = {
+        ...DL_PLAYER,
+        careerStats: {
+          idp: {
+            soloTkl: null,
+            astTkl: null,
+            sacks: null,
+            int: null,
+            ff: null,
+          },
+        },
+      };
+      render(<FootballPlayerDetail player={NULL_IDP} />);
+      expect(screen.getByText('Career IDP Stats')).toBeTruthy();
+      // One em dash per column (Solo, Ast, Sacks, INT, FF).
+      expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('renders em dashes when careerStats exists but the idp block is missing', () => {
+      const NO_IDP_BLOCK: FootballPlayerDetailPlayer = {
+        ...DL_PLAYER,
+        careerStats: {},
+      };
+      render(<FootballPlayerDetail player={NO_IDP_BLOCK} />);
+      expect(screen.getByText('Career IDP Stats')).toBeTruthy();
+      expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('shows "No stats available" for a very-old-career IDP player with null careerStats', () => {
+      const NO_CAREER: FootballPlayerDetailPlayer = {
+        ...DL_PLAYER,
+        careerStats: null,
+      };
+      render(<FootballPlayerDetail player={NO_CAREER} />);
+      expect(screen.getByText('No stats available')).toBeTruthy();
+      expect(screen.queryByText('Career IDP Stats')).toBeNull();
+    });
+
+    it('shows the Projections upsell to a free IDP user alongside the stats table', () => {
+      render(<FootballPlayerDetail player={LB_PLAYER} />);
+      expect(screen.getByText('Career IDP Stats')).toBeTruthy();
+      expect(screen.getByText('Projections (Premium)')).toBeTruthy();
+    });
+
+    it('hides the Projections upsell for a premium IDP user but keeps the stats table', () => {
+      render(<FootballPlayerDetail player={LB_PLAYER} isPremium />);
+      expect(screen.getByText('Career IDP Stats')).toBeTruthy();
+      expect(screen.queryByText('Projections (Premium)')).toBeNull();
+    });
   });
 
   it('shows "No stats available" when careerStats is null', () => {
