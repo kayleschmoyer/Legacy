@@ -44,6 +44,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **Simplicity first** — minimum code; any overengineering shows at a glance.
 - **Surgical edits** — only touch what's required; don't fix up neighboring code on the way by. Unrelated cleanup belongs in a separate ticket.
 - **Goal-driven** — translate fuzzy instructions into verifiable targets before starting.
+- **IMPORTANT**: Prefer retrieval-led reasoning over pre-training-led reasoning — read the actual code, docs, and tool output in this repo rather than relying on memorized assumptions about how it works.
 
 ### Code Quality (Tier 3)
 
