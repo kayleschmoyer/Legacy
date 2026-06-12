@@ -16,6 +16,7 @@ import {
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
+import { formatMessage } from '../../../i18n';
 
 const APP_BASE_URL = config.appBaseUrl ?? 'https://legacysports.app';
 
@@ -203,7 +204,7 @@ export default function BaseballHome() {
             gap="$4"
           >
             <H3 color="$color" fontSize="$8" fontWeight="bold">
-              Invite Friends
+              {formatMessage('2F5EsD')}
             </H3>
 
             {loadingLeagues ? (
@@ -214,13 +215,12 @@ export default function BaseballHome() {
               </Text>
             ) : rawLeagues.length === 0 ? (
               <Text color="$gray11" fontSize="$4" textAlign="center">
-                Create or join a league first, then share an invite link so
-                friends can join you.
+                {formatMessage('0uDEd6')}
               </Text>
             ) : (
               <>
                 <Text color="$gray11" fontSize="$4" textAlign="center">
-                  Choose a league to share an invite link
+                  {formatMessage('PA8TUT')}
                 </Text>
                 <ScrollView width="100%" maxHeight={300}>
                   <YStack gap="$3" width="100%">
@@ -254,7 +254,7 @@ export default function BaseballHome() {
               onPress={closeInviteModal}
             >
               <Text color="$white" fontSize="$4">
-                Close
+                {formatMessage('y2oJvM')}
               </Text>
             </Button>
           </YStack>

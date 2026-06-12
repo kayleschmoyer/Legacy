@@ -39,6 +39,12 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Typing warn as jest.Mock (not the original method) sidesteps
+// @typescript-eslint/unbound-method; requireMock returns the live mock instance.
+const { LOGGER: mockLogger } = jest.requireMock<{
+  LOGGER: { warn: jest.Mock };
+}>('@legacy-sports/logging');
+
 jest.mock('@legacy-sports/app-config/native', () => ({
   config: { appBaseUrl: undefined },
 }));
@@ -321,6 +327,19 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         'https://legacysports.app/baseball/league/join/ABC12345',
       );
       expect(shareArg.title).toBe('Join Fantasy Legends');
+    });
+
+    it('renders the modal copy from the message catalog with no missing-message warnings (LS-7958)', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('invite'));
+      // Heading + dismiss copy now resolved via formatMessage (IDs 2F5EsD / y2oJvM).
+      expect(screen.getByText('Invite Friends')).toBeTruthy();
+      expect(screen.getByText('Close')).toBeTruthy();
+      expect(mockLogger.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining(
+          'does not have a value in the requested locale',
+        ),
+      );
     });
 
     it('shows an empty-state message when there are no leagues to invite to', () => {
