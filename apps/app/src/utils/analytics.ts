@@ -6,12 +6,29 @@
  * implementation for cross-platform reporting.
  */
 
-import analytics from '@react-native-firebase/analytics';
+import { getApp } from '@react-native-firebase/app';
+import {
+  type Analytics,
+  getAnalytics,
+  logEvent,
+  setUserId as setAnalyticsUserId,
+  setUserProperty,
+} from '@react-native-firebase/analytics';
 import { LOGGER } from '@legacy-sports/logging';
 
 // Internal state — kept in sync with Firebase user properties
 let _subscriptionTier: 'free' | 'premium' | undefined;
 let _userId: string | undefined;
+
+// Memoized modular Analytics instance. Resolved lazily so the Firebase app
+// is only looked up after native initialization, not at module load.
+let _analytics: Analytics | undefined;
+function analyticsInstance(): Analytics {
+  if (_analytics === undefined) {
+    _analytics = getAnalytics(getApp());
+  }
+  return _analytics;
+}
 
 async function trackEvent(
   eventName: string,
@@ -28,7 +45,7 @@ async function trackEvent(
     if (_subscriptionTier !== undefined) {
       clean['subscription_tier'] = _subscriptionTier;
     }
-    await analytics().logEvent(eventName, clean);
+    await logEvent(analyticsInstance(), eventName, clean);
     LOGGER.info('[Analytics] Event tracked:', eventName, clean);
   } catch (err) {
     LOGGER.warn(
@@ -42,7 +59,7 @@ async function trackEvent(
 export async function setUserId(userId: string | number): Promise<void> {
   _userId = String(userId);
   try {
-    await analytics().setUserId(_userId);
+    await setAnalyticsUserId(analyticsInstance(), _userId);
     LOGGER.info('[Analytics] User ID set:', _userId);
   } catch (err) {
     LOGGER.warn(
@@ -59,7 +76,8 @@ export async function setUserProperties(properties: {
   if (properties.subscriptionTier !== undefined) {
     _subscriptionTier = properties.subscriptionTier;
     try {
-      await analytics().setUserProperty(
+      await setUserProperty(
+        analyticsInstance(),
         'subscription_tier',
         properties.subscriptionTier,
       );
