@@ -1,25 +1,20 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
-import { Slot, usePathname } from 'expo-router';
+import { Slot } from 'expo-router';
 import { GrowthBook, GrowthBookProvider } from '@growthbook/growthbook-react';
 import { ApolloProvider } from '@apollo/client/react';
 import {
   getRollbarConfigFromEnv,
   initRollbar,
 } from '@legacy-sports/rollbar/native';
-import {
-  AuthProvider,
-  EnhancedAuthGuard,
-  ErrorBoundary,
-  useAuth,
-} from '@legacy-sports/shared-components';
+import { AuthProvider, ErrorBoundary } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
-import Login from './login';
 import { DbClientContext } from '../common/ApolloClientContext';
+import { useCurrentUserInfo } from '../common/auth/AuthHooks';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import { ThemeProvider } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
@@ -74,46 +69,52 @@ function AnalyticsIdentify({ userId }: { userId: number }): null {
 
 function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
-  const { user } = useAuth();
+  // Source the analytics identity from the native auth state (the secure-store
+  // JWT), not the shared web AuthProvider — the latter never authenticates on
+  // React Native (no localStorage / cookies). `id > 0` skips the BYPASS_AUTH
+  // LOCAL_USER sentinel (id === -1).
+  const { data: currentUser } = useCurrentUserInfo();
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Apollo's StoreValue type includes `any`, making ApolloClient<NormalizedCacheObject> flagged; same pattern as tamaguiConfig on L142
     <ApolloProvider client={client.apolloClient}>
-      {user?.id ? <AnalyticsIdentify userId={user.id} /> : null}
+      {currentUser?.id && currentUser.id > 0 ? (
+        <AnalyticsIdentify userId={currentUser.id} />
+      ) : null}
       <Slot />
     </ApolloProvider>
   );
 }
 
 /**
- * Inner layout — wraps auth guard with theme-aware content.
- * Placed inside ThemeProvider so it can read resolvedTheme.
+ * Inner layout — provides the OAuth context and renders the router outlet.
+ *
+ * Auth gating is the router's job, NOT a top-level guard: the public `/login`
+ * route renders the login screen, and the authenticated `(app)` route group
+ * self-guards via `useCurrentUserInfo()` (the native secure-store JWT),
+ * redirecting to `/login` when there is no session — see
+ * `app/(app)/_layout.tsx` and `AuthorizedUserContext`.
+ *
+ * The previous `EnhancedAuthGuard` here gated on the shared web `AuthProvider`,
+ * whose `isAuthenticated` never flips on React Native (no localStorage /
+ * cookies / window events). Its `testMode={isDev}` bypass masked this in dev,
+ * but in release builds the guard was active and trapped users on the login
+ * screen even after a successful native login (LS-7942). `AuthProvider` is kept
+ * so any shared component that reads `useAuth()` still finds its context; it is
+ * inert on native and performs no network calls.
  */
 function InnerLayout(): React.JSX.Element {
-  const pathname = usePathname() ?? '';
-
   return (
     <AuthProvider config={authConfig}>
-      <EnhancedAuthGuard
-        currentPath={pathname}
-        loginComponent={<Login />}
-        testMode={isDev} // Enable test mode in development
-        onLoginSuccess={() => {
-          LOGGER.info('Mobile app login successful!');
-        }}
-        onLoginFailure={(error) => {
-          LOGGER.error('Mobile app login failed:', error);
-        }}
-      >
-        <AuthenticatedContent />
-      </EnhancedAuthGuard>
+      <AuthenticatedContent />
     </AuthProvider>
   );
 }
 
 /**
- * Main Mobile App Layout - Clean authentication flow
- * Uses EnhancedAuthGuard at root level for consistent behavior
+ * Main Mobile App Layout — provider stack + router outlet. Auth gating is
+ * delegated to the router (`/login` is public; the `(app)` group self-guards
+ * via the native secure-store JWT), not a top-level guard (LS-7942).
  */
 export default function Layout() {
   useEffect(() => {

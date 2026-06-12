@@ -30,7 +30,6 @@ export function buildNativeConfig(): AppConfig {
       process.env.EXPO_PUBLIC_DISCORD_CLIENT_ID ?? extra?.['discordClientId'],
     // Web-only keys — not available on native
     environmentName: undefined,
-    authTestMode: undefined,
     // Build-metadata keys — available on native via EXPO_PUBLIC_* (inlined by
     // babel-preset-expo) with extra fallback for backward compat (LS-7561).
     appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? extra?.['appVersion'],

@@ -120,10 +120,6 @@ export interface EnhancedAuthGuardProps {
    */
   loginSubtitle?: string;
   /**
-   * Test mode - enables mock login
-   */
-  testMode?: boolean;
-  /**
    * Called when login is successful
    */
   onLoginSuccess?: () => void;
@@ -167,7 +163,6 @@ export function EnhancedAuthGuard({
   loginComponent,
   loginTitle: _loginTitle,
   loginSubtitle: _loginSubtitle,
-  testMode = false,
   onLoginSuccess,
   onLoginFailure,
   onLogoutSuccess: _onLogoutSuccess,
@@ -190,11 +185,6 @@ export function EnhancedAuthGuard({
       wasAuthenticatedRef.current = true;
     }
   }, [isAuthenticated]);
-
-  // In test mode, bypass authentication and show content directly
-  if (testMode) {
-    return children;
-  }
 
   // Public paths bypass the auth gate entirely (no login wall, no loading spinner).
   // On web, window.location.pathname is already restored by the companion script in

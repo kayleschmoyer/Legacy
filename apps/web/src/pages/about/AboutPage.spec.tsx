@@ -84,7 +84,6 @@ jest.mock('../../config/environment', () => ({
     websocketUrl: '',
     isDev: false,
     environmentName: 'production',
-    authTestMode: false,
     baseUrl: '/',
     appVersion: '1.0.0',
     commitSha: 'abc123',

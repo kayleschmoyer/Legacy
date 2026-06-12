@@ -80,11 +80,6 @@ export const CONFIG_KEYS = {
     web: 'VITE_ENVIRONMENT_NAME',
     required: false,
   },
-  authTestMode: {
-    clientSafe: true,
-    web: 'VITE_AUTH_TEST_MODE',
-    required: false,
-  },
   // appVersion / commitSha / buildDate have mobile names so AboutScreen and
   // similar screens can read them via the native adapter instead of direct env.
   appVersion: {

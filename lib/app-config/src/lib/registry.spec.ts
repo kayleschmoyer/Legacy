@@ -14,7 +14,6 @@ describe('CONFIG_KEYS registry', () => {
       'appBaseUrl',
       // Web-only keys (no mobile counterpart)
       'environmentName',
-      'authTestMode',
       'discordClientId',
       'appVersion',
       'commitSha',

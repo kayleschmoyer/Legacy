@@ -84,6 +84,30 @@ describe('EnhancedAuthGuard – session expiry on a public path', () => {
     expect(screen.queryByTestId('login-page')).toBeNull();
   });
 
+  it('renders the LoginPage for an unauthenticated user on a protected path (auth is always enforced — no test-mode bypass)', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeMockAuthService() as unknown as AuthService,
+    );
+    // A non-public route: the guard must wall it off behind login. This locks
+    // the removal of the former `testMode` escape hatch, which could short-
+    // circuit authentication and return children unconditionally (LS-7942).
+    setLocation('/baseball/league/1');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard>
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('login-page')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('app')).toBeNull();
+  });
+
   it('shows the LoginPage when an authenticated user is logged out while on a public path', async () => {
     const MockedAuthService = jest.mocked(AuthService);
     const mockInstance = makeMockAuthService({

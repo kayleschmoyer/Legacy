@@ -22,7 +22,6 @@ export function buildWebConfig(): AppConfig {
     environmentName: import.meta.env['VITE_ENVIRONMENT_NAME'] as
       | string
       | undefined,
-    authTestMode: import.meta.env['VITE_AUTH_TEST_MODE'] as string | undefined,
     discordClientId: import.meta.env['VITE_DISCORD_CLIENT_ID'] as
       | string
       | undefined,

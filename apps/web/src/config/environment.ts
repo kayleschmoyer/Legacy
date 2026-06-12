@@ -17,7 +17,6 @@ export interface EnvironmentConfig {
   readonly isDev: boolean;
   /** Resolved environment name: VITE_ENVIRONMENT_NAME if set, else 'development' or 'production'. */
   readonly environmentName: string;
-  readonly authTestMode: boolean;
   readonly baseUrl: string;
   readonly appVersion: string;
   readonly commitSha: string;
@@ -70,7 +69,6 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   environmentName:
     config.environmentName ??
     (import.meta.env.DEV === true ? 'development' : 'production'),
-  authTestMode: config.authTestMode === 'true',
   baseUrl: import.meta.env.BASE_URL || '/',
   appVersion: config.appVersion ?? 'unknown',
   commitSha: config.commitSha ?? 'unknown',

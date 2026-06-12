@@ -15,7 +15,6 @@ export function buildNodeConfig(): AppConfig {
     googleClientId: getEnvVarOptional('CLIENT_ID'),
     appBaseUrl: undefined,
     environmentName: undefined,
-    authTestMode: undefined,
     discordClientId: undefined,
     appVersion: undefined,
     commitSha: undefined,

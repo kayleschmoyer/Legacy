@@ -250,7 +250,6 @@ try {
                     <LoginPage />
                   </ApolloProvider>
                 }
-                testMode={env.authTestMode}
                 publicPaths={PUBLIC_PATHS}
                 publicExactPaths={PUBLIC_EXACT_PATHS}
                 onLoginSuccess={() => {
