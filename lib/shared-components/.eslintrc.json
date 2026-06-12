@@ -1,5 +1,9 @@
 ﻿{
-  "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
+  "extends": [
+    "plugin:@nx/react",
+    "../../.eslintrc.json",
+    "../../.eslintrc.hermes.json"
+  ],
   "ignorePatterns": [
     "!**/*",
     "jest.config.ts",

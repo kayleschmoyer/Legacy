@@ -1,5 +1,5 @@
 ﻿{
-  "extends": ["../../.eslintrc.json"],
+  "extends": ["../../.eslintrc.json", "../../.eslintrc.hermes.json"],
   "ignorePatterns": ["!**/*", "jest.config.ts", "**/*.d.ts"],
   "overrides": [
     {
