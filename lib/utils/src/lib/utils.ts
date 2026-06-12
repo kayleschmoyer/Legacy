@@ -57,6 +57,39 @@ export function cleanDescription(desc: string): string {
   return desc.replace(/(?:,\s*)+and\.\s*$/, '.');
 }
 
+// ─── Diacritics ─────────────────────────────────────────────────────────────
+
+/**
+ * Precomposed accented Latin letters → their ASCII base letter.
+ *
+ * This is deliberately a static lookup rather than
+ * `str.normalize('NFD').replace(/[̀-ͯ]/g, '')` because the Hermes
+ * engine used by the React Native app does not implement
+ * `String.prototype.normalize` (no Intl variant / polyfill), so calling it
+ * throws `undefined is not a function` at runtime (LS-7946). Covers the
+ * Latin-1 Supplement and common Latin Extended-A characters that appear in
+ * MLB player names.
+ */
+const DIACRITIC_FROM =
+  'ÀÁÂÃÄÅàáâãäåÇçÈÉÊËèéêëÌÍÎÏìíîïÑñÒÓÔÕÖØòóôõöøÙÚÛÜùúûüÝýÿŠšŽž';
+const DIACRITIC_TO =
+  'AAAAAAaaaaaaCcEEEEeeeeIIIIiiiiNnOOOOOOooooooUUUUuuuuYyySsZz';
+
+/**
+ * Remove diacritical marks from a string, returning its ASCII equivalent.
+ * Hermes-safe replacement for `normalize('NFD')`-based accent stripping.
+ *
+ * @example stripDiacritics('José Ramírez') // 'Jose Ramirez'
+ */
+export function stripDiacritics(input: string): string {
+  let out = '';
+  for (const ch of input) {
+    const idx = DIACRITIC_FROM.indexOf(ch);
+    out += idx === -1 ? ch : DIACRITIC_TO[idx];
+  }
+  return out;
+}
+
 // ─── Player name extraction ─────────────────────────────────────────────────
 
 /**

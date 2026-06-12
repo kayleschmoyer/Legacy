@@ -17,6 +17,7 @@ import {
 import {
   cleanDescription,
   extractPlayerNameFromDescription,
+  stripDiacritics,
 } from '@legacy-sports/utils';
 import {
   BG_DARK,
@@ -448,10 +449,10 @@ export function OnThisDayFeed({
                 event.playerName &&
                 /[\u0080-\uFFFF]/.test(event.playerName)
               ) {
-                // Replace ASCII-only player name with accented canonical name
-                const ascii = event.playerName
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '');
+                // Replace ASCII-only player name with accented canonical name.
+                // Uses stripDiacritics (not String.prototype.normalize, which
+                // is unimplemented on Hermes/React Native \u2014 LS-7946).
+                const ascii = stripDiacritics(event.playerName);
                 desc = desc.replace(ascii, event.playerName);
               }
               return desc;

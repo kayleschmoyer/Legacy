@@ -7,6 +7,7 @@ export {
   cryptoRandomFloat,
   cleanDescription,
   extractPlayerNameFromDescription,
+  stripDiacritics,
 } from './lib/utils';
 export * from './lib/ErrorHandling';
 export * from './lib/help-content';

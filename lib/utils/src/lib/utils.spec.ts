@@ -1,6 +1,7 @@
 import {
   cleanDescription,
   extractPlayerNameFromDescription,
+  stripDiacritics,
   utils,
 } from './utils';
 
@@ -41,6 +42,40 @@ describe('cleanDescription', () => {
   it('does not strip "and" when it is part of the sentence', () => {
     const desc = 'Traded to the Cubs for Smith and Jones.';
     expect(cleanDescription(desc)).toBe(desc);
+  });
+});
+
+describe('stripDiacritics', () => {
+  it('strips accents from a Spanish player name', () => {
+    expect(stripDiacritics('José Ramírez')).toBe('Jose Ramirez');
+  });
+
+  it('strips the ñ from a name', () => {
+    expect(stripDiacritics('Adolis García Muñoz')).toBe('Adolis Garcia Munoz');
+  });
+
+  it('handles uppercase accented letters', () => {
+    expect(stripDiacritics('ÀÉÎÕÜÇ')).toBe('AEIOUC');
+  });
+
+  it('leaves a plain ASCII string unchanged', () => {
+    expect(stripDiacritics('Mike Trout')).toBe('Mike Trout');
+  });
+
+  it('returns an empty string unchanged', () => {
+    expect(stripDiacritics('')).toBe('');
+  });
+
+  it('reproduces the canonical-name swap that crashed on Hermes (LS-7946)', () => {
+    // The widget swaps an ASCII-rendered name in a description back to the
+    // accented canonical name. stripDiacritics replaces the unsupported
+    // String.prototype.normalize used previously.
+    const canonical = 'José Abreu';
+    const ascii = stripDiacritics(canonical);
+    expect(ascii).toBe('Jose Abreu');
+    expect('Signed Jose Abreu as a free agent.'.replace(ascii, canonical)).toBe(
+      'Signed José Abreu as a free agent.',
+    );
   });
 });
 
