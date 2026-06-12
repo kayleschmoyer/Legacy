@@ -2,11 +2,11 @@ import React from 'react';
 import { FlatList } from 'react-native';
 import { Text, YStack } from 'tamagui';
 import { MatchupCard } from './MatchupCard';
-import type { MatchupFragment } from '../../../api/db/graphql.generated';
+import type { AppMatchupFragment } from '../../../api/db/graphql.generated';
 
 export interface MatchupListProps {
-  matchups: MatchupFragment[];
-  onMatchupPress?: (matchup: MatchupFragment) => void;
+  matchups: AppMatchupFragment[];
+  onMatchupPress?: (matchup: AppMatchupFragment) => void;
   loading?: boolean;
   emptyMessage?: string;
 }

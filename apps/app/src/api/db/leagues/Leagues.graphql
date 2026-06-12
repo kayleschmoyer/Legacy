@@ -1,4 +1,4 @@
-fragment League on League {
+fragment AppLeague on League {
   id
   name
   owner
@@ -36,7 +36,7 @@ fragment League on League {
   primaryColor
   secondaryColor
   userMembership {
-    ...LeagueMember
+    ...AppLeagueMember
   }
   # teams field not available in deployed schema - needs Lambda deployment
   # teams {
@@ -47,16 +47,16 @@ fragment League on League {
   # leagueMembers field not available
   # leagueMembers @include(if: $withMembers) {
   #   nodes {
-  #     ...LeagueMember
+  #     ...AppLeagueMember
   #   }
   # }
   # matchupByCurrentMatchup field not available
   # matchupByCurrentMatchup @include(if: $withMatchup) {
-  #   ...Matchup
+  #   ...AppMatchup
   # }
 }
 
-fragment LeagueMember on LeagueMember {
+fragment AppLeagueMember on LeagueMember {
   leagueId
   permissionLevel
   teamId
@@ -80,7 +80,7 @@ query GetLeagueById(
   $withMatchup: Boolean = false
 ) {
   league(id: $id) {
-    ...League
+    ...AppLeague
   }
 }
 
@@ -92,7 +92,7 @@ mutation CreateLeague(
 ) {
   createLeagueAndTeams(input: $input) {
     league {
-      ...League
+      ...AppLeague
     }
   }
 }
@@ -105,7 +105,7 @@ query GetPositionsForLeague($leagueId: Int!) {
 
 query GetUserLeagues {
   userLeagues {
-    ...League
+    ...AppLeague
   }
 }
 
@@ -115,7 +115,7 @@ mutation DeleteAllLeagues {
 
 mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
   startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
-    ...League
+    ...AppLeague
   }
 }
 

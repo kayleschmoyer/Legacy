@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { PlayerFragment } from '@legacy-sports/shared-components';
 import { usePlayerProjections } from '@legacy-sports/shared-components';
 import { useCareerAverageStats } from './careerAverages';
-import type { TeamMemberFragment } from '../../api/db/graphql.generated';
+import type { AppTeamMemberFragment } from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../common/scoring';
 
 export interface TeamMemberProjectionsResult {
@@ -12,7 +12,7 @@ export interface TeamMemberProjectionsResult {
 }
 
 function buildPlayers(
-  teamMembers: ReadonlyArray<TeamMemberFragment>,
+  teamMembers: ReadonlyArray<AppTeamMemberFragment>,
 ): PlayerFragment[] {
   const players: PlayerFragment[] = [];
 
@@ -49,7 +49,7 @@ function mapProjectionsToRecord(
 }
 
 export function useTeamMemberProjections(
-  teamMembers: ReadonlyArray<TeamMemberFragment>,
+  teamMembers: ReadonlyArray<AppTeamMemberFragment>,
   leagueId: number | null | undefined,
 ): TeamMemberProjectionsResult {
   const players = useMemo(() => buildPlayers(teamMembers), [teamMembers]);

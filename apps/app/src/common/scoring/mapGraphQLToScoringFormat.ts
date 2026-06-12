@@ -10,10 +10,10 @@
 
 import type { SeasonStats } from '@legacy-sports/scoring';
 import type {
+  AppMatchupPlayerFragment,
   GameBatting,
   GameFielding,
   GamePitching,
-  MatchupPlayerFragment,
 } from '../../api/db/graphql.generated';
 
 export interface ScoringBattingStats {
@@ -156,13 +156,13 @@ export function mapFieldingStats(
 // Without this mapping, projection always returns 0 because "g" is undefined.
 
 type SeasonBattingFragment = NonNullable<
-  MatchupPlayerFragment['seasonBatting']
+  AppMatchupPlayerFragment['seasonBatting']
 >;
 type SeasonPitchingFragment = NonNullable<
-  MatchupPlayerFragment['seasonPitching']
+  AppMatchupPlayerFragment['seasonPitching']
 >;
 type SeasonFieldingFragment = NonNullable<
-  MatchupPlayerFragment['seasonFielding']
+  AppMatchupPlayerFragment['seasonFielding']
 >;
 
 export interface ScoringSeasonBattingStats {
@@ -298,12 +298,12 @@ export function mapSeasonFieldingStats(
 }
 
 /**
- * Maps a MatchupPlayerFragment to the SeasonStats shape expected by
+ * Maps a AppMatchupPlayerFragment to the SeasonStats shape expected by
  * calculateMatchupProjection. Returns null when playerId or season is absent.
  * sf is always null — sacrifice flies are not present in the season fragment (known TODO).
  */
 export function mapMatchupPlayerToSeasonStats(
-  mp: MatchupPlayerFragment,
+  mp: AppMatchupPlayerFragment,
 ): SeasonStats | null {
   if (!mp.playerId || !mp.season) return null;
   const batting = mapSeasonBattingStats(mp.seasonBatting);

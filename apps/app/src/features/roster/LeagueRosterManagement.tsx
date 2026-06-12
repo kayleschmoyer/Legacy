@@ -8,23 +8,23 @@ import {
   RosterWeekNavigation,
 } from '@legacy-sports/shared-components/roster';
 import {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
 export interface LeagueRosterManagementProps {
   positions: readonly LeaguePositionFragment[];
-  teamPlayers: readonly TeamMemberFragment[];
+  teamPlayers: readonly AppTeamMemberFragment[];
   onPlayerAssign: (
-    player: TeamMemberFragment,
+    player: AppTeamMemberFragment,
     position: LeaguePositionFragment,
   ) => void;
   onPlayerRemove: (position: LeaguePositionFragment) => void;
   /** Swap two players' slots (atomic swap mutation on the data layer). */
   onPlayerSwap?: (
-    incoming: TeamMemberFragment,
+    incoming: AppTeamMemberFragment,
     target: LeaguePositionFragment,
-    displaced: TeamMemberFragment,
+    displaced: AppTeamMemberFragment,
   ) => void;
   loading?: boolean;
   leagueId?: number | null;
@@ -93,7 +93,7 @@ export function LeagueRosterManagement({
           <PendingWaiverClaims teamId={myTeamId} />
         )}
 
-        <RosterBoard<TeamMemberFragment, LeaguePositionFragment>
+        <RosterBoard<AppTeamMemberFragment, LeaguePositionFragment>
           positions={positions}
           teamPlayers={teamPlayers}
           onPlayerAssign={onPlayerAssign}

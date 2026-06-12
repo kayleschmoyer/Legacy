@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { MatchupCard } from './MatchupCard';
 import { MatchupStatus } from '../../../api/db/graphql.generated';
-import type { MatchupFragment } from '../../../api/db/graphql.generated';
+import type { AppMatchupFragment } from '../../../api/db/graphql.generated';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock(
@@ -24,8 +24,8 @@ jest.mock('@tamagui/lucide-icons', () => ({
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const createMatchup = (
-  overrides: Partial<MatchupFragment> = {},
-): MatchupFragment => ({
+  overrides: Partial<AppMatchupFragment> = {},
+): AppMatchupFragment => ({
   __typename: 'Matchup',
   id: '1',
   weekNumber: 3,

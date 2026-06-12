@@ -1,4 +1,4 @@
-fragment Player on Player {
+fragment AppPlayer on Player {
   id
   firstName
   lastName

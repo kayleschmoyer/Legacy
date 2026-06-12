@@ -27,8 +27,8 @@ import {
   useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
@@ -279,7 +279,7 @@ export default function FootballLeagueId(): React.JSX.Element {
   }, [league?.name, inviteUrl]);
 
   const handlePlayerAssign = useCallback(
-    async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+    async (player: AppTeamMemberFragment, position: LeaguePositionFragment) => {
       if (typeof player.id !== 'number') {
         handleError(new Error('Missing team member identifier'));
         return;
@@ -323,9 +323,9 @@ export default function FootballLeagueId(): React.JSX.Element {
 
   const handlePlayerSwap = useCallback(
     async (
-      incoming: TeamMemberFragment,
+      incoming: AppTeamMemberFragment,
       target: LeaguePositionFragment,
-      displaced: TeamMemberFragment,
+      displaced: AppTeamMemberFragment,
     ) => {
       if (typeof incoming.id !== 'number' || typeof displaced.id !== 'number') {
         handleError(new Error('Missing team member identifier'));
@@ -454,7 +454,7 @@ export default function FootballLeagueId(): React.JSX.Element {
             positions={positionsData?.leaguePositions || []}
             teamPlayers={
               teamMembersData?.teamMembers?.filter(
-                (member): member is TeamMemberFragment => member !== null,
+                (member): member is AppTeamMemberFragment => member !== null,
               ) ?? []
             }
             onPlayerAssign={(player, position) => {

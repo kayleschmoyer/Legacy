@@ -8,8 +8,8 @@ import {
 import { calculateMatchupWinProbability } from '@legacy-sports/analytics';
 import { LOGGER } from '@legacy-sports/logging';
 import {
-  type MatchupFragment,
-  type MatchupPlayerFragment,
+  type AppMatchupFragment,
+  type AppMatchupPlayerFragment,
   MatchupStatus,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
@@ -50,7 +50,7 @@ interface CategoryScores {
 }
 
 export interface MatchupWinProbabilityPanelProps {
-  matchup: MatchupFragment | null | undefined;
+  matchup: AppMatchupFragment | null | undefined;
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -268,7 +268,7 @@ export function MatchupWinProbabilityPanel({
 
     // Per-category actual scores for a single game
     const gameCategoryScores = (
-      game: NonNullable<MatchupPlayerFragment['games']>[number],
+      game: NonNullable<AppMatchupPlayerFragment['games']>[number],
     ) => ({
       batting: game.battingGame
         ? computeScoring(

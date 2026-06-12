@@ -4,8 +4,8 @@ import type { Text as RNText, View as RNView } from 'react-native';
 
 import { LeagueRosterManagement } from './LeagueRosterManagement';
 import type {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
 type RNComponents = {
@@ -71,7 +71,7 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
 const POSITIONS: LeaguePositionFragment[] = [
   { __typename: 'LeaguePosition', id: 1, leagueId: 10, positionType: 'SP' },
 ];
-const PLAYERS: TeamMemberFragment[] = [];
+const PLAYERS: AppTeamMemberFragment[] = [];
 
 const baseProps = {
   positions: POSITIONS,

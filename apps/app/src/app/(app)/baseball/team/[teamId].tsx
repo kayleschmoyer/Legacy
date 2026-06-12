@@ -10,9 +10,9 @@ import {
 } from '@legacy-sports/shared-components';
 import { applyMultiplierGroups } from '../../../../common/scoring';
 import {
+  AppMatchupFragment,
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  MatchupFragment,
-  TeamMemberFragment,
   useGetLeagueScoringProfileQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
@@ -58,19 +58,19 @@ const ALL_TABS = Object.freeze(['Lineup', 'Rotation', 'Settings'] as const);
 type Tab = (typeof ALL_TABS)[number];
 
 interface TabContentProps {
-  matchup: MatchupFragment | null | undefined;
+  matchup: AppMatchupFragment | null | undefined;
   selectedTab: Tab;
   rosterSlots: readonly (LeaguePositionFragment | null)[];
   onPlayerAdded: (
-    player: TeamMemberFragment,
+    player: AppTeamMemberFragment,
     position: LeaguePositionFragment,
   ) => void;
   onPlayerMoved: (
-    playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment,
+    playerOne: AppTeamMemberFragment,
+    playerTwo: AppTeamMemberFragment,
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
-  team: readonly (TeamMemberFragment | null)[];
+  team: readonly (AppTeamMemberFragment | null)[];
   isOwner: boolean;
   battingSettings: Partial<Record<string, number>>;
   fieldingSettings: Partial<Record<string, number>>;
@@ -360,7 +360,7 @@ export default function Team(): React.JSX.Element {
   const [selectedTabIdx, setSelectedTabIdx] = useState(0);
 
   const onPlayerAdded = (
-    player: TeamMemberFragment,
+    player: AppTeamMemberFragment,
     positionSlot: LeaguePositionFragment,
   ) => {
     if (!player.id) return;
@@ -378,8 +378,8 @@ export default function Team(): React.JSX.Element {
   };
 
   const onPlayerMoved = (
-    playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment,
+    playerOne: AppTeamMemberFragment,
+    playerTwo: AppTeamMemberFragment,
   ) => {
     if (!playerOne.id || !playerTwo.id) return;
 

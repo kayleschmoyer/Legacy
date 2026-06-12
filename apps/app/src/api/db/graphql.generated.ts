@@ -4895,7 +4895,7 @@ export type GetArchivedUserLeagueSummariesQuery = {
   }>;
 };
 
-export type LeagueFragment = {
+export type AppLeagueFragment = {
   __typename?: 'League';
   id?: number | null;
   name?: string | null;
@@ -4942,7 +4942,7 @@ export type LeagueFragment = {
   } | null;
 };
 
-export type LeagueMemberFragment = {
+export type AppLeagueMemberFragment = {
   __typename?: 'LeagueMember';
   leagueId?: number | null;
   permissionLevel?: string | null;
@@ -5298,7 +5298,7 @@ export type GetUserTeamIdQuery = {
   userTeamId?: number | null;
 };
 
-export type MatchupFragment = {
+export type AppMatchupFragment = {
   __typename?: 'Matchup';
   id?: string | null;
   weekNumber?: number | null;
@@ -5425,7 +5425,7 @@ export type GetLeagueStandingsQuery = {
   }> | null;
 };
 
-export type MatchupPlayerFragment = {
+export type AppMatchupPlayerFragment = {
   __typename?: 'MatchupPlayer';
   id?: string | null;
   matchupId?: number | null;
@@ -6585,7 +6585,7 @@ export type ClaimFreeAgentMutation = {
   } | null;
 };
 
-export type PlayerFragment = {
+export type AppPlayerFragment = {
   __typename?: 'Player';
   id?: number | null;
   firstName?: string | null;
@@ -7149,7 +7149,7 @@ export type TeamFragment = {
   bannerUrl?: string | null;
 };
 
-export type TeamMemberFragment = {
+export type AppTeamMemberFragment = {
   __typename?: 'TeamMember';
   id?: number | null;
   playerId?: number | null;
@@ -7529,16 +7529,16 @@ export const UserLeagueSummaryFragmentDoc = gql`
     isCommissioner
   }
 `;
-export const LeagueMemberFragmentDoc = gql`
-  fragment LeagueMember on LeagueMember {
+export const AppLeagueMemberFragmentDoc = gql`
+  fragment AppLeagueMember on LeagueMember {
     leagueId
     permissionLevel
     teamId
     userId
   }
 `;
-export const LeagueFragmentDoc = gql`
-  fragment League on League {
+export const AppLeagueFragmentDoc = gql`
+  fragment AppLeague on League {
     id
     name
     owner
@@ -7576,10 +7576,10 @@ export const LeagueFragmentDoc = gql`
     primaryColor
     secondaryColor
     userMembership {
-      ...LeagueMember
+      ...AppLeagueMember
     }
   }
-  ${LeagueMemberFragmentDoc}
+  ${AppLeagueMemberFragmentDoc}
 `;
 export const LeaguePositionFragmentDoc = gql`
   fragment LeaguePosition on LeaguePosition {
@@ -7588,8 +7588,8 @@ export const LeaguePositionFragmentDoc = gql`
     positionType
   }
 `;
-export const MatchupFragmentDoc = gql`
-  fragment Matchup on Matchup {
+export const AppMatchupFragmentDoc = gql`
+  fragment AppMatchup on Matchup {
     id
     weekNumber
     leagueId
@@ -7606,8 +7606,8 @@ export const MatchupFragmentDoc = gql`
     endTime
   }
 `;
-export const MatchupPlayerFragmentDoc = gql`
-  fragment MatchupPlayer on MatchupPlayer {
+export const AppMatchupPlayerFragmentDoc = gql`
+  fragment AppMatchupPlayer on MatchupPlayer {
     id
     matchupId
     playerId
@@ -7823,8 +7823,8 @@ export const NotificationHistoryItemFragmentDoc = gql`
     createdAt
   }
 `;
-export const PlayerFragmentDoc = gql`
-  fragment Player on Player {
+export const AppPlayerFragmentDoc = gql`
+  fragment AppPlayer on Player {
     id
     firstName
     lastName
@@ -7926,8 +7926,8 @@ export const TeamFragmentDoc = gql`
     bannerUrl
   }
 `;
-export const TeamMemberFragmentDoc = gql`
-  fragment TeamMember on TeamMember {
+export const AppTeamMemberFragmentDoc = gql`
+  fragment AppTeamMember on TeamMember {
     id
     playerId
     positionId
@@ -8819,10 +8819,10 @@ export const GetLeagueById = gql`
     $withMatchup: Boolean = false
   ) {
     league(id: $id) {
-      ...League
+      ...AppLeague
     }
   }
-  ${LeagueFragmentDoc}
+  ${AppLeagueFragmentDoc}
 `;
 
 /**
@@ -8919,11 +8919,11 @@ export const CreateLeague = gql`
   ) {
     createLeagueAndTeams(input: $input) {
       league {
-        ...League
+        ...AppLeague
       }
     }
   }
-  ${LeagueFragmentDoc}
+  ${AppLeagueFragmentDoc}
 `;
 export type CreateLeagueMutationFn = MutationFunction<
   CreateLeagueMutation,
@@ -9065,10 +9065,10 @@ export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<
 export const GetUserLeagues = gql`
   query GetUserLeagues {
     userLeagues {
-      ...League
+      ...AppLeague
     }
   }
-  ${LeagueFragmentDoc}
+  ${AppLeagueFragmentDoc}
 `;
 
 /**
@@ -9198,10 +9198,10 @@ export type DeleteAllLeaguesMutationOptions = BaseMutationOptions<
 export const StartDraft = gql`
   mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
     startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
-      ...League
+      ...AppLeague
     }
   }
-  ${LeagueFragmentDoc}
+  ${AppLeagueFragmentDoc}
 `;
 export type StartDraftMutationFn = MutationFunction<
   StartDraftMutation,
@@ -9754,10 +9754,10 @@ export type GetUserTeamIdQueryResult = Apollo.QueryResult<
 export const GetMatchupById = gql`
   query GetMatchupById($id: Int!) {
     getMatchupById(id: $id) {
-      ...Matchup
+      ...AppMatchup
     }
   }
-  ${MatchupFragmentDoc}
+  ${AppMatchupFragmentDoc}
 `;
 
 /**
@@ -9845,10 +9845,10 @@ export type GetMatchupByIdQueryResult = Apollo.QueryResult<
 export const GetMatchupsForLeague = gql`
   query GetMatchupsForLeague($leagueId: Int!, $weekNumber: Int) {
     getMatchupsForLeague(leagueId: $leagueId, weekNumber: $weekNumber) {
-      ...Matchup
+      ...AppMatchup
     }
   }
-  ${MatchupFragmentDoc}
+  ${AppMatchupFragmentDoc}
 `;
 
 /**
@@ -10025,10 +10025,10 @@ export type GetCurrentWeekForLeagueQueryResult = Apollo.QueryResult<
 export const GetMatchupsByWeek = gql`
   query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {
     getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
-      ...Matchup
+      ...AppMatchup
     }
   }
-  ${MatchupFragmentDoc}
+  ${AppMatchupFragmentDoc}
 `;
 
 /**
@@ -10218,10 +10218,10 @@ export type GetLeagueStandingsQueryResult = Apollo.QueryResult<
 export const GetMatchupPlayers = gql`
   query GetMatchupPlayers($matchupId: Int!) {
     getMatchupPlayers(matchupId: $matchupId) {
-      ...MatchupPlayer
+      ...AppMatchupPlayer
     }
   }
-  ${MatchupPlayerFragmentDoc}
+  ${AppMatchupPlayerFragmentDoc}
 `;
 
 /**
@@ -10315,10 +10315,10 @@ export const UpdateMatchupPlayerPosition = gql`
       matchupPlayerId: $matchupPlayerId
       positionId: $positionId
     ) {
-      ...MatchupPlayer
+      ...AppMatchupPlayer
     }
   }
-  ${MatchupPlayerFragmentDoc}
+  ${AppMatchupPlayerFragmentDoc}
 `;
 export type UpdateMatchupPlayerPositionMutationFn = MutationFunction<
   UpdateMatchupPlayerPositionMutation,
@@ -10377,10 +10377,10 @@ export const SwapMatchupPlayerPositions = gql`
       matchupPlayerIdB: $matchupPlayerIdB
       positionIdB: $positionIdB
     ) {
-      ...MatchupPlayer
+      ...AppMatchupPlayer
     }
   }
-  ${MatchupPlayerFragmentDoc}
+  ${AppMatchupPlayerFragmentDoc}
 `;
 export type SwapMatchupPlayerPositionsMutationFn = MutationFunction<
   SwapMatchupPlayerPositionsMutation,
@@ -10443,10 +10443,10 @@ export const GetMatchupHistory = gql`
       status: $status
       limit: $limit
     ) {
-      ...Matchup
+      ...AppMatchup
     }
   }
-  ${MatchupFragmentDoc}
+  ${AppMatchupFragmentDoc}
 `;
 
 /**
@@ -13252,10 +13252,10 @@ export type RestoreGooglePurchasesMutationOptions = BaseMutationOptions<
 export const GetTeamMembers = gql`
   query GetTeamMembers($teamId: Int!) {
     teamMembers(teamId: $teamId) {
-      ...TeamMember
+      ...AppTeamMember
     }
   }
-  ${TeamMemberFragmentDoc}
+  ${AppTeamMemberFragmentDoc}
 `;
 
 /**
@@ -13346,10 +13346,10 @@ export const UpdateTeamMemberPosition = gql`
       teamMemberId: $teamMemberId
       positionId: $positionId
     ) {
-      ...TeamMember
+      ...AppTeamMember
     }
   }
-  ${TeamMemberFragmentDoc}
+  ${AppTeamMemberFragmentDoc}
 `;
 export type UpdateTeamMemberPositionMutationFn = MutationFunction<
   UpdateTeamMemberPositionMutation,
@@ -13408,10 +13408,10 @@ export const SwapTeamMemberPositions = gql`
       teamMemberIdB: $teamMemberIdB
       positionIdB: $positionIdB
     ) {
-      ...TeamMember
+      ...AppTeamMember
     }
   }
-  ${TeamMemberFragmentDoc}
+  ${AppTeamMemberFragmentDoc}
 `;
 export type SwapTeamMemberPositionsMutationFn = MutationFunction<
   SwapTeamMemberPositionsMutation,
@@ -13462,10 +13462,10 @@ export type SwapTeamMemberPositionsMutationOptions = BaseMutationOptions<
 export const SetTradeBlock = gql`
   mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
     setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
-      ...TeamMember
+      ...AppTeamMember
     }
   }
-  ${TeamMemberFragmentDoc}
+  ${AppTeamMemberFragmentDoc}
 `;
 export type SetTradeBlockMutationFn = MutationFunction<
   SetTradeBlockMutation,
@@ -13600,10 +13600,10 @@ export type GetTeamByIdQueryResult = Apollo.QueryResult<
 export const GetLeagueTradeBlock = gql`
   query GetLeagueTradeBlock($leagueId: Int!) {
     leagueTradeBlock(leagueId: $leagueId) {
-      ...TeamMember
+      ...AppTeamMember
     }
   }
-  ${TeamMemberFragmentDoc}
+  ${AppTeamMemberFragmentDoc}
 `;
 
 /**

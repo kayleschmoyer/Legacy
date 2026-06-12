@@ -1,4 +1,4 @@
-fragment Matchup on Matchup {
+fragment AppMatchup on Matchup {
   id
   weekNumber
   leagueId
@@ -17,13 +17,13 @@ fragment Matchup on Matchup {
 
 query GetMatchupById($id: Int!) {
   getMatchupById(id: $id) {
-    ...Matchup
+    ...AppMatchup
   }
 }
 
 query GetMatchupsForLeague($leagueId: Int!, $weekNumber: Int) {
   getMatchupsForLeague(leagueId: $leagueId, weekNumber: $weekNumber) {
-    ...Matchup
+    ...AppMatchup
   }
 }
 
@@ -33,7 +33,7 @@ query GetCurrentWeekForLeague($leagueId: Int!) {
 
 query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {
   getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
-    ...Matchup
+    ...AppMatchup
   }
 }
 
@@ -56,7 +56,7 @@ query GetLeagueStandings($leagueId: Int!) {
 
 # ── Matchup Players & Lineup Editing ─────────────────────────────────────────
 
-fragment MatchupPlayer on MatchupPlayer {
+fragment AppMatchupPlayer on MatchupPlayer {
   id
   matchupId
   playerId
@@ -193,7 +193,7 @@ fragment MatchupPlayer on MatchupPlayer {
 
 query GetMatchupPlayers($matchupId: Int!) {
   getMatchupPlayers(matchupId: $matchupId) {
-    ...MatchupPlayer
+    ...AppMatchupPlayer
   }
 }
 
@@ -202,7 +202,7 @@ mutation UpdateMatchupPlayerPosition($matchupPlayerId: Int!, $positionId: Int) {
     matchupPlayerId: $matchupPlayerId
     positionId: $positionId
   ) {
-    ...MatchupPlayer
+    ...AppMatchupPlayer
   }
 }
 
@@ -218,7 +218,7 @@ mutation SwapMatchupPlayerPositions(
     matchupPlayerIdB: $matchupPlayerIdB
     positionIdB: $positionIdB
   ) {
-    ...MatchupPlayer
+    ...AppMatchupPlayer
   }
 }
 
@@ -238,6 +238,6 @@ query GetMatchupHistory(
     status: $status
     limit: $limit
   ) {
-    ...Matchup
+    ...AppMatchup
   }
 }

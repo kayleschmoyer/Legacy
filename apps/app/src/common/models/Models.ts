@@ -3,8 +3,8 @@ import {
   PITCHING_POSITIONS,
 } from '@legacy-sports/shared-components';
 import {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
 export { ALLOWED_POSITIONS, PITCHING_POSITIONS };
@@ -65,8 +65,8 @@ export function isBattingSlot(
 }
 
 export function isPitcher(
-  teamMember: TeamMemberFragment | null,
-): teamMember is TeamMemberFragment {
+  teamMember: AppTeamMemberFragment | null,
+): teamMember is AppTeamMemberFragment {
   if (teamMember === null) return false;
   const eligible = teamMember.player?.eligiblePositions ?? [];
   // If no eligibility data, fall back to treating everyone as a pitcher
@@ -75,8 +75,8 @@ export function isPitcher(
 }
 
 export function isBatter(
-  teamMember: TeamMemberFragment | null,
-): teamMember is TeamMemberFragment {
+  teamMember: AppTeamMemberFragment | null,
+): teamMember is AppTeamMemberFragment {
   if (teamMember === null) return false;
   const eligible = teamMember.player?.eligiblePositions ?? [];
   // If no eligibility data, fall back to treating everyone as a batter
@@ -85,7 +85,7 @@ export function isBatter(
 }
 
 export function canPlayerPlayPosition(
-  player: TeamMemberFragment | undefined,
+  player: AppTeamMemberFragment | undefined,
   positionMapping: LeaguePositionFragment | undefined,
 ): boolean {
   if (

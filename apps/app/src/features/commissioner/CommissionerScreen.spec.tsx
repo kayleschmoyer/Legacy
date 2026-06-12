@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import { CommissionerScreen } from './CommissionerScreen';
-import type { LeagueFragment } from '../../api/db/graphql.generated';
+import type { AppLeagueFragment } from '../../api/db/graphql.generated';
 
 type RNComponents = {
   View: typeof RNView;
@@ -143,7 +143,7 @@ describe('CommissionerScreen', () => {
       render(
         <CommissionerScreen
           leagueId={1}
-          league={mockBaseballLeague as unknown as LeagueFragment}
+          league={mockBaseballLeague as unknown as AppLeagueFragment}
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );
@@ -154,7 +154,7 @@ describe('CommissionerScreen', () => {
       render(
         <CommissionerScreen
           leagueId={1}
-          league={mockBaseballLeague as unknown as LeagueFragment}
+          league={mockBaseballLeague as unknown as AppLeagueFragment}
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );
@@ -165,7 +165,7 @@ describe('CommissionerScreen', () => {
       render(
         <CommissionerScreen
           leagueId={1}
-          league={mockBaseballLeague as unknown as LeagueFragment}
+          league={mockBaseballLeague as unknown as AppLeagueFragment}
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );
@@ -190,7 +190,7 @@ describe('CommissionerScreen', () => {
       render(
         <CommissionerScreen
           leagueId={1}
-          league={mockFootballLeague as unknown as LeagueFragment}
+          league={mockFootballLeague as unknown as AppLeagueFragment}
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );
@@ -201,7 +201,7 @@ describe('CommissionerScreen', () => {
       render(
         <CommissionerScreen
           leagueId={1}
-          league={mockFootballLeague as unknown as LeagueFragment}
+          league={mockFootballLeague as unknown as AppLeagueFragment}
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );

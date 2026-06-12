@@ -4,8 +4,8 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import {
-  type MatchupFragment,
-  type MatchupPlayerFragment,
+  type AppMatchupFragment,
+  type AppMatchupPlayerFragment,
 } from '../../api/db/graphql.generated';
 import { type ScoringSettings } from '../../common/scoring';
 import {
@@ -22,8 +22,8 @@ export interface ComputedMatchupScores {
 }
 
 export interface ComputeMatchupScoresInput {
-  matchup: MatchupFragment | null | undefined;
-  players: readonly MatchupPlayerFragment[] | null | undefined;
+  matchup: AppMatchupFragment | null | undefined;
+  players: readonly AppMatchupPlayerFragment[] | null | undefined;
   /**
    * True when the players query returned (or partially returned) a GraphQL
    * error. With `errorPolicy: 'all'`, Apollo surfaces the error alongside any
@@ -63,7 +63,7 @@ export function computeMatchupScores({
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
   const calculateGameScore = (
-    game: NonNullable<MatchupPlayerFragment['games']>[number],
+    game: NonNullable<AppMatchupPlayerFragment['games']>[number],
   ): number => {
     let total = 0;
     if (game.battingGame) {
@@ -87,7 +87,9 @@ export function computeMatchupScores({
     return total;
   };
 
-  const calculatePlayerProjection = (player: MatchupPlayerFragment): number => {
+  const calculatePlayerProjection = (
+    player: AppMatchupPlayerFragment,
+  ): number => {
     const gamesPlayed = player.games?.length ?? 0;
     const actualScore =
       player.games?.reduce((sum, game) => sum + calculateGameScore(game), 0) ??

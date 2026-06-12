@@ -2,8 +2,8 @@
 // These provide better types than the current incomplete GraphQL schema
 
 import {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
 // Event handler types for form events
@@ -32,7 +32,7 @@ export function hasValidPositionType(obj: {
 }
 
 // Extended types with proper null safety
-export interface SafeTeamMember extends TeamMemberFragment {
+export interface SafeTeamMember extends AppTeamMemberFragment {
   id: number;
   playerId: number;
 }
@@ -44,7 +44,7 @@ export interface SafeLeaguePosition extends LeaguePositionFragment {
 
 // Utility functions for safe data access
 export function toSafeTeamMember(
-  member: TeamMemberFragment | null,
+  member: AppTeamMemberFragment | null,
 ): SafeTeamMember | null {
   if (!member || !hasValidId(member) || !hasValidPlayerId(member)) {
     return null;

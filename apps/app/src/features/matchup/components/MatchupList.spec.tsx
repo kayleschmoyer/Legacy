@@ -4,7 +4,7 @@ import type { Text as RNText, View as RNView } from 'react-native';
 
 import { MatchupList } from './MatchupList';
 import { MatchupStatus } from '../../../api/db/graphql.generated';
-import type { MatchupFragment } from '../../../api/db/graphql.generated';
+import type { AppMatchupFragment } from '../../../api/db/graphql.generated';
 
 // ── Mock type helpers ────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ jest.mock('tamagui', () => {
 
 // ── Test data ────────────────────────────────────────────────────────────────
 
-const MOCK_MATCHUPS: MatchupFragment[] = [
+const MOCK_MATCHUPS: AppMatchupFragment[] = [
   {
     __typename: 'Matchup',
     id: '1',

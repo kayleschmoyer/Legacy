@@ -8,21 +8,21 @@ import {
 } from '@legacy-sports/shared-components';
 import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
-const getEligiblePositions = (player: TeamMemberFragment): string[] =>
+const getEligiblePositions = (player: AppTeamMemberFragment): string[] =>
   player.player?.eligiblePositions ?? [];
 
-const isPlayerPitcher = (player: TeamMemberFragment): boolean =>
+const isPlayerPitcher = (player: AppTeamMemberFragment): boolean =>
   getEligiblePositions(player).some((pos) => PITCHING_POSITIONS.has(pos));
 
-const isPlayerBatter = (player: TeamMemberFragment): boolean =>
+const isPlayerBatter = (player: AppTeamMemberFragment): boolean =>
   getEligiblePositions(player).some((pos) => !PITCHING_POSITIONS.has(pos));
 
 const canPlayerPlayPosition = (
-  player: TeamMemberFragment | undefined,
+  player: AppTeamMemberFragment | undefined,
   position: LeaguePositionFragment | undefined,
 ): boolean => {
   if (!player || !position) return true;
@@ -35,7 +35,9 @@ const canPlayerPlayPosition = (
 
 type MaybeNumber = number | null | undefined;
 
-const getPlayerName = (teamMember: TeamMemberFragment | undefined): string => {
+const getPlayerName = (
+  teamMember: AppTeamMemberFragment | undefined,
+): string => {
   if (!teamMember?.player) {
     return 'Empty';
   }
@@ -94,11 +96,11 @@ const formatScoreDisplay = (
 interface PlayerRowProps {
   item: PlayerData;
   isSelected: boolean;
-  teamMember: TeamMemberFragment | undefined;
+  teamMember: AppTeamMemberFragment | undefined;
   positionSlot: LeaguePositionFragment | undefined;
   projValue: number | undefined;
   actualValue: number | undefined;
-  selectedPlayer: TeamMemberFragment | undefined;
+  selectedPlayer: AppTeamMemberFragment | undefined;
   selectedPositionMapping: LeaguePositionFragment | undefined;
   onClick: (item: PlayerData) => void;
 }
@@ -173,15 +175,15 @@ const PlayerRow = memo(
 export interface LineupEditorProps {
   availableRosterSlots: readonly LeaguePositionFragment[];
   onPlayerAdded: (
-    player: TeamMemberFragment,
+    player: AppTeamMemberFragment,
     position: LeaguePositionFragment,
   ) => void;
   onPlayerMoved: (
-    playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment,
+    playerOne: AppTeamMemberFragment,
+    playerTwo: AppTeamMemberFragment,
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
-  team: readonly TeamMemberFragment[];
+  team: readonly AppTeamMemberFragment[];
   projections: Record<number, number>;
   actual: Record<number, number>;
 }
@@ -228,7 +230,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   }, [availableRosterSlots]);
 
   const teamMemberByPlayerId = useMemo(() => {
-    const map = new Map<number, TeamMemberFragment>();
+    const map = new Map<number, AppTeamMemberFragment>();
     for (const member of team) {
       const id = normalizeNumericIdentifier(member.playerId);
       if (id !== undefined) map.set(id, member);
@@ -237,7 +239,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   }, [team]);
 
   const teamMemberByPositionId = useMemo(() => {
-    const map = new Map<number, TeamMemberFragment>();
+    const map = new Map<number, AppTeamMemberFragment>();
     for (const member of team) {
       const id = normalizeNumericIdentifier(member.positionId);
       if (id !== undefined) map.set(id, member);
@@ -279,7 +281,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   }, [selectedPlayerData, team]);
 
   const onBenchPlayerClicked = useCallback(
-    (benchPlayer: TeamMemberFragment) => {
+    (benchPlayer: AppTeamMemberFragment) => {
       const benchPlayerId = normalizeNumericIdentifier(benchPlayer.playerId);
 
       if (benchPlayerId === undefined) {
@@ -426,7 +428,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   const onClick = useCallback(
     (item: PlayerData) => {
       let mapping: LeaguePositionFragment | undefined;
-      let teamMember: TeamMemberFragment | undefined;
+      let teamMember: AppTeamMemberFragment | undefined;
 
       switch (item.type) {
         case 'starter-data':

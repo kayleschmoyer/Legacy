@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import { MatchupScoreboardHero } from '@legacy-sports/shared-components/matchup';
 import {
-  type MatchupFragment,
-  type MatchupPlayerFragment,
+  type AppMatchupFragment,
+  type AppMatchupPlayerFragment,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '../../../api/db/graphql.generated';
@@ -12,7 +12,7 @@ import { mapMatchupPlayerToSeasonStats } from '../../../common/scoring/mapGraphQ
 import { computeMatchupScores } from '../computeMatchupScores';
 
 export interface MatchupScoreboardProps {
-  matchup: MatchupFragment | null | undefined;
+  matchup: AppMatchupFragment | null | undefined;
   /** League id used to resolve team names and scoring settings. */
   leagueId: number | null | undefined;
   gamesRemaining?: number;
@@ -50,7 +50,7 @@ export function MatchupScoreboard({
 
   const seasonStatsMap = useMemo(() => {
     const map = new Map<number, SeasonStats>();
-    playersData?.getMatchupPlayers?.forEach((mp: MatchupPlayerFragment) => {
+    playersData?.getMatchupPlayers?.forEach((mp: AppMatchupPlayerFragment) => {
       const stats = mapMatchupPlayerToSeasonStats(mp);
       if (stats) map.set(stats.playerId, stats);
     });

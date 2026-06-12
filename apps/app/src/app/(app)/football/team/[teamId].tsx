@@ -4,8 +4,8 @@ import { Alert, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import {
+  AppTeamMemberFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
@@ -87,14 +87,14 @@ function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
 interface TabContentProps {
   selectedTab: Tab;
   rosterSlots: readonly (LeaguePositionFragment | null)[];
-  team: readonly (TeamMemberFragment | null)[];
+  team: readonly (AppTeamMemberFragment | null)[];
   onPlayerAdded: (
-    player: TeamMemberFragment,
+    player: AppTeamMemberFragment,
     position: LeaguePositionFragment,
   ) => void;
   onPlayerMoved: (
-    playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment,
+    playerOne: AppTeamMemberFragment,
+    playerTwo: AppTeamMemberFragment,
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
   isOwner: boolean;
@@ -143,7 +143,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           onPlayerMoved={isOwner ? onPlayerMoved : noOp}
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
           projections={{}}
-          team={team.filter((m): m is TeamMemberFragment => m != null)}
+          team={team.filter((m): m is AppTeamMemberFragment => m != null)}
           actual={{}}
         />
       );
@@ -222,7 +222,7 @@ export default function FootballTeam(): React.JSX.Element {
   const [selectedTabIdx, setSelectedTabIdx] = useState(0);
 
   const onPlayerAdded = (
-    player: TeamMemberFragment,
+    player: AppTeamMemberFragment,
     positionSlot: LeaguePositionFragment,
   ) => {
     if (!player.id) return;
@@ -240,8 +240,8 @@ export default function FootballTeam(): React.JSX.Element {
   };
 
   const onPlayerMoved = (
-    playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment,
+    playerOne: AppTeamMemberFragment,
+    playerTwo: AppTeamMemberFragment,
   ) => {
     if (!playerOne.id || !playerTwo.id) return;
 
