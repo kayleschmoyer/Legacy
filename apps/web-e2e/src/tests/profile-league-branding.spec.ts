@@ -14,7 +14,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import {
+  isGraphQLEndpoint,
+  unmockedGraphQLFallback,
+} from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,12 +107,10 @@ async function setupProfileGraphQL(
         return;
       }
 
-      // Default — return empty data for unhandled operations
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: {} }),
-      });
+      // Cascade unhandled operations (e.g. the ambient MyIdentities query the
+      // ProfileSettingsPage fires on load) to the _apiIsolation baseline fixture
+      // instead of swallowing them with empty data, which would crash the page.
+      await unmockedGraphQLFallback(route);
     },
   );
 
