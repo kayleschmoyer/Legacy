@@ -10,6 +10,7 @@ import {
   useGetUnreadNotificationCountQuery,
 } from '../../../api/db/graphql.generated';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
+import { getEasProjectId } from '../../../features/notifications/getEasProjectId';
 
 const BRAND_GOLD = '#C5A55A';
 const BRAND_SEAM_RED = '#C41E3A';
@@ -97,9 +98,13 @@ export default function YouTab(): React.JSX.Element {
       // Best-effort: deactivate the Expo push token before clearing
       // credentials so a logged-out device stops receiving notifications.
       // (Previously handled by the drawer's doLogout, removed in LS-7792.)
-      if (isPhysicalDevice) {
+      // The Expo projectId is required by getExpoPushTokenAsync on SDK 54+; skip
+      // when it is not configured so we never hit the `No "projectId" found`
+      // error during logout (LS-7955).
+      const projectId = getEasProjectId();
+      if (isPhysicalDevice && projectId) {
         try {
-          const tokenData = await getExpoPushTokenAsync();
+          const tokenData = await getExpoPushTokenAsync({ projectId });
           await disableDeviceToken({
             variables: { deviceToken: tokenData.data },
           });

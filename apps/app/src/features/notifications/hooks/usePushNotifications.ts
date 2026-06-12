@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import {
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
@@ -19,6 +18,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { PermissionStatus } from 'expo-modules-core';
 import { useRegisterDeviceTokenMutation } from '../../../api/db/graphql.generated';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
+import { getEasProjectId } from '../getEasProjectId';
 
 // Configure how notifications appear when app is in foreground
 setNotificationHandler({
@@ -91,17 +91,20 @@ export function usePushNotifications(userId: number | null | undefined) {
       });
     }
 
-    try {
-      // Pass projectId when available (required for valid tokens on EAS builds
-      // and Expo SDK 54+; optional on development builds without EAS setup).
-      const easProjectId = (
-        Constants.expoConfig?.extra as
-          | { eas?: { projectId?: string } }
-          | undefined
-      )?.eas?.projectId;
-      const tokenData = await getExpoPushTokenAsync(
-        easProjectId != null ? { projectId: easProjectId } : undefined,
+    // The Expo projectId is required to mint a valid push token on EAS builds
+    // and Expo SDK 54+. Without it getExpoPushTokenAsync throws
+    // `No "projectId" found` (LS-7955), so skip registration cleanly rather than
+    // logging an error on dev builds that have no EAS project configured.
+    const projectId = getEasProjectId();
+    if (!projectId) {
+      LOGGER.info(
+        'Skipping push registration: no EAS projectId configured (set EAS_PROJECT_ID)',
       );
+      return;
+    }
+
+    try {
+      const tokenData = await getExpoPushTokenAsync({ projectId });
       const token = tokenData.data;
       LOGGER.info('Registering Expo push token', { platform: Platform.OS });
 

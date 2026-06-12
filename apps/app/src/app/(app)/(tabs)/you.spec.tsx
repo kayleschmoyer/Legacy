@@ -15,9 +15,11 @@ const mockNavigate = jest.fn();
 const mockLogout = jest.fn<Promise<void>, []>();
 const mockDisableDeviceToken = jest.fn().mockResolvedValue({});
 const mockGetExpoPushTokenAsync = jest
-  .fn<Promise<{ data: string }>, []>()
+  .fn<Promise<{ data: string }>, [unknown?]>()
   .mockResolvedValue({ data: 'mock-token' });
 let mockIsPhysicalDevice = false;
+// Mutable so tests can toggle whether an EAS projectId is configured.
+let mockEasProjectId: string | undefined = 'proj-test';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate }),
@@ -26,7 +28,22 @@ jest.mock('expo-router', () => ({
 jest.mock('expo-notifications', () => ({
   // Lazy wrapper: the mock factory is hoisted above the const initialization,
   // so reference the typed mock at call time (not factory-eval time).
-  getExpoPushTokenAsync: () => mockGetExpoPushTokenAsync(),
+  getExpoPushTokenAsync: (options?: unknown) =>
+    mockGetExpoPushTokenAsync(options),
+}));
+
+jest.mock('expo-constants', () => ({
+  // __esModule: true keeps babel's _interopRequireDefault from double-wrapping
+  // the default export (so Constants.expoConfig resolves), matching
+  // apps/app/__mocks__/expo-constants.js.
+  __esModule: true,
+  default: {
+    get expoConfig() {
+      return {
+        extra: mockEasProjectId ? { eas: { projectId: mockEasProjectId } } : {},
+      };
+    },
+  },
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -146,6 +163,7 @@ describe('YouTab', () => {
     jest.clearAllMocks();
     mockUnreadCount = 0;
     mockIsPhysicalDevice = false;
+    mockEasProjectId = 'proj-test';
     setPlatformOS('ios');
     mockLogout.mockResolvedValue(undefined);
     mockDisableDeviceToken.mockResolvedValue({});
@@ -308,7 +326,22 @@ describe('YouTab', () => {
           variables: { deviceToken: 'mock-token' },
         });
       });
+      expect(mockGetExpoPushTokenAsync).toHaveBeenCalledWith({
+        projectId: 'proj-test',
+      });
       expect(mockLogout).toHaveBeenCalled();
+    });
+
+    it('skips push token deactivation when no EAS projectId is configured', async () => {
+      mockIsPhysicalDevice = true;
+      mockEasProjectId = undefined;
+      renderYouTab();
+      fireEvent.press(screen.getByTestId('you-logout'));
+      await waitFor(() => {
+        expect(mockLogout).toHaveBeenCalled();
+      });
+      expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
+      expect(mockDisableDeviceToken).not.toHaveBeenCalled();
     });
 
     it('skips push token deactivation on non-physical devices', async () => {

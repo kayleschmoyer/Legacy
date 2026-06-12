@@ -61,8 +61,25 @@ if (
 // changes.
 const staticConfig = require('./app.json').expo;
 
+// EAS/Expo projectId (LS-7955). `expo-notifications`' getExpoPushTokenAsync
+// needs the Expo projectId to mint valid push tokens on EAS builds and Expo
+// SDK 54+; without it the call throws `No "projectId" found` and device tokens
+// are never registered. The projectId is account-specific (not committed to
+// app.json), so it is supplied via the EAS_PROJECT_ID env var (root .env / CI /
+// EAS secret) and surfaced at runtime as Constants.expoConfig.extra.eas.projectId.
+// When unset (local dev without EAS setup) push registration is skipped instead
+// of erroring — see getEasProjectId / usePushNotifications.
+const easProjectId = process.env.EAS_PROJECT_ID?.trim();
+
 /** @type {(ctx: { config: import('@expo/config-types').ExpoConfig }) => import('@expo/config-types').ExpoConfig} */
 module.exports = ({ config }) => ({
   ...config,
   ...staticConfig,
+  extra: {
+    ...config.extra,
+    ...staticConfig.extra,
+    ...(easProjectId
+      ? { eas: { ...staticConfig.extra?.eas, projectId: easProjectId } }
+      : {}),
+  },
 });
