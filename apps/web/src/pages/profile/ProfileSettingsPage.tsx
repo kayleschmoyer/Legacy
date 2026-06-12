@@ -286,6 +286,13 @@ const ProfileSettingsPage: React.FC = () => {
 
   const currentAvatarUrl = userData?.user?.avatarUrl ?? null;
   const dbUsername = userData?.user?.username ?? userName;
+  // The DB user record is the source of truth for the canonical email — the
+  // JWT email never changes within a session, so it would pin the "Primary
+  // email" badge to the login-time identity even after setCanonicalEmail.
+  const canonicalEmail = userData?.user?.email ?? userEmail;
+  // A partial/errored MyIdentities response yields data without the field;
+  // guard so the page renders the empty state instead of crashing.
+  const identities = identitiesData?.myIdentities ?? [];
 
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [discordError, setDiscordError] = useState<string | null>(null);
@@ -899,16 +906,16 @@ const ProfileSettingsPage: React.FC = () => {
                       Loading…
                     </Paragraph>
                   </XStack>
-                ) : identitiesData?.myIdentities.length === 0 ? (
+                ) : identities.length === 0 ? (
                   <Paragraph size="$3" color="$colorPress">
                     No linked providers found.
                   </Paragraph>
                 ) : (
                   <YStack gap="$3">
-                    {identitiesData?.myIdentities.map((identity) => {
+                    {identities.map((identity) => {
                       const isCanonical =
                         identity.providerEmail !== null &&
-                        identity.providerEmail === userEmail;
+                        identity.providerEmail === canonicalEmail;
                       const canSetCanonical =
                         identity.providerEmailVerified &&
                         identity.providerEmail !== null &&
@@ -1060,20 +1067,12 @@ const ProfileSettingsPage: React.FC = () => {
 
                 {/* Legacy Discord connect button when no identities loaded yet */}
                 {auth.config.discordClientId &&
-                !identitiesData?.myIdentities.some(
-                  (i) => i.provider === 'discord',
-                ) ? (
+                !identities.some((i) => i.provider === 'discord') ? (
                   <YStack
                     gap="$3"
-                    paddingTop={
-                      (identitiesData?.myIdentities.length ?? 0) > 0
-                        ? '$3'
-                        : '$0'
-                    }
+                    paddingTop={identities.length > 0 ? '$3' : '$0'}
                   >
-                    {(identitiesData?.myIdentities.length ?? 0) > 0 ? (
-                      <Separator />
-                    ) : null}
+                    {identities.length > 0 ? <Separator /> : null}
                     <XStack
                       alignItems="center"
                       justifyContent="space-between"

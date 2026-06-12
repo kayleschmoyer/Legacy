@@ -14,7 +14,10 @@
  */
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
-import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import {
+  isGraphQLEndpoint,
+  unmockedGraphQLFallback,
+} from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -70,12 +73,11 @@ async function setupProfileGraphQL(page: import('@playwright/test').Page) {
         return;
       }
 
-      // Default mock — return empty data for any unhandled GraphQL operations
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: {} }),
-      });
+      // Cascade unhandled operations (e.g. the ambient MyIdentities query the
+      // ProfileSettingsPage fires on load) to the _apiIsolation baseline
+      // fixture instead of swallowing them with empty data, which would crash
+      // the page (LS-7960).
+      await unmockedGraphQLFallback(route);
     },
   );
 }
@@ -395,11 +397,7 @@ async function setupProfileGraphQLWithIdentities(
         return;
       }
 
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: {} }),
-      });
+      await unmockedGraphQLFallback(route);
     },
   );
 }
@@ -420,7 +418,13 @@ test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression
     await setupProfileGraphQLWithIdentities(page);
     await page.goto('/profile/settings');
     await expect(page.getByText('Primary email')).toBeVisible();
-    await expect(page.getByText('Google')).toBeVisible();
+    // Scope to the section — bare getByText('Google') also matches the
+    // info banner and the "Google OAuth" sign-in method row.
+    await expect(
+      page
+        .getByTestId('profile-linked-identities-section')
+        .getByText('Google', { exact: true }),
+    ).toBeVisible();
   });
 
   test('shows "Set as primary" button for a verified non-canonical identity', async ({
@@ -493,16 +497,17 @@ test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression
           return;
         }
 
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
+        await unmockedGraphQLFallback(route);
       },
     );
 
     await page.goto('/profile/settings');
-    const setAsPrimaryBtn = page.getByTestId('set-canonical-email-2');
+    // EditButton is a Tamagui styled() component, which does not forward
+    // data-testid in the web build — locate by accessible role + name. Only
+    // the non-canonical verified identity (discord, id 2) renders the button.
+    const setAsPrimaryBtn = page.getByRole('button', {
+      name: 'Set as primary',
+    });
     await expect(setAsPrimaryBtn).toBeVisible();
     await setAsPrimaryBtn.click();
     await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
