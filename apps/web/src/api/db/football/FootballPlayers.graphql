@@ -1,3 +1,100 @@
+fragment FootballPlayerHeader on FootballPlayer {
+  id
+  firstName
+  lastName
+  position
+  isDst
+  nflTeam
+  pfrId
+  previousTeams
+  careerStats {
+    passing {
+      yds
+      td
+      int
+      rating
+    }
+    rushing {
+      yds
+      td
+    }
+    receiving {
+      rec
+      yds
+      td
+    }
+    kicking {
+      fgm
+      fga
+    }
+    defense {
+      sacks
+      int
+      ptsAllowedPerG
+    }
+    idp {
+      soloTkl
+      astTkl
+      sacks
+      int
+      ff
+    }
+  }
+}
+
+fragment FootballPlayerDetailExtras on FootballPlayer {
+  careerStats {
+    defense {
+      g
+      fumRec
+      defTd
+      ydsAllowedPerG
+    }
+  }
+  seasonStats {
+    passing {
+      season
+      team
+      g
+      cmp
+      att
+      yds
+      td
+      int
+      rating
+    }
+    rushing {
+      season
+      team
+      g
+      att
+      yds
+      td
+      ydsPerAtt
+    }
+    receiving {
+      season
+      team
+      g
+      tgt
+      rec
+      yds
+      td
+      ydsPerRec
+    }
+    defense {
+      season
+      team
+      g
+      sacks
+      int
+      fumRec
+      defTd
+      ptsAllowed
+    }
+  }
+}
+
 query FootballPlayers(
   $position: String
   $nflTeam: String
@@ -11,47 +108,7 @@ query FootballPlayers(
     after: $after
   ) {
     nodes {
-      id
-      firstName
-      lastName
-      position
-      isDst
-      nflTeam
-      pfrId
-      previousTeams
-      careerStats {
-        passing {
-          yds
-          td
-          int
-          rating
-        }
-        rushing {
-          yds
-          td
-        }
-        receiving {
-          rec
-          yds
-          td
-        }
-        kicking {
-          fgm
-          fga
-        }
-        defense {
-          sacks
-          int
-          ptsAllowedPerG
-        }
-        idp {
-          soloTkl
-          astTkl
-          sacks
-          int
-          ff
-        }
-      }
+      ...FootballPlayerHeader
     }
     pageInfo {
       hasNextPage
@@ -62,92 +119,7 @@ query FootballPlayers(
 
 query FootballPlayer($id: Int!) {
   footballPlayer(id: $id) {
-    id
-    firstName
-    lastName
-    position
-    isDst
-    nflTeam
-    pfrId
-    previousTeams
-    careerStats {
-      passing {
-        yds
-        td
-        int
-        rating
-      }
-      rushing {
-        yds
-        td
-      }
-      receiving {
-        rec
-        yds
-        td
-      }
-      kicking {
-        fgm
-        fga
-      }
-      defense {
-        g
-        sacks
-        int
-        fumRec
-        defTd
-        ptsAllowedPerG
-        ydsAllowedPerG
-      }
-      idp {
-        soloTkl
-        astTkl
-        sacks
-        int
-        ff
-      }
-    }
-    seasonStats {
-      passing {
-        season
-        team
-        g
-        cmp
-        att
-        yds
-        td
-        int
-        rating
-      }
-      rushing {
-        season
-        team
-        g
-        att
-        yds
-        td
-        ydsPerAtt
-      }
-      receiving {
-        season
-        team
-        g
-        tgt
-        rec
-        yds
-        td
-        ydsPerRec
-      }
-      defense {
-        season
-        team
-        g
-        sacks
-        int
-        fumRec
-        defTd
-        ptsAllowed
-      }
-    }
+    ...FootballPlayerHeader
+    ...FootballPlayerDetailExtras
   }
 }

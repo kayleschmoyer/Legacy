@@ -5180,6 +5180,119 @@ export type CastAwardVoteMutation = {
   castAwardVote?: boolean | null;
 };
 
+export type FootballPlayerHeaderFragment = {
+  __typename?: 'FootballPlayer';
+  id: number;
+  firstName: string;
+  lastName: string;
+  position?: string | null;
+  isDst: boolean;
+  nflTeam?: string | null;
+  pfrId?: string | null;
+  previousTeams: Array<string>;
+  careerStats?: {
+    __typename?: 'FootballCareerStats';
+    passing?: {
+      __typename?: 'FootballCareerPassing';
+      yds?: number | null;
+      td?: number | null;
+      int?: number | null;
+      rating?: number | null;
+    } | null;
+    rushing?: {
+      __typename?: 'FootballCareerRushing';
+      yds?: number | null;
+      td?: number | null;
+    } | null;
+    receiving?: {
+      __typename?: 'FootballCareerReceiving';
+      rec?: number | null;
+      yds?: number | null;
+      td?: number | null;
+    } | null;
+    kicking?: {
+      __typename?: 'FootballCareerKicking';
+      fgm?: number | null;
+      fga?: number | null;
+    } | null;
+    defense?: {
+      __typename?: 'FootballCareerDefense';
+      sacks?: number | null;
+      int?: number | null;
+      ptsAllowedPerG?: number | null;
+    } | null;
+    idp?: {
+      __typename?: 'FootballCareerIdp';
+      soloTkl?: number | null;
+      astTkl?: number | null;
+      sacks?: number | null;
+      int?: number | null;
+      ff?: number | null;
+    } | null;
+  } | null;
+};
+
+export type FootballPlayerDetailExtrasFragment = {
+  __typename?: 'FootballPlayer';
+  careerStats?: {
+    __typename?: 'FootballCareerStats';
+    defense?: {
+      __typename?: 'FootballCareerDefense';
+      g?: number | null;
+      fumRec?: number | null;
+      defTd?: number | null;
+      ydsAllowedPerG?: number | null;
+    } | null;
+  } | null;
+  seasonStats?: {
+    __typename?: 'FootballPlayerSeasonStats';
+    passing?: Array<{
+      __typename?: 'FootballSeasonPassing';
+      season?: number | null;
+      team?: string | null;
+      g?: number | null;
+      cmp?: number | null;
+      att?: number | null;
+      yds?: number | null;
+      td?: number | null;
+      int?: number | null;
+      rating?: number | null;
+    }> | null;
+    rushing?: Array<{
+      __typename?: 'FootballSeasonRushing';
+      season?: number | null;
+      team?: string | null;
+      g?: number | null;
+      att?: number | null;
+      yds?: number | null;
+      td?: number | null;
+      ydsPerAtt?: number | null;
+    }> | null;
+    receiving?: Array<{
+      __typename?: 'FootballSeasonReceiving';
+      season?: number | null;
+      team?: string | null;
+      g?: number | null;
+      tgt?: number | null;
+      rec?: number | null;
+      yds?: number | null;
+      td?: number | null;
+      ydsPerRec?: number | null;
+    }> | null;
+    defense?: Array<{
+      __typename?: 'FootballSeasonDefense';
+      season?: number | null;
+      team?: string | null;
+      g?: number | null;
+      sacks?: number | null;
+      int?: number | null;
+      fumRec?: number | null;
+      defTd?: number | null;
+      ptsAllowed?: number | null;
+    }> | null;
+  } | null;
+};
+
 export type FootballPlayersQueryVariables = Exact<{
   position?: InputMaybe<Scalars['String']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
@@ -5293,12 +5406,12 @@ export type FootballPlayerQuery = {
       } | null;
       defense?: {
         __typename?: 'FootballCareerDefense';
-        g?: number | null;
         sacks?: number | null;
         int?: number | null;
+        ptsAllowedPerG?: number | null;
+        g?: number | null;
         fumRec?: number | null;
         defTd?: number | null;
-        ptsAllowedPerG?: number | null;
         ydsAllowedPerG?: number | null;
       } | null;
       idp?: {
@@ -10236,6 +10349,105 @@ export const MyAwardVoteFieldsFragmentDoc = gql`
     playerLastName
   }
 `;
+export const FootballPlayerHeaderFragmentDoc = gql`
+  fragment FootballPlayerHeader on FootballPlayer {
+    id
+    firstName
+    lastName
+    position
+    isDst
+    nflTeam
+    pfrId
+    previousTeams
+    careerStats {
+      passing {
+        yds
+        td
+        int
+        rating
+      }
+      rushing {
+        yds
+        td
+      }
+      receiving {
+        rec
+        yds
+        td
+      }
+      kicking {
+        fgm
+        fga
+      }
+      defense {
+        sacks
+        int
+        ptsAllowedPerG
+      }
+      idp {
+        soloTkl
+        astTkl
+        sacks
+        int
+        ff
+      }
+    }
+  }
+`;
+export const FootballPlayerDetailExtrasFragmentDoc = gql`
+  fragment FootballPlayerDetailExtras on FootballPlayer {
+    careerStats {
+      defense {
+        g
+        fumRec
+        defTd
+        ydsAllowedPerG
+      }
+    }
+    seasonStats {
+      passing {
+        season
+        team
+        g
+        cmp
+        att
+        yds
+        td
+        int
+        rating
+      }
+      rushing {
+        season
+        team
+        g
+        att
+        yds
+        td
+        ydsPerAtt
+      }
+      receiving {
+        season
+        team
+        g
+        tgt
+        rec
+        yds
+        td
+        ydsPerRec
+      }
+      defense {
+        season
+        team
+        g
+        sacks
+        int
+        fumRec
+        defTd
+        ptsAllowed
+      }
+    }
+  }
+`;
 export const UserLeagueSummaryFragmentDoc = gql`
   fragment UserLeagueSummary on UserLeagueSummary {
     leagueId
@@ -12670,47 +12882,7 @@ export const FootballPlayers = gql`
       after: $after
     ) {
       nodes {
-        id
-        firstName
-        lastName
-        position
-        isDst
-        nflTeam
-        pfrId
-        previousTeams
-        careerStats {
-          passing {
-            yds
-            td
-            int
-            rating
-          }
-          rushing {
-            yds
-            td
-          }
-          receiving {
-            rec
-            yds
-            td
-          }
-          kicking {
-            fgm
-            fga
-          }
-          defense {
-            sacks
-            int
-            ptsAllowedPerG
-          }
-          idp {
-            soloTkl
-            astTkl
-            sacks
-            int
-            ff
-          }
-        }
+        ...FootballPlayerHeader
       }
       pageInfo {
         hasNextPage
@@ -12718,6 +12890,7 @@ export const FootballPlayers = gql`
       }
     }
   }
+  ${FootballPlayerHeaderFragmentDoc}
 `;
 
 /**
@@ -12804,95 +12977,12 @@ export type FootballPlayersQueryResult = Apollo.QueryResult<
 export const FootballPlayer = gql`
   query FootballPlayer($id: Int!) {
     footballPlayer(id: $id) {
-      id
-      firstName
-      lastName
-      position
-      isDst
-      nflTeam
-      pfrId
-      previousTeams
-      careerStats {
-        passing {
-          yds
-          td
-          int
-          rating
-        }
-        rushing {
-          yds
-          td
-        }
-        receiving {
-          rec
-          yds
-          td
-        }
-        kicking {
-          fgm
-          fga
-        }
-        defense {
-          g
-          sacks
-          int
-          fumRec
-          defTd
-          ptsAllowedPerG
-          ydsAllowedPerG
-        }
-        idp {
-          soloTkl
-          astTkl
-          sacks
-          int
-          ff
-        }
-      }
-      seasonStats {
-        passing {
-          season
-          team
-          g
-          cmp
-          att
-          yds
-          td
-          int
-          rating
-        }
-        rushing {
-          season
-          team
-          g
-          att
-          yds
-          td
-          ydsPerAtt
-        }
-        receiving {
-          season
-          team
-          g
-          tgt
-          rec
-          yds
-          td
-          ydsPerRec
-        }
-        defense {
-          season
-          team
-          g
-          sacks
-          int
-          fumRec
-          defTd
-          ptsAllowed
-        }
-      }
+      ...FootballPlayerHeader
+      ...FootballPlayerDetailExtras
     }
   }
+  ${FootballPlayerHeaderFragmentDoc}
+  ${FootballPlayerDetailExtrasFragmentDoc}
 `;
 
 /**
