@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, H1, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
 import { NFL_TEAMS } from '../../constants/nflTeams';
+import { GameLogsTable } from '../stats/GameLogsTable';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -909,6 +910,19 @@ export function FootballPlayerDetail({
 
           {/* Projections premium upsell — shown to free users only */}
           {!isPremium && <ProjectionsTeaser onUpgrade={onUpgrade} />}
+
+          {/* Game Logs */}
+          <YStack gap={8}>
+            <Text
+              fontSize={13}
+              color={TEXT_MUTED}
+              fontFamily={FONT_BODY}
+              fontWeight="600"
+            >
+              GAME LOGS
+            </Text>
+            <GameLogsTable sport="nfl" initialPlayerId={String(player.id)} />
+          </YStack>
         </YStack>
       )}
     </YStack>

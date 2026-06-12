@@ -9,6 +9,22 @@ import {
 } from './FootballPlayerDetail';
 import { fireEvent, render, screen } from '../../test-utils';
 
+jest.mock('../stats/GameLogsTable', () => ({
+  GameLogsTable: ({
+    sport,
+    initialPlayerId,
+  }: {
+    sport?: string;
+    initialPlayerId?: string;
+  }) => (
+    <div
+      data-testid="game-logs-table"
+      data-sport={sport}
+      data-player-id={initialPlayerId}
+    />
+  ),
+}));
+
 const QB_PLAYER: FootballPlayerDetailPlayer = {
   id: 1,
   firstName: 'Patrick',
@@ -485,5 +501,13 @@ describe('FootballPlayerDetail', () => {
       render(<FootballPlayerDetail player={null} loading />);
       expect(screen.queryByText('Projections (Premium)')).toBeNull();
     });
+  });
+
+  it('renders the Game Logs section with sport=nfl and the player id pre-populated', () => {
+    render(<FootballPlayerDetail player={QB_PLAYER} />);
+    expect(screen.getByText('GAME LOGS')).toBeTruthy();
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-sport')).toBe('nfl');
+    expect(table.getAttribute('data-player-id')).toBe('1');
   });
 });

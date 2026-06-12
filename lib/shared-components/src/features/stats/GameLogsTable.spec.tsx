@@ -65,6 +65,17 @@ describe('GameLogsTable', () => {
     expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
   });
+
+  it('pre-populates the player ID input when initialPlayerId is provided (LS-6231)', () => {
+    const { getByPlaceholderText } = render(
+      <GameLogsTable
+        initialPlayerId="nfl-123"
+        apiEndpoint="https://test.example.com/logs"
+      />,
+    );
+    const input = getByPlaceholderText('Enter player ID') as HTMLInputElement;
+    expect(input.value).toBe('nfl-123');
+  });
 });
 
 describe('GameLogsTable input validation', () => {

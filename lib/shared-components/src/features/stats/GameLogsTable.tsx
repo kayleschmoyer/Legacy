@@ -405,6 +405,13 @@ export interface GameLogsTableProps {
    * (LS-7480, LS-7469)
    */
   isPremium?: boolean;
+  /**
+   * Pre-seed the player-ID filter on mount. Useful when embedding the table
+   * inside a player detail page where the ID is already known (LS-6231). The
+   * field remains editable so the user can look up a different player without
+   * leaving the page.
+   */
+  initialPlayerId?: string;
 }
 
 /** Venue options shown in the premium multi-select. (LS-7469) */
@@ -462,6 +469,7 @@ function GameLogsTable({
   apiEndpoint,
   sport = 'mlb',
   isPremium = false,
+  initialPlayerId = '',
 }: GameLogsTableProps) {
   // Resolve once per mount. If we're in a production build and the env var
   // is unset (or pinned to localhost), this throws — we render an error state
@@ -486,7 +494,10 @@ function GameLogsTable({
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  const [filters, dispatch] = useReducer(filterReducer, INITIAL_FILTERS);
+  const [filters, dispatch] = useReducer(filterReducer, {
+    ...INITIAL_FILTERS,
+    player: initialPlayerId,
+  });
   // Store the raw server payload (stat → gameNum → value). The O(stats*games)
   // reshape is done lazily in useMemo below so the fetch callback never blocks
   // the main thread. startTransition defers the resulting render. (LS-7472)
