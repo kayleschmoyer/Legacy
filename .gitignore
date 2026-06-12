@@ -354,6 +354,9 @@ scratch/*
 # Scheduled-tasks MCP server runtime lock (sessionId/pid/acquiredAt)
 .claude/scheduled_tasks.lock
 
+# PR-watch opt-out marker (per-checkout runtime file)
+.claude/.pr-watch-opt-out
+
 # Copilot CLI session marker (runtime file written by session-start hook)
 .copilot-session
 .twig
