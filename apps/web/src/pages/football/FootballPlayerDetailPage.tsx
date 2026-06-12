@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { YStack } from 'tamagui';
 import { CombinedGraphQLErrors } from '@apollo/client';
-import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
+import {
+  FOOTBALL_PLAYER_DETAIL_POLL_MS,
+  FootballPlayerDetail,
+} from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
@@ -24,6 +27,10 @@ export function FootballPlayerDetailPage() {
   const { data, loading, error } = useFootballPlayerQuery({
     variables: { id: playerId },
     skip: !playerId,
+    // Auto-refresh so injury-status changes surface without a manual reload
+    // (LS-6252). Apollo pauses polling while the tab is hidden and stops it on
+    // unmount; a skipped query (no playerId) does not poll.
+    pollInterval: FOOTBALL_PLAYER_DETAIL_POLL_MS,
   });
 
   function handleUpgrade() {

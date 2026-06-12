@@ -1,6 +1,7 @@
 /**
  * LS-6227 — footballPlayer UNAUTHENTICATED error handling.
  * LS-6228 — back-button cold-start deep-link fallback.
+ * LS-6252 — injury-status auto-refresh via Apollo pollInterval.
  *
  * Covers:
  *   1. UNAUTHENTICATED GraphQL error → storeCameFrom + navigate to /login (no error banner).
@@ -8,10 +9,12 @@
  *   3. Successful load → player detail rendered, no error.
  *   4. Back press with in-app history → navigate(-1).
  *   5. Back press on cold-start deep link (empty history) → navigate('/football/players').
+ *   6. Detail query is polled on the shared cadence so status changes auto-refresh.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
+import { FOOTBALL_PLAYER_DETAIL_POLL_MS } from '@legacy-sports/shared-components/football';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { useIsPremium } from '../../hooks/useIsPremium';
@@ -30,6 +33,9 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 
 jest.mock('@legacy-sports/shared-components/football', () => ({
+  // Sentinel value so the wiring test proves the container forwards the shared
+  // constant rather than a hard-coded literal.
+  FOOTBALL_PLAYER_DETAIL_POLL_MS: 54321,
   FootballPlayerDetail: ({
     error,
     player,
@@ -243,5 +249,18 @@ describe('FootballPlayerDetailPage', () => {
       expect(screen.queryByText('teaser-upgrade')).toBeNull();
       expect(screen.queryByText('upgrade-modal-open')).toBeNull();
     });
+  });
+
+  it('polls the query so injury-status changes auto-refresh (LS-6252)', () => {
+    mockUseFootballPlayerQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+    } as ReturnType<typeof useFootballPlayerQuery>);
+
+    render(<FootballPlayerDetailPage />);
+
+    const options = mockUseFootballPlayerQuery.mock.calls[0][0];
+    expect(options?.pollInterval).toBe(FOOTBALL_PLAYER_DETAIL_POLL_MS);
   });
 });

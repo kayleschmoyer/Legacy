@@ -15,3 +15,4 @@ export {
   type FootballSeasonRushingRow,
   type FootballSeasonReceivingRow,
 } from './FootballPlayerDetail';
+export { FOOTBALL_PLAYER_DETAIL_POLL_MS } from './playerDetailPolling';
