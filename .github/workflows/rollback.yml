@@ -469,6 +469,9 @@ jobs:
           TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
           TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Client-side Rollbar token — keep in lockstep with lambda-terraform-apply
+          # so a rollback apply does not destroy the github-secrets SSM param (LS-7957).
+          TF_VAR_rollbar_client_access_token: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}

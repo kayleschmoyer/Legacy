@@ -202,6 +202,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
+          # secrets.tf); when set it materializes the github-secrets SSM param that
+          # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
+          # repo secret consumed by build-android-app.yml / deploy-web.yml (LS-7957).
+          TF_VAR_rollbar_client_access_token: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
@@ -237,6 +242,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
+          # secrets.tf); when set it materializes the github-secrets SSM param that
+          # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
+          # repo secret consumed by build-android-app.yml / deploy-web.yml (LS-7957).
+          TF_VAR_rollbar_client_access_token: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
@@ -319,6 +329,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
+          # secrets.tf); when set it materializes the github-secrets SSM param that
+          # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
+          # repo secret consumed by build-android-app.yml / deploy-web.yml (LS-7957).
+          TF_VAR_rollbar_client_access_token: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
@@ -361,6 +376,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
+          # secrets.tf); when set it materializes the github-secrets SSM param that
+          # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
+          # repo secret consumed by build-android-app.yml / deploy-web.yml (LS-7957).
+          TF_VAR_rollbar_client_access_token: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
