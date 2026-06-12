@@ -345,3 +345,45 @@ jobs:
       # prune-runner-amis.yml.
       - name: Prune old runner AMIs
         uses: ./.github/actions/prune-runner-amis
+
+      # Belt-and-suspenders teardown (LS-7875). Packer terminates the build
+      # instance on success, and the runner-ami-builder role self-terminates
+      # tagged instances on most failures — but a hard interrupt (e.g. the
+      # build host being scaled down mid-run) can leak the instance. This step
+      # always runs and reaps THIS build's instance by the ID Packer logs, so a
+      # crash that skips Packer's own cleanup cannot leave a costly orphan. The
+      # hourly packer-orphan-sweeper Lambda is the backstop for the case where
+      # the host dies before this step can run at all.
+      - name: Terminate leaked Packer build instance
+        if: always()
+        working-directory: terraform/runners/packer
+        run: |
+          set -uo pipefail
+          if [[ ! -f packer-build.log ]]; then
+            echo "No packer-build.log — Packer did not start; nothing to clean up."
+            exit 0
+          fi
+          # amazon-ebs logs e.g. "==> amazon-ebs.runner: Instance ID: i-0abc123".
+          INSTANCE_ID=$(grep -oE "Instance ID: i-[0-9a-f]+" packer-build.log \
+            | tail -n 1 | awk '{print $3}')
+          if [[ -z "${INSTANCE_ID:-}" ]]; then
+            echo "No instance ID found in packer-build.log; nothing to clean up."
+            exit 0
+          fi
+          STATE=$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query 'Reservations[].Instances[].State.Name' \
+            --output text 2>/dev/null || true)
+          case "$STATE" in
+            pending|running|stopping|stopped)
+              echo "Reaping leaked Packer build instance $INSTANCE_ID (state=$STATE)"
+              # Stamp the Name the builder role's TerminateInstances condition
+              # matches, in case Packer crashed before applying run_tags.
+              aws ec2 create-tags --resources "$INSTANCE_ID" \
+                --tags Key=Name,Value="Packer Builder - ci-teardown-reaped" || true
+              aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" || true
+              ;;
+            *)
+              echo "Instance $INSTANCE_ID already gone (state=${STATE:-none}); nothing to do."
+              ;;
+          esac
