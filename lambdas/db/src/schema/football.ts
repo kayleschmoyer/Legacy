@@ -1090,6 +1090,16 @@ FootballPlayerRef.implement({
       type: FootballCareerStatsRef,
       nullable: true,
       resolve: async (parent, _args, context) => {
+        // Career stats are intentionally gated on authentication only — NOT on
+        // a premium subscription tier (LS-6248). QA finding FPD-024 flagged the
+        // absence of a premium entitlement check here as a potential leak; the
+        // product decision is that career stats are an authenticated (logged-in)
+        // feature available to all tiers, mirroring the public `seasonStats`
+        // field. This is a deliberate choice, not an oversight: do NOT add a
+        // `requirePremium`/`requireEntitlement` gate without an accompanying
+        // product/entitlement change. The regression test in
+        // `football.resolver.spec.ts` asserts this auth-only (non-premium)
+        // contract so the decision is not silently changed.
         if (!context.user) {
           throw AuthenticationError(
             'Authentication required to query football career stats',

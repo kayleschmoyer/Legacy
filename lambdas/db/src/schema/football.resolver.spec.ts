@@ -427,6 +427,53 @@ describe('football resolvers', () => {
     });
   });
 
+  // ── careerStats field (LS-6248 / FPD-024) ───────────────────────────────────
+  // Career stats are gated on authentication ONLY — never on premium tier.
+  // These tests lock in that deliberate product decision so a future change
+  // cannot silently add (or remove) the auth gate without failing here.
+  describe('careerStats field', () => {
+    function getResolver() {
+      const type = schema.getType('FootballPlayer') as GraphQLObjectType;
+      const field = type.getFields().careerStats;
+      if (!field?.resolve) throw new Error('careerStats resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    const player = {
+      id: 7,
+      firstName: 'Patrick',
+      lastName: 'Mahomes',
+      pfrId: 'MahoPa00',
+      isDst: false,
+      nflTeam: 'KC',
+      position: 'QB',
+    };
+
+    it('throws UNAUTHENTICATED when no user in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(player, {}, mockContext, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('resolves for a free (non-premium) authenticated user — no premium gate', async () => {
+      // A non-admin, free-tier user must reach the data. If a premium
+      // entitlement gate were ever added, this would reject with
+      // PREMIUM_REQUIRED instead of resolving.
+      mockContext.user = { id: 1, isAdmin: false };
+
+      const result = await getResolver()(
+        player,
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toMatchObject({ playerId: 7 });
+    });
+  });
+
   // ── FootballWeeklyGameLog (LS-6233) ─────────────────────────────────────────
 
   describe('FootballWeeklyGameLog type', () => {
