@@ -11,16 +11,12 @@ inputs:
   path:
     description: "Local path to upload from or download to"
     required: true
-  run-id:
-    description: "Workflow run ID for namespacing (default: current run)"
-    required: false
-    default: ""
   bucket:
     description: "S3 bucket name"
     required: false
     default: "legacy-sports-dev-ci-artifacts"
   if-no-files-found:
-    description: "Behavior when no files found: warn, error, ignore (upload only)"
+    description: "Behavior when no files found: warn, error, ignore (upload and download)"
     required: false
     default: "warn"
   role-to-assume:
@@ -53,24 +49,12 @@ runs:
         MODE: ${{ inputs.mode }}
         NAME: ${{ inputs.name }}
         LOCAL_PATH: ${{ inputs.path }}
-        RUN_ID: ${{ inputs.run-id || github.run_id }}
         BUCKET: ${{ inputs.bucket }}
         IF_NO_FILES: ${{ inputs.if-no-files-found }}
       run: |
-        # Namespace by RUN_ID only — NOT run_attempt. Artifact content is a pure
-        # function of the commit (RUN_ID is unique per run, stable across attempts),
-        # so per-attempt scoping adds no isolation but breaks two real cases:
-        #   1. "Re-run failed jobs" (LS-7873): the producer job (e.g. build) is not
-        #      re-run, so it never uploads under the new attempt number, yet the
-        #      re-run consumer (e.g. e2e) looks under that new attempt and finds
-        #      nothing — the web-build download silently misses and E2E aborts with
-        #      an empty blob-report, blocking the merge queue for every PR.
-        #   2. Cross-workflow handoff (deploy-pr-preview passes run-id of another
-        #      run, but GITHUB_RUN_ATTEMPT is this workflow's attempt, not the
-        #      producer's) — only worked by coincidence when both were on attempt 1.
-        # A re-run that DOES re-run the producer overwrites the stable prefix via the
-        # `aws s3 sync --delete` upload below, so retries still get a clean set.
-        S3_PREFIX="s3://${BUCKET}/ci-artifacts/${RUN_ID}/${NAME}"
+        # Key by commit SHA so re-running failed jobs always finds the artifact from
+        # the same build, regardless of run_attempt.
+        S3_PREFIX="s3://${BUCKET}/ci-artifacts/${GITHUB_SHA}/${NAME}"
 
         if [ "$MODE" = "upload" ]; then
           # Check if there are files to upload
@@ -103,11 +87,24 @@ runs:
           fi
 
         elif [ "$MODE" = "download" ]; then
-          # Check if the S3 prefix exists
+          # Check if the S3 prefix exists, honoring if-no-files-found
           if ! aws s3 ls "$S3_PREFIX/" > /dev/null 2>&1; then
-            echo "::warning::No artifact found at ${S3_PREFIX}"
-            echo "success=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            case "$IF_NO_FILES" in
+              error)
+                echo "::error::No artifact found at ${S3_PREFIX}"
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 1
+                ;;
+              warn)
+                echo "::warning::No artifact found at ${S3_PREFIX}"
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+              ignore)
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
           fi
 
           mkdir -p "$LOCAL_PATH"

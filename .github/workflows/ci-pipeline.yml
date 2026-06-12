@@ -626,6 +626,7 @@ jobs:
           mode: download
           name: web-build
           path: dist/apps/web
+          if-no-files-found: error
 
       - name: "E2E Testing"
         id: e2e
