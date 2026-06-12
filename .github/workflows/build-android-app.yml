@@ -342,6 +342,59 @@ jobs:
             ./artifacts/${{ needs.build-android.outputs.apk_name }}
             ./artifacts/legacy-sports-latest.apk
 
+      # Self-publish the "Released" date badge to the CI badges gist so the
+      # README badge no longer depends on shields.io's shared GitHub token pool
+      # (which renders "unable to select next github token from pool" whenever
+      # that pool is rate-limited). Only release builds become `make_latest`, so
+      # only they advance the badge — mirroring github/release-date semantics.
+      - name: Publish Released date badge
+        if: needs.build-android.outputs.build_type == 'release'
+        shell: bash
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.CI_BADGES_GIST_ID }}
+        run: |
+          RELEASE_DATE=$(date -u '+%Y-%m-%d')
+
+          # shields.io endpoint schema. Label/color/style match the previous
+          # img.shields.io/github/release-date badge so the README is unchanged
+          # visually. for-the-badge keeps it consistent with the Download button.
+          if command -v jq >/dev/null 2>&1; then
+            jq -n --arg message "$RELEASE_DATE" '{
+              schemaVersion: 1,
+              label: "Released",
+              message: $message,
+              color: "C5A55A",
+              namedLogo: "github",
+              logoColor: "white",
+              style: "for-the-badge",
+              cacheSeconds: 300
+            }' > Released.json
+            PAYLOAD=$(jq -n --rawfile content Released.json \
+              '{files: {"Released.json": {content: $content}}}')
+          else
+            # jq-less fallback (no escaping needed — the date has no special chars)
+            printf '{"schemaVersion":1,"label":"Released","message":"%s","color":"C5A55A","namedLogo":"github","logoColor":"white","style":"for-the-badge","cacheSeconds":300}' \
+              "$RELEASE_DATE" > Released.json
+            BADGE_CONTENT=$(sed 's/\\/\\\\/g; s/"/\\"/g' Released.json | tr -d '\n')
+            PAYLOAD="{\"files\":{\"Released.json\":{\"content\":\"${BADGE_CONTENT}\"}}}"
+          fi
+
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/released_badge_response.json \
+            -X PATCH \
+            -H "Authorization: Bearer ${GIST_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/gists/${GIST_ID}" \
+            -d "$PAYLOAD")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Released badge updated to ${RELEASE_DATE}"
+          else
+            echo "❌ Failed to update Released badge (HTTP ${HTTP_CODE})"
+            cat /tmp/released_badge_response.json
+            exit 1
+          fi
+
   notify:
     name: Notify Build Results
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
