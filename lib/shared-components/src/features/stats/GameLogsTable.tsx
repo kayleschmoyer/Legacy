@@ -1,15 +1,15 @@
-import { useVirtualizer } from '@tanstack/react-virtual';
 import React, {
-  startTransition,
+  useCallback,
+  useEffect,
   useMemo,
   useReducer,
   useRef,
   useState,
 } from 'react';
-import { Button, Input, Sheet, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Check } from '@tamagui/lucide-icons';
-import { Platform, Table } from '../../platform-components';
-import { Select as OpponentSelect } from '../../components/Select';
+import { Button, Input, Spinner, Text, YStack } from 'tamagui';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { FlatList, InteractionManager } from 'react-native';
+import { Platform } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
 import {
   expandMlbFranchiseAbbrs,
@@ -17,10 +17,20 @@ import {
   MLB_TEAMS,
   NFL_FRANCHISES,
 } from '../../constants/teams';
-import { DatePicker } from '../../components/DatePicker';
 
-// Platform-agnostic React components (no React Native imports)
-// Using CSS-in-JS for styling instead of StyleSheet
+// LS-5703 — Game logs virtualization + pagination.
+//
+// Prior behavior: page-level <ScrollView> wrapped the entire form + table, the
+// full season payload was reshaped synchronously on the main thread, and every
+// row was rendered eagerly. A 162-game MLB season produces ~5000 cells; a
+// 1000-game career view jammed the page on low-end Android.
+//
+// Now:
+//   - LS-7470 row virtualization (react-virtual on web, FlatList on native).
+//   - LS-7471 outer ScrollView removed — only the table virtualizes.
+//   - LS-7472 reshape deferred via requestIdleCallback / InteractionManager.
+//   - LS-7473 server pagination (limit/offset/total).
+//   - LS-7475 infinite scroll @ 80% with a 1000-row render cap + Load all.
 
 /** Em-dash used to disambiguate "no value" from a real zero stat. (LS-7461) */
 const EM_DASH = '—';
@@ -35,184 +45,41 @@ function renderCell(cell: CellValue): string | number {
   return cell;
 }
 
-// Cross-platform table implementation
-interface TableProps {
-  headers: string[];
-  data: Array<Array<CellValue>>;
-  title?: string;
-  /**
-   * Stable identifier per row (e.g. gameId). Used as React key so that
-   * sort/filter changes don't cause reconciliation churn — the wrong rows
-   * keep their internal state if we use the array index. (LS-7460)
-   */
-  rowKeys?: string[];
-}
+const DEFAULT_PAGE_SIZE = 50;
+const INFINITE_SCROLL_THRESHOLD = 0.8;
+const RENDER_CAP = 1000;
+const ROW_HEIGHT_PX = 36;
+const SCROLLER_HEIGHT_PX = 480;
+const MIN_TABLE_WIDTH_PX = 600;
 
-/**
- * Activate row virtualization once the result set crosses this threshold.
- * Below it the DOM is small enough that virtualizing adds no value. (LS-7475)
- */
-export const VIRTUAL_ROW_THRESHOLD = 100;
-
-/** Visible height (px) of the scroll window when virtualization is active. */
-const VIRTUAL_CONTAINER_HEIGHT = 600;
-
-/** Pixel height used by the virtualizer to estimate each row before measuring. */
-const ESTIMATED_ROW_HEIGHT = 37;
-
-const CrossPlatformTable: React.FC<TableProps> = ({
-  headers,
-  data,
-  title,
-  rowKeys,
-}) => {
-  // Ref for the scrollable container. Attached to the DOM element only when
-  // virtualization is active; the virtualizer reads scroll position from it.
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Always call the hook (rules-of-hooks). The virtualizer is inactive when
-  // the container ref is null (i.e. for small datasets or native), so it
-  // computes zero virtual items without side effects.
-  const rowVirtualizer = useVirtualizer({
-    count: data.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => ESTIMATED_ROW_HEIGHT,
-    overscan: 5,
-  });
-
-  if (Platform.OS === 'web') {
-    // LS-7475 — virtualise rows for large (premium career) result sets so that
-    // only the rows in the viewport are in the DOM, keeping rendering O(1) with
-    // respect to career length.
-    const shouldVirtualize = data.length > VIRTUAL_ROW_THRESHOLD;
-
-    const virtualItems = shouldVirtualize
-      ? rowVirtualizer.getVirtualItems()
-      : null;
-    const totalVirtualSize = rowVirtualizer.getTotalSize();
-
-    const firstVirtual =
-      virtualItems !== null && virtualItems.length > 0
-        ? virtualItems[0]
-        : undefined;
-    const lastVirtual =
-      virtualItems !== null && virtualItems.length > 0
-        ? virtualItems[virtualItems.length - 1]
-        : undefined;
-
-    // Padding rows stand in for the off-screen rows so the scrollbar reflects
-    // the true total height without rendering every <tr>. (LS-7475)
-    const paddingTop = firstVirtual !== undefined ? firstVirtual.start : 0;
-    const paddingBottom =
-      lastVirtual !== undefined ? totalVirtualSize - lastVirtual.end : 0;
-
-    // Indices of rows to render: all of them when small, virtual slice when large.
-    const rowIndices: number[] =
-      virtualItems !== null
-        ? virtualItems.map((vi) => vi.index)
-        : data.map((_, i) => i);
-
+// requestIdleCallback shim — Safari and Jest don't ship it.
+type IdleHandle = number;
+function scheduleIdle(fn: () => void): IdleHandle {
+  if (
+    typeof window !== 'undefined' &&
+    typeof (window as unknown as { requestIdleCallback?: unknown })
+      .requestIdleCallback === 'function'
+  ) {
     return (
-      <div
-        // LS-7459 — wrap the table in a horizontally-scrollable container so
-        // wide stat tables don't overflow the viewport on narrow screens.
-        // `minWidth` on the inner table keeps columns from collapsing.
-        // LS-7475 — also the vertical scroll anchor for the virtualizer when
-        // shouldVirtualize is true.
-        ref={shouldVirtualize ? scrollRef : undefined}
-        style={{
-          overflowX: 'auto',
-          maxWidth: '100%',
-          marginTop: 16,
-          ...(shouldVirtualize
-            ? { overflowY: 'auto', maxHeight: VIRTUAL_CONTAINER_HEIGHT }
-            : {}),
-        }}
-      >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 600,
-            borderCollapse: 'collapse',
-          }}
-        >
-          <thead
-            // LS-7458 — keep column labels in view as the user scrolls a
-            // 162-game MLB season. `position: sticky` resolves against the
-            // nearest scrollable ancestor (the document on web).
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 1,
-              backgroundColor: '#f5f5f5',
-            }}
-          >
-            <tr>
-              {headers.map((header, index) => (
-                <th
-                  key={index}
-                  style={{
-                    padding: 8,
-                    border: '1px solid #ddd',
-                    backgroundColor: '#f5f5f5',
-                    textAlign: 'left',
-                  }}
-                >
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Top spacer row — represents the off-screen rows above the viewport */}
-            {paddingTop > 0 ? (
-              <tr>
-                <td
-                  colSpan={headers.length}
-                  style={{ height: paddingTop, padding: 0, border: 'none' }}
-                />
-              </tr>
-            ) : null}
-            {rowIndices.map((rowIndex) => {
-              const row = data[rowIndex];
-              return (
-                // LS-7460 — prefer the explicit row key (e.g. gameId) so React
-                // re-uses the right <tr> across sort/filter changes.
-                <tr key={rowKeys?.[rowIndex] ?? rowIndex}>
-                  {(row ?? []).map((cell, cellIndex) => (
-                    <td
-                      key={cellIndex}
-                      style={{
-                        padding: 8,
-                        border: '1px solid #ddd',
-                      }}
-                    >
-                      {renderCell(cell)}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-            {/* Bottom spacer row — represents the off-screen rows below the viewport */}
-            {paddingBottom > 0 ? (
-              <tr>
-                <td
-                  colSpan={headers.length}
-                  style={{ height: paddingBottom, padding: 0, border: 'none' }}
-                />
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    );
+      window as unknown as { requestIdleCallback: (cb: () => void) => number }
+    ).requestIdleCallback(fn);
   }
-
-  // React Native implementation — normalize empty cells the same way so the
-  // em-dash treatment is consistent across web + native. (LS-7461)
-  const normalizedData = data.map((row) => row.map(renderCell));
-  return <Table headers={headers} data={normalizedData} title={title} />;
-};
+  return setTimeout(fn, 0) as unknown as number;
+}
+function cancelIdle(h: IdleHandle | null): void {
+  if (h == null) return;
+  if (
+    typeof window !== 'undefined' &&
+    typeof (window as unknown as { cancelIdleCallback?: unknown })
+      .cancelIdleCallback === 'function'
+  ) {
+    (
+      window as unknown as { cancelIdleCallback: (h: number) => void }
+    ).cancelIdleCallback(h);
+    return;
+  }
+  clearTimeout(h as unknown as ReturnType<typeof setTimeout>);
+}
 
 // ---------------------------------------------------------------------------
 // Filter state machine (LS-7466).
@@ -225,113 +92,58 @@ const CrossPlatformTable: React.FC<TableProps> = ({
 // ---------------------------------------------------------------------------
 
 export type GameLogSport = 'mlb' | 'nfl';
-/** Premium multi-select venue option (LS-7469). */
-export type VenueOption = 'home' | 'away' | 'neutral' | 'international';
-/** Free-user single-select toggle (unchanged from LS-7465). */
 export type Venue = 'all' | 'home' | 'away';
 
 export interface FilterState {
   player: string;
-  dateFrom: string;
-  dateTo: string;
+  date: string;
   opponentFranchiseIds: string[];
   venue: Venue;
-  /** Premium multi-select: empty array means no venue filter applied. (LS-7469) */
-  venues: VenueOption[];
 }
 
 type FilterAction =
   | { type: 'setPlayer'; value: string }
-  | { type: 'setDateFrom'; value: string }
-  | { type: 'setDateTo'; value: string }
+  | { type: 'setDate'; value: string }
   | { type: 'setOpponents'; value: string[] }
   | { type: 'setVenue'; value: Venue }
-  | { type: 'setVenues'; value: VenueOption[] }
-  | { type: 'addVenue'; value: VenueOption }
-  | { type: 'removeVenue'; value: VenueOption }
   | { type: 'reset' };
 
 const INITIAL_FILTERS: FilterState = {
   player: '',
-  dateFrom: '',
-  dateTo: '',
+  date: '',
   opponentFranchiseIds: [],
   venue: 'all',
-  venues: [],
 };
 
 function filterReducer(state: FilterState, action: FilterAction): FilterState {
   switch (action.type) {
     case 'setPlayer':
       return { ...state, player: action.value };
-    case 'setDateFrom':
-      return { ...state, dateFrom: action.value };
-    case 'setDateTo':
-      return { ...state, dateTo: action.value };
+    case 'setDate':
+      return { ...state, date: action.value };
     case 'setOpponents':
       return { ...state, opponentFranchiseIds: action.value };
     case 'setVenue':
       return { ...state, venue: action.value };
-    case 'setVenues':
-      return { ...state, venues: action.value };
-    // addVenue/removeVenue operate on the reducer's own current state so
-    // rapid-fire dispatches (e.g. clicking two checkboxes before re-render)
-    // accumulate correctly without stale-closure issues. (LS-7469)
-    case 'addVenue':
-      return state.venues.includes(action.value)
-        ? state
-        : { ...state, venues: [...state.venues, action.value] };
-    case 'removeVenue':
-      return {
-        ...state,
-        venues: state.venues.filter((v) => v !== action.value),
-      };
     case 'reset':
       return INITIAL_FILTERS;
   }
 }
 
 /**
- * Normalize a bare YYYY-MM-DD string to an ISO 8601 date-time with an
- * explicit timezone offset so the server resolves the correct calendar day
- * for every user regardless of their locale. (LS-7453)
- *
- * `timezoneOffsetMinutes` defaults to the host's local offset
- * (`Date.prototype.getTimezoneOffset` semantics: UTC-7 → 420, UTC+5 → -300).
- * Pass an explicit value in tests to make assertions timezone-independent.
- *
- * An empty string is returned as-is (no date filter active).
- */
-export function normalizeGameDate(
-  dateStr: string,
-  timezoneOffsetMinutes: number = new Date().getTimezoneOffset(),
-): string {
-  if (!dateStr) return dateStr;
-  const sign = timezoneOffsetMinutes <= 0 ? '+' : '-';
-  const absMinutes = Math.abs(timezoneOffsetMinutes);
-  const hh = String(Math.floor(absMinutes / 60)).padStart(2, '0');
-  const mm = String(absMinutes % 60).padStart(2, '0');
-  return `${dateStr}T00:00:00${sign}${hh}:${mm}`;
-}
-
-/**
  * Shape the POST body for `/baseball-game-logs`. Exported so unit tests can
  * assert opponent expansion + venue serialization without mocking fetch.
- * (LS-7466, LS-7473, LS-7478, LS-7451)
+ * (LS-7466, LS-7478)
  */
 export function buildGameLogsRequestBody(
   filters: FilterState,
   sport: GameLogSport,
-  options?: { limit?: number },
 ): {
   player_id: string;
-  game_date_from?: string;
-  game_date_to?: string;
+  game_date: string;
   opponent_franchise_ids?: string[];
   opponent_abbrs?: string[];
   venue?: 'home' | 'away';
-  limit?: number;
-  venues?: VenueOption[];
 } {
   const expand =
     sport === 'nfl' ? expandNflFranchiseAbbrs : expandMlbFranchiseAbbrs;
@@ -346,47 +158,28 @@ export function buildGameLogsRequestBody(
 
   return {
     player_id: filters.player,
-    // LS-7453: attach the local timezone offset so the server resolves the
-    // correct calendar date for cross-coast users who enter YYYY-MM-DD.
-    ...(filters.dateFrom
-      ? { game_date_from: normalizeGameDate(filters.dateFrom) }
-      : {}),
-    ...(filters.dateTo
-      ? { game_date_to: normalizeGameDate(filters.dateTo) }
-      : {}),
+    game_date: filters.date,
     ...(filters.opponentFranchiseIds.length > 0
       ? {
           opponent_franchise_ids: filters.opponentFranchiseIds,
           opponent_abbrs: opponentAbbrs,
         }
       : {}),
-    // Premium multi-select (LS-7469): venues array takes precedence over the
-    // single-select toggle. When the array is empty no venue filter is applied.
-    ...(filters.venues.length > 0
-      ? { venues: filters.venues }
-      : filters.venue !== 'all'
-        ? { venue: filters.venue }
-        : {}),
-    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+    ...(filters.venue !== 'all' ? { venue: filters.venue } : {}),
   };
 }
-
-/** Maximum game logs returned per request for non-premium users (LS-7473). */
-export const DEFAULT_GAME_LOGS_LIMIT = 50;
 
 // Strict format guards applied before sending to the API (defense-in-depth;
 // backend must still use parameterized queries — see LS-5704 follow-up).
 const PLAYER_ID_RE = /^[\w-]+$/; // alphanumeric, hyphens, underscores
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
 
 export interface GameLogsTableProps {
   /**
    * API endpoint for fetching game logs.
    *
-   * When omitted, the endpoint is resolved from `VITE_STATS_API_URL` (web) or
-   * `EXPO_PUBLIC_STATS_API_URL` (native). In a production build the resolver
-   * REFUSES to fall back to localhost — see {@link resolveStatsApiEndpoint}
-   * and the wire-up note above it. (LS-7691)
+   * When omitted, falls back to a localhost dev URL. Production builds wire
+   * this from build-time env (`VITE_STATS_API_URL` on web,
+   * `EXPO_PUBLIC_STATS_API_URL` on native).
    */
   apiEndpoint?: string;
   /**
@@ -412,125 +205,437 @@ export interface GameLogsTableProps {
    * leaving the page.
    */
   initialPlayerId?: string;
+  /** Page size hint for the server. */
+  pageSize?: number;
 }
 
-/** Venue options shown in the premium multi-select. (LS-7469) */
-const PREMIUM_VENUE_OPTIONS: Array<{ value: VenueOption; label: string }> = [
-  { value: 'home', label: 'Home' },
-  { value: 'away', label: 'Away' },
-  { value: 'neutral', label: 'Neutral Site' },
-  { value: 'international', label: 'International Series' },
-];
+const DEFAULT_ENDPOINT = 'http://localhost:5000/baseball-game-logs';
 
-// React Native injects `__DEV__` globally; on web it is defined via Vite's
-// `define` block. May be undefined under Jest, so we treat that as "not prod".
-declare const __DEV__: boolean | undefined;
+interface DateRangeValidation {
+  error: string | null;
+  ready: boolean;
+}
 
-const LOCALHOST_RE = /(?:localhost|127\.0\.0\.1)/;
-const DEV_FALLBACK_URL = 'http://localhost:5000/baseball-game-logs';
-const LOCALHOST_BUILD_HINT =
-  'This typically means VITE_STATS_API_URL was not injected at build time.';
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function parseIsoDate(value: string): Date | null {
+  if (!ISO_DATE_RE.test(value)) return null;
+  const d = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10) === value ? d : null;
+}
 
-/**
- * Resolve the stats API endpoint at component mount.
- *
- * Production wire-up (must be set per build target — otherwise this throws
- * in prod):
- *   - Web (Vite): `VITE_STATS_API_URL` in the workspace `.env` consumed by
- *     `apps/web/vite.config.mts` (envDir points at the repo root). Vite reads
- *     it via `import.meta.env` in `lib/app-config/src/lib/config.web.ts`; for
- *     this shared component we read `process.env.VITE_STATS_API_URL`, which
- *     Vite replaces at build time alongside `import.meta.env.VITE_*`.
- *   - Native (Expo): `EXPO_PUBLIC_STATS_API_URL` in `apps/app/.env`, picked up
- *     by `babel-preset-expo` (see `lib/app-config/src/lib/statsApiUrl.ts` and
- *     the LS-6402 RFC). The native screens use that helper directly.
- *
- * Mirrors the native-side `resolveStatsApiUrl` pattern (LS-6402): refuse the
- * localhost fallback in release builds so a misconfigured deploy fails loudly
- * instead of silently rendering an empty table. (LS-7691, same bug class as
- * LS-7585 / Google Sign-In redirect loop.)
- */
-export function resolveStatsApiEndpoint(): string {
-  const fromEnv = process.env.VITE_STATS_API_URL;
-  const candidate = fromEnv && fromEnv.length > 0 ? fromEnv : DEV_FALLBACK_URL;
-  const isProd =
-    typeof __DEV__ !== 'undefined'
-      ? __DEV__ === false
-      : process.env.NODE_ENV === 'production';
-  if (isProd && LOCALHOST_RE.test(candidate)) {
-    throw new Error(
-      'VITE_STATS_API_URL is not configured for this build. Set it in eas.json / vite config before deploying.',
+function todayIsoEt(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+export function validateDateRange(
+  startDate: string,
+  endDate: string,
+  today: string = todayIsoEt(),
+): DateRangeValidation {
+  const hasStart = startDate.trim() !== '';
+  const hasEnd = endDate.trim() !== '';
+
+  if (!hasStart && !hasEnd) return { error: null, ready: true };
+
+  if (hasStart !== hasEnd) {
+    return { error: 'Please enter both a start and end date.', ready: false };
+  }
+
+  const start = parseIsoDate(startDate);
+  const end = parseIsoDate(endDate);
+  if (!start || !end) {
+    return {
+      error: 'Use the date picker — dates must be valid.',
+      ready: false,
+    };
+  }
+
+  if (start.getTime() > end.getTime()) {
+    return { error: 'Start date must be on or before end date.', ready: false };
+  }
+
+  const todayDate = parseIsoDate(today);
+  if (todayDate && end.getTime() > todayDate.getTime()) {
+    return { error: 'End date cannot be in the future.', ready: false };
+  }
+
+  return { error: null, ready: true };
+}
+
+interface DateFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  max?: string;
+  min?: string;
+  disabled?: boolean;
+  testID?: string;
+}
+const DateField: React.FC<DateFieldProps> = ({
+  label,
+  value,
+  onChange,
+  max,
+  min,
+  disabled,
+  testID,
+}) => {
+  if (Platform.OS === 'web') {
+    return (
+      <YStack marginBottom="$3" flex={1}>
+        <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+          {label}
+        </Text>
+        <input
+          type="date"
+          aria-label={label}
+          data-testid={testID}
+          value={value}
+          max={max}
+          min={min}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            padding: 12,
+            fontSize: 16,
+            border: '1px solid #999',
+            borderRadius: 6,
+            backgroundColor: disabled ? '#f0f0f0' : '#fff',
+            width: '100%',
+            boxSizing: 'border-box',
+          }}
+        />
+      </YStack>
     );
   }
-  return candidate;
+  return (
+    <YStack marginBottom="$3" flex={1}>
+      <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+        {label}
+      </Text>
+      <Input
+        borderWidth={1}
+        borderColor="$gray8"
+        borderRadius="$3"
+        padding="$3"
+        fontSize="$4"
+        backgroundColor="$white"
+        value={value}
+        onChangeText={onChange}
+        placeholder="YYYY-MM-DD"
+        editable={!disabled}
+        testID={testID}
+        accessibilityLabel={label}
+      />
+    </YStack>
+  );
+};
+
+type ServerLegacy = Record<string, Record<string, string | number>>;
+interface ServerPaginated {
+  stats: string[];
+  rows: Array<Record<string, CellValue> & { gameId: string }>;
+  total?: number;
 }
 
+function isPaginated(payload: unknown): payload is ServerPaginated {
+  if (payload == null || typeof payload !== 'object') return false;
+  const p = payload as Partial<ServerPaginated>;
+  return Array.isArray(p.stats) && Array.isArray(p.rows);
+}
+
+interface ReshapedPage {
+  stats: string[];
+  rows: Array<{ gameId: string; cells: CellValue[] }>;
+  total: number | null;
+}
+
+/**
+ * Reshape a server payload (legacy `{[stat]: {[gameId]: value}}` or paginated
+ * `{stats, rows, total}`) into row-oriented form. Pure — safe to defer to an
+ * idle callback or `runAfterInteractions`. (LS-7472)
+ */
+export function reshapeGameLogs(
+  payload: ServerLegacy | ServerPaginated,
+  existingStats: string[] = [],
+): ReshapedPage {
+  if (isPaginated(payload)) {
+    const stats = payload.stats.length > 0 ? payload.stats : existingStats;
+    const rows = payload.rows.map((r) => ({
+      gameId: String(r.gameId),
+      cells: stats.map((s) => (s in r ? r[s] : null)),
+    }));
+    return {
+      stats,
+      rows,
+      total: typeof payload.total === 'number' ? payload.total : null,
+    };
+  }
+  const statKeys = Object.keys(payload);
+  const stats = statKeys.length > 0 ? statKeys : existingStats;
+  const byGame: Record<string, Record<string, CellValue>> = {};
+  for (const stat of statKeys) {
+    const col = payload[stat];
+    for (const gameId of Object.keys(col)) {
+      if (!byGame[gameId]) byGame[gameId] = {};
+      byGame[gameId][stat] = col[gameId];
+    }
+  }
+  const rows = Object.keys(byGame).map((gameId) => ({
+    gameId,
+    cells: stats.map((s) => byGame[gameId][s] ?? null),
+  }));
+  return { stats, rows, total: rows.length };
+}
+
+interface VirtualBodyProps {
+  stats: string[];
+  rows: Array<{ gameId: string; cells: CellValue[] }>;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onEndReached: () => void;
+}
+
+const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
+  stats,
+  rows,
+  hasMore,
+  loadingMore,
+  onEndReached,
+}) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowCount = rows.length + (hasMore || loadingMore ? 1 : 0);
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT_PX,
+    overscan: 8,
+  });
+
+  const items = virtualizer.getVirtualItems();
+  const lastItem = items[items.length - 1];
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+    if (!lastItem) return;
+    if (lastItem.index >= rows.length * INFINITE_SCROLL_THRESHOLD) {
+      onEndReached();
+    }
+  }, [lastItem, rows.length, hasMore, loadingMore, onEndReached]);
+
+  const colWidth = `${100 / Math.max(stats.length, 1)}%`;
+
+  return (
+    <div
+      ref={parentRef}
+      data-testid="game-logs-virtual-scroller"
+      style={{
+        height: SCROLLER_HEIGHT_PX,
+        overflow: 'auto',
+        border: '1px solid #ddd',
+      }}
+    >
+      <div style={{ minWidth: MIN_TABLE_WIDTH_PX }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
+            display: 'flex',
+            backgroundColor: '#f5f5f5',
+            borderBottom: '1px solid #ddd',
+          }}
+        >
+          {stats.map((h) => (
+            <div
+              key={h}
+              style={{
+                flexBasis: colWidth,
+                flexGrow: 1,
+                padding: 8,
+                fontWeight: 600,
+                fontSize: 14,
+                borderRight: '1px solid #ddd',
+              }}
+            >
+              {h}
+            </div>
+          ))}
+        </div>
+        <div
+          style={{
+            position: 'relative',
+            height: virtualizer.getTotalSize(),
+          }}
+        >
+          {items.map((vi) => {
+            const isSentinel = vi.index >= rows.length;
+            const row = isSentinel ? null : rows[vi.index];
+            return (
+              <div
+                key={
+                  isSentinel
+                    ? `sentinel-${vi.index}`
+                    : (row?.gameId ?? vi.index)
+                }
+                data-testid={
+                  isSentinel
+                    ? 'game-logs-loading-more'
+                    : row
+                      ? `game-logs-row-${row.gameId}`
+                      : undefined
+                }
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${vi.start}px)`,
+                  height: ROW_HEIGHT_PX,
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderBottom: '1px solid #eee',
+                }}
+              >
+                {isSentinel ? (
+                  <div
+                    style={{
+                      padding: 8,
+                      fontStyle: 'italic',
+                      color: '#666',
+                    }}
+                  >
+                    Loading more games…
+                  </div>
+                ) : (
+                  (row?.cells ?? []).map((cell, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        flexBasis: colWidth,
+                        flexGrow: 1,
+                        padding: '0 8px',
+                        fontSize: 14,
+                        borderRight: '1px solid #eee',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {renderCell(cell)}
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VirtualBodyNative: React.FC<VirtualBodyProps> = ({
+  stats,
+  rows,
+  hasMore,
+  loadingMore,
+  onEndReached,
+}) => (
+  <FlatList
+    data={rows}
+    keyExtractor={(r) => r.gameId}
+    windowSize={10}
+    removeClippedSubviews
+    initialNumToRender={20}
+    maxToRenderPerBatch={20}
+    onEndReachedThreshold={1 - INFINITE_SCROLL_THRESHOLD}
+    onEndReached={() => {
+      if (hasMore && !loadingMore) onEndReached();
+    }}
+    ListHeaderComponent={
+      <YStack flexDirection="row" backgroundColor="$gray3" paddingVertical="$2">
+        {stats.map((h) => (
+          <Text key={h} flex={1} fontWeight="600" paddingHorizontal="$2">
+            {h}
+          </Text>
+        ))}
+      </YStack>
+    }
+    stickyHeaderIndices={[0]}
+    ListFooterComponent={
+      hasMore || loadingMore ? (
+        <YStack padding="$3" alignItems="center">
+          <Text color="$gray10" fontStyle="italic">
+            Loading more games…
+          </Text>
+        </YStack>
+      ) : null
+    }
+    renderItem={({ item }) => (
+      <YStack
+        flexDirection="row"
+        paddingVertical="$2"
+        borderBottomWidth={1}
+        borderBottomColor="$gray5"
+      >
+        {item.cells.map((cell, i) => (
+          <Text key={i} flex={1} paddingHorizontal="$2">
+            {renderCell(cell)}
+          </Text>
+        ))}
+      </YStack>
+    )}
+  />
+);
+
+const VirtualBody: React.FC<VirtualBodyProps> = (props) =>
+  Platform.OS === 'web' ? (
+    <VirtualBodyWeb {...props} />
+  ) : (
+    <VirtualBodyNative {...props} />
+  );
+
 function GameLogsTable({
-  apiEndpoint,
+  apiEndpoint = DEFAULT_ENDPOINT,
   sport = 'mlb',
   isPremium = false,
   initialPlayerId = '',
+  pageSize = DEFAULT_PAGE_SIZE,
 }: GameLogsTableProps) {
-  // Resolve once per mount. If we're in a production build and the env var
-  // is unset (or pinned to localhost), this throws — we render an error state
-  // instead of attempting the fetch. (LS-7691)
-  const resolution = useMemo<{
-    url: string | null;
-    error: Error | null;
-  }>(() => {
-    try {
-      return { url: apiEndpoint ?? resolveStatsApiEndpoint(), error: null };
-    } catch (err) {
-      return {
-        url: null,
-        error: err instanceof Error ? err : new Error(String(err)),
-      };
-    }
-  }, [apiEndpoint]);
-  if (resolution.error) {
-    handleError(resolution.error);
-  }
-  const resolvedEndpoint = resolution.url;
-
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-
   const [filters, dispatch] = useReducer(filterReducer, {
     ...INITIAL_FILTERS,
     player: initialPlayerId,
   });
-  // Store the raw server payload (stat → gameNum → value). The O(stats*games)
-  // reshape is done lazily in useMemo below so the fetch callback never blocks
-  // the main thread. startTransition defers the resulting render. (LS-7472)
-  const [rawData, setRawData] = useState<
-    Record<string, Record<string, string | number>> | undefined
-  >(undefined);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const [stats, setStats] = useState<string[]>([]);
+  const [rows, setRows] = useState<
+    Array<{ gameId: string; cells: CellValue[] }>
+  >([]);
+  const [total, setTotal] = useState<number | null>(null);
+  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
-
-  // Reshape raw payload from { stat: { gameNum: value } } to
-  // { gameNum: { stat: value } } and collect the stat-key list.
-  // Memoised so it only re-runs when the server response changes. (LS-7472)
-  const { games, stats } = useMemo(() => {
-    if (!rawData) return { games: undefined, stats: [] as string[] };
-
-    const reshapedGames: Record<string, Record<string, string | number>> = {};
-    const gameStats: Set<string> = new Set();
-
-    for (const key of Object.keys(rawData)) {
-      gameStats.add(key);
-      const statData = rawData[key];
-
-      for (const gameNum of Object.keys(statData)) {
-        if (!(gameNum in reshapedGames)) {
-          reshapedGames[gameNum] = {};
-        }
-        reshapedGames[gameNum][key] = statData[gameNum];
-      }
-    }
-
-    return { games: reshapedGames, stats: Array.from(gameStats) };
-  }, [rawData]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [opponentSheetOpen, setOpponentSheetOpen] = useState(false);
+
+  const today = useMemo(() => todayIsoEt(), []);
+  const validation = useMemo(
+    () => validateDateRange(startDate, endDate, today),
+    [startDate, endDate, today],
+  );
+  const submitDisabled = loading || !validation.ready;
+  const hitCap = !showAll && rows.length >= RENDER_CAP;
+  const hasMore = !hitCap && total != null && rows.length < total;
 
   const teamOptions = useMemo(() => {
     if (sport === 'nfl') {
@@ -560,9 +665,113 @@ function GameLogsTable({
     }
   };
 
-  const getGameLog = async () => {
-    setInputError(null);
+  // LS-7472 — heavy reshape is queued and run on idle to keep paint smooth.
+  const pendingPayloadRef = useRef<{
+    payload: ServerLegacy | ServerPaginated;
+    append: boolean;
+  } | null>(null);
+  const [reshapeTick, setReshapeTick] = useState(0);
 
+  useEffect(() => {
+    if (reshapeTick === 0) return;
+    const pending = pendingPayloadRef.current;
+    if (!pending) return;
+
+    let idle: IdleHandle | null = null;
+    let interactionHandle: { cancel: () => void } | null = null;
+    let cancelled = false;
+
+    const run = () => {
+      if (cancelled) return;
+      const shaped = reshapeGameLogs(pending.payload, stats);
+      pendingPayloadRef.current = null;
+      setStats((prev) => (shaped.stats.length > 0 ? shaped.stats : prev));
+      setRows((prev) =>
+        pending.append ? [...prev, ...shaped.rows] : shaped.rows,
+      );
+      if (shaped.total != null) {
+        setTotal((prev) =>
+          pending.append && prev != null ? prev : shaped.total,
+        );
+      } else if (!pending.append) {
+        setTotal(null);
+      }
+      setLoading(false);
+      setLoadingMore(false);
+    };
+
+    if (Platform.OS === 'web') {
+      idle = scheduleIdle(run);
+    } else {
+      interactionHandle = InteractionManager.runAfterInteractions(run);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idle != null) cancelIdle(idle);
+      if (interactionHandle) interactionHandle.cancel();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- driven by reshapeTick
+  }, [reshapeTick]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const fetchPage = useCallback(
+    async (nextOffset: number, append: boolean) => {
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      try {
+        const expand =
+          sport === 'nfl' ? expandNflFranchiseAbbrs : expandMlbFranchiseAbbrs;
+        const opponentAbbrs = filters.opponentFranchiseIds.flatMap(expand);
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            player_id: filters.player,
+            ...(startDate ? { start_date: startDate } : {}),
+            ...(endDate ? { end_date: endDate } : {}),
+            ...(filters.opponentFranchiseIds.length > 0
+              ? {
+                  opponent_franchise_ids: filters.opponentFranchiseIds,
+                  opponent_abbrs: opponentAbbrs,
+                }
+              : {}),
+            ...(filters.venue !== 'all' ? { venue: filters.venue } : {}),
+            // LS-7473 — legacy endpoint ignores these; the new endpoint paginates.
+            limit: pageSize,
+            offset: nextOffset,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- response.json() is any
+        const payload: ServerLegacy | ServerPaginated = await response.json();
+        pendingPayloadRef.current = { payload, append };
+        setOffset(nextOffset + pageSize);
+        setReshapeTick((t) => t + 1);
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        handleError(error);
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
+    },
+    [apiEndpoint, filters, sport, startDate, endDate, pageSize],
+  );
+
+  const getGameLog = useCallback(async () => {
+    setInputError(null);
     const trimmedPlayer = filters.player.trim();
     if (!trimmedPlayer) {
       setInputError('Please enter a player ID');
@@ -574,117 +783,27 @@ function GameLogsTable({
       );
       return;
     }
-    if (filters.dateFrom && !DATE_RE.test(filters.dateFrom)) {
-      setInputError(
-        'Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)',
-      );
-      return;
-    }
-    if (filters.dateTo && !DATE_RE.test(filters.dateTo)) {
-      setInputError('End date must be in YYYY-MM-DD format (e.g. 2024-06-01)');
-      return;
-    }
-    if (
-      filters.dateFrom &&
-      DATE_RE.test(filters.dateFrom) &&
-      filters.dateFrom > todayStr
-    ) {
-      setInputError('Start date cannot be in the future');
-      return;
-    }
-    if (
-      filters.dateTo &&
-      DATE_RE.test(filters.dateTo) &&
-      filters.dateTo > todayStr
-    ) {
-      setInputError('End date cannot be in the future');
-      return;
-    }
-    // AC1 (LS-7451): guard inverted ranges before they reach the API.
-    if (
-      filters.dateFrom &&
-      filters.dateTo &&
-      filters.dateFrom > filters.dateTo
-    ) {
-      setInputError('Start date must be on or before end date');
-      return;
-    }
+    if (!validation.ready) return;
+    setRows([]);
+    setStats([]);
+    setTotal(null);
+    setOffset(0);
+    setShowAll(false);
+    await fetchPage(0, false);
+  }, [filters.player, validation.ready, fetchPage]);
 
-    if (!resolvedEndpoint) return;
+  const handleEndReached = useCallback(() => {
+    if (!hasMore || loadingMore || loading) return;
+    void fetchPage(offset, true);
+  }, [hasMore, loadingMore, loading, offset, fetchPage]);
 
-    setLoading(true);
-    try {
-      // Use fetch for cross-platform compatibility
-      // Non-premium requests cap results server-side to avoid large payloads
-      // and slow renders for users who haven't unlocked full history. (LS-7473)
-      const limit = isPremium ? undefined : DEFAULT_GAME_LOGS_LIMIT;
-      const response = await fetch(resolvedEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(
-          buildGameLogsRequestBody(filters, sport, { limit }),
-        ),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- fetch response.json() returns any
-      const serverData: Record<
-        string,
-        Record<string, string | number>
-      > = await response.json();
-
-      // Store the raw payload; the reshape runs in useMemo, deferred by
-      // startTransition so the main thread yields before the re-render. (LS-7472)
-      startTransition(() => {
-        setRawData(serverData);
-      });
-    } catch (error) {
-      // If the URL was localhost when fetch blew up, the network error is
-      // almost always a missing build-time env var rather than a server fault.
-      // Surface that explicitly so support tickets don't sit at "no data". (LS-7691)
-      if (LOCALHOST_RE.test(resolvedEndpoint)) {
-        const message = error instanceof Error ? error.message : String(error);
-        handleError(new Error(`${message} — ${LOCALHOST_BUILD_HINT}`));
-      } else {
-        handleError(error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Prepare table data + stable row identifiers (gameIds) so the table can use
-  // them as React keys. Use `??` (not `||`) so a real `0` stat is preserved as
-  // `0`, not coerced to the missing-value sentinel. (LS-7460, LS-7461)
-  const gameIds: string[] = games ? Object.keys(games) : [];
-  const tableData: Array<Array<CellValue>> = gameIds.map((gameId) =>
-    stats.map((s) => games?.[gameId]?.[s] ?? null),
-  );
-
-  if (resolution.error) {
-    return (
-      <YStack flex={1} padding="$4">
-        <Text
-          fontSize="$5"
-          fontWeight="bold"
-          marginBottom="$4"
-          textAlign="center"
-        >
-          Game logs unavailable
-        </Text>
-        <Text color="$red10" fontSize="$4">
-          {resolution.error.message}
-        </Text>
-      </YStack>
-    );
-  }
+  const showingCount = rows.length;
+  const totalLabel =
+    total != null ? `Showing ${showingCount} of ${total}` : null;
 
   return (
+    // LS-7471 — outer ScrollView removed. Form is non-scrolling; the
+    // virtualized table body is the only scroll container.
     <YStack flex={1} padding="$4">
       <Text
         fontSize="$5"
@@ -715,62 +834,41 @@ function GameLogsTable({
         />
       </YStack>
 
-      <YStack marginBottom="$4">
+      <YStack marginBottom="$2">
         <Text fontSize="$4" fontWeight="600" marginBottom="$2">
           Date range (optional):
         </Text>
-        <YStack gap="$2">
-          <DatePicker
-            value={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
-            onChange={(date) =>
-              dispatch({
-                type: 'setDateFrom',
-                value: date.toISOString().split('T')[0],
-              })
-            }
-            placeholder="Start date (YYYY-MM-DD)"
-            disabled={loading}
-          />
-          {filters.dateFrom ? (
-            <Button
-              size="$2"
-              chromeless
-              onPress={() => dispatch({ type: 'setDateFrom', value: '' })}
-            >
-              <Text fontSize="$3" color="$gray10">
-                Clear start date
-              </Text>
-            </Button>
-          ) : null}
-          <DatePicker
-            value={filters.dateTo ? new Date(filters.dateTo) : undefined}
-            onChange={(date) =>
-              dispatch({
-                type: 'setDateTo',
-                value: date.toISOString().split('T')[0],
-              })
-            }
-            placeholder="End date (YYYY-MM-DD)"
-            disabled={loading}
-          />
-          {filters.dateTo ? (
-            <Button
-              size="$2"
-              chromeless
-              onPress={() => dispatch({ type: 'setDateTo', value: '' })}
-            >
-              <Text fontSize="$3" color="$gray10">
-                Clear end date
-              </Text>
-            </Button>
-          ) : null}
-        </YStack>
+        <DateField
+          label="Start date"
+          value={startDate}
+          onChange={setStartDate}
+          max={endDate || today}
+          disabled={loading}
+          testID="game-logs-start-date"
+        />
+        <DateField
+          label="End date"
+          value={endDate}
+          onChange={setEndDate}
+          min={startDate || undefined}
+          max={today}
+          disabled={loading}
+          testID="game-logs-end-date"
+        />
+        <Text fontSize="$2" color="$gray10" marginBottom="$2">
+          Dates are interpreted as Eastern Time (matches MLB game-date
+          attribution).
+        </Text>
+        {validation.error ? (
+          <Text fontSize="$3" color="$red10" marginBottom="$2" role="alert">
+            {validation.error}
+          </Text>
+        ) : null}
       </YStack>
 
-      {/* Opponent filter (LS-7865). Web: native <select> preserved so existing
-          tests remain green. Native: Tamagui Select (non-premium single-select)
-          or Sheet with checkmarks (premium multi-select). Native screen routing
-          is deferred; the picker is verified via GameLogsTable.stories.tsx. */}
+      {/* Opponent filter (LS-7476/77/80). Native renders nothing here today —
+          a follow-up will add a cross-platform picker; meanwhile native users
+          keep the player + date set without an opponent restriction. */}
       {Platform.OS === 'web' ? (
         <YStack marginBottom="$4">
           <Text fontSize="$4" fontWeight="600" marginBottom="$2">
@@ -805,161 +903,46 @@ function GameLogsTable({
             ))}
           </select>
         </YStack>
-      ) : isPremium ? (
-        <YStack marginBottom="$4">
-          <Text fontSize="$4" fontWeight="600" marginBottom="$2">
-            Opponent:
-          </Text>
-          <Button
-            borderWidth={1}
-            borderColor="$gray8"
-            borderRadius="$3"
-            paddingHorizontal="$3"
-            paddingVertical="$3"
-            backgroundColor="$white"
-            onPress={() => setOpponentSheetOpen(true)}
-            disabled={loading}
-            opacity={loading ? 0.5 : 1}
-            justifyContent="flex-start"
-          >
-            <Text fontSize="$4" color="$gray11">
-              {filters.opponentFranchiseIds.length === 0
-                ? 'All opponents'
-                : `${filters.opponentFranchiseIds.length} selected`}
-            </Text>
-          </Button>
-          <Sheet
-            open={opponentSheetOpen}
-            onOpenChange={setOpponentSheetOpen}
-            modal
-            snapPointsMode="fit"
-          >
-            <Sheet.Frame>
-              <Sheet.Handle />
-              <Sheet.ScrollView>
-                {teamOptions.map((t) => {
-                  const checked = filters.opponentFranchiseIds.includes(t.id);
-                  return (
-                    <XStack
-                      key={t.id}
-                      role="checkbox"
-                      aria-checked={checked}
-                      onPress={() => {
-                        const next = checked
-                          ? filters.opponentFranchiseIds.filter(
-                              (id) => id !== t.id,
-                            )
-                          : [...filters.opponentFranchiseIds, t.id];
-                        dispatch({ type: 'setOpponents', value: next });
-                      }}
-                      padding="$3"
-                      alignItems="center"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                    >
-                      <Text flex={1} fontSize="$4">
-                        {t.label}
-                      </Text>
-                      {checked ? <Check size={16} color="$blue10" /> : null}
-                    </XStack>
-                  );
-                })}
-              </Sheet.ScrollView>
-            </Sheet.Frame>
-            <Sheet.Overlay />
-          </Sheet>
-        </YStack>
-      ) : (
-        <YStack marginBottom="$4">
-          <Text fontSize="$4" fontWeight="600" marginBottom="$2">
-            Opponent:
-          </Text>
-          <OpponentSelect
-            value={filters.opponentFranchiseIds[0] ?? ''}
-            onValueChange={(id) =>
-              dispatch({ type: 'setOpponents', value: id ? [id] : [] })
-            }
-            options={[
-              { value: '', label: 'All opponents' },
-              ...teamOptions.map((t) => ({ value: t.id, label: t.label })),
-            ]}
-            placeholder="All opponents"
-            disabled={loading}
-          />
-        </YStack>
-      )}
+      ) : null}
 
-      {/* Venue filter.
-          - Free users: tri-state button group (All / Home / Away) — web + native.
-          - Premium users (web only): checkboxes for all four venue types including
-            Neutral Site and International Series (LS-7469). When no box is checked
-            no venue filter is applied (equivalent to "All"). */}
+      {/* Home/Away tri-state (LS-7465). Buttons rather than radio so the
+          control styles consistently across web + native via tamagui. */}
       <YStack marginBottom="$4">
         <Text fontSize="$4" fontWeight="600" marginBottom="$2">
           Venue:
         </Text>
-        {isPremium && Platform.OS === 'web' ? (
-          <YStack gap="$2">
-            {PREMIUM_VENUE_OPTIONS.map(({ value, label }) => (
-              <label
-                key={value}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                }}
+        <YStack flexDirection="row" gap="$2">
+          {(['all', 'home', 'away'] as const).map((v) => (
+            <Button
+              key={v}
+              data-testid={`venue-${v}`}
+              backgroundColor={filters.venue === v ? '$blue10' : '$gray4'}
+              onPress={() => dispatch({ type: 'setVenue', value: v })}
+              disabled={loading}
+              paddingHorizontal="$4"
+              paddingVertical="$2"
+            >
+              <Text
+                color={filters.venue === v ? '$white' : '$gray12'}
+                fontWeight="600"
               >
-                <input
-                  type="checkbox"
-                  data-testid={`venue-${value}`}
-                  checked={filters.venues.includes(value)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    dispatch({
-                      type: e.target.checked ? 'addVenue' : 'removeVenue',
-                      value,
-                    });
-                  }}
-                  disabled={loading}
-                />
-                <Text fontSize="$4">{label}</Text>
-              </label>
-            ))}
-          </YStack>
-        ) : (
-          <YStack flexDirection="row" gap="$2">
-            {(['all', 'home', 'away'] as const).map((v) => (
-              <Button
-                key={v}
-                data-testid={`venue-${v}`}
-                backgroundColor={filters.venue === v ? '$blue10' : '$gray4'}
-                onPress={() => dispatch({ type: 'setVenue', value: v })}
-                disabled={loading}
-                paddingHorizontal="$4"
-                paddingVertical="$2"
-              >
-                <Text
-                  color={filters.venue === v ? '$white' : '$gray12'}
-                  fontWeight="600"
-                >
-                  {v === 'all' ? 'All' : v === 'home' ? 'Home' : 'Away'}
-                </Text>
-              </Button>
-            ))}
-          </YStack>
-        )}
+                {v === 'all' ? 'All' : v === 'home' ? 'Home' : 'Away'}
+              </Text>
+            </Button>
+          ))}
+        </YStack>
       </YStack>
 
       <Button
-        backgroundColor={loading ? '$gray8' : '$blue10'}
+        backgroundColor={submitDisabled ? '$gray8' : '$blue10'}
         paddingVertical="$3"
         paddingHorizontal="$6"
         borderRadius="$3"
         alignItems="center"
         marginBottom="$4"
         onPress={() => void getGameLog()}
-        disabled={loading}
-        opacity={loading ? 0.5 : 1}
+        disabled={submitDisabled}
+        opacity={submitDisabled ? 0.5 : 1}
       >
         {loading ? (
           <Spinner size="small" color="$white" />
@@ -976,13 +959,48 @@ function GameLogsTable({
         </Text>
       ) : null}
 
-      {games && stats.length > 0 ? (
-        <YStack marginTop="$4">
-          <CrossPlatformTable
-            headers={stats}
-            data={tableData}
-            rowKeys={gameIds}
+      {rows.length > 0 && stats.length > 0 ? (
+        <YStack flex={1} marginTop="$2">
+          {totalLabel ? (
+            <Text
+              fontSize="$3"
+              color="$gray10"
+              marginBottom="$2"
+              data-testid="game-logs-total-label"
+            >
+              {totalLabel}
+            </Text>
+          ) : null}
+          <VirtualBody
+            stats={stats}
+            rows={rows}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onEndReached={handleEndReached}
           />
+          {hitCap ? (
+            <YStack marginTop="$3" alignItems="center">
+              <Text fontSize="$3" color="$gray10" marginBottom="$2">
+                Rendering capped at {RENDER_CAP} rows for performance.
+              </Text>
+              <Button
+                onPress={() => {
+                  setShowAll(true);
+                  if (
+                    total != null &&
+                    rows.length < total &&
+                    !loadingMore &&
+                    !loading
+                  ) {
+                    void fetchPage(offset, true);
+                  }
+                }}
+                testID="game-logs-load-all"
+              >
+                <Text>Load all {total ?? ''} rows</Text>
+              </Button>
+            </YStack>
+          ) : null}
         </YStack>
       ) : null}
     </YStack>

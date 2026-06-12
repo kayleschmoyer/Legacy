@@ -171,7 +171,7 @@ test.describe('View Game Logs — Date input validation (LS-7455) @regression', 
     });
 
     await page.getByPlaceholder('Enter player ID').fill('mlb-1234');
-    await page.getByPlaceholder('Start date (YYYY-MM-DD)').fill('2099-12-31');
+    await page.getByPlaceholder('YYYY-MM-DD').first().fill('2099-12-31');
     await page.getByRole('button', { name: 'Get Player Data' }).click();
 
     await expect(page.getByRole('alert')).toContainText(

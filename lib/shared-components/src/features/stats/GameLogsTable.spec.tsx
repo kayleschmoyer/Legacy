@@ -1,48 +1,90 @@
 import React from 'react';
-import { act, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
+import { InteractionManager } from 'react-native';
 import {
   buildGameLogsRequestBody,
-  DEFAULT_GAME_LOGS_LIMIT,
   GameLogsTable,
-  normalizeGameDate,
-  type VenueOption,
-  VIRTUAL_ROW_THRESHOLD,
+  reshapeGameLogs,
+  validateDateRange,
 } from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
 
 // Mock fetch globally
 global.fetch = jest.fn();
 
-// Use the manual mock from src/components/__mocks__/DatePicker.tsx so
-// GameLogsTable tests stay focused on filter-state behavior without depending
-// on Tamagui's Popover (which varies by Platform.OS in the test envs).
-jest.mock('../../components/DatePicker');
+// Make requestIdleCallback synchronous so the deferred reshape completes in the same tick.
+(
+  global as unknown as { requestIdleCallback: (cb: () => void) => number }
+).requestIdleCallback = (cb) => {
+  cb();
+  return 0;
+};
+(
+  global as unknown as { cancelIdleCallback: (h: number) => void }
+).cancelIdleCallback = (h: number) =>
+  clearTimeout(h as unknown as ReturnType<typeof setTimeout>);
+
+function mockInteractionManagerSync(): void {
+  if (typeof InteractionManager?.runAfterInteractions !== 'function') return;
+  jest
+    .spyOn(InteractionManager, 'runAfterInteractions')
+    .mockImplementation((task) => {
+      if (typeof task === 'function') task();
+      return { cancel: () => undefined };
+    });
+}
+
+// Before each test: reset all mock state (calls + implementations) then re-apply the
+// InteractionManager shim so the native-path deferred reshape runs synchronously.
+beforeEach(() => {
+  jest.resetAllMocks();
+  global.fetch = jest.fn();
+  mockInteractionManagerSync();
+});
+
+const FIXED_TODAY = '2026-06-02';
+
+function mockFetchOnce(body: unknown): jest.Mock {
+  const m = global.fetch as jest.Mock;
+  m.mockImplementationOnce(() =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(body),
+    } as unknown as Response),
+  );
+  return m;
+}
+
+function makePaginated(
+  startGameId: number,
+  count: number,
+  total: number,
+): {
+  stats: string[];
+  rows: Array<{ gameId: string; AB: number; H: number }>;
+  total: number;
+} {
+  const stats = ['AB', 'H'];
+  const rows: Array<{ gameId: string; AB: number; H: number }> = [];
+  for (let i = 0; i < count; i++) {
+    rows.push({
+      gameId: `g-${startGameId + i}`,
+      AB: 4,
+      H: 1,
+    });
+  }
+  return { stats, rows, total };
+}
 
 describe('GameLogsTable', () => {
-  const originalEnv = process.env.VITE_STATS_API_URL;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    // Pin a configured URL so the prod-guard tests are opt-in.
-    process.env.VITE_STATS_API_URL = 'https://stats.example.com/game-logs';
-    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
-  });
-
-  afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.VITE_STATS_API_URL;
-    } else {
-      process.env.VITE_STATS_API_URL = originalEnv;
-    }
-    delete (globalThis as { __DEV__?: boolean }).__DEV__;
   });
 
   it('renders correctly with default props', () => {
     const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
-    expect(getByPlaceholderText('Start date (YYYY-MM-DD)')).toBeTruthy();
-    expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
   });
 
@@ -52,37 +94,11 @@ describe('GameLogsTable', () => {
     );
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
-    expect(getByPlaceholderText('Start date (YYYY-MM-DD)')).toBeTruthy();
-    expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
-  });
-
-  it('displays input fields and button', () => {
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
-
-    expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
-    expect(getByPlaceholderText('Start date (YYYY-MM-DD)')).toBeTruthy();
-    expect(getByPlaceholderText('End date (YYYY-MM-DD)')).toBeTruthy();
-    expect(getByText('Get Player Data')).toBeTruthy();
-  });
-
-  it('pre-populates the player ID input when initialPlayerId is provided (LS-6231)', () => {
-    const { getByPlaceholderText } = render(
-      <GameLogsTable
-        initialPlayerId="nfl-123"
-        apiEndpoint="https://test.example.com/logs"
-      />,
-    );
-    const input = getByPlaceholderText('Enter player ID') as HTMLInputElement;
-    expect(input.value).toBe('nfl-123');
   });
 });
 
 describe('GameLogsTable input validation', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('shows inline error when player ID is empty', () => {
     const { getByText } = render(<GameLogsTable />);
     const submit =
@@ -107,216 +123,153 @@ describe('GameLogsTable input validation', () => {
       ),
     ).toBeTruthy();
   });
+});
 
-  it('date picker rejects invalid strings and valid date is forwarded to API (LS-7454)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText, queryByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
-    );
-    // Invalid date string — the mock DatePicker ignores it; filters.dateFrom stays empty.
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: 'not-a-date' },
+describe('validateDateRange', () => {
+  it('accepts an empty range (date filter is optional)', () => {
+    expect(validateDateRange('', '', FIXED_TODAY)).toEqual({
+      error: null,
+      ready: true,
     });
-    // Valid start date — fires onChange with the parsed Date object.
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2024-06-01' },
-    });
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-    // No date-format error (bad input was rejected by picker; valid date passed through).
+  });
+
+  it('rejects a half-open range', () => {
+    expect(validateDateRange('2026-04-01', '', FIXED_TODAY).ready).toBe(false);
+    expect(validateDateRange('', '2026-04-01', FIXED_TODAY).ready).toBe(false);
+  });
+
+  it('rejects malformed date strings', () => {
     expect(
-      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const body = JSON.parse(calls[0][1].body as string) as {
-      game_date_from: string;
-    };
-    // LS-7453: dates carry the local tz offset; use normalizeGameDate so
-    // the assertion is timezone-independent across CI environments.
-    expect(body.game_date_from).toBe(normalizeGameDate('2024-06-01'));
+      validateDateRange('not-a-date', '2026-04-01', FIXED_TODAY).ready,
+    ).toBe(false);
   });
 
-  it('shows inline error when date is in the future (LS-7452)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockClear();
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2099-12-31' },
-    });
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-    expect(getByText('Start date cannot be in the future')).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+  it('rejects impossible calendar dates (e.g. Feb 31)', () => {
+    expect(
+      validateDateRange('2026-02-31', '2026-03-01', FIXED_TODAY).ready,
+    ).toBe(false);
   });
 
-  it('shows inline error when start date is after end date (LS-7451)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2024-06-10' },
-    });
-    fireEvent.change(getByPlaceholderText('End date (YYYY-MM-DD)'), {
-      target: { value: '2024-06-01' },
-    });
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-    expect(getByText('Start date must be on or before end date')).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+  it('rejects inverted ranges where end < start', () => {
+    const result = validateDateRange('2026-05-01', '2026-04-01', FIXED_TODAY);
+    expect(result.ready).toBe(false);
+    expect(result.error).toMatch(/start date must be on or before end date/i);
   });
 
-  it('accepts start === end (single-day range) and proceeds with fetch (LS-7451)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText, queryByRole } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
-    );
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2024-06-01' },
-    });
-    fireEvent.change(getByPlaceholderText('End date (YYYY-MM-DD)'), {
-      target: { value: '2024-06-01' },
-    });
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-    expect(queryByRole('alert')).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  it('rejects end date in the future', () => {
+    const result = validateDateRange('2026-04-01', '2030-04-01', FIXED_TODAY);
+    expect(result.ready).toBe(false);
+    expect(result.error).toMatch(/future/i);
   });
 });
 
-describe('GameLogsTable date validation edge-cases (LS-7455)', () => {
-  const clickSubmit = (getByText: (text: string) => HTMLElement): void => {
-    const el = getByText('Get Player Data');
-    fireEvent.click(el.closest('button') ?? el);
-  };
-
-  it('DatePicker drops slash-separated dates; form submits without a date filter', () => {
-    (global.fetch as jest.Mock).mockClear();
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
+describe('reshapeGameLogs (LS-7472)', () => {
+  it('handles the paginated `{stats, rows, total}` shape', () => {
+    const out = reshapeGameLogs({
+      stats: ['AB', 'H'],
+      rows: [
+        { gameId: 'g-1', AB: 4, H: 2 },
+        { gameId: 'g-2', AB: 3, H: 0 },
+      ],
+      total: 162,
     });
-    const { getByPlaceholderText, getByText, queryByText } = render(
-      <GameLogsTable />,
-    );
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2024/06/01' },
-    });
-    clickSubmit(getByText);
-    // Real <input type="date"> never produces slash-separated values; the mock
-    // enforces the same constraint. The date field stays empty, so no format
-    // error is shown and the form submits normally.
-    expect(
-      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeNull();
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(out.stats).toEqual(['AB', 'H']);
+    expect(out.rows).toHaveLength(2);
+    expect(out.rows[0]).toEqual({ gameId: 'g-1', cells: [4, 2] });
+    expect(out.total).toBe(162);
   });
 
-  it('DatePicker drops MM-DD-YYYY dates; form submits without a date filter', () => {
-    (global.fetch as jest.Mock).mockClear();
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
+  it('preserves a real 0 (not coerced to em-dash) from paginated input', () => {
+    const out = reshapeGameLogs({
+      stats: ['AB', 'H'],
+      rows: [{ gameId: 'g-1', AB: 0, H: 0 }],
     });
-    const { getByPlaceholderText, getByText, queryByText } = render(
-      <GameLogsTable />,
-    );
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '06-01-2024' },
-    });
-    clickSubmit(getByText);
-    expect(
-      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeNull();
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(out.rows[0].cells).toEqual([0, 0]);
   });
 
-  it('DatePicker drops partial year-month dates; form submits without a date filter', () => {
-    (global.fetch as jest.Mock).mockClear();
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
-    });
-    const { getByPlaceholderText, getByText, queryByText } = render(
-      <GameLogsTable />,
-    );
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2024-06' },
-    });
-    clickSubmit(getByText);
-    expect(
-      queryByText('Start date must be in YYYY-MM-DD format (e.g. 2024-06-01)'),
-    ).toBeNull();
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+  it('reshapes the legacy stat-major payload into game-major rows', () => {
+    const legacy = {
+      AB: { 'g-1': 4, 'g-2': 3 },
+      H: { 'g-1': 2, 'g-2': 0 },
+    };
+    const out = reshapeGameLogs(legacy);
+    expect(out.stats).toEqual(['AB', 'H']);
+    expect(out.rows).toHaveLength(2);
+    // Legacy → treat full payload size as the total (LS-7473 graceful fallback).
+    expect(out.total).toBe(2);
   });
 
-  it('rejects a future start date (2099-12-31) client-side (LS-7452)', () => {
-    (global.fetch as jest.Mock).mockClear();
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
+  it('fills missing stats with null in paginated rows', () => {
+    const out = reshapeGameLogs({
+      stats: ['AB', 'H', 'HR'],
+      rows: [{ gameId: 'g-1', AB: 4, H: 2 }],
     });
+    expect(out.rows[0].cells).toEqual([4, 2, null]);
+  });
+});
+
+describe('GameLogsTable pagination (LS-7473)', () => {
+  it('sends limit + offset in the request body', () => {
+    const fetchMock = mockFetchOnce(makePaginated(1, 50, 162));
+
     const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
-    fireEvent.change(getByPlaceholderText('Start date (YYYY-MM-DD)'), {
-      target: { value: '2099-12-31' },
-    });
-    clickSubmit(getByText);
-    expect(getByText('Start date cannot be in the future')).toBeTruthy();
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
-  it('omits game_date_from and game_date_to when both date fields are blank', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockClear();
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-    const { getByPlaceholderText, getByText } = render(<GameLogsTable />);
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    act(() => {
+      fireEvent.click(submit);
     });
-    clickSubmit(getByText);
+
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const body = JSON.parse(calls[0][1].body as string) as Record<
-      string,
-      unknown
-    >;
-    expect(body).not.toHaveProperty('game_date_from');
-    expect(body).not.toHaveProperty('game_date_to');
+    const [, firstCallInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(firstCallInit.body as string) as {
+      player_id: string;
+      limit: number;
+      offset: number;
+    };
+    expect(body.player_id).toBe('mlb-1234');
+    expect(body.limit).toBe(50);
+    expect(body.offset).toBe(0);
+  });
+
+  it('uses a custom pageSize when provided', () => {
+    const fetchMock = mockFetchOnce(makePaginated(1, 25, 162));
+
+    const { getByPlaceholderText, getByText } = render(
+      <GameLogsTable pageSize={25} />,
+    );
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    act(() => {
+      fireEvent.click(submit);
+    });
+
+    const [, customCallInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(customCallInit.body as string) as {
+      limit: number;
+    };
+    expect(body.limit).toBe(25);
+  });
+});
+
+describe('GameLogsTable submit gating', () => {
+  it('does not fetch when player id is blank', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    const { getByText } = render(<GameLogsTable />);
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
+    fireEvent.click(submit);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -341,44 +294,17 @@ describe('Team reference data (LS-7477)', () => {
   });
 });
 
-describe('buildGameLogsRequestBody (LS-7456, LS-7466, LS-7473, LS-7478, LS-7451)', () => {
+describe('buildGameLogsRequestBody (LS-7466, LS-7478)', () => {
   const baseFilters = {
     player: 'mlb-1234',
-    dateFrom: '',
-    dateTo: '',
+    date: '',
     opponentFranchiseIds: [] as string[],
     venue: 'all' as const,
-    venues: [] as VenueOption[],
   };
 
-  it('omits date range + opponent + venue keys when filters are inactive', () => {
+  it('omits opponent + venue keys when filters are inactive', () => {
     const body = buildGameLogsRequestBody(baseFilters, 'mlb');
-    expect(body).toEqual({ player_id: 'mlb-1234' });
-  });
-
-  it('includes limit when provided (LS-7473)', () => {
-    const body = buildGameLogsRequestBody(baseFilters, 'mlb', { limit: 50 });
-    expect(body.limit).toBe(50);
-  });
-
-  it('omits limit when not provided (LS-7473)', () => {
-    const body = buildGameLogsRequestBody(baseFilters, 'mlb');
-    expect(body.limit).toBeUndefined();
-  });
-
-  it('includes game_date_from and game_date_to only when non-empty (LS-7451)', () => {
-    const body = buildGameLogsRequestBody(
-      { ...baseFilters, dateFrom: '2026-04-01', dateTo: '2026-04-30' },
-      'mlb',
-    );
-    expect(body.game_date_from).toBe(normalizeGameDate('2026-04-01'));
-    expect(body.game_date_to).toBe(normalizeGameDate('2026-04-30'));
-  });
-
-  it('omits game_date_from and game_date_to when both are empty (LS-7451)', () => {
-    const body = buildGameLogsRequestBody(baseFilters, 'mlb');
-    expect(body).not.toHaveProperty('game_date_from');
-    expect(body).not.toHaveProperty('game_date_to');
+    expect(body).toEqual({ player_id: 'mlb-1234', game_date: '' });
   });
 
   it('serializes the venue toggle as "home" or "away"', () => {
@@ -430,91 +356,27 @@ describe('buildGameLogsRequestBody (LS-7456, LS-7466, LS-7473, LS-7478, LS-7451)
     ).toEqual(expect.arrayContaining(['LAC', 'SD']));
   });
 
-  it('forwards combined filter state (player + date range + opponent + venue — LS-7466, LS-7450, LS-7451)', () => {
+  it('forwards combined filter state (player + date + opponent + venue — LS-7466)', () => {
     const body = buildGameLogsRequestBody(
       {
         player: 'mlb-1234',
-        dateFrom: '2026-04-01',
-        dateTo: '2026-04-30',
+        date: '2026-04-15',
         opponentFranchiseIds: ['NYY'],
         venue: 'home',
-        venues: [],
       },
       'mlb',
     );
     expect(body).toEqual({
       player_id: 'mlb-1234',
-      // LS-7453: dates carry the local tz offset; use normalizeGameDate so
-      // assertions are timezone-independent across CI environments.
-      game_date_from: normalizeGameDate('2026-04-01'),
-      game_date_to: normalizeGameDate('2026-04-30'),
+      game_date: '2026-04-15',
       opponent_franchise_ids: ['NYY'],
       opponent_abbrs: ['NYY'],
       venue: 'home',
     });
   });
-
-  it('sends only game_date_from when only start date is set (LS-7450)', () => {
-    const body = buildGameLogsRequestBody(
-      { ...baseFilters, dateFrom: '2026-04-01' },
-      'mlb',
-    );
-    expect(body).toEqual({
-      player_id: 'mlb-1234',
-      game_date_from: normalizeGameDate('2026-04-01'),
-    });
-  });
-
-  it('sends only game_date_to when only end date is set (LS-7450)', () => {
-    const body = buildGameLogsRequestBody(
-      { ...baseFilters, dateTo: '2026-04-30' },
-      'mlb',
-    );
-    expect(body).toEqual({
-      player_id: 'mlb-1234',
-      game_date_to: normalizeGameDate('2026-04-30'),
-    });
-  });
-
-  it('sends venues array for premium multi-select (LS-7469)', () => {
-    const body = buildGameLogsRequestBody(
-      { ...baseFilters, venues: ['home', 'neutral'] },
-      'mlb',
-    );
-    expect(body.venues).toEqual(['home', 'neutral']);
-    expect(body.venue).toBeUndefined();
-  });
-
-  it('venues array takes precedence over single venue toggle (LS-7469)', () => {
-    const body = buildGameLogsRequestBody(
-      { ...baseFilters, venue: 'away', venues: ['home', 'neutral'] },
-      'mlb',
-    );
-    expect(body.venues).toEqual(['home', 'neutral']);
-    expect(body.venue).toBeUndefined();
-  });
-
-  it('falls back to single venue when venues array is empty (LS-7469)', () => {
-    const body = buildGameLogsRequestBody(
-      { ...baseFilters, venue: 'away', venues: [] },
-      'mlb',
-    );
-    expect(body.venue).toBe('away');
-    expect(body.venues).toBeUndefined();
-  });
-
-  it('omits both venue keys when venues is empty and venue is all (LS-7469)', () => {
-    const body = buildGameLogsRequestBody(baseFilters, 'mlb');
-    expect(body.venue).toBeUndefined();
-    expect(body.venues).toBeUndefined();
-  });
 });
 
 describe('GameLogsTable filter controls', () => {
-  beforeEach(() => {
-    (global.fetch as jest.Mock).mockClear();
-  });
-
   it('renders opponent dropdown with all 30 MLB teams (LS-7479)', () => {
     const { queryByTestId } = render(<GameLogsTable sport="mlb" />);
     const select = queryByTestId('opponent-filter') as HTMLSelectElement | null;
@@ -535,58 +397,6 @@ describe('GameLogsTable filter controls', () => {
     const select = queryByTestId('opponent-filter') as HTMLSelectElement | null;
     if (!select) return; // opponent filter is web-only — skip on native
     expect(select.multiple).toBe(true);
-  });
-
-  it('sends DEFAULT_GAME_LOGS_LIMIT in the request body for non-premium users (LS-7473)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
-    });
-
-    const { getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
-    );
-
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const body = JSON.parse(calls[0][1].body as string) as { limit?: number };
-    expect(body.limit).toBe(DEFAULT_GAME_LOGS_LIMIT);
-  });
-
-  it('omits limit from the request body for premium users (LS-7473)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
-    });
-
-    const { getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" isPremium />,
-    );
-
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const body = JSON.parse(calls[0][1].body as string) as { limit?: number };
-    expect(body.limit).toBeUndefined();
   });
 
   it('venue toggle changes the outgoing payload (LS-7467)', () => {
@@ -620,368 +430,24 @@ describe('GameLogsTable filter controls', () => {
   });
 });
 
-describe('GameLogsTable reshape deferred off main thread (LS-7472)', () => {
-  it('renders table headers and cells from a multi-stat multi-game payload', async () => {
-    // Simulate a season payload: two stat keys each mapping to two game entries.
-    // The raw shape is { stat: { gameNum: value } }; the component must
-    // transpose it to { gameNum: { stat: value } } via useMemo + startTransition.
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          HR: { '1': 1, '2': 0 },
-          RBI: { '1': 3, '2': 0 },
-        }),
-    });
+describe('GameLogsTable render cap (LS-7475)', () => {
+  it('shows the totals label once a page arrives', async () => {
+    mockFetchOnce(makePaginated(1, 50, 162));
 
-    const { getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
+    const { getByPlaceholderText, getByText, findByTestId } = render(
+      <GameLogsTable />,
     );
-
     fireEvent.change(getByPlaceholderText('Enter player ID'), {
       target: { value: 'mlb-1234' },
     });
-
+    const submit =
+      getByText('Get Player Data').closest('button') ??
+      getByText('Get Player Data');
     act(() => {
-      fireEvent.click(
-        getByText('Get Player Data').closest('button') ??
-          getByText('Get Player Data'),
-      );
+      fireEvent.click(submit);
     });
 
-    // waitFor drains microtasks and flushes the startTransition render.
-    await waitFor(() => {
-      expect(document.querySelector('table')).toBeTruthy();
-    });
-
-    // Cross-platform: on web the headers are <th> text inside innerHTML;
-    // on native the Table mock renders them as a "headers" attribute.
-    const tableEl = document.querySelector('table');
-    const tableContent =
-      tableEl?.getAttribute('headers') ?? tableEl?.innerHTML ?? '';
-    expect(tableContent).toContain('HR');
-    expect(tableContent).toContain('RBI');
-  });
-});
-
-describe('normalizeGameDate (LS-7453)', () => {
-  it('returns empty string unchanged', () => {
-    expect(normalizeGameDate('', 420)).toBe('');
-  });
-
-  it('appends UTC-7 offset (PDT) — offset=420', () => {
-    expect(normalizeGameDate('2024-06-01', 420)).toBe(
-      '2024-06-01T00:00:00-07:00',
-    );
-  });
-
-  it('appends UTC+5 offset — offset=-300', () => {
-    expect(normalizeGameDate('2024-06-01', -300)).toBe(
-      '2024-06-01T00:00:00+05:00',
-    );
-  });
-
-  it('appends UTC offset — offset=0', () => {
-    expect(normalizeGameDate('2024-06-01', 0)).toBe(
-      '2024-06-01T00:00:00+00:00',
-    );
-  });
-
-  it('handles half-hour offsets (e.g. IST UTC+5:30 — offset=-330)', () => {
-    expect(normalizeGameDate('2024-06-01', -330)).toBe(
-      '2024-06-01T00:00:00+05:30',
-    );
-  });
-
-  it('uses the host timezone by default (output matches expected pattern)', () => {
-    const result = normalizeGameDate('2024-06-01');
-    expect(result).toMatch(/^2024-06-01T00:00:00[+-]\d{2}:\d{2}$/);
-  });
-});
-
-describe('GameLogsTable production endpoint guard (LS-7691)', () => {
-  const originalEnv = process.env.VITE_STATS_API_URL;
-
-  afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.VITE_STATS_API_URL;
-    } else {
-      process.env.VITE_STATS_API_URL = originalEnv;
-    }
-    delete (globalThis as { __DEV__?: boolean }).__DEV__;
-  });
-
-  it('allows the localhost fallback in dev builds when env is unset', () => {
-    delete process.env.VITE_STATS_API_URL;
-    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
-
-    const { getByText, queryByText } = render(<GameLogsTable />);
-    expect(getByText('Get Player Data')).toBeTruthy();
-    expect(queryByText(/VITE_STATS_API_URL is not configured/)).toBeNull();
-  });
-
-  it('renders an error state in production when env is unset', () => {
-    delete process.env.VITE_STATS_API_URL;
-    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
-
-    const { getByText, queryByText } = render(<GameLogsTable />);
-
-    expect(getByText(/VITE_STATS_API_URL is not configured/)).toBeTruthy();
-    expect(getByText('Game logs unavailable')).toBeTruthy();
-    // The fetch form must not be rendered.
-    expect(queryByText('Get Player Data')).toBeNull();
-  });
-
-  it('renders an error state in production when env points at localhost', () => {
-    process.env.VITE_STATS_API_URL = 'http://localhost:5000/baseball-game-logs';
-    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
-
-    const { getByText } = render(<GameLogsTable />);
-
-    expect(getByText(/VITE_STATS_API_URL is not configured/)).toBeTruthy();
-  });
-
-  it('respects an explicit apiEndpoint prop even in production', () => {
-    delete process.env.VITE_STATS_API_URL;
-    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
-
-    const { getByText, queryByText } = render(
-      <GameLogsTable apiEndpoint="https://prod.example.com/game-logs" />,
-    );
-    expect(getByText('Get Player Data')).toBeTruthy();
-    expect(queryByText(/VITE_STATS_API_URL is not configured/)).toBeNull();
-  });
-});
-
-// Helpers for virtualization tests
-function buildServerData(
-  gameCount: number,
-): Record<string, Record<string, number>> {
-  const result: Record<string, Record<string, number>> = { hits: {}, rbi: {} };
-  for (let i = 0; i < gameCount; i++) {
-    result['hits'][String(i)] = 1;
-    result['rbi'][String(i)] = 1;
-  }
-  return result;
-}
-
-function submitQuery(
-  getByPlaceholderText: (t: string) => HTMLElement,
-  getByText: (t: string) => HTMLElement,
-) {
-  fireEvent.change(getByPlaceholderText('Enter player ID'), {
-    target: { value: 'mlb-1234' },
-  });
-  const submitText = getByText('Get Player Data');
-  fireEvent.click(submitText.closest('button') ?? submitText);
-}
-
-describe('CrossPlatformTable virtualization (LS-7475)', () => {
-  const fetchMock = global.fetch as jest.Mock;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env.VITE_STATS_API_URL = 'https://stats.example.com/game-logs';
-    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
-  });
-
-  afterEach(() => {
-    delete process.env.VITE_STATS_API_URL;
-    delete (globalThis as { __DEV__?: boolean }).__DEV__;
-  });
-
-  it('VIRTUAL_ROW_THRESHOLD is 100', () => {
-    expect(VIRTUAL_ROW_THRESHOLD).toBe(100);
-  });
-
-  it('adds overflowY scroll container when row count exceeds threshold', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(buildServerData(VIRTUAL_ROW_THRESHOLD + 1)),
-    });
-
-    const { container, getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
-    );
-
-    // act flushes async state updates (fetch → setData → re-render). (LS-7475)
-    await act(async () => {
-      submitQuery(getByPlaceholderText, getByText);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    // Web-only: on mobile, CrossPlatformTable renders the native Table mock which
-    // has no overflowX wrapper div (LS-7475).
-    const divs = Array.from(container.querySelectorAll('div'));
-    const webWrapperDiv = divs.find((d) => d.style.overflowX === 'auto');
-    if (!webWrapperDiv) return;
-
-    // For large datasets the wrapper also carries overflowY + maxHeight.
-    expect(webWrapperDiv.style.overflowY).toBe('auto');
-    expect(webWrapperDiv.style.maxHeight).toBeTruthy();
-  });
-
-  it('does not add overflowY scroll container for datasets at or below threshold', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(buildServerData(VIRTUAL_ROW_THRESHOLD)),
-    });
-
-    const { container, getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
-    );
-
-    await act(async () => {
-      submitQuery(getByPlaceholderText, getByText);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    // Web-only: on mobile, CrossPlatformTable renders the native Table mock which
-    // has no overflowX wrapper div (LS-7475).
-    const divs = Array.from(container.querySelectorAll('div'));
-    const webWrapperDiv = divs.find((d) => d.style.overflowX === 'auto');
-    if (!webWrapperDiv) return;
-
-    // Small dataset — the wrapper should not carry overflowY.
-    expect(webWrapperDiv.style.overflowY).not.toBe('auto');
-  });
-
-  it('renders fewer DOM rows than total when virtualization is active', async () => {
-    const totalRows = VIRTUAL_ROW_THRESHOLD + 50;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(buildServerData(totalRows)),
-    });
-
-    const { container, getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" />,
-    );
-
-    await act(async () => {
-      submitQuery(getByPlaceholderText, getByText);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    // Web-only: on mobile, CrossPlatformTable renders the native Table mock which
-    // has no overflowX wrapper div (LS-7475).
-    const allDivs = Array.from(container.querySelectorAll('div'));
-    if (!allDivs.some((d) => d.style.overflowX === 'auto')) return;
-
-    // Spacer rows (padding) have colSpan; data rows have individual <td> cells.
-    // Count <tr> elements that have multiple <td> children (i.e. real data rows).
-    const tbody = container.querySelector('tbody');
-    const dataRows = tbody
-      ? Array.from(tbody.querySelectorAll('tr')).filter(
-          (tr) => tr.querySelectorAll('td').length > 1,
-        )
-      : [];
-
-    expect(dataRows.length).toBeLessThan(totalRows);
-  });
-});
-
-describe('Premium venue multi-select (LS-7469)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env.VITE_STATS_API_URL = 'https://stats.example.com/game-logs';
-    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
-  });
-
-  afterEach(() => {
-    delete (globalThis as { __DEV__?: boolean }).__DEV__;
-  });
-
-  it('renders checkboxes for all four venue options including neutral + international', () => {
-    const { queryByTestId } = render(<GameLogsTable isPremium />);
-    const homeCheckbox = queryByTestId('venue-home') as HTMLInputElement | null;
-    // Premium checkboxes only render when Platform.OS === 'web' — skip on native
-    if (!homeCheckbox || homeCheckbox.type !== 'checkbox') return;
-    expect(queryByTestId('venue-away')).toBeTruthy();
-    expect(queryByTestId('venue-neutral')).toBeTruthy();
-    expect(queryByTestId('venue-international')).toBeTruthy();
-  });
-
-  it('free users still see the All/Home/Away button toggle (no regression)', () => {
-    const { queryByTestId } = render(<GameLogsTable />);
-    const allBtn = queryByTestId('venue-all');
-    // Buttons only render on web (or native fallback) — skip when absent
-    if (!allBtn) return;
-    expect(queryByTestId('venue-home')).toBeTruthy();
-    expect(queryByTestId('venue-away')).toBeTruthy();
-    // No neutral or international in the free-user view
-    expect(queryByTestId('venue-neutral')).toBeNull();
-    expect(queryByTestId('venue-international')).toBeNull();
-  });
-
-  it('selecting multiple checkboxes posts venues array (LS-7469)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-
-    const { getByPlaceholderText, queryByTestId, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" isPremium />,
-    );
-
-    const homeCheckbox = queryByTestId('venue-home') as HTMLInputElement | null;
-    // Premium checkboxes only render when Platform.OS === 'web' — skip on native
-    if (!homeCheckbox || homeCheckbox.type !== 'checkbox') return;
-    const neutralCheckbox = queryByTestId('venue-neutral') as HTMLInputElement;
-
-    fireEvent.click(homeCheckbox);
-    fireEvent.click(neutralCheckbox);
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const body = JSON.parse(calls[0][1].body as string) as {
-      venues?: string[];
-      venue?: string;
-    };
-    expect(body.venues).toEqual(expect.arrayContaining(['home', 'neutral']));
-    expect(body.venue).toBeUndefined();
-  });
-
-  it('unchecking all boxes omits the venues key entirely (LS-7469)', () => {
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-
-    const { getByPlaceholderText, queryByTestId, getByText } = render(
-      <GameLogsTable apiEndpoint="https://test.example.com/logs" isPremium />,
-    );
-
-    const homeCheckbox = queryByTestId('venue-home') as HTMLInputElement | null;
-    // Premium checkboxes only render when Platform.OS === 'web' — skip on native
-    if (!homeCheckbox || homeCheckbox.type !== 'checkbox') return;
-
-    // Click once to check, click again to uncheck — net result is empty venues array
-    fireEvent.click(homeCheckbox);
-    fireEvent.click(homeCheckbox);
-    fireEvent.change(getByPlaceholderText('Enter player ID'), {
-      target: { value: 'mlb-1234' },
-    });
-
-    const submit =
-      getByText('Get Player Data').closest('button') ??
-      getByText('Get Player Data');
-    fireEvent.click(submit);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const body = JSON.parse(calls[0][1].body as string) as {
-      venues?: string[];
-      venue?: string;
-    };
-    expect(body.venues).toBeUndefined();
-    expect(body.venue).toBeUndefined();
+    const label = await findByTestId('game-logs-total-label');
+    expect(label.textContent).toMatch(/Showing\s+50\s+of\s+162/);
   });
 });

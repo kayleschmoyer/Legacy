@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
+    "@tanstack/react-virtual": "^3.13.0",
     "@legacy-sports/api": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "@legacy-sports/design-tokens": "workspace:*",
