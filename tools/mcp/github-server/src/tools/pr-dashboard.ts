@@ -1,7 +1,8 @@
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
-import { deduplicateChecks, summarizeCIStatus } from '../types.js';
-import type { CICheck, ToolResult } from '../types.js';
+import { evaluatePRChecks } from '../required-checks.js';
+import type { CIPartition } from '../required-checks.js';
+import type { ToolResult } from '../types.js';
 
 interface PRDashboardParams {
   state?: string;
@@ -10,21 +11,6 @@ interface PRDashboardParams {
   limit?: number;
   excludeDrafts?: boolean;
 }
-
-interface CheckRunNode {
-  __typename: 'CheckRun';
-  name: string;
-  status: string;
-  conclusion: string | null;
-}
-
-interface StatusContextNode {
-  __typename: 'StatusContext';
-  context: string;
-  state: string;
-}
-
-type StatusCheckNode = CheckRunNode | StatusContextNode;
 
 interface PRNode {
   number: number;
@@ -40,16 +26,10 @@ interface PRNode {
   isDraft: boolean;
   mergeable: string;
   reviewDecision: string | null;
+  // Head commit SHA — required checks are evaluated against it via REST
+  // (the merge-queue-aligned path), not GraphQL statusCheckRollup.
   commits: {
-    nodes: Array<{
-      commit: {
-        statusCheckRollup: {
-          contexts: {
-            nodes: Array<StatusCheckNode | null>;
-          };
-        } | null;
-      };
-    }>;
+    nodes: Array<{ commit: { oid: string } }>;
   };
 }
 
@@ -73,6 +53,8 @@ interface BatchReviewThreadsResponse {
   };
 }
 
+type CIStatus = 'pass' | 'fail' | 'pending' | 'none';
+
 // GraphQL state enum values
 function mapState(state: string): string {
   switch (state) {
@@ -89,27 +71,38 @@ function mapState(state: string): string {
   }
 }
 
-function normalizeChecks(nodes: (StatusCheckNode | null)[]): CICheck[] {
-  return nodes.flatMap((node) => {
-    if (node == null) return [];
-    if (node.__typename === 'CheckRun') {
-      return {
-        name: node.name,
-        status: node.status,
-        conclusion: node.conclusion,
-      };
-    }
-    return {
-      name: node.context,
-      status: node.state,
-      conclusion:
-        node.state === 'SUCCESS'
-          ? 'SUCCESS'
-          : node.state === 'PENDING'
-            ? null
-            : node.state,
-    };
-  });
+/** Collapse a required-check partition into a single dashboard CI status. */
+function ciStatusFromPartition(ci: CIPartition): CIStatus {
+  if (ci.failing.length > 0) return 'fail';
+  if (ci.pending.length > 0) return 'pending';
+  if (ci.passing > 0) return 'pass';
+  return 'none';
+}
+
+/**
+ * Run `task` over `items` with bounded concurrency. The dashboard evaluates each
+ * PR's required checks with its own REST calls; capping in-flight requests keeps
+ * a 30–50 PR dashboard from issuing 100+ simultaneous GitHub calls.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  task: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      for (;;) {
+        const index = cursor++;
+        if (index >= items.length) return;
+        results[index] = await task(items[index], index);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
 }
 
 function buildBatchReviewThreadsQuery(prNumbers: number[]): string {
@@ -224,16 +217,7 @@ query($query: String!, $first: Int!) {
         reviewDecision
         commits(last: 1) {
           nodes {
-            commit {
-              statusCheckRollup {
-                contexts(first: 100) {
-                  nodes {
-                    ... on CheckRun { __typename name status conclusion }
-                    ... on StatusContext { __typename context state }
-                  }
-                }
-              }
-            }
+            commit { oid }
           }
         }
       }
@@ -268,16 +252,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         reviewDecision
         commits(last: 1) {
           nodes {
-            commit {
-              statusCheckRollup {
-                contexts(first: 100) {
-                  nodes {
-                    ... on CheckRun { __typename name status conclusion }
-                    ... on StatusContext { __typename context state }
-                  }
-                }
-              }
-            }
+            commit { oid }
           }
         }
       }
@@ -348,16 +323,29 @@ query($owner: String!, $repo: String!, $first: Int!) {
       prNumbers,
     );
 
+    // Evaluate each PR's required checks via the merge-queue-aligned helper.
+    // Bounded concurrency keeps the per-PR REST calls from overwhelming the API.
+    const ciPartitions = await mapWithConcurrency(prNodes, 8, async (pr) => {
+      const sha = pr.commits.nodes[0]?.commit.oid;
+      if (!sha) return null;
+      try {
+        return await evaluatePRChecks(
+          repo.owner,
+          repo.name,
+          sha,
+          pr.baseRefName,
+        );
+      } catch {
+        // A single PR's check fetch failing must not blank the whole dashboard.
+        return null;
+      }
+    });
+
     // Build dashboard rows
-    const rows = prNodes.map((pr) => {
-      const commitNode = pr.commits.nodes[0];
-      const checkNodes = (
-        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? []
-      ).filter((n): n is StatusCheckNode => n != null);
-      const rawChecks = normalizeChecks(checkNodes);
-      const checks = deduplicateChecks(rawChecks);
-      const hadStaleChecks = checks.length < rawChecks.length;
-      const ci = summarizeCIStatus(checks);
+    const rows = prNodes.map((pr, i) => {
+      const ci = ciPartitions[i];
+      const ciStatus: CIStatus = ci ? ciStatusFromPartition(ci) : 'none';
+      const hadStaleChecks = ci?.hadDuplicateRuns ?? false;
       const threads = threadCounts[pr.number] ?? {
         total: -1,
         unresolved: -1,
@@ -372,7 +360,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         author: pr.author?.login ?? 'unknown',
         isDraft: pr.isDraft,
         mergeable: pr.mergeable,
-        ciStatus: ci,
+        ciStatus,
         hadStaleChecks,
         reviewDecision: pr.reviewDecision,
         unresolvedThreads: threads.unresolved,

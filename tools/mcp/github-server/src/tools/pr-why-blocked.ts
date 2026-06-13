@@ -1,6 +1,7 @@
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
-import { FAILED_CONCLUSIONS } from '../types.js';
+import { evaluatePRChecks } from '../required-checks.js';
+import type { CIPartition } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
 
 interface PRWhyBlockedParams {
@@ -8,21 +9,6 @@ interface PRWhyBlockedParams {
 }
 
 // ── GraphQL response types ────────────────────────────────────────────────────
-
-interface CheckRunNode {
-  __typename: 'CheckRun';
-  name: string;
-  status: string;
-  conclusion: string | null;
-}
-
-interface StatusContextNode {
-  __typename: 'StatusContext';
-  context: string;
-  state: string;
-}
-
-type StatusCheckNode = CheckRunNode | StatusContextNode;
 
 interface ReviewerUser {
   __typename: 'User';
@@ -45,22 +31,15 @@ interface PRWhyBlockedGraphQLResponse {
       mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
       isInMergeQueue: boolean;
       reviewDecision: string | null;
+      // Head commit SHA + base branch — used to evaluate required checks via REST
+      // (the merge-queue-aligned path) instead of GraphQL statusCheckRollup.
+      headRefOid: string;
+      baseRefName: string;
       labels: {
         pageInfo: { hasNextPage: boolean };
         nodes: Array<{ name: string }>;
       };
       autoMergeRequest: { enabledBy: { login: string } } | null;
-      commits: {
-        nodes: Array<{
-          commit: {
-            statusCheckRollup: {
-              contexts: {
-                nodes: Array<StatusCheckNode | null>;
-              };
-            } | null;
-          };
-        }>;
-      };
       reviews: {
         pageInfo: { hasNextPage: boolean };
         nodes: Array<{
@@ -100,24 +79,12 @@ query($owner: String!, $repo: String!, $number: Int!) {
       mergeable
       isInMergeQueue
       reviewDecision
+      headRefOid
+      baseRefName
       autoMergeRequest { enabledBy { login } }
       labels(first: 100) {
         pageInfo { hasNextPage }
         nodes { name }
-      }
-      commits(last: 1) {
-        nodes {
-          commit {
-            statusCheckRollup {
-              contexts(first: 100) {
-                nodes {
-                  ... on CheckRun { __typename name status conclusion }
-                  ... on StatusContext { __typename context state }
-                }
-              }
-            }
-          }
-        }
       }
       reviews(first: 100) {
         pageInfo { hasNextPage }
@@ -146,65 +113,6 @@ query($owner: String!, $repo: String!, $number: Int!) {
   }
 }`;
 
-// ── CI helpers ────────────────────────────────────────────────────────────────
-
-// Mirrors the EXCLUDED_CHECKS set in .github/scripts/merge-queue-processor.js.
-// process-merge-queue would be circular (the job is the merge queue itself).
-// delayed-recheck is a housekeeping job, not a quality gate.
-const EXCLUDED_CHECK_NAMES = new Set([
-  'process-merge-queue',
-  'delayed-recheck',
-]);
-
-const PENDING_STATUSES = new Set([
-  'IN_PROGRESS',
-  'QUEUED',
-  'PENDING',
-  'WAITING',
-]);
-
-interface CIPartition {
-  failing: string[];
-  pending: string[];
-  passing: number;
-}
-
-export function partitionChecks(
-  nodes: (StatusCheckNode | null)[],
-): CIPartition {
-  const failing: string[] = [];
-  const pending: string[] = [];
-  let passing = 0;
-
-  for (const node of nodes) {
-    if (node == null) continue;
-    const name = node.__typename === 'CheckRun' ? node.name : node.context;
-    if (EXCLUDED_CHECK_NAMES.has(name)) continue;
-    const conclusion =
-      node.__typename === 'CheckRun' ? node.conclusion : node.state;
-    const status = node.__typename === 'CheckRun' ? node.status : node.state;
-
-    if (conclusion && FAILED_CONCLUSIONS.has(conclusion)) {
-      failing.push(name);
-    } else if (!conclusion && PENDING_STATUSES.has(status)) {
-      pending.push(name);
-    } else if (
-      conclusion === 'SUCCESS' ||
-      conclusion === 'NEUTRAL' ||
-      conclusion === 'SKIPPED' ||
-      status === 'COMPLETED'
-    ) {
-      passing++;
-    } else if (PENDING_STATUSES.has(status)) {
-      pending.push(name);
-    } else {
-      passing++;
-    }
-  }
-
-  return { failing, pending, passing };
-}
-
 // ── Diagnosis ─────────────────────────────────────────────────────────────────
 
 type PRStatus = 'DONE' | 'BLOCKED' | 'WAITING' | 'READY';
@@ -227,8 +135,14 @@ function reviewerName(
   return reviewer.__typename;
 }
 
+/**
+ * Diagnose why a PR is (or isn't) mergeable. `ci` is the required-check partition
+ * computed by the shared `evaluatePRChecks` helper — the same merge-queue-aligned
+ * evaluation the processor uses, so triage and the merge gate agree.
+ */
 export function diagnose(
   pr: NonNullable<PRWhyBlockedGraphQLResponse['repository']['pullRequest']>,
+  ci: CIPartition,
 ): Diagnosis {
   const labels = new Set(pr.labels.nodes.map((l) => l.name));
   const hasReadyLabel = labels.has('bot:ready-for-review');
@@ -236,11 +150,6 @@ export function diagnose(
   const labelsTruncated = pr.labels.pageInfo.hasNextPage;
   const reviewsTruncated = pr.reviews.pageInfo.hasNextPage;
   const reviewRequestsTruncated = pr.reviewRequests.pageInfo.hasNextPage;
-
-  // CI partition
-  const checkNodes =
-    pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
-  const ci = partitionChecks(checkNodes);
 
   // Unresolved, non-outdated review threads.
   // pageInfo.hasNextPage means >100 threads exist; unresolved count from nodes
@@ -313,7 +222,7 @@ export function diagnose(
     return {
       status: 'BLOCKED',
       reason: 'CI_FAILING',
-      summary: `${ci.failing.length} CI check${ci.failing.length === 1 ? '' : 's'} ${ci.failing.length === 1 ? 'is' : 'are'} failing.`,
+      summary: `${ci.failing.length} required CI check${ci.failing.length === 1 ? '' : 's'} ${ci.failing.length === 1 ? 'is' : 'are'} failing.`,
       details: {
         failingChecks: ci.failing,
         pendingChecks: ci.pending,
@@ -427,7 +336,7 @@ export function diagnose(
     return {
       status: 'WAITING',
       reason: 'CI_PENDING',
-      summary: `${ci.pending.length} CI check${ci.pending.length === 1 ? '' : 's'} still running.`,
+      summary: `${ci.pending.length} required CI check${ci.pending.length === 1 ? '' : 's'} still running or not yet registered.`,
       details: {
         pendingChecks: ci.pending,
         passingChecks: ci.passing,
@@ -508,7 +417,18 @@ export async function prWhyBlocked(
       };
     }
 
-    const diagnosis = diagnose(pr);
+    // Evaluate required checks the same way the merge-queue processor does:
+    // required-name filter + latest-run-per-name dedup + commit statuses. This is
+    // what prevents stale duplicate runs and non-required checks producing a
+    // false CI_FAILING verdict (LS-7993).
+    const ci = await evaluatePRChecks(
+      repo.owner,
+      repo.name,
+      pr.headRefOid,
+      pr.baseRefName,
+    );
+
+    const diagnosis = diagnose(pr, ci);
 
     return {
       content: [
