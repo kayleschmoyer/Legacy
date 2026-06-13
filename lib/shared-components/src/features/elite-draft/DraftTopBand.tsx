@@ -52,7 +52,7 @@ export function DraftTopBand({
   isMyPick,
   currentPickInfo,
   isCommissioner,
-  isOwner,
+  isOwner: _isOwner,
   draftId,
   commPickMode,
   autoPickDisabled,
@@ -88,7 +88,7 @@ export function DraftTopBand({
     ? teamNameById(currentPickInfo.teamId)
     : null;
 
-  const showCommish = (isCommissioner || isOwner) && draftId;
+  const showCommish = isCommissioner && !!draftId;
   const showAutopick = draftId !== null && myTeamId !== null;
 
   return (
