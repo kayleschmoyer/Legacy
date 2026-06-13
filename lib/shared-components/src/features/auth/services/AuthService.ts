@@ -85,7 +85,7 @@ export class AuthService {
    * Raw VITE_* / process.env reads are not permitted outside lib/app-config.
    */
   private getOAuthProxyUrl(): string {
-    return this.config.oauthProxyUrl ?? 'http://localhost:5001';
+    return this.config.oauthProxyUrl ?? '';
   }
 
   /**
@@ -777,7 +777,7 @@ export class AuthService {
     }
   }
 
-  // ─── User profile caching ───────────────────────────────────────────────
+  // ─── User profile caching ───────────────────────────────────────────────────
 
   /**
    * Store a decoded user profile in localStorage for fast session restore
@@ -828,7 +828,7 @@ export class AuthService {
     }
   }
 
-  // ─── Admin impersonation profile ────────────────────────────────────────
+  // ─── Admin impersonation profile ──────────────────────────────────────────
 
   storeAdminProfile(user: User): void {
     try {
@@ -865,7 +865,7 @@ export class AuthService {
     }
   }
 
-  // ─── Impersonated user profile ─────────────────────────────────────────
+  // ─── Impersonated user profile ───────────────────────────────────────────────
 
   storeImpersonatedUserProfile(user: {
     id: number;
@@ -907,7 +907,7 @@ export class AuthService {
     }
   }
 
-  // ─── Server-side impersonation management ──────────────────────────────
+  // ─── Server-side impersonation management ───────────────────────────────────────
 
   /**
    * Call POST /oauth/stop-impersonate to clear the HttpOnly impersonation
@@ -976,7 +976,7 @@ export class AuthService {
     return result.user;
   }
 
-  // ─── Server-side logout ─────────────────────────────────────────────────
+  // ─── Server-side logout ─────────────────────────────────────────────────────
 
   /**
    * Call the server logout endpoint to clear HttpOnly cookies.
@@ -1003,7 +1003,7 @@ export class AuthService {
     }
   }
 
-  // ─── CSRF helper ──────────────────────────────────────────────────────
+  // ─── CSRF helper ────────────────────────────────────────────────────────
 
   /** In-memory fallback when localStorage is unavailable */
   private csrfTokenFallback = '';

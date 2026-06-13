@@ -49,7 +49,7 @@ export interface EnvironmentConfig {
  * Derived/computed fields are handled here.
  */
 export const getEnvironmentConfig = (): EnvironmentConfig => ({
-  oauthProxyUrl: config.oauthProxy ?? 'http://localhost:5001',
+  oauthProxyUrl: config.oauthProxy ?? '',
   googleClientId: config.googleClientId ?? 'placeholder-google-client-id',
   graphqlUrl: config.graphqlHost ?? 'http://localhost:5000/graphql',
   // In E2E tests, VITE_WEBSOCKET_URL is "" (not set at build time), which
@@ -120,11 +120,11 @@ const LOCALHOST_RE = /^https?:\/\/localhost/;
 export function getProductionConfigErrors(): readonly string[] {
   if (env.isDev) return [];
   const errors: string[] = [];
-  if (LOCALHOST_RE.test(env.oauthProxyUrl)) errors.push('VITE_OAUTH_PROXY_URL');
+  if (!env.oauthProxyUrl || LOCALHOST_RE.test(env.oauthProxyUrl))
+    errors.push('VITE_OAUTH_PROXY_URL');
   if (env.googleClientId.startsWith('placeholder-'))
     errors.push('VITE_GOOGLE_CLIENT_ID');
   if (LOCALHOST_RE.test(env.graphqlUrl)) errors.push('VITE_GRAPHQL_HOST');
-  if (!env.websocketUrl) errors.push('VITE_WEBSOCKET_URL');
   return errors;
 }
 

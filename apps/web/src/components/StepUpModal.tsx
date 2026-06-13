@@ -39,7 +39,7 @@ function getCsrfToken(): string {
  */
 export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
   const { config, user } = useAuth();
-  const oauthProxyUrl = config.oauthProxyUrl ?? 'http://localhost:5001';
+  const oauthProxyUrl = config.oauthProxyUrl;
 
   const [mode, setMode] = useState<'totp' | 'password'>(
     user?.mfaEnabled ? 'totp' : 'password',
@@ -51,6 +51,12 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
   const handleSubmit = async () => {
     const trimmed = value.trim();
     if (!trimmed) return;
+    if (!oauthProxyUrl) {
+      setError(
+        'Authentication service is not configured. Please contact support.',
+      );
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -88,7 +94,10 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
       const data = (await response.json()) as { validUntil: number };
       onSuccess(data.validUntil);
     } catch (err) {
-      LOGGER.error('StepUpModal: fetch error', { err });
+      LOGGER.error(
+        'StepUpModal: fetch error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
