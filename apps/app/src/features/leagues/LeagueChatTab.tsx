@@ -2,7 +2,6 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -69,7 +68,7 @@ export function LeagueChatTab({
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
       keyboardVerticalOffset={80}
     >
       <YStack flex={1}>

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   SafeAreaView,
   TextInput,
 } from 'react-native';
@@ -405,10 +404,7 @@ export default function FootballPlayers(): React.JSX.Element {
         : (NFL_TEAMS[teamFilter]?.abbreviation ?? teamFilter);
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
         {/* Position filter pills */}
         <FlatList

@@ -1,10 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import { FlatList, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft, MessageSquare, Send, Users } from '@tamagui/lucide-icons';
@@ -120,7 +115,7 @@ function ConversationThread({
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
       keyboardVerticalOffset={90}
     >
       <YStack flex={1}>
