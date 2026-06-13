@@ -13,7 +13,7 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.legacySports",
+      "bundleIdentifier": "com.legacysports.app",
       "googleServicesFile": "./ios/GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "associatedDomains": [
@@ -26,7 +26,7 @@
         "foregroundImage": "./assets/adaptive_icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.legacySports",
+      "package": "com.legacysports.app",
       "googleServicesFile": "./android/app/google-services.json",
       "intentFilters": [
         {

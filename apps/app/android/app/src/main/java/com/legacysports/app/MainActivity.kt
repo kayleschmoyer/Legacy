@@ -1,4 +1,4 @@
-package com.legacySports
+package com.legacysports.app
 
 import android.os.Build
 import android.os.Bundle
