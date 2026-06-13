@@ -5,6 +5,9 @@ import { Platform } from 'react-native';
 const FLAG_GRANT_READ_URI_PERMISSION = 1;
 const FLAG_ACTIVITY_NEW_TASK = 268_435_456;
 const APK_MIME_TYPE = 'application/vnd.android.package-archive';
+// Android 8.0 (API 26) introduced per-source "Install unknown apps" permission.
+const ANDROID_O_API_LEVEL = 26;
+const APP_PACKAGE_NAME = 'com.legacySports';
 
 export interface DownloadProgress {
   totalBytesWritten: number;
@@ -22,6 +25,18 @@ export class ApkInstallError extends Error {
   ) {
     super(message);
     this.name = 'ApkInstallError';
+  }
+}
+
+/**
+ * Thrown when the Android "Install unknown apps" per-source permission has not
+ * been granted for this app. The caller should offer to open the system
+ * settings page via {@link openInstallPackagesSettings}.
+ */
+export class ApkInstallPermissionError extends ApkInstallError {
+  constructor() {
+    super('Install unknown apps permission is not granted for this app');
+    this.name = 'ApkInstallPermissionError';
   }
 }
 
@@ -124,6 +139,23 @@ export async function verifyApkIntegrity(
   }
 }
 
+/**
+ * Opens the system "Install unknown apps" settings page for this app so the
+ * user can grant the per-source sideload permission (Android 8+, API 26+).
+ * No-ops on non-Android platforms or when the settings activity is unavailable.
+ */
+export async function openInstallPackagesSettings(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    await startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', {
+      data: `package:${APP_PACKAGE_NAME}`,
+      flags: FLAG_ACTIVITY_NEW_TASK,
+    });
+  } catch {
+    // Settings activity unavailable on this device — ignore.
+  }
+}
+
 export async function launchApkInstaller(fileUri: string): Promise<void> {
   if (Platform.OS !== 'android') {
     throw new ApkInstallError('APK install is only supported on Android');
@@ -131,6 +163,8 @@ export async function launchApkInstaller(fileUri: string): Promise<void> {
 
   let contentUri: string;
   try {
+    // ExpoFile.contentUri provides a content:// URI backed by Expo's FileProvider,
+    // satisfying Android 10+ (API 29+) scoped storage requirements.
     contentUri = new ExpoFile(fileUri).contentUri;
   } catch (error) {
     throw new ApkInstallError(
@@ -146,6 +180,29 @@ export async function launchApkInstaller(fileUri: string): Promise<void> {
       type: APK_MIME_TYPE,
     });
   } catch (error) {
+    // On Android 8+ (API 26+) apps must be individually authorised to install
+    // packages from unknown sources via the per-source system setting. When the
+    // intent is rejected for this reason, surface a typed error so the caller
+    // can redirect the user to the system settings page.
+    if (
+      typeof Platform.Version === 'number' &&
+      Platform.Version >= ANDROID_O_API_LEVEL &&
+      isInstallPermissionError(error)
+    ) {
+      throw new ApkInstallPermissionError();
+    }
     throw new ApkInstallError('Could not launch APK installer', error);
   }
+}
+
+function isInstallPermissionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  // SecurityException when REQUEST_INSTALL_PACKAGES is absent or the per-source
+  // "Install unknown apps" setting is disabled.
+  if (msg.includes('permission') || msg.includes('security')) return true;
+  // ActivityNotFoundException on Android 11+ when package visibility prevents
+  // the system installer from resolving the VIEW intent.
+  if (msg.includes('no activity') || msg.includes('not found')) return true;
+  return false;
 }

@@ -3,8 +3,10 @@ import { File as ExpoFile } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import {
   ApkInstallError,
+  ApkInstallPermissionError,
   downloadApk,
   launchApkInstaller,
+  openInstallPackagesSettings,
   verifyApkIntegrity,
 } from './installApk';
 
@@ -17,6 +19,13 @@ jest.mock('expo-file-system', () => ({
 
 jest.mock('expo-intent-launcher', () => ({
   startActivityAsync: jest.fn(),
+}));
+
+// Platform.Version is a getter-only property on the real react-native module,
+// so the launchApkInstaller tests cannot reassign it via Object.assign. Mock
+// the module to expose a writable Platform object.
+jest.mock('react-native', () => ({
+  Platform: { OS: 'android', Version: 34 },
 }));
 
 const MockFile = ExpoFile as jest.Mock;
@@ -139,25 +148,29 @@ describe('downloadApk', () => {
 
 describe('launchApkInstaller', () => {
   let originalPlatformOS: typeof Platform.OS;
+  let originalPlatformVersion: typeof Platform.Version;
 
   beforeEach(() => {
     jest.clearAllMocks();
     originalPlatformOS = Platform.OS;
+    originalPlatformVersion = Platform.Version;
     MockFile.mockReturnValue({
       exists: false,
       uri: FILE_URI,
       contentUri: CONTENT_URI,
     });
+    Object.assign(Platform, { OS: 'android', Version: 34 });
+    mockStartActivityAsync.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
-    Object.assign(Platform, { OS: originalPlatformOS });
+    Object.assign(Platform, {
+      OS: originalPlatformOS,
+      Version: originalPlatformVersion,
+    });
   });
 
   it('reads contentUri from the File instance and starts the install intent', async () => {
-    Object.assign(Platform, { OS: 'android' });
-    mockStartActivityAsync.mockResolvedValue(undefined);
-
     await launchApkInstaller(FILE_URI);
 
     expect(MockFile).toHaveBeenCalledWith(FILE_URI);
@@ -166,6 +179,17 @@ describe('launchApkInstaller', () => {
       expect.objectContaining({
         data: CONTENT_URI,
         type: 'application/vnd.android.package-archive',
+      }),
+    );
+  });
+
+  it('includes FLAG_GRANT_READ_URI_PERMISSION and FLAG_ACTIVITY_NEW_TASK', async () => {
+    await launchApkInstaller(FILE_URI);
+    expect(mockStartActivityAsync).toHaveBeenCalledWith(
+      'android.intent.action.VIEW',
+      expect.objectContaining({
+        // FLAG_GRANT_READ_URI_PERMISSION (1) | FLAG_ACTIVITY_NEW_TASK (268435456)
+        flags: 1 | 268_435_456,
       }),
     );
   });
@@ -179,7 +203,6 @@ describe('launchApkInstaller', () => {
   });
 
   it('wraps contentUri access errors in ApkInstallError', async () => {
-    Object.assign(Platform, { OS: 'android' });
     MockFile.mockImplementationOnce(() => {
       throw new Error('file not found');
     });
@@ -187,13 +210,86 @@ describe('launchApkInstaller', () => {
     await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(/content URI/);
   });
 
-  it('wraps startActivityAsync errors in ApkInstallError', async () => {
-    Object.assign(Platform, { OS: 'android' });
-    mockStartActivityAsync.mockRejectedValue(new Error('activity not found'));
+  describe('Android 14+ package install permission handling', () => {
+    it('throws ApkInstallPermissionError on SecurityException (permission denied)', async () => {
+      mockStartActivityAsync.mockRejectedValue(
+        new Error(
+          'Permission Denial: installing com.legacySports requires android.permission.REQUEST_INSTALL_PACKAGES',
+        ),
+      );
+      await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
+        ApkInstallPermissionError,
+      );
+    });
 
-    await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
-      /launch APK installer/,
+    it('throws ApkInstallPermissionError on error containing "security"', async () => {
+      mockStartActivityAsync.mockRejectedValue(
+        new Error('security: install blocked'),
+      );
+      await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
+        ApkInstallPermissionError,
+      );
+    });
+
+    it('throws ApkInstallPermissionError when activity not found (package visibility blocked)', async () => {
+      mockStartActivityAsync.mockRejectedValue(
+        new Error('No activity found to handle intent'),
+      );
+      await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
+        ApkInstallPermissionError,
+      );
+    });
+
+    it('does not throw ApkInstallPermissionError on Android < 8 (API 26)', async () => {
+      Object.assign(Platform, { Version: 25 });
+      mockStartActivityAsync.mockRejectedValue(
+        new Error('security: something'),
+      );
+      const error = await launchApkInstaller(FILE_URI).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApkInstallError);
+      expect(error).not.toBeInstanceOf(ApkInstallPermissionError);
+    });
+
+    it('throws generic ApkInstallError for non-permission failures on Android 8+', async () => {
+      mockStartActivityAsync.mockRejectedValue(new Error('disk I/O error'));
+      const error = await launchApkInstaller(FILE_URI).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApkInstallError);
+      expect(error).not.toBeInstanceOf(ApkInstallPermissionError);
+    });
+  });
+});
+
+describe('openInstallPackagesSettings', () => {
+  let originalPlatformOS: typeof Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    originalPlatformOS = Platform.OS;
+    Object.assign(Platform, { OS: 'android' });
+    mockStartActivityAsync.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    Object.assign(Platform, { OS: originalPlatformOS });
+  });
+
+  it('opens MANAGE_UNKNOWN_APP_SOURCES for this app package', async () => {
+    await openInstallPackagesSettings();
+    expect(mockStartActivityAsync).toHaveBeenCalledWith(
+      'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
+      expect.objectContaining({ data: 'package:com.legacySports' }),
     );
+  });
+
+  it('does nothing on non-Android platforms', async () => {
+    Object.assign(Platform, { OS: 'ios' });
+    await openInstallPackagesSettings();
+    expect(mockStartActivityAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when the settings activity is unavailable', async () => {
+    mockStartActivityAsync.mockRejectedValue(new Error('Activity not found'));
+    await expect(openInstallPackagesSettings()).resolves.toBeUndefined();
   });
 });
 
