@@ -1,6 +1,6 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
 import { Redirect } from 'expo-router';
-import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+import { BrandedSplash } from '@legacy-sports/shared-components';
 import { LegacySportsJwt, useCurrentUserInfo } from './AuthHooks';
 
 export const AUTHORIZED_CONTEXT = createContext<null | LegacySportsJwt>(null);
@@ -11,7 +11,7 @@ export function AuthorizedUserContextProvider({
   const { loading, data: currentInfo } = useCurrentUserInfo();
 
   if (loading) {
-    return <UnifiedLoadingPanel />;
+    return <BrandedSplash />;
   }
 
   if (currentInfo === null) {

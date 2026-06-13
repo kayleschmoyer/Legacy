@@ -33,10 +33,10 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
       expect(content).toContain("gestureHandler: 'gesture-handler'");
     });
 
-    it('should have loading panel available', () => {
+    it('should have a branded splash on the cold-start auth gate', () => {
       const layoutPath = path.join(APP_ROOT, 'app/(app)/_layout.tsx');
       const content = fs.readFileSync(layoutPath, 'utf8');
-      expect(content).toContain('UnifiedLoadingPanel');
+      expect(content).toContain('BrandedSplash');
     });
   });
 

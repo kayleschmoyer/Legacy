@@ -1,6 +1,6 @@
 import { Redirect, Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+import { BrandedSplash } from '@legacy-sports/shared-components';
 
 import { LeagueIdHeader } from './baseball/league/[leagueId]';
 import { FootballLeagueIdHeader } from './football/league/[leagueId]';
@@ -26,7 +26,7 @@ export default function Layout() {
   usePushNotifications(currentUser?.id ?? null);
 
   if (loading) {
-    return <UnifiedLoadingPanel />;
+    return <BrandedSplash />;
   }
 
   if (!currentUser) {

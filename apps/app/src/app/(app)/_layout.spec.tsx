@@ -67,8 +67,8 @@ jest.mock('@legacy-sports/shared-components', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View, ActivityIndicator } = require('react-native') as RNComponents;
   return {
-    UnifiedLoadingPanel: () => (
-      <View testID="loading-panel">
+    BrandedSplash: () => (
+      <View testID="branded-splash">
         <ActivityIndicator />
       </View>
     ),
@@ -233,10 +233,10 @@ describe('App (tabs) Stack Layout', () => {
       expect(screen.getByTestId('stack-navigator')).toBeTruthy();
     });
 
-    it('shows the loading panel while user data is loading', () => {
+    it('shows the branded splash while user data is loading', () => {
       mockUseCurrentUserInfo.mockReturnValue({ data: null, loading: true });
       render(<Layout />);
-      expect(screen.getByTestId('loading-panel')).toBeTruthy();
+      expect(screen.getByTestId('branded-splash')).toBeTruthy();
     });
 
     it('redirects to login when the user is not authenticated', () => {

@@ -45,8 +45,8 @@ jest.mock('@legacy-sports/shared-components', () => {
   const { View, ActivityIndicator } =
     jest.requireActual<RNComponents>('react-native');
   return {
-    UnifiedLoadingPanel: () => (
-      <View testID="loading-panel">
+    BrandedSplash: () => (
+      <View testID="branded-splash">
         <ActivityIndicator />
       </View>
     ),
@@ -89,7 +89,7 @@ describe('AuthorizedUserContext', () => {
   });
 
   describe('AuthorizedUserContextProvider', () => {
-    it('renders loading panel while user info is loading', () => {
+    it('renders branded splash while user info is loading', () => {
       mockUseCurrentUserInfo.mockReturnValue({ loading: true, data: null });
 
       render(
@@ -98,7 +98,7 @@ describe('AuthorizedUserContext', () => {
         </AuthorizedUserContextProvider>,
       );
 
-      expect(screen.getByTestId('loading-panel')).toBeTruthy();
+      expect(screen.getByTestId('branded-splash')).toBeTruthy();
       expect(screen.queryByText('Child content')).toBeNull();
     });
 
