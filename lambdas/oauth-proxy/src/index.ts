@@ -52,7 +52,7 @@ import {
 import { handleMfaEnroll, handleMfaVerifySetup } from './handlers/Mfa';
 import { handleStepUpVerify } from './handlers/StepUp';
 import { withRateLimit } from './util/rate-limit';
-import { sanitizeHeaders } from './util/lambda';
+import { describeErrorCause, sanitizeHeaders } from './util/lambda';
 
 // Defense-in-depth rate-limit budgets for auth endpoints. Per-IP, per
 // Lambda execution context (see util/rate-limit.ts). Edge throttling
@@ -596,9 +596,13 @@ const baseOAuthHandler = async (
       body: JSON.stringify({ error: 'Method Not Allowed' }),
     });
   } catch (error) {
+    // A DrizzleQueryError's `message` is only "Failed query: <sql>"; the real
+    // Postgres failure lives in `error.cause`. Surface it so 500s are
+    // diagnosable from CloudWatch and not just Rollbar (LS-7935).
     LOGGER.error(
       'OAuth Proxy Handler Error:',
       error instanceof Error ? error.message : String(error),
+      describeErrorCause(error),
     );
 
     // Capture error with request context

@@ -9,7 +9,7 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { debug, info, warn, error },
 }));
 
-import { parseEventBody, sanitizeHeaders } from './lambda';
+import { describeErrorCause, parseEventBody, sanitizeHeaders } from './lambda';
 
 function makeEvent(
   body: string | null,
@@ -119,5 +119,63 @@ describe('sanitizeHeaders', () => {
       'X-Forwarded-For': '1.2.3.4',
     });
     expect(result).toEqual({ 'x-forwarded-for': '1.2.3.4' });
+  });
+});
+
+describe('describeErrorCause', () => {
+  it('extracts the Postgres fields from a wrapped DrizzleQueryError cause', () => {
+    // Mirrors the real shape: a DrizzleQueryError whose `message` is only the
+    // SQL, with the originating node-postgres error attached as `cause`.
+    const pgError = Object.assign(new Error('Connection terminated'), {
+      code: '08006',
+      severity: 'FATAL',
+      routine: 'pqReadData',
+      detail: 'server closed the connection unexpectedly',
+    });
+    const drizzleError = Object.assign(
+      new Error('Failed query: select ... from "app_internal"."users"'),
+      { cause: pgError },
+    );
+
+    expect(describeErrorCause(drizzleError)).toEqual({
+      causeName: 'Error',
+      causeMessage: 'Connection terminated',
+      pgCode: '08006',
+      pgSeverity: 'FATAL',
+      pgRoutine: 'pqReadData',
+      pgDetail: 'server closed the connection unexpectedly',
+    });
+  });
+
+  it('returns undefined cause when the error has none', () => {
+    expect(describeErrorCause(new Error('boom'))).toEqual({
+      cause: undefined,
+    });
+  });
+
+  it('preserves an explicit null cause distinctly from absent', () => {
+    expect(
+      describeErrorCause(Object.assign(new Error('boom'), { cause: null })),
+    ).toEqual({ cause: null });
+  });
+
+  it('stringifies a primitive non-Error cause', () => {
+    expect(
+      describeErrorCause(
+        Object.assign(new Error('boom'), { cause: 'pool gone' }),
+      ),
+    ).toEqual({ cause: 'pool gone' });
+  });
+
+  it('JSON-stringifies an object non-Error cause (no "[object Object]")', () => {
+    expect(
+      describeErrorCause(
+        Object.assign(new Error('boom'), { cause: { reason: 'pool gone' } }),
+      ),
+    ).toEqual({ cause: '{"reason":"pool gone"}' });
+  });
+
+  it('handles a non-Error argument without throwing', () => {
+    expect(describeErrorCause('not an error')).toEqual({ cause: undefined });
   });
 });
