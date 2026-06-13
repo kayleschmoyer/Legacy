@@ -296,13 +296,20 @@ function PositionPill({
   return (
     <YStack
       paddingHorizontal={14}
-      paddingVertical={7}
+      paddingVertical={10}
+      minHeight={44}
       borderRadius={20}
       borderWidth={1}
       onPress={onPress}
       pressStyle={{ opacity: 0.7 }}
-      backgroundColor={selected ? `${accentColor}26` : '$glassSurface'}
+      backgroundColor={selected ? `${accentColor}4D` : '$glassSurface'}
       borderColor={selected ? accentColor : '$glassBorder'}
+      justifyContent="center"
+      alignItems="center"
+      testID={`position-pill-${pos}`}
+      accessibilityLabel={`Filter by ${pos}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
     >
       <Text
         fontSize={13}
@@ -416,7 +423,8 @@ export default function FootballPlayers(): React.JSX.Element {
         <FlatList
           data={POSITIONS}
           horizontal
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={true}
+          fadingEdgeLength={32}
           keyExtractor={(item) => item}
           renderItem={({ item: pos }) => (
             <PositionPill
@@ -447,7 +455,7 @@ export default function FootballPlayers(): React.JSX.Element {
             borderColor="$glassBorder"
             borderRadius="$2"
             paddingHorizontal={10}
-            height={36}
+            height={44}
             alignItems="center"
           >
             <TextInput
@@ -455,7 +463,8 @@ export default function FootballPlayers(): React.JSX.Element {
               placeholderTextColor="#666"
               value={searchInput}
               onChangeText={setSearchInput}
-              style={{ flex: 1, color: '#fff', fontSize: 14, height: 36 }}
+              accessibilityLabel="Search players"
+              style={{ flex: 1, color: '#fff', fontSize: 14, height: 44 }}
             />
           </XStack>
 
