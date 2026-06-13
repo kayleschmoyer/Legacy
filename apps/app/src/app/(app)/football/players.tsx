@@ -268,7 +268,7 @@ function PlayerRow({
               </Text>
             </YStack>
             {player.nflTeam && (
-              <Text fontSize={12} color="$gray10">
+              <Text fontSize={12} color="$textMuted">
                 {isDst && teamData
                   ? teamData.city
                   : (teamData?.abbreviation ?? player.nflTeam ?? '')}

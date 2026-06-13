@@ -253,6 +253,18 @@ describe('FootballPlayers', () => {
       expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
     });
 
+    // Regression for FPD-017 (LS-6241): the team-abbreviation subtitle must use a
+    // token that is defined in the branded dark theme. `$gray10` is not part of
+    // brandDark, so it relied on token-level fallback that can render
+    // black-on-black on some devices. `$textMuted` is defined in both themes.
+    it('renders the team abbreviation subtitle with the defined $textMuted token', () => {
+      render(<FootballPlayers />);
+      const subtitle = screen
+        .getAllByText('KC')
+        .find((node) => node.props.color === '$textMuted');
+      expect(subtitle).toBeTruthy();
+    });
+
     it('renders QB passing stats', () => {
       render(<FootballPlayers />);
       expect(screen.getByText('5,000')).toBeTruthy();
