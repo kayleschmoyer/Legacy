@@ -49,10 +49,10 @@ const POSITION_COLORS: Record<string, string> = {
   WR: '#9B59B6',
   TE: '#E67E22',
   K: '#95A5A6',
-  DST: '#C0392B',
-  DL: '#C0392B',
-  LB: '#C0392B',
-  DB: '#C0392B',
+  DST: '#C41E3A', // seam red (team defense unit)
+  DL: '#C25A2A', // burnt orange-red (defensive line)
+  LB: '#9B7A3D', // amber-brown (linebackers)
+  DB: '#6B3FA0', // deep purple (defensive backs)
 };
 
 const TEAM_OPTIONS: Array<{ value: string; label: string }> = [

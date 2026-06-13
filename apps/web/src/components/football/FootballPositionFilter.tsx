@@ -71,22 +71,49 @@ const Pill = styled(Text, {
 });
 
 export function FootballPositionFilter({ selected, onChange }: Props) {
+  const pillRefs = React.useRef<(HTMLElement | null)[]>([]);
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 4 }}
     >
-      <XStack gap={8} paddingVertical={4}>
-        {POSITIONS.map((pos) => {
+      <XStack
+        gap={8}
+        paddingVertical={4}
+        role="radiogroup"
+        aria-label="Filter by position"
+      >
+        {POSITIONS.map((pos, index) => {
           const isActive = pos === selected;
           const accentColor =
             pos === 'All' ? BRAND_NAVY : FOOTBALL_POSITION_COLORS[pos];
           return (
             <Pill
               key={pos}
+              ref={(el: HTMLElement | null) => {
+                pillRefs.current[index] = el;
+              }}
               active={isActive}
               onPress={() => onChange(pos)}
+              role="radio"
+              aria-checked={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                let nextIndex: number | null = null;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  nextIndex = (index + 1) % POSITIONS.length;
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  nextIndex = (index - 1 + POSITIONS.length) % POSITIONS.length;
+                }
+                if (nextIndex !== null) {
+                  onChange(POSITIONS[nextIndex]);
+                  pillRefs.current[nextIndex]?.focus();
+                }
+              }}
               style={
                 isActive
                   ? {

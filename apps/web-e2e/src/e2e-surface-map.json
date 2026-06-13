@@ -191,6 +191,11 @@
       "apps/web/src/pages/football/**",
       "apps/web/src/components/football/**"
     ],
+    "apps/web-e2e/src/tests/football-position-filter-a11y.spec.ts": [
+      "apps/web/src/components/football/**",
+      "apps/web/src/constants/colors.ts",
+      "lib/shared-components/src/utils/colors.ts"
+    ],
     "apps/web-e2e/src/tests/form-a11y.spec.ts": [
       "apps/web/src/pages/baseball/**",
       "apps/web/src/pages/football/**",

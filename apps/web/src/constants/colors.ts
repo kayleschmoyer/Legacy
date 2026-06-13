@@ -67,8 +67,13 @@ export const POS_RB = '#8B6F47'; // dirt brown
 export const POS_WR = '#2D6A4F'; // turf green
 export const POS_TE = '#7C8794'; // steel
 export const POS_K = BRAND_GOLD; // heritage gold
-export const POS_DEF = '#4A6FA5'; // navy blue
+export const POS_DEF = '#4A6FA5'; // navy blue (legacy / catch-all)
 export const POS_FLEX = '#C49A6C'; // muted gold
+// IDP defensive sub-position tokens — each visually distinct.
+export const POS_DST = BRAND_SEAM_RED; // seam red (team defense unit)
+export const POS_DL = '#C25A2A'; // burnt orange-red (defensive line)
+export const POS_LB = '#9B7A3D'; // amber-brown (linebackers)
+export const POS_DB = '#6B3FA0'; // deep purple (defensive backs)
 
 /** Position → color map for all football positions including defensive designations. */
 export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
@@ -77,10 +82,10 @@ export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
   WR: POS_WR,
   TE: POS_TE,
   K: POS_K,
-  DST: POS_DEF,
-  DL: POS_DEF,
-  LB: POS_DEF,
-  DB: POS_DEF,
+  DST: POS_DST,
+  DL: POS_DL,
+  LB: POS_LB,
+  DB: POS_DB,
 };
 
 export function getFootballPositionColor(
@@ -107,6 +112,10 @@ export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
     K: POS_K,
     DEF: POS_DEF,
     FLEX: POS_FLEX,
+    DST: POS_DST,
+    DL: POS_DL,
+    LB: POS_LB,
+    DB: POS_DB,
   },
 };
 
