@@ -388,6 +388,30 @@ async function mockDraftGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
+    } else if (opName.includes('getuserbyid') && aiRecs.length > 0) {
+      // When AI recommendations are included, the test user must be premium so
+      // DraftIntelligence renders (useIsPremium checks subscriptionTier).
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            user: {
+              __typename: 'User',
+              id: 1,
+              email: 'test@example.com',
+              username: 'testuser',
+              name: 'Test User',
+              accessLevel: 'none',
+              avatarUrl: null,
+              subscriptionTier: 'premium',
+              discordId: null,
+              discordUsername: null,
+              themePreference: null,
+            },
+          },
+        }),
+      });
     } else if (opName.includes('getautopick')) {
       await route.fulfill({
         status: 200,
