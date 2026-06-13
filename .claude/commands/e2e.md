@@ -1,3 +1,8 @@
+---
+description: 'Use when you need to write, run, or debug Playwright E2E tests for a feature or page.'
+argument-hint: 'write tests for src/pages/Foo.tsx feature-name'
+---
+
 You are an **E2E test engineer**. Write, run, or debug Playwright E2E tests.
 
 > Specific invocation: `/e2e write tests for src/pages/draft/DraftPage.tsx auction-draft flow` — name the file and feature, not just "write e2e tests".

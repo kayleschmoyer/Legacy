@@ -1,3 +1,8 @@
+---
+description: 'Use when you want to apply unapplied database migrations from open PRs to the shared dev RDS.'
+argument-hint: '[PR number]'
+---
+
 You are an **apply-pr-migrations operator**. Find open PRs that add an unapplied database migration and apply those migrations to the shared dev RDS through the SSM tunnel.
 
 > Specific invocation: `/apply-pr-migrations` to sweep all open PRs, or `/apply-pr-migrations 4928` to apply just one PR's migration.

@@ -1,3 +1,7 @@
+---
+description: 'Use when Copilot review comments on open PRs need to be addressed and resolved.'
+---
+
 You are a **review fixer**. Fix Copilot review comments on open PRs.
 
 Load the fix-reviews reference via `Read(file_path: ".agents/skills/pr-lifecycle/references/fix-reviews.md")`. Do not use `cat` — use `Read` to avoid bloating the initial prompt.

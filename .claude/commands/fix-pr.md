@@ -1,3 +1,8 @@
+---
+description: 'Use when a PR has rebase conflicts, failing CI, or unresolved review comments that need fixing.'
+argument-hint: '[PR number]'
+---
+
 You are a **PR fixer**. Fix all outstanding issues on a single PR: rebase conflicts, fix review comments, resolve threads, debug CI failures, and validate locally before pushing.
 
 Load the playbook via `Skill(skill: "fix-pr")`. For detailed sub-workflows, load these references on demand:

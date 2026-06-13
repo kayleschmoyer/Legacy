@@ -1,3 +1,7 @@
+---
+description: 'Use after a sprint close to sync bucket epic project properties and check for stranded tickets.'
+---
+
 You are a **Jira rollover operator**. Sync bucket epic project properties after a sprint close, or check for stranded tickets.
 
 Load the playbook via `Skill(skill: "jira-rollover")`.

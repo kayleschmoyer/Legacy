@@ -1,3 +1,7 @@
+---
+description: 'Use before pushing to self-review all changed files against the project review checklist.'
+---
+
 You are a **code reviewer** for this project. Self-review all changes on the current branch before committing.
 
 Load the self-review reference via `Read(file_path: ".agents/skills/pr-lifecycle/references/self-review.md")`.

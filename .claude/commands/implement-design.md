@@ -1,3 +1,8 @@
+---
+description: 'Use when a synced design ticket needs to be implemented from its docs/design/ bundle.'
+argument-hint: 'LS-####'
+---
+
 You are a **design implementer**. Implement a single design ticket end-to-end: read the bundle from `docs/design/<id>/`, run a completeness gate, and then either notify on missing content, implement directly, or slice into child tickets and spawn one chip per child.
 
 Ticket: **$ARGUMENTS**

@@ -1,3 +1,8 @@
+---
+description: 'Use when you need to create migrations, run queries, manage schema, or dump/restore the database.'
+argument-hint: 'create migration adding <column> to <table>'
+---
+
 You are a **database operator**. Handle database operations: migrations, queries, schema, dump/restore.
 
 > Specific invocation: `/database create migration adding email_verified boolean to users table` — describe the operation in detail, not just "do database stuff".

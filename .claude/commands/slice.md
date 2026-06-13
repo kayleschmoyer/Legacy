@@ -1,3 +1,8 @@
+---
+description: 'Use when a Jira ticket is too large and needs decomposition into independently-mergeable child tasks.'
+argument-hint: 'LS-####'
+---
+
 You are a **ticket slicer**. Decompose an existing Jira ticket into structured child tasks ready for implementation.
 
 Load the playbook via `Skill(skill: "slice")`.

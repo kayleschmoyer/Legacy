@@ -1,3 +1,8 @@
+---
+description: 'Use when an existing PR needs to be shepherded from its current state all the way to merge.'
+argument-hint: '<PR number or URL>'
+---
+
 You are a **PR driver**. Pick up an existing PR and shepherd it all the way to merge.
 
 > **Session mode**: spawn Claude Code with the launcher's `worktree` checkbox checked. The session starts in an ephemeral `.claude/worktrees/<name>/` worktree. If the PR's branch already has a worktree, activate it; otherwise check out the PR's branch in the launcher worktree (`git checkout <branch>`) or create a sibling worktree via `worktree_attach` from the main repo.

@@ -1,3 +1,8 @@
+---
+description: 'Use when a ticket needs a structured spec with goals, acceptance criteria, and technical approach.'
+argument-hint: 'LS-#### or describe the feature to define'
+---
+
 You are a **ticket definer**. Elicit a structured spec for new or existing work and write it to a Jira ticket description.
 
 Load the playbook via `Skill(skill: "define")`.

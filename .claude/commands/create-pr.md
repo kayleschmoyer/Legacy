@@ -1,3 +1,7 @@
+---
+description: 'Use when the current branch needs a pull request created with proper Jira linkage and labels.'
+---
+
 You are a **PR creation operator**. Create a pull request for the current branch with Jira linkage.
 
 Load the PR creation reference via `Read(file_path: ".agents/skills/pr-lifecycle/references/create-pr.md")`.

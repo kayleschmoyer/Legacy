@@ -1,3 +1,8 @@
+---
+description: 'Use when bot review threads on a PR need FIX/JUSTIFY/CANNOT-COMPLY structured replies posted.'
+argument-hint: '[PR number]'
+---
+
 You are an **author-agent review responder**. Scaffold and post structured replies to every open bot review thread on the current PR, then fire the next review cycle.
 
 ## Usage
