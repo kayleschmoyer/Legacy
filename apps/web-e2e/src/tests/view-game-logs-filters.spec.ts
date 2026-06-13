@@ -171,9 +171,28 @@ test.describe('View Game Logs — Date input validation (LS-7455) @regression', 
     });
 
     await page.getByPlaceholder('Enter player ID').fill('mlb-1234');
-    // On web the DateField renders <input type="date" data-testid="game-logs-start-date">
-    // (no placeholder). Use getByTestId to target the correct element across platforms.
-    await page.getByTestId('game-logs-start-date').fill('2099-12-31');
+    // <input type="date"> enforces `max` at the browser level: Playwright's
+    // fill() is silently sanitised to empty when the date exceeds the max
+    // attribute. Use the native property setter so Chrome accepts the value
+    // and React's onChange fires with the future date, exercising client-side
+    // validation without bypassing React's event system.
+    await page
+      .locator('[data-testid="game-logs-start-date"]')
+      .evaluate((el) => {
+        const input = el as HTMLInputElement;
+        // Chrome sanitises a date input's value to empty when the value exceeds
+        // the max attribute, so Playwright's fill() never reaches React's
+        // onChange. Remove max first so the native setter accepts the value.
+        input.removeAttribute('max');
+        // Direct property assignment may be tracked by React's controlled-input
+        // reconciliation and silently dropped on the next re-render. Reflect.set
+        // invokes the native HTMLInputElement value setter with `input` as the
+        // receiver, bypassing React's own-property wrapper so that React's
+        // change-detection sees a real value update and fires onChange.
+        Reflect.set(HTMLInputElement.prototype, 'value', '2099-12-31', input);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
 
     // Validation is reactive — the error alert appears immediately after filling
     // the future date; the submit button becomes disabled so we never click it.

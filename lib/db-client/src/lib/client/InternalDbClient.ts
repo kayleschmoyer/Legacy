@@ -68,17 +68,6 @@ export async function getUserById(
     .then(TakeUniqueOrNull);
 }
 
-export async function getUserByDiscordId(
-  db: InternalDb,
-  discordId: string,
-): Promise<InternalUser | null> {
-  return await db
-    .select()
-    .from(Schema.usersInAppInternal)
-    .where(() => eq(Schema.usersInAppInternal.discordId, discordId))
-    .then(TakeUniqueOrNull);
-}
-
 // ── user_identities (LS-7823, multi-provider identity) ───────────────────────
 //
 // These operate over the app_internal.user_identities table introduced in Phase
@@ -315,9 +304,8 @@ export type LinkIdentityResult =
   | { ok: false; reason: 'PROVIDER_ACCOUNT_TAKEN' | 'ALREADY_LINKED' };
 
 /**
- * Provider-agnostic link of an identity onto a user, generalizing the
- * Discord-only `linkDiscordAccount`. Enforces both link rules up front so the
- * caller can return a friendly 409:
+ * Provider-agnostic link of an identity onto a user. Enforces both link rules
+ * up front so the caller can return a friendly 409:
  * - `PROVIDER_ACCOUNT_TAKEN` — that provider account is linked to another user.
  * - `ALREADY_LINKED` — the user already has a (different) identity for this
  *   provider.
@@ -360,8 +348,7 @@ export type UnlinkIdentityResult =
   | { ok: false; reason: 'NOT_LINKED' | 'LAST_IDENTITY' };
 
 /**
- * Provider-agnostic unlink, generalizing the Discord-only
- * `unlinkDiscordAccount`. Enforces the design's two unlink rules:
+ * Provider-agnostic unlink. Enforces the design's two unlink rules:
  * - **Reachability guard** — refuse to remove the last identity unless a local
  *   password remains, so the account never becomes unreachable.
  * - **Canonical re-derivation** — if the unlinked identity was the canonical
@@ -432,26 +419,6 @@ export async function getSubscriptionByUserId(
     .where(() => eq(Schema.subscriptions.userId, userId))
     .limit(1);
   return results[0] ?? null;
-}
-
-export async function linkDiscordAccount(
-  db: InternalDb,
-  userId: number,
-  discordId: string,
-  discordUsername: string,
-  discordAvatar: string | null,
-): Promise<InternalUser> {
-  return await db
-    .update(Schema.usersInAppInternal)
-    .set({
-      discordId,
-      discordUsername,
-      discordAvatar,
-      updatedAt: new Date(),
-    })
-    .where(eq(Schema.usersInAppInternal.id, userId))
-    .returning()
-    .then(TakeUniqueOrThrow);
 }
 
 /**
@@ -605,21 +572,4 @@ export async function consumePasswordResetToken(
     )
     .returning()
     .then(TakeUniqueOrNull);
-}
-
-export async function unlinkDiscordAccount(
-  db: InternalDb,
-  userId: number,
-): Promise<InternalUser> {
-  return await db
-    .update(Schema.usersInAppInternal)
-    .set({
-      discordId: null,
-      discordUsername: null,
-      discordAvatar: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(Schema.usersInAppInternal.id, userId))
-    .returning()
-    .then(TakeUniqueOrThrow);
 }

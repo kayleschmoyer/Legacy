@@ -16,13 +16,10 @@ interface UserRow {
   access_level: string | null;
   avatar_url: string | null;
   subscription_tier: string | null;
-  discord_id: string | null;
-  discord_username: string | null;
-  discord_avatar: string | null;
 }
 
 const USER_SELECT =
-  'SELECT id, canonical_email, username, access_level, avatar_url, subscription_tier, discord_id, discord_username, discord_avatar FROM public.users';
+  'SELECT id, email, username, access_level, avatar_url, subscription_tier FROM public.users';
 
 export async function getUser(params: GetUserParams): Promise<ToolResult> {
   const { identifier, by = 'username' } = params;
@@ -97,9 +94,6 @@ export async function getUser(params: GetUserParams): Promise<ToolResult> {
       accessLevel: user.access_level,
       avatarUrl: user.avatar_url,
       subscriptionTier: user.subscription_tier,
-      discordId: user.discord_id,
-      discordUsername: user.discord_username,
-      discordAvatar: user.discord_avatar,
     };
 
     return {

@@ -264,7 +264,6 @@ const ProfileSettingsPage: React.FC = () => {
   const { themePreference, setThemePreference } = useThemeContext();
   const themeOptionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const userName = user?.username ?? '';
-  const userEmail = user?.email ?? '';
   const userImage = user?.picture ?? null;
   const accessLevel = user?.accessLevel ?? 'none';
 
@@ -272,6 +271,7 @@ const ProfileSettingsPage: React.FC = () => {
     variables: { id: user?.id ?? 0 },
     skip: !user?.id,
   });
+  const userEmail = userData?.user?.email ?? user?.email ?? '';
   const {
     data: identitiesData,
     loading: identitiesLoading,
@@ -315,12 +315,13 @@ const ProfileSettingsPage: React.FC = () => {
   useEffect(() => {
     if (searchParams.get('discord_linked') === '1') {
       void refetchUser();
+      void refetchIdentities();
       // Strip the param from the URL without pushing a new history entry
       const next = new URLSearchParams(searchParams);
       next.delete('discord_linked');
       navigate({ search: next.toString() }, { replace: true });
     }
-  }, [searchParams, navigate, refetchUser]);
+  }, [searchParams, navigate, refetchUser, refetchIdentities]);
 
   const handleAvatarSelect = (url: string | null) => {
     void updateUserAvatar({

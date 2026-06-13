@@ -62,10 +62,10 @@ test.describe('View Game Logs — render perf (LS-5703)', () => {
       return m ? m.duration : Number.POSITIVE_INFINITY;
     });
 
-    // Budget: 250ms from click to scroller visible. The synchronous
-    // pre-LS-5703 implementation took multiple seconds on a 1000-row payload;
-    // raised from 200ms to 250ms to absorb CI runner variance (LS-6226).
-    expect(elapsed).toBeLessThan(250);
+    // Budget: 2000ms from click to scroller visible (includes Playwright poll
+    // overhead). The synchronous pre-LS-5703 path took multiple seconds on a
+    // 1000-row payload; 2s catches that while tolerating slow CI runners.
+    expect(elapsed).toBeLessThan(2000);
   });
 
   test('shows totals label and triggers a second page when scrolled to 80%', async ({

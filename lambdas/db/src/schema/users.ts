@@ -23,9 +23,6 @@ export const UserRef = builder.objectRef<{
   accessLevel?: string | null;
   avatarUrl?: string | null;
   subscriptionTier?: string | null;
-  discordId?: string | null;
-  discordUsername?: string | null;
-  discordAvatar?: string | null;
   themePreference?: string | null;
 }>('User');
 
@@ -37,9 +34,6 @@ UserRef.implement({
     accessLevel: t.exposeString('accessLevel', { nullable: true }),
     avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
     subscriptionTier: t.exposeString('subscriptionTier', { nullable: true }),
-    discordId: t.exposeString('discordId', { nullable: true }),
-    discordUsername: t.exposeString('discordUsername', { nullable: true }),
-    discordAvatar: t.exposeString('discordAvatar', { nullable: true }),
     themePreference: t.exposeString('themePreference', { nullable: true }),
   }),
 });
@@ -167,9 +161,6 @@ builder.queryField('users', (t) =>
         username: u.username,
         accessLevel: u.accessLevel,
         avatarUrl: u.avatarUrl ?? null,
-        discordId: u.discordId ?? null,
-        discordUsername: u.discordUsername ?? null,
-        discordAvatar: u.discordAvatar ?? null,
         themePreference: u.themePreference ?? null,
       }));
     },
@@ -233,9 +224,6 @@ builder.queryField('user', (t) =>
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
-        discordId: user.discordId ?? null,
-        discordUsername: user.discordUsername ?? null,
-        discordAvatar: user.discordAvatar ?? null,
         themePreference: user.themePreference ?? null,
       };
     },
@@ -268,9 +256,6 @@ builder.queryField('userByEmail', (t) =>
         username: foundUser.username,
         accessLevel: foundUser.accessLevel,
         avatarUrl: foundUser.avatarUrl ?? null,
-        discordId: foundUser.discordId ?? null,
-        discordUsername: foundUser.discordUsername ?? null,
-        discordAvatar: foundUser.discordAvatar ?? null,
         themePreference: foundUser.themePreference ?? null,
       };
     },
@@ -301,9 +286,6 @@ builder.queryField('searchUsers', (t) =>
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
-        discordId: user.discordId ?? null,
-        discordUsername: user.discordUsername ?? null,
-        discordAvatar: user.discordAvatar ?? null,
         themePreference: user.themePreference ?? null,
       }));
     },
@@ -339,9 +321,6 @@ builder.mutationField('updateUserRole', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
-        discordId: updated.discordId ?? null,
-        discordUsername: updated.discordUsername ?? null,
-        discordAvatar: updated.discordAvatar ?? null,
         themePreference: updated.themePreference ?? null,
       };
     },
@@ -385,9 +364,6 @@ builder.mutationField('updateUsername', (t) =>
           username: updated.username,
           accessLevel: updated.accessLevel,
           avatarUrl: updated.avatarUrl ?? null,
-          discordId: updated.discordId ?? null,
-          discordUsername: updated.discordUsername ?? null,
-          discordAvatar: updated.discordAvatar ?? null,
           themePreference: updated.themePreference ?? null,
         };
       } catch (error: unknown) {
@@ -436,9 +412,6 @@ builder.mutationField('updateUserAvatar', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
-        discordId: updated.discordId ?? null,
-        discordUsername: updated.discordUsername ?? null,
-        discordAvatar: updated.discordAvatar ?? null,
         themePreference: updated.themePreference ?? null,
       };
     },
@@ -484,9 +457,6 @@ builder.mutationField('updateUserTheme', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
-        discordId: updated.discordId ?? null,
-        discordUsername: updated.discordUsername ?? null,
-        discordAvatar: updated.discordAvatar ?? null,
         themePreference: updated.themePreference ?? null,
       };
     },
@@ -677,9 +647,6 @@ const SetCanonicalEmailResultRef = builder.objectRef<{
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
-    discordId?: string | null;
-    discordUsername?: string | null;
-    discordAvatar?: string | null;
     themePreference?: string | null;
   };
   changed: boolean;
@@ -747,9 +714,6 @@ builder.mutationField('setCanonicalEmail', (t) =>
           username: result.user.username,
           accessLevel: result.user.accessLevel,
           avatarUrl: result.user.avatarUrl ?? null,
-          discordId: result.user.discordId ?? null,
-          discordUsername: result.user.discordUsername ?? null,
-          discordAvatar: result.user.discordAvatar ?? null,
           themePreference: result.user.themePreference ?? null,
         },
         changed: result.changed,

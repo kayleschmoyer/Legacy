@@ -27,9 +27,6 @@ export const users = pgView('users', {
   accessLevel: accessLevel('access_level'),
   avatarUrl: text('avatar_url'),
   subscriptionTier: text('subscription_tier'),
-  discordId: varchar('discord_id', { length: 32 }),
-  discordUsername: varchar('discord_username', { length: 100 }),
-  discordAvatar: varchar('discord_avatar', { length: 255 }),
   themePreference: varchar('theme_preference', { length: 10 }),
   canonicalEmailSource: text('canonical_email_source'),
 }).as(sql`SELECT id,
@@ -38,9 +35,6 @@ export const users = pgView('users', {
        access_level::character varying::access_level AS access_level,
        avatar_url,
        subscription_tier::text AS subscription_tier,
-       discord_id,
-       discord_username,
-       discord_avatar,
        theme_preference,
        canonical_email_source::text AS canonical_email_source
 FROM app_internal.users`);

@@ -4451,9 +4451,6 @@ export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
   avatarUrl?: Maybe<Scalars['String']['output']>;
-  discordAvatar?: Maybe<Scalars['String']['output']>;
-  discordId?: Maybe<Scalars['String']['output']>;
-  discordUsername?: Maybe<Scalars['String']['output']>;
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   subscriptionTier?: Maybe<Scalars['String']['output']>;
@@ -10072,9 +10069,24 @@ export type UserFragment = {
   accessLevel?: string | null;
   avatarUrl?: string | null;
   subscriptionTier?: string | null;
-  discordId?: string | null;
-  discordUsername?: string | null;
   themePreference?: string | null;
+};
+
+export type GetMyIdentitiesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetMyIdentitiesQuery = {
+  __typename?: 'Query';
+  myIdentities: Array<{
+    __typename?: 'UserIdentity';
+    id: number;
+    provider: string;
+    providerEmail?: string | null;
+    providerEmailVerified: boolean;
+    providerUsername?: string | null;
+    providerAvatar?: string | null;
+    linkedAt: string;
+    lastLoginAt?: string | null;
+  }>;
 };
 
 export type AdminUserFragment = {
@@ -10099,8 +10111,6 @@ export type GetUserByIdQuery = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
-    discordId?: string | null;
-    discordUsername?: string | null;
     themePreference?: string | null;
   } | null;
 };
@@ -10124,8 +10134,6 @@ export type GetAllUsersQuery = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
-    discordId?: string | null;
-    discordUsername?: string | null;
     themePreference?: string | null;
   }> | null;
 };
@@ -10155,8 +10163,6 @@ export type UpdateUserRoleMutation = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
-    discordId?: string | null;
-    discordUsername?: string | null;
     themePreference?: string | null;
   } | null;
 };
@@ -10191,8 +10197,6 @@ export type UpdateUsernameMutation = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
-    discordId?: string | null;
-    discordUsername?: string | null;
     themePreference?: string | null;
   } | null;
 };
@@ -10255,8 +10259,6 @@ export type SetCanonicalEmailMutation = {
       accessLevel?: string | null;
       avatarUrl?: string | null;
       subscriptionTier?: string | null;
-      discordId?: string | null;
-      discordUsername?: string | null;
       themePreference?: string | null;
     };
   };
@@ -10985,8 +10987,6 @@ export const UserFragmentDoc = gql`
     accessLevel
     avatarUrl
     subscriptionTier
-    discordId
-    discordUsername
     themePreference
   }
 `;
@@ -23329,6 +23329,98 @@ export type VetoTradeMutationResult = Apollo.MutationResult<VetoTradeMutation>;
 export type VetoTradeMutationOptions = BaseMutationOptions<
   VetoTradeMutation,
   VetoTradeMutationVariables
+>;
+export const GetMyIdentities = gql`
+  query GetMyIdentities {
+    myIdentities {
+      id
+      provider
+      providerEmail
+      providerEmailVerified
+      providerUsername
+      providerAvatar
+      linkedAt
+      lastLoginAt
+    }
+  }
+`;
+
+/**
+ * __useGetMyIdentitiesQuery__
+ *
+ * To run a query within a React component, call `useGetMyIdentitiesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyIdentitiesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyIdentitiesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyIdentitiesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyIdentitiesQuery,
+    GetMyIdentitiesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetMyIdentitiesQuery, GetMyIdentitiesQueryVariables>(
+    GetMyIdentities,
+    options,
+  );
+}
+export function useGetMyIdentitiesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyIdentitiesQuery,
+    GetMyIdentitiesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyIdentitiesQuery,
+    GetMyIdentitiesQueryVariables
+  >(GetMyIdentities, options);
+}
+export function useGetMyIdentitiesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyIdentitiesQuery,
+        GetMyIdentitiesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyIdentitiesQuery,
+    GetMyIdentitiesQueryVariables
+  >(
+    GetMyIdentities,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyIdentitiesQuery,
+          GetMyIdentitiesQueryVariables
+        >,
+  );
+}
+export type GetMyIdentitiesQueryHookResult = ReturnType<
+  typeof useGetMyIdentitiesQuery
+>;
+export type GetMyIdentitiesLazyQueryHookResult = ReturnType<
+  typeof useGetMyIdentitiesLazyQuery
+>;
+export type GetMyIdentitiesSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyIdentitiesSuspenseQuery
+>;
+export type GetMyIdentitiesQueryResult = Apollo.QueryResult<
+  GetMyIdentitiesQuery,
+  GetMyIdentitiesQueryVariables
 >;
 export const GetUserById = gql`
   query GetUserById($id: Int!) {

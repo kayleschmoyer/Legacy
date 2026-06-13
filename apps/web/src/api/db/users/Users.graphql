@@ -5,9 +5,20 @@ fragment User on User {
   accessLevel
   avatarUrl
   subscriptionTier
-  discordId
-  discordUsername
   themePreference
+}
+
+query GetMyIdentities {
+  myIdentities {
+    id
+    provider
+    providerEmail
+    providerEmailVerified
+    providerUsername
+    providerAvatar
+    linkedAt
+    lastLoginAt
+  }
 }
 
 fragment AdminUser on User {

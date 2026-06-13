@@ -1,9 +1,7 @@
 import { LOGGER } from '@legacy-sports/logging';
 import {
   InternalDb,
-  linkDiscordAccount,
   linkIdentity,
-  unlinkDiscordAccount,
   unlinkIdentity,
 } from '@legacy-sports/db-client';
 import { OAuthProvider } from './resolveOrCreateUser';
@@ -37,9 +35,6 @@ export type IdentityMutationResult =
  * Enforces the two link rules via {@link linkIdentity}:
  * - provider account already linked to another user → 409
  * - user already has that provider linked → 409
- *
- * For Discord, the legacy `users.discord_*` columns are dual-written so the
- * existing GraphQL/web consumers keep working until Phase 3.
  */
 export async function linkProviderIdentity(
   db: InternalDb,
@@ -77,16 +72,6 @@ export async function linkProviderIdentity(
     };
   }
 
-  if (identity.provider === 'discord') {
-    await linkDiscordAccount(
-      db,
-      userId,
-      identity.providerAccountId,
-      identity.providerUsername ?? '',
-      identity.providerAvatar ?? null,
-    );
-  }
-
   LOGGER.info('Identity linked', { provider: identity.provider, userId });
   return { ok: true };
 }
@@ -96,8 +81,7 @@ export async function linkProviderIdentity(
  *
  * Enforces the reachability guard (refuse to remove the last identity unless a
  * local password remains) and re-derives the canonical email when the unlinked
- * identity was its source, both via {@link unlinkIdentity}. For Discord, the
- * legacy `users.discord_*` columns are cleared too.
+ * identity was its source, both via {@link unlinkIdentity}.
  */
 export async function unlinkProviderIdentity(
   db: InternalDb,
@@ -120,10 +104,6 @@ export async function unlinkProviderIdentity(
       message:
         'Cannot unlink your only sign-in method — set a password or link another provider first',
     };
-  }
-
-  if (provider === 'discord') {
-    await unlinkDiscordAccount(db, userId);
   }
 
   LOGGER.info('Identity unlinked', {

@@ -641,13 +641,7 @@ export const handleDiscordLink = async (
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        discordId: discordUser.id,
-        discordUsername: discordUser.username,
-        discordAvatar: discordUser.avatar
-          ? discordAvatarUrl(discordUser.id, discordUser.avatar)
-          : null,
-      }),
+      body: JSON.stringify({ ok: true }),
     };
   });
 

@@ -50,8 +50,6 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
         accessLevel: 'none',
         avatarUrl: null,
         subscriptionTier: null,
-        discordId: null,
-        discordUsername: null,
         themePreference: null,
       },
     },

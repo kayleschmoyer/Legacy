@@ -134,9 +134,6 @@ const mockUser = {
   avatarUrl: null,
   privacyPolicyAcceptedAt: null,
   subscriptionTier: 'free' as const,
-  discordId: 'discord-123',
-  discordUsername: 'DiscordUser',
-  discordAvatar: null,
   themePreference: null,
   lastLoginAt: null,
   mfaEnabled: false,
@@ -615,9 +612,7 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
         providerAccountId: 'discord-123',
       }),
     );
-    expect(JSON.parse(result.body) as { discordId: string }).toMatchObject({
-      discordId: 'discord-123',
-    });
+    expect(JSON.parse(result.body)).toMatchObject({ ok: true });
   });
 
   it('requires authentication (401) when no user id resolves', async () => {

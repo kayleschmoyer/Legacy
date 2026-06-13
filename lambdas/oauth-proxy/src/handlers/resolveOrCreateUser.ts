@@ -9,7 +9,6 @@ import {
   getUserById,
   InternalDb,
   InternalUser,
-  linkDiscordAccount,
   linkIdentity,
   setCanonicalEmail,
   touchIdentityOnLogin,
@@ -53,8 +52,8 @@ export type ResolveOrCreateUserResult =
 
 /**
  * Shared, provider-agnostic sign-in resolver for OAuth providers. Replaces the
- * per-provider, email-only lookups (`getOrCreateUser`, `getUserFromGoogleEmail`,
- * Discord's `getUserByDiscordId` + email fallback).
+ * per-provider, email-only lookups (e.g. `getOrCreateUser`, `getUserFromGoogleEmail`,
+ * the former Discord snowflake + email fallback).
  *
  * Keyed on `(provider, providerAccountId)` with a guarded email-owner fallback,
  * exactly as `docs/architecture/multi-provider-identity.md` (Authentication
@@ -90,9 +89,6 @@ export async function resolveOrCreateUser(
       providerAvatar: input.meta?.providerAvatar,
     });
 
-    // No legacy discord_* dual-write here: a returning user already has those
-    // columns populated (Phase 1 backfill or the link/create path below), and
-    // refreshing them every sign-in would churn users.updated_at needlessly.
     const user = await applyCanonicalEmailRule(db, existing, input);
     return { status: 'ok', user, outcome: 'returning_identity' };
   }
@@ -154,7 +150,6 @@ export async function resolveOrCreateUser(
     }
 
     const user = await applyCanonicalEmailRule(db, owner, input);
-    await syncDiscordLegacyColumns(db, user.id, input);
     return { status: 'ok', user, outcome: 'auto_linked' };
   }
 
@@ -178,7 +173,6 @@ export async function resolveOrCreateUser(
     providerUsername: input.meta?.providerUsername,
     providerAvatar: input.meta?.providerAvatar,
   });
-  await syncDiscordLegacyColumns(db, user.id, input);
   return { status: 'ok', user, outcome: 'new_user' };
 }
 
@@ -220,25 +214,4 @@ async function applyCanonicalEmailRule(
     provider,
   });
   return setCanonicalEmail(db, user.id, providerEmail, provider);
-}
-
-/**
- * Keep the legacy `users.discord_*` columns in sync with the Discord identity
- * row. The columns are still read by the GraphQL `User` type and the web
- * profile UI; this dual-write preserves those consumers until Phase 3 drops the
- * columns. No-op for non-Discord providers.
- */
-async function syncDiscordLegacyColumns(
-  db: InternalDb,
-  userId: number,
-  input: ResolveOrCreateUserInput,
-): Promise<void> {
-  if (input.provider !== 'discord') return;
-  await linkDiscordAccount(
-    db,
-    userId,
-    input.providerAccountId,
-    input.meta?.providerUsername ?? '',
-    input.meta?.providerAvatar ?? null,
-  );
 }

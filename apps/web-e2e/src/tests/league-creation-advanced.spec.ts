@@ -94,8 +94,6 @@ async function mockPremiumUser(page: import('@playwright/test').Page) {
               accessLevel: 'none',
               avatarUrl: null,
               subscriptionTier: 'premium',
-              discordId: null,
-              discordUsername: null,
               themePreference: null,
             },
           },

@@ -6,9 +6,8 @@
  * safe auto-link of a password-less email owner, and each conflict path
  * (password account, unverified email, owner already has the provider,
  * ambiguous email owner). Also covers canonical-email rule #3 (refresh only
- * from the source provider, skip on collision) and the legacy `discord_*`
- * dual-write. The db-client primitives are mocked so the resolver's control
- * flow is verified in isolation.
+ * from the source provider, skip on collision). The db-client primitives are
+ * mocked so the resolver's control flow is verified in isolation.
  */
 import {
   createIdentity,
@@ -20,7 +19,6 @@ import {
   getUserById,
   InternalUser,
   InternalUserIdentity,
-  linkDiscordAccount,
   linkIdentity,
   setCanonicalEmail,
   touchIdentityOnLogin,
@@ -44,7 +42,6 @@ jest.mock('@legacy-sports/db-client', () => ({
   getUserByCanonicalEmailOrIdentityEmail: jest.fn(),
   getUserByEmail: jest.fn(),
   getUserById: jest.fn(),
-  linkDiscordAccount: jest.fn(),
   linkIdentity: jest.fn(),
   setCanonicalEmail: jest.fn(),
   touchIdentityOnLogin: jest.fn().mockResolvedValue(undefined),
@@ -60,7 +57,6 @@ const mockCreateUser = createUser as jest.Mock;
 const mockCreateIdentity = createIdentity as jest.Mock;
 const mockSetCanonicalEmail = setCanonicalEmail as jest.Mock;
 const mockTouchIdentity = touchIdentityOnLogin as jest.Mock;
-const mockLinkDiscord = linkDiscordAccount as jest.Mock;
 
 // A minimal fake DB handle — the resolver never touches it directly, it only
 // passes it to the (mocked) db-client primitives.
@@ -76,9 +72,6 @@ function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
     privacyPolicyAcceptedAt: null,
     avatarUrl: null,
     subscriptionTier: 'free',
-    discordId: null,
-    discordUsername: null,
-    discordAvatar: null,
     themePreference: null,
     lastLoginAt: null,
     mfaEnabled: false,
@@ -353,49 +346,5 @@ describe('canonical-email rule #3', () => {
     });
 
     expect(mockSetCanonicalEmail).not.toHaveBeenCalled();
-  });
-});
-
-describe('Discord legacy-column dual-write', () => {
-  it('syncs users.discord_* on a new Discord user', async () => {
-    mockGetIdentity.mockResolvedValue(null);
-    mockEmailOwner.mockResolvedValue({ user: null, ambiguous: false });
-    const created = makeUser({ id: 3, canonicalEmail: 'd@example.com' });
-    mockCreateUser.mockResolvedValue(created);
-    mockSetCanonicalEmail.mockResolvedValue(
-      makeUser({ id: 3, canonicalEmailSource: 'discord' }),
-    );
-
-    await resolveOrCreateUser(db, {
-      provider: 'discord',
-      providerAccountId: 'snowflake-1',
-      providerEmail: 'd@example.com',
-      emailVerified: true,
-      meta: { providerUsername: 'duser', providerAvatar: 'avatarhash' },
-    });
-
-    expect(mockLinkDiscord).toHaveBeenCalledWith(
-      db,
-      3,
-      'snowflake-1',
-      'duser',
-      'avatarhash',
-    );
-  });
-
-  it('does not dual-write for non-Discord providers', async () => {
-    mockGetIdentity.mockResolvedValue(null);
-    mockEmailOwner.mockResolvedValue({ user: null, ambiguous: false });
-    mockCreateUser.mockResolvedValue(makeUser({ id: 3 }));
-    mockSetCanonicalEmail.mockResolvedValue(makeUser({ id: 3 }));
-
-    await resolveOrCreateUser(db, {
-      provider: 'google',
-      providerAccountId: 'sub-x',
-      providerEmail: 'g@example.com',
-      emailVerified: true,
-    });
-
-    expect(mockLinkDiscord).not.toHaveBeenCalled();
   });
 });

@@ -4479,9 +4479,6 @@ input UpsertLeagueSeasonAwardInput {
 type User {
   accessLevel: String
   avatarUrl: String
-  discordAvatar: String
-  discordId: String
-  discordUsername: String
   email: String
   id: Int
   subscriptionTier: String

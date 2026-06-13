@@ -33,8 +33,6 @@ const MOCK_USER_DATA = {
     avatarUrl: null,
     accessLevel: 'none',
     subscriptionTier: null,
-    discordId: null,
-    discordUsername: null,
     themePreference: null,
   },
 };
@@ -386,8 +384,6 @@ async function setupProfileGraphQLWithIdentities(
                   avatarUrl: null,
                   accessLevel: 'none',
                   subscriptionTier: null,
-                  discordId: null,
-                  discordUsername: null,
                   themePreference: null,
                 },
               },

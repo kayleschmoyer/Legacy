@@ -69,9 +69,6 @@ export const usersInAppInternal = appInternal.table(
     subscriptionTier: subscriptionTierInAppInternal('subscription_tier')
       .notNull()
       .default('free'),
-    discordId: varchar('discord_id', { length: 32 }),
-    discordUsername: varchar('discord_username', { length: 100 }),
-    discordAvatar: varchar('discord_avatar', { length: 255 }),
     themePreference: varchar('theme_preference', { length: 10 }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     mfaEnabled: boolean('mfa_enabled').notNull().default(false),

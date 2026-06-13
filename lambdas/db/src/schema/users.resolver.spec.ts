@@ -821,9 +821,6 @@ describe('updateUserTheme mutation', () => {
         username: 'user42',
         accessLevel: 'none',
         avatarUrl: null,
-        discordId: null,
-        discordUsername: null,
-        discordAvatar: null,
         themePreference: theme,
       });
       const resolve = getResolver();
@@ -1282,9 +1279,6 @@ describe('setCanonicalEmail mutation', () => {
       username: 'user42',
       accessLevel: 'user',
       avatarUrl: null,
-      discordId: null,
-      discordUsername: null,
-      discordAvatar: null,
       themePreference: null,
     };
     mockSetCanonicalEmail.mockResolvedValue({
@@ -1321,9 +1315,6 @@ describe('setCanonicalEmail mutation', () => {
       username: 'user42',
       accessLevel: 'user',
       avatarUrl: null,
-      discordId: null,
-      discordUsername: null,
-      discordAvatar: null,
       themePreference: null,
     };
     mockSetCanonicalEmail.mockResolvedValue({
