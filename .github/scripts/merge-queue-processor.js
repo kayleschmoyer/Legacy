@@ -736,22 +736,39 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         }
       }
 
-      // 405 with either "N of M required status checks are expected" or
-      // "N of M required status checks have not succeeded" means branch
-      // protection is waiting for required checks against this SHA — i.e.
-      // CI is still registering or in-progress. Treat as pending and re-queue,
-      // mirroring the 422 head-modified fast path. Other 405 causes propagate.
+      // 405 "Repository rule violations" with a transient required-check state
+      // means branch protection is waiting on (or briefly lost) a required check
+      // against this SHA — treat as pending and re-queue, mirroring the 422
+      // head-modified fast path. Two distinct GitHub message shapes:
+      //
+      //   - aggregate: "N of M required status checks are expected"
+      //                "N of M required status checks have not succeeded"
+      //     → CI is still registering or in-progress (LS-4181/LS-4184).
+      //
+      //   - single:    'Required status check "X" is cancelled.'
+      //                'Required status check "X" is expected.'
+      //     → GitHub's ruleset evaluator latched onto a stale/cancelled duplicate
+      //       run for a required check NAME even though the latest run for that
+      //       name succeeded. validateStatusChecks (latest-completed-per-name)
+      //       already saw it green, so this is a server-side divergence, not a
+      //       real failure. Re-queue; a push / base-push / self-retry re-evaluates
+      //       once the cancelled run is superseded (LS-7989, RFC LS-7988).
+      //
+      // Other 405 causes (e.g. "Pull Request is not mergeable") still propagate.
       const mergeErrMsg =
         (error.response?.data?.message ?? '') + '\n' + (error.message ?? '');
-      if (
-        error.status === 405 &&
+      const isTransientRequiredCheck405 =
         /\d+ of \d+ required status checks? (?:(?:are|is) expected|(?:have|has) not succeeded)/i.test(
           mergeErrMsg,
-        )
-      ) {
+        ) ||
+        /required status check .+? is (?:expected|pending|queued|in[_ ]?progress|cancelled)\b/i.test(
+          mergeErrMsg,
+        );
+      if (error.status === 405 && isTransientRequiredCheck405) {
         console.log(
-          `⏳ PR #${pr.number}: merge rejected with 405 (required checks pending) — ` +
-            `CI still registering or in-progress. Will re-evaluate on next trigger.`,
+          `⏳ PR #${pr.number}: merge rejected with 405 (required check in a transient state) — ` +
+            `CI still registering or in-progress, or a cancelled duplicate run is pending replacement. ` +
+            `Will re-evaluate on next trigger.`,
         );
         hasPendingPRs = true;
         return;

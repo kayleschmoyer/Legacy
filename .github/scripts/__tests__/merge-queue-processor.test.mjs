@@ -511,6 +511,93 @@ describe('merge-queue-processor — 405 required-checks-expected handling (LS-41
     );
   });
 
+  it('treats 405 single-check "Required status check \\"X\\" is cancelled" as pending — no error comment, no throw (LS-7989)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw Object.assign(new Error('Repository rule violations found'), {
+        status: 405,
+        response: {
+          data: {
+            message:
+              'Repository rule violations found\n\n' +
+              'Required status check "🚀 CI Pipeline / lint" is cancelled.',
+          },
+        },
+      });
+    };
+
+    await assert.doesNotReject(
+      () =>
+        processor({
+          github,
+          context,
+          isDryRun: false,
+          forceCheck: false,
+          isRetry: false,
+        }),
+      'processor should not throw when a required check is reported cancelled',
+    );
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'merge attempt should have been made',
+    );
+    assert.strictEqual(
+      calls.comments.filter((c) =>
+        c.body?.includes('Merge Queue Processing Error'),
+      ).length,
+      0,
+      'should NOT post a Processing Error comment for a cancelled-duplicate race',
+    );
+  });
+
+  it('treats 405 single-check "Required status check \\"X\\" is expected" as pending (LS-7989)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw Object.assign(new Error('Repository rule violations found'), {
+        status: 405,
+        response: {
+          data: {
+            message:
+              'Repository rule violations found\n\n' +
+              'Required status check "Verify All Migrations Applied" is expected.',
+          },
+        },
+      });
+    };
+
+    await assert.doesNotReject(() =>
+      processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      }),
+    );
+
+    assert.strictEqual(
+      calls.comments.filter((c) =>
+        c.body?.includes('Merge Queue Processing Error'),
+      ).length,
+      0,
+      'should NOT post a Processing Error comment for an expecting-check race',
+    );
+  });
+
   it('logs verbatim 405 response body (message + documentation_url) before interpretation (LS-4926)', async () => {
     const { github, calls } = makeGithub({
       reviews: [
