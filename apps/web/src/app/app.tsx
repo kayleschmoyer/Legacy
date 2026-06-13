@@ -31,6 +31,7 @@ import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { NAV_Z_INDEX } from '../constants/dimensions';
 import { useFeatureValue } from '../context/GrowthBookProvider';
+import { useIsPremiumStatus } from '../hooks/useIsPremium';
 
 /* ────────────────────────────────────────────────────────
  * Lazy-loaded routes — these pages are split into separate
@@ -169,6 +170,20 @@ function AdminGuard({
   const { user, isLoading } = useAuth();
   if (isLoading) return <UnifiedLoadingPanel fullScreen />;
   if (user?.accessLevel !== 'admin') return <Navigate to="/" replace />;
+  return children;
+}
+
+/** Redirects free-tier users to /pricing. Defense-in-depth for routes whose
+ *  primary value is a premium feature (e.g. analytics). Loading state renders
+ *  a full-screen spinner to prevent a flash of the premium route. */
+function PremiumGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
+  const { isPremium, isLoading } = useIsPremiumStatus();
+  if (isLoading) return <UnifiedLoadingPanel fullScreen />;
+  if (!isPremium) return <Navigate to="/pricing" replace />;
   return children;
 }
 
@@ -707,7 +722,11 @@ function App() {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route
               path="/leagues/:leagueId/analytics"
-              element={<AnalyticsPage />}
+              element={
+                <PremiumGuard>
+                  <AnalyticsPage />
+                </PremiumGuard>
+              }
             />
             <Route path="/scoreboard" element={<ScoreboardPage />} />
             <Route path="/standings" element={<StandingsRedirectPage />} />

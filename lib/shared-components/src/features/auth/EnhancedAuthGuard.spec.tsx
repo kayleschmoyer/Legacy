@@ -149,3 +149,141 @@ describe('EnhancedAuthGuard – session expiry on a public path', () => {
     expect(screen.queryByTestId('app')).toBeNull();
   });
 });
+
+describe('EnhancedAuthGuard – premium path interception', () => {
+  function makeAuthenticatedService() {
+    return makeMockAuthService({
+      getStoredUserProfile: jest.fn(() => ({
+        id: 1,
+        email: 'user@test.com',
+        username: 'FreeUser',
+        accessLevel: 'none' as const,
+      })),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+    });
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    setLocation('/');
+  });
+
+  it('renders children on a premium path when isPremiumUser is true', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeAuthenticatedService() as unknown as AuthService,
+    );
+    setLocation('/leagues/1/analytics');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard premiumPaths={['/leagues']} isPremiumUser={true}>
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('app')).toBeTruthy();
+    });
+  });
+
+  it('renders premiumFallback on a premium prefix path when isPremiumUser is false', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeAuthenticatedService() as unknown as AuthService,
+    );
+    setLocation('/leagues/1/analytics');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard
+          premiumPaths={['/leagues']}
+          isPremiumUser={false}
+          premiumFallback={<div data-testid="upgrade">upgrade</div>}
+        >
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upgrade')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('app')).toBeNull();
+  });
+
+  it('renders premiumFallback on a premium exact path when isPremiumUser is false', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeAuthenticatedService() as unknown as AuthService,
+    );
+    setLocation('/leagues/1/analytics');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard
+          premiumExactPaths={['/leagues/1/analytics']}
+          isPremiumUser={false}
+          premiumFallback={<div data-testid="upgrade">upgrade</div>}
+        >
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upgrade')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('app')).toBeNull();
+  });
+
+  it('renders children on a non-premium path even when isPremiumUser is false', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeAuthenticatedService() as unknown as AuthService,
+    );
+    setLocation('/baseball');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard
+          premiumPaths={['/leagues']}
+          isPremiumUser={false}
+          premiumFallback={<div data-testid="upgrade">upgrade</div>}
+        >
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('app')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('upgrade')).toBeNull();
+  });
+
+  it('renders children when isPremiumUser is undefined even on a premium path', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    MockedAuthService.mockImplementation(
+      () => makeAuthenticatedService() as unknown as AuthService,
+    );
+    setLocation('/leagues/1/analytics');
+
+    render(
+      <AuthProvider config={testConfig}>
+        <EnhancedAuthGuard
+          premiumPaths={['/leagues']}
+          premiumFallback={<div data-testid="upgrade">upgrade</div>}
+        >
+          <div data-testid="app">app</div>
+        </EnhancedAuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('app')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('upgrade')).toBeNull();
+  });
+});

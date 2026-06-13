@@ -155,6 +155,32 @@ export interface EnhancedAuthGuardProps {
    * Native callers should pass currentPath from their router.
    */
   publicExactPaths?: string[];
+  /**
+   * Paths that require a premium subscription. Matched as a prefix (same rules
+   * as publicPaths). When the authenticated user is on one of these paths and
+   * isPremiumUser is explicitly false, premiumFallback is rendered instead of
+   * children. Has no effect when isPremiumUser is undefined or true.
+   * Entries must not include a trailing slash.
+   */
+  premiumPaths?: string[];
+  /**
+   * Paths that require a premium subscription using exact matching only —
+   * child routes are NOT automatically premium-gated when the parent path is
+   * listed here. Same no-trailing-slash rules as premiumPaths apply.
+   */
+  premiumExactPaths?: string[];
+  /**
+   * Whether the authenticated user holds a premium subscription.
+   * Pass false to enable premium-path blocking; undefined (default) disables
+   * the check entirely so callers that don't supply a value are unaffected.
+   */
+  isPremiumUser?: boolean;
+  /**
+   * Content to render when the user is authenticated but not premium and
+   * navigates to a premium-required path. Typically a redirect component or
+   * an upgrade prompt. Defaults to null (blank) when omitted.
+   */
+  premiumFallback?: React.ReactNode;
 }
 
 export function EnhancedAuthGuard({
@@ -169,6 +195,10 @@ export function EnhancedAuthGuard({
   currentPath: currentPathOverride,
   publicPaths = [],
   publicExactPaths = [],
+  premiumPaths = [],
+  premiumExactPaths = [],
+  isPremiumUser,
+  premiumFallback = null,
 }: EnhancedAuthGuardProps) {
   const { isAuthenticated, isLoading, loginWithOAuth, config } = useAuth();
 
@@ -239,6 +269,20 @@ export function EnhancedAuthGuard({
         />
       )
     );
+  }
+
+  // Intercept navigation to premium-required paths for free-tier users.
+  // Only runs after authentication is confirmed (isPremiumUser === false is an
+  // explicit signal from the caller; undefined means "not checking").
+  const isOnPremiumPath =
+    isPremiumUser === false &&
+    (premiumPaths.length > 0 || premiumExactPaths.length > 0) &&
+    (premiumPaths.some(
+      (p) => currentPath === p || currentPath.startsWith(p + '/'),
+    ) ||
+      premiumExactPaths.some((p) => currentPath === p));
+  if (isOnPremiumPath) {
+    return premiumFallback;
   }
 
   // Show authenticated content

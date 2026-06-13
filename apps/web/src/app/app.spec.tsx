@@ -193,6 +193,7 @@ jest.mock('../components/a11y/GlobalAnnouncer', () => ({
 
 // Mock page components (default exports)
 jest.mock('../pages/about/AboutPage', () => () => <div>About Page</div>);
+jest.mock('../pages/pricing/PricingPage', () => () => <div>Pricing Page</div>);
 
 jest.mock('../pages/management/ManagementPage', () => () => (
   <div>Management Page</div>
@@ -268,6 +269,13 @@ jest.mock('../hooks/useWebPushRegistration', () => ({
 // Mock ScoreboardTicker — it uses Apollo query hooks (for example, useGetScoreboardQuery), which require an ApolloProvider
 jest.mock('../components/scoreboard/ScoreboardTicker', () => ({
   ScoreboardTicker: () => null,
+}));
+
+// Mock useIsPremiumStatus — PremiumGuard calls this; the hook uses Apollo and
+// requires an ApolloProvider that is not present in these unit tests.
+jest.mock('../hooks/useIsPremium', () => ({
+  useIsPremium: jest.fn(() => true),
+  useIsPremiumStatus: jest.fn(() => ({ isPremium: true, isLoading: false })),
 }));
 
 // Mock new nav components that use Apollo query hooks (require an ApolloProvider)
@@ -559,7 +567,22 @@ describe('App', () => {
   });
 
   describe('League analytics route', () => {
-    it('renders the analytics page at /leagues/:leagueId/analytics', async () => {
+    let useIsPremiumStatusMock: jest.Mock;
+
+    beforeEach(() => {
+      useIsPremiumStatusMock = jest.requireMock(
+        '../hooks/useIsPremium',
+      ).useIsPremiumStatus;
+    });
+
+    afterEach(() => {
+      useIsPremiumStatusMock.mockReturnValue({
+        isPremium: true,
+        isLoading: false,
+      });
+    });
+
+    it('renders the analytics page at /leagues/:leagueId/analytics for premium users', async () => {
       const { container } = render(
         <MemoryRouter
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -572,6 +595,27 @@ describe('App', () => {
       await act(() => Promise.resolve());
 
       expect(container).toHaveTextContent('Analytics Page');
+    });
+
+    it('redirects free-tier users away from /leagues/:leagueId/analytics', async () => {
+      useIsPremiumStatusMock.mockReturnValue({
+        isPremium: false,
+        isLoading: false,
+      });
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/leagues/42/analytics']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+
+      await act(() => Promise.resolve());
+
+      // PremiumGuard redirects to /pricing — analytics page must not render
+      expect(container).not.toHaveTextContent('Analytics Page');
     });
   });
 
