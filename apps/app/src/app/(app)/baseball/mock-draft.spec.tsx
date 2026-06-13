@@ -23,6 +23,11 @@ jest.mock('tamagui', () => {
   return mocks.tamaguiMocks;
 });
 
+// Lucide icons use Tamagui theming internally and crash without a provider.
+jest.mock('@tamagui/lucide-icons', () => ({
+  Lock: () => null,
+}));
+
 // Subscription status — controlled per-test
 interface SubscriptionResult {
   isPremium: boolean;
@@ -238,6 +243,75 @@ describe('MockDraftPage', () => {
       };
       render(<MockDraftPage />);
       expect(screen.queryByText(/free mock drafts used this week/)).toBeNull();
+    });
+  });
+
+  describe('limit-reached screen (LS-5020)', () => {
+    it('shows the limit-reached screen when a free user has no remaining drafts', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 2,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: false,
+        },
+      };
+      render(<MockDraftPage />);
+      expect(screen.getByTestId('mock-draft-limit-reached')).toBeTruthy();
+      expect(screen.getByText('Weekly Limit Reached')).toBeTruthy();
+      expect(
+        screen.getByText('2 of 2 free mock drafts used this week'),
+      ).toBeTruthy();
+      expect(screen.getByText('Upgrade to Premium')).toBeTruthy();
+    });
+
+    it('does not show the setup form when limit is reached', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 2,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: false,
+        },
+      };
+      render(<MockDraftPage />);
+      expect(screen.queryByText('Start Mock Draft')).toBeNull();
+    });
+
+    it('does not show the limit-reached screen for unlimited users even when remaining is 0', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 5,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: true,
+        },
+      };
+      render(<MockDraftPage />);
+      expect(screen.queryByTestId('mock-draft-limit-reached')).toBeNull();
+      expect(screen.getByText('Start Mock Draft')).toBeTruthy();
+    });
+
+    it('shows the setup form (fail-open) when usage data is null', () => {
+      mockUsageData = undefined;
+      render(<MockDraftPage />);
+      expect(screen.queryByTestId('mock-draft-limit-reached')).toBeNull();
+      expect(screen.getByText('Start Mock Draft')).toBeTruthy();
+    });
+
+    it('navigates to subscription-settings on upgrade press', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 2,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: false,
+        },
+      };
+      render(<MockDraftPage />);
+      fireEvent.press(screen.getByText('Upgrade to Premium'));
+      expect(mockTrackClick).toHaveBeenCalledWith('Mock Draft Simulator');
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
     });
   });
 

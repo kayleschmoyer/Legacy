@@ -192,12 +192,17 @@ export const tamaguiMocks = {
 
   YStack: ({
     children,
+    ...rest
   }: {
     children: React.ReactNode;
     [key: string]: unknown;
   }) => {
     const { View } = getRN();
-    return React.createElement(View, null, children);
+    return React.createElement(
+      View,
+      { testID: rest.testID as string | undefined },
+      children,
+    );
   },
 
   Separator: () => {

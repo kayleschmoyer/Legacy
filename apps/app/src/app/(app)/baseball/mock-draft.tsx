@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
-import { Button, H1, ScrollView, Text, YStack } from 'tamagui';
+import { Lock } from '@tamagui/lucide-icons';
+import { Button, H1, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   type MockDraftSettings,
   MockDraftSetup,
@@ -75,6 +76,84 @@ function PremiumUpsell(): React.JSX.Element {
 }
 
 /**
+ * Shown to free-tier users who have exhausted their weekly mock draft allowance
+ * (LS-5020). Mirrors the web's LimitReachedScreen: blocks the form and surfaces
+ * an upgrade path rather than letting users submit only to get a server error.
+ */
+function LimitReachedScreen({
+  used,
+  limit,
+}: {
+  used: number;
+  limit: number;
+}): React.JSX.Element {
+  const router = useRouter();
+
+  const onUpgrade = () => {
+    trackPremiumFeatureClick(MOCK_DRAFT_FEATURE_NAME);
+    void router.navigate('subscription-settings');
+  };
+
+  return (
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack
+        backgroundColor="$background"
+        flexGrow={1}
+        padding="$5"
+        space="$3"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <YStack
+          testID="mock-draft-limit-reached"
+          backgroundColor="$gray2"
+          borderRadius="$4"
+          borderWidth={1}
+          borderColor={`${BRAND_GOLD}73`}
+          padding="$5"
+          space="$4"
+          width="100%"
+          maxWidth={480}
+          alignItems="center"
+        >
+          <Lock size={32} color={BRAND_GOLD} />
+          <YStack space="$1" alignItems="center">
+            <Text
+              color={BRAND_GOLD}
+              fontSize="$6"
+              fontWeight="bold"
+              textAlign="center"
+            >
+              Weekly Limit Reached
+            </Text>
+            <Text color="$gray11" fontSize="$3" textAlign="center">
+              {used} of {limit} free mock drafts used this week
+            </Text>
+          </YStack>
+          <Text color="$gray11" fontSize="$3" textAlign="center">
+            Upgrade to Premium for unlimited mock drafts and uninterrupted draft
+            practice.
+          </Text>
+          <XStack space="$3" width="100%">
+            <Button
+              flex={1}
+              backgroundColor={BRAND_GOLD}
+              borderRadius="$4"
+              onPress={onUpgrade}
+              pressStyle={{ opacity: 0.85 }}
+            >
+              <Text color="$background" fontWeight="bold">
+                Upgrade to Premium
+              </Text>
+            </Button>
+          </XStack>
+        </YStack>
+      </YStack>
+    </ScrollView>
+  );
+}
+
+/**
  * Mock Draft Simulator screen for mobile (LS-5185). Renders the shared
  * {@link MockDraftSetup} settings form (LS-7711) so web and native stay in
  * sync, wrapping it in native chrome: the page header, the Premium upsell for
@@ -131,6 +210,27 @@ export function MockDraftPage(): React.JSX.Element {
       setMissingLeagueIdError("Couldn't start mock draft — please try again.");
     }
   };
+
+  // Free-tier users who have exhausted their weekly allowance see a blocking
+  // limit-reached screen instead of a form that would fail on submit (LS-5020).
+  // Mirrors web's LimitReachedScreen logic. Fails open when usage is unavailable
+  // so the server-side cap still applies on the rare network-error path.
+  const limitReached =
+    usage != null &&
+    usage.isUnlimited !== true &&
+    usage.used != null &&
+    usage.limit != null &&
+    usage.remaining != null &&
+    usage.remaining <= 0;
+
+  if (limitReached) {
+    return (
+      <LimitReachedScreen
+        used={usage.used as number}
+        limit={usage.limit as number}
+      />
+    );
+  }
 
   const errorMessage = error?.message ?? missingLeagueIdError;
   const showUpsell = !subscriptionLoading && !isPremium;
