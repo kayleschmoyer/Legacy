@@ -310,6 +310,8 @@ jobs:
         run: |
           cp "artifacts/${{ needs.build-android.outputs.apk_name }}" \
              "artifacts/legacy-sports-latest.apk"
+          sha256sum "artifacts/legacy-sports-latest.apk" | awk '{print $1}' \
+             > "artifacts/legacy-sports-latest.apk.sha256"
 
       - name: Create Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
@@ -341,6 +343,7 @@ jobs:
           files: |
             ./artifacts/${{ needs.build-android.outputs.apk_name }}
             ./artifacts/legacy-sports-latest.apk
+            ./artifacts/legacy-sports-latest.apk.sha256
 
       # Self-publish the "Released" date badge to the CI badges gist so the
       # README badge no longer depends on shields.io's shared GitHub token pool

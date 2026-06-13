@@ -16,6 +16,7 @@ import { config } from '@legacy-sports/app-config/native';
 import {
   downloadApk,
   launchApkInstaller,
+  verifyApkIntegrity,
 } from '../../features/updates/installApk';
 import {
   fetchLatestRelease,
@@ -28,6 +29,7 @@ type Phase =
   | { kind: 'checking' }
   | { kind: 'checked'; info: LatestReleaseInfo }
   | { kind: 'downloading'; written: number; expected: number }
+  | { kind: 'verifying' }
   | { kind: 'installing'; fileUri: string }
   | { kind: 'error'; message: string };
 
@@ -82,6 +84,10 @@ export default function UpdateCheckScreen(): React.JSX.Element {
             expected: p.totalBytesExpectedToWrite || info.apkSizeBytes,
           });
         });
+        if (info.apkSha256Url) {
+          setPhase({ kind: 'verifying' });
+          await verifyApkIntegrity(fileUri, info.apkSha256Url);
+        }
         setPhase({ kind: 'installing', fileUri });
         await launchApkInstaller(fileUri);
       } catch (error) {
@@ -222,6 +228,22 @@ export default function UpdateCheckScreen(): React.JSX.Element {
             <Paragraph fontFamily="$mono">
               {formatBytes(phase.written)} / {formatBytes(phase.expected)} (
               {progressPercent(phase.written, phase.expected)}%)
+            </Paragraph>
+            <Spinner />
+          </YStack>
+        ) : null}
+
+        {phase.kind === 'verifying' ? (
+          <YStack
+            gap="$3"
+            padding="$4"
+            borderRadius="$5"
+            borderWidth={1}
+            borderColor="$borderColor"
+          >
+            <H3>Verifying integrity…</H3>
+            <Paragraph color="$colorPress">
+              Checking the download against the published checksum.
             </Paragraph>
             <Spinner />
           </YStack>

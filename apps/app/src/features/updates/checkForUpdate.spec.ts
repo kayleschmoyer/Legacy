@@ -61,6 +61,12 @@ describe('fetchLatestRelease', () => {
           'https://github.com/bkrupa/legacy-sports/releases/download/android-v1.5.0-20260522_120000/legacy-sports-latest.apk',
         size: 50_000_000,
       },
+      {
+        name: 'legacy-sports-latest.apk.sha256',
+        browser_download_url:
+          'https://github.com/bkrupa/legacy-sports/releases/download/android-v1.5.0-20260522_120000/legacy-sports-latest.apk.sha256',
+        size: 65,
+      },
     ],
   };
 
@@ -87,6 +93,21 @@ describe('fetchLatestRelease', () => {
     expect(result.installedVersion).toBe('1.4.0');
     expect(result.apkDownloadUrl).toContain('legacy-sports-latest.apk');
     expect(result.apkSizeBytes).toBe(50_000_000);
+    expect(result.apkSha256Url).toContain('legacy-sports-latest.apk.sha256');
+  });
+
+  it('returns apkSha256Url=null when sha256 asset is absent', async () => {
+    const releaseWithoutChecksum = {
+      ...mockRelease,
+      assets: mockRelease.assets.filter(
+        (a) => a.name !== 'legacy-sports-latest.apk.sha256',
+      ),
+    };
+    const result = await fetchLatestRelease({
+      installedVersion: '1.0.0',
+      fetchFn: mockFetch({}, releaseWithoutChecksum),
+    });
+    expect(result.apkSha256Url).toBeNull();
   });
 
   it('returns updateAvailable=false when versions match', async () => {

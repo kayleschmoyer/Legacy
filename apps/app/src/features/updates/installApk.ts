@@ -66,6 +66,64 @@ export async function downloadApk(
   }
 }
 
+export async function verifyApkIntegrity(
+  fileUri: string,
+  sha256Url: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<void> {
+  let checksumText: string;
+  try {
+    const response = await fetchFn(sha256Url);
+    if (!response.ok) {
+      throw new ApkInstallError(
+        `Could not fetch APK checksum: HTTP ${response.status}`,
+      );
+    }
+    checksumText = await response.text();
+  } catch (error) {
+    if (error instanceof ApkInstallError) throw error;
+    throw new ApkInstallError(
+      `Could not fetch APK checksum from ${sha256Url}`,
+      error,
+    );
+  }
+
+  const expectedHash = checksumText.split(/\s/)[0]?.trim().toLowerCase();
+  if (!expectedHash || !/^[0-9a-f]{64}$/.test(expectedHash)) {
+    throw new ApkInstallError('APK checksum file has unrecognised format');
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = await new ExpoFile(fileUri).bytes();
+  } catch (error) {
+    throw new ApkInstallError(
+      'Could not read downloaded APK for verification',
+      error,
+    );
+  }
+
+  let computedHash: string;
+  try {
+    const hashBuffer = await crypto.subtle.digest(
+      'SHA-256',
+      new Uint8Array(bytes),
+    );
+    const hashBytes = new Uint8Array(hashBuffer);
+    computedHash = Array.from(hashBytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch (error) {
+    throw new ApkInstallError('APK integrity computation failed', error);
+  }
+
+  if (computedHash !== expectedHash) {
+    throw new ApkInstallError(
+      'APK integrity check failed: the downloaded file may be corrupt or tampered',
+    );
+  }
+}
+
 export async function launchApkInstaller(fileUri: string): Promise<void> {
   if (Platform.OS !== 'android') {
     throw new ApkInstallError('APK install is only supported on Android');

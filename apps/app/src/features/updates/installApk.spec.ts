@@ -1,7 +1,12 @@
 import { Platform } from 'react-native';
 import { File as ExpoFile } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
-import { ApkInstallError, downloadApk, launchApkInstaller } from './installApk';
+import {
+  ApkInstallError,
+  downloadApk,
+  launchApkInstaller,
+  verifyApkIntegrity,
+} from './installApk';
 
 // Factories use only jest.fn() — no outer-variable references that would be
 // undefined when Babel-hoisted jest.mock calls execute before variable init.
@@ -189,5 +194,104 @@ describe('launchApkInstaller', () => {
     await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
       /launch APK installer/,
     );
+  });
+});
+
+const KNOWN_BYTES = new Uint8Array([1, 2, 3]);
+
+async function hashOf(bytes: Uint8Array): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function mockFetch(status: number, body: string): typeof fetch {
+  return jest.fn().mockResolvedValue({
+    ok: status >= 200 && status < 300,
+    status,
+    text: () => Promise.resolve(body),
+  }) as unknown as typeof fetch;
+}
+
+describe('verifyApkIntegrity', () => {
+  const mockBytes = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    MockFile.mockReturnValue({ bytes: mockBytes });
+  });
+
+  it('passes when computed hash matches expected hash', async () => {
+    const expected = await hashOf(KNOWN_BYTES);
+    mockBytes.mockResolvedValue(KNOWN_BYTES);
+
+    await expect(
+      verifyApkIntegrity(
+        'file:///cache/test.apk',
+        'https://example.com/test.sha256',
+        mockFetch(200, expected),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws ApkInstallError when hash does not match', async () => {
+    mockBytes.mockResolvedValue(KNOWN_BYTES);
+    const wrongHash = 'b'.repeat(64);
+
+    await expect(
+      verifyApkIntegrity(
+        'file:///cache/test.apk',
+        'https://example.com/test.sha256',
+        mockFetch(200, wrongHash),
+      ),
+    ).rejects.toThrow(ApkInstallError);
+  });
+
+  it('throws ApkInstallError when checksum fetch fails', async () => {
+    await expect(
+      verifyApkIntegrity(
+        'file:///cache/test.apk',
+        'https://example.com/test.sha256',
+        mockFetch(404, 'Not Found'),
+      ),
+    ).rejects.toThrow(/HTTP 404/);
+  });
+
+  it('throws ApkInstallError when checksum format is invalid', async () => {
+    await expect(
+      verifyApkIntegrity(
+        'file:///cache/test.apk',
+        'https://example.com/test.sha256',
+        mockFetch(200, 'not-a-valid-hash'),
+      ),
+    ).rejects.toThrow(/unrecognised format/);
+  });
+
+  it('throws ApkInstallError when reading the APK file fails', async () => {
+    const expected = await hashOf(KNOWN_BYTES);
+    mockBytes.mockRejectedValue(new Error('disk read error'));
+
+    await expect(
+      verifyApkIntegrity(
+        'file:///cache/test.apk',
+        'https://example.com/test.sha256',
+        mockFetch(200, expected),
+      ),
+    ).rejects.toThrow(/read downloaded APK/);
+  });
+
+  it('accepts checksum file with trailing whitespace and filename suffix', async () => {
+    const expected = await hashOf(KNOWN_BYTES);
+    mockBytes.mockResolvedValue(KNOWN_BYTES);
+
+    // sha256sum output format: "<hash>  <filename>\n"
+    await expect(
+      verifyApkIntegrity(
+        'file:///cache/test.apk',
+        'https://example.com/test.sha256',
+        mockFetch(200, `${expected}  legacy-sports-latest.apk\n`),
+      ),
+    ).resolves.toBeUndefined();
   });
 });

@@ -6,6 +6,7 @@ const RELEASES_API_URL =
 const TAG_PATTERN = /^android-v(\d+\.\d+\.\d+)-(\d{8}_\d{6})$/;
 
 const APK_ASSET_NAME = 'legacy-sports-latest.apk';
+const APK_SHA256_ASSET_NAME = 'legacy-sports-latest.apk.sha256';
 
 export interface GitHubReleaseAsset {
   name: string;
@@ -36,6 +37,7 @@ export interface LatestReleaseInfo {
   releaseUrl: string;
   apkDownloadUrl: string;
   apkSizeBytes: number;
+  apkSha256Url: string | null;
   updateAvailable: boolean;
 }
 
@@ -116,6 +118,10 @@ export async function fetchLatestRelease({
     );
   }
 
+  const sha256Asset = release.assets.find(
+    (a) => a.name === APK_SHA256_ASSET_NAME,
+  );
+
   const cmp = compareSemver(parsed.version, installedVersion);
   return {
     installedVersion,
@@ -126,6 +132,7 @@ export async function fetchLatestRelease({
     releaseUrl: release.html_url,
     apkDownloadUrl: apkAsset.browser_download_url,
     apkSizeBytes: apkAsset.size,
+    apkSha256Url: sha256Asset?.browser_download_url ?? null,
     updateAvailable: cmp > 0,
   };
 }
