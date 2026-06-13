@@ -679,11 +679,16 @@ jobs:
           cat /tmp/affected-specs.txt
           # PLAYWRIGHT_BROWSERS_PATH was exported to "" via GITHUB_ENV by the
           # E2E Testing step, so browsers resolve from the user cache here too.
+          # --pass-with-no-tests: an affected spec whose tests are ALL @critical
+          # (already run above) or @slow leaves an empty selection after
+          # --grep-invert. Playwright treats zero matched tests as a hard error
+          # (exit 1) by default; this flag makes that case a no-op pass instead.
           pnpm exec playwright test \
             --config=apps/web-e2e/playwright.config.ts \
             --project=chromium \
             --grep-invert="@critical|@slow" \
             --reporter=line \
+            --pass-with-no-tests \
             --output=apps/web-e2e/test-results-affected \
             "${SPECS[@]}"
 
