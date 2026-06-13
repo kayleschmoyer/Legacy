@@ -11,10 +11,6 @@
       "fallbackToCacheTimeout": 0
     },
     "assetBundlePatterns": ["**/*"],
-    "extra": {
-      "oauthProxy": "placeholder-oauth-proxy-url",
-      "googleClientId": "placeholder-google-client-id"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.legacySports",
