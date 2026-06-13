@@ -73,15 +73,49 @@ export function useWebPushRegistration(): void {
       registeredRef.current = true;
       LOGGER.info(`[${LOG_TAG}] Device token registered with backend`);
     } catch (error) {
-      LOGGER.warn(`[${LOG_TAG}] Failed to register push subscription`, {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      LOGGER.warn(
+        `[${LOG_TAG}] Failed to register push subscription`,
+        error as Error,
+      );
     }
   }, [registerToken]);
 
   useEffect(() => {
     if (isAuthenticated) {
       void register();
+    } else {
+      // Reset so a subsequent login attempt triggers a fresh registration.
+      registeredRef.current = false;
     }
   }, [isAuthenticated, register]);
+
+  // Handle pushsubscriptionchange messages from the service worker.
+  // The SW cannot make authenticated API calls, so it forwards the new
+  // subscription JSON here for us to re-register with the backend.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event: MessageEvent<unknown>) => {
+      if (
+        typeof event.data !== 'object' ||
+        event.data === null ||
+        (event.data as Record<string, unknown>)['type'] !==
+          'PUSH_SUBSCRIPTION_CHANGED'
+      ) {
+        return;
+      }
+      const subscription = (event.data as Record<string, unknown>)[
+        'subscription'
+      ];
+      if (typeof subscription !== 'string') return;
+
+      void registerToken({
+        variables: { input: { deviceToken: subscription, platform: 'web' } },
+      });
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+    return () =>
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+  }, [registerToken]);
 }

@@ -18,12 +18,15 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: jest.fn() }),
 }));
 
+const mockAddPushTokenListener = jest.fn(() => ({ remove: jest.fn() }));
+
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({
     remove: jest.fn(),
   })),
+  addPushTokenListener: (cb: () => void) => mockAddPushTokenListener(cb),
   getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
   getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
   requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
@@ -118,5 +121,45 @@ describe('usePushNotifications — token registration', () => {
 
     expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
     expect(mockRegisterDeviceToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePushNotifications — token rotation', () => {
+  it('re-registers when the OS rolls a new device push token', async () => {
+    mockExtra = { eas: { projectId: 'proj-abc' } };
+
+    let capturedListener: (() => void) | null = null;
+    mockAddPushTokenListener.mockImplementation((cb: () => void) => {
+      capturedListener = cb;
+      return { remove: jest.fn() };
+    });
+
+    renderHook(() => usePushNotifications(1));
+
+    // Wait for initial registration
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(1),
+    );
+
+    // Simulate OS token rotation
+    capturedListener?.();
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it('subscribes addPushTokenListener on mount and unsubscribes on unmount', () => {
+    mockExtra = {};
+    const mockRemove = jest.fn();
+    mockAddPushTokenListener.mockReturnValue({ remove: mockRemove });
+
+    const { unmount } = renderHook(() => usePushNotifications(1));
+
+    expect(mockAddPushTokenListener).toHaveBeenCalled();
+
+    unmount();
+
+    expect(mockRemove).toHaveBeenCalled();
   });
 });

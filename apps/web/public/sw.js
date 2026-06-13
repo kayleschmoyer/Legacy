@@ -29,6 +29,43 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      // Use the already-renewed subscription if the browser provided one;
+      // otherwise re-subscribe with the same options as the old subscription.
+      let newSubscription = event.newSubscription;
+      if (!newSubscription) {
+        const options = event.oldSubscription?.options ?? {
+          userVisibleOnly: true,
+        };
+        try {
+          newSubscription =
+            await self.registration.pushManager.subscribe(options);
+        } catch {
+          // Re-subscription failed — the client will attempt registration on
+          // next page load via useWebPushRegistration.
+          return;
+        }
+      }
+
+      // Forward the new subscription to all open windows so the app can
+      // re-register it with the backend (the SW cannot make authed API calls).
+      const subscriptionJson = JSON.stringify(newSubscription.toJSON());
+      const clientList = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+      for (const client of clientList) {
+        client.postMessage({
+          type: 'PUSH_SUBSCRIPTION_CHANGED',
+          subscription: subscriptionJson,
+        });
+      }
+    })(),
+  );
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 

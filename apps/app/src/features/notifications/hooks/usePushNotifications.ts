@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import {
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
+  addPushTokenListener,
   AndroidImportance,
   getExpoPushTokenAsync,
   getLastNotificationResponseAsync,
@@ -118,16 +119,23 @@ export function usePushNotifications(userId: number | null | undefined) {
         },
       });
     } catch (error) {
-      LOGGER.error(
-        'Failed to register push token',
-        error instanceof Error ? error.message : String(error),
-      );
+      LOGGER.error('Failed to register push token', error as Error);
     }
   }, [userId, registerDeviceToken]);
 
   // Register on mount / when userId becomes available
   useEffect(() => {
     void registerToken();
+  }, [registerToken]);
+
+  // Re-register whenever the OS rolls a new device push token (e.g. after an
+  // app update or credential rotation). Without this, the old token stays in
+  // the backend and push delivery silently fails until the next cold start.
+  useEffect(() => {
+    const subscription = addPushTokenListener(() => {
+      void registerToken();
+    });
+    return () => subscription.remove();
   }, [registerToken]);
 
   // Foreground notification listener
