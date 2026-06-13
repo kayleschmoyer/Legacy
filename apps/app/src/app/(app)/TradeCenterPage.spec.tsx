@@ -308,9 +308,14 @@ describe('TradeCenterPage', () => {
   });
 });
 
-// ── Parity assertions (LS-7485 — TC-002-P) ───────────────────────────────────
+// ── Parity assertions (LS-7485 — TC-002-P / LS-7513 — TC-019 / LS-7516 — TC-019-P) ──────────
 // Verify the native surface uses permissionLevel (not league.owner) to match
 // the web surface and the server's vetoTrade authorisation logic.
+// Additional intentional differences that must stay stable:
+//   - Real-time: wired via useWebSocket + keychain JWT + onSubscribeRefresh
+//     (not via the shared LeagueWebSocketContext used by web).
+//   - Premium gating (TC-019-P): no page-level premium UI on native; isPremium
+//     and onUpgradePremium are NOT injected into TradingCenter at this level.
 
 describe('TradeCenterPage — surface contract (parity assertions)', () => {
   it.each([
@@ -357,6 +362,41 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
 
     await waitFor(() => {
       expect(typeof capturedNativeProps?.onSubscribeRefresh).toBe('function');
+    });
+  });
+
+  // ── Premium gating contract (LS-7516 — TC-019-P) ────────────────────────────
+  // Native has no page-level premium UI (no equivalent of the web TradeAnalyzerCard).
+  // isPremium and onUpgradePremium must NOT be injected at this level so the
+  // shared TradingCenter manages its own premium state independently.
+
+  it('does not inject isPremium into TradingCenter — native has no page-level premium gating', async () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(capturedNativeProps?.isPremium).toBeUndefined();
+    });
+  });
+
+  it('does not inject onUpgradePremium into TradingCenter — native has no premium upsell at page level', async () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(capturedNativeProps?.onUpgradePremium).toBeUndefined();
     });
   });
 });

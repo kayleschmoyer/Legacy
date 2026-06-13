@@ -152,6 +152,22 @@ describe('TradesTab — spectator guard', () => {
   });
 });
 
+describe('TradesTab — premium gating contract (LS-7516 — TC-019-P)', () => {
+  // The Trades tab has no page-level premium UI (no equivalent of the web
+  // TradeAnalyzerCard). isPremium and onUpgradePremium must NOT be injected at
+  // this level — the shared TradingCenter manages its own premium state via
+  // PremiumTradeTools and the isPremium prop only if a caller explicitly provides it.
+  it('does not inject isPremium into TradingCenter — tab has no page-level premium gating', () => {
+    render(<TradesTab league={baseLeague} isMember myTeamId={42} />);
+    expect(capturedProps?.isPremium).toBeUndefined();
+  });
+
+  it('does not inject onUpgradePremium into TradingCenter — tab has no premium upsell flow', () => {
+    render(<TradesTab league={baseLeague} isMember myTeamId={42} />);
+    expect(capturedProps?.onUpgradePremium).toBeUndefined();
+  });
+});
+
 describe('TradesTab — missing league id guard', () => {
   it('renders an empty error state (not TradingCenter) when league.id is absent', () => {
     const leagueWithoutId = {

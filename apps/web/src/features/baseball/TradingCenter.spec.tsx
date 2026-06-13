@@ -1,9 +1,9 @@
 /**
- * Contract tests for the web TradingCenter wrapper (LS-7513 — TC-019).
+ * Contract tests for the web TradingCenter wrapper (LS-7513 — TC-019 / LS-7516 — TC-019-P).
  *
  * The web wrapper is the second of three surfaces that compose TradingCenter.
  * Its responsibilities are:
- *   1. Forward all caller props (leagueId, userTeamId, isCommissioner, …) to
+ *   1. Forward all caller props (leagueId, userTeamId, isCommissioner, isPremium, …) to
  *      the shared TradingCenter component unchanged.
  *   2. Wire real-time refresh by subscribing to the page-level
  *      LeagueWebSocketContext via useLeagueWebSocket, and connecting the
@@ -15,8 +15,17 @@
  * Contrast with the other two surfaces:
  *   - Native TradeCenterPage: creates its own WebSocket connection using
  *     useWebSocket + a keychain JWT and passes onSubscribeRefresh explicitly.
+ *     Premium gating (TC-019-P): does not inject isPremium — no page-level
+ *     premium UI on native.
  *   - Trades tab (league-detail-v2): inherits the page-level context without
  *     any explicit real-time wiring in the tab component itself.
+ *     Premium gating (TC-019-P): does not inject isPremium — no page-level
+ *     premium UI on the tab.
+ *
+ * Premium gating note (TC-019-P): this wrapper CAN forward isPremium when the
+ * caller provides it, but LeagueTradesView (the /trade-center caller) does not
+ * inject it. The web page gates premium at page level via TradeAnalyzerCard,
+ * not by threading isPremium into each per-league TradingCenter instance.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 import React from 'react';
