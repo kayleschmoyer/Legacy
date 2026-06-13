@@ -12,7 +12,7 @@
  * Matchup game-level stat types (LS-4765): used by LS-4151 matchup resolver.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, eq, gt, ilike, or, SQL } from 'drizzle-orm';
+import { and, eq, gt, or, sql, SQL } from 'drizzle-orm';
 import { builder } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 
@@ -1406,12 +1406,19 @@ builder.queryField('footballPlayers', (t) =>
       }
 
       if (args.search) {
-        const term = `%${args.search}%`;
+        const tokens = args.search.trim().split(/\s+/).filter(Boolean);
+        const tokenConditions = tokens.map((token) => {
+          const escaped = token.replace(/[\\%_]/g, '\\$&');
+          const pattern = `%${escaped}%`;
+          return or(
+            sql<boolean>`${PublicSchema.players.firstName} ILIKE ${pattern} ESCAPE '\\'`,
+            sql<boolean>`${PublicSchema.players.lastName} ILIKE ${pattern} ESCAPE '\\'`,
+          )!;
+        });
         conditions.push(
-          or(
-            ilike(PublicSchema.players.firstName, term),
-            ilike(PublicSchema.players.lastName, term),
-          )!,
+          tokenConditions.length === 1
+            ? tokenConditions[0]
+            : and(...tokenConditions)!,
         );
       }
 

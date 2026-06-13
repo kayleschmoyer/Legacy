@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   type GraphQLObjectType,
   type GraphQLSchema,
@@ -363,6 +364,94 @@ describe('football resolvers', () => {
           undefined as never,
         ),
       ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
+
+    describe('search parameter handling', () => {
+      // Serialize the WHERE SQL passed to db.where() into { sql, params }
+      // using drizzle's own dialect, so assertions read the real compiled
+      // query rather than poking at SQL-object internals.
+      function compileWhere(): { sql: string; params: unknown[] } {
+        const whereArg = mockDb.where.mock.calls[0][0];
+        const { sql, params } = new PgDialect().sqlToQuery(whereArg);
+        return { sql, params };
+      }
+
+      it('full-name search splits on whitespace and produces per-token ILIKE params', async () => {
+        mockDb.then.mockImplementationOnce((resolve) =>
+          resolve([
+            {
+              id: 1,
+              firstName: 'Patrick',
+              lastName: 'Mahomes',
+              pfrId: null,
+              isDst: false,
+              nflTeam: 'KC',
+              position: 'QB',
+            },
+          ]),
+        );
+
+        const result = (await getResolver()(
+          {},
+          { position: null, search: 'Patrick Mahomes', after: null },
+          mockContext,
+          undefined as never,
+        )) as FootballPlayersResult;
+
+        expect(result.nodes).toHaveLength(1);
+        expect(result.nodes[0].firstName).toBe('Patrick');
+
+        const { params } = compileWhere();
+        // Each token is matched across firstName OR lastName, AND-ed together,
+        // so both tokens appear as ILIKE bind params.
+        expect(params).toContain('%Patrick%');
+        expect(params).toContain('%Mahomes%');
+      });
+
+      it('single-token search produces one ILIKE pattern (unchanged behavior)', async () => {
+        await getResolver()(
+          {},
+          { position: null, search: 'Mahomes', after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const { params } = compileWhere();
+        expect(params).toContain('%Mahomes%');
+        expect(params).not.toContain('%Patrick%');
+      });
+
+      it('escapes underscore so a single _ does not act as a wildcard', async () => {
+        await getResolver()(
+          {},
+          { position: null, search: '_', after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql, params } = compileWhere();
+        // The underscore is escaped, so it matches a literal '_' rather than
+        // any single character (which would return the whole table).
+        expect(params).toContain('%\\_%');
+        expect(params).not.toContain('%_%');
+        expect(sql).toContain('ESCAPE');
+      });
+
+      it('escapes percent sign so a single % does not match all players', async () => {
+        await getResolver()(
+          {},
+          { position: null, search: '%', after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql, params } = compileWhere();
+        // The percent is escaped, so it matches a literal '%' rather than any
+        // sequence (which would return the whole table).
+        expect(params).toContain('%\\%%');
+        expect(params).not.toContain('%%%');
+        expect(sql).toContain('ESCAPE');
+      });
     });
   });
 
