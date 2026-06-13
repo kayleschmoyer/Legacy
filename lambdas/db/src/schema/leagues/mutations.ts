@@ -876,6 +876,40 @@ async function requireJoinLeagueCapacity(
   }
 }
 
+async function notifyLeagueMembersOfJoin(
+  context: Context,
+  leagueId: number,
+  joinerUsername: string,
+  joinerId: number,
+): Promise<void> {
+  if (!context.notificationPublisher) return;
+  try {
+    const existingMembers = await context.db
+      .select({ userId: PublicSchema.leagueMembers.userId })
+      .from(PublicSchema.leagueMembers)
+      .where(
+        and(
+          eq(PublicSchema.leagueMembers.leagueId, leagueId),
+          ne(PublicSchema.leagueMembers.userId, joinerId),
+        ),
+      );
+    const memberUserIds = existingMembers.map((m) => m.userId);
+    if (memberUserIds.length > 0) {
+      await context.notificationPublisher.publishToMany(memberUserIds, {
+        notificationType: 'LEAGUE_MEMBER_JOINED',
+        title: 'New Member Joined',
+        body: `${joinerUsername} joined your league!`,
+        data: { leagueId },
+      });
+    }
+  } catch (pushErr: unknown) {
+    LOGGER.warn(
+      'Failed to send push notifications for league join (non-fatal)',
+      { err: pushErr },
+    );
+  }
+}
+
 // Mutation field to join a league using an invite code
 builder.mutationField('joinLeagueByCode', (t) =>
   t.field({
@@ -1014,6 +1048,13 @@ builder.mutationField('joinLeagueByCode', (t) =>
             { err },
           );
         }
+
+        await notifyLeagueMembersOfJoin(
+          context,
+          league.id,
+          joinerUsername,
+          userId,
+        );
 
         return team;
       } catch (error) {
@@ -1227,6 +1268,13 @@ builder.mutationField('joinLeague', (t) =>
             { err },
           );
         }
+
+        await notifyLeagueMembersOfJoin(
+          context,
+          league.id,
+          joinerUsername,
+          userId,
+        );
 
         return {
           success: true,
@@ -2150,6 +2198,13 @@ builder.mutationField('joinPublicLeague', (t) =>
             { err },
           );
         }
+
+        await notifyLeagueMembersOfJoin(
+          context,
+          leagueId,
+          joinerUsername,
+          userId,
+        );
 
         return {
           success: true,
