@@ -318,8 +318,14 @@ function PositionPill({
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) setDebounced(value);
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [value, delay]);
   return debounced;
 }
@@ -359,7 +365,7 @@ export default function FootballPlayers(): React.JSX.Element {
           : teamFilter === 'AFC' || teamFilter === 'NFC'
             ? undefined
             : teamFilter,
-      search: debouncedSearch || undefined,
+      search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
       after: cursor,
     },
     notifyOnNetworkStatusChange: true,

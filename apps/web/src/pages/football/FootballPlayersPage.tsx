@@ -32,8 +32,14 @@ type PlayerListItem = NonNullable<
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) setDebounced(value);
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [value, delay]);
   return debounced;
 }
@@ -66,7 +72,7 @@ export function FootballPlayersPage() {
   const queryVars = {
     position: position === 'All' ? undefined : position,
     nflTeam: teamFilter === 'All' ? undefined : teamFilter,
-    search: debouncedSearch || undefined,
+    search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
     after: cursor,
   };
 
