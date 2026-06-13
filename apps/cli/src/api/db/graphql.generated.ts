@@ -784,6 +784,7 @@ export type FootballCareerKicking = {
   fg3039m?: Maybe<Scalars['Int']['output']>;
   fg4049a?: Maybe<Scalars['Int']['output']>;
   fg4049m?: Maybe<Scalars['Int']['output']>;
+  fgPct?: Maybe<Scalars['Float']['output']>;
   fga?: Maybe<Scalars['Int']['output']>;
   fgm?: Maybe<Scalars['Int']['output']>;
   g?: Maybe<Scalars['Int']['output']>;

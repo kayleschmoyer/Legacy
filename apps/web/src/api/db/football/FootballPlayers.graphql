@@ -27,6 +27,7 @@ fragment FootballPlayerHeader on FootballPlayer {
     kicking {
       fgm
       fga
+      fgPct
     }
     defense {
       sacks

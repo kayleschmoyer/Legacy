@@ -46,6 +46,7 @@ export interface FootballPlayerCardStats {
   kicking?: {
     fgm?: number | null;
     fga?: number | null;
+    fgPct?: number | null;
   } | null;
   defense?: {
     sacks?: number | null;
@@ -195,10 +196,8 @@ function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
   }
 
   const { passing, rushing, receiving, kicking } = stats;
-  const fgPct =
-    kicking?.fga && kicking.fga > 0
-      ? ((kicking.fgm ?? 0) / kicking.fga) * 100
-      : null;
+  // Server-provided FG% (LS-6244) — single source of truth, no client recompute.
+  const fgPct = kicking?.fgPct ?? null;
 
   if (!passing && !rushing && !receiving && !kicking) {
     return (

@@ -784,6 +784,7 @@ export type FootballCareerKicking = {
   fg3039m?: Maybe<Scalars['Int']['output']>;
   fg4049a?: Maybe<Scalars['Int']['output']>;
   fg4049m?: Maybe<Scalars['Int']['output']>;
+  fgPct?: Maybe<Scalars['Float']['output']>;
   fga?: Maybe<Scalars['Int']['output']>;
   fgm?: Maybe<Scalars['Int']['output']>;
   g?: Maybe<Scalars['Int']['output']>;
@@ -6455,6 +6456,7 @@ export type FootballPlayersQuery = {
           __typename?: 'FootballCareerKicking';
           fgm?: number | null;
           fga?: number | null;
+          fgPct?: number | null;
         } | null;
         defense?: {
           __typename?: 'FootballCareerDefense';
@@ -6589,6 +6591,7 @@ export type FootballPlayerQuery = {
         __typename?: 'FootballCareerKicking';
         fgm?: number | null;
         fga?: number | null;
+        fgPct?: number | null;
       } | null;
       defense?: {
         __typename?: 'FootballCareerDefense';
@@ -11635,6 +11638,7 @@ export const FootballPlayers = gql`
           kicking {
             fgm
             fga
+            fgPct
           }
           defense {
             sacks
@@ -11831,6 +11835,7 @@ export const FootballPlayer = gql`
         kicking {
           fgm
           fga
+          fgPct
         }
         defense {
           g

@@ -149,10 +149,8 @@ function PlayerStats({ player }: { player: FootballPlayerNode }) {
   // independent of the nominal position, so multi-category players (QB with
   // rushing, RB with receiving, hybrid TE/WR) surface all their stats (LS-6242).
   const { passing, rushing, receiving, kicking } = stats;
-  const fgPct =
-    kicking?.fga && kicking.fga > 0
-      ? ((kicking.fgm ?? 0) / kicking.fga) * 100
-      : null;
+  // Server-provided FG% (LS-6244) — single source of truth, no client recompute.
+  const fgPct = kicking?.fgPct ?? null;
 
   if (!passing && !rushing && !receiving && !kicking) {
     return (

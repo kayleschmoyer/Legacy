@@ -541,6 +541,16 @@ CareerKickingRef.implement({
     g: t.exposeInt('g', { nullable: true }),
     fgm: t.exposeInt('fgm', { nullable: true }),
     fga: t.exposeInt('fga', { nullable: true }),
+    // Server-computed field goal percentage — single source of truth so clients
+    // never re-derive it from fgm/fga (LS-6244). Rounded to 1 decimal to match the
+    // season kicking fgPct scale (numeric(4,1)). Null when no attempts.
+    fgPct: t.float({
+      nullable: true,
+      resolve: (k) =>
+        k.fga && k.fga > 0
+          ? Math.round(((k.fgm ?? 0) / k.fga) * 1000) / 10
+          : null,
+    }),
     fg019m: t.exposeInt('fg019m', { nullable: true }),
     fg019a: t.exposeInt('fg019a', { nullable: true }),
     fg2029m: t.exposeInt('fg2029m', { nullable: true }),

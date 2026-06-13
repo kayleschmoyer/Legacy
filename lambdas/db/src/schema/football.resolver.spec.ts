@@ -667,4 +667,45 @@ describe('football resolvers', () => {
       );
     });
   });
+
+  describe('FootballCareerKicking type (LS-6244)', () => {
+    it('exposes a server-computed fgPct field', () => {
+      const type = schema.getType('FootballCareerKicking') as GraphQLObjectType;
+      const field = type.getFields().fgPct;
+      expect(field).toBeDefined();
+      expect(field?.resolve).toBeDefined();
+    });
+
+    it('computes fgPct from fgm/fga rounded to 1 decimal', () => {
+      const type = schema.getType('FootballCareerKicking') as GraphQLObjectType;
+      const field = type.getFields().fgPct;
+
+      // 25/30 = 83.33% → 83.3 (single source of truth, no client recompute)
+      expect(
+        field.resolve!(
+          { fgm: 25, fga: 30 },
+          {},
+          mockContext,
+          undefined as never,
+        ),
+      ).toBe(83.3);
+    });
+
+    it('returns null fgPct when there are no attempts', () => {
+      const type = schema.getType('FootballCareerKicking') as GraphQLObjectType;
+      const field = type.getFields().fgPct;
+
+      expect(
+        field.resolve!({ fgm: 0, fga: 0 }, {}, mockContext, undefined as never),
+      ).toBeNull();
+      expect(
+        field.resolve!(
+          { fgm: null, fga: null },
+          {},
+          mockContext,
+          undefined as never,
+        ),
+      ).toBeNull();
+    });
+  });
 });

@@ -39,6 +39,7 @@ query FootballPlayers(
         kicking {
           fgm
           fga
+          fgPct
         }
         defense {
           sacks
@@ -152,6 +153,7 @@ query FootballPlayer($id: Int!) {
       kicking {
         fgm
         fga
+        fgPct
       }
       defense {
         g

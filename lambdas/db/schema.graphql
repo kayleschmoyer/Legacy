@@ -904,6 +904,7 @@ type FootballCareerKicking {
   fg3039m: Int
   fg4049a: Int
   fg4049m: Int
+  fgPct: Float
   fga: Int
   fgm: Int
   g: Int

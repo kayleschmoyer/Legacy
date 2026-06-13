@@ -46,6 +46,7 @@ export interface FootballPlayerDetailStats {
   kicking?: {
     fgm?: number | null;
     fga?: number | null;
+    fgPct?: number | null;
   } | null;
   defense?: {
     g?: number | null;
@@ -724,7 +725,8 @@ function ReceivingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
 
 function KickingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
   const k = stats.kicking;
-  const fgPct = k?.fga && k.fga > 0 ? ((k.fgm ?? 0) / k.fga) * 100 : null;
+  // Server-provided FG% (LS-6244) — single source of truth, no client recompute.
+  const fgPct = k?.fgPct ?? null;
   return (
     <StatGroup title="Career Kicking">
       <StatCell label="FGM" value={fmt(k?.fgm)} />
