@@ -54,6 +54,7 @@ export async function loadPlayerGameStats(
     isDst: boolean;
     nflTeam: string | null;
     position: Player['position'];
+    jerseyNumber: number | null;
   } = {
     id: playerId,
     firstName: '',
@@ -77,6 +78,7 @@ export async function loadPlayerGameStats(
     isDst: false,
     nflTeam: null,
     position: null,
+    jerseyNumber: null,
   };
 
   try {

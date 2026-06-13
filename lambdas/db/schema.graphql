@@ -1072,6 +1072,7 @@ type FootballPlayer {
   headshotUrl: String
   id: Int!
   isDst: Boolean!
+  jerseyNumber: Int
   lastName: String!
   nflTeam: String
   pfrId: String

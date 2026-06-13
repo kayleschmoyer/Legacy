@@ -52,6 +52,8 @@ export const players = pgTable(
     // PFR canonical position for football players (LS-250). Nullable — baseball players
     // and football players without a PFR mapping have null.
     position: playerPosition('position'),
+    // NFL jersey number for display (LS-6236). Nullable — DST and unmapped players have null.
+    jerseyNumber: integer('jersey_number'),
   },
   (table) => {
     return {

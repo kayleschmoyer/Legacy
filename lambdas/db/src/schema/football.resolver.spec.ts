@@ -13,6 +13,7 @@ type FootballPlayersResult = {
     isDst: boolean;
     nflTeam: string | null;
     position: string | null;
+    jerseyNumber: number | null;
   }>;
   pageInfo: { hasNextPage: boolean; endCursor: string | null };
 };
@@ -25,6 +26,7 @@ type FootballPlayerResult = {
   isDst: boolean;
   nflTeam: string | null;
   position: string | null;
+  jerseyNumber: number | null;
 } | null;
 
 describe('football resolvers', () => {
@@ -71,6 +73,7 @@ describe('football resolvers', () => {
           nflTeam: 'nflTeam',
           pfrId: 'pfrId',
           position: 'position',
+          jerseyNumber: 'jerseyNumber',
         },
         footballSeasonPassing: { playerId: 'playerId', season: 'season' },
         footballSeasonRushing: { playerId: 'playerId', season: 'season' },

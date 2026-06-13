@@ -63,6 +63,7 @@ async function main() {
     isDst: false,
     nflTeam: null,
     position: null,
+    jerseyNumber: null,
   };
 
   const season = parseInt(options.season, 10);

@@ -950,6 +950,7 @@ export type FootballPlayer = {
   headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
   isDst: Scalars['Boolean']['output'];
+  jerseyNumber?: Maybe<Scalars['Int']['output']>;
   lastName: Scalars['String']['output'];
   nflTeam?: Maybe<Scalars['String']['output']>;
   pfrId?: Maybe<Scalars['String']['output']>;

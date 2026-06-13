@@ -70,6 +70,7 @@ interface ScoringResultRow {
   is_dst: boolean;
   nfl_team: string | null;
   position: string | null;
+  jersey_number: number | null;
 }
 
 export interface PlayerFilters {
@@ -604,7 +605,7 @@ export class PlayerService {
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             p.bat_hand, p.throw_hand,
-            p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position,
+            p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
             ${fieldingScoreExpr} AS fielding_score,
@@ -653,6 +654,7 @@ export class PlayerService {
           isDst: row.is_dst ?? false,
           nflTeam: row.nfl_team ?? null,
           position: toPlayerPosition(row.position),
+          jerseyNumber: row.jersey_number ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

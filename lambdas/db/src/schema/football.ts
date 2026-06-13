@@ -759,6 +759,7 @@ interface FootballPlayerShape {
   isDst: boolean;
   nflTeam: string | null;
   position: string | null;
+  jerseyNumber: number | null;
 }
 
 /**
@@ -831,6 +832,7 @@ FootballPlayerRef.implement({
     isDst: t.exposeBoolean('isDst', { nullable: false }),
     nflTeam: t.exposeString('nflTeam', { nullable: true }),
     position: t.exposeString('position', { nullable: true }),
+    jerseyNumber: t.exposeInt('jerseyNumber', { nullable: true }),
     previousTeams: t.field({
       type: ['String'],
       nullable: false,
@@ -1396,6 +1398,7 @@ builder.queryField('footballPlayers', (t) =>
           isDst: PublicSchema.players.isDst,
           nflTeam: PublicSchema.players.nflTeam,
           position: PublicSchema.players.position,
+          jerseyNumber: PublicSchema.players.jerseyNumber,
         })
         .from(PublicSchema.players)
         .where(and(...conditions))
@@ -1444,6 +1447,7 @@ builder.queryField('footballPlayer', (t) =>
           isDst: PublicSchema.players.isDst,
           nflTeam: PublicSchema.players.nflTeam,
           position: PublicSchema.players.position,
+          jerseyNumber: PublicSchema.players.jerseyNumber,
         })
         .from(PublicSchema.players)
         .where(
