@@ -10,6 +10,8 @@ import { resolvePostLoginDestination } from '../common/auth/postLoginDestination
 import { getLastVisitedLeague } from '../common/utilities/lastVisitedLeague';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 
+const BG_DEEP_NAVY = '#0A0F1A';
+
 const Login: React.FC = () => {
   const router = useRouter();
   // The guard renders this screen in place at the deep-linked route, so the
@@ -112,7 +114,7 @@ const Login: React.FC = () => {
         flex={1}
         justifyContent="center"
         padding="$5"
-        backgroundColor="#0A0F1A"
+        backgroundColor={BG_DEEP_NAVY}
       >
         <LoginPage
           onGoogleSignIn={handleGoogleSignIn}
