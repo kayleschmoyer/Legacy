@@ -252,6 +252,24 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
   });
 
   describe('create + navigation', () => {
+    it('redirects to upgrade instead of creating when at the free-tier cap (LS-5013)', async () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...MOCK_LEAGUES,
+            { id: 3, name: 'Third', inviteCode: 'C3' },
+          ],
+        },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith('subscription-settings'),
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
     it('runs the create mutation and navigates to the new league', async () => {
       render(<BaseballHome />);
       fireEvent.press(screen.getByTestId('create'));

@@ -124,6 +124,10 @@ export default function BaseballHome() {
     showLeagueCap && rawLeagues.length >= FREE_TIER_LEAGUE_LIMIT;
 
   const handleCreateLeague = async (input: QuickCreateLeagueInput) => {
+    if (atFreeLeagueLimit) {
+      goToUpgrade();
+      return;
+    }
     const result = await createLeague({
       variables: {
         input: {

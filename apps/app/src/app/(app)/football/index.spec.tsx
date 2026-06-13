@@ -1,0 +1,275 @@
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import type {
+  Pressable as RNPressable,
+  Text as RNText,
+  View as RNView,
+} from 'react-native';
+
+import FootballHome from './index';
+
+// ── Mock type helpers ────────────────────────────────────────────────────────
+
+type RNComponents = {
+  View: typeof RNView;
+  Text: typeof RNText;
+  Pressable: typeof RNPressable;
+};
+
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+const mockNavigate = jest.fn();
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
+}));
+
+jest.mock('@legacy-sports/shared-components/football', () => {
+  const { View, Text, Pressable } =
+    jest.requireActual<RNComponents>('react-native');
+  return {
+    NFLHome: (props: {
+      leagues: { name?: string | null }[];
+      loading?: boolean;
+      error?: boolean;
+      onCreateLeague: () => void;
+      onJoinLeague?: () => void;
+      onBrowseLeagues?: () => void;
+      onViewLeague: (id: string | number) => void;
+    }) => (
+      <View testID="nfl-home">
+        <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
+        <Text>{`loading:${String(props.loading)}`}</Text>
+        <Text>{`error:${String(props.error)}`}</Text>
+        <Pressable testID="create" onPress={() => props.onCreateLeague()}>
+          <Text>create</Text>
+        </Pressable>
+        <Pressable testID="join" onPress={() => props.onJoinLeague?.()}>
+          <Text>join</Text>
+        </Pressable>
+        <Pressable testID="view" onPress={() => props.onViewLeague(7)}>
+          <Text>view</Text>
+        </Pressable>
+      </View>
+    ),
+  };
+});
+
+const mockUserInfo = { id: 1, username: 'testuser' };
+jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
+  useAuthorizedUserInfo: () => mockUserInfo,
+}));
+
+const mockUseGetUserLeaguesQuery: jest.MockedFunction<
+  (options?: { skip?: boolean }) => {
+    data: unknown;
+    loading: boolean;
+    error?: unknown;
+  }
+> = jest.fn();
+jest.mock('../../../api/db/graphql.generated', () => ({
+  Sport: { Football: 'football', Baseball: 'baseball' },
+  useGetUserLeaguesQuery: (options?: { skip?: boolean }) =>
+    mockUseGetUserLeaguesQuery(options),
+}));
+
+interface SubscriptionResult {
+  isPremium: boolean;
+  loading: boolean;
+}
+const mockUseSubscription = jest.fn(
+  (): SubscriptionResult => ({ isPremium: false, loading: false }),
+);
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useSubscription: (): SubscriptionResult => mockUseSubscription(),
+}));
+
+jest.mock('../../../features/subscription/constants', () => ({
+  FREE_TIER_LEAGUE_LIMIT: 3,
+}));
+
+jest.mock('../_screenErrorBoundary', () => ({
+  ScreenErrorBoundary: null,
+}));
+
+// ── Test data ────────────────────────────────────────────────────────────────
+
+const FOOTBALL_LEAGUES = [
+  {
+    id: 1,
+    name: 'Grid Iron Legends',
+    sport: 'football',
+    draftStatus: null,
+    currentWeekNumber: null,
+    weekAdvanceStatus: null,
+  },
+  {
+    id: 2,
+    name: 'Touchdown Club',
+    sport: 'football',
+    draftStatus: null,
+    currentWeekNumber: null,
+    weekAdvanceStatus: null,
+  },
+];
+
+describe('FootballHome (mobile NFLHome wrapper)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: FOOTBALL_LEAGUES },
+      loading: false,
+    });
+    mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
+  });
+
+  it('maps query leagues into NFLHome (football only)', () => {
+    render(<FootballHome />);
+    expect(
+      screen.getByText('leagues:Grid Iron Legends,Touchdown Club'),
+    ).toBeTruthy();
+  });
+
+  it('passes skip based on authentication', () => {
+    render(<FootballHome />);
+    expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: false });
+  });
+
+  describe('create league — free-tier cap enforcement (LS-5013)', () => {
+    it('navigates to create when the user is below the free-tier cap', () => {
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockPush).toHaveBeenCalledWith('/football/league/create');
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('redirects to upgrade when the user is at the free-tier cap', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...FOOTBALL_LEAGUES,
+            {
+              id: 3,
+              name: 'Third',
+              sport: 'football',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+          ],
+        },
+        loading: false,
+      });
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+      expect(mockPush).not.toHaveBeenCalledWith('/football/league/create');
+    });
+
+    it('counts all leagues (all sports) against the cap', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...FOOTBALL_LEAGUES,
+            {
+              id: 3,
+              name: 'Baseball League',
+              sport: 'baseball',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+          ],
+        },
+        loading: false,
+      });
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+    });
+
+    it('allows create for premium users even at 3+ leagues', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true, loading: false });
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...FOOTBALL_LEAGUES,
+            {
+              id: 3,
+              name: 'Third',
+              sport: 'football',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+            {
+              id: 4,
+              name: 'Fourth',
+              sport: 'football',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+          ],
+        },
+        loading: false,
+      });
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockPush).toHaveBeenCalledWith('/football/league/create');
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('allows create while subscription is loading (defer to server)', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false, loading: true });
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...FOOTBALL_LEAGUES,
+            {
+              id: 3,
+              name: 'Third',
+              sport: 'football',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+          ],
+        },
+        loading: false,
+      });
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockPush).toHaveBeenCalledWith('/football/league/create');
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('allows create when leagues failed to load (defer to server)', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: null,
+        loading: false,
+      });
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockPush).toHaveBeenCalledWith('/football/league/create');
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('navigation', () => {
+    it('navigates to join league', () => {
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('join'));
+      expect(mockPush).toHaveBeenCalledWith('/football/league/join');
+    });
+
+    it('navigates to view a league', () => {
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('view'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/football/league/[leagueId]',
+        params: { leagueId: 7 },
+      });
+    });
+  });
+});

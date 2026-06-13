@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { NFLHome } from '@legacy-sports/shared-components/football';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
@@ -6,6 +6,8 @@ import {
   Sport,
   useGetUserLeaguesQuery,
 } from '../../../api/db/graphql.generated';
+import { useSubscription } from '../../../features/subscription/useSubscription';
+import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
 
 export default function FootballHome() {
   const userInfo = useAuthorizedUserInfo();
@@ -14,6 +16,18 @@ export default function FootballHome() {
   const { data, loading, error } = useGetUserLeaguesQuery({
     skip: !userInfo?.id,
   });
+
+  const { isPremium, loading: subscriptionLoading } = useSubscription();
+
+  // Count all leagues (all sports) against the free-tier cap — mirrors the
+  // backend's setActiveLeagues enforcement and the baseball home pattern.
+  const userLeagues = data?.userLeagues;
+  const rawLeagues = userLeagues ?? [];
+  const leaguesLoadFailed = !loading && userLeagues == null;
+  const leaguesLoaded = !loading && !leaguesLoadFailed;
+  const showLeagueCap = !subscriptionLoading && !isPremium && leaguesLoaded;
+  const atFreeLeagueLimit =
+    showLeagueCap && rawLeagues.length >= FREE_TIER_LEAGUE_LIMIT;
 
   type LeagueWithId = NonNullable<
     NonNullable<typeof data>['userLeagues'][number]
@@ -35,12 +49,20 @@ export default function FootballHome() {
     [data?.userLeagues],
   );
 
+  const handleCreateLeague = useCallback(() => {
+    if (atFreeLeagueLimit) {
+      router.navigate('subscription-settings');
+      return;
+    }
+    router.push('/football/league/create');
+  }, [atFreeLeagueLimit, router]);
+
   return (
     <NFLHome
       leagues={leagues}
       loading={loading && !data}
       error={!!error}
-      onCreateLeague={() => router.push('/football/league/create')}
+      onCreateLeague={handleCreateLeague}
       onJoinLeague={() => router.push('/football/league/join')}
       onBrowseLeagues={() => router.push('/league-discovery')}
       onViewLeague={(id) =>
