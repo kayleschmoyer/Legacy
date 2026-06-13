@@ -41,8 +41,9 @@ jest.mock('../../components/UpgradeModal', () => ({
   UpgradeModal: () => null,
 }));
 
+let mockIsPremium = false;
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremiumStatus: () => ({ isPremium: false, isLoading: false }),
+  useIsPremiumStatus: () => ({ isPremium: mockIsPremium, isLoading: false }),
 }));
 
 jest.mock('../../utils/analytics', () => ({
@@ -109,6 +110,7 @@ jest.mock('tamagui', () => {
 });
 
 const mockCreateLeague = jest.fn();
+let mockLeagueCount = 0;
 jest.mock('../../api/db/graphql.generated', () => ({
   GetUserLeagues: 'GetUserLeagues',
   Sport: { Baseball: 'baseball', Football: 'football' },
@@ -116,6 +118,14 @@ jest.mock('../../api/db/graphql.generated', () => ({
     mockCreateLeague,
     { loading: false },
   ]),
+  useGetUserLeaguesQuery: jest.fn(() => ({
+    data: {
+      userLeagues: Array.from({ length: mockLeagueCount }, (_, i) => ({
+        id: i + 1,
+        name: `League ${i + 1}`,
+      })),
+    },
+  })),
 }));
 
 // ---------------------------------------------------------------------------
@@ -144,10 +154,46 @@ function expandAllSections() {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('LeagueCreatePage — free league limit (LS-5012)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('does not show the limit banner when a free user has fewer than 3 leagues', () => {
+    mockLeagueCount = 2;
+    renderPage('/baseball/league/create');
+    expect(screen.queryByTestId('league-limit-banner')).not.toBeInTheDocument();
+  });
+
+  it('shows the limit banner when a free user has exactly 3 leagues', () => {
+    mockLeagueCount = 3;
+    renderPage('/baseball/league/create');
+    expect(screen.getByTestId('league-limit-banner')).toBeInTheDocument();
+  });
+
+  it('shows the limit banner when a free user has more than 3 leagues', () => {
+    mockLeagueCount = 5;
+    renderPage('/baseball/league/create');
+    expect(screen.getByTestId('league-limit-banner')).toBeInTheDocument();
+  });
+
+  it('does not show the limit banner for premium users at 3 leagues', () => {
+    mockLeagueCount = 3;
+    mockIsPremium = true;
+    renderPage('/baseball/league/create');
+    expect(screen.queryByTestId('league-limit-banner')).not.toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
   });
 
   it('renders both sport tabs at the baseball URL', () => {
@@ -233,6 +279,8 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
   });
 
   it('shows the reset notice when switching from Auction to Automated draft', () => {

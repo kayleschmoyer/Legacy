@@ -37,6 +37,7 @@ import {
 } from '../../utils/draftDateUtils';
 import {
   DEFAULT_NUM_DIVISIONS,
+  FREE_LEAGUE_LIMIT,
   MAX_LEAGUE_NAME_LENGTH,
 } from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
@@ -50,6 +51,7 @@ import {
   DefensiveFormat as GqlDefensiveFormat,
   Sport,
   useCreateLeagueAndTeamsMutation,
+  useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
 import {
   AMBER,
@@ -990,6 +992,12 @@ export function LeagueCreatePage(): React.JSX.Element {
     : SPORTS.filter((s) => s.id !== 'football');
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] = useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
+  const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
+
+  const { data: leaguesData } = useGetUserLeaguesQuery();
+  const leagueCount = leaguesData?.userLeagues?.length ?? 0;
+  const atLeagueLimit =
+    !isPremium && !premiumLoading && leagueCount >= FREE_LEAGUE_LIMIT;
 
   // Sport is URL-driven (LS-4631): `/baseball/league/create` vs
   // `/football/league/create`. SportSwitcher navigates between the two; the
@@ -1143,6 +1151,11 @@ export function LeagueCreatePage(): React.JSX.Element {
     e.preventDefault();
     setSubmitError(null);
 
+    if (atLeagueLimit) {
+      trackPremiumFeatureClick('Unlimited League Creation');
+      setShowLeagueLimitModal(true);
+      return;
+    }
     if ((!isPremium || premiumLoading) && formData.waiverType === 'faab') {
       trackPremiumFeatureClick('FAAB Waiver Settings');
       setShowWaiverUpgradeModal(true);
@@ -1392,6 +1405,72 @@ export function LeagueCreatePage(): React.JSX.Element {
             </XStack>
           )}
         </YStack>
+
+        {/* ── Free league limit banner ── */}
+        {atLeagueLimit && (
+          <XStack
+            role="alert"
+            aria-live="polite"
+            data-testid="league-limit-banner"
+            gap="$3"
+            alignItems="flex-start"
+            backgroundColor="rgba(197,165,90,0.08)"
+            borderWidth={1}
+            borderColor="rgba(197,165,90,0.35)"
+            borderRadius="$4"
+            padding="$4"
+          >
+            <YStack
+              width={36}
+              height={36}
+              borderRadius={18}
+              backgroundColor="rgba(197,165,90,0.2)"
+              alignItems="center"
+              justifyContent="center"
+              flexShrink={0}
+            >
+              <Text fontSize={16}>
+                <span role="img" aria-label="trophy">
+                  🏆
+                </span>
+              </Text>
+            </YStack>
+            <YStack flex={1}>
+              <Text
+                fontFamily="$display"
+                fontWeight="700"
+                fontSize={13}
+                letterSpacing={0.8}
+                textTransform="uppercase"
+                color="$brandGoldLight"
+              >
+                League limit reached
+              </Text>
+              <Text
+                fontFamily="$body"
+                fontSize={13}
+                color="$color11"
+                marginTop={2}
+              >
+                Free accounts can be in up to {FREE_LEAGUE_LIMIT} leagues.
+                Upgrade to Legacy Commissioner for unlimited leagues.
+              </Text>
+            </YStack>
+            <Button
+              size="$2"
+              onPress={() => {
+                trackPremiumFeatureClick('Unlimited League Creation');
+                setShowLeagueLimitModal(true);
+              }}
+              backgroundColor="$brandGold"
+              borderWidth={0}
+            >
+              <Text color="#111" fontWeight="700" fontSize={13}>
+                Upgrade
+              </Text>
+            </Button>
+          </XStack>
+        )}
 
         {/* ── Submit error banner ── */}
         {submitError && (
@@ -2359,6 +2438,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowEraUpgradeModal}
         featureName="Historical Era Selection"
         featureDescription="Unlock all historical eras to restrict your league's player pool — Dead Ball, Golden Age, Expansion, and more."
+      />
+      <UpgradeModal
+        open={showLeagueLimitModal}
+        onOpenChange={setShowLeagueLimitModal}
+        featureName="Unlimited League Creation"
+        featureDescription={`Free accounts can be in up to ${FREE_LEAGUE_LIMIT} leagues. Upgrade to Legacy Commissioner for unlimited league creation.`}
       />
     </ScrollView>
   );
