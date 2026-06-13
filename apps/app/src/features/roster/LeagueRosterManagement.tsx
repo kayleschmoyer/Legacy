@@ -26,6 +26,11 @@ export interface LeagueRosterManagementProps {
     target: LeaguePositionFragment,
     displaced: AppTeamMemberFragment,
   ) => void;
+  /** Navigate to a player's detail page. Sport-aware routing handled by the caller. */
+  onPlayerPress?: (player: {
+    player?: { id?: number | null } | null;
+    playerId?: number | null;
+  }) => void;
   loading?: boolean;
   leagueId?: number | null;
   /** The league's live/current week. Enables week navigation when provided. */
@@ -50,6 +55,7 @@ export function LeagueRosterManagement({
   onPlayerAssign,
   onPlayerRemove,
   onPlayerSwap,
+  onPlayerPress,
   loading = false,
   leagueId,
   currentWeek,
@@ -99,6 +105,7 @@ export function LeagueRosterManagement({
           onPlayerAssign={onPlayerAssign}
           onPlayerRemove={onPlayerRemove}
           onPlayerSwap={onPlayerSwap}
+          onPlayerPress={onPlayerPress}
           loading={loading}
           readOnly={isPast}
         />

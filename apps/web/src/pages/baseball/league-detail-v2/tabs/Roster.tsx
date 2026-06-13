@@ -9,6 +9,7 @@ import { PendingTradeOfferBanner } from '@legacy-sports/shared-components';
 import {
   type LeagueFragment,
   type LeaguePositionFragment,
+  Sport,
   type TeamMemberFragment,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
@@ -143,6 +144,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         }}
         onPlayerSwap={(incoming, target, displaced) => {
           void handleSwap(incoming, target, displaced);
+        }}
+        onPlayerPress={(player) => {
+          const playerId = player.player?.id ?? player.playerId;
+          if (playerId != null) {
+            navigate(
+              league.sport === Sport.Football
+                ? `/football/players/${playerId}`
+                : `/players/${playerId}`,
+            );
+          }
         }}
         loading={loading}
         error={error ?? null}

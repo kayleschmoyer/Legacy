@@ -96,4 +96,19 @@ describe('redirectSystemPath', () => {
       redirectSystemPath({ path: '/baseball/league/123', initial: false }),
     ).toBe('/baseball/league/123');
   });
+
+  it('passes through football player detail paths unchanged', () => {
+    expect(
+      redirectSystemPath({ path: '/football/players/42', initial: true }),
+    ).toBe('/football/players/42');
+    expect(
+      redirectSystemPath({ path: '/football/players/999', initial: false }),
+    ).toBe('/football/players/999');
+  });
+
+  it('passes through baseball player detail paths unchanged', () => {
+    expect(redirectSystemPath({ path: '/players/123', initial: true })).toBe(
+      '/players/123',
+    );
+  });
 });

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Card, H2, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Users } from '@tamagui/lucide-icons';
+import { ChevronRight, Users } from '@tamagui/lucide-icons';
 import {
   canPlayerPlayPosition,
   getPositionLabel,
@@ -26,6 +26,7 @@ export interface RosterBoardPlayer {
   positionId?: number | null;
   nickname?: string | null;
   player?: {
+    id?: number | null;
     firstName?: string | null;
     lastName?: string | null;
     eligiblePositions?: readonly string[] | null;
@@ -48,6 +49,12 @@ export interface RosterBoardProps<
    * platforms whose data layer has no atomic swap mutation).
    */
   onPlayerSwap?: (incoming: P, target: Pos, displaced: P) => void;
+  /**
+   * Called when the user taps the chevron next to a player's name to view their
+   * detail page. The caller is responsible for sport-aware navigation (e.g.
+   * `/football/players/:id` vs `/players/:id`). When omitted, no chevron is shown.
+   */
+  onPlayerPress?: (player: P) => void;
   loading?: boolean;
   error?: Error | null;
   readOnly?: boolean;
@@ -63,6 +70,7 @@ interface SlotRowProps {
   state: SlotState;
   readOnly: boolean;
   onPress: () => void;
+  onPlayerPress?: () => void;
 }
 
 function SlotRow({
@@ -73,6 +81,7 @@ function SlotRow({
   state,
   readOnly,
   onPress,
+  onPlayerPress,
 }: SlotRowProps): React.JSX.Element {
   const posType = positionType.toUpperCase();
   const badge = getPositionColors(posType);
@@ -141,6 +150,19 @@ function SlotRow({
           {subText}
         </Text>
       </YStack>
+      {assignedName && onPlayerPress && (
+        <YStack
+          role="button"
+          aria-label={`View ${assignedName} detail`}
+          padding="$1"
+          onPress={(e: { stopPropagation: () => void }) => {
+            e.stopPropagation();
+            onPlayerPress();
+          }}
+        >
+          <ChevronRight size={16} color="var(--gray9)" />
+        </YStack>
+      )}
     </XStack>
   );
 }
@@ -152,6 +174,7 @@ interface BenchRowProps {
   selected: boolean;
   readOnly: boolean;
   onPress: () => void;
+  onPlayerPress?: () => void;
 }
 
 function BenchRow({
@@ -161,6 +184,7 @@ function BenchRow({
   selected,
   readOnly,
   onPress,
+  onPlayerPress,
 }: BenchRowProps): React.JSX.Element {
   const badge = getPositionColors(primaryPosition);
   return (
@@ -204,6 +228,19 @@ function BenchRow({
           {eligible.length > 0 ? eligible.join(' · ') : 'Unclassified'}
         </Text>
       </YStack>
+      {onPlayerPress && (
+        <YStack
+          role="button"
+          aria-label={`View ${name} detail`}
+          padding="$1"
+          onPress={(e: { stopPropagation: () => void }) => {
+            e.stopPropagation();
+            onPlayerPress();
+          }}
+        >
+          <ChevronRight size={16} color="var(--gray9)" />
+        </YStack>
+      )}
     </XStack>
   );
 }
@@ -265,6 +302,7 @@ export function RosterBoard<
   onPlayerAssign,
   onPlayerRemove,
   onPlayerSwap,
+  onPlayerPress,
   loading = false,
   error = null,
   readOnly = false,
@@ -417,6 +455,9 @@ export function RosterBoard<
         state={state}
         readOnly={readOnly}
         onPress={() => handleSlotPress(position)}
+        onPlayerPress={
+          assigned && onPlayerPress ? () => onPlayerPress(assigned) : undefined
+        }
       />
     );
   };
@@ -530,6 +571,9 @@ export function RosterBoard<
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
                     onPress={() => handleBenchSelect(p)}
+                    onPlayerPress={
+                      onPlayerPress ? () => onPlayerPress(p) : undefined
+                    }
                   />
                 ))
               )}
@@ -552,6 +596,9 @@ export function RosterBoard<
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
                     onPress={() => handleBenchSelect(p)}
+                    onPlayerPress={
+                      onPlayerPress ? () => onPlayerPress(p) : undefined
+                    }
                   />
                 ))
               )}

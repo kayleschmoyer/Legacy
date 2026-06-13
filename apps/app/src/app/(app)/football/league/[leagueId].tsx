@@ -347,6 +347,19 @@ export default function FootballLeagueId(): React.JSX.Element {
     [swapTeamMemberPositions],
   );
 
+  const handlePlayerPress = useCallback(
+    (player: {
+      player?: { id?: number | null } | null;
+      playerId?: number | null;
+    }) => {
+      const playerId = player.player?.id ?? player.playerId;
+      if (playerId != null) {
+        router.push(`/football/players/${playerId}`);
+      }
+    },
+    [router],
+  );
+
   const rankedStandings = useMemo(() => {
     const formatRecord = (
       w: number | null | undefined,
@@ -466,6 +479,7 @@ export default function FootballLeagueId(): React.JSX.Element {
             onPlayerSwap={(incoming, target, displaced) => {
               void handlePlayerSwap(incoming, target, displaced);
             }}
+            onPlayerPress={handlePlayerPress}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
             leagueId={numLeagueId}
             currentWeek={league?.currentWeekNumber}
