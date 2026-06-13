@@ -867,6 +867,44 @@ describe('FootballPlayerDetail', () => {
     render(<FootballPlayerDetail player={freeAgentWithPhoto} />);
     expect(screen.queryByText('FA')).toBeNull();
   });
+
+  describe('LS-6251 / FPD-027 — injury-data freshness badge', () => {
+    it('renders a fresh "Last updated" badge when synced recently', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        injuriesLastSyncedAt: new Date(
+          Date.now() - 6 * 60 * 1000,
+        ).toISOString(),
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.getByText('Last updated: 6 min ago')).toBeTruthy();
+    });
+
+    it('renders a "Stale" badge when synced over an hour ago', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        injuriesLastSyncedAt: new Date(
+          Date.now() - 12 * 60 * 60 * 1000,
+        ).toISOString(),
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.getByText('Stale (12 hours old)')).toBeTruthy();
+    });
+
+    it('renders no freshness badge when injuriesLastSyncedAt is absent', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(screen.queryByText(/Last updated:|Stale \(/)).toBeNull();
+    });
+
+    it('renders no freshness badge when injuriesLastSyncedAt is null', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        injuriesLastSyncedAt: null,
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.queryByText(/Last updated:|Stale \(/)).toBeNull();
+    });
+  });
 });
 
 describe('resolveFootballPlayerTab', () => {

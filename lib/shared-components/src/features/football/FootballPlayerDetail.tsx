@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, H1, Image, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
+import { formatInjuryFreshness } from './injuryFreshness';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import { GameLogsTable } from '../stats/GameLogsTable';
 import {
@@ -155,6 +156,11 @@ export interface FootballPlayerDetailPlayer {
   careerStats?: FootballPlayerDetailStats | null;
   seasonStats?: FootballPlayerDetailSeasonStats | null;
   previousTeams: string[];
+  /**
+   * ISO-8601 timestamp injury data was last refreshed, or null when never
+   * synced. Drives the freshness badge (LS-6251 / FPD-027).
+   */
+  injuriesLastSyncedAt?: string | null;
 }
 
 function fmt(n: number | null | undefined): string {
@@ -219,6 +225,46 @@ function StatGroup({
         {children}
       </XStack>
     </YStack>
+  );
+}
+
+/**
+ * Relative-freshness badge for injury data (LS-6251 / FPD-027). Renders nothing
+ * when there is no last-synced timestamp, a muted "Last updated: …" label when
+ * fresh, and a red "Stale (…)" label when the data is older than the staleness
+ * threshold so a user is never misled by silently stale injury status.
+ */
+function InjuryFreshnessBadge({
+  syncedAtIso,
+}: {
+  syncedAtIso: string | null | undefined;
+}) {
+  const freshness = formatInjuryFreshness(syncedAtIso);
+  if (!freshness) return null;
+
+  const color = freshness.isStale ? BRAND_SEAM_RED_LIGHT : TEXT_MUTED;
+  return (
+    <XStack
+      alignItems="center"
+      gap={6}
+      accessibilityLabel={`Injury data freshness: ${freshness.label}`}
+    >
+      <YStack
+        width={6}
+        height={6}
+        borderRadius={3}
+        backgroundColor={color}
+        opacity={freshness.isStale ? 1 : 0.7}
+      />
+      <Text
+        fontSize={12}
+        color={color}
+        fontFamily={FONT_BODY}
+        fontWeight={freshness.isStale ? '700' : '400'}
+      >
+        {freshness.label}
+      </Text>
+    </XStack>
   );
 }
 
@@ -1123,6 +1169,9 @@ export function FootballPlayerDetail({
               </XStack>
             </YStack>
           </XStack>
+
+          {/* Injury-data freshness (LS-6251 / FPD-027) — hidden until synced */}
+          <InjuryFreshnessBadge syncedAtIso={player.injuriesLastSyncedAt} />
 
           {/* Career stats summary */}
           {!player.careerStats ? (

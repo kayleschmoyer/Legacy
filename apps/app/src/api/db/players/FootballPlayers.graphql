@@ -73,6 +73,7 @@ query FootballPlayer($id: Int!) {
     pfrId
     headshotUrl
     previousTeams
+    injuriesLastSyncedAt
     seasonStats {
       passing {
         season

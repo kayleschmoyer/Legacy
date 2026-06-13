@@ -770,6 +770,7 @@ interface FootballPlayerShape {
   nflTeam: string | null;
   position: string | null;
   jerseyNumber: number | null;
+  injuriesLastSyncedAt: Date | null;
 }
 
 /**
@@ -843,6 +844,15 @@ FootballPlayerRef.implement({
     nflTeam: t.exposeString('nflTeam', { nullable: true }),
     position: t.exposeString('position', { nullable: true }),
     jerseyNumber: t.exposeInt('jerseyNumber', { nullable: true }),
+    injuriesLastSyncedAt: t.field({
+      type: 'String',
+      nullable: true,
+      description:
+        'ISO-8601 timestamp injury data was last refreshed from the upstream ' +
+        'provider, or null if never synced. Drives the freshness badge on the ' +
+        'player detail page (LS-6251 / FPD-027).',
+      resolve: (parent) => parent.injuriesLastSyncedAt?.toISOString() ?? null,
+    }),
     previousTeams: t.field({
       type: ['String'],
       nullable: false,
@@ -1409,6 +1419,7 @@ builder.queryField('footballPlayers', (t) =>
           nflTeam: PublicSchema.players.nflTeam,
           position: PublicSchema.players.position,
           jerseyNumber: PublicSchema.players.jerseyNumber,
+          injuriesLastSyncedAt: PublicSchema.players.injuriesLastSyncedAt,
         })
         .from(PublicSchema.players)
         .where(and(...conditions))
@@ -1458,6 +1469,7 @@ builder.queryField('footballPlayer', (t) =>
           nflTeam: PublicSchema.players.nflTeam,
           position: PublicSchema.players.position,
           jerseyNumber: PublicSchema.players.jerseyNumber,
+          injuriesLastSyncedAt: PublicSchema.players.injuriesLastSyncedAt,
         })
         .from(PublicSchema.players)
         .where(

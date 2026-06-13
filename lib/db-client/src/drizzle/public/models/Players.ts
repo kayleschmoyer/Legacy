@@ -25,6 +25,12 @@ export const players = pgTable(
     lastName: text('last_name').notNull(),
     brefId: varchar('bref_id', { length: 10 }).notNull(),
     statsLastFetchedAt: timestamp('stats_last_fetched_at'),
+    // Timestamp injury data was last refreshed from the upstream provider
+    // (LS-6251 / FPD-027). Nullable — NULL means never synced. Drives the
+    // "last updated" freshness badge on the football player detail page.
+    injuriesLastSyncedAt: timestamp('injuries_last_synced_at', {
+      withTimezone: true,
+    }),
     // Career achievement counts — populated by the data loader from bref award_summary
     allStarSelections: integer('all_star_selections').notNull().default(0),
     goldGloves: integer('gold_gloves').notNull().default(0),

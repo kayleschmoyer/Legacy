@@ -47,6 +47,7 @@ async function main() {
     lastName: 'Player',
     mlbPlayerId: null,
     statsLastFetchedAt: null,
+    injuriesLastSyncedAt: null,
     allStarSelections: 0,
     goldGloves: 0,
     silverSluggers: 0,

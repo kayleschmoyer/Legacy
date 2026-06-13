@@ -38,6 +38,7 @@ export async function loadPlayerGameStats(
     brefId: string;
     mlbPlayerId: number | null;
     statsLastFetchedAt: Date;
+    injuriesLastSyncedAt: Date | null;
     allStarSelections: number;
     goldGloves: number;
     silverSluggers: number;
@@ -62,6 +63,7 @@ export async function loadPlayerGameStats(
     brefId,
     mlbPlayerId: null,
     statsLastFetchedAt: new Date(),
+    injuriesLastSyncedAt: null,
     allStarSelections: 0,
     goldGloves: 0,
     silverSluggers: 0,

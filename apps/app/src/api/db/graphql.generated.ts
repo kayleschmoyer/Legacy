@@ -944,6 +944,8 @@ export type FootballPlayer = {
   firstName: Scalars['String']['output'];
   headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
+  /** ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027). */
+  injuriesLastSyncedAt?: Maybe<Scalars['String']['output']>;
   isDst: Scalars['Boolean']['output'];
   jerseyNumber?: Maybe<Scalars['Int']['output']>;
   lastName: Scalars['String']['output'];
@@ -6499,6 +6501,7 @@ export type FootballPlayerQuery = {
     pfrId?: string | null;
     headshotUrl?: string | null;
     previousTeams: Array<string>;
+    injuriesLastSyncedAt?: string | null;
     seasonStats?: {
       __typename?: 'FootballPlayerSeasonStats';
       passing?: Array<{
@@ -11755,6 +11758,7 @@ export const FootballPlayer = gql`
       pfrId
       headshotUrl
       previousTeams
+      injuriesLastSyncedAt
       seasonStats {
         passing {
           season

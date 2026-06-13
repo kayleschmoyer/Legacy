@@ -123,5 +123,6 @@ query FootballPlayer($id: Int!) {
   footballPlayer(id: $id) {
     ...FootballPlayerHeader
     ...FootballPlayerDetailExtras
+    injuriesLastSyncedAt
   }
 }

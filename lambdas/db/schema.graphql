@@ -1072,6 +1072,11 @@ type FootballPlayer {
   firstName: String!
   headshotUrl: String
   id: Int!
+
+  """
+  ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027).
+  """
+  injuriesLastSyncedAt: String
   isDst: Boolean!
   jerseyNumber: Int
   lastName: String!

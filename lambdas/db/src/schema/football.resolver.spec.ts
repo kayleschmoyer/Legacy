@@ -27,6 +27,7 @@ type FootballPlayerResult = {
   nflTeam: string | null;
   position: string | null;
   jerseyNumber: number | null;
+  injuriesLastSyncedAt: Date | null;
 } | null;
 
 describe('football resolvers', () => {
@@ -397,6 +398,7 @@ describe('football resolvers', () => {
     });
 
     it('returns mapped FootballPlayer when found', async () => {
+      const syncedAt = new Date('2026-06-11T12:00:00.000Z');
       mockDb.then.mockImplementationOnce((resolve) =>
         resolve([
           {
@@ -407,6 +409,7 @@ describe('football resolvers', () => {
             isDst: false,
             nflTeam: 'KC',
             position: 'TE',
+            injuriesLastSyncedAt: syncedAt,
           },
         ]),
       );
@@ -426,6 +429,7 @@ describe('football resolvers', () => {
         isDst: false,
         nflTeam: 'KC',
         position: 'TE',
+        injuriesLastSyncedAt: syncedAt,
       });
     });
   });
@@ -474,6 +478,44 @@ describe('football resolvers', () => {
       );
 
       expect(result).toMatchObject({ playerId: 7 });
+    });
+  });
+
+  // ── injuriesLastSyncedAt field (LS-6251 / FPD-027) ──────────────────────────
+
+  describe('FootballPlayer.injuriesLastSyncedAt field', () => {
+    function getField() {
+      const type = schema.getType('FootballPlayer') as GraphQLObjectType;
+      const field = type.getFields().injuriesLastSyncedAt;
+      if (!field?.resolve) {
+        throw new Error('injuriesLastSyncedAt resolver not found');
+      }
+      return field;
+    }
+
+    it('is exposed on the FootballPlayer type', () => {
+      expect(getField()).toBeDefined();
+    });
+
+    it('serializes a Date to an ISO-8601 string', () => {
+      const syncedAt = new Date('2026-06-11T12:00:00.000Z');
+      const result = getField().resolve!(
+        { injuriesLastSyncedAt: syncedAt },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe('2026-06-11T12:00:00.000Z');
+    });
+
+    it('resolves to null when never synced', () => {
+      const result = getField().resolve!(
+        { injuriesLastSyncedAt: null },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBeNull();
     });
   });
 
