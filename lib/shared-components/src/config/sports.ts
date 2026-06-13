@@ -133,6 +133,7 @@ export const PICK_TIME_OPTIONS = Object.freeze([
   { label: '5 min', value: '300' },
   { label: '10 min', value: '600' },
   { label: '1 hour', value: '3600' },
+  { label: '12 hours', value: '43200' },
   { label: '24 hours', value: '86400' },
   { label: '48 hours', value: '172800' },
 ]);
