@@ -3,6 +3,13 @@ export { LoginPage } from './LoginPage';
 export { AuthProvider, useAuth, useOptionalAuth } from './hooks/useAuth';
 export type { UseAuthResult } from './hooks/useAuth';
 export { AuthService, AuthSessionExpiredError } from './services/AuthService';
+export {
+  useStepUpGate,
+  isStepUpFresh,
+  markStepUpVerified,
+  clearStepUp,
+} from './hooks/useStepUpGate';
+export type { UseStepUpGateResult } from './hooks/useStepUpGate';
 export { consumeBillingNotice } from './services/billingNotice';
 export type { BillingNoticeStatus } from './services/billingNotice';
 export {

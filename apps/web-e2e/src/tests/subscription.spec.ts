@@ -57,6 +57,16 @@ async function routeGraphQL(
   });
 }
 
+/** Seed a fresh step-up token so the StepUpModal is bypassed in billing tests. */
+async function seedStepUp(page: import('@playwright/test').Page) {
+  await page.evaluate(() => {
+    sessionStorage.setItem(
+      'ls_step_up_until',
+      String(Math.floor(Date.now() / 1000) + 900),
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // PremiumGate — Player Comparison page (known usage of PremiumGate)
 // ---------------------------------------------------------------------------
@@ -272,6 +282,7 @@ test.describe('SubscriptionPage — active premium @regression', () => {
 
     await page.goto('/profile/subscription');
     await page.waitForLoadState('load');
+    await seedStepUp(page);
 
     const manageBtn = page
       .getByRole('button', { name: /manage billing|billing portal|manage/i })
@@ -400,6 +411,7 @@ test.describe('Subscription upgrade flow @critical', () => {
 
     await page.goto('/profile/subscription');
     await stripePricesDone;
+    await seedStepUp(page);
 
     await page
       .getByRole('button', { name: /upgrade|get premium/i })
@@ -447,6 +459,7 @@ test.describe('Subscription upgrade flow @critical', () => {
 
     await page.goto('/profile/subscription');
     await page.waitForLoadState('load');
+    await seedStepUp(page);
 
     const upgradeBtn = page
       .getByRole('button', { name: /upgrade|get premium/i })
@@ -503,6 +516,7 @@ test.describe('Subscription upgrade flow @critical', () => {
 
     await page.goto('/profile/subscription');
     await page.waitForLoadState('load');
+    await seedStepUp(page);
 
     const upgradeBtn = page
       .getByRole('button', { name: /upgrade|get premium/i })

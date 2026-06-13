@@ -50,6 +50,7 @@ import {
   handleStopImpersonate,
 } from './handlers/Impersonate';
 import { handleMfaEnroll, handleMfaVerifySetup } from './handlers/Mfa';
+import { handleStepUpVerify } from './handlers/StepUp';
 import { withRateLimit } from './util/rate-limit';
 import { sanitizeHeaders } from './util/lambda';
 
@@ -277,6 +278,7 @@ const baseOAuthHandler = async (
               '/oauth/discord (Discord OAuth login)',
               '/oauth/discord/link (link Discord to existing account)',
               '/oauth/discord/unlink (unlink Discord from account)',
+              '/oauth/step-up/verify (re-authenticate before sensitive actions)',
               '/oauth/mfa/enroll (begin TOTP enrollment)',
               '/oauth/mfa/verify-setup (confirm TOTP enrollment)',
             ],
@@ -472,6 +474,18 @@ const baseOAuthHandler = async (
         }
         break;
 
+      case '/oauth/step-up/verify':
+      case '/dev/oauth/step-up/verify':
+        if (event.httpMethod === 'POST') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.step-up.verify', ...AUTH_RATE_LIMIT },
+            () => handleStepUpVerify(event),
+          );
+          return cors(result);
+        }
+        break;
+
       case '/oauth/mfa/enroll':
       case '/dev/oauth/mfa/enroll':
         if (event.httpMethod === 'POST') {
@@ -617,3 +631,4 @@ export * from './handlers/DeviceFlow';
 export * from './handlers/RefreshJwt';
 export * from './handlers/Impersonate';
 export * from './handlers/Mfa';
+export * from './handlers/StepUp';

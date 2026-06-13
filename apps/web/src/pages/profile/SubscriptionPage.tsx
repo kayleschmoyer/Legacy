@@ -16,7 +16,9 @@ import {
 } from '@tamagui/lucide-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
+import { useStepUpGate } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
+import { StepUpModal } from '../../components/StepUpModal';
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
@@ -650,7 +652,14 @@ const SubscriptionPage: React.FC = () => {
   const [createBillingPortalSession, { loading: portalLoading }] =
     useCreateBillingPortalSessionMutation();
 
-  const handleUpgrade = async () => {
+  const {
+    isPrompting: isStepUpPrompting,
+    requireStepUp,
+    onVerified: onStepUpVerified,
+    onDismiss: onStepUpDismiss,
+  } = useStepUpGate();
+
+  const handleUpgradeAction = async () => {
     setCheckoutError(null);
     const priceId = billingCycle === 'annual' ? annualPriceId : monthlyPriceId;
 
@@ -694,7 +703,11 @@ const SubscriptionPage: React.FC = () => {
     }
   };
 
-  const handleManageSubscription = async () => {
+  const handleUpgrade = () => {
+    requireStepUp(() => void handleUpgradeAction());
+  };
+
+  const handleManageSubscriptionAction = async () => {
     const result = await createBillingPortalSession({
       variables: {
         returnUrl: window.location.href,
@@ -707,10 +720,14 @@ const SubscriptionPage: React.FC = () => {
     }
   };
 
-  const handleCancelConfirm = async () => {
+  const handleManageSubscription = () => {
+    requireStepUp(() => void handleManageSubscriptionAction());
+  };
+
+  const handleCancelConfirm = () => {
     // Opens billing portal to complete cancellation on Stripe side
     setShowCancelDialog(false);
-    await handleManageSubscription();
+    requireStepUp(() => void handleManageSubscriptionAction());
   };
 
   return (
@@ -719,6 +736,10 @@ const SubscriptionPage: React.FC = () => {
         title="Subscription"
         description="Manage your Legacy Sports subscription and billing."
       />
+
+      {isStepUpPrompting && (
+        <StepUpModal onSuccess={onStepUpVerified} onDismiss={onStepUpDismiss} />
+      )}
 
       {showCancelDialog && (
         <CancelConfirmDialog

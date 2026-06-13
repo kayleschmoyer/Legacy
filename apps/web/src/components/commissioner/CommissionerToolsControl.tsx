@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { useStepUpGate } from '@legacy-sports/shared-components/auth';
 import {
   Button,
   Card,
@@ -25,6 +26,7 @@ import {
   UserMinus,
   UserPlus,
 } from '@tamagui/lucide-icons';
+import { StepUpModal } from '../StepUpModal';
 import {
   GetLeagueTeamsQuery,
   useBulkDropTeamPlayersMutation,
@@ -96,11 +98,13 @@ function LmNoteSection({
   currentNote,
   onSuccess,
   onError,
+  requireStepUp,
 }: {
   leagueId: number;
   currentNote?: string | null;
   onSuccess?: (msg: string) => void;
   onError?: (err: Error) => void;
+  requireStepUp: (action: () => void) => void;
 }) {
   const [note, setNote] = useState(currentNote ?? '');
   const [saved, setSaved] = useState(false);
@@ -152,7 +156,7 @@ function LmNoteSection({
         </Text>
         <Button
           size="$3"
-          onPress={() => void handleSave()}
+          onPress={() => requireStepUp(() => void handleSave())}
           disabled={loading}
           icon={
             loading ? (
@@ -179,11 +183,13 @@ function ForceRosterMovesSection({
   teams,
   onSuccess,
   onError,
+  requireStepUp,
 }: {
   leagueId: number;
   teams: LeagueTeam[];
   onSuccess?: (msg: string) => void;
   onError?: (err: Error) => void;
+  requireStepUp: (action: () => void) => void;
 }) {
   const [addTeamId, setAddTeamId] = useState('');
   const [addPlayerId, setAddPlayerId] = useState('');
@@ -318,7 +324,7 @@ function ForceRosterMovesSection({
         />
         <Button
           size="$3"
-          onPress={() => void handleForceAdd()}
+          onPress={() => requireStepUp(() => void handleForceAdd())}
           disabled={addLoading || !addTeamId || !addPlayerId}
           icon={addLoading ? <Spinner size="small" /> : <UserPlus size={14} />}
           backgroundColor="$blue9"
@@ -385,7 +391,7 @@ function ForceRosterMovesSection({
         />
         <Button
           size="$3"
-          onPress={() => void handleForceDrop()}
+          onPress={() => requireStepUp(() => void handleForceDrop())}
           disabled={dropLoading || !dropTeamId || !dropPlayerId}
           icon={
             dropLoading ? <Spinner size="small" /> : <UserMinus size={14} />
@@ -409,11 +415,13 @@ export function EditMatchupScoresSection({
   teams,
   onSuccess,
   onError,
+  requireStepUp,
 }: {
   leagueId: number;
   teams: LeagueTeam[];
   onSuccess?: (msg: string) => void;
   onError?: (err: Error) => void;
+  requireStepUp: (action: () => void) => void;
 }) {
   const [matchupId, setMatchupId] = useState('');
   const [team1Score, setTeam1Score] = useState('');
@@ -556,7 +564,7 @@ export function EditMatchupScoresSection({
           />
           <Button
             size="$3"
-            onPress={() => void handleEdit()}
+            onPress={() => requireStepUp(() => void handleEdit())}
             disabled={loading || !matchupId || !team1Score || !team2Score}
             icon={loading ? <Spinner size="small" /> : <Check size={14} />}
             backgroundColor="$blue9"
@@ -578,11 +586,13 @@ export function SwapMatchupTeamsSection({
   teams,
   onSuccess,
   onError,
+  requireStepUp,
 }: {
   leagueId: number;
   teams: LeagueTeam[];
   onSuccess?: (msg: string) => void;
   onError?: (err: Error) => void;
+  requireStepUp: (action: () => void) => void;
 }) {
   const [matchupId1, setMatchupId1] = useState('');
   const [matchupId2, setMatchupId2] = useState('');
@@ -700,7 +710,7 @@ export function SwapMatchupTeamsSection({
           />
           <Button
             size="$3"
-            onPress={() => void handleSwap()}
+            onPress={() => requireStepUp(() => void handleSwap())}
             disabled={loading || !matchupId1 || !matchupId2}
             icon={loading ? <Spinner size="small" /> : <RefreshCw size={14} />}
             backgroundColor="$blue9"
@@ -722,11 +732,13 @@ function TeamManagementSection({
   teams,
   onSuccess,
   onError,
+  requireStepUp,
 }: {
   leagueId: number;
   teams: LeagueTeam[];
   onSuccess?: (msg: string) => void;
   onError?: (err: Error) => void;
+  requireStepUp: (action: () => void) => void;
 }) {
   const [lockTeamId, setLockTeamId] = useState('');
   const [lockReason, setLockReason] = useState('');
@@ -839,7 +851,7 @@ function TeamManagementSection({
         <XStack gap="$2">
           <Button
             size="$3"
-            onPress={() => void handleLock(true)}
+            onPress={() => requireStepUp(() => void handleLock(true))}
             disabled={
               lockLoading ||
               !lockTeamId ||
@@ -854,7 +866,7 @@ function TeamManagementSection({
           </Button>
           <Button
             size="$3"
-            onPress={() => void handleLock(false)}
+            onPress={() => requireStepUp(() => void handleLock(false))}
             disabled={
               lockLoading ||
               !lockTeamId ||
@@ -931,7 +943,7 @@ function TeamManagementSection({
             </Text>
             <Button
               size="$3"
-              onPress={() => void handleBulkDrop()}
+              onPress={() => requireStepUp(() => void handleBulkDrop())}
               disabled={bulkLoading}
               icon={
                 bulkLoading ? <Spinner size="small" /> : <Trash2 size={14} />
@@ -962,10 +974,12 @@ function RecalculateScoresSection({
   leagueId,
   onSuccess,
   onError,
+  requireStepUp,
 }: {
   leagueId: number;
   onSuccess?: (msg: string) => void;
   onError?: (err: Error) => void;
+  requireStepUp: (action: () => void) => void;
 }) {
   const [weekFilter, setWeekFilter] = useState('all');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -1101,7 +1115,7 @@ function RecalculateScoresSection({
               <XStack gap="$2">
                 <Button
                   size="$3"
-                  onPress={() => void handleRecalculate()}
+                  onPress={() => requireStepUp(() => void handleRecalculate())}
                   disabled={loading}
                   icon={
                     loading ? (
@@ -1257,8 +1271,19 @@ export function CommissionerToolsControl({
 
   const teams = teamsData?.leagueTeams ?? [];
 
+  const {
+    isPrompting: isStepUpPrompting,
+    requireStepUp,
+    onVerified: onStepUpVerified,
+    onDismiss: onStepUpDismiss,
+  } = useStepUpGate();
+
   return (
     <YStack gap="$4">
+      {isStepUpPrompting && (
+        <StepUpModal onSuccess={onStepUpVerified} onDismiss={onStepUpDismiss} />
+      )}
+
       <Card
         padding="$3"
         backgroundColor="$blue2"
@@ -1282,6 +1307,7 @@ export function CommissionerToolsControl({
         currentNote={currentLmNotes}
         onSuccess={onSuccess}
         onError={onError}
+        requireStepUp={requireStepUp}
       />
 
       {teamsLoading ? (
@@ -1293,6 +1319,7 @@ export function CommissionerToolsControl({
             teams={teams}
             onSuccess={onSuccess}
             onError={onError}
+            requireStepUp={requireStepUp}
           />
 
           <EditMatchupScoresSection
@@ -1300,12 +1327,14 @@ export function CommissionerToolsControl({
             teams={teams}
             onSuccess={onSuccess}
             onError={onError}
+            requireStepUp={requireStepUp}
           />
 
           <RecalculateScoresSection
             leagueId={leagueId}
             onSuccess={onSuccess}
             onError={onError}
+            requireStepUp={requireStepUp}
           />
 
           <SwapMatchupTeamsSection
@@ -1313,6 +1342,7 @@ export function CommissionerToolsControl({
             teams={teams}
             onSuccess={onSuccess}
             onError={onError}
+            requireStepUp={requireStepUp}
           />
 
           <TeamManagementSection
@@ -1320,6 +1350,7 @@ export function CommissionerToolsControl({
             teams={teams}
             onSuccess={onSuccess}
             onError={onError}
+            requireStepUp={requireStepUp}
           />
         </>
       )}

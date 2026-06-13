@@ -92,6 +92,17 @@ jest.mock('tamagui', () => {
   );
 });
 
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useStepUpGate: () => ({
+    isPrompting: false,
+    requireStepUp: jest.fn((action: () => void) => action()),
+    onVerified: jest.fn(),
+    onDismiss: jest.fn(),
+  }),
+}));
+
+jest.mock('../StepUpModal', () => ({ StepUpModal: () => null }));
+
 describe('EditMatchupScoresSection — LS-4040 double-submit guard', () => {
   beforeEach(() => {
     mockEditScore.mockReset();
@@ -137,7 +148,13 @@ describe('EditMatchupScoresSection — LS-4040 double-submit guard', () => {
       { id: 2, name: 'Team B' },
     ] as unknown as Teams;
 
-    render(<EditMatchupScoresSection leagueId={1} teams={teams} />);
+    render(
+      <EditMatchupScoresSection
+        leagueId={1}
+        teams={teams}
+        requireStepUp={(action) => action()}
+      />,
+    );
 
     fireEvent.change(screen.getByLabelText('Select matchup to edit'), {
       target: { value: '101' },
@@ -219,7 +236,12 @@ describe('SwapMatchupTeamsSection — LS-4055 same-week validation', () => {
   it('rejects swap when matchups are from different weeks', () => {
     const onError = jest.fn();
     render(
-      <SwapMatchupTeamsSection leagueId={1} teams={teams} onError={onError} />,
+      <SwapMatchupTeamsSection
+        leagueId={1}
+        teams={teams}
+        onError={onError}
+        requireStepUp={(action) => action()}
+      />,
     );
 
     fireEvent.change(screen.getByLabelText('Matchup A'), {
@@ -249,6 +271,7 @@ describe('SwapMatchupTeamsSection — LS-4055 same-week validation', () => {
         leagueId={1}
         teams={teams}
         onSuccess={onSuccess}
+        requireStepUp={(action) => action()}
       />,
     );
 

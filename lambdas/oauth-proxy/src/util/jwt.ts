@@ -29,6 +29,7 @@ export async function createJwt(
     accessLevel: user.accessLevel,
     email: user.canonicalEmail,
     id: user.id,
+    mfaEnabled: user.mfaEnabled,
     username: user.username,
     ...(picture && { picture }),
   };

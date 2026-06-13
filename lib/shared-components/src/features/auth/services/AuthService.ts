@@ -20,6 +20,7 @@ interface User {
   username: string;
   picture?: string;
   accessLevel: 'none' | 'admin';
+  mfaEnabled?: boolean;
 }
 
 interface AuthTokens {
@@ -448,6 +449,7 @@ export class AuthService {
         name?: string;
         picture?: string;
         accessLevel?: 'none' | 'admin';
+        mfaEnabled?: boolean;
       };
 
       const user = {
@@ -456,6 +458,7 @@ export class AuthService {
         username: payload.username ?? payload.name ?? 'Unknown',
         picture: payload.picture,
         accessLevel: payload.accessLevel ?? 'none',
+        mfaEnabled: payload.mfaEnabled,
       };
 
       return user;
