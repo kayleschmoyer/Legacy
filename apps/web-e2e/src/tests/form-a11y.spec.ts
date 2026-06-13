@@ -424,8 +424,40 @@ test.describe('Form field accessibility @regression', () => {
     }) => {
       await page.route(
         (url) => isGraphQLEndpoint(url),
-        async (route) => {
-          await route.fallback();
+        async (route, request) => {
+          const body = request.postDataJSON() as { operationName?: string };
+          if (body.operationName === 'GetUserById') {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                data: {
+                  user: {
+                    __typename: 'User',
+                    id: 1,
+                    username: 'testuser',
+                    email: 'testuser@example.com',
+                    avatarUrl: null,
+                    accessLevel: 'none',
+                  },
+                },
+              }),
+            });
+            return;
+          }
+          if (body.operationName === 'MyIdentities') {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ data: { myIdentities: [] } }),
+            });
+            return;
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: {} }),
+          });
         },
       );
 

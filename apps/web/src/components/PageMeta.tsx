@@ -12,8 +12,8 @@ function usePathname(): string {
 interface PageMetaProps {
   /** Page-specific title. " | Legacy Sports" is appended automatically. */
   title: string;
-  /** Short plain-text summary used in meta description, og:description, and Twitter card. */
-  description: string;
+  /** Short plain-text summary used in meta description, og:description, and Twitter card. Omit to suppress description meta tags (e.g. while data is loading). */
+  description?: string;
   /**
    * Absolute URL to a preview image (1200×630 recommended).
    * Defaults to the site logo at /logo-512.png.
@@ -75,14 +75,16 @@ export function PageMeta({
     <>
       {/* Standard */}
       <title>{fullTitle}</title>
-      <meta name="description" content={description} />
+      {description != null && <meta name="description" content={description} />}
       <link rel="canonical" href={pageUrl} />
 
       {/* Open Graph (Facebook, LinkedIn, Discord, Slack, iMessage…) */}
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:type" content={ogType} />
       <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
+      {description != null && (
+        <meta property="og:description" content={description} />
+      )}
       <meta property="og:image" content={image} />
       {imageWidth != null && (
         <meta property="og:image:width" content={String(imageWidth)} />
@@ -102,7 +104,9 @@ export function PageMeta({
       {/* Twitter / X Card */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
+      {description != null && (
+        <meta name="twitter:description" content={description} />
+      )}
       <meta name="twitter:image" content={image} />
     </>
   );

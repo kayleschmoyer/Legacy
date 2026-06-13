@@ -64,7 +64,11 @@ export function FootballPlayerDetailPage() {
           [player?.firstName, player?.lastName].filter(Boolean).join(' ') ||
           'Player'
         }
-        description={`${player?.position ?? 'Football player'} — ${player?.nflTeam ?? ''}`}
+        description={
+          player
+            ? `${player.position ?? 'Football player'} — ${player.nflTeam ?? ''}`
+            : undefined
+        }
       />
       <FootballPlayerDetail
         player={player}

@@ -60,6 +60,15 @@ async function setupProfileGraphQL(
         return;
       }
 
+      if (body.operationName === 'MyIdentities') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { myIdentities: [] } }),
+        });
+        return;
+      }
+
       if (body.operationName === 'UpdateUserAvatar') {
         if (opts.interceptMutations) {
           mutationCalls.push({
