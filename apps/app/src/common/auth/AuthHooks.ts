@@ -19,6 +19,7 @@ import { captureError } from '@legacy-sports/rollbar/native';
 import { getMobileOAuthConfig } from './mobileOAuthConfig';
 import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
 import { DISCORD_SIGN_IN_CANCELLED, signInWithDiscord } from './discordAuth';
+import { onSessionExpired } from './sessionEvents';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 import { clearApolloCache } from '../ApolloClientContext';
@@ -133,6 +134,12 @@ async function resetToken(): Promise<void> {
     );
   }
 }
+
+// When Apollo detects a 401/UNAUTHENTICATED, clear local auth state so hooks
+// re-evaluate and the app redirects to login.
+onSessionExpired(() => {
+  void resetToken();
+});
 
 // Surfaced to the UI for unexpected (non-OAuthError) sign-in failures. An
 // arbitrary error here — from a third-party library, the network stack, or the
