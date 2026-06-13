@@ -221,6 +221,19 @@ const DST_PLAYER: FootballPlayerDetailPlayer = {
   },
 };
 
+const K_PLAYER: FootballPlayerDetailPlayer = {
+  id: 10,
+  firstName: 'Justin',
+  lastName: 'Tucker',
+  position: 'K',
+  isDst: false,
+  nflTeam: 'BAL',
+  previousTeams: [],
+  careerStats: {
+    kicking: { fgm: 27, fga: 30, fgPct: 90 },
+  },
+};
+
 const LB_PLAYER: FootballPlayerDetailPlayer = {
   id: 3,
   firstName: 'Micah',
@@ -497,6 +510,54 @@ describe('FootballPlayerDetail', () => {
       render(<FootballPlayerDetail player={LB_PLAYER} isPremium />);
       expect(screen.getByText('Career IDP Stats')).toBeTruthy();
       expect(screen.queryByText('Projections (Premium)')).toBeNull();
+    });
+  });
+
+  describe('LS-7639 / GAP-003 — Kicker (K) stats table with server-provided FG%', () => {
+    it('renders the kicking stat group with FGM / FGA for a kicker', () => {
+      render(<FootballPlayerDetail player={K_PLAYER} />);
+      expect(screen.getByText('Career Kicking')).toBeTruthy();
+      expect(screen.getByText('FGM')).toBeTruthy();
+      expect(screen.getByText('FGA')).toBeTruthy();
+      expect(screen.getByText('FG%')).toBeTruthy();
+      expect(screen.getByText('27')).toBeTruthy();
+      expect(screen.getByText('30')).toBeTruthy();
+    });
+
+    it('renders the server-provided FG% formatted to 1 decimal place', () => {
+      // FG% is the server-authoritative fgPct (LS-6244), no longer a client
+      // recompute; the table formats it to 1 decimal via fmtFloat (90 → "90.0").
+      render(<FootballPlayerDetail player={K_PLAYER} />);
+      expect(screen.getByText('90.0')).toBeTruthy();
+    });
+
+    it('renders FG% as an em dash (not NaN%) for a 0-attempt kicker', () => {
+      // A 0-attempt kicker has no server FG% (fgPct is null); the cell must
+      // render "—" rather than NaN%.
+      const ROOKIE_K: FootballPlayerDetailPlayer = {
+        ...K_PLAYER,
+        id: 11,
+        careerStats: { kicking: { fgm: 0, fga: 0, fgPct: null } },
+      };
+      render(<FootballPlayerDetail player={ROOKIE_K} />);
+      expect(screen.getByText('Career Kicking')).toBeTruthy();
+      expect(screen.getByText('FG%')).toBeTruthy();
+      expect(screen.queryByText(/NaN/)).toBeNull();
+      // FG% falls back to "—" (FGM / FGA render "0").
+      expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('omits the Career Kicking group entirely when kicking stats are null', () => {
+      const EMPTY_K: FootballPlayerDetailPlayer = {
+        ...K_PLAYER,
+        id: 12,
+        careerStats: { kicking: null },
+      };
+      render(<FootballPlayerDetail player={EMPTY_K} />);
+      // hasAnyValue(null) is false, so the group is not rendered at all —
+      // null-safe with no NaN cell.
+      expect(screen.queryByText('Career Kicking')).toBeNull();
+      expect(screen.queryByText(/NaN/)).toBeNull();
     });
   });
 
