@@ -100,12 +100,14 @@ fragment FootballPlayerDetailExtras on FootballPlayer {
 query FootballPlayers(
   $position: String
   $nflTeam: String
+  $conference: String
   $search: String
   $after: String
 ) {
   footballPlayers(
     position: $position
     nflTeam: $nflTeam
+    conference: $conference
     search: $search
     after: $after
   ) {

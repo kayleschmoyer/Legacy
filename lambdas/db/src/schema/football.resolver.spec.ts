@@ -453,6 +453,43 @@ describe('football resolvers', () => {
         expect(sql).toContain('ESCAPE');
       });
     });
+
+    it('throws BAD_USER_INPUT for invalid conference value', async () => {
+      await expect(
+        getResolver()(
+          {},
+          { position: null, conference: 'BADCONF', search: null, after: null },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
+
+    it('applies inArray condition when conference=AFC is passed', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: null, conference: 'AFC', search: null, after: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.where).toHaveBeenCalled();
+    });
+
+    it('applies inArray condition when conference=NFC is passed', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: null, conference: 'NFC', search: null, after: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.where).toHaveBeenCalled();
+    });
   });
 
   // ── footballPlayer ───────────────────────────────────────────────────────────

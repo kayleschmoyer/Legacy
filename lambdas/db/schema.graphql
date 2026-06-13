@@ -3088,6 +3088,7 @@ type Query {
   """
   footballPlayers(
     after: String
+    conference: String
     first: Int
     nflTeam: String
     position: String

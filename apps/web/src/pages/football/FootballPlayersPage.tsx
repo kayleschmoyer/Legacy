@@ -94,9 +94,11 @@ export function FootballPlayersPage() {
     }
   }, [position, teamFilter, debouncedSearch]);
 
+  const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
   const queryVars = {
     position: position === 'All' ? undefined : position,
-    nflTeam: teamFilter === 'All' ? undefined : teamFilter,
+    nflTeam: teamFilter === 'All' || isConference ? undefined : teamFilter,
+    conference: isConference ? teamFilter : undefined,
     search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
     after: cursor,
   };

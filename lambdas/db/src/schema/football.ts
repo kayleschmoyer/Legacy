@@ -12,7 +12,7 @@
  * Matchup game-level stat types (LS-4765): used by LS-4151 matchup resolver.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, eq, gt, or, sql, SQL } from 'drizzle-orm';
+import { and, eq, gt, inArray, or, sql, SQL } from 'drizzle-orm';
 import { builder } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 
@@ -1362,6 +1362,54 @@ function isValidNflTeam(t: string): t is NflTeamAbbr {
   return (VALID_NFL_TEAMS as readonly string[]).includes(t);
 }
 
+const VALID_CONFERENCES = ['AFC', 'NFC'] as const;
+type NflConference = (typeof VALID_CONFERENCES)[number];
+
+function isValidConference(c: string): c is NflConference {
+  return (VALID_CONFERENCES as readonly string[]).includes(c);
+}
+
+// Static conference-to-teams mapping derived from NFL_TEAMS in shared-components.
+// Maintained here to avoid a cross-package import in the lambda schema layer.
+const CONFERENCE_TEAMS: Record<NflConference, NflTeamAbbr[]> = {
+  AFC: [
+    'BUF',
+    'MIA',
+    'NE',
+    'NYJ',
+    'BAL',
+    'CIN',
+    'CLE',
+    'PIT',
+    'HOU',
+    'IND',
+    'JAX',
+    'TEN',
+    'DEN',
+    'KC',
+    'LV',
+    'LAC',
+  ],
+  NFC: [
+    'DAL',
+    'NYG',
+    'PHI',
+    'WAS',
+    'CHI',
+    'DET',
+    'GB',
+    'MIN',
+    'ATL',
+    'CAR',
+    'NO',
+    'TB',
+    'ARI',
+    'LAR',
+    'SEA',
+    'SF',
+  ],
+};
+
 builder.queryField('footballPlayers', (t) =>
   t.field({
     type: FootballPlayersConnectionRef,
@@ -1370,6 +1418,7 @@ builder.queryField('footballPlayers', (t) =>
     args: {
       position: t.arg.string({ required: false }),
       nflTeam: t.arg.string({ required: false }),
+      conference: t.arg.string({ required: false }),
       search: t.arg.string({ required: false }),
       after: t.arg.string({ required: false }),
       first: t.arg.int({ required: false }),
@@ -1399,6 +1448,18 @@ builder.queryField('footballPlayers', (t) =>
           throw UserInputError(`Invalid NFL team: ${args.nflTeam}`);
         }
         conditions.push(eq(PublicSchema.players.nflTeam, args.nflTeam));
+      }
+
+      if (args.conference) {
+        if (!isValidConference(args.conference)) {
+          throw UserInputError(`Invalid NFL conference: ${args.conference}`);
+        }
+        conditions.push(
+          inArray(
+            PublicSchema.players.nflTeam,
+            CONFERENCE_TEAMS[args.conference],
+          ),
+        );
       }
 
       if (afterId != null && !isNaN(afterId)) {

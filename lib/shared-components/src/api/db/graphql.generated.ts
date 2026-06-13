@@ -3121,6 +3121,7 @@ export type QueryFootballPlayerArgs = {
 
 export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
