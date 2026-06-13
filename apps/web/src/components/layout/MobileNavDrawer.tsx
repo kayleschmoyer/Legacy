@@ -92,6 +92,34 @@ export const MobileNavDrawer: React.FC<Props> = ({
     return () => document.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
+  // LS-4986: intercept the Android/browser back button while the drawer is
+  // open. Push a dummy history entry on open so the back button pops it
+  // instead of navigating away; listen for popstate to close the drawer.
+  // On non-back-button close (backdrop tap, X button), pop the dummy entry
+  // only if history.length is exactly one ahead of where we started — if
+  // handleNav fired in the meantime, length will be higher and we skip the
+  // back() call to avoid pulling the user away from their destination.
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const lengthBeforePush = window.history.length;
+    window.history.pushState({ navDrawerOpen: true }, '');
+    let closedByBackButton = false;
+    const handlePopState = () => {
+      closedByBackButton = true;
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (
+        !closedByBackButton &&
+        window.history.length === lengthBeforePush + 1
+      ) {
+        window.history.back();
+      }
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 

@@ -666,3 +666,115 @@ describe('EliteDraftBoardScreen — stale pick announcement dismissal (LS-4449/L
     expect(dismissAnnouncement).not.toHaveBeenCalled();
   });
 });
+
+// LS-4986: onActiveDraftChange fires true when draft is running, false otherwise.
+describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
+  it('calls onActiveDraftChange(true) when draft is in-progress', () => {
+    const onActiveDraftChange = jest.fn();
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueDraft: {
+          selectionMethod: 'standard',
+          draftCompletedAt: null,
+          id: '42',
+        },
+      }),
+    );
+
+    render(
+      <EliteDraftBoardScreen
+        {...defaultProps}
+        onActiveDraftChange={onActiveDraftChange}
+      />,
+    );
+
+    expect(onActiveDraftChange).toHaveBeenCalledWith(true);
+  });
+
+  it('calls onActiveDraftChange(true) when draft is paused', () => {
+    const onActiveDraftChange = jest.fn();
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'paused',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueDraft: {
+          selectionMethod: 'standard',
+          draftCompletedAt: null,
+          id: '42',
+        },
+      }),
+    );
+
+    render(
+      <EliteDraftBoardScreen
+        {...defaultProps}
+        onActiveDraftChange={onActiveDraftChange}
+      />,
+    );
+
+    expect(onActiveDraftChange).toHaveBeenCalledWith(true);
+  });
+
+  it('calls onActiveDraftChange(false) when draft is in pre-draft lobby', () => {
+    const onActiveDraftChange = jest.fn();
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'pre_draft',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueDraft: null,
+        draftId: null,
+      }),
+    );
+
+    render(
+      <EliteDraftBoardScreen
+        {...defaultProps}
+        onActiveDraftChange={onActiveDraftChange}
+      />,
+    );
+
+    expect(onActiveDraftChange).toHaveBeenCalledWith(false);
+  });
+
+  it('calls onActiveDraftChange(false) when draft is complete (WebSocket path)', () => {
+    const onActiveDraftChange = jest.fn();
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+      }),
+    );
+
+    render(
+      <EliteDraftBoardScreen
+        {...defaultProps}
+        onActiveDraftChange={onActiveDraftChange}
+      />,
+    );
+
+    expect(onActiveDraftChange).toHaveBeenCalledWith(false);
+  });
+});

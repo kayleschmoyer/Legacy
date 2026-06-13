@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { EliteDraftBoardScreen } from './EliteDraftBoard';
 
 // ---------------------------------------------------------------------------
@@ -132,21 +132,22 @@ jest.mock('@apollo/client/react', () => ({
   ]),
 }));
 
-/** Wrap the component with MemoryRouter so useNavigate / useParams work. */
+/**
+ * Wrap the component with a data router so useNavigate, useParams, and
+ * useBlocker all work.  MemoryRouter is a legacy router that lacks the
+ * data-router context required by useBlocker (React Router v6.4+).
+ */
 function renderDraftBoard() {
-  return render(
-    <MemoryRouter
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      initialEntries={['/baseball/league/1/draft']}
-    >
-      <Routes>
-        <Route
-          path="/baseball/league/:id/draft"
-          element={<EliteDraftBoardScreen />}
-        />
-      </Routes>
-    </MemoryRouter>,
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/baseball/league/:id/draft',
+        element: <EliteDraftBoardScreen />,
+      },
+    ],
+    { initialEntries: ['/baseball/league/1/draft'] },
   );
+  return render(<RouterProvider router={router} />);
 }
 
 // Minimal smoke + a11y semantics tests for the draft board

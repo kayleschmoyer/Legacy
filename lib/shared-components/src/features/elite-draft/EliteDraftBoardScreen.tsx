@@ -51,6 +51,12 @@ export interface EliteDraftBoardScreenProps {
    * callers can read `league.sport` (ADR 0011 / LS-4658).
    */
   sport?: SportKind;
+  /**
+   * Called when the draft transitions between active (in-progress/paused) and
+   * inactive states. Callers can use this to set up navigation guards that
+   * prevent accidental back-button exits from an active draft session (LS-4986).
+   */
+  onActiveDraftChange?: (active: boolean) => void;
 }
 
 export function EliteDraftBoardScreen({
@@ -61,6 +67,7 @@ export function EliteDraftBoardScreen({
   renderChat,
   onPlayerDrafted,
   sport = 'baseball',
+  onActiveDraftChange,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
@@ -227,6 +234,20 @@ export function EliteDraftBoardScreen({
     setLiveMessage: ui.setLiveMessage,
     setPlayerSearch: ui.setPlayerSearch,
   });
+
+  // LS-4986: notify callers when the draft is actively running so they can set
+  // up navigation guards (e.g. browser/Android back-button interception).
+  const isDraftRunning = Boolean(
+    !ui.draftComplete &&
+    !queries.leagueDraft?.draftCompletedAt &&
+    !queries.currentPickInfo?.isComplete &&
+    (queries.league?.draftStatus === 'in-progress' ||
+      queries.league?.draftStatus === 'paused'),
+  );
+  useEffect(() => {
+    onActiveDraftChange?.(isDraftRunning);
+    return () => onActiveDraftChange?.(false);
+  }, [isDraftRunning, onActiveDraftChange]);
 
   // ---- Derived values ----
   const onlineTeamIds = useMemo<ReadonlySet<string>>(() => {
