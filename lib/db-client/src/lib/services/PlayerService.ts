@@ -72,6 +72,10 @@ interface ScoringResultRow {
   position: string | null;
   jersey_number: number | null;
   injuries_last_synced_at: string | null;
+  // Football injury/news columns (LS-5436)
+  injury_status: string | null;
+  injury_designation: string | null;
+  news: string | null;
 }
 
 export interface PlayerFilters {
@@ -608,6 +612,7 @@ export class PlayerService {
             p.bat_hand, p.throw_hand,
             p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
             p.injuries_last_synced_at,
+            p.injury_status, p.injury_designation, p.news,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
             ${fieldingScoreExpr} AS fielding_score,
@@ -660,6 +665,9 @@ export class PlayerService {
           injuriesLastSyncedAt: row.injuries_last_synced_at
             ? new Date(row.injuries_last_synced_at)
             : null,
+          injuryStatus: row.injury_status ?? null,
+          injuryDesignation: row.injury_designation ?? null,
+          news: row.news ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

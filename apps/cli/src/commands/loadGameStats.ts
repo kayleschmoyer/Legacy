@@ -60,6 +60,9 @@ async function loadPlayerGameStats(
     nflTeam: string | null;
     position: Player['position'];
     jerseyNumber: number | null;
+    injuryStatus: string | null;
+    injuryDesignation: string | null;
+    news: string | null;
   } = {
     id: playerId,
     firstName: '',
@@ -85,6 +88,9 @@ async function loadPlayerGameStats(
     nflTeam: null,
     position: null,
     jerseyNumber: null,
+    injuryStatus: null,
+    injuryDesignation: null,
+    news: null,
   };
 
   // Load batting stats

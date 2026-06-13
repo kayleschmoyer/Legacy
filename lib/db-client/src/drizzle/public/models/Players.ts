@@ -60,6 +60,11 @@ export const players = pgTable(
     position: playerPosition('position'),
     // NFL jersey number for display (LS-6236). Nullable — DST and unmapped players have null.
     jerseyNumber: integer('jersey_number'),
+    // Injury status and news for football players (LS-5436). Populated by the
+    // injury data pipeline; null until a feed is connected.
+    injuryStatus: text('injury_status'),
+    injuryDesignation: text('injury_designation'),
+    news: text('news'),
   },
   (table) => {
     return {

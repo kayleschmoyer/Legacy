@@ -5,11 +5,14 @@ import { formatInjuryFreshness } from './injuryFreshness';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import { GameLogsTable } from '../stats/GameLogsTable';
 import {
+  AMBER,
+  AMBER_LIGHT,
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_SEAM_RED_LIGHT,
+  ORANGE,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
   TEXT_MUTED,
@@ -161,6 +164,9 @@ export interface FootballPlayerDetailPlayer {
    * synced. Drives the freshness badge (LS-6251 / FPD-027).
    */
   injuriesLastSyncedAt?: string | null;
+  injuryStatus?: string | null;
+  injuryDesignation?: string | null;
+  news?: string | null;
 }
 
 function fmt(n: number | null | undefined): string {
@@ -268,6 +274,102 @@ function InjuryFreshnessBadge({
   );
 }
 
+const INJURY_COLORS: Record<string, { bg: string; text: string }> = {
+  out: {
+    bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15),
+    text: BRAND_SEAM_RED_LIGHT,
+  },
+  ir: { bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15), text: BRAND_SEAM_RED_LIGHT },
+  pup: {
+    bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15),
+    text: BRAND_SEAM_RED_LIGHT,
+  },
+  doubtful: { bg: withAlpha(ORANGE, 0.15), text: ORANGE },
+  questionable: { bg: withAlpha(AMBER_LIGHT, 0.15), text: AMBER },
+  'day-to-day': { bg: withAlpha(AMBER_LIGHT, 0.15), text: AMBER },
+};
+
+function injuryColors(status: string): { bg: string; text: string } {
+  return (
+    INJURY_COLORS[status.toLowerCase()] ?? {
+      bg: withAlpha(TEXT_MUTED, 0.12),
+      text: TEXT_MUTED,
+    }
+  );
+}
+
+function InjuryBanner({
+  injuryStatus,
+  injuryDesignation,
+}: {
+  injuryStatus: string;
+  injuryDesignation?: string | null;
+}) {
+  const colors = injuryColors(injuryStatus);
+  return (
+    <XStack
+      backgroundColor={colors.bg}
+      borderWidth={1}
+      borderColor={withAlpha(colors.text, 0.3)}
+      borderRadius={8}
+      paddingHorizontal={12}
+      paddingVertical={8}
+      gap={8}
+      alignItems="center"
+      flexWrap="wrap"
+      data-testid="injury-banner"
+    >
+      <Text
+        fontSize={13}
+        fontWeight="700"
+        fontFamily={FONT_DISPLAY}
+        color={colors.text}
+        textTransform="uppercase"
+        letterSpacing={0.6}
+      >
+        {injuryStatus}
+      </Text>
+      {injuryDesignation ? (
+        <Text fontSize={13} color={colors.text} fontFamily={FONT_BODY}>
+          {injuryDesignation}
+        </Text>
+      ) : null}
+    </XStack>
+  );
+}
+
+function NewsCard({ news }: { news: string }) {
+  return (
+    <YStack
+      backgroundColor={SURFACE_CARD}
+      borderWidth={1}
+      borderColor={OUTLINE_SUBTLE}
+      borderRadius={8}
+      padding={14}
+      gap={6}
+      data-testid="news-card"
+    >
+      <Text
+        fontSize={11}
+        fontWeight="700"
+        color={BRAND_GOLD}
+        fontFamily={FONT_DISPLAY}
+        textTransform="uppercase"
+        letterSpacing={1}
+      >
+        Latest News
+      </Text>
+      <Text
+        fontSize={13}
+        color={TEXT_PRIMARY}
+        fontFamily={FONT_BODY}
+        lineHeight={20}
+      >
+        {news}
+      </Text>
+    </YStack>
+  );
+}
 function IdpStatsTable({ stats }: { stats: FootballPlayerDetailStats }) {
   const idp = stats.idp;
   return (
@@ -1173,7 +1275,18 @@ export function FootballPlayerDetail({
           {/* Injury-data freshness (LS-6251 / FPD-027) — hidden until synced */}
           <InjuryFreshnessBadge syncedAtIso={player.injuriesLastSyncedAt} />
 
-          {/* Career stats summary */}
+          {/* Injury status */}
+          {player.injuryStatus ? (
+            <InjuryBanner
+              injuryStatus={player.injuryStatus}
+              injuryDesignation={player.injuryDesignation}
+            />
+          ) : null}
+
+          {/* Player news */}
+          {player.news ? <NewsCard news={player.news} /> : null}
+
+          {/* Career stats */}
           {!player.careerStats ? (
             <YStack
               backgroundColor={SURFACE_CARD}

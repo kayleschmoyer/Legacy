@@ -946,9 +946,12 @@ export type FootballPlayer = {
   id: Scalars['Int']['output'];
   /** ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027). */
   injuriesLastSyncedAt?: Maybe<Scalars['String']['output']>;
+  injuryDesignation?: Maybe<Scalars['String']['output']>;
+  injuryStatus?: Maybe<Scalars['String']['output']>;
   isDst: Scalars['Boolean']['output'];
   jerseyNumber?: Maybe<Scalars['Int']['output']>;
   lastName: Scalars['String']['output'];
+  news?: Maybe<Scalars['String']['output']>;
   nflTeam?: Maybe<Scalars['String']['output']>;
   pfrId?: Maybe<Scalars['String']['output']>;
   position?: Maybe<Scalars['String']['output']>;

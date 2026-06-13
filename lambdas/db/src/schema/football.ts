@@ -771,6 +771,9 @@ interface FootballPlayerShape {
   position: string | null;
   jerseyNumber: number | null;
   injuriesLastSyncedAt: Date | null;
+  injuryStatus: string | null;
+  injuryDesignation: string | null;
+  news: string | null;
 }
 
 /**
@@ -900,6 +903,9 @@ FootballPlayerRef.implement({
         return [...new Set(allTeams)].filter((team) => team !== currentTeam);
       },
     }),
+    injuryStatus: t.exposeString('injuryStatus', { nullable: true }),
+    injuryDesignation: t.exposeString('injuryDesignation', { nullable: true }),
+    news: t.exposeString('news', { nullable: true }),
     seasonStats: t.field({
       type: FootballPlayerSeasonStatsRef,
       nullable: true,
@@ -1420,6 +1426,9 @@ builder.queryField('footballPlayers', (t) =>
           position: PublicSchema.players.position,
           jerseyNumber: PublicSchema.players.jerseyNumber,
           injuriesLastSyncedAt: PublicSchema.players.injuriesLastSyncedAt,
+          injuryStatus: PublicSchema.players.injuryStatus,
+          injuryDesignation: PublicSchema.players.injuryDesignation,
+          news: PublicSchema.players.news,
         })
         .from(PublicSchema.players)
         .where(and(...conditions))
@@ -1470,6 +1479,9 @@ builder.queryField('footballPlayer', (t) =>
           position: PublicSchema.players.position,
           jerseyNumber: PublicSchema.players.jerseyNumber,
           injuriesLastSyncedAt: PublicSchema.players.injuriesLastSyncedAt,
+          injuryStatus: PublicSchema.players.injuryStatus,
+          injuryDesignation: PublicSchema.players.injuryDesignation,
+          news: PublicSchema.players.news,
         })
         .from(PublicSchema.players)
         .where(
