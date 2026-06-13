@@ -8,9 +8,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { EliteDraftBoardScreen } from '@legacy-sports/shared-components/elite-draft';
 import type { DraftChatProps } from '@legacy-sports/shared-components/elite-draft';
+import { PremiumGate } from './PremiumGate';
 import { LeagueChatTab } from '../features/baseball/LeagueChatTab';
 import { env } from '../config/environment';
 import { trackPlayerSelected } from '../utils/analytics';
+import { useIsPremium } from '../hooks/useIsPremium';
 
 const DIALOG_OVERLAY: React.CSSProperties = {
   position: 'fixed',
@@ -48,6 +50,7 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
   const { id: leagueIdParam } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const leagueId = leagueIdParam ? parseInt(leagueIdParam, 10) : null;
+  const isPremium = useIsPremium();
   const [isDraftActive, setIsDraftActive] = useState(false);
 
   // Block in-app navigation (including browser/Android back button) while a
@@ -75,90 +78,98 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
   }, [blocker]);
 
   return (
-    <>
-      {blocker.state === 'blocked' && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="draft-exit-title"
-          style={DIALOG_OVERLAY}
-        >
-          <div style={DIALOG_CARD}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>
-              <span role="img" aria-label="warning">
-                ⚠️
-              </span>
-            </div>
-            <div
-              id="draft-exit-title"
-              style={{
-                fontFamily: "'Big Shoulders Display', sans-serif",
-                fontSize: 24,
-                color: '#F8FAFC',
-                letterSpacing: '0.06em',
-                marginBottom: 12,
-              }}
-            >
-              LEAVE DRAFT?
-            </div>
-            <p
-              style={{
-                color: '#9CAAC5',
-                fontSize: 14,
-                lineHeight: 1.5,
-                margin: '0 0 24px',
-              }}
-            >
-              Your draft is still in progress. Leaving now will not forfeit your
-              picks — auto-pick will fill in while you&apos;re away — but you
-              may miss your turn.
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button
-                onClick={handleReset}
+    <PremiumGate
+      isPremium={isPremium}
+      featureName="Live Draft"
+      featureDescription="The live draft board with real-time picks and draft recommendations is available on the Premium plan."
+    >
+      <>
+        {blocker.state === 'blocked' && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="draft-exit-title"
+            style={DIALOG_OVERLAY}
+          >
+            <div style={DIALOG_CARD}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>
+                <span role="img" aria-label="warning">
+                  ⚠️
+                </span>
+              </div>
+              <div
+                id="draft-exit-title"
                 style={{
-                  flex: 1,
-                  padding: '10px 20px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(197,165,90,0.4)',
-                  background: 'transparent',
-                  color: '#C5A55A',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
+                  fontFamily: "'Big Shoulders Display', sans-serif",
+                  fontSize: 24,
+                  color: '#F8FAFC',
+                  letterSpacing: '0.06em',
+                  marginBottom: 12,
                 }}
               >
-                Stay in Draft
-              </button>
-              <button
-                onClick={handleProceed}
+                LEAVE DRAFT?
+              </div>
+              <p
                 style={{
-                  flex: 1,
-                  padding: '10px 20px',
-                  borderRadius: 8,
-                  border: 0,
-                  background: 'rgba(197,165,90,0.15)',
-                  color: '#DEE6FF',
-                  fontWeight: 700,
+                  color: '#9CAAC5',
                   fontSize: 14,
-                  cursor: 'pointer',
+                  lineHeight: 1.5,
+                  margin: '0 0 24px',
                 }}
               >
-                Leave Anyway
-              </button>
+                Your draft is still in progress. Leaving now will not forfeit
+                your picks — auto-pick will fill in while you&apos;re away — but
+                you may miss your turn.
+              </p>
+              <div
+                style={{ display: 'flex', gap: 12, justifyContent: 'center' }}
+              >
+                <button
+                  onClick={handleReset}
+                  style={{
+                    flex: 1,
+                    padding: '10px 20px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(197,165,90,0.4)',
+                    background: 'transparent',
+                    color: '#C5A55A',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Stay in Draft
+                </button>
+                <button
+                  onClick={handleProceed}
+                  style={{
+                    flex: 1,
+                    padding: '10px 20px',
+                    borderRadius: 8,
+                    border: 0,
+                    background: 'rgba(197,165,90,0.15)',
+                    color: '#DEE6FF',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Leave Anyway
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      <EliteDraftBoardScreen
-        leagueId={leagueId}
-        onNavigate={(path) => navigate(path)}
-        websocketUrl={env.websocketUrl}
-        renderChat={renderChat}
-        onPlayerDrafted={trackPlayerSelected}
-        onActiveDraftChange={setIsDraftActive}
-      />
-    </>
+        )}
+        <EliteDraftBoardScreen
+          leagueId={leagueId}
+          onNavigate={(path) => navigate(path)}
+          websocketUrl={env.websocketUrl}
+          renderChat={renderChat}
+          onPlayerDrafted={trackPlayerSelected}
+          onActiveDraftChange={setIsDraftActive}
+        />
+      </>
+    </PremiumGate>
   );
 }
 

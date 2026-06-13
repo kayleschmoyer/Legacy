@@ -564,6 +564,12 @@
       "apps/web/src/pages/pricing/**",
       "apps/web/src/pages/donate/**"
     ],
+    "apps/web-e2e/src/tests/league-premium-gate.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "apps/web/src/components/PremiumGate.tsx",
+      "apps/web/src/hooks/useIsPremium.ts"
+    ],
     "apps/web-e2e/src/tests/submit-new-trade.spec.ts": [
       "apps/web/src/pages/baseball/**",
       "apps/web/src/features/roster/**",

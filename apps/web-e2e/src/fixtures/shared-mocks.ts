@@ -49,7 +49,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
         name: 'Test User',
         accessLevel: 'none',
         avatarUrl: null,
-        subscriptionTier: null,
+        subscriptionTier: 'premium',
         themePreference: null,
       },
     },

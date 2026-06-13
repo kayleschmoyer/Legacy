@@ -33,6 +33,8 @@ import { setLastVisitedLeague } from '../../../lib/last-visited-league';
 import { LeagueWebSocketContext } from '../../../context/LeagueWebSocketContext';
 import { useLeagueWebSocket } from '../../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketLifecycle } from '../../../hooks/useLeagueWebSocketLifecycle';
+import { useIsPremium } from '../../../hooks/useIsPremium';
+import { PremiumGate } from '../../../components/PremiumGate';
 
 /** Subscribes to page-level WS events that need to refetch league-level data. */
 function LeagueWSPageHandler({
@@ -80,6 +82,8 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   const { user, isLoading: authLoading, token: authToken } = useAuth();
   const leagueId = id ? parseInt(id, 10) : NaN;
   const isAuthenticated = !authLoading && !!user;
+
+  const isPremium = useIsPremium();
 
   const { client: wsClient, connected: wsConnected } =
     useLeagueWebSocketLifecycle({ leagueId, isAuthenticated, authToken });
@@ -325,165 +329,185 @@ export function LeagueDetailPageV2(): React.JSX.Element {
         title={`${league.name ?? 'League'} · Legacy Sports`}
         description={`Manage and view ${league.name ?? 'your league'} — matchups, roster, standings, trades and more.`}
       />
-      <LeagueDetailShell
-        sport="baseball"
-        className="ls-root"
-        pageClassName="ls-page"
-        league={{
-          name: league.name ?? 'League',
-          scoringLabel: scoringProfileName,
-          era:
-            league.minCareerSeasons || league.minCareerGames
-              ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
-              : 'All-Time',
-          draftStatus: league.draftStatus ?? 'pre-draft',
-          currentWeek: league.currentWeekNumber ?? null,
-          totalMatchups: league.totalMatchups ?? null,
-          teamCount: teams.length || null,
-          inviteCode: league.inviteCode,
-        }}
-        role={role}
-        onRoleChange={setRole}
-        season={seasonValue}
-        onSeasonChange={setSeasonValue}
-        seasons={seasonOptions}
-        isCommissioner={isCommissioner}
-        isMember={isMember}
-        tabs={WEB_LEAGUE_TABS}
-        activeTab={tab}
-        onTabChange={(t) => setTab(t as TabId)}
-        onAnalytics={() => navigate(`/leagues/${leagueId}/analytics`)}
-        onBack={() => navigate('/baseball/leagues')}
-        onInvite={() => setTab('overview')}
+      <PremiumGate
+        isPremium={isPremium}
+        featureName="Fantasy League"
+        featureDescription="Full league access — roster management, live draft, commissioner tools, and advanced stats — is available on the Premium plan."
       >
-        {tab === 'overview' && (
-          <div
-            role="tabpanel"
-            id="panel-overview"
-            aria-labelledby="tab-overview"
-          >
-            <OverviewTab
-              league={league}
-              teams={teams}
-              myTeamId={userTeamId ?? null}
-              isCommissioner={effIsCommish}
-              onTab={setTab}
-              onTeam={onTeamNav}
-              onJoinDraft={() => navigate(`/baseball/league/${leagueId}/draft`)}
-              currentUserId={user?.id ?? null}
-              myRoster={myRoster}
-            />
-          </div>
-        )}
-        {tab === 'matchup' && (
-          <div role="tabpanel" id="panel-matchup" aria-labelledby="tab-matchup">
-            <MatchupTab
-              league={league}
-              myTeamId={userTeamId ?? null}
-              initialMatchupId={routeMatchupId ?? null}
-              onTeam={onTeamNav}
-            />
-          </div>
-        )}
-        {tab === 'roster' && (isMember || !userTeamIdSettled) && (
-          <div role="tabpanel" id="panel-roster" aria-labelledby="tab-roster">
-            <RosterTab league={league} myTeamId={userTeamId ?? null} />
-          </div>
-        )}
-        {tab === 'free-agents' && (
-          <div
-            role="tabpanel"
-            id="panel-free-agents"
-            aria-labelledby="tab-free-agents"
-          >
-            <FreeAgentsTab
-              league={league}
-              isMember={effIsMember}
-              myTeamId={userTeamId ?? null}
-            />
-          </div>
-        )}
-        {tab === 'standings' && (
-          <div
-            role="tabpanel"
-            id="panel-standings"
-            aria-labelledby="tab-standings"
-          >
-            <StandingsTab
-              league={league}
-              teams={teams}
-              myTeamId={userTeamId ?? null}
-              onTeam={onTeamNav}
-            />
-          </div>
-        )}
-        {tab === 'trades' && (
-          <div role="tabpanel" id="panel-trades" aria-labelledby="tab-trades">
-            <TradesTab
-              league={league}
-              isMember={effIsMember}
-              myTeamId={userTeamId ?? null}
-              isCommissioner={isCommissioner}
-            />
-          </div>
-        )}
-        {tab === 'history' && (
-          <div role="tabpanel" id="panel-history" aria-labelledby="tab-history">
-            <HistoryTab league={league} />
-          </div>
-        )}
-        {tab === 'team' && (isMember || !userTeamIdSettled) && (
-          <div role="tabpanel" id="panel-team" aria-labelledby="tab-team">
-            <TeamTab
-              league={league}
-              myTeamId={userTeamId ?? null}
-              myTeam={teams.find((t) => t.id === userTeamId) ?? null}
-            />
-          </div>
-        )}
-        {tab === 'commish' && settingsError ? (
-          <div
-            role="alert"
-            aria-live="assertive"
-            style={{
-              background: 'rgba(196, 30, 58, 0.1)',
-              border: '1px solid rgba(196, 30, 58, 0.4)',
-              borderRadius: 8,
-              padding: 12,
-              color: '#c41e3a',
-              fontWeight: 600,
-            }}
-          >
-            Error saving settings: {settingsError}
-          </div>
-        ) : null}
-        {tab === 'commish' && settingsSuccess ? (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              background: 'rgba(34, 197, 94, 0.1)',
-              border: '1px solid rgba(34, 197, 94, 0.4)',
-              borderRadius: 8,
-              padding: 12,
-              color: '#16a34a',
-              fontWeight: 600,
-            }}
-          >
-            {settingsSuccess}
-          </div>
-        ) : null}
-        {tab === 'commish' && isCommissioner && (
-          <div role="tabpanel" id="panel-commish" aria-labelledby="tab-commish">
-            <CommishTab
-              league={league}
-              teams={teams}
-              onSettingsSuccess={setSettingsSuccess}
-              onSettingsError={setSettingsError}
-            />
-          </div>
-        )}
-      </LeagueDetailShell>
+        <LeagueDetailShell
+          sport="baseball"
+          className="ls-root"
+          pageClassName="ls-page"
+          league={{
+            name: league.name ?? 'League',
+            scoringLabel: scoringProfileName,
+            era:
+              league.minCareerSeasons || league.minCareerGames
+                ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
+                : 'All-Time',
+            draftStatus: league.draftStatus ?? 'pre-draft',
+            currentWeek: league.currentWeekNumber ?? null,
+            totalMatchups: league.totalMatchups ?? null,
+            teamCount: teams.length || null,
+            inviteCode: league.inviteCode,
+          }}
+          role={role}
+          onRoleChange={setRole}
+          season={seasonValue}
+          onSeasonChange={setSeasonValue}
+          seasons={seasonOptions}
+          isCommissioner={isCommissioner}
+          isMember={isMember}
+          tabs={WEB_LEAGUE_TABS}
+          activeTab={tab}
+          onTabChange={(t) => setTab(t as TabId)}
+          onAnalytics={() => navigate(`/leagues/${leagueId}/analytics`)}
+          onBack={() => navigate('/baseball/leagues')}
+          onInvite={() => setTab('overview')}
+        >
+          {tab === 'overview' && (
+            <div
+              role="tabpanel"
+              id="panel-overview"
+              aria-labelledby="tab-overview"
+            >
+              <OverviewTab
+                league={league}
+                teams={teams}
+                myTeamId={userTeamId ?? null}
+                isCommissioner={effIsCommish}
+                onTab={setTab}
+                onTeam={onTeamNav}
+                onJoinDraft={() =>
+                  navigate(`/baseball/league/${leagueId}/draft`)
+                }
+                currentUserId={user?.id ?? null}
+                myRoster={myRoster}
+              />
+            </div>
+          )}
+          {tab === 'matchup' && (
+            <div
+              role="tabpanel"
+              id="panel-matchup"
+              aria-labelledby="tab-matchup"
+            >
+              <MatchupTab
+                league={league}
+                myTeamId={userTeamId ?? null}
+                initialMatchupId={routeMatchupId ?? null}
+                onTeam={onTeamNav}
+              />
+            </div>
+          )}
+          {tab === 'roster' && (isMember || !userTeamIdSettled) && (
+            <div role="tabpanel" id="panel-roster" aria-labelledby="tab-roster">
+              <RosterTab league={league} myTeamId={userTeamId ?? null} />
+            </div>
+          )}
+          {tab === 'free-agents' && (
+            <div
+              role="tabpanel"
+              id="panel-free-agents"
+              aria-labelledby="tab-free-agents"
+            >
+              <FreeAgentsTab
+                league={league}
+                isMember={effIsMember}
+                myTeamId={userTeamId ?? null}
+              />
+            </div>
+          )}
+          {tab === 'standings' && (
+            <div
+              role="tabpanel"
+              id="panel-standings"
+              aria-labelledby="tab-standings"
+            >
+              <StandingsTab
+                league={league}
+                teams={teams}
+                myTeamId={userTeamId ?? null}
+                onTeam={onTeamNav}
+              />
+            </div>
+          )}
+          {tab === 'trades' && (
+            <div role="tabpanel" id="panel-trades" aria-labelledby="tab-trades">
+              <TradesTab
+                league={league}
+                isMember={effIsMember}
+                myTeamId={userTeamId ?? null}
+                isCommissioner={isCommissioner}
+              />
+            </div>
+          )}
+          {tab === 'history' && (
+            <div
+              role="tabpanel"
+              id="panel-history"
+              aria-labelledby="tab-history"
+            >
+              <HistoryTab league={league} />
+            </div>
+          )}
+          {tab === 'team' && (isMember || !userTeamIdSettled) && (
+            <div role="tabpanel" id="panel-team" aria-labelledby="tab-team">
+              <TeamTab
+                league={league}
+                myTeamId={userTeamId ?? null}
+                myTeam={teams.find((t) => t.id === userTeamId) ?? null}
+              />
+            </div>
+          )}
+          {tab === 'commish' && settingsError ? (
+            <div
+              role="alert"
+              aria-live="assertive"
+              style={{
+                background: 'rgba(196, 30, 58, 0.1)',
+                border: '1px solid rgba(196, 30, 58, 0.4)',
+                borderRadius: 8,
+                padding: 12,
+                color: '#c41e3a',
+                fontWeight: 600,
+              }}
+            >
+              Error saving settings: {settingsError}
+            </div>
+          ) : null}
+          {tab === 'commish' && settingsSuccess ? (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                borderRadius: 8,
+                padding: 12,
+                color: '#16a34a',
+                fontWeight: 600,
+              }}
+            >
+              {settingsSuccess}
+            </div>
+          ) : null}
+          {tab === 'commish' && isCommissioner && (
+            <div
+              role="tabpanel"
+              id="panel-commish"
+              aria-labelledby="tab-commish"
+            >
+              <CommishTab
+                league={league}
+                teams={teams}
+                onSettingsSuccess={setSettingsSuccess}
+                onSettingsError={setSettingsError}
+              />
+            </div>
+          )}
+        </LeagueDetailShell>
+      </PremiumGate>
     </LeagueWebSocketContext.Provider>
   );
 }
