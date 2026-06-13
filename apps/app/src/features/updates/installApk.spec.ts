@@ -1,0 +1,193 @@
+import { Platform } from 'react-native';
+import { File as ExpoFile } from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { ApkInstallError, downloadApk, launchApkInstaller } from './installApk';
+
+// Factories use only jest.fn() — no outer-variable references that would be
+// undefined when Babel-hoisted jest.mock calls execute before variable init.
+jest.mock('expo-file-system', () => ({
+  File: jest.fn(),
+  Paths: { cache: { uri: 'file:///cache/' } },
+}));
+
+jest.mock('expo-intent-launcher', () => ({
+  startActivityAsync: jest.fn(),
+}));
+
+const MockFile = ExpoFile as jest.Mock;
+const mockStartActivityAsync = IntentLauncher.startActivityAsync as jest.Mock;
+
+const FILE_URI = 'file:///cache/legacy-sports-latest.apk';
+const CONTENT_URI =
+  'content://com.legacysports.provider/cache/legacy-sports-latest.apk';
+
+describe('downloadApk', () => {
+  const mockDownloadAsync = jest.fn();
+  const mockDelete = jest.fn();
+
+  function setupFileMock(overrides: Partial<{ exists: boolean }> = {}) {
+    MockFile.mockReturnValue({
+      exists: overrides.exists ?? false,
+      delete: mockDelete,
+      uri: FILE_URI,
+      contentUri: CONTENT_URI,
+    });
+    (MockFile as { createDownloadTask: jest.Mock }).createDownloadTask = jest
+      .fn()
+      .mockReturnValue({ downloadAsync: mockDownloadAsync });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupFileMock();
+  });
+
+  it('creates a File in the cache directory and starts a download task', async () => {
+    mockDownloadAsync.mockResolvedValue({ uri: FILE_URI });
+
+    const result = await downloadApk('https://example.com/app.apk');
+
+    expect(MockFile).toHaveBeenCalledWith(
+      { uri: 'file:///cache/' },
+      'legacy-sports-latest.apk',
+    );
+    expect(
+      (MockFile as { createDownloadTask: jest.Mock }).createDownloadTask,
+    ).toHaveBeenCalledWith(
+      'https://example.com/app.apk',
+      expect.objectContaining({ uri: FILE_URI }),
+      undefined,
+    );
+    expect(result).toBe(FILE_URI);
+  });
+
+  it('deletes a pre-existing file before downloading', async () => {
+    setupFileMock({ exists: true });
+    mockDownloadAsync.mockResolvedValue({ uri: FILE_URI });
+
+    await downloadApk('https://example.com/app.apk');
+
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips deletion when no prior file exists', async () => {
+    mockDownloadAsync.mockResolvedValue({ uri: FILE_URI });
+
+    await downloadApk('https://example.com/app.apk');
+
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('maps new API progress fields to the legacy-named callback interface', async () => {
+    type ProgressFn = (p: { bytesWritten: number; totalBytes: number }) => void;
+    let capturedOnProgress: ProgressFn | undefined;
+
+    (MockFile as { createDownloadTask: jest.Mock }).createDownloadTask = jest
+      .fn()
+      .mockImplementation(
+        (_url: string, _file: unknown, opts?: { onProgress?: ProgressFn }) => {
+          capturedOnProgress = opts?.onProgress;
+          return { downloadAsync: mockDownloadAsync };
+        },
+      );
+
+    mockDownloadAsync.mockResolvedValue({ uri: FILE_URI });
+    const onProgress = jest.fn();
+    await downloadApk('https://example.com/app.apk', onProgress);
+
+    capturedOnProgress?.({ bytesWritten: 1024, totalBytes: 4096 });
+
+    expect(onProgress).toHaveBeenCalledWith({
+      totalBytesWritten: 1024,
+      totalBytesExpectedToWrite: 4096,
+    });
+  });
+
+  it('throws ApkInstallError when download produces no file', async () => {
+    mockDownloadAsync.mockResolvedValue(null);
+
+    await expect(downloadApk('https://example.com/app.apk')).rejects.toThrow(
+      ApkInstallError,
+    );
+  });
+
+  it('wraps unexpected download errors in ApkInstallError', async () => {
+    mockDownloadAsync.mockRejectedValue(new Error('network timeout'));
+
+    await expect(downloadApk('https://example.com/app.apk')).rejects.toThrow(
+      /APK download failed/,
+    );
+  });
+
+  it('ignores errors thrown during stale-file cleanup', async () => {
+    setupFileMock({ exists: true });
+    mockDelete.mockImplementation(() => {
+      throw new Error('permission denied');
+    });
+    mockDownloadAsync.mockResolvedValue({ uri: FILE_URI });
+
+    await expect(downloadApk('https://example.com/app.apk')).resolves.toBe(
+      FILE_URI,
+    );
+  });
+});
+
+describe('launchApkInstaller', () => {
+  let originalPlatformOS: typeof Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    originalPlatformOS = Platform.OS;
+    MockFile.mockReturnValue({
+      exists: false,
+      uri: FILE_URI,
+      contentUri: CONTENT_URI,
+    });
+  });
+
+  afterEach(() => {
+    Object.assign(Platform, { OS: originalPlatformOS });
+  });
+
+  it('reads contentUri from the File instance and starts the install intent', async () => {
+    Object.assign(Platform, { OS: 'android' });
+    mockStartActivityAsync.mockResolvedValue(undefined);
+
+    await launchApkInstaller(FILE_URI);
+
+    expect(MockFile).toHaveBeenCalledWith(FILE_URI);
+    expect(mockStartActivityAsync).toHaveBeenCalledWith(
+      'android.intent.action.VIEW',
+      expect.objectContaining({
+        data: CONTENT_URI,
+        type: 'application/vnd.android.package-archive',
+      }),
+    );
+  });
+
+  it('throws ApkInstallError on non-android platforms', async () => {
+    Object.assign(Platform, { OS: 'ios' });
+
+    await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
+      /only supported on Android/,
+    );
+  });
+
+  it('wraps contentUri access errors in ApkInstallError', async () => {
+    Object.assign(Platform, { OS: 'android' });
+    MockFile.mockImplementationOnce(() => {
+      throw new Error('file not found');
+    });
+
+    await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(/content URI/);
+  });
+
+  it('wraps startActivityAsync errors in ApkInstallError', async () => {
+    Object.assign(Platform, { OS: 'android' });
+    mockStartActivityAsync.mockRejectedValue(new Error('activity not found'));
+
+    await expect(launchApkInstaller(FILE_URI)).rejects.toThrow(
+      /launch APK installer/,
+    );
+  });
+});

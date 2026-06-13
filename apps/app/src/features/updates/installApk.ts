@@ -1,9 +1,4 @@
-import {
-  cacheDirectory,
-  createDownloadResumable,
-  deleteAsync,
-  getContentUriAsync,
-} from 'expo-file-system/legacy';
+import { File as ExpoFile, Paths } from 'expo-file-system';
 import { startActivityAsync } from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 
@@ -34,33 +29,33 @@ export async function downloadApk(
   url: string,
   onProgress?: ProgressCallback,
 ): Promise<string> {
-  if (!cacheDirectory) {
-    throw new ApkInstallError('Cache directory is unavailable');
-  }
-  const fileUri = `${cacheDirectory}${APK_CACHE_FILENAME}`;
+  const file = new ExpoFile(Paths.cache, APK_CACHE_FILENAME);
 
   try {
     // Best-effort cleanup of any prior download.
-    await deleteAsync(fileUri, { idempotent: true });
+    if (file.exists) {
+      file.delete();
+    }
   } catch {
     // Ignore — stale file is not fatal.
   }
 
-  const resumable = createDownloadResumable(
+  const task = ExpoFile.createDownloadTask(
     url,
-    fileUri,
-    {},
+    file,
     onProgress
-      ? (p) =>
-          onProgress({
-            totalBytesWritten: p.totalBytesWritten,
-            totalBytesExpectedToWrite: p.totalBytesExpectedToWrite,
-          })
+      ? {
+          onProgress: (p) =>
+            onProgress({
+              totalBytesWritten: p.bytesWritten,
+              totalBytesExpectedToWrite: p.totalBytes,
+            }),
+        }
       : undefined,
   );
 
   try {
-    const result = await resumable.downloadAsync();
+    const result = await task.downloadAsync();
     if (!result?.uri) {
       throw new ApkInstallError('Download produced no file');
     }
@@ -78,7 +73,7 @@ export async function launchApkInstaller(fileUri: string): Promise<void> {
 
   let contentUri: string;
   try {
-    contentUri = await getContentUriAsync(fileUri);
+    contentUri = new ExpoFile(fileUri).contentUri;
   } catch (error) {
     throw new ApkInstallError(
       'Could not generate content URI for downloaded APK',
