@@ -635,7 +635,8 @@
       "apps/web/src/components/CareerArcChart.tsx",
       "apps/web/src/components/CareerArcSparkline.tsx",
       "lambdas/stats/**",
-      "apps/web/src/pages/games/**"
+      "apps/web/src/pages/games/**",
+      "lib/shared-components/src/features/stats/**"
     ],
     "apps/web-e2e/src/tests/view-game-logs-perf.spec.ts": [
       "apps/web/src/pages/players/**",
@@ -644,7 +645,8 @@
       "apps/web/src/components/CareerArcChart.tsx",
       "apps/web/src/components/CareerArcSparkline.tsx",
       "lambdas/stats/**",
-      "apps/web/src/pages/games/**"
+      "apps/web/src/pages/games/**",
+      "lib/shared-components/src/features/stats/**"
     ],
     "apps/web-e2e/src/tests/waiver-claims.spec.ts": [
       "apps/web/src/pages/baseball/**",
