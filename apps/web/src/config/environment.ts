@@ -124,6 +124,7 @@ export function getProductionConfigErrors(): readonly string[] {
   if (env.googleClientId.startsWith('placeholder-'))
     errors.push('VITE_GOOGLE_CLIENT_ID');
   if (LOCALHOST_RE.test(env.graphqlUrl)) errors.push('VITE_GRAPHQL_HOST');
+  if (!env.websocketUrl) errors.push('VITE_WEBSOCKET_URL');
   return errors;
 }
 

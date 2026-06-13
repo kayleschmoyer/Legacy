@@ -16,11 +16,8 @@ import { captureError } from '@legacy-sports/rollbar/web';
 import { CSRF_HEADER, getCsrfToken, storeCsrfToken } from './csrf';
 import { env } from '../config/environment';
 
-// GraphQL endpoint URL from centralized environment config
-const GRAPHQL_URL = env.graphqlUrl;
-
 const httpLink = createHttpLink({
-  uri: (operation) => `${GRAPHQL_URL}?ref=${operation.operationName}`,
+  uri: (operation) => `${env.graphqlUrl}?ref=${operation.operationName}`,
   headers: {
     'apollo-require-preflight': 'true',
   },

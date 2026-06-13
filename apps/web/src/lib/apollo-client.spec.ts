@@ -25,14 +25,27 @@ import {
   syncUserProfileFromJwt,
 } from './apollo-client';
 
+// Capture the uri factory that apollo-client.ts passes to createHttpLink at
+// module init time. Stored here so it survives clearMocks: true (jest.preset.js
+// wipes jest.fn().mock.calls before every test, but plain variables persist).
+// Must be `var` (not `let`): jest.mock factories are hoisted above `let`
+// declarations by babel-jest, so a `let` would be in the TDZ when the factory runs.
+// eslint-disable-next-line no-var
+var capturedHttpLinkUri:
+  | ((op: { operationName: string }) => string)
+  | undefined;
+
 jest.mock('@apollo/client', () => {
   const actual =
     jest.requireActual<typeof import('@apollo/client')>('@apollo/client');
   return {
     ...actual,
-    createHttpLink: jest.fn(() => ({
-      request: jest.fn(),
-    })),
+    createHttpLink: jest.fn(
+      (options: { uri: (op: { operationName: string }) => string }) => {
+        capturedHttpLinkUri = options.uri;
+        return { request: jest.fn() };
+      },
+    ),
   };
 });
 
@@ -233,6 +246,29 @@ function runWithError(
     }
   });
 }
+
+// ─── httpLink lazy URL resolution ────────────────────────────────────────────
+
+describe('httpLink lazy URL resolution', () => {
+  it('reads env.graphqlUrl at each request, not at module load time', () => {
+    // capturedHttpLinkUri was set when apollo-client.ts first called
+    // createHttpLink at module init (before clearMocks had a chance to wipe it).
+    if (!capturedHttpLinkUri) throw new Error('httpLink uri was not captured');
+
+    const envModule = jest.requireMock<{ env: { graphqlUrl: string } }>(
+      '../config/environment',
+    );
+    const saved = envModule.env.graphqlUrl;
+    envModule.env.graphqlUrl = 'https://runtime.example.com/graphql';
+
+    try {
+      const url = capturedHttpLinkUri({ operationName: 'MyQuery' });
+      expect(url).toBe('https://runtime.example.com/graphql?ref=MyQuery');
+    } finally {
+      envModule.env.graphqlUrl = saved;
+    }
+  });
+});
 
 // ─── errorLink decision logic ─────────────────────────────────────────────────
 

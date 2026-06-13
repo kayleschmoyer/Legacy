@@ -6,9 +6,9 @@ export class DbClient {
   public readonly apolloClient: ApolloClient;
 
   constructor() {
-    const graphqlHost = config.graphqlHost;
     const link = new HttpLink({
-      uri: (operation) => `${graphqlHost}?ref=${operation.operationName}`,
+      uri: (operation) =>
+        `${config.graphqlHost}?ref=${operation.operationName}`,
     });
 
     this.apolloClient = new ApolloClient({
