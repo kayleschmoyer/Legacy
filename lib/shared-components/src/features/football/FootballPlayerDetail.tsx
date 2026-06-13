@@ -734,22 +734,17 @@ function KickingStatGroup({ stats }: { stats: FootballPlayerDetailStats }) {
   );
 }
 
-function OffenseStatsTable({
-  pos,
-  stats,
-}: {
-  pos: string | null | undefined;
-  stats: FootballPlayerDetailStats;
-}) {
-  if (pos === 'QB') return <PassingStatGroup stats={stats} />;
-  if (pos === 'RB') return <RushingStatGroup stats={stats} />;
-  if (pos === 'WR' || pos === 'TE') return <ReceivingStatGroup stats={stats} />;
-  if (pos === 'K') return <KickingStatGroup stats={stats} />;
-
-  // Unknown or missing position (e.g. FB, OL, or null). Rather than render
-  // nothing — leaving a silently empty page below the header — fall back to
-  // showing whatever career categories actually have data, and an explanatory
-  // message when none do (LS-6243 / FPD-019).
+/**
+ * Renders a career stat card for every offensive category that has data,
+ * independent of the player's nominal position (LS-6242). The server returns
+ * each category separately (or `null`/all-null when the player has no rows in
+ * that table), so a QB with rushing data shows both Passing and Rushing cards,
+ * an RB with receptions shows Rushing and Receiving, etc. Gating on category
+ * presence — rather than the position label — stops multi-category stats from
+ * being silently discarded. When no category has data, an explanatory message
+ * is shown rather than a silently empty page (LS-6243 / FPD-019).
+ */
+function OffenseStatsTable({ stats }: { stats: FootballPlayerDetailStats }) {
   const groups: React.ReactNode[] = [];
   if (hasAnyValue(stats.passing))
     groups.push(<PassingStatGroup key="passing" stats={stats} />);
@@ -1146,10 +1141,7 @@ export function FootballPlayerDetail({
           ) : isIdp ? (
             <IdpStatsTable stats={player.careerStats} />
           ) : (
-            <OffenseStatsTable
-              pos={player.position}
-              stats={player.careerStats}
-            />
+            <OffenseStatsTable stats={player.careerStats} />
           )}
 
           {/* Season-by-season breakdown tables */}

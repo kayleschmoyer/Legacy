@@ -11,6 +11,7 @@ import { ChevronDown } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import type { NflTeam } from '@legacy-sports/shared-components';
 import { NFL_TEAMS } from '@legacy-sports/shared-components';
+import { StatCategory } from '@legacy-sports/shared-components/football';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useFootballPlayersQuery } from '../../../api/db/graphql.generated';
 
@@ -144,78 +145,56 @@ function PlayerStats({ player }: { player: FootballPlayerNode }) {
     );
   }
 
-  if (pos === 'QB') {
-    const p = stats.passing;
-    if (!p)
-      return (
-        <Text fontSize={12} color="$gray9">
-          No stats available
-        </Text>
-      );
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatChip value={fmt(p.yds)} label="YDS" />
-        <StatChip value={fmt(p.td)} label="TD" />
-        <StatChip value={fmt(p.int)} label="INT" />
-        <StatChip value={fmtFloat(p.rating)} label="RTG" />
-      </XStack>
-    );
-  }
+  // Offense: render a labeled row for every category with a non-null record,
+  // independent of the nominal position, so multi-category players (QB with
+  // rushing, RB with receiving, hybrid TE/WR) surface all their stats (LS-6242).
+  const { passing, rushing, receiving, kicking } = stats;
+  const fgPct =
+    kicking?.fga && kicking.fga > 0
+      ? ((kicking.fgm ?? 0) / kicking.fga) * 100
+      : null;
 
-  if (pos === 'RB') {
-    const r = stats.rushing;
-    if (!r)
-      return (
-        <Text fontSize={12} color="$gray9">
-          No stats available
-        </Text>
-      );
+  if (!passing && !rushing && !receiving && !kicking) {
     return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatChip value={fmt(r.yds)} label="YDS" />
-        <StatChip value={fmt(r.td)} label="TD" />
-      </XStack>
-    );
-  }
-
-  if (pos === 'WR' || pos === 'TE') {
-    const r = stats.receiving;
-    if (!r)
-      return (
-        <Text fontSize={12} color="$gray9">
-          No stats available
-        </Text>
-      );
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatChip value={fmt(r.rec)} label="REC" />
-        <StatChip value={fmt(r.yds)} label="YDS" />
-        <StatChip value={fmt(r.td)} label="TD" />
-      </XStack>
-    );
-  }
-
-  if (pos === 'K') {
-    const k = stats.kicking;
-    if (!k)
-      return (
-        <Text fontSize={12} color="$gray9">
-          No stats available
-        </Text>
-      );
-    const fgPct = k.fga && k.fga > 0 ? ((k.fgm ?? 0) / k.fga) * 100 : null;
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatChip value={`${fmt(k.fgm)}/${fmt(k.fga)}`} label="FG" />
-        <StatChip value={`${fmtFloat(fgPct)}%`} label="" />
-      </XStack>
+      <Text fontSize={12} color="$gray9">
+        No stats available
+      </Text>
     );
   }
 
   return (
-    <Text fontSize={12} color="$gray9">
-      No stats available
-    </Text>
+    <YStack gap={6}>
+      {passing && (
+        <StatCategory label="Pass">
+          <StatChip value={fmt(passing.yds)} label="YDS" />
+          <StatChip value={fmt(passing.td)} label="TD" />
+          <StatChip value={fmt(passing.int)} label="INT" />
+          <StatChip value={fmtFloat(passing.rating)} label="RTG" />
+        </StatCategory>
+      )}
+      {rushing && (
+        <StatCategory label="Rush">
+          <StatChip value={fmt(rushing.yds)} label="YDS" />
+          <StatChip value={fmt(rushing.td)} label="TD" />
+        </StatCategory>
+      )}
+      {receiving && (
+        <StatCategory label="Rec">
+          <StatChip value={fmt(receiving.rec)} label="REC" />
+          <StatChip value={fmt(receiving.yds)} label="YDS" />
+          <StatChip value={fmt(receiving.td)} label="TD" />
+        </StatCategory>
+      )}
+      {kicking && (
+        <StatCategory label="Kick">
+          <StatChip
+            value={`${fmt(kicking.fgm)}/${fmt(kicking.fga)}`}
+            label="FG"
+          />
+          <StatChip value={`${fmtFloat(fgPct)}%`} label="" />
+        </StatCategory>
+      )}
+    </YStack>
   );
 }
 

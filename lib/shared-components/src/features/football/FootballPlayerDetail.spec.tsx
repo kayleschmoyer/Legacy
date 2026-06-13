@@ -281,6 +281,42 @@ describe('FootballPlayerDetail', () => {
     expect(screen.getAllByText('105.2').length).toBeGreaterThanOrEqual(1);
   });
 
+  describe('LS-6242 — multi-category players render every populated category', () => {
+    it('renders both passing and rushing cards for a QB with rushing data', () => {
+      const DUAL_THREAT_QB: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        firstName: 'Josh',
+        lastName: 'Allen',
+        careerStats: {
+          passing: { yds: 21000, td: 150, int: 60, rating: 96.3 },
+          rushing: { yds: 762, td: 15 },
+        },
+      };
+      render(<FootballPlayerDetail player={DUAL_THREAT_QB} />);
+      expect(screen.getByText('Career Passing')).toBeTruthy();
+      expect(screen.getByText('Career Rushing')).toBeTruthy();
+      // Rushing TDs (15) must be visible — the core data the bug hid.
+      expect(screen.getByText('762')).toBeTruthy();
+      expect(screen.getByText('15')).toBeTruthy();
+    });
+
+    it('renders both rushing and receiving cards for an RB with receptions', () => {
+      render(<FootballPlayerDetail player={RB_PLAYER} />);
+      expect(screen.getByText('Career Rushing')).toBeTruthy();
+      expect(screen.getByText('Career Receiving')).toBeTruthy();
+      // Receiving yards (564) must be visible — invisible before the fix. The
+      // value also appears in the season-breakdown table, so allow multiples.
+      expect(screen.getAllByText('564').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders only the populated category for a single-category QB', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(screen.getByText('Career Passing')).toBeTruthy();
+      expect(screen.queryByText('Career Rushing')).toBeNull();
+      expect(screen.queryByText('Career Receiving')).toBeNull();
+    });
+  });
+
   it('renders DST stats for a defense', () => {
     render(<FootballPlayerDetail player={DST_PLAYER} />);
     expect(screen.getByText('Career DST Stats')).toBeTruthy();

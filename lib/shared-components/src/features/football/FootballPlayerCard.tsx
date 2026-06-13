@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import { StatCategory } from './StatCategory';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import {
   BRAND_NAVY,
@@ -175,9 +176,15 @@ function fmtFloat(n: number | null | undefined, decimals = 1): string {
   return n.toFixed(decimals);
 }
 
+/**
+ * Renders a labeled stat row for every offensive category with a non-null
+ * record (LS-6242). The server returns each category independently, so a QB
+ * with rushing data shows both a Pass and a Rush row, an RB with receptions
+ * shows Rush and Rec, etc. Gating on category presence rather than the position
+ * label stops multi-category stats from being silently discarded.
+ */
 function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
   const stats = player.careerStats;
-  const pos = player.position;
 
   if (!stats) {
     return (
@@ -187,54 +194,53 @@ function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
     );
   }
 
-  if (pos === 'QB') {
-    const p = stats.passing;
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatLine value={fmt(p?.yds)} label="YDS" />
-        <StatLine value={fmt(p?.td)} label="TD" />
-        <StatLine value={fmt(p?.int)} label="INT" />
-        <StatLine value={fmtFloat(p?.rating)} label="RTG" />
-      </XStack>
-    );
-  }
+  const { passing, rushing, receiving, kicking } = stats;
+  const fgPct =
+    kicking?.fga && kicking.fga > 0
+      ? ((kicking.fgm ?? 0) / kicking.fga) * 100
+      : null;
 
-  if (pos === 'RB') {
-    const r = stats.rushing;
+  if (!passing && !rushing && !receiving && !kicking) {
     return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatLine value={fmt(r?.yds)} label="YDS" />
-        <StatLine value={fmt(r?.td)} label="TD" />
-      </XStack>
-    );
-  }
-
-  if (pos === 'WR' || pos === 'TE') {
-    const r = stats.receiving;
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatLine value={fmt(r?.rec)} label="REC" />
-        <StatLine value={fmt(r?.yds)} label="YDS" />
-        <StatLine value={fmt(r?.td)} label="TD" />
-      </XStack>
-    );
-  }
-
-  if (pos === 'K') {
-    const k = stats.kicking;
-    const fgPct = k?.fga && k.fga > 0 ? ((k.fgm ?? 0) / k.fga) * 100 : null;
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatLine value={`${fmt(k?.fgm)}/${fmt(k?.fga)}`} label="FG" />
-        <StatLine value={`${fmtFloat(fgPct)}%`} label="" />
-      </XStack>
+      <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+        No stats available
+      </Text>
     );
   }
 
   return (
-    <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-      No stats available
-    </Text>
+    <YStack gap={6}>
+      {passing && (
+        <StatCategory label="Pass">
+          <StatLine value={fmt(passing.yds)} label="YDS" />
+          <StatLine value={fmt(passing.td)} label="TD" />
+          <StatLine value={fmt(passing.int)} label="INT" />
+          <StatLine value={fmtFloat(passing.rating)} label="RTG" />
+        </StatCategory>
+      )}
+      {rushing && (
+        <StatCategory label="Rush">
+          <StatLine value={fmt(rushing.yds)} label="YDS" />
+          <StatLine value={fmt(rushing.td)} label="TD" />
+        </StatCategory>
+      )}
+      {receiving && (
+        <StatCategory label="Rec">
+          <StatLine value={fmt(receiving.rec)} label="REC" />
+          <StatLine value={fmt(receiving.yds)} label="YDS" />
+          <StatLine value={fmt(receiving.td)} label="TD" />
+        </StatCategory>
+      )}
+      {kicking && (
+        <StatCategory label="Kick">
+          <StatLine
+            value={`${fmt(kicking.fgm)}/${fmt(kicking.fga)}`}
+            label="FG"
+          />
+          <StatLine value={`${fmtFloat(fgPct)}%`} label="" />
+        </StatCategory>
+      )}
+    </YStack>
   );
 }
 

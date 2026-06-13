@@ -17,4 +17,5 @@ export {
   type FootballSeasonReceivingRow,
   type FootballPlayerTab,
 } from './FootballPlayerDetail';
+export { StatCategory } from './StatCategory';
 export { FOOTBALL_PLAYER_DETAIL_POLL_MS } from './playerDetailPolling';

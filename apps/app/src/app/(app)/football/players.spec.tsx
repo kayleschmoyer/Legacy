@@ -28,6 +28,29 @@ jest.mock('@legacy-sports/shared-components', () => ({
   },
 }));
 
+jest.mock('@legacy-sports/shared-components/football', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createElement } = require('react') as typeof import('react');
+  return {
+    StatCategory: ({
+      label,
+      children,
+    }: {
+      label: string;
+      children: import('react').ReactNode;
+    }) => {
+      const { View, Text } =
+        jest.requireActual<typeof import('react-native')>('react-native');
+      return createElement(
+        View,
+        null,
+        createElement(Text, null, label),
+        children,
+      );
+    },
+  };
+});
+
 jest.mock('@tamagui/lucide-icons', () => ({
   ChevronDown: 'ChevronDown',
 }));
@@ -237,6 +260,36 @@ describe('FootballPlayers', () => {
       expect(screen.getByText('37')).toBeTruthy();
       expect(screen.getByText('TD')).toBeTruthy();
       expect(screen.getByText('RTG')).toBeTruthy();
+    });
+
+    it('renders both passing and rushing rows for a dual-threat QB (LS-6242)', () => {
+      const DUAL_THREAT_QB = {
+        ...QB_PLAYER,
+        firstName: 'Josh',
+        lastName: 'Allen',
+        careerStats: {
+          passing: { yds: 21000, td: 150, int: 60, rating: 96.3 },
+          rushing: { yds: 762, td: 15 },
+          receiving: null,
+          kicking: null,
+          defense: null,
+          idp: null,
+        },
+      };
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [DUAL_THREAT_QB],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      // Both category captions present; rushing data (762) no longer hidden.
+      expect(screen.getByText('Pass')).toBeTruthy();
+      expect(screen.getByText('Rush')).toBeTruthy();
+      expect(screen.getByText('762')).toBeTruthy();
     });
 
     it('renders DST stats: sacks, INT, pts allowed per game', () => {
