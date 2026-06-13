@@ -6,6 +6,7 @@ import {
   AddToDraftQueue as ADD_TO_DRAFT_QUEUE,
   CommissionerPick as COMMISSIONER_PICK,
   CommissionerSetDraftAutoPickDisabled as COMMISSIONER_SET_AUTOPICK_DISABLED,
+  CommissionerToggleUserAutoPick as COMMISSIONER_TOGGLE_USER_AUTO_PICK,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   type InitializeLiveDraftMutation,
   type InitializeLiveDraftMutationVariables,
@@ -93,6 +94,10 @@ export function useDraftActions({
   const [removeFromQueueMutation] = useMutation(REMOVE_FROM_DRAFT_QUEUE);
   const [toggleAutoPickMutation, { loading: toggleAutoPickLoading }] =
     useMutation(TOGGLE_DRAFT_AUTO_PICK);
+  const [
+    commissionerToggleUserAutoPickMutation,
+    { loading: commissionerToggleUserAutoPickLoading },
+  ] = useMutation(COMMISSIONER_TOGGLE_USER_AUTO_PICK);
 
   // Synchronous re-entry guards. Apollo's `loading` flag only flips on the
   // next render, so a rapid second click (or a timer/websocket-driven
@@ -426,6 +431,37 @@ export function useDraftActions({
     showToast,
   ]);
 
+  const handleCommissionerToggleUserAutoPick = useCallback(
+    async (teamId: number, enable: boolean) => {
+      if (!draftId || commissionerToggleUserAutoPickLoading) return;
+      try {
+        await commissionerToggleUserAutoPickMutation({
+          variables: { draftId, teamId, enable },
+        });
+        void refetchAutoPickStatuses();
+        showToast(
+          enable
+            ? 'Auto-pick enabled for that team'
+            : 'Auto-pick disabled for that team',
+          'info',
+        );
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Failed to update auto-pick for team';
+        showToast(msg, 'error');
+      }
+    },
+    [
+      draftId,
+      commissionerToggleUserAutoPickLoading,
+      commissionerToggleUserAutoPickMutation,
+      refetchAutoPickStatuses,
+      showToast,
+    ],
+  );
+
   return {
     handleInitializeDraft,
     handleMakePick,
@@ -435,6 +471,7 @@ export function useDraftActions({
     handleToggleUserAutoPick,
     handleCommissionerPick,
     handleToggleQueue,
+    handleCommissionerToggleUserAutoPick,
     nudgeExpiredDraftPick,
     isMyTeamAutoPick,
     initDraftLoading,
@@ -444,5 +481,6 @@ export function useDraftActions({
     commPickLoading,
     autoPickDisabledLoading,
     toggleAutoPickLoading,
+    commissionerToggleUserAutoPickLoading,
   } as const;
 }

@@ -1754,6 +1754,8 @@ export type Mutation = {
   commissionerPick?: Maybe<DraftPick>;
   /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
   commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
+  /** Commissioner: enable or disable auto-pick for a specific team in a live draft (LS-7981). Logs the action as a system message in the draft chat. */
+  commissionerToggleUserAutoPick?: Maybe<Scalars['Boolean']['output']>;
   createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   /** Create a Stripe Billing Portal session for managing an existing subscription (upgrade, downgrade, cancel, update payment method). */
   createBillingPortalSession?: Maybe<BillingPortalSessionResult>;
@@ -2031,6 +2033,12 @@ export type MutationCommissionerPickArgs = {
 export type MutationCommissionerSetDraftAutoPickDisabledArgs = {
   disabled: Scalars['Boolean']['input'];
   draftId: Scalars['Int']['input'];
+};
+
+export type MutationCommissionerToggleUserAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type MutationCreateAllMatchupsArgs = {

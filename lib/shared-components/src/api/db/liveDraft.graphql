@@ -131,6 +131,18 @@ mutation CommissionerSetDraftAutoPickDisabled(
   }
 }
 
+mutation CommissionerToggleUserAutoPick(
+  $draftId: Int!
+  $teamId: Int!
+  $enable: Boolean!
+) {
+  commissionerToggleUserAutoPick(
+    draftId: $draftId
+    teamId: $teamId
+    enable: $enable
+  )
+}
+
 # --- Draft Queue (LS-473) ---
 
 query GetMyDraftQueue($draftId: Int!) {

@@ -1760,6 +1760,8 @@ export type Mutation = {
   commissionerPick?: Maybe<DraftPick>;
   /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
   commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
+  /** Commissioner: enable or disable auto-pick for a specific team in a live draft (LS-7981). Logs the action as a system message in the draft chat. */
+  commissionerToggleUserAutoPick?: Maybe<Scalars['Boolean']['output']>;
   createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   /** Create a Stripe Billing Portal session for managing an existing subscription (upgrade, downgrade, cancel, update payment method). */
   createBillingPortalSession?: Maybe<BillingPortalSessionResult>;
@@ -2037,6 +2039,12 @@ export type MutationCommissionerPickArgs = {
 export type MutationCommissionerSetDraftAutoPickDisabledArgs = {
   disabled: Scalars['Boolean']['input'];
   draftId: Scalars['Int']['input'];
+};
+
+export type MutationCommissionerToggleUserAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type MutationCreateAllMatchupsArgs = {
@@ -7126,6 +7134,17 @@ export type CommissionerSetDraftAutoPickDisabledMutation = {
     id?: number | null;
     autoPickDisabled?: boolean | null;
   } | null;
+};
+
+export type CommissionerToggleUserAutoPickMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
+}>;
+
+export type CommissionerToggleUserAutoPickMutation = {
+  __typename?: 'Mutation';
+  commissionerToggleUserAutoPick?: boolean | null;
 };
 
 export type GetMyDraftQueueQueryVariables = Exact<{
@@ -15784,6 +15803,64 @@ export type CommissionerSetDraftAutoPickDisabledMutationOptions =
     CommissionerSetDraftAutoPickDisabledMutation,
     CommissionerSetDraftAutoPickDisabledMutationVariables
   >;
+export const CommissionerToggleUserAutoPick = gql`
+  mutation CommissionerToggleUserAutoPick(
+    $draftId: Int!
+    $teamId: Int!
+    $enable: Boolean!
+  ) {
+    commissionerToggleUserAutoPick(
+      draftId: $draftId
+      teamId: $teamId
+      enable: $enable
+    )
+  }
+`;
+export type CommissionerToggleUserAutoPickMutationFn = MutationFunction<
+  CommissionerToggleUserAutoPickMutation,
+  CommissionerToggleUserAutoPickMutationVariables
+>;
+
+/**
+ * __useCommissionerToggleUserAutoPickMutation__
+ *
+ * To run a mutation, you first call `useCommissionerToggleUserAutoPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCommissionerToggleUserAutoPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [commissionerToggleUserAutoPickMutation, { data, loading, error }] = useCommissionerToggleUserAutoPickMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      teamId: // value for 'teamId'
+ *      enable: // value for 'enable'
+ *   },
+ * });
+ */
+export function useCommissionerToggleUserAutoPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CommissionerToggleUserAutoPickMutation,
+    CommissionerToggleUserAutoPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CommissionerToggleUserAutoPickMutation,
+    CommissionerToggleUserAutoPickMutationVariables
+  >(CommissionerToggleUserAutoPick, options);
+}
+export type CommissionerToggleUserAutoPickMutationHookResult = ReturnType<
+  typeof useCommissionerToggleUserAutoPickMutation
+>;
+export type CommissionerToggleUserAutoPickMutationResult =
+  Apollo.MutationResult<CommissionerToggleUserAutoPickMutation>;
+export type CommissionerToggleUserAutoPickMutationOptions = BaseMutationOptions<
+  CommissionerToggleUserAutoPickMutation,
+  CommissionerToggleUserAutoPickMutationVariables
+>;
 export const GetMyDraftQueue = gql`
   query GetMyDraftQueue($draftId: Int!) {
     getMyDraftQueue(draftId: $draftId) {

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-import type { CurrentDraftPickInfo } from './types';
+import type { CurrentDraftPickInfo, LeagueTeam } from './types';
 
 interface DraftTopBandProps {
   draftPaused: boolean;
@@ -22,11 +22,15 @@ interface DraftTopBandProps {
   toggleAutoPickLoading: boolean;
   myTeamId: number | null;
   teamNameById: (teamId: number | null | undefined) => string;
+  leagueTeams: LeagueTeam[];
+  autoPickTeamIds: ReadonlySet<string>;
+  commissionerToggleUserAutoPickLoading: boolean;
   onPauseDraft: () => void;
   onResumeDraft: () => void;
   onToggleCommPickMode: () => void;
   onToggleAutoPickDisabled: () => void;
   onToggleUserAutoPick: () => void;
+  onCommissionerToggleUserAutoPick: (teamId: number, enable: boolean) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -63,12 +67,17 @@ export function DraftTopBand({
   toggleAutoPickLoading,
   myTeamId,
   teamNameById,
+  leagueTeams,
+  autoPickTeamIds,
+  commissionerToggleUserAutoPickLoading,
   onPauseDraft,
   onResumeDraft,
   onToggleCommPickMode,
   onToggleAutoPickDisabled: _onToggleAutoPickDisabled,
   onToggleUserAutoPick,
+  onCommissionerToggleUserAutoPick,
 }: DraftTopBandProps): React.JSX.Element {
+  const [userApExpanded, setUserApExpanded] = useState(false);
   const tClass = timerClass(timeRemaining, pickTimeLimitSeconds, draftPaused);
 
   // SVG ring: circumference ~314 for r=50; pct remaining drives dashoffset
@@ -258,6 +267,44 @@ export function DraftTopBand({
           >
             Commish…
           </button>
+          <button
+            className={`d-tb-btn${userApExpanded ? ' active' : ''}`}
+            onClick={() => setUserApExpanded((v) => !v)}
+            aria-pressed={userApExpanded}
+            aria-label="Toggle per-team auto-pick controls"
+            title="Enable or disable auto-pick for individual teams"
+          >
+            AP…
+          </button>
+          {userApExpanded && leagueTeams.length > 0 && (
+            <div
+              className="d-tb-user-ap-panel"
+              role="region"
+              aria-label="Per-team auto-pick controls"
+            >
+              {leagueTeams.map((team) => {
+                const teamIdNum = Number(team.id);
+                const isOn = autoPickTeamIds.has(String(team.id));
+                return (
+                  <div key={team.id} className="d-tb-user-ap-row">
+                    <span className="d-tb-user-ap-name" title={team.name}>
+                      {team.name}
+                    </span>
+                    <button
+                      className={`d-tb-user-ap-btn${isOn ? ' on' : ''}`}
+                      disabled={commissionerToggleUserAutoPickLoading}
+                      onClick={() =>
+                        onCommissionerToggleUserAutoPick(teamIdNum, !isOn)
+                      }
+                      aria-label={`${isOn ? 'Disable' : 'Enable'} auto-pick for ${team.name}`}
+                    >
+                      {isOn ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

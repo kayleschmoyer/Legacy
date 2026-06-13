@@ -12,6 +12,7 @@ import './update-draft-settings';
 import './pause-resume-draft';
 import './commissioner-pick';
 import './commissioner-disable-autopick';
+import './commissioner-toggle-user-autopick';
 import './draft-order';
 import './toggle-autopick';
 import './undo-last-pick';

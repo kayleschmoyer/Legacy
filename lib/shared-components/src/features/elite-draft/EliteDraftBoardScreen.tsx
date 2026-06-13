@@ -495,6 +495,11 @@ export function EliteDraftBoardScreen({
           toggleAutoPickLoading={actions.toggleAutoPickLoading}
           myTeamId={queries.myTeamId}
           teamNameById={queries.teamNameById}
+          leagueTeams={queries.leagueTeams}
+          autoPickTeamIds={queries.autoPickTeamIds}
+          commissionerToggleUserAutoPickLoading={
+            actions.commissionerToggleUserAutoPickLoading
+          }
           onPauseDraft={() => void actions.handlePauseDraft()}
           onResumeDraft={() => void actions.handleResumeDraft()}
           onToggleCommPickMode={() => ui.setCommPickMode(!ui.commPickMode)}
@@ -502,6 +507,9 @@ export function EliteDraftBoardScreen({
             void actions.handleToggleAutoPickDisabled()
           }
           onToggleUserAutoPick={() => void actions.handleToggleUserAutoPick()}
+          onCommissionerToggleUserAutoPick={(teamId, enable) =>
+            void actions.handleCommissionerToggleUserAutoPick(teamId, enable)
+          }
         />
 
         <DraftSidebar
