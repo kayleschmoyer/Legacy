@@ -7,12 +7,17 @@ import {
   FootballPlayerDetail,
   resolveFootballPlayerTab,
 } from '@legacy-sports/shared-components/football';
+import { config } from '@legacy-sports/app-config/web';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
+
+const FOOTBALL_GAME_LOGS_ENDPOINT = config.statsApiUrl
+  ? `${config.statsApiUrl.replace(/\/+$/, '')}/nfl-game-logs`
+  : undefined;
 
 const PROJECTIONS_FEATURE_NAME = 'Projections';
 const PROJECTIONS_FEATURE_DESCRIPTION =
@@ -84,6 +89,7 @@ export function FootballPlayerDetailPage() {
         isPremium={isPremium}
         onUpgrade={handleUpgrade}
         initialTab={initialTab}
+        gameLogsApiEndpoint={FOOTBALL_GAME_LOGS_ENDPOINT}
       />
       {!isPremium && (
         <UpgradeModal

@@ -942,6 +942,8 @@ export type FootballPlayer = {
   __typename?: 'FootballPlayer';
   careerStats?: Maybe<FootballCareerStats>;
   firstName: Scalars['String']['output'];
+  /** Per-game stat log for a given season (LS-6456). Queries game_football_* tables and returns one row per game played, with only the stat categories that have data for that game. */
+  gameLogs: Array<FootballPlayerGameLog>;
   headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
   /** ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027). */
@@ -963,6 +965,11 @@ export type FootballPlayer = {
 };
 
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
+export type FootballPlayerGameLogsArgs = {
+  season: Scalars['Int']['input'];
+};
+
+/** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
 export type FootballPlayerSeasonStatsArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -970,6 +977,20 @@ export type FootballPlayerSeasonStatsArgs = {
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
 export type FootballPlayerWeeklyGameLogsArgs = {
   season: Scalars['Int']['input'];
+};
+
+/** Per-game stat row for a football player in a given season (LS-6456). Merges data from game_football_passing/rushing/receiving/kicking/defense/defense_idp tables. Only categories with data for a game are non-null. */
+export type FootballPlayerGameLog = {
+  __typename?: 'FootballPlayerGameLog';
+  defense?: Maybe<FootballGameDefenseStats>;
+  gameIdentifier: Scalars['String']['output'];
+  gameNum: Scalars['Int']['output'];
+  idp?: Maybe<FootballGameIdpStats>;
+  kicking?: Maybe<FootballGameKickingStats>;
+  passing?: Maybe<FootballGamePassingStats>;
+  receiving?: Maybe<FootballGameReceivingStats>;
+  rushing?: Maybe<FootballGameRushingStats>;
+  season: Scalars['Int']['output'];
 };
 
 /** All season stats across stat categories for a football player (LS-255) */
@@ -5306,6 +5327,28 @@ export type FootballPlayerDetailExtrasFragment = {
       defTd?: number | null;
       ptsAllowed?: number | null;
     }> | null;
+    kicking?: Array<{
+      __typename?: 'FootballSeasonKicking';
+      season?: number | null;
+      team?: string | null;
+      g?: number | null;
+      fgm?: number | null;
+      fga?: number | null;
+      xpm?: number | null;
+      xpa?: number | null;
+    }> | null;
+    idp?: Array<{
+      __typename?: 'FootballSeasonDefenseIdp';
+      season?: number | null;
+      team?: string | null;
+      g?: number | null;
+      soloTkl?: number | null;
+      astTkl?: number | null;
+      sacks?: number | null;
+      int?: number | null;
+      pd?: number | null;
+      ff?: number | null;
+    }> | null;
   } | null;
 };
 
@@ -5490,6 +5533,28 @@ export type FootballPlayerQuery = {
         fumRec?: number | null;
         defTd?: number | null;
         ptsAllowed?: number | null;
+      }> | null;
+      kicking?: Array<{
+        __typename?: 'FootballSeasonKicking';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        fgm?: number | null;
+        fga?: number | null;
+        xpm?: number | null;
+        xpa?: number | null;
+      }> | null;
+      idp?: Array<{
+        __typename?: 'FootballSeasonDefenseIdp';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        soloTkl?: number | null;
+        astTkl?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        pd?: number | null;
+        ff?: number | null;
       }> | null;
     } | null;
   } | null;
@@ -10473,6 +10538,26 @@ export const FootballPlayerDetailExtrasFragmentDoc = gql`
         fumRec
         defTd
         ptsAllowed
+      }
+      kicking {
+        season
+        team
+        g
+        fgm
+        fga
+        xpm
+        xpa
+      }
+      idp {
+        season
+        team
+        g
+        soloTkl
+        astTkl
+        sacks
+        int
+        pd
+        ff
       }
     }
   }

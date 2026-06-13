@@ -759,6 +759,103 @@ FootballWeeklyGameLogRef.implement({
   }),
 });
 
+// ── Per-game log type (LS-6456) ──────────────────────────────────────────────
+// Exposes one row per game played by a player in a given season.
+// Queries game_football_* tables and merges rows by gameNum.
+// opponent/gameDate are not available in the DB layer — use the /nfl-game-logs
+// REST endpoint for richer per-game views with opponent context.
+
+export interface FootballPlayerGameLogShape {
+  season: number;
+  gameNum: number;
+  gameIdentifier: string;
+  passing: {
+    cmp: number | null;
+    att: number | null;
+    yds: number | null;
+    td: number | null;
+    int: number | null;
+  } | null;
+  rushing: { att: number | null; yds: number | null; td: number | null } | null;
+  receiving: {
+    rec: number | null;
+    tgt: number | null;
+    yds: number | null;
+    td: number | null;
+  } | null;
+  kicking: {
+    fgm: number | null;
+    fga: number | null;
+    xpm: number | null;
+    xpa: number | null;
+  } | null;
+  defense: {
+    sacks: number | null;
+    int: number | null;
+    fumRec: number | null;
+    defTd: number | null;
+    safeties: number | null;
+    ptsAllowed: number | null;
+    ydsAllowed: number | null;
+  } | null;
+  idp: {
+    soloTkl: number | null;
+    astTkl: number | null;
+    sacks: number | null;
+    int: number | null;
+    pd: number | null;
+    ff: number | null;
+    fr: number | null;
+    defTd: number | null;
+    safeties: number | null;
+  } | null;
+}
+
+export const FootballPlayerGameLogRef =
+  builder.objectRef<FootballPlayerGameLogShape>('FootballPlayerGameLog');
+
+FootballPlayerGameLogRef.implement({
+  description:
+    'Per-game stat row for a football player in a given season (LS-6456). ' +
+    'Merges data from game_football_passing/rushing/receiving/kicking/defense/defense_idp ' +
+    'tables. Only categories with data for a game are non-null.',
+  fields: (t) => ({
+    season: t.exposeInt('season', { nullable: false }),
+    gameNum: t.exposeInt('gameNum', { nullable: false }),
+    gameIdentifier: t.exposeString('gameIdentifier', { nullable: false }),
+    passing: t.field({
+      type: FootballGamePassingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.passing,
+    }),
+    rushing: t.field({
+      type: FootballGameRushingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.rushing,
+    }),
+    receiving: t.field({
+      type: FootballGameReceivingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.receiving,
+    }),
+    kicking: t.field({
+      type: FootballGameKickingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.kicking,
+    }),
+    defense: t.field({
+      type: FootballGameDefenseStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.defense,
+    }),
+    idp: t.field({
+      type: FootballGameIDPStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.idp,
+    }),
+  }),
+});
+
 // ── FootballPlayer type ───────────────────────────────────────────────────────
 
 interface FootballPlayerShape {
@@ -1256,6 +1353,166 @@ FootballPlayerRef.implement({
         // Contract: inject an explicit { isBye: true } sentinel row for every
         // bye week — never omit weeks, as gaps silently shift week numbers in UI.
         return [];
+      },
+    }),
+    gameLogs: t.field({
+      type: [FootballPlayerGameLogRef],
+      nullable: false,
+      description:
+        'Per-game stat log for a given season (LS-6456). ' +
+        'Queries game_football_* tables and returns one row per game played, ' +
+        'with only the stat categories that have data for that game.',
+      args: {
+        season: t.arg.int({ required: true }),
+      },
+      resolve: async (parent, args, context) => {
+        if (!context.user) {
+          throw AuthenticationError(
+            'Authentication required to query football game logs',
+          );
+        }
+        const db = context.db;
+        const playerId = parent.id;
+        const season = args.season;
+
+        const [passing, rushing, receiving, kicking, defense, idp] =
+          await Promise.all([
+            db
+              .select()
+              .from(PublicSchema.gameFootballPassing)
+              .where(
+                and(
+                  eq(PublicSchema.gameFootballPassing.playerId, playerId),
+                  eq(PublicSchema.gameFootballPassing.season, season),
+                ),
+              )
+              .orderBy(PublicSchema.gameFootballPassing.gameNum),
+            db
+              .select()
+              .from(PublicSchema.gameFootballRushing)
+              .where(
+                and(
+                  eq(PublicSchema.gameFootballRushing.playerId, playerId),
+                  eq(PublicSchema.gameFootballRushing.season, season),
+                ),
+              )
+              .orderBy(PublicSchema.gameFootballRushing.gameNum),
+            db
+              .select()
+              .from(PublicSchema.gameFootballReceiving)
+              .where(
+                and(
+                  eq(PublicSchema.gameFootballReceiving.playerId, playerId),
+                  eq(PublicSchema.gameFootballReceiving.season, season),
+                ),
+              )
+              .orderBy(PublicSchema.gameFootballReceiving.gameNum),
+            db
+              .select()
+              .from(PublicSchema.gameFootballKicking)
+              .where(
+                and(
+                  eq(PublicSchema.gameFootballKicking.playerId, playerId),
+                  eq(PublicSchema.gameFootballKicking.season, season),
+                ),
+              )
+              .orderBy(PublicSchema.gameFootballKicking.gameNum),
+            db
+              .select()
+              .from(PublicSchema.gameFootballDefense)
+              .where(
+                and(
+                  eq(PublicSchema.gameFootballDefense.playerId, playerId),
+                  eq(PublicSchema.gameFootballDefense.season, season),
+                ),
+              )
+              .orderBy(PublicSchema.gameFootballDefense.gameNum),
+            db
+              .select()
+              .from(PublicSchema.gameFootballDefenseIdp)
+              .where(
+                and(
+                  eq(PublicSchema.gameFootballDefenseIdp.playerId, playerId),
+                  eq(PublicSchema.gameFootballDefenseIdp.season, season),
+                ),
+              )
+              .orderBy(PublicSchema.gameFootballDefenseIdp.gameNum),
+          ]);
+
+        const byGame = new Map<number, FootballPlayerGameLogShape>();
+
+        const ensure = (
+          gameNum: number,
+          gameIdentifier: string,
+        ): FootballPlayerGameLogShape => {
+          if (!byGame.has(gameNum)) {
+            byGame.set(gameNum, {
+              season,
+              gameNum,
+              gameIdentifier,
+              passing: null,
+              rushing: null,
+              receiving: null,
+              kicking: null,
+              defense: null,
+              idp: null,
+            });
+          }
+          return byGame.get(gameNum)!;
+        };
+
+        for (const r of passing) {
+          const row = ensure(r.gameNum, r.gameIdentifier);
+          row.passing = {
+            cmp: r.cmp,
+            att: r.att,
+            yds: r.yds,
+            td: r.td,
+            int: r.interceptions,
+          };
+        }
+        for (const r of rushing) {
+          const row = ensure(r.gameNum, r.gameIdentifier);
+          row.rushing = { att: r.att, yds: r.yds, td: r.td };
+        }
+        for (const r of receiving) {
+          const row = ensure(r.gameNum, r.gameIdentifier);
+          row.receiving = { rec: r.rec, tgt: r.tgt, yds: r.yds, td: r.td };
+        }
+        for (const r of kicking) {
+          const row = ensure(r.gameNum, r.gameIdentifier);
+          row.kicking = { fgm: r.fgm, fga: r.fga, xpm: r.xpm, xpa: r.xpa };
+        }
+        for (const r of defense) {
+          const row = ensure(r.gameNum, r.gameIdentifier);
+          row.defense = {
+            sacks: r.sacks,
+            int: r.interceptions,
+            fumRec: r.fumblesRec,
+            defTd: r.defTd,
+            safeties: r.safeties,
+            ptsAllowed: r.ptsAllowed,
+            ydsAllowed: r.ydsAllowed,
+          };
+        }
+        for (const r of idp) {
+          const row = ensure(r.gameNum, r.gameIdentifier);
+          row.idp = {
+            soloTkl: r.soloTkl,
+            astTkl: r.astTkl,
+            sacks: toFloat(r.sacks),
+            int: r.interceptions,
+            pd: r.pd,
+            ff: r.ff,
+            fr: r.fr,
+            defTd: r.defTd,
+            safeties: r.safeties,
+          };
+        }
+
+        return Array.from(byGame.values()).sort(
+          (a, b) => a.gameNum - b.gameNum,
+        );
       },
     }),
   }),

@@ -1070,6 +1070,11 @@ A football player (skill, IDP, or synthetic DST) with optional season and career
 type FootballPlayer {
   careerStats: FootballCareerStats
   firstName: String!
+
+  """
+  Per-game stat log for a given season (LS-6456). Queries game_football_* tables and returns one row per game played, with only the stat categories that have data for that game.
+  """
+  gameLogs(season: Int!): [FootballPlayerGameLog!]!
   headshotUrl: String
   id: Int!
 
@@ -1097,6 +1102,21 @@ type FootballPlayer {
   Per-week game log for the given season (LS-6233). Bye weeks appear as explicit rows with isBye:true — never a gap.
   """
   weeklyGameLogs(season: Int!): [FootballWeeklyGameLog!]!
+}
+
+"""
+Per-game stat row for a football player in a given season (LS-6456). Merges data from game_football_passing/rushing/receiving/kicking/defense/defense_idp tables. Only categories with data for a game are non-null.
+"""
+type FootballPlayerGameLog {
+  defense: FootballGameDefenseStats
+  gameIdentifier: String!
+  gameNum: Int!
+  idp: FootballGameIDPStats
+  kicking: FootballGameKickingStats
+  passing: FootballGamePassingStats
+  receiving: FootballGameReceivingStats
+  rushing: FootballGameRushingStats
+  season: Int!
 }
 
 """

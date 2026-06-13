@@ -94,6 +94,26 @@ fragment FootballPlayerDetailExtras on FootballPlayer {
       defTd
       ptsAllowed
     }
+    kicking {
+      season
+      team
+      g
+      fgm
+      fga
+      xpm
+      xpa
+    }
+    idp {
+      season
+      team
+      g
+      soloTkl
+      astTkl
+      sacks
+      int
+      pd
+      ff
+    }
   }
 }
 

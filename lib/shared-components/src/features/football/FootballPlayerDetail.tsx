@@ -1087,6 +1087,13 @@ export interface FootballPlayerDetailProps {
    * FPD-027 respectively; passing them before those features land is a no-op.
    */
   initialTab?: FootballPlayerTab;
+  /**
+   * API endpoint for the NFL game logs REST service. When provided, the
+   * embedded GameLogsTable uses this URL; otherwise it falls back to its
+   * own default (localhost dev). Pass `config.statsApiUrl + '/nfl-game-logs'`
+   * from the web app (LS-6456).
+   */
+  gameLogsApiEndpoint?: string;
 }
 
 /**
@@ -1104,6 +1111,7 @@ export function FootballPlayerDetail({
   isPremium = false,
   onUpgrade,
   initialTab: _initialTab = 'overview',
+  gameLogsApiEndpoint,
 }: FootballPlayerDetailProps) {
   const isDst = player?.isDst ?? false;
   const isIdp =
@@ -1219,7 +1227,11 @@ export function FootballPlayerDetail({
             >
               GAME LOGS
             </Text>
-            <GameLogsTable sport="nfl" initialPlayerId={String(player.id)} />
+            <GameLogsTable
+              sport="nfl"
+              initialPlayerId={player.pfrId ?? String(player.id)}
+              apiEndpoint={gameLogsApiEndpoint}
+            />
           </YStack>
         </YStack>
       )}

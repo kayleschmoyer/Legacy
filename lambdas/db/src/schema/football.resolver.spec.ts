@@ -99,6 +99,36 @@ describe('football resolvers', () => {
           defTd: 'defTd',
           safeties: 'safeties',
         },
+        gameFootballPassing: {
+          playerId: 'playerId',
+          season: 'season',
+          gameNum: 'gameNum',
+        },
+        gameFootballRushing: {
+          playerId: 'playerId',
+          season: 'season',
+          gameNum: 'gameNum',
+        },
+        gameFootballReceiving: {
+          playerId: 'playerId',
+          season: 'season',
+          gameNum: 'gameNum',
+        },
+        gameFootballKicking: {
+          playerId: 'playerId',
+          season: 'season',
+          gameNum: 'gameNum',
+        },
+        gameFootballDefense: {
+          playerId: 'playerId',
+          season: 'season',
+          gameNum: 'gameNum',
+        },
+        gameFootballDefenseIdp: {
+          playerId: 'playerId',
+          season: 'season',
+          gameNum: 'gameNum',
+        },
         careerFootballPassing: { playerId: 'playerId' },
         careerFootballRushing: { playerId: 'playerId' },
         careerFootballReceiving: { playerId: 'playerId' },
@@ -833,6 +863,254 @@ describe('football resolvers', () => {
       expect(result).toBe(
         `https://www.pro-football-reference.com/req/20240117/images/headshots/MahoPa00_${year}.jpg`,
       );
+    });
+  });
+
+  // ── gameLogs field (LS-6456) ──────────────────────────────────────────────────
+
+  describe('gameLogs field (LS-6456)', () => {
+    type GameLogRow = {
+      season: number;
+      gameNum: number;
+      gameIdentifier: string;
+      passing: {
+        cmp: number;
+        att: number;
+        yds: number;
+        td: number;
+        int: number;
+      } | null;
+      rushing: { att: number; yds: number; td: number } | null;
+      receiving: { rec: number; tgt: number; yds: number; td: number } | null;
+      kicking: { fgm: number; fga: number; xpm: number; xpa: number } | null;
+      defense: object | null;
+      idp: {
+        soloTkl: number | null;
+        astTkl: number | null;
+        sacks: number | null;
+        int: number | null;
+        pd: number | null;
+        ff: number | null;
+        fr: number | null;
+        defTd: number | null;
+        safeties: number | null;
+      } | null;
+    };
+
+    function getResolver() {
+      const type = schema.getType('FootballPlayer') as GraphQLObjectType;
+      const field = type.getFields().gameLogs;
+      if (!field?.resolve) throw new Error('gameLogs resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    const player = {
+      id: 7,
+      firstName: 'Patrick',
+      lastName: 'Mahomes',
+      pfrId: 'MahoPa00',
+      isDst: false,
+      nflTeam: 'KC',
+      position: 'QB',
+    };
+
+    // Mock the 6 parallel DB queries in Promise.all order:
+    // passing, rushing, receiving, kicking, defense, idp
+    function mockGameQueries(
+      passing: object[] = [],
+      rushing: object[] = [],
+      receiving: object[] = [],
+      kicking: object[] = [],
+      defense: object[] = [],
+      idp: object[] = [],
+    ) {
+      mockDb.then
+        .mockImplementationOnce((resolve: (v: object[]) => void) =>
+          resolve(passing),
+        )
+        .mockImplementationOnce((resolve: (v: object[]) => void) =>
+          resolve(rushing),
+        )
+        .mockImplementationOnce((resolve: (v: object[]) => void) =>
+          resolve(receiving),
+        )
+        .mockImplementationOnce((resolve: (v: object[]) => void) =>
+          resolve(kicking),
+        )
+        .mockImplementationOnce((resolve: (v: object[]) => void) =>
+          resolve(defense),
+        )
+        .mockImplementationOnce((resolve: (v: object[]) => void) =>
+          resolve(idp),
+        );
+    }
+
+    it('throws UNAUTHENTICATED when no user in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          player,
+          { season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('returns empty array when player has no game data for the season', async () => {
+      mockGameQueries();
+
+      const result = await getResolver()(
+        player,
+        { season: 2024 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns one row with only passing stats when only passing data exists', async () => {
+      mockGameQueries([
+        {
+          gameNum: 1,
+          gameIdentifier: '202409080kc',
+          cmp: 30,
+          att: 45,
+          yds: 350,
+          td: 3,
+          interceptions: 1,
+        },
+      ]);
+
+      const result = (await getResolver()(
+        player,
+        { season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as GameLogRow[];
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        season: 2024,
+        gameNum: 1,
+        gameIdentifier: '202409080kc',
+        passing: { cmp: 30, att: 45, yds: 350, td: 3, int: 1 },
+        rushing: null,
+        receiving: null,
+        kicking: null,
+        defense: null,
+        idp: null,
+      });
+    });
+
+    it('merges passing and rushing into one row when they share a gameNum', async () => {
+      mockGameQueries(
+        [
+          {
+            gameNum: 5,
+            gameIdentifier: '202410060kc',
+            cmp: 22,
+            att: 30,
+            yds: 280,
+            td: 2,
+            interceptions: 0,
+          },
+        ],
+        [{ gameNum: 5, gameIdentifier: '202410060kc', att: 4, yds: 20, td: 0 }],
+      );
+
+      const result = (await getResolver()(
+        player,
+        { season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as GameLogRow[];
+
+      expect(result).toHaveLength(1);
+      expect(result[0].passing).toMatchObject({
+        cmp: 22,
+        att: 30,
+        yds: 280,
+        td: 2,
+        int: 0,
+      });
+      expect(result[0].rushing).toMatchObject({ att: 4, yds: 20, td: 0 });
+    });
+
+    it('sorts results by gameNum ascending', async () => {
+      mockGameQueries([
+        {
+          gameNum: 3,
+          gameIdentifier: '202409220kc',
+          cmp: 25,
+          att: 38,
+          yds: 300,
+          td: 2,
+          interceptions: 0,
+        },
+        {
+          gameNum: 1,
+          gameIdentifier: '202409080kc',
+          cmp: 30,
+          att: 45,
+          yds: 350,
+          td: 3,
+          interceptions: 1,
+        },
+      ]);
+
+      const result = (await getResolver()(
+        player,
+        { season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as GameLogRow[];
+
+      expect(result).toHaveLength(2);
+      expect(result[0].gameNum).toBe(1);
+      expect(result[1].gameNum).toBe(3);
+    });
+
+    it('converts IDP sacks from numeric string to float', async () => {
+      mockGameQueries(
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          {
+            gameNum: 2,
+            gameIdentifier: '202409150buf',
+            soloTkl: 5,
+            astTkl: 2,
+            sacks: '2.5',
+            interceptions: 1,
+            pd: 0,
+            ff: 0,
+            fr: 0,
+            defTd: 0,
+            safeties: 0,
+          },
+        ],
+      );
+
+      const result = (await getResolver()(
+        player,
+        { season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as GameLogRow[];
+
+      expect(result).toHaveLength(1);
+      expect(result[0].idp).toMatchObject({
+        soloTkl: 5,
+        astTkl: 2,
+        sacks: 2.5,
+        int: 1,
+      });
     });
   });
 
