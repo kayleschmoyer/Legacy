@@ -49,8 +49,9 @@ if (rollbarConfig) {
 const authConfig: OAuthConfig = getMobileOAuthConfig();
 
 /**
- * Runs inside AppProvider (Apollo context) to set analytics identity using
- * the real subscriptionTier from the database.
+ * Runs inside AppProvider (Apollo context) to set analytics identity and
+ * GrowthBook targeting attributes using the real subscriptionTier from the
+ * database.
  */
 function AnalyticsIdentify({ userId }: { userId: number }): null {
   const { data } = useGetUserByIdQuery({
@@ -62,6 +63,7 @@ function AnalyticsIdentify({ userId }: { userId: number }): null {
     if (!data?.user) return;
     const tier = data.user.subscriptionTier === 'premium' ? 'premium' : 'free';
     void setUserProperties({ userId, subscriptionTier: tier });
+    void growthbook.setAttributes({ id: userId, subscriptionTier: tier });
   }, [userId, data]);
 
   return null;
