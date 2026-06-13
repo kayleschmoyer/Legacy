@@ -6,6 +6,7 @@ import React from 'react';
 import {
   FootballPlayerDetail,
   type FootballPlayerDetailPlayer,
+  resolveFootballPlayerTab,
 } from './FootballPlayerDetail';
 import { fireEvent, render, screen, within } from '../../test-utils';
 
@@ -644,5 +645,39 @@ describe('FootballPlayerDetail', () => {
     const table = screen.getByTestId('game-logs-table');
     expect(table.getAttribute('data-sport')).toBe('nfl');
     expect(table.getAttribute('data-player-id')).toBe('1');
+  });
+
+  it('accepts initialTab prop without throwing (LS-6230 URL contract)', () => {
+    expect(() =>
+      render(<FootballPlayerDetail player={QB_PLAYER} initialTab="advanced" />),
+    ).not.toThrow();
+    expect(() =>
+      render(<FootballPlayerDetail player={QB_PLAYER} initialTab="news" />),
+    ).not.toThrow();
+    expect(() =>
+      render(<FootballPlayerDetail player={QB_PLAYER} initialTab="overview" />),
+    ).not.toThrow();
+  });
+});
+
+describe('resolveFootballPlayerTab', () => {
+  it('returns overview for null', () => {
+    expect(resolveFootballPlayerTab(null)).toBe('overview');
+  });
+
+  it('returns overview for undefined', () => {
+    expect(resolveFootballPlayerTab(undefined)).toBe('overview');
+  });
+
+  it('returns overview for an unrecognised value', () => {
+    expect(resolveFootballPlayerTab('projections')).toBe('overview');
+    expect(resolveFootballPlayerTab('')).toBe('overview');
+    expect(resolveFootballPlayerTab('ADVANCED')).toBe('overview');
+  });
+
+  it('returns the valid tab value unchanged', () => {
+    expect(resolveFootballPlayerTab('overview')).toBe('overview');
+    expect(resolveFootballPlayerTab('advanced')).toBe('advanced');
+    expect(resolveFootballPlayerTab('news')).toBe('news');
   });
 });

@@ -7,6 +7,7 @@ export {
 } from './FootballPlayerCard';
 export {
   FootballPlayerDetail,
+  resolveFootballPlayerTab,
   type FootballPlayerDetailProps,
   type FootballPlayerDetailPlayer,
   type FootballPlayerDetailStats,
@@ -14,5 +15,6 @@ export {
   type FootballSeasonPassingRow,
   type FootballSeasonRushingRow,
   type FootballSeasonReceivingRow,
+  type FootballPlayerTab,
 } from './FootballPlayerDetail';
 export { FOOTBALL_PLAYER_DETAIL_POLL_MS } from './playerDetailPolling';

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { YStack } from 'tamagui';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import {
   FOOTBALL_PLAYER_DETAIL_POLL_MS,
   FootballPlayerDetail,
+  resolveFootballPlayerTab,
 } from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
@@ -20,6 +21,7 @@ const PROJECTIONS_FEATURE_DESCRIPTION =
 export function FootballPlayerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const playerId = id ? parseInt(id, 10) : 0;
   const isPremium = useIsPremium();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -53,6 +55,7 @@ export function FootballPlayerDetailPage() {
   }, [isAuthError, navigate]);
 
   const player = data?.footballPlayer;
+  const initialTab = resolveFootballPlayerTab(searchParams.get('tab'));
 
   return (
     <YStack flex={1} minHeight="100vh">
@@ -73,6 +76,7 @@ export function FootballPlayerDetailPage() {
         }}
         isPremium={isPremium}
         onUpgrade={handleUpgrade}
+        initialTab={initialTab}
       />
       {!isPremium && (
         <UpgradeModal

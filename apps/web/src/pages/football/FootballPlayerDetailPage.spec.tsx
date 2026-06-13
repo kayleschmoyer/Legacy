@@ -26,6 +26,7 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useParams: () => ({ id: '42' }),
+  useSearchParams: () => [new URLSearchParams(''), jest.fn()],
 }));
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -60,6 +61,12 @@ jest.mock('@legacy-sports/shared-components/football', () => ({
       )}
     </div>
   ),
+  // Mirror the real implementation: only the known tab identifiers pass
+  // through; everything else (null/undefined/unknown) falls back to 'overview'.
+  resolveFootballPlayerTab: (raw: string | null | undefined) =>
+    raw === 'overview' || raw === 'advanced' || raw === 'news'
+      ? raw
+      : 'overview',
 }));
 
 jest.mock('../../components/UpgradeModal', () => ({

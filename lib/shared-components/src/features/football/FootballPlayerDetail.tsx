@@ -698,6 +698,27 @@ function ProjectionsTeaser({ onUpgrade }: { onUpgrade?: () => void }) {
   );
 }
 
+/** Valid tab identifiers for the football player detail URL contract. */
+export type FootballPlayerTab = 'overview' | 'advanced' | 'news';
+
+const VALID_TABS: ReadonlySet<string> = new Set<FootballPlayerTab>([
+  'overview',
+  'advanced',
+  'news',
+]);
+
+function isFootballPlayerTab(value: string): value is FootballPlayerTab {
+  return VALID_TABS.has(value);
+}
+
+/** Coerce an arbitrary string to a valid tab, falling back to 'overview'. */
+export function resolveFootballPlayerTab(
+  raw: string | null | undefined,
+): FootballPlayerTab {
+  if (raw && isFootballPlayerTab(raw)) return raw;
+  return 'overview';
+}
+
 export interface FootballPlayerDetailProps {
   player: FootballPlayerDetailPlayer | null | undefined;
   loading?: boolean;
@@ -721,6 +742,12 @@ export interface FootballPlayerDetailProps {
    * but the CTA is inert.
    */
   onUpgrade?: () => void;
+  /**
+   * Active tab driven by the `?tab=` URL param. Defaults to `'overview'`.
+   * Premium tabs (`'advanced'`, `'news'`) are reserved for FPD-022 and
+   * FPD-027 respectively; passing them before those features land is a no-op.
+   */
+  initialTab?: FootballPlayerTab;
 }
 
 /**
@@ -736,6 +763,7 @@ export function FootballPlayerDetail({
   onBack,
   isPremium = false,
   onUpgrade,
+  initialTab: _initialTab = 'overview',
 }: FootballPlayerDetailProps) {
   const teamData = player?.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
   const isDst = player?.isDst ?? false;
