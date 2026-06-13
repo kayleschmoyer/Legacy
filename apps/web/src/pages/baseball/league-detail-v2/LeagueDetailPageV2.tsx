@@ -363,7 +363,16 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           onTabChange={(t) => setTab(t as TabId)}
           onAnalytics={() => navigate(`/leagues/${leagueId}/analytics`)}
           onBack={() => navigate('/baseball/leagues')}
-          onInvite={() => setTab('overview')}
+          onInvite={() => {
+            setTab('overview');
+            // Scroll to the invite card after the overview tab has rendered.
+            // setTimeout(0) defers until after React commits the DOM update.
+            setTimeout(() => {
+              document
+                .getElementById('invite-section')
+                ?.scrollIntoView({ behavior: 'smooth' });
+            }, 0);
+          }}
         >
           {tab === 'overview' && (
             <div

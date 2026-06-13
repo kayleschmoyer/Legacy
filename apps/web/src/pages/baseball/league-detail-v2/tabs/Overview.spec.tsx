@@ -161,6 +161,55 @@ const snapshotBase = {
   startersCount: 9,
 };
 
+describe('OverviewTab — Invite section anchor (LS-7968)', () => {
+  const baseLeague = {
+    __typename: 'League',
+    id: 5670,
+    sport: Sport.Baseball,
+    draftStatus: 'active',
+    maxRosterSize: 25,
+    gamesPerMatchup: 7,
+    inviteCode: 'XYZ789',
+    lmNotes: null,
+    currentWeekNumber: null,
+    currentMatchup: null,
+  } as unknown as LeagueFragment;
+
+  it('renders invite-section anchor when isCommissioner is true', () => {
+    const { container } = render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={true}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(container.querySelector('#invite-section')).toBeInTheDocument();
+  });
+
+  it('does not render invite-section anchor when isCommissioner is false', () => {
+    const { container } = render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(container.querySelector('#invite-section')).not.toBeInTheDocument();
+  });
+});
+
 describe('OverviewTab — Join Draft Room (LS-4916)', () => {
   const baseLeague = {
     __typename: 'League',

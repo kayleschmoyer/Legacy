@@ -569,7 +569,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             weekNumber={league.currentWeekNumber}
           />
           {league.id != null ? <DuesCompact leagueId={league.id} /> : null}
-          {isCommissioner ? <InviteCard league={league} /> : null}
+          {isCommissioner ? (
+            <div id="invite-section">
+              <InviteCard league={league} />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
