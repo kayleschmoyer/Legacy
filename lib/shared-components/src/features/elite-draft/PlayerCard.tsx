@@ -21,6 +21,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   player,
   index,
   isMyPick,
+  isCommPick,
   pickLoading,
   isWatched,
   isQueued,
@@ -32,6 +33,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   player: DraftPlayer;
   index: number;
   isMyPick: boolean;
+  isCommPick?: boolean;
   pickLoading?: boolean;
   isWatched: boolean;
   isQueued?: boolean;
@@ -226,7 +228,7 @@ export const PlayerCard = React.memo(function PlayerCard({
         {/* Actions */}
         <div className="d-card-actions">
           <button
-            className={`d-draft-btn ${isDrafting ? 'drafting' : isMyPick ? 'can-draft' : 'waiting'}`}
+            className={`d-draft-btn ${isDrafting ? 'drafting' : isMyPick ? (isCommPick ? 'force-pick' : 'can-draft') : 'waiting'}`}
             onClick={() => onDraft(player.id)}
             disabled={!isMyPick || isDrafting}
             aria-disabled={!isMyPick || isDrafting}
@@ -234,14 +236,18 @@ export const PlayerCard = React.memo(function PlayerCard({
               isDrafting
                 ? `Drafting ${player.name}…`
                 : isMyPick
-                  ? `Draft ${player.name} now`
+                  ? isCommPick
+                    ? `Force pick ${player.name} as commissioner`
+                    : `Draft ${player.name} now`
                   : `Waiting for your turn to draft ${player.name}`
             }
           >
             {isDrafting
               ? '⏳ DRAFTING…'
               : isMyPick
-                ? '⚡ DRAFT NOW'
+                ? isCommPick
+                  ? '👑 FORCE PICK'
+                  : '⚡ DRAFT NOW'
                 : '⏳ WAITING'}
           </button>
           <button

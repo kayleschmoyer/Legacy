@@ -935,6 +935,35 @@ export const CSS = `
   transform: translateY(0) scale(0.97);
   box-shadow: 0 2px 8px rgba(5,150,105,0.3);
 }
+.d-draft-btn.force-pick {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 60%, #5b21b6 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+  will-change: transform;
+}
+.d-draft-btn.force-pick::before {
+  content: '';
+  position: absolute; top: 0; left: -40%; width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  transition: left 0.5s ease;
+}
+.d-draft-btn.force-pick::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(124,58,237,0.5);
+  animation: draftBtnPing 2s ease-out infinite;
+  pointer-events: none;
+}
+.d-draft-btn.force-pick:hover::before { left: 120%; }
+.d-draft-btn.force-pick:hover {
+  box-shadow: 0 8px 32px rgba(124,58,237,0.5);
+  transform: translateY(-2px);
+}
+.d-draft-btn.force-pick:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 2px 8px rgba(124,58,237,0.35);
+}
 .d-draft-btn.drafting {
   background: linear-gradient(135deg, rgba(5,150,105,0.4) 0%, rgba(4,120,87,0.4) 100%);
   color: rgba(255,255,255,0.6);
@@ -1033,6 +1062,13 @@ export const CSS = `
 .d-state-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(197, 165, 90, 0.35);
+}
+.d-state-btn.force-pick {
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+}
+.d-state-btn.force-pick:hover {
+  box-shadow: 0 8px 24px rgba(124,58,237,0.5);
 }
 
 /* ===== Mobile Draft Banner (visible only on small screens) ===== */

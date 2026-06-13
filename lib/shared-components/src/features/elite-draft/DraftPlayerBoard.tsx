@@ -520,7 +520,7 @@ export function DraftPlayerBoard({
                       <td>
                         {(commPickMode ? isOwner : isMyPick) && (
                           <button
-                            className="d-state-btn"
+                            className={`d-state-btn${commPickMode && isOwner ? ' force-pick' : ''}`}
                             style={{ padding: '3px 10px', fontSize: 11 }}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -528,7 +528,7 @@ export function DraftPlayerBoard({
                             }}
                             disabled={pickLoading}
                           >
-                            Draft
+                            {commPickMode && isOwner ? 'Force Pick' : 'Draft'}
                           </button>
                         )}
                       </td>
@@ -659,6 +659,7 @@ export function DraftPlayerBoard({
                   player={player}
                   index={idx}
                   isMyPick={commPickMode ? isOwner : isMyPick}
+                  isCommPick={commPickMode && isOwner}
                   pickLoading={commPickMode ? false : pickLoading}
                   isWatched={watchlistSet.has(player.id)}
                   isQueued={queuedPlayerIds.has(player.id)}
