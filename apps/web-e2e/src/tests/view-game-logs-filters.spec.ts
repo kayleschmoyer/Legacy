@@ -136,7 +136,7 @@ test.describe('View Game Logs — Date input validation (LS-7455) @regression', 
     await page.waitForLoadState('load');
   });
 
-  test('invalid start date format is silently dropped by the date input; form submits without a date filter (LS-7455)', async ({
+  test('start date after end date is rejected client-side (LS-7455)', async ({
     page,
   }) => {
     let postCalled = false;
@@ -146,19 +146,24 @@ test.describe('View Game Logs — Date input validation (LS-7455) @regression', 
     });
 
     await page.getByPlaceholder('Enter player ID').fill('mlb-1234');
-    // <input type="date"> enforces YYYY-MM-DD at the browser level; Playwright's
-    // fill() raises for non-conforming strings (e.g. 'not-a-date').  Invalid
-    // dates therefore never reach the React state at all — covered exhaustively
-    // by the GameLogsTable unit tests.  This spec verifies the downstream
-    // guarantee: with the date field untouched the form still submits normally.
-    await page.getByRole('button', { name: 'Get Player Data' }).click();
+    // On web the DateField renders <input type="date" data-testid="game-logs-…-date">
+    // (no placeholder). The native input only accepts ISO strings, so malformed
+    // free text is impossible by construction — Playwright's fill() raises for
+    // non-conforming strings. The reachable client-side date validation is the
+    // start > end ordering check: both fields take valid ISO dates and
+    // validateDateRange flags the inverted range.
+    await page.getByTestId('game-logs-start-date').fill('2020-06-02');
+    await page.getByTestId('game-logs-end-date').fill('2020-06-01');
 
-    // No format error — no invalid date value reached the component.
+    // Validation is reactive — the error alert appears immediately after filling
+    // the inverted range; the submit button becomes disabled so we never click it.
+    await expect(page.getByRole('alert')).toContainText(
+      'Start date must be on or before end date.',
+    );
     await expect(
-      page.getByText('Start date must be in YYYY-MM-DD format'),
-    ).not.toBeVisible();
-    // The form submits normally (no date filter applied).
-    await expect.poll(() => postCalled).toBe(true);
+      page.getByRole('button', { name: 'Get Player Data' }),
+    ).toBeDisabled();
+    expect(postCalled).toBe(false);
   });
 
   test('future start date (2099-12-31) is rejected client-side (LS-7452, LS-7455)', async ({
