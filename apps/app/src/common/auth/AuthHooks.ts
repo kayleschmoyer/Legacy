@@ -418,6 +418,9 @@ export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
           'BYPASS_AUTH is set in a production build — remove EXPO_PUBLIC_BYPASS_AUTH from your production environment.',
         );
       }
+      LOGGER.warn(
+        'BYPASS_AUTH is active — returning fake LOCAL_USER (id: -1). Remove EXPO_PUBLIC_BYPASS_AUTH before shipping to production.',
+      );
       return LOCAL_USER;
     }
     return await getJwt();

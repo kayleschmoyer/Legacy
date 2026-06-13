@@ -51,10 +51,11 @@ jest.mock('expo-router', () => {
 });
 
 // Mock @legacy-sports/logging
+const mockLoggerWarn = jest.fn();
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
-    warn: jest.fn(),
+    warn: (...args: unknown[]): unknown => mockLoggerWarn(...args),
     error: jest.fn(),
     debug: jest.fn(),
   },
@@ -221,6 +222,7 @@ const TEST_JWT = createFakeJwt(TEST_USER);
 describe('AuthHooks', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockLoggerWarn.mockReset();
     mockGetMobileOAuthConfig.mockReturnValue({
       ...DEFAULT_MOBILE_OAUTH_CONFIG,
     });
@@ -826,6 +828,9 @@ describe('AuthHooks', () => {
         id: -1,
         username: 'LOCAL USER',
       });
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('BYPASS_AUTH'),
+      );
     });
 
     it('surfaces an error when BYPASS_AUTH is true in a production build', async () => {
