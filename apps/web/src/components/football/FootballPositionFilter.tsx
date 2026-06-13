@@ -3,13 +3,8 @@ import { ScrollView, styled, Text, XStack } from 'tamagui';
 import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  FOOTBALL_POSITION_COLORS,
   OUTLINE_SUBTLE,
-  POS_DEF,
-  POS_K,
-  POS_QB,
-  POS_RB,
-  POS_TE,
-  POS_WR,
   SURFACE_CARD,
   TEXT_MUTED,
   TEXT_PRIMARY,
@@ -40,18 +35,6 @@ const POSITIONS: FootballPosition[] = [
   'LB',
   'DB',
 ];
-
-const POSITION_COLORS: Record<string, string> = {
-  QB: POS_QB,
-  RB: POS_RB,
-  WR: POS_WR,
-  TE: POS_TE,
-  K: POS_K,
-  DST: POS_DEF,
-  DL: POS_DEF,
-  LB: POS_DEF,
-  DB: POS_DEF,
-};
 
 interface Props {
   selected: FootballPosition;
@@ -97,7 +80,8 @@ export function FootballPositionFilter({ selected, onChange }: Props) {
       <XStack gap={8} paddingVertical={4}>
         {POSITIONS.map((pos) => {
           const isActive = pos === selected;
-          const accentColor = pos === 'All' ? BRAND_NAVY : POSITION_COLORS[pos];
+          const accentColor =
+            pos === 'All' ? BRAND_NAVY : FOOTBALL_POSITION_COLORS[pos];
           return (
             <Pill
               key={pos}

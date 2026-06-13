@@ -70,6 +70,25 @@ export const POS_K = BRAND_GOLD; // heritage gold
 export const POS_DEF = '#4A6FA5'; // navy blue
 export const POS_FLEX = '#C49A6C'; // muted gold
 
+/** Position → color map for all football positions including defensive designations. */
+export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
+  QB: POS_QB,
+  RB: POS_RB,
+  WR: POS_WR,
+  TE: POS_TE,
+  K: POS_K,
+  DST: POS_DEF,
+  DL: POS_DEF,
+  LB: POS_DEF,
+  DB: POS_DEF,
+};
+
+export function getFootballPositionColor(
+  pos: string | null | undefined,
+): string {
+  return (pos && FOOTBALL_POSITION_COLORS[pos]) ?? BRAND_NAVY;
+}
+
 export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
   baseball: {
     C: POS_CATCHER,

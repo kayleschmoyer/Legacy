@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Input, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Search } from '@tamagui/lucide-icons';
+import { Input, Spinner, Text, useMedia, XStack, YStack } from 'tamagui';
+import { LayoutGrid, LayoutList, Search } from '@tamagui/lucide-icons';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
+import type { FootballPlayerCardStats } from '@legacy-sports/shared-components/football';
 import {
   type FootballPlayersQuery,
   useFootballPlayersQuery,
@@ -17,8 +18,12 @@ import {
   BRAND_GOLD,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  BRAND_SEAM_RED_LIGHT,
+  getFootballPositionColor,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
+  SURFACE_HOVER,
   SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_PRIMARY,
@@ -29,6 +34,10 @@ import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 type PlayerListItem = NonNullable<
   FootballPlayersQuery['footballPlayers']
 >['nodes'][number];
+
+type ViewMode = 'cards' | 'table';
+
+const VIEW_MODE_KEY = 'football_players_view_mode';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -45,8 +54,274 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+// ─── Key stat extraction for table row ────────────────────────────────────
+
+function fmt(n: number | null | undefined): string {
+  if (n == null) return '—';
+  return n.toLocaleString();
+}
+
+function fmtFloat(n: number | null | undefined, decimals = 1): string {
+  if (n == null) return '—';
+  return n.toFixed(decimals);
+}
+
+interface KeyStat {
+  label: string;
+  value: string;
+}
+
+function getKeyStat(
+  position: string | null | undefined,
+  isDst: boolean,
+  stats: FootballPlayerCardStats | null | undefined,
+): KeyStat {
+  if (!stats) return { label: '—', value: '' };
+  const pos = position ?? '';
+
+  if (isDst || pos === 'DST') {
+    const d = stats.defense;
+    if (!d) return { label: '—', value: '' };
+    return {
+      label: 'SK / INT',
+      value: `${fmtFloat(d.sacks)} / ${fmt(d.int)}`,
+    };
+  }
+  if (pos === 'DL' || pos === 'LB' || pos === 'DB') {
+    const idp = stats.idp;
+    if (!idp) return { label: '—', value: '' };
+    return {
+      label: 'TKL / SK',
+      value: `${fmt(idp.soloTkl)} / ${fmtFloat(idp.sacks)}`,
+    };
+  }
+  if (pos === 'K') {
+    const k = stats.kicking;
+    if (!k) return { label: '—', value: '' };
+    return {
+      label: 'FG',
+      value: `${fmt(k.fgm)}/${fmt(k.fga)}`,
+    };
+  }
+  if (pos === 'QB') {
+    const p = stats.passing;
+    if (!p) return { label: '—', value: '' };
+    return {
+      label: 'YDS / TD',
+      value: `${fmt(p.yds)} / ${fmt(p.td)}`,
+    };
+  }
+  if (pos === 'RB') {
+    const r = stats.rushing;
+    if (!r) return { label: '—', value: '' };
+    return {
+      label: 'YDS / TD',
+      value: `${fmt(r.yds)} / ${fmt(r.td)}`,
+    };
+  }
+  // WR / TE / flex
+  const rec = stats.receiving;
+  if (!rec) return { label: '—', value: '' };
+  return {
+    label: 'REC / YDS',
+    value: `${fmt(rec.rec)} / ${fmt(rec.yds)}`,
+  };
+}
+
+// ─── Table row ─────────────────────────────────────────────────────────────
+
+function TableHeader() {
+  const colStyles = {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  } as const;
+
+  return (
+    <XStack
+      backgroundColor={SURFACE_PANEL}
+      borderBottomWidth={1}
+      borderColor={OUTLINE_SUBTLE}
+    >
+      <XStack flex={1} minWidth={160} {...colStyles}>
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          letterSpacing={0.8}
+        >
+          NAME
+        </Text>
+      </XStack>
+      <XStack width={72} {...colStyles}>
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          letterSpacing={0.8}
+        >
+          POS
+        </Text>
+      </XStack>
+      <XStack width={80} {...colStyles}>
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          letterSpacing={0.8}
+        >
+          TEAM
+        </Text>
+      </XStack>
+      <XStack flex={1} minWidth={120} {...colStyles} justifyContent="flex-end">
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          letterSpacing={0.8}
+          textAlign="right"
+        >
+          CAREER STATS
+        </Text>
+      </XStack>
+    </XStack>
+  );
+}
+
+function TableRow({
+  player,
+  onNavigate,
+}: {
+  player: PlayerListItem;
+  onNavigate: (id: string) => void;
+}) {
+  const pos = player?.position;
+  const isDst = player?.isDst ?? false;
+  const posLabel = isDst ? 'DST' : pos;
+  const posColor = getFootballPositionColor(posLabel);
+  const keyStat = getKeyStat(pos, isDst, player?.careerStats ?? null);
+
+  const fullName =
+    [player?.firstName, player?.lastName].filter(Boolean).join(' ') ||
+    'Unknown Player';
+
+  const colStyles = {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center' as const,
+  };
+
+  return (
+    <XStack
+      cursor="pointer"
+      borderBottomWidth={1}
+      borderColor={OUTLINE_SUBTLE}
+      hoverStyle={{ backgroundColor: SURFACE_HOVER }}
+      pressStyle={{ opacity: 0.85 }}
+      animation="quick"
+      onPress={() => player?.id != null && onNavigate(String(player.id))}
+    >
+      <XStack flex={1} minWidth={160} {...colStyles}>
+        <Text
+          fontSize={14}
+          fontWeight="600"
+          color={TEXT_PRIMARY}
+          fontFamily={FONT_DISPLAY}
+          numberOfLines={1}
+        >
+          {fullName}
+        </Text>
+      </XStack>
+      <XStack width={72} {...colStyles}>
+        <YStack
+          paddingHorizontal={6}
+          paddingVertical={2}
+          borderRadius={4}
+          backgroundColor={withAlpha(posColor, 0.15)}
+          borderWidth={1}
+          borderColor={withAlpha(posColor, 0.5)}
+        >
+          <Text
+            fontSize={11}
+            fontWeight="700"
+            color={posColor}
+            fontFamily={FONT_BODY}
+            letterSpacing={0.5}
+          >
+            {posLabel ?? '?'}
+          </Text>
+        </YStack>
+      </XStack>
+      <XStack width={80} {...colStyles}>
+        <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+          {player?.nflTeam ?? '—'}
+        </Text>
+      </XStack>
+      <XStack flex={1} minWidth={120} {...colStyles} justifyContent="flex-end">
+        {keyStat.value ? (
+          <XStack gap={6} alignItems="baseline">
+            <Text
+              fontSize={13}
+              fontWeight="700"
+              color={TEXT_PRIMARY}
+              fontVariant={['tabular-nums']}
+            >
+              {keyStat.value}
+            </Text>
+            <Text fontSize={11} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+              {keyStat.label}
+            </Text>
+          </XStack>
+        ) : (
+          <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            —
+          </Text>
+        )}
+      </XStack>
+    </XStack>
+  );
+}
+
+// ─── View toggle button ────────────────────────────────────────────────────
+
+function ViewToggleButton({
+  active,
+  onPress,
+  children,
+}: {
+  active: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <YStack
+      width={32}
+      height={32}
+      borderRadius={6}
+      alignItems="center"
+      justifyContent="center"
+      backgroundColor={active ? withAlpha(BRAND_NAVY, 0.5) : 'transparent'}
+      borderWidth={1}
+      borderColor={active ? BRAND_NAVY : OUTLINE_SUBTLE}
+      cursor="pointer"
+      onPress={onPress}
+      hoverStyle={{ borderColor: BRAND_NAVY }}
+      pressStyle={{ opacity: 0.8 }}
+      animation="quick"
+    >
+      {children}
+    </YStack>
+  );
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────
+
 export function FootballPlayersPage() {
   const navigate = useNavigate();
+  const media = useMedia();
   const [position, setPosition] = useState<FootballPosition>('All');
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
@@ -74,6 +349,27 @@ export function FootballPlayersPage() {
       navigate(
         `/football/players/compare?a=${selectedArray[0]}&b=${selectedArray[1]}`,
       );
+    }
+  }
+
+  // Default: table on desktop, cards on mobile. Persisted to localStorage.
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const stored = localStorage.getItem(VIEW_MODE_KEY);
+      if (stored === 'cards' || stored === 'table') return stored;
+    } catch {
+      // ignore storage errors
+    }
+    // media.sm = maxWidth 800 (mobile/tablet) → cards; else → table
+    return media.sm ? 'cards' : 'table';
+  });
+
+  function handleSetViewMode(mode: ViewMode) {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      // ignore storage errors
     }
   }
 
@@ -135,6 +431,8 @@ export function FootballPlayersPage() {
   const isLoadingMore = loading && cursor !== undefined && allNodes.length > 0;
   const isInitialLoad = loading && allNodes.length === 0;
 
+  const players = allNodes ?? [];
+
   return (
     <YStack flex={1} backgroundColor={BG_DARK} minHeight="100vh">
       <PageMeta
@@ -179,33 +477,58 @@ export function FootballPlayersPage() {
           borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
         }}
       >
-        {/* Search */}
-        <XStack
-          alignItems="center"
-          gap={8}
-          backgroundColor={SURFACE_CARD}
-          borderWidth={1}
-          borderColor={OUTLINE_SUBTLE}
-          borderRadius={8}
-          paddingHorizontal={12}
-          height={40}
-        >
-          <Search size={16} color={TEXT_MUTED} />
-          <Input
+        {/* Search + view toggle */}
+        <XStack gap={8} alignItems="center">
+          <XStack
             flex={1}
-            placeholder="Search players..."
-            placeholderTextColor={TEXT_MUTED}
-            value={searchInput}
-            onChangeText={setSearchInput}
-            backgroundColor="transparent"
-            borderWidth={0}
-            color={TEXT_PRIMARY}
-            fontSize={14}
-            fontFamily={FONT_BODY}
+            alignItems="center"
+            gap={8}
+            backgroundColor={SURFACE_CARD}
+            borderWidth={1}
+            borderColor={OUTLINE_SUBTLE}
+            borderRadius={8}
+            paddingHorizontal={12}
             height={40}
-            paddingHorizontal={0}
-            focusStyle={{ outlineWidth: 0 }}
-          />
+          >
+            <Search size={16} color={TEXT_MUTED} />
+            <Input
+              flex={1}
+              placeholder="Search players..."
+              placeholderTextColor={TEXT_MUTED}
+              value={searchInput}
+              onChangeText={setSearchInput}
+              backgroundColor="transparent"
+              borderWidth={0}
+              color={TEXT_PRIMARY}
+              fontSize={14}
+              fontFamily={FONT_BODY}
+              height={40}
+              paddingHorizontal={0}
+              focusStyle={{ outlineWidth: 0 }}
+            />
+          </XStack>
+
+          {/* View toggle */}
+          <XStack gap={4}>
+            <ViewToggleButton
+              active={viewMode === 'cards'}
+              onPress={() => handleSetViewMode('cards')}
+            >
+              <LayoutGrid
+                size={16}
+                color={viewMode === 'cards' ? TEXT_PRIMARY : TEXT_MUTED}
+              />
+            </ViewToggleButton>
+            <ViewToggleButton
+              active={viewMode === 'table'}
+              onPress={() => handleSetViewMode('table')}
+            >
+              <LayoutList
+                size={16}
+                color={viewMode === 'table' ? TEXT_PRIMARY : TEXT_MUTED}
+              />
+            </ViewToggleButton>
+          </XStack>
         </XStack>
 
         {/* Position pills */}
@@ -224,13 +547,13 @@ export function FootballPlayersPage() {
       <YStack flex={1} padding={16} gap={16}>
         {error && (
           <YStack
-            backgroundColor={withAlpha('#C41E3A', 0.1)}
+            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.1)}
             borderWidth={1}
-            borderColor={withAlpha('#C41E3A', 0.3)}
+            borderColor={withAlpha(BRAND_SEAM_RED, 0.3)}
             borderRadius={8}
             padding={16}
           >
-            <Text color="#E63950" fontSize={14}>
+            <Text color={BRAND_SEAM_RED_LIGHT} fontSize={14}>
               Failed to load players. Please try again.
             </Text>
           </YStack>
@@ -247,7 +570,7 @@ export function FootballPlayersPage() {
           </YStack>
         )}
 
-        {!isInitialLoad && (allNodes ?? []).length === 0 && !loading && (
+        {!isInitialLoad && players.length === 0 && !loading && (
           <YStack
             flex={1}
             alignItems="center"
@@ -264,8 +587,7 @@ export function FootballPlayersPage() {
           </YStack>
         )}
 
-        {/* Player grid — 1col mobile, 2col tablet, 3col desktop */}
-        {(allNodes ?? []).length > 0 && (
+        {players.length > 0 && viewMode === 'cards' && (
           <YStack
             style={{
               display: 'grid',
@@ -273,7 +595,7 @@ export function FootballPlayersPage() {
               gap: 12,
             }}
           >
-            {(allNodes ?? []).map((player) =>
+            {players.map((player) =>
               player?.id != null ? (
                 <FootballPlayerCard
                   key={player.id}
@@ -284,6 +606,27 @@ export function FootballPlayersPage() {
                   isSelectable
                   isSelected={selectedIds.has(player.id)}
                   onSelect={handleSelectPlayer}
+                />
+              ) : null,
+            )}
+          </YStack>
+        )}
+
+        {players.length > 0 && viewMode === 'table' && (
+          <YStack
+            backgroundColor={SURFACE_CARD}
+            borderWidth={1}
+            borderColor={OUTLINE_SUBTLE}
+            borderRadius={10}
+            overflow="hidden"
+          >
+            <TableHeader />
+            {players.map((player) =>
+              player?.id != null ? (
+                <TableRow
+                  key={player.id}
+                  player={player}
+                  onNavigate={(id) => navigate(`/football/players/${id}`)}
                 />
               ) : null,
             )}
