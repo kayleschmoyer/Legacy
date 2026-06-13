@@ -17,7 +17,7 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
-import { buildNativeConfig } from './config.native';
+import { buildNativeConfig, makeLazyConfig } from './config.native';
 
 describe('native adapter', () => {
   const originalEnv = process.env;
@@ -123,6 +123,27 @@ describe('native adapter', () => {
   it('does not throw when native-required keys are provided via extra', () => {
     // The default mock provides graphqlHost, oauthProxy, googleClientId via extra
     expect(() => buildNativeConfig()).not.toThrow();
+  });
+
+  describe('lazy config export (LS-4970)', () => {
+    it('does not throw at creation time when native-required keys are missing', () => {
+      mockExtraData = {};
+      expect(() => makeLazyConfig()).not.toThrow();
+    });
+
+    it('throws when a required property is accessed with missing keys', () => {
+      mockExtraData = {};
+      const lazyCfg = makeLazyConfig();
+      expect(() => lazyCfg.graphqlHost).toThrow(
+        'required native keys are not configured',
+      );
+    });
+
+    it('returns the correct value on property access when keys are present', () => {
+      process.env.EXPO_PUBLIC_GRAPHQL_HOST = 'https://lazy.example.com/graphql';
+      const lazyCfg = makeLazyConfig();
+      expect(lazyCfg.graphqlHost).toBe('https://lazy.example.com/graphql');
+    });
   });
 
   describe('native-required key validation (LS-7701)', () => {

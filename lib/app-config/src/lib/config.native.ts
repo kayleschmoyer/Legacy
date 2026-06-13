@@ -46,8 +46,8 @@ export function buildNativeConfig(): AppConfig {
     repoUrl: process.env.EXPO_PUBLIC_REPO_URL ?? extra?.['repoUrl'],
   };
 
-  // Validate native-required keys up-front so the app fails loudly at startup
-  // rather than when an individual consumer first tries to use a missing value.
+  // Validate all native-required keys together so one error lists everything missing,
+  // rather than surfacing one missing key at a time per consumer.
   const missingNative = (
     Object.entries(CONFIG_KEYS) as [
       string,
@@ -71,4 +71,18 @@ export function buildNativeConfig(): AppConfig {
   return validateConfig(values);
 }
 
-export const config: AppConfig = buildNativeConfig();
+export function makeLazyConfig(): AppConfig {
+  let _cache: AppConfig | undefined;
+  return new Proxy({} as AppConfig, {
+    get(_target, prop: string | symbol) {
+      if (_cache === undefined) {
+        _cache = buildNativeConfig();
+      }
+      return (_cache as Record<string | symbol, unknown>)[prop];
+    },
+  });
+}
+
+// Lazy: buildNativeConfig() runs on first property access, not at import time.
+// Prevents a crash at module load when EXPO_PUBLIC_* vars are absent (LS-4970).
+export const config: AppConfig = makeLazyConfig();
