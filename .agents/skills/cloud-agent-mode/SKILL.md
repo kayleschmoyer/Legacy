@@ -1,6 +1,6 @@
 ---
 name: cloud-agent-mode
-description: Running as a cloud coding agent (Claude Code on the web, Copilot Coding Agent). Covers GitHub and Jira auth setup, token configuration tables, Jira tool mapping, and which MCP servers are available vs unavailable in cloud environments. Load when operating in a cloud environment or when troubleshooting auth for cloud agents.
+description: Cloud (Claude Code on the web, Copilot Coding Agent) implementation of the ticket-to-merge workflow. Covers the cloud platform matrix, degraded mode, GitHub/Jira auth setup, token tables, tool mapping, and which MCP servers are available vs unavailable. Load when operating in a cloud environment or troubleshooting cloud-agent auth. The environment-neutral ordering lives in workflow-overview/references/ticket-to-merge-spine.md; this skill is the cloud tool binding plus cloud-only auth, quirks, and degraded-mode reality.
 ---
 
 # Skill: Cloud Agent Mode
@@ -57,32 +57,27 @@ The "cloud agent" label covers three distinct configurations with very different
 
 > The flow below assumes the full hosted-Lambda toolchain is connected (custom MCP servers all reached via OAuth connectors on local/CC web, or Cognito machine-grant bearer on Copilot). On default Claude Code on the web sessions where these servers do **not** auto-load, follow [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) instead.
 
-1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_claim_ticket({ key: "LS-####" })` (atomically checks blockers, validates status, and transitions to In Progress)
-   - **Before claiming, check the job environment for `JIRA_ASSIGNEE_EMAIL`** (`echo "$JIRA_ASSIGNEE_EMAIL"`; on Copilot it is exported from the repo variable by `copilot-setup-steps.yml`). If non-empty, pass it: `jira_claim_ticket({ key: "LS-####", assignee: "<email>" })` so the claim is attributed to a real user instead of the service account. If unset, omit the param.
-   - `action: "PROCEED"` → claimed; use `branchRecommendation` to decide git base (main vs a blocker branch)
-   - `action: "STOP"` → read `reason` and halt; do not proceed
-   - `action: "ALREADY_CLAIMED"` → call `github_list_prs(search: "LS-####")`; **STOP** if an open PR exists. If no PR exists, inspect the `ticket.updated` timestamp: **STOP** if within the last 60 minutes (assume another agent just claimed it); only proceed if older than 60 minutes (orphaned ticket — note it in the PR body and continue without re-transitioning)
-2. **Code**: implement the changes
-3. **Commit and push** (establish durable branch before validation):
-   - `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })`
-   - Shell fallback: `git add <files> && git commit -m "type(scope): LS-#### msg" && git push -u origin HEAD`
-4. **Before running `make pc` (Step 6): Open draft PR + post checkpoint** — a container reaped during `make pc` cannot recover without a pushed branch and draft PR as a durable substrate:
-   - **Open draft PR**:
-     - Copilot: `github_create_pr({ title: "LS-#### type(scope): msg", body: <markdown>, draft: true })`
-     - CC web: `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })`
-   - **Apply `agent-in-progress`**: `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` — **custom `legacy-sports-github` server only** (no built-in equivalent); closes the sweep race window before validation
-   - **Post continuation checkpoint**: `continuation_post({ pr: <PR#>, ... })` recording what's left (run migrations, `make pc`, self-review, mark ready, merge) and current state. A resuming container calls `continuation_status({ pr: <PR#> })` and picks up here instead of restarting
-5. **DB**: `db_migration_status()` → `db_migrate()`
-6. **Pre-commit**: `make_run({ target: "pc", runInBackground: true })` → `make_run_wait({ jobId })` (re-call if status is "running") — the draft PR from Step 4 makes a container reap here non-fatal. `runInBackground: true` is **required** in cloud sessions to avoid the ~60s MCP transport timeout that kills synchronous `make_run` calls; `make_run_wait` returns within 55s per call and is re-invoked until done
-7. **Self-review (MANDATORY gate)**: `make_run({ target: "lint-review-patterns" })`, then read every changed file in full and manually check patterns **#3, #4, #7, #8, #9, #19, #20** from `../pr-lifecycle/references/common-review-patterns.md`. Also scan for dead code, unsafe casts, missing/null guards, async correctness, stale comments, misleading success logs, and missing tests for changed behavior. Produce a **Self-Review Summary** before proceeding. If you find issues, fix them, re-run Step 6, then repeat this Step 7 on the updated diff and update the **Self-Review Summary** before proceeding.
-   - **Copilot Coding Agent note**: there may be no `/review` slash-command support in this environment. That does **not** waive the gate — inline the checklist from `../pr-lifecycle/references/self-review.md` yourself.
-8. **Mark ready** — mark the PR ready before ending the session or handing off; draft is a working state, not a stopping point:
-   - **Copilot**: `github_mark_pr_ready({ number: <PR#> })` — the custom server applies `bot:ready-for-review` automatically
-   - **CC web**: After `make pc` passes, call `mcp__github__update_pull_request({ owner, repo, pullNumber: <PR#>, draft: false })` to flip the draft flag, then call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` from the custom `legacy-sports-github` server. The built-in mark-ready flips the flag only; the `github_manage_labels` call is the step that applies the trigger label. Without it, the first review cycle fires once on `ready_for_review` but does not re-fire after fix-pushes — Cycle-1 mandates stall permanently. `github_manage_labels` has no built-in equivalent; use the custom server for this call.
-   - Refresh the continuation checkpoint after marking ready: `continuation_post({ pr: <PR#>, ... })` recording "validation passed, PR marked ready"
-9. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
+**Follow the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md).** The ordering, the four critical gates, and the **mandatory tracking-task graph (Step 1c)** are environment-neutral and apply in cloud sessions exactly as locally — including the **draft PR opens before `make pc`**, and `make pc` must pass before mark-ready. Create the task graph before writing code; it is the only thing that survives a container reap or `/compact`. The table below is just the **cloud tool binding** for each spine step — it is not a second source of ordering.
 
-10. **Review lifecycle**: monitor PR → fix Copilot comments → self-review changed files → fix code → validate before every push → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)
+| Spine step                | Cloud call (Copilot — custom `legacy-sports-github`)                                | Cloud call (CC web — built-in `mcp__github__*`)                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Create/claim ticket       | `jira_create_ticket({ sprint: "current" })`, `jira_claim_ticket({ key, assignee })` | same (or Atlassian plugin on default CC web — see [degraded mode](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp))      |
+| Commit / push             | `worktree_commit({ message })`, `worktree_push({ setUpstream: true })`              | `git add <files> && git commit -m "type(scope): LS-#### msg" && git push -u origin HEAD`                                              |
+| Open draft PR             | `github_create_pr({ title, body, draft: true })`                                    | `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })`                                             |
+| Apply `agent-in-progress` | `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`                | same custom call — **no built-in equivalent**                                                                                         |
+| Continuation checkpoint   | `continuation_post({ pr: <PR#>, ... })`                                             | same                                                                                                                                  |
+| Migrations                | `db_migration_status()` → `db_migrate()`                                            | (Docker absent on default CC web — see degraded mode)                                                                                 |
+| Validate                  | `make_run({ target: "pc", runInBackground: true })` → `make_run_wait({ jobId })`    | `make pc` via Bash                                                                                                                    |
+| Mark ready                | `github_mark_pr_ready({ number: <PR#> })` (applies `bot:ready-for-review`)          | `mcp__github__update_pull_request({ draft: false })` **then** `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` |
+| Jira In Review            | `jira_transition({ key, status: "In Review" })`                                     | same / Atlassian plugin                                                                                                               |
+
+**Cloud-specific notes on those steps:**
+
+- **Assignee**: before claiming, check `JIRA_ASSIGNEE_EMAIL` (`echo "$JIRA_ASSIGNEE_EMAIL"`; on Copilot it is exported from the repo variable by `copilot-setup-steps.yml`). If non-empty, pass `assignee: "<email>"`; if unset, omit. Handle the claim result per the spine: `PROCEED` → use `branchRecommendation`; `STOP` → halt; `ALREADY_CLAIMED` → `github_list_prs(search: "LS-####")`, **STOP** if an open PR exists or `ticket.updated` is within 60 minutes, else proceed (orphaned ticket — note in PR body).
+- **`runInBackground: true` is required** for `make pc` in cloud sessions — it avoids the ~60s MCP transport timeout that kills synchronous `make_run` calls. `make_run_wait` returns within 55s per call and is re-invoked until done.
+- **Mark-ready label nuance (CC web)**: the built-in `mcp__github__update_pull_request({ draft: false })` flips the draft flag only — it does **not** apply `bot:ready-for-review`. Follow it with `github_manage_labels` from the custom server. Without the label, Cycle-1 mandates stall permanently because review does not re-fire after fix-pushes. `github_manage_labels` has no built-in equivalent.
+- **Self-review (MANDATORY gate)**: `make_run({ target: "lint-review-patterns" })`, then read every changed file in full and check patterns **#3, #4, #7, #8, #9, #19, #20** from [`../pr-lifecycle/references/common-review-patterns.md`](../pr-lifecycle/references/common-review-patterns.md); also scan for dead code, unsafe casts, missing/null guards, async correctness, stale comments, misleading success logs, missing tests. Produce a Self-Review Summary; if you find issues, fix, re-validate, and repeat. On Copilot there may be no `/review` slash command — that does not waive the gate; inline the checklist from [`../pr-lifecycle/references/self-review.md`](../pr-lifecycle/references/self-review.md).
+- **After mark-ready**: refresh the checkpoint (`continuation_post` recording "validation passed, PR marked ready"), then drive the [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) — monitor → fix Copilot comments → self-review → validate before every push → reply → resolve threads → re-request review. The CI/review/merge machinery that runs once the PR is ready is environment-neutral — see [ci-and-merge-pipeline.md](../workflow-overview/references/ci-and-merge-pipeline.md) (CI orchestrator, Copilot review flow, Jira branch sync, merge queue) and [roles-and-required-checks.md](../workflow-overview/references/roles-and-required-checks.md) (required vs advisory checks).
 
 Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`, `gh pr edit <PR#> --add-label "agent-in-progress"`.
 
@@ -90,13 +85,15 @@ Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commi
 
 Cloud (and native ephemeral) containers can be reaped mid-run — most often during the longest stretch of the workflow, `make pc` on a wide-blast-radius change (which runs effectively twice when the formatter auto-commits). If the only record of progress is an unpushed local commit, the reap loses the task and a fresh container restarts from zero. A transcript that simply stops mid-`make pc`, with no closing summary, is this failure — the container ended, the agent did not decide it was done.
 
-**The cloud workflow above (Steps 3–4) is already ordered for timeout resilience**: commit and push happen at Step 3, and the draft PR + continuation checkpoint are created at Step 4 — both _before_ `make pc` at Step 6. Follow the numbered steps in order and a container kill during `make pc` is automatically non-fatal.
+**The [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md) is already ordered for timeout resilience**: commit and push happen, then the draft PR + `agent-in-progress` label + continuation checkpoint are created — all _before_ `make pc`. This is the spine's [draft-PR-before-validation gate](../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions). Follow the spine order and a container kill during `make pc` is automatically non-fatal.
 
-The gate that still holds: **`make pc` must pass before `github_mark_pr_ready` (Step 8)**. A draft PR existing earlier is fine — it is inert until marked ready. See the [continuation-plan artifact](../dev-process/artifacts/continuation-plan.md) for checkpoint format.
+The gate that still holds: **`make pc` must pass before mark-ready**. A draft PR existing earlier is fine — it is inert until marked ready.
+
+The spine's **tracking-task graph (Step 1c)** is what makes this survive compaction: with task (3) `make pc` `blockedBy` task (2) draft-PR, an agent that loses its prose context cannot skip ahead to validation. See the [continuation-plan artifact](../dev-process/artifacts/continuation-plan.md) for checkpoint format.
 
 **Resuming after a reap:** a fresh container reattaches to the branch, calls `continuation_status({ pr: <PR#> })`, and continues from "what's left" in the checkpoint instead of restarting from zero.
 
-> Distinct from [Cloud-to-Local Teleport](#cloud-to-local-teleport), which hands off on a **capability** gap (no AWS/DB/Terraform); this handles a **time** gap (container reaped before completion). See also [workflow-overview Step 10b](../workflow-overview/SKILL.md) for the equivalent local pattern.
+> Distinct from [Cloud-to-Local Teleport](#cloud-to-local-teleport), which hands off on a **capability** gap (no AWS/DB/Terraform); this handles a **time** gap (container reaped before completion).
 
 ## Degraded-Mode Workflow (Claude Code on the web, no custom MCP)
 
@@ -125,6 +122,8 @@ This is the runbook for default Claude Code on the web sessions. Three diagnosti
 | Workflow run lookups           | ⚠️ partial          | `mcp__github__list_workflow_runs` may be loaded; if so, use it. Otherwise, native event surfacing.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ### Workflow shape
+
+This is the **degraded tool binding for the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md)** — same ordering, same four gates, same mandatory [tracking-task graph (Step 1c)](../workflow-overview/references/ticket-to-merge-spine.md#read-first-the-enforcement-that-survives-compaction) (create it before code; it survives a reap). The steps below only swap in the primitives that default CC web actually has (Atlassian plugin, built-in `mcp__github__*`, Bash). The one structural difference from the spine is the **hard stop at thread resolution** after a bot Cycle-2 mandate (see the capability matrix above and the stop-point script below).
 
 1. **Identify the ticket** via Atlassian plugin: `searchJiraIssuesUsingJql({ cloudId: "fb294606-...", jql: "key = LS-####", maxResults: 1 })`. Never `getJiraIssue` — see AGENTS.md.
 2. **Transition to In Progress** via `transitionJiraIssue({ cloudId: "fb294606-...", issueIdOrKey: "LS-####", transition: { id: "21" } })`. Mind Quirk 2 — retry once if the first call rejects the nested object.
@@ -545,7 +544,7 @@ If the custom server is unavailable, create the ticket first (without `additiona
 
 **Correct call pattern for `transitionJiraIssue`** (once warm):
 
-1. Get transition IDs for the ticket — prefer `jira_get_transitions` (custom MCP server) if available, since the Atlassian plugin's `getTransitionsForJiraIssue` is known to return full issue data instead of the transitions array (see AGENTS.md). If the custom server is unavailable, look up the target status ID from the Jira UI or the static LS transition table in `.agents/skills/workflow-overview/SKILL.md`:
+1. Get transition IDs for the ticket — prefer `jira_get_transitions` (custom MCP server) if available, since the Atlassian plugin's `getTransitionsForJiraIssue` is known to return full issue data instead of the transitions array (see AGENTS.md). If the custom server is unavailable, look up the target status ID from the Jira UI or the static LS transition ID table in [Discovering transition IDs](#discovering-transition-ids) below:
    `jira_get_transitions({ key: "LS-####" })`
 2. Then pass the transition as a JSON object (NOT a string):
    `transitionJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####", transition: { id: "21" } })`

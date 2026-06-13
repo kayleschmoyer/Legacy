@@ -7,7 +7,7 @@ A structured handoff posted as a PR comment when work on an in-flight PR transfe
 - Entrypoint 10 (inherited-pr) — always.
 - Self-resumption of stalled work after >24h gap or after context loss — always.
 - Any time another author has pushed commits to a PR you are now driving.
-- **Before a long validation/build step (e.g. `make pc`) in an ephemeral or time-limited container** — any cloud agent, and native ephemeral worktree sessions at risk of ending mid-task. This is the **timeout-resilience checkpoint**: a same-author plan posted so that, if the container is reaped during validation, a fresh container resumes from the checkpoint instead of restarting from zero. See [workflow-overview Step 10b](../../workflow-overview/SKILL.md) and [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience).
+- **Before a long validation/build step (e.g. `make pc`) in an ephemeral or time-limited container** — any cloud agent, and native ephemeral worktree sessions at risk of ending mid-task. This is the **timeout-resilience checkpoint**: a same-author plan posted so that, if the container is reaped during validation, a fresh container resumes from the checkpoint instead of restarting from zero. See the spine's [draft-PR-before-validation gate](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions) and [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience).
 
 ## Precondition: a PR must exist
 
@@ -99,5 +99,5 @@ Requires `GITHUB_TOKEN` for posting/fetching comments; returns formatted body fo
 - [Entrypoint 10: inherited-pr](../entrypoints/10-inherited-pr.md).
 - [drive-pr skill](../../drive-pr/SKILL.md) — the operational driver-agent flow.
 - [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience) — the timeout-resilience checkpoint flow.
-- [workflow-overview Step 10b](../../workflow-overview/SKILL.md) — draft-PR-first ordering in the canonical checklist.
+- [ticket-to-merge-spine — draft-PR-before-validation gate](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions) — draft-PR-first ordering in the canonical spine.
 - [Template](../templates/continuation-plan-template.md).
