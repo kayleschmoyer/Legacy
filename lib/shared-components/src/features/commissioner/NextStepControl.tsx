@@ -346,7 +346,10 @@ export function NextStepControl({
 
   const getDialogMessage = () => {
     if (actionType === 'draft') {
-      return 'This will start a random draft to assign players to all teams. Players will be randomly assigned to roster positions. After the draft completes, you can create Week 1 matchups.';
+      if (isLiveDraft) {
+        return 'This will start a live draft. Team managers will take turns picking players in real-time. After all picks are complete, you can create Week 1 matchups.';
+      }
+      return 'This will start an automated draft to assign players to all teams. Players will be automatically assigned to roster positions. After the draft completes, you can create Week 1 matchups.';
     } else if (actionType === 'createWeek1') {
       return 'This will create Week 1 matchups, pairing up all teams in the league. Players will be automatically assigned random historical seasons for their first matchup.';
     } else if (actionType === 'selectGame') {
