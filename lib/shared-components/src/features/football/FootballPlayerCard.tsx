@@ -15,6 +15,7 @@ import {
   SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  WHITE,
   withAlpha,
 } from '../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
@@ -289,37 +290,78 @@ export interface FootballPlayerCardProps {
    */
   onNavigateToPlayer?: (playerId: string) => void;
   onAddToRoster?: (player: FootballPlayerCardPlayer) => void;
+  isSelectable?: boolean;
+  isSelected?: boolean;
+  onSelect?: (playerId: number) => void;
 }
 
 export function FootballPlayerCard({
   player,
   onNavigateToPlayer,
   onAddToRoster,
+  isSelectable = false,
+  isSelected = false,
+  onSelect,
 }: FootballPlayerCardProps) {
   const pos = player.position;
   const isDst = player.isDst ?? false;
   const isIdp = pos === 'DL' || pos === 'LB' || pos === 'DB';
   const teamData = player.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
 
+  function handlePress() {
+    if (isSelectable) {
+      onSelect?.(player.id);
+    } else {
+      player.id != null && onNavigateToPlayer?.(String(player.id));
+    }
+  }
+
   return (
     <YStack
       backgroundColor={SURFACE_CARD}
-      borderWidth={1}
-      borderColor={OUTLINE_SUBTLE}
+      borderWidth={isSelected ? 2 : 1}
+      borderColor={isSelected ? BRAND_NAVY : OUTLINE_SUBTLE}
       borderRadius={10}
       overflow="hidden"
       cursor="pointer"
       pressStyle={{ opacity: 0.85, scale: 0.99 }}
       hoverStyle={{ borderColor: BRAND_NAVY, backgroundColor: SURFACE_PANEL }}
       animation="quick"
-      onPress={() =>
-        player.id != null && onNavigateToPlayer?.(String(player.id))
-      }
+      onPress={handlePress}
+      role={isSelectable ? 'checkbox' : 'button'}
+      aria-checked={isSelectable ? isSelected : undefined}
+      tabIndex={0}
+      onKeyDown={(e: { key: string; preventDefault: () => void }) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handlePress();
+        }
+      }}
       padding={14}
       gap={10}
     >
       {/* Header row */}
       <XStack gap={12} alignItems="flex-start">
+        {isSelectable && (
+          <YStack
+            width={20}
+            height={20}
+            borderRadius={4}
+            borderWidth={2}
+            borderColor={isSelected ? BRAND_NAVY : OUTLINE_SUBTLE}
+            backgroundColor={isSelected ? BRAND_NAVY : 'transparent'}
+            alignItems="center"
+            justifyContent="center"
+            alignSelf="center"
+            flexShrink={0}
+          >
+            {isSelected && (
+              <Text fontSize={12} color={WHITE} fontWeight="700">
+                ✓
+              </Text>
+            )}
+          </YStack>
+        )}
         <TeamBadge teamAbbr={player.nflTeam} isDst={isDst} />
 
         <YStack flex={1} gap={4}>

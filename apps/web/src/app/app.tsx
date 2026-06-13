@@ -155,6 +155,11 @@ const FootballPlayerDetailPage = lazyWithRetry(() =>
     default: m.FootballPlayerDetailPage,
   })),
 );
+const FootballPlayersComparePage = lazyWithRetry(() =>
+  import('../pages/football/FootballPlayersComparePage').then((m) => ({
+    default: m.FootballPlayersComparePage,
+  })),
+);
 const FootballViewGameLogsPage = lazyWithRetry(() =>
   import('../pages/football/FootballViewGameLogsPage').then((m) => ({
     default: m.FootballViewGameLogsPage,
@@ -581,6 +586,15 @@ function App() {
               element={
                 <FootballGate>
                   <FootballViewGameLogsPage />
+                </FootballGate>
+              }
+            />
+            {/* Static segment must precede /football/players/:id dynamic route. */}
+            <Route
+              path="/football/players/compare"
+              element={
+                <FootballGate>
+                  <FootballPlayersComparePage />
                 </FootballGate>
               }
             />

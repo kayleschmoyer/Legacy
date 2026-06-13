@@ -16,6 +16,7 @@ import {
   BG_DARK,
   BRAND_GOLD,
   BRAND_NAVY,
+  BRAND_NAVY_LIGHT,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
   SURFACE_PANEL,
@@ -51,6 +52,30 @@ export function FootballPlayersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<PlayerListItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  function handleSelectPlayer(playerId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else if (next.size < 2) {
+        next.add(playerId);
+      }
+      return next;
+    });
+  }
+
+  const selectedArray = Array.from(selectedIds);
+  const isCompareReady = selectedArray.length === 2;
+
+  function goToCompare() {
+    if (selectedArray.length === 2) {
+      navigate(
+        `/football/players/compare?a=${selectedArray[0]}&b=${selectedArray[1]}`,
+      );
+    }
+  }
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -254,6 +279,9 @@ export function FootballPlayersPage() {
                   onNavigateToPlayer={(playerId) =>
                     navigate(`/football/players/${playerId}`)
                   }
+                  isSelectable
+                  isSelected={selectedIds.has(player.id)}
+                  onSelect={handleSelectPlayer}
                 />
               ) : null,
             )}
@@ -292,6 +320,92 @@ export function FootballPlayersPage() {
           </XStack>
         )}
       </YStack>
+
+      {/* Compare sticky bar */}
+      {selectedIds.size > 0 && (
+        <XStack
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            padding: '12px 16px',
+            background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BG_DARK} 100%)`,
+            borderTop: `1px solid ${OUTLINE_SUBTLE}`,
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <Text
+            fontSize={14}
+            color={TEXT_MUTED}
+            fontFamily={FONT_BODY}
+            flex={1}
+          >
+            {selectedIds.size === 1
+              ? 'Select 1 more player to compare'
+              : '2 players selected'}
+          </Text>
+          {selectedIds.size > 0 && (
+            <YStack
+              paddingHorizontal={12}
+              paddingVertical={6}
+              borderRadius={6}
+              backgroundColor={SURFACE_PANEL}
+              borderWidth={1}
+              borderColor={OUTLINE_SUBTLE}
+              onPress={() => setSelectedIds(new Set())}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e: { key: string; preventDefault: () => void }) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedIds(new Set());
+                }
+              }}
+              cursor="pointer"
+              pressStyle={{ opacity: 0.8 }}
+            >
+              <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+                Clear
+              </Text>
+            </YStack>
+          )}
+          {isCompareReady && (
+            <YStack
+              paddingHorizontal={20}
+              paddingVertical={8}
+              borderRadius={8}
+              backgroundColor={BRAND_NAVY}
+              borderWidth={1}
+              borderColor={BRAND_GOLD}
+              onPress={goToCompare}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e: { key: string; preventDefault: () => void }) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  goToCompare();
+                }
+              }}
+              cursor="pointer"
+              hoverStyle={{ backgroundColor: BRAND_NAVY_LIGHT }}
+              pressStyle={{ opacity: 0.85 }}
+              animation="quick"
+            >
+              <Text
+                fontSize={14}
+                color={BRAND_GOLD}
+                fontWeight="700"
+                fontFamily={FONT_BODY}
+              >
+                Compare Players
+              </Text>
+            </YStack>
+          )}
+        </XStack>
+      )}
     </YStack>
   );
 }

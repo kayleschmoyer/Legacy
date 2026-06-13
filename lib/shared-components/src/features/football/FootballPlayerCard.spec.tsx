@@ -113,4 +113,32 @@ describe('FootballPlayerCard', () => {
     expect(screen.getByText('Sacks')).toBeTruthy();
     expect(screen.getByText('Pts Allowed/G')).toBeTruthy();
   });
+
+  describe('LS-6460 — selectable state for player comparison', () => {
+    it('fires onSelect with the numeric id (not onNavigateToPlayer) when selectable and pressed', () => {
+      const onSelect = jest.fn();
+      const onNavigate = jest.fn();
+      render(
+        <FootballPlayerCard
+          player={QB_PLAYER}
+          isSelectable
+          onSelect={onSelect}
+          onNavigateToPlayer={onNavigate}
+        />,
+      );
+      fireEvent.click(screen.getByText('Patrick Mahomes'));
+      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
+
+    it('renders a checkmark when selected', () => {
+      render(<FootballPlayerCard player={QB_PLAYER} isSelectable isSelected />);
+      expect(screen.getByText('✓')).toBeTruthy();
+    });
+
+    it('does not render a checkmark when selectable but not selected', () => {
+      render(<FootballPlayerCard player={QB_PLAYER} isSelectable />);
+      expect(screen.queryByText('✓')).toBeNull();
+    });
+  });
 });
