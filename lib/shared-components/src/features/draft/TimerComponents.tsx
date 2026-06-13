@@ -139,7 +139,8 @@ function TimerBar({
   label = 'Time Remaining',
   variant = 'default',
 }: TimerBarProps) {
-  const minutes = Math.floor(time / 60);
+  const hours = Math.floor(time / 3600);
+  const minutes = Math.floor((time % 3600) / 60);
   const seconds = time % 60;
 
   // Create default color animation if not provided
@@ -218,7 +219,9 @@ function TimerBar({
           color="white"
           textAlign="center"
         >
-          {minutes}:{seconds.toString().padStart(2, '0')}
+          {maxTime >= 3600
+            ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+            : `${minutes}:${seconds.toString().padStart(2, '0')}`}
         </TamaguiText>
         {label && (
           <TamaguiText

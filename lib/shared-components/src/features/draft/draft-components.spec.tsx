@@ -19,15 +19,14 @@ interface TimerBarProps {
   variant?: string;
 }
 
-const TimerBar = ({
-  time,
-  maxTime: _maxTime,
-  label,
-  variant,
-}: TimerBarProps) => {
-  const minutes = Math.floor(time / 60);
+const TimerBar = ({ time, maxTime, label, variant }: TimerBarProps) => {
+  const hours = Math.floor(time / 3600);
+  const minutes = Math.floor((time % 3600) / 60);
   const seconds = time % 60;
-  const timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const timeDisplay =
+    (maxTime ?? 0) >= 3600
+      ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      : `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
   return (
     <div data-testid="timer-bar" data-variant={variant}>
@@ -190,6 +189,22 @@ describe('Draft Components', () => {
       );
 
       expect(getByText('1:00')).toBeTruthy();
+    });
+
+    it('displays H:MM:SS when maxTime is 1 hour or more', () => {
+      const { getByText } = render(
+        <TimerBar time={3661} maxTime={86400} label="Draft Timer" />,
+      );
+
+      expect(getByText('1:01:01')).toBeTruthy();
+    });
+
+    it('displays 24:00:00 for a full 24-hour timer', () => {
+      const { getByText } = render(
+        <TimerBar time={86400} maxTime={86400} label="Draft Timer" />,
+      );
+
+      expect(getByText('24:00:00')).toBeTruthy();
     });
   });
 
@@ -433,6 +448,30 @@ describe('Draft Components', () => {
       );
 
       expect(getByText('1:30')).toBeTruthy();
+    });
+
+    it('displays hours when time remaining is 1 hour or more', () => {
+      const { getByText } = render(
+        <DraftStatusBar
+          draftBoard={mockDraftBoard}
+          currentTeam={mockDraftBoard.teams[0]}
+          timeRemaining={86400}
+        />,
+      );
+
+      expect(getByText('24:00:00')).toBeTruthy();
+    });
+
+    it('displays hours:minutes:seconds for times >= 1 hour', () => {
+      const { getByText } = render(
+        <DraftStatusBar
+          draftBoard={mockDraftBoard}
+          currentTeam={mockDraftBoard.teams[0]}
+          timeRemaining={3661}
+        />,
+      );
+
+      expect(getByText('1:01:01')).toBeTruthy();
     });
   });
 });

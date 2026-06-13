@@ -170,11 +170,13 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
  */
 interface TimerProps {
   time: number;
+  maxTime: number;
   isActive: boolean;
 }
 
-const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
-  const minutes = Math.floor(time / 60);
+const Timer: React.FC<TimerProps> = ({ time, maxTime, isActive }) => {
+  const hours = Math.floor(time / 3600);
+  const minutes = Math.floor((time % 3600) / 60);
   const seconds = time % 60;
 
   const getTimerColor = () => {
@@ -193,7 +195,9 @@ const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
       minWidth={120}
     >
       <Text fontSize="$6" fontWeight="700" color="white" fontFamily="$mono">
-        {minutes}:{seconds.toString().padStart(2, '0')}
+        {maxTime >= 3600
+          ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+          : `${minutes}:${seconds.toString().padStart(2, '0')}`}
       </Text>
       <Text fontSize="$2" color="white" opacity={0.9} marginTop="$1">
         {isActive ? 'Time Remaining' : 'Paused'}
@@ -392,7 +396,7 @@ function DraftBoard({
 
       {/* Timer */}
       <XStack justifyContent="center" padding="$3">
-        <Timer time={time} isActive={isActive} />
+        <Timer time={time} maxTime={draft.timeRemaining} isActive={isActive} />
       </XStack>
 
       {/* Timer Controls */}

@@ -573,8 +573,16 @@ function DraftStatusBar({
             </Text>
             {timeRemaining !== undefined && (
               <Text fontSize={12} color="$blue400">
-                {Math.floor(timeRemaining / 60)}:
-                {(timeRemaining % 60).toString().padStart(2, '0')}
+                {timeRemaining >= 3600
+                  ? `${Math.floor(timeRemaining / 3600)}:${Math.floor(
+                      (timeRemaining % 3600) / 60,
+                    )
+                      .toString()
+                      .padStart(
+                        2,
+                        '0',
+                      )}:${(timeRemaining % 60).toString().padStart(2, '0')}`
+                  : `${Math.floor(timeRemaining / 60)}:${(timeRemaining % 60).toString().padStart(2, '0')}`}
               </Text>
             )}
           </YStack>
