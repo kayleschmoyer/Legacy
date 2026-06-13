@@ -1,4 +1,6 @@
 import React from 'react';
+import { Card, Text, XStack, YStack } from 'tamagui';
+import { Lock } from '@tamagui/lucide-icons';
 import type {
   CurrentDraftPickInfo,
   DraftPickRecord,
@@ -10,7 +12,40 @@ import { BaseballCard } from './BaseballCard';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { CurrentPickPanel } from './CurrentPickPanel';
-import { PremiumGate } from '../../components/PremiumGate';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
+
+const PremiumGate: React.FC<{
+  isPremium: boolean;
+  featureName: string;
+  featureDescription?: string;
+  children: React.ReactNode;
+}> = ({ isPremium, featureName, featureDescription, children }) => {
+  if (isPremium) {
+    return children as React.JSX.Element;
+  }
+  return (
+    <Card
+      bordered
+      padding="$3"
+      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.04)}
+    >
+      <YStack gap="$2">
+        <XStack alignItems="center" gap="$2">
+          <Lock color={BRAND_NAVY_LIGHT} size={16} />
+          <Text fontWeight="600">{featureName}</Text>
+        </XStack>
+        {featureDescription ? (
+          <Text fontSize="$2" color="$gray10">
+            {featureDescription}
+          </Text>
+        ) : null}
+        <Text fontSize="$2" color="$gray11">
+          Available with Premium leagues.
+        </Text>
+      </YStack>
+    </Card>
+  );
+};
 
 interface DraftSidebarProps {
   // Draft status
@@ -43,7 +78,7 @@ interface DraftSidebarProps {
   myTeam: DraftPlayer[];
   myTeamPicks: DraftPickRecord[];
   positionCounts: Record<string, number>;
-  isPremium: boolean;
+  isPremium?: boolean;
   // Pick history
   pickHistory: DraftPickRecord[];
   statsLookup: Map<number, DraftPlayer>;
@@ -93,7 +128,7 @@ export function DraftSidebar({
   myTeam,
   myTeamPicks,
   positionCounts,
-  isPremium,
+  isPremium = false,
   pickHistory,
   statsLookup,
   chatOpen,
