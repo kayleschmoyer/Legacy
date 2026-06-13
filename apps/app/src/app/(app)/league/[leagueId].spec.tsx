@@ -64,21 +64,14 @@ jest.mock('tamagui', () => {
   const RN = require('react-native') as RNComponents;
   const { View, Text: RNText, ActivityIndicator } = RN;
   return {
-    YStack: ({
-      children,
-      testID,
-    }: {
-      children?: React.ReactNode;
-      testID?: string;
-    }) => <View testID={testID}>{children}</View>,
-    XStack: ({
-      children,
-      testID,
-    }: {
-      children?: React.ReactNode;
-      testID?: string;
-    }) => <View testID={testID}>{children}</View>,
     Card: ({
+      children,
+      testID,
+    }: {
+      children?: React.ReactNode;
+      testID?: string;
+    }) => <View testID={testID}>{children}</View>,
+    YStack: ({
       children,
       testID,
     }: {
@@ -95,22 +88,11 @@ jest.mock('tamagui', () => {
       children?: React.ReactNode;
       testID?: string;
     }) => <RNText testID={testID}>{children}</RNText>,
-    Button: ({
-      children,
-      testID,
-    }: {
-      children?: React.ReactNode;
-      testID?: string;
-    }) => <RNText testID={testID}>{children}</RNText>,
     Spinner: () => <ActivityIndicator testID="spinner" />,
-    Separator: () => <View />,
   };
 });
 
 jest.mock('@legacy-sports/shared-components', () => ({
-  CommissionerAuditLog: () => null,
-  CommissionerNoteControl: () => null,
-  DeleteLeagueControl: () => null,
   LeagueTradeBlock: () => null,
   PendingTradeOffers: () => null,
   PendingWaiverClaims: () => null,
@@ -125,14 +107,8 @@ jest.mock('../../../features/roster/LeagueRosterManagement', () => ({
 jest.mock('../../../features/leagues/LeagueChatTab', () => ({
   LeagueChatTab: () => null,
 }));
-jest.mock('../../../features/scoring/LeagueScoringEditor', () => ({
-  LeagueScoringEditor: () => null,
-}));
-jest.mock('../../../features/commissioner/LeagueDuesSetup', () => ({
-  LeagueDuesSetup: () => null,
-}));
-jest.mock('../../../features/commissioner/SalaryCapManagementCard', () => ({
-  SalaryCapManagementCard: () => null,
+jest.mock('../../../features/commissioner/CommissionerScreen', () => ({
+  CommissionerScreen: () => null,
 }));
 jest.mock('../../../features/matchup/components/MatchupList', () => ({
   MatchupList: () => null,
@@ -142,14 +118,6 @@ jest.mock('../../../features/matchup/hooks/useMatchup', () => ({
 }));
 jest.mock('../../../features/matchup/hooks/useStandings', () => ({
   useStandings: () => ({ standings: [], loading: false, error: null }),
-}));
-jest.mock('../../../common/scoring', () => ({
-  useLeagueScoringSettings: () => ({
-    profile: null,
-    loading: false,
-    error: null,
-    refetch: jest.fn(),
-  }),
 }));
 jest.mock('../FreeAgents', () => ({
   LeagueFreeAgents: () => null,
@@ -218,7 +186,6 @@ jest.mock('../../../api/db/graphql.generated', () => ({
     jest.fn(),
     { data: null, loading: false, error: null },
   ],
-  useStartDraftMutation: () => [jest.fn(), { loading: false }],
   useUpdateTeamMemberPositionMutation: () => [jest.fn()],
   useSwapTeamMemberPositionsMutation: () => [jest.fn()],
 }));
