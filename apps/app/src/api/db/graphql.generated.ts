@@ -6493,6 +6493,74 @@ export type FootballPlayerQuery = {
     nflTeam?: string | null;
     pfrId?: string | null;
     previousTeams: Array<string>;
+    seasonStats?: {
+      __typename?: 'FootballPlayerSeasonStats';
+      passing?: Array<{
+        __typename?: 'FootballSeasonPassing';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        yds?: number | null;
+        td?: number | null;
+        int?: number | null;
+        rating?: number | null;
+      }> | null;
+      rushing?: Array<{
+        __typename?: 'FootballSeasonRushing';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        att?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      }> | null;
+      receiving?: Array<{
+        __typename?: 'FootballSeasonReceiving';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        tgt?: number | null;
+        rec?: number | null;
+        yds?: number | null;
+        td?: number | null;
+      }> | null;
+      kicking?: Array<{
+        __typename?: 'FootballSeasonKicking';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        fgm?: number | null;
+        fga?: number | null;
+        xpm?: number | null;
+        xpa?: number | null;
+      }> | null;
+      defense?: Array<{
+        __typename?: 'FootballSeasonDefense';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        fumRec?: number | null;
+        defTd?: number | null;
+        ptsAllowed?: number | null;
+      }> | null;
+      idp?: Array<{
+        __typename?: 'FootballSeasonDefenseIdp';
+        season?: number | null;
+        team?: string | null;
+        g?: number | null;
+        soloTkl?: number | null;
+        astTkl?: number | null;
+        sacks?: number | null;
+        int?: number | null;
+        pd?: number | null;
+        ff?: number | null;
+        fr?: number | null;
+        defTd?: number | null;
+        safeties?: number | null;
+      }> | null;
+    } | null;
     careerStats?: {
       __typename?: 'FootballCareerStats';
       passing?: {
@@ -11677,6 +11745,67 @@ export const FootballPlayer = gql`
       nflTeam
       pfrId
       previousTeams
+      seasonStats {
+        passing {
+          season
+          team
+          g
+          yds
+          td
+          int
+          rating
+        }
+        rushing {
+          season
+          team
+          g
+          att
+          yds
+          td
+        }
+        receiving {
+          season
+          team
+          g
+          tgt
+          rec
+          yds
+          td
+        }
+        kicking {
+          season
+          team
+          g
+          fgm
+          fga
+          xpm
+          xpa
+        }
+        defense {
+          season
+          team
+          g
+          sacks
+          int
+          fumRec
+          defTd
+          ptsAllowed
+        }
+        idp {
+          season
+          team
+          g
+          soloTkl
+          astTkl
+          sacks
+          int
+          pd
+          ff
+          fr
+          defTd
+          safeties
+        }
+      }
       careerStats {
         passing {
           yds

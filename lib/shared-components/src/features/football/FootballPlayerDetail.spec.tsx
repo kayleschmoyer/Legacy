@@ -144,6 +144,36 @@ const TRADED_PLAYER: FootballPlayerDetailPlayer = {
   },
 };
 
+const QB_PLAYER_WITH_SEASONS: FootballPlayerDetailPlayer = {
+  ...QB_PLAYER,
+  seasonStats: {
+    passing: [
+      {
+        season: 2025,
+        team: 'KC',
+        g: 17,
+        cmp: 390,
+        att: 580,
+        yds: 4800,
+        td: 35,
+        int: 10,
+        rating: 108.0,
+      },
+      {
+        season: 2024,
+        team: 'KC',
+        g: 17,
+        cmp: 370,
+        att: 560,
+        yds: 4700,
+        td: 32,
+        int: 12,
+        rating: 104.5,
+      },
+    ],
+  },
+};
+
 const DST_PLAYER: FootballPlayerDetailPlayer = {
   id: 2,
   firstName: 'Kansas City',
@@ -285,8 +315,8 @@ describe('FootballPlayerDetail', () => {
     expect(screen.getByText('Defense — Season Breakdown')).toBeTruthy();
     expect(screen.getByText('DEF TD')).toBeTruthy();
     expect(screen.getByText('PTS')).toBeTruthy();
-    expect(screen.getByText('2023')).toBeTruthy();
-    expect(screen.getByText('2022')).toBeTruthy();
+    expect(screen.getAllByText('2023').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2022').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('294')).toBeTruthy();
   });
 
@@ -465,8 +495,8 @@ describe('FootballPlayerDetail', () => {
       expect(screen.getByText('CMP')).toBeTruthy();
       expect(screen.getAllByText('ATT').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('RTG').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('2023')).toBeTruthy();
-      expect(screen.getByText('2022')).toBeTruthy();
+      expect(screen.getAllByText('2023').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('2022').length).toBeGreaterThanOrEqual(1);
     });
 
     it('shows team column in passing breakdown rows', () => {
@@ -657,6 +687,38 @@ describe('FootballPlayerDetail', () => {
     expect(() =>
       render(<FootballPlayerDetail player={QB_PLAYER} initialTab="overview" />),
     ).not.toThrow();
+  });
+
+  describe('LS-6232 — Season filter dropdown', () => {
+    it('shows the Season dropdown when seasonStats data is present', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER} />);
+      expect(screen.getByText('Season')).toBeTruthy();
+    });
+
+    it('hides the Season dropdown when seasonStats is null', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        seasonStats: null,
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.queryByText('Season')).toBeNull();
+    });
+
+    it('hides the Season dropdown when all season arrays are empty', () => {
+      const player: FootballPlayerDetailPlayer = {
+        ...QB_PLAYER,
+        seasonStats: { passing: [], rushing: [], receiving: [] },
+      };
+      render(<FootballPlayerDetail player={player} />);
+      expect(screen.queryByText('Season')).toBeNull();
+    });
+
+    it('defaults to "All Seasons" showing all season rows', () => {
+      render(<FootballPlayerDetail player={QB_PLAYER_WITH_SEASONS} />);
+      // Both 2025 and 2024 rows should be visible with the default "All Seasons" selection
+      expect(screen.getAllByText('2025').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('2024').length).toBeGreaterThanOrEqual(1);
+    });
   });
 });
 

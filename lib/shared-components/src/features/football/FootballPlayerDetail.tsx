@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, H1, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
 import { NFL_TEAMS } from '../../constants/nflTeams';
@@ -16,6 +16,7 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
+import { Select } from '../../components/Select';
 
 /**
  * Portable career-stats shape consumed by {@link FootballPlayerDetail}.
@@ -108,11 +109,38 @@ export interface FootballSeasonDefenseRow {
   ptsAllowed?: number | null;
 }
 
+export interface FootballSeasonKickingRow {
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  fgm?: number | null;
+  fga?: number | null;
+  xpm?: number | null;
+  xpa?: number | null;
+}
+
+export interface FootballSeasonIdpRow {
+  season?: number | null;
+  team?: string | null;
+  g?: number | null;
+  soloTkl?: number | null;
+  astTkl?: number | null;
+  sacks?: number | null;
+  int?: number | null;
+  pd?: number | null;
+  ff?: number | null;
+  fr?: number | null;
+  defTd?: number | null;
+  safeties?: number | null;
+}
+
 export interface FootballPlayerDetailSeasonStats {
   passing?: FootballSeasonPassingRow[] | null;
   rushing?: FootballSeasonRushingRow[] | null;
   receiving?: FootballSeasonReceivingRow[] | null;
   defense?: FootballSeasonDefenseRow[] | null;
+  kicking?: FootballSeasonKickingRow[] | null;
+  idp?: FootballSeasonIdpRow[] | null;
 }
 
 export interface FootballPlayerDetailPlayer {
@@ -466,30 +494,189 @@ function DefenseSeasonTable({ rows }: { rows: FootballSeasonDefenseRow[] }) {
   );
 }
 
+function KickingSeasonTable({ rows }: { rows: FootballSeasonKickingRow[] }) {
+  return (
+    <SeasonTableWrap title="Kicking — Season Breakdown">
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', minWidth: 360 }}
+      >
+        <thead>
+          <tr>
+            {['YEAR', 'TEAM', 'G', 'FGM', 'FGA', 'XPM', 'XPA'].map((h) => (
+              <th
+                key={h}
+                style={
+                  h === 'YEAR' || h === 'TEAM'
+                    ? TABLE_HEADER_STYLE
+                    : { ...TABLE_HEADER_STYLE, textAlign: 'right' }
+                }
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.season}-${r.team}-${i}`}>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.season ?? '—'}</td>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.team ?? '—'}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.g)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.fgm)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.fga)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.xpm)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.xpa)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SeasonTableWrap>
+  );
+}
+
+function IdpSeasonTable({ rows }: { rows: FootballSeasonIdpRow[] }) {
+  return (
+    <SeasonTableWrap title="IDP — Season Breakdown">
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}
+      >
+        <thead>
+          <tr>
+            {[
+              'YEAR',
+              'TEAM',
+              'G',
+              'SOLO',
+              'AST',
+              'SACKS',
+              'INT',
+              'PD',
+              'FF',
+            ].map((h) => (
+              <th
+                key={h}
+                style={
+                  h === 'YEAR' || h === 'TEAM'
+                    ? TABLE_HEADER_STYLE
+                    : { ...TABLE_HEADER_STYLE, textAlign: 'right' }
+                }
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.season}-${r.team}-${i}`}>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.season ?? '—'}</td>
+              <td style={TABLE_CELL_LEFT_STYLE}>{r.team ?? '—'}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.g)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.soloTkl)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.astTkl)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmtFloat(r.sacks)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.int)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.pd)}</td>
+              <td style={TABLE_CELL_STYLE}>{fmt(r.ff)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SeasonTableWrap>
+  );
+}
+
+const ALL_SEASONS = 'all';
+
+function extractSeasons(ss: FootballPlayerDetailSeasonStats): number[] {
+  const seen = new Set<number>();
+  for (const arr of [
+    ss.passing,
+    ss.rushing,
+    ss.receiving,
+    ss.defense,
+    ss.kicking,
+    ss.idp,
+  ]) {
+    for (const row of arr ?? []) {
+      if (row.season != null) seen.add(row.season);
+    }
+  }
+  return Array.from(seen).sort((a, b) => b - a);
+}
+
 function SeasonBreakdowns({ player }: { player: FootballPlayerDetailPlayer }) {
   const ss = player.seasonStats;
+
+  const allSeasons = ss ? extractSeasons(ss) : [];
+
+  const [selectedSeason, setSelectedSeason] = useState<string>(ALL_SEASONS);
+
   if (!ss) return null;
 
   const passing = ss.passing ?? [];
   const rushing = ss.rushing ?? [];
   const receiving = ss.receiving ?? [];
   const defense = ss.defense ?? [];
+  const kicking = ss.kicking ?? [];
+  const idp = ss.idp ?? [];
 
   if (
     passing.length === 0 &&
     rushing.length === 0 &&
     receiving.length === 0 &&
-    defense.length === 0
+    defense.length === 0 &&
+    kicking.length === 0 &&
+    idp.length === 0
   ) {
     return null;
   }
 
+  const filterRows = <T extends { season?: number | null }>(rows: T[]): T[] =>
+    selectedSeason === ALL_SEASONS
+      ? rows
+      : rows.filter((r) => String(r.season) === selectedSeason);
+
+  const filteredPassing = filterRows(passing);
+  const filteredRushing = filterRows(rushing);
+  const filteredReceiving = filterRows(receiving);
+  const filteredDefense = filterRows(defense);
+  const filteredKicking = filterRows(kicking);
+  const filteredIdp = filterRows(idp);
+
+  const seasonOptions = [
+    { value: ALL_SEASONS, label: 'All Seasons' },
+    ...allSeasons.map((s) => ({ value: String(s), label: String(s) })),
+  ];
+
   return (
-    <YStack gap={20}>
-      {passing.length > 0 && <PassingSeasonTable rows={passing} />}
-      {rushing.length > 0 && <RushingSeasonTable rows={rushing} />}
-      {receiving.length > 0 && <ReceivingSeasonTable rows={receiving} />}
-      {defense.length > 0 && <DefenseSeasonTable rows={defense} />}
+    <YStack gap={16}>
+      {allSeasons.length > 0 && (
+        <Select
+          label="Season"
+          value={selectedSeason}
+          onValueChange={setSelectedSeason}
+          options={seasonOptions}
+        />
+      )}
+      <YStack gap={20}>
+        {filteredPassing.length > 0 && (
+          <PassingSeasonTable rows={filteredPassing} />
+        )}
+        {filteredRushing.length > 0 && (
+          <RushingSeasonTable rows={filteredRushing} />
+        )}
+        {filteredReceiving.length > 0 && (
+          <ReceivingSeasonTable rows={filteredReceiving} />
+        )}
+        {filteredDefense.length > 0 && (
+          <DefenseSeasonTable rows={filteredDefense} />
+        )}
+        {filteredKicking.length > 0 && (
+          <KickingSeasonTable rows={filteredKicking} />
+        )}
+        {filteredIdp.length > 0 && <IdpSeasonTable rows={filteredIdp} />}
+      </YStack>
     </YStack>
   );
 }

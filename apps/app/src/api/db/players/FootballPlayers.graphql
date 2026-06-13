@@ -70,6 +70,67 @@ query FootballPlayer($id: Int!) {
     nflTeam
     pfrId
     previousTeams
+    seasonStats {
+      passing {
+        season
+        team
+        g
+        yds
+        td
+        int
+        rating
+      }
+      rushing {
+        season
+        team
+        g
+        att
+        yds
+        td
+      }
+      receiving {
+        season
+        team
+        g
+        tgt
+        rec
+        yds
+        td
+      }
+      kicking {
+        season
+        team
+        g
+        fgm
+        fga
+        xpm
+        xpa
+      }
+      defense {
+        season
+        team
+        g
+        sacks
+        int
+        fumRec
+        defTd
+        ptsAllowed
+      }
+      idp {
+        season
+        team
+        g
+        soloTkl
+        astTkl
+        sacks
+        int
+        pd
+        ff
+        fr
+        defTd
+        safeties
+      }
+    }
     careerStats {
       passing {
         yds
