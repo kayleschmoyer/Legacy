@@ -12,6 +12,20 @@ name: "Check Merge Conflicts (Base Push Sweep)"
 # This also serves as a recovery path when GitHub fails to deliver the
 # pull_request: opened event to check-conflicts.yml (observed on PRs where
 # only push-triggered workflows ran on open, e.g. LS-7717).
+#
+# IDEMPOTENCY (LS-7992, Phase 3 of LS-7988): main can advance several times
+# while a PR sits open, so this sweep re-runs against the SAME head SHA
+# repeatedly. To avoid stacking multiple terminal "No Merge Conflicts" runs on
+# one SHA — which GitHub's ruleset evaluator and the MCP triage tooling
+# mishandle — the sweep REUSES the existing check-run id for
+# (head_sha, "No Merge Conflicts") instead of POSTing a new one each push
+# (Option A in the ticket). Option B (a shared cancel-in-progress concurrency
+# group keyed by PR) was rejected: this is a single job that sweeps ALL open
+# PRs, so it cannot be keyed by one PR number, and cancel-in-progress would
+# itself leave `cancelled` terminal runs — the exact duplicate-required-name
+# state Phase 3 exists to eliminate. The reusable-id lookup lives in
+# .github/scripts/resolve-conflict-check-run.mjs (unit-tested via
+# .github/checks/conflict-check-idempotency-tests.sh).
 
 on:
   push:
@@ -81,15 +95,35 @@ jobs:
             echo "--- PR #${PR_NUM} (head: ${HEAD_SHA:0:7}) ---"
             STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-            # Create in_progress check run before doing the work.
-            # Capture stdout (the run ID) separately; let stderr flow to the log.
-            # On failure, warn and fall back to a single completed POST at the end.
+            # Idempotency (LS-7992): reuse the existing "No Merge Conflicts" run
+            # for this head SHA instead of creating a duplicate on every base
+            # push. Look up the prior run (created by an earlier sweep or by the
+            # PR-side check-conflicts.yml); the end-of-loop PATCH overwrites it
+            # with this sweep's terminal result. We deliberately do NOT reset a
+            # reused run to in_progress: that would replace a known-good terminal
+            # state with a "pending" one that could stick (blocking the PR) if
+            # the sweep crashes mid-test, and adds a needless API round-trip.
             RUN_ID=""
-            if ! RUN_ID=$(printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"in_progress","started_at":"%s"}' \
-                "$HEAD_SHA" "$STARTED_AT" \
-                | gh api "repos/${GH_REPO}/check-runs" -X POST --input - --jq '.id'); then
-              echo "::warning::Failed to create in_progress check run for PR #${PR_NUM}; will POST completed run directly"
-              RUN_ID=""
+            EXISTING_RUNS=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/check-runs" \
+              -X GET -f check_name="No Merge Conflicts" -f per_page=100 2>/dev/null || true)
+            if [ -n "$EXISTING_RUNS" ]; then
+              RUN_ID=$(printf '%s' "$EXISTING_RUNS" \
+                | node .github/scripts/resolve-conflict-check-run.mjs "No Merge Conflicts" \
+                || true)
+            fi
+
+            if [ -n "$RUN_ID" ]; then
+              echo "Reusing existing 'No Merge Conflicts' check run ${RUN_ID} for PR #${PR_NUM}"
+            else
+              # No prior run — create an in_progress run before doing the work.
+              # Capture stdout (the run ID) separately; let stderr flow to the log.
+              # On failure, warn and fall back to a single completed POST at the end.
+              if ! RUN_ID=$(printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"in_progress","started_at":"%s"}' \
+                  "$HEAD_SHA" "$STARTED_AT" \
+                  | gh api "repos/${GH_REPO}/check-runs" -X POST --input - --jq '.id'); then
+                echo "::warning::Failed to create in_progress check run for PR #${PR_NUM}; will POST completed run directly"
+                RUN_ID=""
+              fi
             fi
 
             # Detach to the pushed base so each PR starts from the same base.
