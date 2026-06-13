@@ -37,6 +37,7 @@ type NotificationData = {
   leagueId?: number;
   matchupId?: number;
   tradeOfferId?: number;
+  sport?: string;
   [key: string]: unknown;
 };
 
@@ -196,6 +197,7 @@ function isNotificationData(value: unknown): value is NotificationData {
   if ('matchupId' in obj && typeof obj['matchupId'] !== 'number') return false;
   if ('tradeOfferId' in obj && typeof obj['tradeOfferId'] !== 'number')
     return false;
+  if ('sport' in obj && typeof obj['sport'] !== 'string') return false;
   return true;
 }
 
@@ -203,19 +205,20 @@ function navigateFromNotification(
   router: ReturnType<typeof useRouter>,
   data: NotificationData,
 ) {
-  const { notificationType, leagueId, matchupId, tradeOfferId } = data;
+  const { notificationType, leagueId, matchupId, tradeOfferId, sport } = data;
+  const sportPrefix = sport ?? 'baseball';
 
   if (
     (notificationType === 'DRAFT_STARTED' ||
       notificationType === 'DRAFT_PICK_MADE') &&
     leagueId
   ) {
-    router.navigate(`/baseball/league/${leagueId}`);
+    router.navigate(`/${sportPrefix}/league/${leagueId}`);
     return;
   }
 
   if (notificationType === 'DRAFT_COMPLETED' && leagueId) {
-    router.navigate(`/baseball/league/${leagueId}`);
+    router.navigate(`/${sportPrefix}/league/${leagueId}`);
     return;
   }
 
@@ -232,7 +235,7 @@ function navigateFromNotification(
 
   if (matchupId && leagueId) {
     router.navigate({
-      pathname: '/baseball/matchup',
+      pathname: `/${sportPrefix}/matchup`,
       params: {
         matchupId: String(matchupId),
         leagueId: String(leagueId),

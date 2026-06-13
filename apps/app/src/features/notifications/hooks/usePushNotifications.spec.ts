@@ -142,7 +142,23 @@ describe('usePushNotifications — navigateFromNotification', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/notifications');
   });
 
-  it('navigates to league on DRAFT_STARTED tap', () => {
+  it('navigates to baseball league on DRAFT_STARTED tap with sport=baseball', () => {
+    const { tap } = setupListeners();
+
+    tap({ notificationType: 'DRAFT_STARTED', leagueId: 3, sport: 'baseball' });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/3');
+  });
+
+  it('navigates to football league on DRAFT_STARTED tap with sport=football', () => {
+    const { tap } = setupListeners();
+
+    tap({ notificationType: 'DRAFT_STARTED', leagueId: 3, sport: 'football' });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/football/league/3');
+  });
+
+  it('defaults to baseball league on DRAFT_STARTED tap when sport is absent', () => {
     const { tap } = setupListeners();
 
     tap({ notificationType: 'DRAFT_STARTED', leagueId: 3 });
@@ -150,7 +166,29 @@ describe('usePushNotifications — navigateFromNotification', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/3');
   });
 
-  it('navigates to matchup on matchupId+leagueId tap', () => {
+  it('navigates to baseball matchup on matchupId+leagueId tap with sport=baseball', () => {
+    const { tap } = setupListeners();
+
+    tap({ leagueId: 3, matchupId: 99, sport: 'baseball' });
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/baseball/matchup',
+      params: { matchupId: '99', leagueId: '3' },
+    });
+  });
+
+  it('navigates to football matchup on matchupId+leagueId tap with sport=football', () => {
+    const { tap } = setupListeners();
+
+    tap({ leagueId: 3, matchupId: 99, sport: 'football' });
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/football/matchup',
+      params: { matchupId: '99', leagueId: '3' },
+    });
+  });
+
+  it('defaults to baseball matchup on matchupId+leagueId tap when sport is absent', () => {
     const { tap } = setupListeners();
 
     tap({ leagueId: 3, matchupId: 99 });

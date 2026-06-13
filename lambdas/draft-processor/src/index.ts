@@ -1611,13 +1611,37 @@ async function processDraftMessage(
     // Until the IAM policy is added, publish calls will fail with AccessDenied
     // and degrade gracefully via the non-fatal catch block below.
     if (pushPublisher) {
+      let leagueSport = 'baseball';
+      try {
+        const [leagueRow] = await runWithPublicClient(
+          getDbOptions(),
+          async (db) =>
+            db
+              .select({ sport: PublicSchema.leagues.sport })
+              .from(PublicSchema.leagues)
+              .where(eq(PublicSchema.leagues.id, leagueId))
+              .limit(1),
+        );
+        leagueSport = leagueRow?.sport ?? 'baseball';
+      } catch (sportLookupErr) {
+        LOGGER.warn(
+          'Could not fetch league sport for push notification, defaulting to baseball',
+          {
+            leagueId,
+            error:
+              sportLookupErr instanceof Error
+                ? sportLookupErr.message
+                : String(sportLookupErr),
+          },
+        );
+      }
       try {
         await pushPublisher.publish({
           userId: message.payload.requestedBy,
           notificationType: 'draft_completed',
           title: 'Draft Complete',
           body: `Your ${selectionMethod} draft for league ${leagueId} has been completed. Check your roster!`,
-          data: { leagueId },
+          data: { leagueId, sport: leagueSport },
         });
         addBreadcrumb('Push notification queued for draft completion', {
           leagueId,

@@ -763,6 +763,7 @@ builder.mutationField('proposeTrade', (t) =>
                 data: {
                   leagueId,
                   tradeOfferId: newTrade.id,
+                  sport: leagueCheck.sport,
                 },
               });
             } catch (pushErr) {
