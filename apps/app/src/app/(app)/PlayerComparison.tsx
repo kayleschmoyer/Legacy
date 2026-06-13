@@ -1,14 +1,11 @@
 import React from 'react';
-import { Spinner, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import {
   PLAYER_COMPARISON_FEATURE_DESCRIPTION as FEATURE_DESCRIPTION,
   PlayerComparison,
 } from '@legacy-sports/shared-components';
-import { PremiumGate } from '../../features/subscription/PremiumGate';
-import { useSubscription } from '../../features/subscription/useSubscription';
+import { withPremiumScreen } from '../../features/subscription/withPremiumScreen';
 
-const BRAND_GOLD = '#B8962E';
 const FEATURE_NAME = 'Player Comparison';
 
 /**
@@ -18,35 +15,23 @@ const FEATURE_NAME = 'Player Comparison';
  * gating and navigation, achieving full web/mobile parity (4-player columns,
  * scoring projections, season breakdowns, achievements).
  */
-export default function PlayerComparisonScreen(): React.JSX.Element {
+function PlayerComparisonContent({
+  isPremium,
+}: {
+  isPremium: boolean;
+}): React.JSX.Element {
   const router = useRouter();
-  const { isPremium, loading } = useSubscription();
-
-  if (loading) {
-    return (
-      <YStack
-        flex={1}
-        alignItems="center"
-        justifyContent="center"
-        backgroundColor="$background"
-      >
-        <Spinner size="large" color={BRAND_GOLD} />
-      </YStack>
-    );
-  }
-
   return (
-    <PremiumGate
+    <PlayerComparison
       isPremium={isPremium}
-      featureName={FEATURE_NAME}
-      featureDescription={FEATURE_DESCRIPTION}
-    >
-      <PlayerComparison
-        isPremium={isPremium}
-        onUpgrade={() => router.navigate('/subscription-settings')}
-      />
-    </PremiumGate>
+      onUpgrade={() => router.navigate('/subscription-settings')}
+    />
   );
 }
+
+export default withPremiumScreen(PlayerComparisonContent, {
+  featureName: FEATURE_NAME,
+  featureDescription: FEATURE_DESCRIPTION,
+});
 
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

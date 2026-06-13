@@ -7,6 +7,8 @@ export { default as SubscriptionSettingsScreen } from './SubscriptionSettingsScr
 export { useSubscription } from './useSubscription';
 export { PREMIUM_FEATURES } from './constants';
 export { AndroidSubscriptionScreen } from './AndroidSubscriptionScreen';
+export { withPremiumScreen } from './withPremiumScreen';
+export type { PremiumScreenOptions } from './withPremiumScreen';
 export {
   useGooglePlayBilling,
   GOOGLE_PLAY_PRODUCTS,
