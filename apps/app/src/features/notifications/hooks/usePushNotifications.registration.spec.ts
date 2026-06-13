@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 import { usePushNotifications } from './usePushNotifications';
 
@@ -7,6 +7,12 @@ import { usePushNotifications } from './usePushNotifications';
 const mockGetExpoPushTokenAsync = jest
   .fn<Promise<{ data: string }>, [unknown?]>()
   .mockResolvedValue({ data: 'expo-token' });
+const mockGetPermissionsAsync = jest
+  .fn<Promise<{ status: string }>, []>()
+  .mockResolvedValue({ status: 'granted' });
+const mockRequestPermissionsAsync = jest
+  .fn<Promise<{ status: string }>, []>()
+  .mockResolvedValue({ status: 'granted' });
 const mockRegisterDeviceToken = jest.fn().mockResolvedValue({});
 const mockLoggerInfo = jest.fn();
 const mockLoggerError = jest.fn();
@@ -28,8 +34,8 @@ jest.mock('expo-notifications', () => ({
   })),
   addPushTokenListener: (cb: () => void) => mockAddPushTokenListener(cb),
   getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
-  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
-  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getPermissionsAsync: () => mockGetPermissionsAsync(),
+  requestPermissionsAsync: () => mockRequestPermissionsAsync(),
   setNotificationChannelAsync: jest.fn().mockResolvedValue(null),
   getExpoPushTokenAsync: (options?: unknown) =>
     mockGetExpoPushTokenAsync(options),
@@ -53,8 +59,25 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
+type AppStateChangeHandler = (state: string) => void;
+let appStateListeners: AppStateChangeHandler[] = [];
+const mockAppStateAddEventListener = jest.fn(
+  (_event: string, handler: AppStateChangeHandler) => {
+    appStateListeners.push(handler);
+    return {
+      remove: () => {
+        appStateListeners = appStateListeners.filter((h) => h !== handler);
+      },
+    };
+  },
+);
+
 jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  AppState: {
+    addEventListener: (...args: [string, AppStateChangeHandler]) =>
+      mockAppStateAddEventListener(...args),
+  },
 }));
 
 jest.mock('../../../common/utilities/DeviceUtils', () => ({
@@ -82,6 +105,7 @@ jest.mock('@legacy-sports/logging', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockExtra = {};
+  appStateListeners = [];
 });
 
 describe('usePushNotifications — token registration', () => {
@@ -121,6 +145,30 @@ describe('usePushNotifications — token registration', () => {
 
     expect(mockGetExpoPushTokenAsync).not.toHaveBeenCalled();
     expect(mockRegisterDeviceToken).not.toHaveBeenCalled();
+  });
+
+  it('re-registers when app returns to foreground after permissions granted', async () => {
+    mockGetPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
+    mockRequestPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
+    mockExtra = { eas: { projectId: 'proj-9999' } };
+
+    renderHook(() => usePushNotifications(1));
+
+    // First run: permission denied, token should NOT be registered
+    await waitFor(() => expect(mockGetPermissionsAsync).toHaveBeenCalled());
+    expect(mockRegisterDeviceToken).not.toHaveBeenCalled();
+
+    // User grants permission in system settings and returns to app
+    mockGetPermissionsAsync.mockResolvedValueOnce({ status: 'granted' });
+    void act(() => {
+      appStateListeners.forEach((handler) => handler('active'));
+    });
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledWith({
+        variables: { input: { deviceToken: 'expo-token', platform: 'ios' } },
+      }),
+    );
   });
 });
 

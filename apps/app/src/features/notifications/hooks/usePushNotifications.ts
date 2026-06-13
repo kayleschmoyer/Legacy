@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import {
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
@@ -134,6 +134,18 @@ export function usePushNotifications(userId: number | null | undefined) {
   useEffect(() => {
     const subscription = addPushTokenListener(() => {
       void registerToken();
+    });
+    return () => subscription.remove();
+  }, [registerToken]);
+
+  // Re-run registration when the app returns to foreground so that tokens are
+  // sent after a user grants permissions in system settings then re-opens the
+  // app (LS-4976).
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void registerToken();
+      }
     });
     return () => subscription.remove();
   }, [registerToken]);

@@ -40,6 +40,7 @@ jest.mock('expo-constants', () => ({
 
 jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  AppState: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
 }));
 
 jest.mock('../../../common/utilities/DeviceUtils', () => ({
