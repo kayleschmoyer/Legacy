@@ -109,6 +109,7 @@ export function CommissionerScreen({
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
           isPremium={isPremium}
+          onUpgrade={() => router.navigate('/subscription-settings')}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />

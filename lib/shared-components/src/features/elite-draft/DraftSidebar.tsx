@@ -10,13 +10,7 @@ import { BaseballCard } from './BaseballCard';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { CurrentPickPanel } from './CurrentPickPanel';
-// PremiumGate is web-specific; use a simple pass-through that renders children.
-const PremiumGate: React.FC<{
-  isPremium: boolean;
-  featureName: string;
-  featureDescription?: string;
-  children: React.ReactNode;
-}> = ({ children }) => children as React.JSX.Element;
+import { PremiumGate } from '../../components/PremiumGate';
 
 interface DraftSidebarProps {
   // Draft status

@@ -189,6 +189,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
           isPremium={isPremium}
+          onUpgrade={() => navigate('/profile/subscription')}
           onSuccess={(msg) => {
             onSettingsError(null);
             onSettingsSuccess(msg);

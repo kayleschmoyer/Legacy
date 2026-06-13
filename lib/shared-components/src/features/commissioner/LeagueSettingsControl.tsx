@@ -14,42 +14,7 @@ import { AlertTriangle, Check, Lock, Settings } from '@tamagui/lucide-icons';
 import { useUpdateLeagueSettingsMutation } from '../../api/db/graphql.generated';
 import { GAMES_PER_MATCHUP_BY_SPORT } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
-
-// PremiumGate enforces premium access for specific sections. On non-premium
-// leagues, it shows a locked/upgrade UI instead of the underlying controls.
-const PremiumGate: React.FC<{
-  isPremium: boolean;
-  featureName: string;
-  featureDescription?: string;
-  children: React.ReactNode;
-}> = ({ isPremium, featureName, featureDescription, children }) => {
-  if (isPremium) {
-    return children as React.JSX.Element;
-  }
-
-  return (
-    <Card
-      bordered
-      padding="$3"
-      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.04)}
-    >
-      <YStack gap="$2">
-        <XStack alignItems="center" gap="$2">
-          <Lock color={BRAND_NAVY_LIGHT} size={16} />
-          <Text fontWeight="600">{featureName}</Text>
-        </XStack>
-        {featureDescription ? (
-          <Text fontSize="$2" color="$gray10">
-            {featureDescription}
-          </Text>
-        ) : null}
-        <Text fontSize="$2" color="$gray11">
-          Available with Premium leagues.
-        </Text>
-      </YStack>
-    </Card>
-  );
-};
+import { PremiumGate } from '../../components/PremiumGate';
 
 export interface LeagueSettingsControlProps {
   leagueId: number;
@@ -69,6 +34,8 @@ export interface LeagueSettingsControlProps {
   currentSalaryCap?: number | null;
   /** Whether the current user has premium access. Passed down from the host app. */
   isPremium?: boolean;
+  /** Optional upgrade callback forwarded to the PremiumGate. Callers supply platform-specific navigation. */
+  onUpgrade?: () => void;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -136,6 +103,7 @@ export function LeagueSettingsControl({
   currentSalaryCapEnabled = false,
   currentSalaryCap = null,
   isPremium = false,
+  onUpgrade,
   onSuccess,
   onError,
 }: LeagueSettingsControlProps) {
@@ -877,6 +845,7 @@ export function LeagueSettingsControl({
                 isPremium={isPremium}
                 featureName="Advanced Playoff Format"
                 featureDescription="Unlock 6-team and 8-team playoff brackets with wildcard rounds for deeper post-season competition."
+                onUpgrade={onUpgrade}
               >
                 <YStack gap="$2">
                   <YStack gap="$1">
@@ -1009,6 +978,7 @@ export function LeagueSettingsControl({
             isPremium={isPremium}
             featureName="Salary Cap"
             featureDescription="Track player salaries and enforce roster spending caps to create a competitive salary cap league."
+            onUpgrade={onUpgrade}
           >
             <YStack gap="$3">
               <Text fontWeight="600" fontSize="$4">
