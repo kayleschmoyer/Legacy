@@ -34,6 +34,8 @@ const DEPTH_SLOTS: Array<{ pos: string; label: string; slots: number }> = [
 ];
 
 type ViewMode = 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
+type SortKey = string;
+type SortDir = 'asc' | 'desc';
 
 interface DraftPlayerBoardProps {
   viewMode: ViewMode;
@@ -125,6 +127,57 @@ export function DraftPlayerBoard({
 
   // O(1) watchlist lookup — avoids O(n) Array.includes per card per render
   const watchlistSet = useMemo(() => new Set(watchlist), [watchlist]);
+
+  // Preserves each player's original rank (1-based position in filteredPlayers)
+  // so the Rank column stays accurate even when the table is sorted by another column.
+  const rankMap = useMemo(
+    () => new Map(filteredPlayers.map((p, i) => [p.id, i + 1])),
+    [filteredPlayers],
+  );
+
+  // Data table sorting
+  const [sortKey, setSortKey] = useState<SortKey>('rank');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const handleHeaderClick = useCallback((key: SortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return key;
+      }
+      setSortDir('desc');
+      return key;
+    });
+  }, []);
+
+  const sortedPlayers = useMemo(() => {
+    if (sortKey === 'rank') return filteredPlayers;
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...filteredPlayers].sort((a, b) => {
+      let aVal: number | string;
+      let bVal: number | string;
+      if (sortKey === 'name') {
+        aVal = a.name;
+        bVal = b.name;
+      } else if (sortKey === 'position') {
+        aVal = a.position ?? '';
+        bVal = b.position ?? '';
+      } else if (sortKey === 'adp') {
+        aVal = (a as DraftPlayer & { adp?: number }).adp ?? Infinity;
+        bVal = (b as DraftPlayer & { adp?: number }).adp ?? Infinity;
+      } else {
+        const col = STAT_COLUMNS_BY_SPORT[sport].find(
+          (c) => c.label === sortKey,
+        );
+        aVal = col ? col.sortValue(a) : 0;
+        bVal = col ? col.sortValue(b) : 0;
+      }
+      if (typeof aVal === 'string') {
+        return dir * aVal.localeCompare(bVal as string);
+      }
+      return dir * (aVal - (bVal as number));
+    });
+  }, [filteredPlayers, sortKey, sortDir, sport]);
 
   // Stable callbacks passed to PlayerCard to prevent re-renders via React.memo
   const handleDraftPlayer = useCallback(
@@ -345,20 +398,74 @@ export function DraftPlayerBoard({
             <table className="d-data-table">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th>Player</th>
-                  <th>Pos</th>
-                  <th className="num">ADP</th>
+                  {(
+                    [
+                      { key: 'rank', label: 'Rank', className: '' },
+                      { key: 'name', label: 'Player', className: '' },
+                      { key: 'position', label: 'Pos', className: '' },
+                      { key: 'adp', label: 'ADP', className: 'num' },
+                    ] as Array<{
+                      key: string;
+                      label: string;
+                      className: string;
+                    }>
+                  ).map(({ key, label, className }) => (
+                    <th
+                      key={key}
+                      className={[
+                        className,
+                        sortKey === key ? 'sort-active' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onClick={() => handleHeaderClick(key)}
+                      aria-sort={
+                        sortKey === key
+                          ? sortDir === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
+                    >
+                      {label}
+                      {sortKey === key && (
+                        <span className="d-sort-arrow" aria-hidden="true">
+                          {sortDir === 'asc' ? ' ↑' : ' ↓'}
+                        </span>
+                      )}
+                    </th>
+                  ))}
                   {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
-                    <th key={col.label} className="num">
+                    <th
+                      key={col.label}
+                      className={[
+                        'num',
+                        sortKey === col.label ? 'sort-active' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onClick={() => handleHeaderClick(col.label)}
+                      aria-sort={
+                        sortKey === col.label
+                          ? sortDir === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
+                    >
                       {col.label}
+                      {sortKey === col.label && (
+                        <span className="d-sort-arrow" aria-hidden="true">
+                          {sortDir === 'asc' ? ' ↑' : ' ↓'}
+                        </span>
+                      )}
                     </th>
                   ))}
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {filteredPlayers.map((player, idx) => {
+                {sortedPlayers.map((player, idx) => {
                   const posColor = getPositionColor(
                     'baseball',
                     player.position ?? '',
@@ -376,7 +483,7 @@ export function DraftPlayerBoard({
                         className="num"
                         style={{ color: 'var(--d-text-muted)', fontSize: 11 }}
                       >
-                        {idx + 1}
+                        {rankMap.get(player.id) ?? idx + 1}
                       </td>
                       <td>
                         <span style={{ fontWeight: 600, fontSize: 13 }}>
@@ -428,7 +535,7 @@ export function DraftPlayerBoard({
                     </tr>
                   );
                 })}
-                {filteredPlayers.length === 0 && !availablePlayersLoading && (
+                {sortedPlayers.length === 0 && !availablePlayersLoading && (
                   <tr>
                     <td
                       colSpan={10}

@@ -386,6 +386,9 @@ export const CSS = `
   cursor: pointer; user-select: none; white-space: nowrap;
 }
 .d-data-table th:hover { color: var(--d-text); }
+.d-data-table th.sort-active { color: var(--d-accent); }
+.d-data-table th.sort-active:hover { color: var(--d-accent); }
+.d-sort-arrow { font-style: normal; }
 .d-data-table th.num, .d-data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .d-data-table td {
   font-size: 12px; color: var(--d-text); padding: 8px 12px;
