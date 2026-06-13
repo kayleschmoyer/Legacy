@@ -466,11 +466,16 @@ async function handleConnect(
           ),
         );
 
-        // Send current online list back to the newly connected client
+        // Send current online list back to the newly connected client,
+        // including the connecting user themselves so they appear as online
+        // in their own draft board view.
         const userListMsg = {
           type: 'USER_LIST',
           leagueId,
-          users: peers.map((p) => ({ userId: p.userId, username: p.username })),
+          users: [
+            ...peers.map((p) => ({ userId: p.userId, username: p.username })),
+            { userId, username },
+          ],
         };
         await sendMessageToConnection(endpoint, connectionId, userListMsg);
       } catch (presenceErr) {

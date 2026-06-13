@@ -433,6 +433,32 @@ describe('WebSocket Lambda Handler', () => {
 
       // Should have sent messages via API Gateway (USER_JOINED to peer, USER_LIST to new conn)
       expect(mockApiGatewaySend).toHaveBeenCalled();
+
+      // USER_LIST sent to the new connection must include the peer AND self (userId: 42)
+      // so the connecting user appears as online in their own draft board view.
+      type PostCmd = { input?: { ConnectionId?: string; Data?: Buffer } };
+      type ParsedMsg = {
+        type: string;
+        users?: { userId: number; username: string }[];
+      };
+      const sentToNewConn = (
+        mockApiGatewaySend.mock.calls as PostCmd[][]
+      ).flatMap((args) => {
+        const cmd = args[0];
+        if (cmd.input?.ConnectionId !== 'new-conn' || !cmd.input.Data)
+          return [];
+        return [JSON.parse(cmd.input.Data.toString()) as ParsedMsg];
+      });
+
+      const userListMsg = sentToNewConn.find((m) => m?.type === 'USER_LIST');
+      expect(userListMsg).toBeDefined();
+      expect(userListMsg?.users).toEqual(
+        expect.arrayContaining([
+          { userId: 99, username: 'peer' },
+          { userId: 42, username: 'testuser' },
+        ]),
+      );
+      expect(userListMsg?.users).toHaveLength(2);
     });
   });
 
