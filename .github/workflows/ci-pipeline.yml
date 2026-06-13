@@ -968,6 +968,47 @@ jobs:
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
           failure-threshold: "lint,format,test,build,custom-checks,lockfile-check,e2e-testing"
 
+      # Aggregate "CI Gate" required status (LS-7991, Phase 2 of LS-7988).
+      # Posts ONE commit status per head SHA folding the granular job results,
+      # so the merge gate evaluates a single unambiguous context instead of the
+      # 5 granular CI check-RUN names (which accumulate cancelled duplicates
+      # under concurrency cancellation and 405 genuinely-green PRs). A commit
+      # status — not a check run — is used deliberately: GitHub evaluates the
+      # latest status per context and has no "cancelled" status state, so it
+      # cannot latch onto a stale duplicate. Computation + SHA-currency guard
+      # live in .github/scripts/ci-gate.js (unit-tested). This runs only on
+      # PR-scoped events and only when summarize itself runs (always() &&
+      # !cancelled() on this job), so a cancelled CI run never posts a verdict.
+      #
+      # STAGED ROLLOUT: `CI Gate` is added to .github/ruleset.json AHEAD OF LIVE
+      # (additive, alongside the granular names) and only becomes enforced when
+      # the owner runs scripts/apply-ruleset.sh. Until then it is informational.
+      # See docs/ci-cd/ci-gate-aggregator.md.
+      - name: "Post CI Gate aggregate status"
+        if: always() && github.event.pull_request.number
+        # Never let a transient status-post failure (or a fork PR's read-only
+        # GITHUB_TOKEN) fail the summarize job — CI Gate is informational during
+        # bake, and once required a missing status blocks merge on its own.
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          GATE_RESULTS: |
+            {
+              "lint":           "${{ needs.lint.result }}",
+              "format":         "${{ needs.format.result }}",
+              "test":           "${{ needs.test.result }}",
+              "build":          "${{ needs.build.result }}",
+              "custom-checks":  "${{ needs.custom-checks.result }}",
+              "lockfile-check": "${{ needs.lockfile-check.result }}",
+              "e2e":            "${{ needs.e2e.result }}"
+            }
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { postCiGate } = require('./.github/scripts/ci-gate.js');
+            const results = JSON.parse(process.env.GATE_RESULTS);
+            await postCiGate({ github, context, core, results });
+
       - name: "Deployment Gate"
         id: deployment-gate
         if: >-

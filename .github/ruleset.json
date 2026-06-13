@@ -81,6 +81,11 @@
             "_comment": "Hermetic e2e affected-selection merge gate (LS-7846). Stable-named aggregation job (ci-pipeline.yml job `e2e-affected`) over the dynamically-sharded `e2e` job — passes when e2e succeeded or was legitimately skipped, fails when any e2e shard failed. Makes hermetic e2e regressions (in @critical OR the PR's affected area, selected via apps/web-e2e/src/e2e-surface-map.json) block merge instead of leaking to the nightly. A single fixed context is required here because the underlying e2e job's shard count (and therefore its per-shard check names) varies per PR. ADDED IN CONFIG AHEAD OF LIVE: a maintainer must run `bash scripts/apply-ruleset.sh` to push this into the live ruleset — until then check-ruleset.yml (a non-required drift check) will report drift, and this PR is gated only by the 8 previously-live required checks. See docs/decisions/0012-pr-ci-e2e-coverage.md.",
             "_calledWorkflow": true,
             "context": "🚀 CI Pipeline / e2e-affected"
+          },
+          {
+            "_comment": "Aggregate CI Gate (LS-7991, Phase 2 of LS-7988). A single commit status posted once per head SHA by the CI Pipeline summarize job (.github/scripts/ci-gate.js), folding the granular lint/format/test/build/custom-checks/lockfile-check/e2e results. It exists to collapse the 5 granular '🚀 CI Pipeline / *' required CHECK-RUN names — whose cancelled duplicates under concurrency cancellation 405 genuinely-green PRs (the root cause in LS-7988) — into ONE unambiguous status context. A commit status is used (not a check run) because GitHub evaluates the latest status per context and has no 'cancelled' status state, so the duplicate-required-name ambiguity cannot recur. ADDED IN CONFIG AHEAD OF LIVE (additive — alongside the granular names): a maintainer runs `bash scripts/apply-ruleset.sh` to push it into the live required set. Until then it is INFORMATIONAL and check-ruleset.yml (a non-required drift check) reports drift — expected, mirroring the e2e-affected precedent above. The final cutover (removing the 5 granular names, keeping CI Gate + bot-review + No Merge Conflicts + Verify All Migrations Applied) is owner-gated and NOT done here. Rollout + rollback: docs/ci-cd/ci-gate-aggregator.md.",
+            "_commitStatus": true,
+            "context": "CI Gate"
           }
         ]
       }

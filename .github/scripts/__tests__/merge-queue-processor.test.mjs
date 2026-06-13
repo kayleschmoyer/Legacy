@@ -47,14 +47,33 @@ function makePR(overrides = {}) {
   };
 }
 
+// A single passing non-lightweight check run so CI is considered "done" by
+// default (used when a test does not supply its own `checkRuns`).
+const DEFAULT_CHECK_RUNS = [
+  {
+    name: 'CI Pipeline',
+    status: 'completed',
+    conclusion: 'success',
+    completed_at: '2026-01-01T00:00:00Z',
+    started_at: '2026-01-01T00:00:00Z',
+  },
+];
+
 // Builds a minimal GitHub mock. `reviews` controls what listReviews returns;
 // `unresolvedThreads` controls the reviewThreads GraphQL response;
 // `pr` overrides the PR returned by paginate/get.
+// `checkRuns` / `commitStatuses` override the check runs and commit statuses
+// posted to the head SHA; `branchRules` overrides the ruleset rules returned by
+// GET /repos/.../rules/branches/{branch} (null/[] → no required checks → the
+// processor evaluates all checks).
 function makeGithub({
   reviews = [],
   unresolvedThreads = [],
   reviewDecision = 'APPROVED',
   pr = makePR(),
+  checkRuns = DEFAULT_CHECK_RUNS,
+  commitStatuses = [],
+  branchRules = [],
 } = {}) {
   const calls = { merges: [], comments: [], updateBranch: [] };
 
@@ -109,27 +128,15 @@ function makeGithub({
         dismissReview: async () => {},
       },
       repos: {
-        // 404 → no branch protection → evaluate all checks
+        // 404 → no classic branch protection. Required checks (if any) come
+        // from the ruleset via github.request below.
         getBranchProtection: async () => {
           throw Object.assign(new Error('Not Found'), { status: 404 });
         },
-        listCommitStatusesForRef: async () => ({ data: [] }),
+        listCommitStatusesForRef: async () => ({ data: commitStatuses }),
       },
       checks: {
-        // Return one non-lightweight passing check so CI is considered done
-        listForRef: async () => ({
-          data: {
-            check_runs: [
-              {
-                name: 'CI Pipeline',
-                status: 'completed',
-                conclusion: 'success',
-                completed_at: '2026-01-01T00:00:00Z',
-                started_at: '2026-01-01T00:00:00Z',
-              },
-            ],
-          },
-        }),
+        listForRef: async () => ({ data: { check_runs: checkRuns } }),
       },
       issues: {
         listComments: async () => ({ data: [] }),
@@ -144,8 +151,16 @@ function makeGithub({
       git: { deleteRef: async () => {} },
     },
 
-    // self-retry dispatch — never fires in tests (eventName is workflow_run)
-    request: async () => {},
+    // Serves the ruleset endpoint (GET /repos/.../rules/branches/{branch}) so
+    // getRequiredChecks can resolve required-check names. Any other request
+    // (e.g. the self-retry workflow_dispatch) resolves to an empty object;
+    // self-retry never fires in tests anyway (eventName is workflow_run).
+    request: async (route) => {
+      if (typeof route === 'string' && route.includes('/rules/branches/')) {
+        return { data: branchRules ?? [] };
+      }
+      return {};
+    },
   };
 
   return { github, calls };
@@ -798,6 +813,165 @@ describe('merge-queue-processor — log sanitization (LS-4181)', () => {
     assert.ok(
       /from-error-message/.test(all),
       'sanitized output should still contain the underlying message',
+    );
+  });
+});
+
+// ── LS-7991 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — CI Gate aggregator ruleset (LS-7991)', () => {
+  // Ruleset that requires ONLY the aggregate `CI Gate` commit status (the
+  // step-3 target state), as returned by GET /repos/.../rules/branches/{branch}.
+  const CI_GATE_ONLY_RULES = [
+    {
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: [{ context: 'CI Gate' }],
+      },
+    },
+  ];
+
+  // Cancelled + duplicate terminal check-RUNS for the OLD granular required
+  // names on the head SHA — the exact shape that 405s a green PR today
+  // (LS-7988). With a CI-Gate-only ruleset these are no longer required names,
+  // so the processor filters them out entirely.
+  const CANCELLED_GRANULAR_DUPLICATES = [
+    {
+      name: '🚀 CI Pipeline / lint',
+      status: 'completed',
+      conclusion: 'cancelled',
+      completed_at: '2026-01-01T00:01:00Z',
+      started_at: '2026-01-01T00:00:00Z',
+    },
+    {
+      name: '🚀 CI Pipeline / lint',
+      status: 'completed',
+      conclusion: 'success',
+      completed_at: '2026-01-01T00:02:00Z',
+      started_at: '2026-01-01T00:01:30Z',
+    },
+    {
+      name: '🚀 CI Pipeline / test',
+      status: 'completed',
+      conclusion: 'cancelled',
+      completed_at: '2026-01-01T00:01:00Z',
+      started_at: '2026-01-01T00:00:00Z',
+    },
+  ];
+
+  it('merges a green PR whose SHA carries cancelled granular duplicates (CI Gate passing)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+      branchRules: CI_GATE_ONLY_RULES,
+      checkRuns: CANCELLED_GRANULAR_DUPLICATES,
+      commitStatuses: [
+        {
+          context: 'CI Gate',
+          state: 'success',
+          created_at: '2026-01-01T00:03:00Z',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'CI Gate success should allow merge despite cancelled granular duplicates',
+    );
+    assert.strictEqual(
+      calls.comments.filter((c) => c.body?.includes('Cannot Merge')).length,
+      0,
+      'should not post a blocker comment',
+    );
+  });
+
+  it('blocks merge when the CI Gate commit status itself failed', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+      branchRules: CI_GATE_ONLY_RULES,
+      checkRuns: CANCELLED_GRANULAR_DUPLICATES,
+      commitStatuses: [
+        {
+          context: 'CI Gate',
+          state: 'failure',
+          created_at: '2026-01-01T00:03:00Z',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      0,
+      'a failing CI Gate must block the merge',
+    );
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes('CI Gate')),
+      'blocker comment should name the failing CI Gate check',
+    );
+  });
+
+  it('does not block on the OLD granular cancelled duplicates once CI Gate is the only required check', async () => {
+    const { github } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+      branchRules: CI_GATE_ONLY_RULES,
+      checkRuns: CANCELLED_GRANULAR_DUPLICATES,
+      commitStatuses: [
+        {
+          context: 'CI Gate',
+          state: 'success',
+          created_at: '2026-01-01T00:03:00Z',
+        },
+      ],
+    });
+
+    // Capture the blocker reason (if any) by spying on console.log.
+    const captured = [];
+    const originalLog = console.log;
+    console.log = (...args) => {
+      captured.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: true, // dry-run: validate only, never call the merge API
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    const all = captured.join('\n');
+    assert.match(all, /ready for merge/i, 'PR should validate as merge-ready');
+    assert.ok(
+      !/🚀 CI Pipeline \/ (lint|test).*cancelled/.test(all),
+      'cancelled granular duplicates must not appear as failing checks',
     );
   });
 });

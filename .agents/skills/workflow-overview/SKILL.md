@@ -128,7 +128,7 @@ Everything downstream of the ready PR is environment-neutral — see the machine
 
 - **[ci-and-merge-pipeline.md](references/ci-and-merge-pipeline.md)** — CI orchestrator + pipeline stages, manual Playwright dispatch, CI failure labels, Copilot review flow, Jira branch sync, merge queue.
 - **[post-merge-and-deploy.md](references/post-merge-and-deploy.md)** — deploy workflows, the lambda-upload CI guard, the NX_BASE race, PR previews, the web deploy pipeline, cleanup.
-- **[roles-checks-secrets.md](references/roles-and-required-checks.md)** — GitHub App separation of duties, required vs advisory checks, secrets reference.
+- **[roles-checks-secrets.md](references/roles-and-required-checks.md)** — GitHub App separation of duties, required vs advisory checks (incl. the aggregate `CI Gate`, LS-7991), secrets reference.
 
 ## Related Skills
 

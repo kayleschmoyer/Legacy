@@ -32,6 +32,8 @@ These must pass for the merge queue to process a PR:
 
 > The CI Pipeline `custom-checks` job also runs the repo-script unit suites — `pnpm test:scripts` (node `--test` over `scripts/__tests__/*.test.mjs`) and `pnpm test:scripts:ps` (the dependency-free PowerShell assertions). `pwsh` is baked into the runner AMI with an install-if-missing fallback in the job (LS-7770).
 
+> **Aggregate `CI Gate` (LS-7991, in staged rollout):** the CI Pipeline `summarize` job posts a single `CI Gate` **commit status** per head SHA (via `.github/scripts/ci-gate.js`) folding the granular `lint/format/test/build/custom-checks/lockfile-check/e2e` results. It exists to collapse the 5 granular `🚀 CI Pipeline / *` required check-RUN names — whose cancelled duplicates 405 genuinely-green PRs (LS-7988) — into one unambiguous required context. It is added to `.github/ruleset.json` **ahead-of-live** and is **informational** until the owner runs `scripts/apply-ruleset.sh`; until then `Check Ruleset Drift` reports expected drift. Full rollout + rollback: [`docs/ci-cd/ci-gate-aggregator.md`](../../../../docs/ci-cd/ci-gate-aggregator.md).
+
 ### Advisory Checks (Not Required by Branch Protection)
 
 These checks are not configured as _required_ branch protection rules, but they still produce GitHub check runs/commit statuses. The merge queue (`merge-queue.yml`) waits for all checks to complete and will block on any failing or pending check unless explicitly configured to ignore it, so failures here can still delay a queued merge.
