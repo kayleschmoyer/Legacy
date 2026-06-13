@@ -9,8 +9,7 @@ import {
 } from './LeagueDetailShell';
 import { render } from '../../test-utils';
 
-// `Settings` (commish tab) and `Roster` (member tab) are chosen so they don't
-// collide with the role-toggle labels ("Commissioner"/"Member"/"Spectator").
+// `Settings` (commish tab) and `Roster` (member tab) are chosen for clarity.
 const TABS: readonly LeagueTabDef[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster', memberOnly: true },
@@ -50,7 +49,7 @@ function renderShell(overrides: Partial<LeagueDetailShellProps> = {}) {
 }
 
 describe('LeagueDetailShell', () => {
-  it('renders the league name (role bar + hero)', () => {
+  it('renders the league name in the hero', () => {
     const { getAllByText } = renderShell();
     expect(getAllByText('Dead Ball Dynasty').length).toBeGreaterThan(0);
   });
@@ -119,13 +118,6 @@ describe('LeagueDetailShell', () => {
     const { getByText } = renderShell({ onTabChange });
     fireEvent.click(getByText('Trades'));
     expect(onTabChange).toHaveBeenCalledWith('trades');
-  });
-
-  it('fires onRoleChange when a role toggle is pressed', () => {
-    const onRoleChange = jest.fn();
-    const { getByText } = renderShell({ onRoleChange });
-    fireEvent.click(getByText('Spectator'));
-    expect(onRoleChange).toHaveBeenCalledWith('spectator');
   });
 
   it('fires onBack from the hero back link', () => {

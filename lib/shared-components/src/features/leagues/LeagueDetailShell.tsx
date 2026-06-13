@@ -64,19 +64,19 @@ export interface LeagueDetailShellProps {
   sport: Sport;
   league: HeroLeague;
 
-  // Role bar
+  // Role / season — kept for backwards compatibility with existing callers
+  // (LeagueRoleBar was removed so these are no longer consumed internally).
   role: LeagueRole;
-  onRoleChange: (role: LeagueRole) => void;
-  season: string;
-  onSeasonChange: (season: string) => void;
-  seasons: readonly SeasonOption[];
+  onRoleChange?: (role: LeagueRole) => void;
+  season?: string;
+  onSeasonChange?: (season: string) => void;
+  seasons?: readonly SeasonOption[];
 
-  // Permissions — ground-truth booleans. The role bar shows the toggle for
-  // every role the user actually holds; the hero "Commissioner" chip and the
+  // Permissions — ground-truth booleans. The hero "Commissioner" chip and the
   // permission-gated tabs use the *effective* perms derived from `role`
   // (so a commissioner viewing as a member sees the member-scoped chrome).
   isCommissioner: boolean;
-  isMember: boolean;
+  isMember?: boolean;
 
   // Tab bar
   tabs: readonly LeagueTabDef[];
@@ -742,12 +742,12 @@ export function LeagueDetailShell({
   sport,
   league,
   role,
-  onRoleChange,
-  season,
-  onSeasonChange,
-  seasons,
+  onRoleChange: _onRoleChange,
+  season: _season,
+  onSeasonChange: _onSeasonChange,
+  seasons: _seasons,
   isCommissioner,
-  isMember,
+  isMember: _isMember,
   tabs,
   activeTab,
   onTabChange,
@@ -762,7 +762,7 @@ export function LeagueDetailShell({
 }: LeagueDetailShellProps): React.JSX.Element {
   // Effective perms for the current view-as role (mirrors web v2). A
   // commissioner viewing as 'member'/'spectator' drops the commissioner chip
-  // and commissioner-only tabs without losing the role toggle itself.
+  // and commissioner-only tabs.
   const effIsCommissioner = role === 'commish' && isCommissioner;
   const effIsMember = effIsCommissioner || role === 'member';
 
@@ -771,16 +771,6 @@ export function LeagueDetailShell({
       {...(fill ? { flex: 1 } : {})}
       {...(className ? { className } : {})}
     >
-      <LeagueRoleBar
-        leagueName={league.name}
-        role={role}
-        onRoleChange={onRoleChange}
-        season={season}
-        onSeasonChange={onSeasonChange}
-        seasons={seasons}
-        isCommissioner={isCommissioner}
-        isMember={isMember}
-      />
       <YStack
         width="100%"
         maxWidth={1280}
