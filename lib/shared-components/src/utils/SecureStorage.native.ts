@@ -15,11 +15,61 @@ import type { ISecureStorage } from '../platform-components/types/auth';
 let secureStore: typeof import('expo-secure-store') | null = null;
 let initialized = false;
 
+// Internal registry key — never exposed as a user-visible key.
+const KNOWN_KEYS_REGISTRY = '__secure_storage_keys__';
+
+/**
+ * Tracks keys written through this module so `clear()` can delete them
+ * from SecureStore. Persisted under KNOWN_KEYS_REGISTRY so it survives
+ * app restarts — previously this was in-memory only, causing `clear()`
+ * to silently leave stale tokens in SecureStore after a restart.
+ */
+const knownKeys = new Set<string>();
+
+const persistKnownKeys = async (
+  store: NonNullable<typeof secureStore>,
+): Promise<void> => {
+  try {
+    await store.setItemAsync(
+      KNOWN_KEYS_REGISTRY,
+      JSON.stringify([...knownKeys]),
+    );
+  } catch (error) {
+    LOGGER.warn(
+      'Failed to persist known-keys registry to SecureStore',
+      String(error),
+    );
+  }
+};
+
 const initializeStorage = async (): Promise<void> => {
   if (initialized) return;
   initialized = true;
   try {
     secureStore = await import('expo-secure-store');
+    // Restore the known-keys registry so clear() can reach keys written
+    // in a previous session without relying on getItem being called first.
+    try {
+      const raw = await secureStore.getItemAsync(KNOWN_KEYS_REGISTRY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (
+          Array.isArray(parsed) &&
+          parsed.every((k): k is string => typeof k === 'string')
+        ) {
+          parsed.forEach((k) => knownKeys.add(k));
+        } else {
+          LOGGER.warn(
+            'known-keys registry in SecureStore had unexpected shape; ignoring',
+          );
+        }
+      }
+    } catch (error) {
+      LOGGER.warn(
+        'Failed to restore known-keys registry from SecureStore',
+        String(error),
+      );
+    }
   } catch (error) {
     LOGGER.warn(
       'Expo SecureStore not available, falling back to in-memory storage',
@@ -61,16 +111,6 @@ class InMemoryFallbackStore {
 
 const memory = new InMemoryFallbackStore();
 
-/**
- * Tracks keys we've written through this instance so `clear()` can
- * delete them from SecureStore — Expo SecureStore has no clear API.
- * This still won't reach keys written by other code paths, but for
- * the auth-token use case (every write goes through this module) it
- * is sufficient and is a strict improvement over the previous
- * memory-only `clear()`.
- */
-const knownKeys = new Set<string>();
-
 export class SecureStorage implements ISecureStorage {
   async setItem(key: string, value: string): Promise<void> {
     await initializeStorage();
@@ -79,6 +119,7 @@ export class SecureStorage implements ISecureStorage {
     if (secureStore) {
       try {
         await secureStore.setItemAsync(key, value);
+        await persistKnownKeys(secureStore);
         LOGGER.debug(`Stored item in SecureStore: ${key}`);
       } catch (error) {
         LOGGER.warn(
@@ -98,6 +139,7 @@ export class SecureStorage implements ISecureStorage {
         const value = await secureStore.getItemAsync(key);
         if (value !== null) {
           memory.set(key, value);
+          knownKeys.add(key);
           return value;
         }
       } catch (error) {
@@ -117,6 +159,7 @@ export class SecureStorage implements ISecureStorage {
     if (secureStore) {
       try {
         await secureStore.deleteItemAsync(key);
+        await persistKnownKeys(secureStore);
       } catch (error) {
         LOGGER.warn(`Failed to remove from SecureStore: ${key}`, String(error));
       }
@@ -130,10 +173,10 @@ export class SecureStorage implements ISecureStorage {
     knownKeys.clear();
     const store = secureStore;
     if (store) {
+      // expo-secure-store has no clear API — purge each tracked key plus
+      // the registry itself so it doesn't resurrect keys after a restart.
       await Promise.all(
-        keys.map((key) =>
-          // expo-secure-store has no clear API — purge each tracked key.
-          // Keys written outside this module won't be reached.
+        [...keys, KNOWN_KEYS_REGISTRY].map((key) =>
           store.deleteItemAsync(key).catch((error: unknown) => {
             LOGGER.warn(
               `Failed to remove from SecureStore during clear: ${key}`,

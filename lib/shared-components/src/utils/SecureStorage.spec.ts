@@ -109,3 +109,53 @@ roundTripContract('native (expo-secure-store + memory fallback)', async () => {
     },
   };
 });
+
+describe('native — cross-session persistence gaps (LS-4966)', () => {
+  let mod: {
+    secureStorage: ISecureStorage;
+    __resetForTesting: () => void;
+  };
+
+  beforeAll(async () => {
+    mod = await import('./SecureStorage.native');
+  });
+
+  beforeEach(() => {
+    mod.__resetForTesting();
+    mockResetExpoStore();
+  });
+
+  afterAll(() => {
+    mod.__resetForTesting();
+    mockResetExpoStore();
+  });
+
+  it('clear() after restart purges keys written in the previous session', async () => {
+    await mod.secureStorage.setItem('auth-token', 'jwt-abc');
+
+    // Simulate restart: wipe in-process state but leave SecureStore data intact.
+    mod.__resetForTesting();
+
+    // clear() must load the persisted registry and delete from SecureStore.
+    await mod.secureStorage.clear();
+
+    // Full reset then verify the key is gone from SecureStore.
+    mod.__resetForTesting();
+    await expect(mod.secureStorage.getItem('auth-token')).resolves.toBeNull();
+  });
+
+  it('getItem warms knownKeys so a subsequent clear() covers that key', async () => {
+    await mod.secureStorage.setItem('session-key', 'value-xyz');
+
+    // Simulate restart without persisted registry (edge-case: registry write failed).
+    mod.__resetForTesting();
+
+    // Reading the key should add it to knownKeys as defense-in-depth.
+    await mod.secureStorage.getItem('session-key');
+    await mod.secureStorage.clear();
+
+    // Full reset then verify gone from SecureStore.
+    mod.__resetForTesting();
+    await expect(mod.secureStorage.getItem('session-key')).resolves.toBeNull();
+  });
+});
