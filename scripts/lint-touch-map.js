@@ -215,8 +215,10 @@ function matchesPattern(file, pattern) {
     return file.startsWith(p);
   }
 
-  // Glob pattern — file glob vs directory glob
-  if (p.includes('*') || p.includes('?')) {
+  // Glob pattern — file glob vs directory glob.
+  // Brace expansion ({a,b}) counts as a glob too; without `{` here a brace
+  // pattern would fall through to the exact-match branch and never fire.
+  if (p.includes('*') || p.includes('?') || p.includes('{')) {
     if (p.endsWith('/') || p.endsWith('/*')) {
       // Directory glob (e.g. "tools/mcp/*/") — match the subtree
       const base = p.endsWith('/') ? p.slice(0, -1) : p;
@@ -389,7 +391,19 @@ If an entry is wrong, extend or correct the touch-map in the same PR.`;
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error(`lint-touch-map error: ${err.message}`);
-  process.exit(0); // advisory — never block CI on script errors
-});
+// Export the pure helpers for unit testing; only run the CLI when invoked
+// directly (node scripts/lint-touch-map.js), not when require()'d by a test.
+module.exports = {
+  extractCodePattern,
+  looksLikeFilePattern,
+  extractDocPaths,
+  parseTouchMap,
+  matchesPattern,
+};
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`lint-touch-map error: ${err.message}`);
+    process.exit(0); // advisory — never block CI on script errors
+  });
+}

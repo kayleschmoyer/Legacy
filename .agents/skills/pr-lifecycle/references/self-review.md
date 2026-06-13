@@ -27,9 +27,17 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
    This script checks for console.\*, @ts-ignore, eslint-disable, route.continue(), LOGGER.error wrapping, empty catch blocks, git ref injection, shell:true, any types, hardcoded localhost, inline gql, dev/prod ternaries, unbounded output, plus UI patterns: role=button without tabIndex (#22), transition:all (#24), inline hex colors (#25), plain Error in GraphQL resolvers (#26), and localStorage writes (#27). This covers 18 of 28 patterns from `common-review-patterns.md`. Fix any violations it reports before proceeding.
 
-3. **Read changed files in full** — not just diff hunks. Context matters for identifying dead code, missing imports, and type mismatches.
+3. **Check documentation touch-map freshness** (surfaces the gap pre-push, while you can still fix it in the same diff):
 
-4. **Check project rules** (each is a hard failure — most are now caught by `make lint-review-patterns` above, but verify these specifically):
+   ```bash
+   node scripts/lint-touch-map.js --dry-run
+   ```
+
+   `--dry-run` skips all GitHub API calls and just prints any gaps to stdout. If it reports a gap, **resolve it now** — do not wait for CI to post the `docs: touch-map gap` label. Per [documentation-freshness.md → Resolving a touch-map gap](../../dev-process/gates/documentation-freshness.md), take exactly one of: (1) update the linked doc, (2) correct/narrow the touch-map row in the same PR if it's a false positive, or (3) post a one-line justification on the PR. A clean run prints `✓ no documentation gaps`.
+
+4. **Read changed files in full** — not just diff hunks. Context matters for identifying dead code, missing imports, and type mismatches.
+
+5. **Check project rules** (each is a hard failure — most are now caught by `make lint-review-patterns` above, but verify these specifically):
    - No `console.*` — use `LOGGER` from `@legacy-sports/logging`
    - No `@ts-ignore` or `eslint-disable` — fix root causes
    - No `route.continue()` in E2E tests — use `route.fulfill()`
@@ -40,7 +48,7 @@ You are a **code reviewer** for this project. Your job is to read all changes on
      2. **Local run** — `pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts <changed-files>` (or `playwright.integration.config.ts` for integration specs), then `pnpm exec playwright show-report` to confirm. Capture the local HTML report path or a screenshot of the green summary.
         Paste the report URL (or local-run evidence) into the PR body under a `## Playwright Evidence` section before marking the PR ready for review. If the report shows any failures in the touched specs, this is a hard failure — fix the tests or the code under test and re-run until green.
 
-5. **Code quality scan**:
+6. **Code quality scan**:
    - Dead code or unused imports
    - Duplicated logic that could use an existing utility
    - Type safety gaps (any casts, missing null checks)
@@ -50,9 +58,9 @@ You are a **code reviewer** for this project. Your job is to read all changes on
    - **Stale inline comments** — after renaming a function, changing behavior, or refactoring, scan for comments that describe the old behavior. Stale comments are a consistent Copilot round-2 finding.
    - **Behavior-change documentation** — if a fix changes observable behavior (navigation, error messages, API responses), verify the PR description and any inline comments accurately describe the new behavior, not the old one.
 
-6. **Reuse check**: Could any new component use existing ones from `lib/shared-components`? Any new utility that duplicates `lib/utils`?
+7. **Reuse check**: Could any new component use existing ones from `lib/shared-components`? Any new utility that duplicates `lib/utils`?
 
-7. **Check against [common review patterns](common-review-patterns.md) (judgment-requiring patterns only)** — Step 2's `make lint-review-patterns` already caught the regex-checkable patterns. Now manually check the patterns that require semantic understanding:
+8. **Check against [common review patterns](common-review-patterns.md) (judgment-requiring patterns only)** — Step 2's `make lint-review-patterns` already caught the regex-checkable patterns. Now manually check the patterns that require semantic understanding:
    - **#3**: Header comment overclaiming test coverage
    - **#4**: Missing UNAUTHENTICATED guard test — **backend resolvers only** (`lambdas/**/*.spec.ts`). Frontend component tests (`apps/`, `lib/`) satisfy this via `skip:` guard + graceful null-data handling, not a server error code assertion. See #4 detail in `common-review-patterns.md`.
    - **#7**: `data: null` mock response — Apollo expects `{ data: { queryName: ... } }`
@@ -62,7 +70,7 @@ You are a **code reviewer** for this project. Your job is to read all changes on
    - **#23**: Collapsed/hidden content — does it use `aria-hidden` and disable `pointerEvents` when hidden? Animating height/opacity alone leaves content in the tab order
    - **#28**: Unsafe `as 'literal-union'` cast on GraphQL args or external data — should be a type guard with an allowed-values array
 
-8. **Fix issues directly** — apply fixes in the working tree, don't just report them. If a fix is ambiguous, explain the tradeoff and pick the safer option.
+9. **Fix issues directly** — apply fixes in the working tree, don't just report them. If a fix is ambiguous, explain the tradeoff and pick the safer option.
 
 ## Output (required before pushing)
 
