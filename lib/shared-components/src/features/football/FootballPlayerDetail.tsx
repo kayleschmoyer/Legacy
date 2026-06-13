@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Button, H1, Image, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
 import { formatInjuryFreshness } from './injuryFreshness';
-import { NFL_TEAMS } from '../../constants/nflTeams';
+import { FootballPlayerHeader } from './FootballPlayerHeader';
 import { GameLogsTable } from '../stats/GameLogsTable';
+import { Select } from '../../components/Select';
 import {
   AMBER,
   AMBER_LIGHT,
@@ -20,7 +21,6 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
-import { Select } from '../../components/Select';
 
 /**
  * Portable career-stats shape consumed by {@link FootballPlayerDetail}.
@@ -155,7 +155,7 @@ export interface FootballPlayerDetailPlayer {
   position?: string | null;
   nflTeam?: string | null;
   isDst?: boolean | null;
-  headshotUrl?: string | null;
+  pfrId?: string | null;
   careerStats?: FootballPlayerDetailStats | null;
   seasonStats?: FootballPlayerDetailSeasonStats | null;
   previousTeams: string[];
@@ -1105,20 +1105,11 @@ export function FootballPlayerDetail({
   onUpgrade,
   initialTab: _initialTab = 'overview',
 }: FootballPlayerDetailProps) {
-  const [headshotError, setHeadshotError] = useState(false);
-  const teamData = player?.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
   const isDst = player?.isDst ?? false;
-  const previousTeams = player?.previousTeams ?? [];
   const isIdp =
     player?.position === 'DL' ||
     player?.position === 'LB' ||
     player?.position === 'DB';
-  // Accessible name for the team-color swatch so screen readers announce the
-  // full franchise ("Kansas City Chiefs") rather than the bare abbreviation
-  // ("KC") rendered inside it (LS-6240).
-  const teamBadgeLabel = player?.nflTeam
-    ? (teamData?.fullName ?? player.nflTeam)
-    : 'Free Agent';
 
   return (
     <YStack flex={1} backgroundColor={BG_DARK}>
@@ -1174,103 +1165,7 @@ export function FootballPlayerDetail({
 
       {player && (
         <YStack padding={24} gap={20} maxWidth={640} width="100%">
-          {/* Player header */}
-          <XStack gap={12} alignItems="center">
-            {/* Headshot or team color swatch fallback */}
-            <YStack
-              width={56}
-              height={56}
-              borderRadius={10}
-              overflow="hidden"
-              accessibilityRole="image"
-              aria-label={teamBadgeLabel}
-              accessibilityLabel={teamBadgeLabel}
-              backgroundColor={
-                player.nflTeam
-                  ? (teamData?.primaryColor ?? BRAND_NAVY)
-                  : withAlpha(TEXT_MUTED, 0.2)
-              }
-              borderWidth={2}
-              borderColor={
-                player.nflTeam
-                  ? (teamData?.secondaryColor ?? BRAND_GOLD)
-                  : TEXT_MUTED
-              }
-              alignItems="center"
-              justifyContent="center"
-            >
-              {player.headshotUrl && !headshotError ? (
-                <Image
-                  source={{ uri: player.headshotUrl }}
-                  width={56}
-                  height={56}
-                  onError={() => setHeadshotError(true)}
-                  accessibilityLabel={
-                    [player.firstName, player.lastName]
-                      .filter(Boolean)
-                      .join(' ') || 'Player headshot'
-                  }
-                />
-              ) : (
-                <Text
-                  fontSize={13}
-                  fontWeight="800"
-                  color={
-                    player.nflTeam
-                      ? (teamData?.secondaryColor ?? BRAND_GOLD)
-                      : TEXT_MUTED
-                  }
-                  fontFamily={FONT_DISPLAY}
-                  textAlign="center"
-                >
-                  {player.nflTeam ?? 'FA'}
-                </Text>
-              )}
-            </YStack>
-
-            <YStack flex={1} gap={4}>
-              <H1
-                fontSize={22}
-                fontWeight="800"
-                color={TEXT_PRIMARY}
-                fontFamily={FONT_DISPLAY}
-                letterSpacing={-0.3}
-                margin={0}
-              >
-                {[player.firstName, player.lastName].filter(Boolean).join(' ')}
-              </H1>
-              <XStack gap={8} alignItems="center">
-                <YStack
-                  paddingHorizontal={8}
-                  paddingVertical={3}
-                  borderRadius={5}
-                  backgroundColor={withAlpha(BRAND_NAVY, 0.4)}
-                  borderWidth={1}
-                  borderColor={BRAND_NAVY}
-                >
-                  <Text fontSize={12} fontWeight="700" color={TEXT_PRIMARY}>
-                    {isDst ? 'DST' : (player.position ?? '?')}
-                  </Text>
-                </YStack>
-                {player.nflTeam ? (
-                  <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-                    {teamData
-                      ? `${teamData.city} · ${player.nflTeam}`
-                      : player.nflTeam}
-                  </Text>
-                ) : (
-                  <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-                    Free Agent
-                  </Text>
-                )}
-                {previousTeams.length > 0 && (
-                  <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-                    {`previously: ${previousTeams.join(', ')}`}
-                  </Text>
-                )}
-              </XStack>
-            </YStack>
-          </XStack>
+          <FootballPlayerHeader player={player} />
 
           {/* Injury-data freshness (LS-6251 / FPD-027) — hidden until synced */}
           <InjuryFreshnessBadge syncedAtIso={player.injuriesLastSyncedAt} />

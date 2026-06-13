@@ -850,7 +850,7 @@ describe('FootballPlayerDetail', () => {
     expect(screen.getByText('FA')).toBeTruthy();
   });
 
-  it('hides team abbreviation swatch when headshotUrl is provided', () => {
+  it('hides team abbreviation swatch when pfrId is provided', () => {
     const freeAgentWithPhoto: FootballPlayerDetailPlayer = {
       id: 99,
       firstName: 'Test',
@@ -858,8 +858,7 @@ describe('FootballPlayerDetail', () => {
       position: 'QB',
       isDst: false,
       nflTeam: null,
-      headshotUrl:
-        'https://www.pro-football-reference.com/req/20240117/images/headshots/TestPl00_2024.jpg',
+      pfrId: 'TestPl00_2024',
       previousTeams: [],
       careerStats: null,
       seasonStats: null,
