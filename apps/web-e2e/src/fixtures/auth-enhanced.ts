@@ -195,6 +195,16 @@ const isolated = base.extend<{ _apiIsolation: void; _coverage: void }>({
       //
       // Values match the global-setup.ts CI-mode hermetic JWT (id=1, admin).
       await page.addInitScript(() => {
+        // Restore a deterministic OAuth proxy URL for the hermetic build. The
+        // production build no longer falls back to http://localhost:5001 when
+        // VITE_OAUTH_PROXY_URL is unset (LS-4964), so the E2E build's
+        // oauthProxyUrl is '' — which breaks the Google sign-in exchange and
+        // hides the OAuth-gated "Forgot password?" link. environment.ts reads
+        // this global (gated on navigator.webdriver) before any app code runs.
+        // The value has NO /oauth suffix on purpose: tests mock
+        // http://localhost:5001/google directly (LS-8011).
+        window.__e2eOauthProxyUrl = 'http://localhost:5001';
+
         if (!window.localStorage.getItem('ls_user_profile')) {
           // Fixed far-future expiry (2100-01-01) — deterministic and never
           // expires mid-suite. Mirrors global-setup.ts / writeStorageState.

@@ -75,6 +75,27 @@ async function seedStepUp(page: import('@playwright/test').Page) {
 // must run as a non-admin free user to exercise the gated UI path.
 const freeUserTest = createCustomAuthTest('free@test.com', 'none');
 
+// LS-5030 flipped the shared-mocks `getuserbyid` baseline to
+// `subscriptionTier: 'premium'`, and useIsPremium() sources premium status from
+// the GetUserById response (not the JWT). A free-gate test must therefore pin a
+// free tier here or the gate never renders and the "Upgrade to Premium" CTA is
+// absent (LS-8011). Mirrors the shared-mocks User shape with a free tier.
+const freeUserByIdResponse = {
+  data: {
+    user: {
+      __typename: 'User',
+      id: 1,
+      email: 'free@test.com',
+      username: 'testuser',
+      name: 'Test User',
+      accessLevel: 'none',
+      avatarUrl: null,
+      subscriptionTier: null,
+      themePreference: null,
+    },
+  },
+};
+
 test.describe('PremiumGate — free user @critical', () => {
   freeUserTest(
     'free user sees blurred content with lock overlay and Upgrade button',
@@ -84,6 +105,8 @@ test.describe('PremiumGate — free user @critical', () => {
       await routeGraphQL(page, {
         getmysubscription: myFreeSubscriptionResponse(),
         mysubscription: myFreeSubscriptionResponse(),
+        // Pin the free tier — the shared-mocks baseline is now premium (LS-5030).
+        getuserbyid: freeUserByIdResponse,
         currentuser: { data: { currentUser: null } },
         // Minimal player comparison stubs so the page shell renders
         getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
@@ -109,6 +132,8 @@ test.describe('PremiumGate — free user @critical', () => {
       await routeGraphQL(page, {
         getmysubscription: myFreeSubscriptionResponse(),
         mysubscription: myFreeSubscriptionResponse(),
+        // Pin the free tier — the shared-mocks baseline is now premium (LS-5030).
+        getuserbyid: freeUserByIdResponse,
         currentuser: { data: { currentUser: null } },
         getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
       });
@@ -137,6 +162,8 @@ test.describe('PremiumGate — free user @critical', () => {
       await routeGraphQL(page, {
         getmysubscription: myFreeSubscriptionResponse(),
         mysubscription: myFreeSubscriptionResponse(),
+        // Pin the free tier — the shared-mocks baseline is now premium (LS-5030).
+        getuserbyid: freeUserByIdResponse,
         currentuser: { data: { currentUser: null } },
         getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
         getstripeprices: {

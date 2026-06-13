@@ -49,7 +49,21 @@ export interface EnvironmentConfig {
  * Derived/computed fields are handled here.
  */
 export const getEnvironmentConfig = (): EnvironmentConfig => ({
-  oauthProxyUrl: config.oauthProxy ?? '',
+  // The production build no longer falls back to http://localhost:5001 when
+  // VITE_OAUTH_PROXY_URL is unset (LS-4964 — that fallback was a MITM vector).
+  // The hermetic E2E web build sets no proxy URL, so oauthProxyUrl would be ''
+  // there, which breaks the Google sign-in exchange and hides the OAuth-gated
+  // "Forgot password?" link. The window.__e2eOauthProxyUrl global (injected via
+  // page.addInitScript before any app script runs) restores a deterministic
+  // 'http://localhost:5001' for tests only — same runtime-override pattern as
+  // websocketUrl / jiraProxyUrl below, gated on navigator.webdriver so it is
+  // inert in normal production loads (LS-8011).
+  oauthProxyUrl:
+    typeof window !== 'undefined' &&
+    navigator.webdriver === true &&
+    typeof window.__e2eOauthProxyUrl === 'string'
+      ? window.__e2eOauthProxyUrl
+      : (config.oauthProxy ?? ''),
   googleClientId: config.googleClientId ?? 'placeholder-google-client-id',
   graphqlUrl: config.graphqlHost ?? 'http://localhost:5000/graphql',
   // In E2E tests, VITE_WEBSOCKET_URL is "" (not set at build time), which

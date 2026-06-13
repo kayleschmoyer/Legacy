@@ -12,4 +12,6 @@ interface Window {
   __e2eJiraProxyUrl?: string;
   /** Giphy API key override for E2E tests — never set in production. */
   __e2eGiphyApiKey?: string;
+  /** OAuth proxy URL override for E2E tests — never set in production. */
+  __e2eOauthProxyUrl?: string;
 }
