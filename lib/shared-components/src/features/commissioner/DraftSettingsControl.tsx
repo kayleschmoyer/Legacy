@@ -11,6 +11,7 @@ import {
 } from 'tamagui';
 import { Check, Lock, Settings } from '@tamagui/lucide-icons';
 import { DateTimePicker } from '../../components/DateTimePicker';
+import { PremiumGate } from '../../components/PremiumGate';
 import {
   DRAFT_MODES,
   DRAFT_ORDERS,
@@ -37,6 +38,8 @@ export interface DraftSettingsControlProps {
   baseballHofOnly?: boolean | null | undefined;
   customEraStartYear?: number | null | undefined;
   customEraEndYear?: number | null | undefined;
+  /** Whether the current user has premium access. Gates the era filter controls. */
+  isPremium?: boolean;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
   /** Called whenever the unsaved-changes state changes. Used by parents to
@@ -121,7 +124,7 @@ function OptionSelector({
 }
 
 /**
- * DraftSettingsControl â€” Commissioner control for editing draft settings.
+ * DraftSettingsControl â€" Commissioner control for editing draft settings.
  *
  * Allows editing draft mode, selection method, draft order, and player pool
  * **only** while the draft status is `not-started`. Once the draft is queued,
@@ -136,6 +139,7 @@ export function DraftSettingsControl({
   baseballHofOnly,
   customEraStartYear,
   customEraEndYear,
+  isPremium = false,
   onSuccess,
   onError,
   onDirtyChange,
@@ -533,7 +537,7 @@ export function DraftSettingsControl({
               <H4 margin={0}>Draft Settings</H4>
               <Text fontSize="$2" color="$gray10">
                 {isDraftLocked
-                  ? 'Settings are locked â€” the draft has already been started.'
+                  ? 'Settings are locked â€" the draft has already been started.'
                   : 'Configure your draft before it begins. Settings lock once the draft starts.'}
               </Text>
             </YStack>
@@ -620,92 +624,100 @@ export function DraftSettingsControl({
               disabled={isDraftLocked || saving}
             />
 
-            {/* Era Filter */}
-            <OptionSelector
-              label="Historical Era Filter"
-              description="Restrict the draft pool to players from a specific era. Change before the draft starts."
-              options={sportEraFilters}
-              value={eraFilterLocal}
-              onChange={handleEraFilterChange}
-              disabled={isDraftLocked || saving}
-            />
+            {/* Era Filter (premium feature) */}
+            <PremiumGate
+              isPremium={isPremium}
+              featureName="Historical Era Filter"
+              featureDescription="Restrict the draft pool to players from a specific historical era."
+            >
+              <YStack gap="$4">
+                <OptionSelector
+                  label="Historical Era Filter"
+                  description="Restrict the draft pool to players from a specific era. Change before the draft starts."
+                  options={sportEraFilters}
+                  value={eraFilterLocal}
+                  onChange={handleEraFilterChange}
+                  disabled={isDraftLocked || saving}
+                />
 
-            {/* Custom era year range (LS-887) */}
-            {eraFilterLocal === 'custom' && (
-              <XStack gap="$3" alignItems="center" flexWrap="wrap">
-                <YStack flex={1} gap="$1">
-                  <Text fontSize="$2" color="$gray10">
-                    Start Year
-                  </Text>
-                  <Input
-                    size="$3"
-                    placeholder="e.g. 1940"
-                    value={
-                      customEraStartYearLocal !== undefined
-                        ? String(customEraStartYearLocal)
-                        : ''
-                    }
-                    onChangeText={(text: string) => {
-                      const year = parseInt(text, 10);
-                      const newVal = isNaN(year) ? undefined : year;
-                      setCustomEraStartYearLocal(newVal);
-                      checkChanges(
-                        draftMode,
-                        selectionMethod,
-                        draftOrder,
-                        playerPool,
-                        eraFilterLocal,
-                        hofOnlyLocal,
-                        scheduledAt,
-                        pickTimeLimitSeconds,
-                        newVal,
-                        customEraEndYearLocal,
-                      );
-                    }}
-                    keyboardType="numeric"
-                    disabled={isDraftLocked || saving}
-                    borderColor="$orange8"
-                  />
-                </YStack>
-                <Text color="$gray10" marginTop="$4">
-                  â€“
-                </Text>
-                <YStack flex={1} gap="$1">
-                  <Text fontSize="$2" color="$gray10">
-                    End Year
-                  </Text>
-                  <Input
-                    size="$3"
-                    placeholder="e.g. 1960"
-                    value={
-                      customEraEndYearLocal !== undefined
-                        ? String(customEraEndYearLocal)
-                        : ''
-                    }
-                    onChangeText={(text: string) => {
-                      const year = parseInt(text, 10);
-                      const newVal = isNaN(year) ? undefined : year;
-                      setCustomEraEndYearLocal(newVal);
-                      checkChanges(
-                        draftMode,
-                        selectionMethod,
-                        draftOrder,
-                        playerPool,
-                        eraFilterLocal,
-                        hofOnlyLocal,
-                        scheduledAt,
-                        pickTimeLimitSeconds,
-                        customEraStartYearLocal,
-                        newVal,
-                      );
-                    }}
-                    keyboardType="numeric"
-                    disabled={isDraftLocked || saving}
-                    borderColor="$orange8"
-                  />
-                </YStack>
-              </XStack>
-            )}
+                {/* Custom era year range (LS-887) */}
+                {eraFilterLocal === 'custom' && (
+                  <XStack gap="$3" alignItems="center" flexWrap="wrap">
+                    <YStack flex={1} gap="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        Start Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1940"
+                        value={
+                          customEraStartYearLocal !== undefined
+                            ? String(customEraStartYearLocal)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          const newVal = isNaN(year) ? undefined : year;
+                          setCustomEraStartYearLocal(newVal);
+                          checkChanges(
+                            draftMode,
+                            selectionMethod,
+                            draftOrder,
+                            playerPool,
+                            eraFilterLocal,
+                            hofOnlyLocal,
+                            scheduledAt,
+                            pickTimeLimitSeconds,
+                            newVal,
+                            customEraEndYearLocal,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={isDraftLocked || saving}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                    <Text color="$gray10" marginTop="$4">
+                      {'—'}
+                    </Text>
+                    <YStack flex={1} gap="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        End Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1960"
+                        value={
+                          customEraEndYearLocal !== undefined
+                            ? String(customEraEndYearLocal)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          const newVal = isNaN(year) ? undefined : year;
+                          setCustomEraEndYearLocal(newVal);
+                          checkChanges(
+                            draftMode,
+                            selectionMethod,
+                            draftOrder,
+                            playerPool,
+                            eraFilterLocal,
+                            hofOnlyLocal,
+                            scheduledAt,
+                            pickTimeLimitSeconds,
+                            customEraStartYearLocal,
+                            newVal,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={isDraftLocked || saving}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                  </XStack>
+                )}
+              </YStack>
+            </PremiumGate>
 
             {/* Hall of Fame Only */}
             <YStack gap="$2">
@@ -810,7 +822,7 @@ export function DraftSettingsControl({
                   {new Date(
                     new Date(scheduledAt).getTime() - 30 * 60 * 1000,
                   ).toLocaleString('en-US', { timeZoneName: 'short' })}
-                  {' â€” '}draft starts at{' '}
+                  {' â€" '}draft starts at{' '}
                   {new Date(scheduledAt).toLocaleString('en-US', {
                     timeZoneName: 'short',
                   })}

@@ -24,6 +24,7 @@ import { LeagueScoringEditor } from '../../../../features/baseball/LeagueScoring
 import { DeleteLeagueControl } from '../../../../features/commissioner/DeleteLeagueControl';
 import { LeagueSettingsControl } from '../../../../components/commissioner/LeagueSettingsControl';
 import { WaiverProcessControl } from '../../../../features/commissioner';
+import { PremiumGate } from '../../../../components/PremiumGate';
 import { I } from '../Icons';
 
 interface AccordSection {
@@ -217,6 +218,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
                 baseballHofOnly={league.baseballHofOnly}
                 customEraStartYear={league.customEraStartYear ?? undefined}
                 customEraEndYear={league.customEraEndYear ?? undefined}
+                isPremium={isPremium}
               />
             ) : null,
           },
@@ -300,17 +302,23 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       iconClass: 'gold',
       icon: <I.Refresh size={16} />,
       content: leagueId ? (
-        <WaiverProcessControl
-          leagueId={leagueId}
-          onSuccess={(msg) => {
-            setWaiverError(null);
-            setWaiverSuccess(msg);
-          }}
-          onError={(err) => {
-            setWaiverSuccess(null);
-            setWaiverError(err.message);
-          }}
-        />
+        <PremiumGate
+          isPremium={league.waiverType !== 'faab' || isPremium}
+          featureName="FAAB Waiver Processing"
+          featureDescription="Manually triggering FAAB waiver claim processing requires a Premium subscription."
+        >
+          <WaiverProcessControl
+            leagueId={leagueId}
+            onSuccess={(msg) => {
+              setWaiverError(null);
+              setWaiverSuccess(msg);
+            }}
+            onError={(err) => {
+              setWaiverSuccess(null);
+              setWaiverError(err.message);
+            }}
+          />
+        </PremiumGate>
       ) : null,
     },
     {

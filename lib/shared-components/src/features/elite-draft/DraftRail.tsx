@@ -125,33 +125,46 @@ export function DraftRail({
         <span aria-hidden="true">{mobileCollapsed ? '▾ Show' : '▴ Hide'}</span>
       </button>
       <div id="d-rail-content" className="d-rail-content">
-        {/* Draft Intelligence — only on user's pick */}
+        {/* Draft Intelligence — only on user's pick, premium only */}
         {isMyPick && (
           <div className="d-intel-panel">
             <div className="d-intel-title">
               Draft Intelligence
-              {isPremium && (
-                <span
-                  style={{
-                    marginLeft: 6,
-                    fontSize: 9,
-                    letterSpacing: '0.14em',
-                    color: 'var(--d-accent)',
-                    fontWeight: 700,
-                  }}
-                >
-                  ✦ PREMIUM
-                </span>
-              )}
+              <span
+                style={{
+                  marginLeft: 6,
+                  fontSize: 9,
+                  letterSpacing: '0.14em',
+                  color: 'var(--d-accent)',
+                  fontWeight: 700,
+                }}
+              >
+                ✦ PREMIUM
+              </span>
             </div>
-            <DraftIntelligence
-              draftId={draftId}
-              teamId={myTeamId}
-              currentOverallPick={currentOverallPick}
-              onDraft={
-                commPickMode && isOwner ? onCommissionerPick : onDraftPlayer
-              }
-            />
+            {isPremium ? (
+              <DraftIntelligence
+                draftId={draftId}
+                teamId={myTeamId}
+                currentOverallPick={currentOverallPick}
+                onDraft={
+                  commPickMode && isOwner ? onCommissionerPick : onDraftPlayer
+                }
+              />
+            ) : (
+              <div className="d-intel-premium-lock">
+                <span
+                  className="d-intel-lock-icon"
+                  role="img"
+                  aria-label="locked"
+                >
+                  🔒
+                </span>
+                <span className="d-intel-lock-msg">
+                  Upgrade to Premium for AI-powered draft recommendations.
+                </span>
+              </div>
+            )}
           </div>
         )}
 
