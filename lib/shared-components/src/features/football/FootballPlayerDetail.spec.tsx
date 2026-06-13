@@ -33,6 +33,8 @@ const QB_PLAYER: FootballPlayerDetailPlayer = {
   position: 'QB',
   isDst: false,
   nflTeam: 'KC',
+  headshotUrl:
+    'https://www.pro-football-reference.com/req/20240117/images/headshots/MahoPa00_2024.jpg',
   previousTeams: [],
   careerStats: {
     passing: { yds: 5000, td: 37, int: 14, rating: 105.2 },
@@ -719,6 +721,41 @@ describe('FootballPlayerDetail', () => {
       expect(screen.getAllByText('2025').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('2024').length).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  it('shows team abbreviation swatch when headshotUrl is absent', () => {
+    const freeAgent: FootballPlayerDetailPlayer = {
+      id: 99,
+      firstName: 'Test',
+      lastName: 'Player',
+      position: 'QB',
+      isDst: false,
+      nflTeam: null,
+      headshotUrl: null,
+      previousTeams: [],
+      careerStats: null,
+      seasonStats: null,
+    };
+    render(<FootballPlayerDetail player={freeAgent} />);
+    expect(screen.getByText('FA')).toBeTruthy();
+  });
+
+  it('hides team abbreviation swatch when headshotUrl is provided', () => {
+    const freeAgentWithPhoto: FootballPlayerDetailPlayer = {
+      id: 99,
+      firstName: 'Test',
+      lastName: 'Player',
+      position: 'QB',
+      isDst: false,
+      nflTeam: null,
+      headshotUrl:
+        'https://www.pro-football-reference.com/req/20240117/images/headshots/TestPl00_2024.jpg',
+      previousTeams: [],
+      careerStats: null,
+      seasonStats: null,
+    };
+    render(<FootballPlayerDetail player={freeAgentWithPhoto} />);
+    expect(screen.queryByText('FA')).toBeNull();
   });
 });
 

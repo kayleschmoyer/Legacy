@@ -819,6 +819,15 @@ FootballPlayerRef.implement({
     firstName: t.exposeString('firstName', { nullable: false }),
     lastName: t.exposeString('lastName', { nullable: false }),
     pfrId: t.exposeString('pfrId', { nullable: true }),
+    headshotUrl: t.field({
+      type: 'String',
+      nullable: true,
+      resolve: (parent) => {
+        if (!parent.pfrId) return null;
+        const year = new Date().getFullYear();
+        return `https://www.pro-football-reference.com/req/20240117/images/headshots/${parent.pfrId}_${year}.jpg`;
+      },
+    }),
     isDst: t.exposeBoolean('isDst', { nullable: false }),
     nflTeam: t.exposeString('nflTeam', { nullable: true }),
     position: t.exposeString('position', { nullable: true }),

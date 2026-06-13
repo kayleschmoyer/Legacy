@@ -1069,6 +1069,7 @@ A football player (skill, IDP, or synthetic DST) with optional season and career
 type FootballPlayer {
   careerStats: FootballCareerStats
   firstName: String!
+  headshotUrl: String
   id: Int!
   isDst: Boolean!
   lastName: String!

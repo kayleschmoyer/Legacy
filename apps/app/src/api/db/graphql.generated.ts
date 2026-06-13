@@ -941,6 +941,7 @@ export type FootballPlayer = {
   __typename?: 'FootballPlayer';
   careerStats?: Maybe<FootballCareerStats>;
   firstName: Scalars['String']['output'];
+  headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
   isDst: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
@@ -6427,6 +6428,7 @@ export type FootballPlayersQuery = {
       isDst: boolean;
       nflTeam?: string | null;
       pfrId?: string | null;
+      headshotUrl?: string | null;
       previousTeams: Array<string>;
       careerStats?: {
         __typename?: 'FootballCareerStats';
@@ -6492,6 +6494,7 @@ export type FootballPlayerQuery = {
     isDst: boolean;
     nflTeam?: string | null;
     pfrId?: string | null;
+    headshotUrl?: string | null;
     previousTeams: Array<string>;
     seasonStats?: {
       __typename?: 'FootballPlayerSeasonStats';
@@ -11610,6 +11613,7 @@ export const FootballPlayers = gql`
         isDst
         nflTeam
         pfrId
+        headshotUrl
         previousTeams
         careerStats {
           passing {
@@ -11744,6 +11748,7 @@ export const FootballPlayer = gql`
       isDst
       nflTeam
       pfrId
+      headshotUrl
       previousTeams
       seasonStats {
         passing {

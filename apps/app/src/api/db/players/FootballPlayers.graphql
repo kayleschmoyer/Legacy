@@ -18,6 +18,7 @@ query FootballPlayers(
       isDst
       nflTeam
       pfrId
+      headshotUrl
       previousTeams
       careerStats {
         passing {
@@ -69,6 +70,7 @@ query FootballPlayer($id: Int!) {
     isDst
     nflTeam
     pfrId
+    headshotUrl
     previousTeams
     seasonStats {
       passing {

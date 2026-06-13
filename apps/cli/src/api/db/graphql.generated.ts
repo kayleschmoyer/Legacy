@@ -941,6 +941,7 @@ export type FootballPlayer = {
   __typename?: 'FootballPlayer';
   careerStats?: Maybe<FootballCareerStats>;
   firstName: Scalars['String']['output'];
+  headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
   isDst: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];

@@ -620,4 +620,48 @@ describe('football resolvers', () => {
       expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
     });
   });
+
+  // ── FootballPlayer.headshotUrl (LS-6235) ────────────────────────────────────
+
+  describe('FootballPlayer.headshotUrl', () => {
+    function getResolver() {
+      const type = schema.getType('FootballPlayer') as GraphQLObjectType;
+      const field = type.getFields().headshotUrl;
+      if (!field?.resolve) throw new Error('headshotUrl resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('returns null when pfrId is null', () => {
+      const result = getResolver()(
+        { id: 1, pfrId: null },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when pfrId is an empty string', () => {
+      const result = getResolver()(
+        { id: 1, pfrId: '' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('constructs the PFR headshot URL from pfrId with the current year', () => {
+      const year = new Date().getFullYear();
+      const result = getResolver()(
+        { id: 1, pfrId: 'MahoPa00' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe(
+        `https://www.pro-football-reference.com/req/20240117/images/headshots/MahoPa00_${year}.jpg`,
+      );
+    });
+  });
 });

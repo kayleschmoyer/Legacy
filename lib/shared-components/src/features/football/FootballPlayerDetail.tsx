@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, H1, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, H1, Image, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import { GameLogsTable } from '../stats/GameLogsTable';
@@ -150,6 +150,7 @@ export interface FootballPlayerDetailPlayer {
   position?: string | null;
   nflTeam?: string | null;
   isDst?: boolean | null;
+  headshotUrl?: string | null;
   careerStats?: FootballPlayerDetailStats | null;
   seasonStats?: FootballPlayerDetailSeasonStats | null;
   previousTeams: string[];
@@ -952,6 +953,7 @@ export function FootballPlayerDetail({
   onUpgrade,
   initialTab: _initialTab = 'overview',
 }: FootballPlayerDetailProps) {
+  const [headshotError, setHeadshotError] = useState(false);
   const teamData = player?.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
   const isDst = player?.isDst ?? false;
   const previousTeams = player?.previousTeams ?? [];
@@ -1014,11 +1016,12 @@ export function FootballPlayerDetail({
         <YStack padding={24} gap={20} maxWidth={640} width="100%">
           {/* Player header */}
           <XStack gap={12} alignItems="center">
-            {/* Team color swatch */}
+            {/* Headshot or team color swatch fallback */}
             <YStack
               width={56}
               height={56}
               borderRadius={10}
+              overflow="hidden"
               accessibilityRole="image"
               aria-label={teamBadgeLabel}
               accessibilityLabel={teamBadgeLabel}
@@ -1036,19 +1039,33 @@ export function FootballPlayerDetail({
               alignItems="center"
               justifyContent="center"
             >
-              <Text
-                fontSize={13}
-                fontWeight="800"
-                color={
-                  player.nflTeam
-                    ? (teamData?.secondaryColor ?? BRAND_GOLD)
-                    : TEXT_MUTED
-                }
-                fontFamily={FONT_DISPLAY}
-                textAlign="center"
-              >
-                {player.nflTeam ?? 'FA'}
-              </Text>
+              {player.headshotUrl && !headshotError ? (
+                <Image
+                  source={{ uri: player.headshotUrl }}
+                  width={56}
+                  height={56}
+                  onError={() => setHeadshotError(true)}
+                  accessibilityLabel={
+                    [player.firstName, player.lastName]
+                      .filter(Boolean)
+                      .join(' ') || 'Player headshot'
+                  }
+                />
+              ) : (
+                <Text
+                  fontSize={13}
+                  fontWeight="800"
+                  color={
+                    player.nflTeam
+                      ? (teamData?.secondaryColor ?? BRAND_GOLD)
+                      : TEXT_MUTED
+                  }
+                  fontFamily={FONT_DISPLAY}
+                  textAlign="center"
+                >
+                  {player.nflTeam ?? 'FA'}
+                </Text>
+              )}
             </YStack>
 
             <YStack flex={1} gap={4}>
