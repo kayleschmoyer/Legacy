@@ -178,46 +178,80 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
     setSimilarBugs([]);
   }, [description]);
 
+  const addFiles = useCallback((files: File[]) => {
+    setAttachmentError('');
+    const newFiles: File[] = [];
+    for (const file of files) {
+      if (!ALLOWED_ATTACHMENT_TYPES.test(file.type)) {
+        setAttachmentError(
+          `${file.name}: unsupported type. Use images or MP4/WebM videos.`,
+        );
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setAttachmentError(
+          `${file.name} is too large (max ${String(MAX_FILE_SIZE_MB)} MB per file).`,
+        );
+        return;
+      }
+      newFiles.push(file);
+    }
+    setAttachments((prev) => {
+      const combined = [...prev, ...newFiles];
+      if (combined.length > MAX_ATTACHMENTS) {
+        setAttachmentError(
+          `Maximum ${String(MAX_ATTACHMENTS)} attachments allowed.`,
+        );
+        return combined.slice(0, MAX_ATTACHMENTS);
+      }
+      return combined;
+    });
+  }, []);
+
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
       // Reset the input so the same file can be re-selected after removal
       e.target.value = '';
-      setAttachmentError('');
-      const newFiles: File[] = [];
-      for (const file of files) {
-        if (!ALLOWED_ATTACHMENT_TYPES.test(file.type)) {
-          setAttachmentError(
-            `${file.name}: unsupported type. Use images or MP4/WebM videos.`,
-          );
-          return;
-        }
-        if (file.size > MAX_FILE_SIZE) {
-          setAttachmentError(
-            `${file.name} is too large (max ${String(MAX_FILE_SIZE_MB)} MB per file).`,
-          );
-          return;
-        }
-        newFiles.push(file);
-      }
-      setAttachments((prev) => {
-        const combined = [...prev, ...newFiles];
-        if (combined.length > MAX_ATTACHMENTS) {
-          setAttachmentError(
-            `Maximum ${String(MAX_ATTACHMENTS)} attachments allowed.`,
-          );
-          return combined.slice(0, MAX_ATTACHMENTS);
-        }
-        return combined;
-      });
+      addFiles(files);
     },
-    [],
+    [addFiles],
   );
 
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
     setAttachmentError('');
   }, []);
+
+  // Listen for paste events while the dialog is open so users can paste
+  // images directly from the clipboard instead of using the file picker.
+  useEffect(() => {
+    if (!open) return;
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imageItems = items.filter(
+        (item) => item.kind === 'file' && item.type.startsWith('image/'),
+      );
+      if (imageItems.length === 0) return;
+      e.preventDefault();
+      const pastedFiles = imageItems
+        .map((item) => {
+          const blob = item.getAsFile();
+          if (!blob) return null;
+          const ext = item.type.split('/')[1] ?? 'png';
+          return new File([blob], `pasted-image-${Date.now()}.${ext}`, {
+            type: item.type,
+          });
+        })
+        .filter((f): f is File => f !== null);
+      if (pastedFiles.length === 0) return;
+      addFiles(pastedFiles);
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [open, addFiles]);
 
   const handleSubmit = useCallback(async () => {
     if (!description.trim()) return;
@@ -619,7 +653,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                     </Paragraph>
                     <Paragraph size="$2" color="$colorPress">
                       (optional · images or videos · max {MAX_ATTACHMENTS}{' '}
-                      files, {MAX_FILE_SIZE_MB} MB each)
+                      files, {MAX_FILE_SIZE_MB} MB each · paste to attach)
                     </Paragraph>
                   </XStack>
 

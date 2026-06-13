@@ -371,6 +371,61 @@ test.describe('Bug Report Submission @regression', () => {
     await expect(page.getByText(/Thanks/)).toBeVisible();
   });
 
+  test('attachment section shows paste hint text', async ({ page }) => {
+    await expect(page.getByText(/paste to attach/i)).toBeVisible();
+  });
+
+  test('pasting an image from clipboard attaches it to the report', async ({
+    page,
+  }) => {
+    const dialog = page.getByRole('dialog');
+
+    // Simulate a paste event carrying a tiny 1×1 transparent PNG
+    await page.evaluate(() => {
+      const base64 =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'image/png' });
+      const file = new File([blob], 'screenshot.png', { type: 'image/png' });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const evt = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(evt, 'clipboardData', {
+        value: dt,
+        configurable: true,
+      });
+      window.dispatchEvent(evt);
+    });
+
+    // The pasted image file name should appear in the attachment list
+    await expect(dialog.getByText(/pasted-image/i)).toBeVisible();
+  });
+
+  test('pasting a non-image (text) does not add an attachment', async ({
+    page,
+  }) => {
+    const dialog = page.getByRole('dialog');
+
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'some copied text');
+      const evt = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(evt, 'clipboardData', {
+        value: dt,
+        configurable: true,
+      });
+      window.dispatchEvent(evt);
+    });
+
+    // No attachment should appear and no error should be shown
+    await expect(dialog.getByText(/pasted-image/i)).not.toBeVisible();
+    await expect(dialog.getByText(/unsupported type/i)).not.toBeVisible();
+  });
+
   test('server error shows an error message inside the dialog', async ({
     page,
   }) => {
