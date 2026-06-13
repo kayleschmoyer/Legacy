@@ -29,6 +29,7 @@ export const ENTITLEMENTS = {
   historical_era_filters: 'historical_era_filters',
   auction_draft: 'auction_draft',
   extended_trade_expiration: 'extended_trade_expiration',
+  advanced_football_stats: 'advanced_football_stats',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -58,6 +59,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.historical_era_filters,
     ENTITLEMENTS.auction_draft,
     ENTITLEMENTS.extended_trade_expiration,
+    ENTITLEMENTS.advanced_football_stats,
   ],
 };
 
@@ -71,6 +73,8 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   historical_era_filters: 'Historical era filters',
   auction_draft: 'Auction draft mode',
   extended_trade_expiration: 'Extended trade expiration',
+  advanced_football_stats:
+    'Advanced football stats (snap %, target share, air yards, route participation)',
 };
 
 export function tierHasEntitlement(
