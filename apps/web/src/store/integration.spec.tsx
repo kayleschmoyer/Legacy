@@ -3,12 +3,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import leagueReducer, {
+  resetLeagueState,
+  setIsCommissioner,
   setLeagueData,
   setLeagueId,
   setLeaguePositions,
+  setTeamMembers,
+  setUserTeamId,
 } from './leagueSlice';
 import { useAppDispatch, useAppSelector } from './hooks';
-import type { LeaguePositionFragment } from '../api/db/graphql.generated';
+import type {
+  LeaguePositionFragment,
+  TeamMemberFragment,
+} from '../api/db/graphql.generated';
 
 // Test component that uses Redux
 function TestComponent() {
@@ -117,6 +124,59 @@ describe('Redux integration tests', () => {
       expect(screen.getByTestId('league-name')).toHaveTextContent('none');
       expect(screen.getByTestId('positions-count')).toHaveTextContent('0');
     });
+  });
+
+  it('should clear user-specific data when resetLeagueState is dispatched (user logout scenario)', () => {
+    // Simulates: User A logs in, views league 123 as commissioner, then logs out.
+    // On logout, onLogout dispatches resetLeagueState() so User B never sees stale data.
+    const store = createTestStore();
+
+    // Populate User A's state (commissioner of league 123)
+    store.dispatch(setLeagueId(123));
+    store.dispatch(setLeagueData({ id: 123, name: 'User A League' }));
+    store.dispatch(
+      setLeaguePositions([
+        { id: 1, positionType: 'C' },
+      ] as LeaguePositionFragment[]),
+    );
+    store.dispatch(
+      setTeamMembers([{ id: 1, playerId: 100 }] as TeamMemberFragment[]),
+    );
+    store.dispatch(setUserTeamId(456));
+    store.dispatch(setIsCommissioner(true));
+
+    // Simulate logout: onLogout dispatches resetLeagueState()
+    store.dispatch(resetLeagueState());
+
+    const state = store.getState().league;
+    expect(state.leagueId).toBeNull();
+    expect(state.leagueData).toBeNull();
+    expect(state.positions).toEqual([]);
+    expect(state.teamMembers).toEqual([]);
+    expect(state.userTeamId).toBeNull();
+    expect(state.isCommissioner).toBe(false);
+  });
+
+  it('should not inherit stale league data when same league is visited after user switch', () => {
+    // When User A (commissioner of 123) logs out and User B opens league 123,
+    // setLeagueId(123) would NOT reset state because the ID hasn't changed.
+    // The fix (resetLeagueState on logout) ensures the state is already clear.
+    const store = createTestStore();
+
+    // User A's session
+    store.dispatch(setLeagueId(123));
+    store.dispatch(setIsCommissioner(true));
+    store.dispatch(setUserTeamId(456));
+
+    // Logout resets the league slice
+    store.dispatch(resetLeagueState());
+
+    // User B visits the same league
+    store.dispatch(setLeagueId(123));
+
+    const state = store.getState().league;
+    expect(state.isCommissioner).toBe(false);
+    expect(state.userTeamId).toBeNull();
   });
 
   it('should maintain state across component re-renders', async () => {

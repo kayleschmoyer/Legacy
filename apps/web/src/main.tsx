@@ -35,6 +35,7 @@ import { installConsoleErrorCapture } from './lib/consoleErrorCapture';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
 import { store } from './store/store';
+import { resetLeagueState } from './store/leagueSlice';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
 import {
   ThemeProvider,
@@ -236,9 +237,11 @@ try {
             <AuthProvider
               config={authConfig}
               onUserSwitch={async () => {
+                store.dispatch(resetLeagueState());
                 await apolloClient.resetStore();
               }}
               onLogout={() => {
+                store.dispatch(resetLeagueState());
                 void apolloClient.clearStore();
               }}
             >
