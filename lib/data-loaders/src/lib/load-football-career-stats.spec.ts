@@ -5,6 +5,8 @@ import { loadFootballCareerStats } from './load-football-career-stats';
 const mockCareerGetAllSeasonTotals = jest.fn();
 const mockCareerGetAllDefenseSeasonTotals = jest.fn();
 const mockTeamDefenseGetSeasonTotals = jest.fn();
+// Records the stats_last_fetched_at stamp (db.execute) calls.
+const mockDbExecute = jest.fn();
 
 jest.mock('@legacy-sports/pfr-client', () => ({
   CareerStats: {
@@ -117,6 +119,9 @@ function makeDb(
         },
       }),
     }),
+    // The loader stamps players.stats_last_fetched_at via db.execute after a
+    // successful load; record the call so tests can assert it happened.
+    execute: (...args: unknown[]): unknown => mockDbExecute(...args),
   } as unknown as PublicDb;
 }
 
@@ -126,6 +131,23 @@ describe('loadFootballCareerStats — stat-group routing', () => {
     mockCareerGetAllSeasonTotals.mockResolvedValue([]);
     mockCareerGetAllDefenseSeasonTotals.mockResolvedValue([]);
     mockTeamDefenseGetSeasonTotals.mockResolvedValue(null);
+    mockDbExecute.mockResolvedValue(undefined);
+  });
+
+  it('stamps stats_last_fetched_at after a successful load', async () => {
+    const db = makeDb({
+      id: 7,
+      pfrId: 'TestQb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'QB',
+      sport: 'football',
+    });
+
+    await loadFootballCareerStats(db, 7);
+
+    // The stamp (db.execute UPDATE ... stats_last_fetched_at) runs exactly once.
+    expect(mockDbExecute).toHaveBeenCalledTimes(1);
   });
 
   it('routes DST player to TeamDefense only', async () => {

@@ -376,7 +376,31 @@ export interface FootballCareerResult {
 // IDP positions that route to career_football_defense_idp
 const IDP_POSITIONS = new Set(['DL', 'LB', 'DB']);
 
+/**
+ * Load a football player's career stats and stamp players.stats_last_fetched_at
+ * so prioritized batch loaders (`load-football-career --limit`) can skip
+ * already-fetched players and resume across runs — mirroring the baseball
+ * loader. The timestamp is set only after a successful load (including a clean
+ * "no data" result); a thrown error leaves the marker untouched so the player
+ * is retried on the next run.
+ */
 export async function loadFootballCareerStats(
+  db: PublicDb,
+  playerId: number,
+  startSeasonOverride?: number,
+): Promise<FootballCareerResult> {
+  const result = await loadFootballCareerStatsInner(
+    db,
+    playerId,
+    startSeasonOverride,
+  );
+  await db.execute(
+    sql`UPDATE players SET stats_last_fetched_at = NOW() WHERE id = ${playerId}`,
+  );
+  return result;
+}
+
+async function loadFootballCareerStatsInner(
   db: PublicDb,
   playerId: number,
   startSeasonOverride?: number,

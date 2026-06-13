@@ -9,10 +9,34 @@ const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 15_000;
 const BACKOFF_MULTIPLIER = 2;
 
+// Bound every request so a stuck socket (e.g. a dropped tunnel/VPN) errors and
+// the caller can move on, instead of hanging a long backfill indefinitely.
+const REQUEST_TIMEOUT_MS = 45_000;
+
 let lastRequest: number;
 
 const responseCache = new Map<string, { data: string; timestamp: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * Build per-request axios config. PFR sits behind Cloudflare; from a non-allowed
+ * network (e.g. local dev) a valid `cf_clearance` cookie plus the *exact*
+ * matching browser User-Agent are required. When `PFR_CF_CLEARANCE` /
+ * `PFR_USER_AGENT` are set in the environment they are attached to every
+ * request, so any PFR-backed command works against live PFR without a wrapper.
+ * Unset in normal/server environments — then no auth headers are added.
+ */
+function pfrRequestConfig(): {
+  headers: Record<string, string>;
+  timeout: number;
+} {
+  const headers: Record<string, string> = {};
+  const ua = process.env.PFR_USER_AGENT;
+  const cf = process.env.PFR_CF_CLEARANCE;
+  if (ua) headers['User-Agent'] = ua;
+  if (cf) headers['Cookie'] = `cf_clearance=${cf}`;
+  return { headers, timeout: REQUEST_TIMEOUT_MS };
+}
 
 export async function getFromProFootballReference(
   url: string,
@@ -45,7 +69,7 @@ export async function getFromProFootballReference(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       LOGGER.debug(`Fetching from Pro Football Reference: ${url}`);
-      const response = await axios.get<string>(url);
+      const response = await axios.get<string>(url, pfrRequestConfig());
 
       responseCache.set(url, {
         data: response.data,

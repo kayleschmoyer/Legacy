@@ -752,6 +752,12 @@ export function buildProgram(): Command {
       'Load career stats for player IDs listed in a file (one per line)',
     )
     .option(
+      '-l, --limit <number>',
+      'Load the next N un-fetched players (never-fetched first, then oldest). ' +
+        'Resumable — run again to continue. Mirrors the baseball --prioritize-new flow.',
+      parseInt,
+    )
+    .option(
       '--start-season <year>',
       'Override start year for PFR season scan (default: 1970)',
       parseInt,
@@ -761,12 +767,14 @@ export function buildProgram(): Command {
         playerId?: number;
         all?: boolean;
         batch?: string;
+        limit?: number;
         startSeason?: number;
       }) =>
         handleLoadFootballCareer({
           playerId: options.playerId,
           all: options.all,
           batch: options.batch,
+          limit: options.limit,
           startSeason: options.startSeason,
         }),
     );

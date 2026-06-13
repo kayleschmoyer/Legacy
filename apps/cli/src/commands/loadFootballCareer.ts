@@ -6,7 +6,7 @@ import {
   PublicSchema,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -15,6 +15,12 @@ export interface HandleLoadFootballCareerArgs {
   playerId?: number;
   all?: boolean;
   batch?: string;
+  /**
+   * Load the next N un-fetched players, prioritizing never-fetched first then
+   * oldest (mirrors the baseball `--prioritize-new` flow). Resumable: the
+   * loader stamps stats_last_fetched_at, so repeated runs continue forward.
+   */
+  limit?: number;
   startSeason?: number;
 }
 
@@ -25,6 +31,26 @@ async function getFootballPlayers(db: PublicDb) {
     .select()
     .from(PublicSchema.players)
     .where(eq(PublicSchema.players.sport, 'football'));
+}
+
+/**
+ * Select the next `limit` football players to load, prioritizing those never
+ * fetched (stats_last_fetched_at IS NULL, ordered first) then the oldest. Only
+ * players with a pfrId are eligible. Backed by the timestamp the loader stamps,
+ * this makes `--limit` a resumable "load the next batch" command.
+ */
+async function getFootballPlayersPrioritized(db: PublicDb, limit: number) {
+  return await db
+    .select()
+    .from(PublicSchema.players)
+    .where(
+      and(
+        eq(PublicSchema.players.sport, 'football'),
+        isNotNull(PublicSchema.players.pfrId),
+      ),
+    )
+    .orderBy(sql`stats_last_fetched_at ASC NULLS FIRST`)
+    .limit(limit);
 }
 
 async function loadSinglePlayer(
@@ -51,10 +77,17 @@ async function loadSinglePlayer(
 export async function handleLoadFootballCareer(
   args: HandleLoadFootballCareerArgs,
 ): Promise<void> {
-  const { playerId, all, batch, startSeason } = args;
+  const { playerId, all, batch, limit, startSeason } = args;
 
-  if (!playerId && !all && !batch) {
-    LOGGER.error('One of --player-id, --all, or --batch is required');
+  if (!playerId && !all && !batch && limit === undefined) {
+    LOGGER.error('One of --player-id, --all, --batch, or --limit is required');
+    process.exit(1);
+  }
+
+  // Validate --limit up front so an invalid value (NaN/0/negative) fails loudly
+  // instead of being falsy and silently falling through to all-players mode.
+  if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+    LOGGER.error(`--limit must be a positive integer (received: ${limit})`);
     process.exit(1);
   }
 
@@ -120,6 +153,50 @@ export async function handleLoadFootballCareer(
           `${errors.length} player(s) failed:`,
           JSON.stringify(errors),
         );
+      }
+      return;
+    }
+
+    // --- Prioritized batch mode (--limit): the next N un-fetched players ---
+    if (limit !== undefined) {
+      const batchPlayers = await getFootballPlayersPrioritized(db, limit);
+      if (batchPlayers.length === 0) {
+        LOGGER.info('No football players with a pfrId to load.');
+        return;
+      }
+      LOGGER.info(
+        `Loading next ${batchPlayers.length} football player(s) ` +
+          '(never-fetched first, then oldest)',
+      );
+      const errors: Array<{ playerId: number; error: string }> = [];
+
+      for (const [index, p] of batchPlayers.entries()) {
+        LOGGER.info(
+          `[${index + 1}/${batchPlayers.length}] Player ${p.id} (${p.pfrId ?? 'no pfrId'})`,
+        );
+        const result = await loadSinglePlayer(db, p.id, startSeason);
+        if (!result.success) {
+          errors.push({ playerId: p.id, error: result.error ?? 'unknown' });
+        }
+        if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
+          clearCache();
+        }
+      }
+
+      LOGGER.info(
+        `Batch complete: ${batchPlayers.length - errors.length}/${batchPlayers.length} succeeded — run again to continue.`,
+      );
+      if (errors.length > 0) {
+        LOGGER.error(
+          `${errors.length} player(s) failed:`,
+          JSON.stringify(errors),
+        );
+      }
+      // Exit non-zero only when the entire batch failed (e.g. cookie/tunnel
+      // down) so callers/CI see the failure. Partial failures are expected for
+      // a resumable loader — failed players stay un-stamped and retry next run.
+      if (errors.length === batchPlayers.length) {
+        process.exit(1);
       }
       return;
     }
