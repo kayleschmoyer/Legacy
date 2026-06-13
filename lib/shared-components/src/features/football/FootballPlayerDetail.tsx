@@ -912,6 +912,12 @@ export interface FootballPlayerDetailProps {
   loading?: boolean;
   error?: boolean;
   /**
+   * When `true`, renders a "Player not found." message instead of player data.
+   * Set this when the player ID is invalid (non-positive integer) or when the
+   * server returns null for a valid ID. Takes no effect when `error` is also true.
+   */
+  notFound?: boolean;
+  /**
    * Called when the back affordance is pressed. Apps supply their own
    * navigation (react-router on web, expo-router on mobile); the component
    * stays platform-agnostic. The back row is hidden when omitted.
@@ -948,6 +954,7 @@ export function FootballPlayerDetail({
   player,
   loading,
   error,
+  notFound,
   onBack,
   isPremium = false,
   onUpgrade,
@@ -1008,6 +1015,14 @@ export function FootballPlayerDetail({
             fontFamily={FONT_BODY}
           >
             Failed to load player. Please try again.
+          </Text>
+        </YStack>
+      )}
+
+      {notFound && !error && (
+        <YStack padding={24}>
+          <Text fontSize={14} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            Player not found.
           </Text>
         </YStack>
       )}

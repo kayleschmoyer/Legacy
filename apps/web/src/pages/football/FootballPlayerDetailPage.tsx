@@ -22,16 +22,17 @@ export function FootballPlayerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const playerId = id ? parseInt(id, 10) : 0;
+  const isValidId = !!id && /^\d+$/.test(id) && parseInt(id, 10) > 0;
+  const playerId = isValidId ? parseInt(id, 10) : 0;
   const isPremium = useIsPremium();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const { data, loading, error } = useFootballPlayerQuery({
     variables: { id: playerId },
-    skip: !playerId,
+    skip: !isValidId,
     // Auto-refresh so injury-status changes surface without a manual reload
     // (LS-6252). Apollo pauses polling while the tab is hidden and stops it on
-    // unmount; a skipped query (no playerId) does not poll.
+    // unmount; a skipped query (invalid id) does not poll.
     pollInterval: FOOTBALL_PLAYER_DETAIL_POLL_MS,
   });
 
@@ -56,6 +57,7 @@ export function FootballPlayerDetailPage() {
 
   const player = data?.footballPlayer;
   const initialTab = resolveFootballPlayerTab(searchParams.get('tab'));
+  const notFound = !isValidId || (!loading && !error && !player);
 
   return (
     <YStack flex={1} minHeight="100vh">
@@ -74,6 +76,7 @@ export function FootballPlayerDetailPage() {
         player={player}
         loading={loading}
         error={!!error && !isAuthError}
+        notFound={notFound}
         onBack={() => {
           if (window.history.length > 1) navigate(-1);
           else navigate('/football/players');

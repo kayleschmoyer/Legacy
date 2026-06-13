@@ -174,11 +174,15 @@ test.describe('View Game Logs — Date input validation (LS-7455) @regression', 
     // On web the DateField renders <input type="date" data-testid="game-logs-start-date">
     // (no placeholder). Use getByTestId to target the correct element across platforms.
     await page.getByTestId('game-logs-start-date').fill('2099-12-31');
-    await page.getByRole('button', { name: 'Get Player Data' }).click();
 
+    // Validation is reactive — the error alert appears immediately after filling
+    // the future date; the submit button becomes disabled so we never click it.
     await expect(page.getByRole('alert')).toContainText(
       'Start date cannot be in the future',
     );
+    await expect(
+      page.getByRole('button', { name: 'Get Player Data' }),
+    ).toBeDisabled();
     expect(postCalled).toBe(false);
   });
 });

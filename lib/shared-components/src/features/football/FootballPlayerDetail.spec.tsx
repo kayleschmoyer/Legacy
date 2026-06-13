@@ -679,6 +679,19 @@ describe('FootballPlayerDetail', () => {
     expect(table.getAttribute('data-player-id')).toBe('1');
   });
 
+  it('shows "Player not found." when notFound is true', () => {
+    render(<FootballPlayerDetail player={null} notFound />);
+    expect(screen.getByText('Player not found.')).toBeTruthy();
+  });
+
+  it('does not show "Player not found." when error is also true', () => {
+    render(<FootballPlayerDetail player={null} notFound error />);
+    expect(screen.queryByText('Player not found.')).toBeNull();
+    expect(
+      screen.getByText('Failed to load player. Please try again.'),
+    ).toBeTruthy();
+  });
+
   it('accepts initialTab prop without throwing (LS-6230 URL contract)', () => {
     expect(() =>
       render(<FootballPlayerDetail player={QB_PLAYER} initialTab="advanced" />),

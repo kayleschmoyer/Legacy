@@ -243,6 +243,14 @@ export function validateDateRange(
 
   if (!hasStart && !hasEnd) return { error: null, ready: true };
 
+  if (hasStart) {
+    const todayDate = parseIsoDate(today);
+    const start = parseIsoDate(startDate);
+    if (start && todayDate && start.getTime() > todayDate.getTime()) {
+      return { error: 'Start date cannot be in the future', ready: false };
+    }
+  }
+
   if (hasStart !== hasEnd) {
     return { error: 'Please enter both a start and end date.', ready: false };
   }

@@ -1,106 +1,84 @@
 /**
- * LS-6227 — footballPlayer UNAUTHENTICATED error handling.
- * LS-6228 — back-button cold-start deep-link fallback.
- * LS-6252 — injury-status auto-refresh via Apollo pollInterval.
+ * FootballPlayerDetailPage — combined coverage.
  *
- * Covers:
+ * LS-6227 — footballPlayer UNAUTHENTICATED error handling:
  *   1. UNAUTHENTICATED GraphQL error → storeCameFrom + navigate to /login (no error banner).
  *   2. Non-auth GraphQL error → error banner rendered, no redirect.
  *   3. Successful load → player detail rendered, no error.
+ * LS-6228 — back-button cold-start deep-link fallback:
  *   4. Back press with in-app history → navigate(-1).
  *   5. Back press on cold-start deep link (empty history) → navigate('/football/players').
- *   6. Detail query is polled on the shared cadence so status changes auto-refresh.
+ * LS-6249 — Projections premium upsell wiring.
+ * LS-6252 — injury-status auto-refresh via Apollo pollInterval.
+ *
+ * LS-6226 — Cold-load deep link to a non-numeric id silently skips the query:
+ *   AC1: /football/players/abc  → query not fired, notFound=true.
+ *   AC2: /football/players/0    → query not fired, notFound=true.
+ *   AC3: /football/players/-5   → query not fired, notFound=true.
+ *   AC4: /football/players/1.5  → query not fired (no wrong player), notFound=true.
+ *   AC5: /football/players/42   → query fired with id=42; player rendered when found.
+ *   AC6: valid id, server returns null → notFound=true.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
-import { FOOTBALL_PLAYER_DETAIL_POLL_MS } from '@legacy-sports/shared-components/football';
+import {
+  FOOTBALL_PLAYER_DETAIL_POLL_MS,
+  FootballPlayerDetail,
+} from '@legacy-sports/shared-components/football';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 
-// ── Router ───────────────────────────────────────────────────────────────────
+// ── Mocks ──────────────────────────────────────────────────────────────────
 
-const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
-  useNavigate: () => mockNavigate,
-  useParams: () => ({ id: '42' }),
+  useNavigate: jest.fn(),
+  useParams: jest.fn(),
   useSearchParams: () => [new URLSearchParams(''), jest.fn()],
 }));
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
-
 jest.mock('@legacy-sports/shared-components/football', () => ({
-  // Sentinel value so the wiring test proves the container forwards the shared
+  // Sentinel so the wiring test proves the container forwards the shared
   // constant rather than a hard-coded literal.
   FOOTBALL_PLAYER_DETAIL_POLL_MS: 54321,
-  FootballPlayerDetail: ({
-    error,
-    player,
-    onBack,
-    isPremium,
-    onUpgrade,
-  }: {
-    error?: boolean;
-    player?: { firstName: string } | null;
-    onBack?: () => void;
-    isPremium?: boolean;
-    onUpgrade?: () => void;
-  }) => (
-    <div>
-      {error && <span>Failed to load player. Please try again.</span>}
-      {player && <span>{player.firstName}</span>}
-      <button onClick={onBack}>Back to Players</button>
-      {!isPremium && (
-        <button type="button" onClick={onUpgrade}>
-          teaser-upgrade
-        </button>
-      )}
-    </div>
-  ),
-  // Mirror the real implementation: only the known tab identifiers pass
-  // through; everything else (null/undefined/unknown) falls back to 'overview'.
+  FootballPlayerDetail: jest.fn(),
   resolveFootballPlayerTab: (raw: string | null | undefined) =>
     raw === 'overview' || raw === 'advanced' || raw === 'news'
       ? raw
       : 'overview',
 }));
-
 jest.mock('../../components/UpgradeModal', () => ({
   UpgradeModal: ({ open }: { open: boolean }) =>
     open ? <span>upgrade-modal-open</span> : null,
 }));
-
 jest.mock('../../hooks/useIsPremium', () => ({ useIsPremium: jest.fn() }));
-
 jest.mock('../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
 }));
-
-const mockUseIsPremium = useIsPremium as jest.MockedFunction<
-  typeof useIsPremium
->;
-
-// ── came-from ────────────────────────────────────────────────────────────────
-
 jest.mock('../../lib/came-from', () => ({ storeCameFrom: jest.fn() }));
-
-// ── GraphQL ───────────────────────────────────────────────────────────────────
-
 jest.mock('../../api/db/graphql.generated', () => ({
   useFootballPlayerQuery: jest.fn(),
 }));
 
+const mockUseParams = useParams as jest.MockedFunction<typeof useParams>;
+const mockUseNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>;
+const mockFootballPlayerDetail = FootballPlayerDetail as jest.MockedFunction<
+  typeof FootballPlayerDetail
+>;
 const mockUseFootballPlayerQuery =
   useFootballPlayerQuery as jest.MockedFunction<typeof useFootballPlayerQuery>;
+const mockUseIsPremium = useIsPremium as jest.MockedFunction<
+  typeof useIsPremium
+>;
 const mockStoreCameFrom = storeCameFrom as jest.MockedFunction<
   typeof storeCameFrom
 >;
+const mockNavigate = jest.fn();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCombinedError(code: string): CombinedGraphQLErrors {
   return new CombinedGraphQLErrors({
@@ -108,14 +86,46 @@ function makeCombinedError(code: string): CombinedGraphQLErrors {
   });
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+/**
+ * Default mock body for FootballPlayerDetail: renders the text/affordances the
+ * LS-6227/6228/6249 DOM-query tests rely on (error banner, player name, back
+ * button, premium teaser). The LS-6226 tests override this to capture props.
+ */
+function renderDetailText(
+  props: React.ComponentProps<typeof FootballPlayerDetail>,
+) {
+  return (
+    <div>
+      {props.error && <span>Failed to load player. Please try again.</span>}
+      {props.notFound && !props.error && <span>Player not found.</span>}
+      {props.player && <span>{props.player.firstName}</span>}
+      <button onClick={props.onBack}>Back to Players</button>
+      {!props.isPremium && (
+        <button type="button" onClick={props.onUpgrade}>
+          teaser-upgrade
+        </button>
+      )}
+    </div>
+  );
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseNavigate.mockReturnValue(mockNavigate);
+  // Default to a valid numeric id; LS-6226 tests override per-case.
+  mockUseParams.mockReturnValue({ id: '42' });
+  mockFootballPlayerDetail.mockImplementation(renderDetailText);
   mockUseIsPremium.mockReturnValue(false);
+  mockUseFootballPlayerQuery.mockReturnValue({
+    data: undefined,
+    loading: false,
+    error: undefined,
+  } as ReturnType<typeof useFootballPlayerQuery>);
 });
 
-describe('FootballPlayerDetailPage', () => {
+// ── LS-6227 / LS-6228 / LS-6249 / LS-6252 ────────────────────────────────────
+
+describe('FootballPlayerDetailPage — auth error handling (LS-6227)', () => {
   it('redirects to /login and suppresses the error banner on UNAUTHENTICATED error', () => {
     mockUseFootballPlayerQuery.mockReturnValue({
       data: undefined,
@@ -125,11 +135,8 @@ describe('FootballPlayerDetailPage', () => {
 
     render(<FootballPlayerDetailPage />);
 
-    // storeCameFrom should have been called to preserve the deep-link
     expect(mockStoreCameFrom).toHaveBeenCalledTimes(1);
-    // navigate to /login with replace so back-button doesn't loop
     expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true });
-    // generic error banner must NOT appear
     expect(
       screen.queryByText('Failed to load player. Please try again.'),
     ).toBeNull();
@@ -269,5 +276,85 @@ describe('FootballPlayerDetailPage', () => {
 
     const options = mockUseFootballPlayerQuery.mock.calls[0][0];
     expect(options?.pollInterval).toBe(FOOTBALL_PLAYER_DETAIL_POLL_MS);
+  });
+});
+
+// ── LS-6226: deep-link id validation ─────────────────────────────────────────
+
+describe('FootballPlayerDetailPage — deep-link id validation (LS-6226)', () => {
+  function renderCapturingProps(id: string) {
+    let props: React.ComponentProps<typeof FootballPlayerDetail> | null = null;
+    mockFootballPlayerDetail.mockImplementation((p) => {
+      props = p;
+      return null;
+    });
+    mockUseParams.mockReturnValue({ id });
+    render(<FootballPlayerDetailPage />);
+    return () => {
+      if (!props) throw new Error('FootballPlayerDetail was not rendered');
+      return props;
+    };
+  }
+
+  it('AC1: non-numeric id "abc" — does not fire query and passes notFound=true', () => {
+    const props = renderCapturingProps('abc');
+    expect(mockUseFootballPlayerQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(props().notFound).toBe(true);
+  });
+
+  it('AC2: id "0" — does not fire query and passes notFound=true', () => {
+    const props = renderCapturingProps('0');
+    expect(mockUseFootballPlayerQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(props().notFound).toBe(true);
+  });
+
+  it('AC3: negative id "-5" — does not fire query and passes notFound=true', () => {
+    const props = renderCapturingProps('-5');
+    expect(mockUseFootballPlayerQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(props().notFound).toBe(true);
+  });
+
+  it('AC4: decimal id "1.5" — does not fire query (no wrong player) and passes notFound=true', () => {
+    const props = renderCapturingProps('1.5');
+    expect(mockUseFootballPlayerQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(props().notFound).toBe(true);
+  });
+
+  it('AC5: valid id "42" — fires query with correct id and passes notFound=false when player found', () => {
+    const player = { id: 42, firstName: 'Patrick', lastName: 'Mahomes' };
+    mockUseFootballPlayerQuery.mockReturnValue({
+      data: { footballPlayer: player },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useFootballPlayerQuery>);
+
+    const props = renderCapturingProps('42');
+    expect(mockUseFootballPlayerQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: false, variables: { id: 42 } }),
+    );
+    expect(props().notFound).toBe(false);
+    expect(props().player).toBe(player);
+  });
+
+  it('AC6: valid id but server returns null — passes notFound=true', () => {
+    mockUseFootballPlayerQuery.mockReturnValue({
+      data: { footballPlayer: null },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useFootballPlayerQuery>);
+
+    const props = renderCapturingProps('99');
+    expect(mockUseFootballPlayerQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: false }),
+    );
+    expect(props().notFound).toBe(true);
   });
 });
