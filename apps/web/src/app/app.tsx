@@ -154,6 +154,11 @@ const FootballPlayerDetailPage = lazyWithRetry(() =>
     default: m.FootballPlayerDetailPage,
   })),
 );
+const FootballViewGameLogsPage = lazyWithRetry(() =>
+  import('../pages/football/FootballViewGameLogsPage').then((m) => ({
+    default: m.FootballViewGameLogsPage,
+  })),
+);
 /** Route-level guard for admin pages — redirects non-admins to home.
  *  Defense-in-depth alongside the in-page accessLevel check in AdminPage. */
 function AdminGuard({
@@ -552,6 +557,15 @@ function App() {
               element={
                 <FootballGate>
                   <FootballPlayersPage />
+                </FootballGate>
+              }
+            />
+            {/* Static segment must precede /football/players/:id dynamic route. */}
+            <Route
+              path="/football/players/view-game-logs"
+              element={
+                <FootballGate>
+                  <FootballViewGameLogsPage />
                 </FootballGate>
               }
             />
