@@ -1,8 +1,29 @@
+import groovy.json.JsonSlurper
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+
+// Read versionName from package.json so it stays in sync with the JS package.
+def packageJson = new JsonSlurper().parseText(new File("$rootDir/../package.json").text)
+def appVersionName = packageJson.version ?: "0.0.0"
+
+// versionCode: prefer the CI build counter (GITHUB_RUN_NUMBER, set by GitHub
+// Actions) so each build produces a unique, monotonically-increasing integer.
+// Falls back to a numeric encoding of the semver (major * 10000 + minor * 100
+// + patch) so local and non-CI builds still produce a valid versionCode.
+def ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toInteger()
+def versionParts = appVersionName.tokenize('.')
+def semverVersionCode = {
+    def toIntSafe = { s -> (s?.isInteger() ? s.toInteger() : 0) }
+    def major = toIntSafe(versionParts.size() > 0 ? versionParts[0] : null)
+    def minor = toIntSafe(versionParts.size() > 1 ? versionParts[1] : null)
+    def patch = toIntSafe(versionParts.size() > 2 ? versionParts[2] : null)
+    major * 10000 + minor * 100 + patch
+}()
+def appVersionCode = ciVersionCode ?: semverVersionCode
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -92,8 +113,8 @@ android {
         applicationId 'com.legacysports.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
