@@ -195,6 +195,55 @@ describe('useDraftActions re-entry guards (LS-2681)', () => {
   });
 });
 
+describe('useDraftActions auto-pick toggle refetch (LS-7978)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockNoop.mockReset();
+  });
+
+  it('calls refetchDraft after enabling auto-pick so the timer sees the expired deadline', async () => {
+    mockNoop.mockResolvedValueOnce({ data: {} });
+    const refetchDraft = jest.fn();
+    const refetchAutoPickStatuses = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ refetchDraft, refetchAutoPickStatuses })),
+    );
+
+    // Default autoPickTeamIds is empty, so enable = true (toggle ON)
+    await act(async () => {
+      await result.current.handleToggleUserAutoPick();
+    });
+
+    expect(refetchAutoPickStatuses).toHaveBeenCalledTimes(1);
+    expect(refetchDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT call refetchDraft when disabling auto-pick', async () => {
+    mockNoop.mockResolvedValueOnce({ data: {} });
+    const refetchDraft = jest.fn();
+    const refetchAutoPickStatuses = jest.fn();
+
+    // myTeamId is 7; include it in autoPickTeamIds so isMyTeamAutoPick = true → enable = false
+    const { result } = renderHook(() =>
+      useDraftActions(
+        makeParams({
+          refetchDraft,
+          refetchAutoPickStatuses,
+          autoPickTeamIds: new Set(['7']),
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.handleToggleUserAutoPick();
+    });
+
+    expect(refetchAutoPickStatuses).toHaveBeenCalledTimes(1);
+    expect(refetchDraft).not.toHaveBeenCalled();
+  });
+});
+
 describe('useDraftActions pause/resume optimistic update (LS-4834)', () => {
   beforeEach(() => {
     mockCallCounter.current = 0;

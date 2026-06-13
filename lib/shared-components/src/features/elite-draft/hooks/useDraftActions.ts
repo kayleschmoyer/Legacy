@@ -400,6 +400,11 @@ export function useDraftActions({
     try {
       await toggleAutoPickMutation({ variables: { draftId, enable } });
       void refetchAutoPickStatuses();
+      // When enabling, the server may have immediately expired the deadline (if
+      // it is currently this team's turn). Refetch the draft so the client sees
+      // the updated currentPickDeadline and the countdown timer can reach zero,
+      // allowing the nudge to fire without waiting up to 60 s for EventBridge.
+      if (enable) void refetchDraft();
       showToast(
         enable
           ? 'Auto-pick enabled — the system will pick for you when your turn arrives'
@@ -417,6 +422,7 @@ export function useDraftActions({
     isMyTeamAutoPick,
     toggleAutoPickMutation,
     refetchAutoPickStatuses,
+    refetchDraft,
     showToast,
   ]);
 
