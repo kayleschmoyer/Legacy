@@ -238,6 +238,10 @@ jest.mock('../../../../common/auth/AuthHooks', () => ({
   Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
 }));
 
+jest.mock('../../../../features/subscription/useSubscription', () => ({
+  useSubscription: () => ({ isPremium: false }),
+}));
+
 jest.mock('../../../../common/utilities/RouteUtils', () => ({
   toIntId: (v: unknown) => {
     const n = parseInt(String(Array.isArray(v) ? v[0] : v), 10);

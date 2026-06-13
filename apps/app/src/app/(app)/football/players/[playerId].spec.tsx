@@ -11,9 +11,15 @@ type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
 const mockUseLocalSearchParams = jest.fn(() => ({ playerId: '7' }));
 const mockBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockUseLocalSearchParams(),
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, navigate: mockNavigate }),
+}));
+
+let mockIsPremium = false;
+jest.mock('../../../../features/subscription/useSubscription', () => ({
+  useSubscription: () => ({ isPremium: mockIsPremium }),
 }));
 
 const mockUseFootballPlayerQuery = jest.fn();
@@ -22,27 +28,32 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
     mockUseFootballPlayerQuery(...args) as Record<string, unknown>,
 }));
 
+let capturedDetailProps: Record<string, unknown> | null = null;
+
 jest.mock('@legacy-sports/shared-components/football', () => {
   const { View, Text } = jest.requireActual<RNComponents>('react-native');
   return {
     // Sentinel value so the wiring test proves the screen forwards the shared
     // constant rather than a hard-coded literal.
     FOOTBALL_PLAYER_DETAIL_POLL_MS: 54321,
-    FootballPlayerDetail: ({
-      player,
-      loading,
-      error,
-    }: {
+    FootballPlayerDetail: (props: {
       player?: { firstName?: string | null } | null;
       loading?: boolean;
       error?: boolean;
-    }) => (
-      <View testID="detail">
-        <Text>{loading ? 'loading' : 'loaded'}</Text>
-        <Text>{error ? 'error' : 'ok'}</Text>
-        <Text>{player?.firstName ?? 'no-player'}</Text>
-      </View>
-    ),
+      isPremium?: boolean;
+      onUpgrade?: () => void;
+      [key: string]: unknown;
+    }) => {
+      capturedDetailProps = props;
+      const { player, loading, error } = props;
+      return (
+        <View testID="detail">
+          <Text>{loading ? 'loading' : 'loaded'}</Text>
+          <Text>{error ? 'error' : 'ok'}</Text>
+          <Text>{player?.firstName ?? 'no-player'}</Text>
+        </View>
+      );
+    },
   };
 });
 
@@ -61,6 +72,8 @@ const QB_PLAYER = {
 describe('FootballPlayerDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedDetailProps = null;
+    mockIsPremium = false;
     mockUseLocalSearchParams.mockReturnValue({ playerId: '7' });
     mockUseFootballPlayerQuery.mockReturnValue({
       data: { footballPlayer: QB_PLAYER },
@@ -120,5 +133,24 @@ describe('FootballPlayerDetailScreen', () => {
       { pollInterval?: number },
     ];
     expect(call[0].pollInterval).toBe(FOOTBALL_PLAYER_DETAIL_POLL_MS);
+  });
+
+  it('passes isPremium=false to FootballPlayerDetail for free-tier users (LS-5011)', () => {
+    mockIsPremium = false;
+    render(<FootballPlayerDetailScreen />);
+    expect(capturedDetailProps?.isPremium).toBe(false);
+  });
+
+  it('passes isPremium=true to FootballPlayerDetail for premium users (LS-5011)', () => {
+    mockIsPremium = true;
+    render(<FootballPlayerDetailScreen />);
+    expect(capturedDetailProps?.isPremium).toBe(true);
+  });
+
+  it('wires onUpgrade to subscription-settings navigation (LS-5011)', () => {
+    render(<FootballPlayerDetailScreen />);
+    expect(typeof capturedDetailProps?.onUpgrade).toBe('function');
+    (capturedDetailProps?.onUpgrade as () => void)();
+    expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
   });
 });

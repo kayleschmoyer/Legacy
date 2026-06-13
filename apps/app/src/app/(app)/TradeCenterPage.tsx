@@ -25,6 +25,7 @@ import {
 } from '../../api/db/graphql.generated';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
+import { useSubscription } from '../../features/subscription/useSubscription';
 
 // ── LeagueTrades ──────────────────────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ function LeagueTrades({
   tradeOfferId,
   onBack,
 }: LeagueTradesProps) {
+  const router = useRouter();
+  const { isPremium } = useSubscription();
   const [wsToken, setWsToken] = useState<string | undefined>();
 
   useEffect(() => {
@@ -166,6 +169,8 @@ function LeagueTrades({
           isCommissioner={isCommissioner}
           deepLinkOfferId={tradeOfferId}
           onSubscribeRefresh={onSubscribeRefresh}
+          isPremium={isPremium}
+          onUpgradePremium={() => router.navigate('subscription-settings')}
         />
       </ScrollView>
     </YStack>

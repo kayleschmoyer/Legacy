@@ -159,6 +159,11 @@ jest.mock('./_screenErrorBoundary', () => ({
   ScreenErrorBoundary: () => null,
 }));
 
+let mockIsPremium = false;
+jest.mock('../../features/subscription/useSubscription', () => ({
+  useSubscription: () => ({ isPremium: mockIsPremium }),
+}));
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -170,6 +175,7 @@ beforeEach(() => {
   mockLeague = undefined;
   capturedNativeProps = null;
   mockSearchParams = {};
+  mockIsPremium = false;
   mockNavigate.mockReset();
   const sharedMocks: { useWebSocket: jest.Mock } = jest.requireMock(
     '@legacy-sports/shared-components',
@@ -314,8 +320,8 @@ describe('TradeCenterPage', () => {
 // Additional intentional differences that must stay stable:
 //   - Real-time: wired via useWebSocket + keychain JWT + onSubscribeRefresh
 //     (not via the shared LeagueWebSocketContext used by web).
-//   - Premium gating (TC-019-P): no page-level premium UI on native; isPremium
-//     and onUpgradePremium are NOT injected into TradingCenter at this level.
+//   - Premium gating (LS-5011): isPremium and onUpgradePremium ARE injected
+//     from useSubscription so premium users see their Trade Analysis Tools.
 
 describe('TradeCenterPage — surface contract (parity assertions)', () => {
   it.each([
@@ -365,12 +371,13 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
     });
   });
 
-  // ── Premium gating contract (LS-7516 — TC-019-P) ────────────────────────────
-  // Native has no page-level premium UI (no equivalent of the web TradeAnalyzerCard).
-  // isPremium and onUpgradePremium must NOT be injected at this level so the
-  // shared TradingCenter manages its own premium state independently.
+  // ── Premium gating contract (LS-5011) ───────────────────────────────────────
+  // isPremium comes from useSubscription and is injected into TradingCenter so
+  // premium users can access Trade Analysis Tools. onUpgradePremium navigates
+  // to subscription-settings for free users who click the upgrade CTA.
 
-  it('does not inject isPremium into TradingCenter — native has no page-level premium gating', async () => {
+  it('injects isPremium=false into TradingCenter when user is on free tier', async () => {
+    mockIsPremium = false;
     mockUserLeagues = {
       userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
     };
@@ -381,11 +388,12 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
     fireEvent.press(screen.getByLabelText('View trades for My League'));
 
     await waitFor(() => {
-      expect(capturedNativeProps?.isPremium).toBeUndefined();
+      expect(capturedNativeProps?.isPremium).toBe(false);
     });
   });
 
-  it('does not inject onUpgradePremium into TradingCenter — native has no premium upsell at page level', async () => {
+  it('injects isPremium=true into TradingCenter when user is on premium tier', async () => {
+    mockIsPremium = true;
     mockUserLeagues = {
       userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
     };
@@ -396,8 +404,26 @@ describe('TradeCenterPage — surface contract (parity assertions)', () => {
     fireEvent.press(screen.getByLabelText('View trades for My League'));
 
     await waitFor(() => {
-      expect(capturedNativeProps?.onUpgradePremium).toBeUndefined();
+      expect(capturedNativeProps?.isPremium).toBe(true);
     });
+  });
+
+  it('injects onUpgradePremium that navigates to subscription-settings', async () => {
+    mockUserLeagues = {
+      userLeagues: [{ id: 1, name: 'My League', leaguePhase: 'active' }],
+    };
+    mockUserTeamId = 42;
+    mockLeague = { league: { id: 1, owner: 99 } };
+    render(<TradeCenterPage />);
+
+    fireEvent.press(screen.getByLabelText('View trades for My League'));
+
+    await waitFor(() => {
+      expect(typeof capturedNativeProps?.onUpgradePremium).toBe('function');
+    });
+
+    (capturedNativeProps?.onUpgradePremium as () => void)();
+    expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
   });
 });
 

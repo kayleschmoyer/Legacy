@@ -6,11 +6,13 @@ import {
 } from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '../../../../api/db/graphql.generated';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
+import { useSubscription } from '../../../../features/subscription/useSubscription';
 
 export default function FootballPlayerDetailScreen(): React.JSX.Element {
   const params = useLocalSearchParams();
   const router = useRouter();
   const playerId = toIntId(params.playerId);
+  const { isPremium } = useSubscription();
 
   const { data, loading, error } = useFootballPlayerQuery({
     skip: playerId === null,
@@ -28,6 +30,8 @@ export default function FootballPlayerDetailScreen(): React.JSX.Element {
         loading={loading}
         error={!!error}
         onBack={() => router.back()}
+        isPremium={isPremium}
+        onUpgrade={() => router.navigate('subscription-settings')}
       />
     </SafeAreaView>
   );

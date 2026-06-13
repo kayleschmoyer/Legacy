@@ -50,6 +50,7 @@ import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserCon
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
+import { useSubscription } from '../../../../features/subscription/useSubscription';
 
 const BASEBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'overview', label: 'Overview' },
@@ -227,6 +228,8 @@ export default function LeagueId(): React.JSX.Element {
     return isCommissioner ? 'commish' : isMember ? 'member' : 'spectator';
   }, [rolePref, isCommissioner, isMember]);
   const setRole = useCallback((r: LeagueRole) => setRolePref(r), []);
+
+  const { isPremium } = useSubscription();
 
   const [season, setSeason] = useState<string>(
     String(league?.seasonNumber ?? new Date().getFullYear()),
@@ -533,6 +536,10 @@ export default function LeagueId(): React.JSX.Element {
                     userTeamId={userTeamId}
                     isCommissioner={isCommissioner}
                     onSubscribeRefresh={onTradesSubscribeRefresh}
+                    isPremium={isPremium}
+                    onUpgradePremium={() =>
+                      router.navigate('subscription-settings')
+                    }
                   />
                   <PendingWaiverClaims teamId={userTeamId} />
                 </>
