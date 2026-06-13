@@ -19,6 +19,44 @@ type RNComponents = {
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+const mockRequireStepUp = jest.fn();
+const mockOnStepUpVerified = jest.fn();
+const mockOnStepUpDismiss = jest.fn();
+let mockIsStepUpPrompting = false;
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useStepUpGate: () => ({
+    isPrompting: mockIsStepUpPrompting,
+    requireStepUp: mockRequireStepUp,
+    onVerified: mockOnStepUpVerified,
+    onDismiss: mockOnStepUpDismiss,
+  }),
+}));
+
+jest.mock('../../common/auth/AuthHooks', () => ({
+  useCurrentUserInfo: () => ({ data: { mfaEnabled: false }, loading: false }),
+  readKeychainValue: jest.fn(),
+  Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
+}));
+
+jest.mock('./StepUpModal', () => ({
+  StepUpModal: ({
+    onDismiss,
+  }: {
+    onSuccess: (v: number) => void;
+    onDismiss: () => void;
+    mfaEnabled?: boolean;
+  }) => {
+    const { View, Text } = jest.requireActual<typeof import('react-native')>(
+      'react-native',
+    ) as RNComponents;
+    return (
+      <View testID="step-up-modal">
+        <Text onPress={onDismiss}>Dismiss</Text>
+      </View>
+    );
+  },
+}));
+
 jest.mock('tamagui', () => {
   const { View, Text } = jest.requireActual<typeof import('react-native')>(
     'react-native',
@@ -99,6 +137,8 @@ jest.mock('./useIAP', () => ({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function resetMocks() {
+  mockIsStepUpPrompting = false;
+  mockRequireStepUp.mockReset();
   mockUseSubscription.mockReturnValue({
     subscription: null,
     isPremium: true,
@@ -224,5 +264,64 @@ describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
     expect(screen.getAllByText('Free')).toHaveLength(2);
     // Only the "Premium" feature-comparison header.
     expect(screen.getAllByText('Premium')).toHaveLength(1);
+  });
+});
+
+describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  it('routes the Upgrade button through requireStepUp instead of calling checkout directly', () => {
+    mockUseSubscription.mockReturnValue({
+      subscription: null,
+      isPremium: false,
+      tier: 'free',
+      loading: false,
+    });
+    const mockCreateCheckout = jest.fn();
+    mockUseCheckoutSession.mockReturnValue([
+      mockCreateCheckout,
+      { loading: false },
+    ]);
+
+    render(<SubscriptionSettingsScreen />);
+
+    fireEvent.press(screen.getAllByText(/^Upgrade/).slice(-1)[0]);
+
+    expect(mockRequireStepUp).toHaveBeenCalledTimes(1);
+    expect(mockCreateCheckout).not.toHaveBeenCalled();
+  });
+
+  it('routes the Manage Subscription button through requireStepUp instead of opening the portal directly', () => {
+    const mockCreatePortal = jest.fn();
+    mockUseBillingPortalSession.mockReturnValue([
+      mockCreatePortal,
+      { loading: false },
+    ]);
+
+    render(<SubscriptionSettingsScreen />);
+
+    fireEvent.press(screen.getByText('Manage Subscription'));
+
+    expect(mockRequireStepUp).toHaveBeenCalledTimes(1);
+    expect(mockCreatePortal).not.toHaveBeenCalled();
+  });
+
+  it('renders the StepUpModal when isStepUpPrompting is true', () => {
+    mockIsStepUpPrompting = true;
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByTestId('step-up-modal')).toBeTruthy();
+  });
+
+  it('does not render the StepUpModal when isStepUpPrompting is false', () => {
+    mockIsStepUpPrompting = false;
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByTestId('step-up-modal')).toBeNull();
   });
 });

@@ -49,6 +49,7 @@ export interface LegacySportsJwt {
   username: string;
   isAdmin: boolean;
   about: string | null | undefined;
+  mfaEnabled?: boolean;
 }
 
 export enum Secret {
