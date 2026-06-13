@@ -8,6 +8,10 @@ import {
 } from '../../../api/db/graphql.generated';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
+import { trackPremiumFeatureClick } from '../../../utils/analytics';
+
+// Analytics label for the upgrade prompt fired from the league-cap gate (LS-5025).
+const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
 
 export default function FootballHome() {
   const userInfo = useAuthorizedUserInfo();
@@ -49,13 +53,18 @@ export default function FootballHome() {
     [data?.userLeagues],
   );
 
+  const goToUpgrade = useCallback(() => {
+    trackPremiumFeatureClick(LEAGUE_CAP_FEATURE_NAME);
+    router.navigate('subscription-settings');
+  }, [router]);
+
   const handleCreateLeague = useCallback(() => {
     if (atFreeLeagueLimit) {
-      router.navigate('subscription-settings');
+      goToUpgrade();
       return;
     }
     router.push('/football/league/create');
-  }, [atFreeLeagueLimit, router]);
+  }, [atFreeLeagueLimit, goToUpgrade, router]);
 
   return (
     <NFLHome

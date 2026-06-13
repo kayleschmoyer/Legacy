@@ -24,6 +24,8 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
 }));
 
+// Harness for the shared NFLHome — exposes callbacks the wrapper feeds in so
+// we can assert data wiring without rendering the full component.
 jest.mock('@legacy-sports/shared-components/football', () => {
   const { View, Text, Pressable } =
     jest.requireActual<RNComponents>('react-native');
@@ -88,6 +90,13 @@ jest.mock('../../../features/subscription/constants', () => ({
   FREE_TIER_LEAGUE_LIMIT: 3,
 }));
 
+const mockTrackPremiumFeatureClick = jest.fn();
+jest.mock('../../../utils/analytics', () => ({
+  trackPremiumFeatureClick: (name: string): void => {
+    mockTrackPremiumFeatureClick(name);
+  },
+}));
+
 jest.mock('../_screenErrorBoundary', () => ({
   ScreenErrorBoundary: null,
 }));
@@ -113,6 +122,15 @@ const FOOTBALL_LEAGUES = [
   },
 ];
 
+const BASEBALL_LEAGUE = {
+  id: 10,
+  name: 'Diamond Dogs',
+  sport: 'baseball',
+  draftStatus: null,
+  currentWeekNumber: null,
+  weekAdvanceStatus: null,
+};
+
 describe('FootballHome (mobile NFLHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -135,7 +153,7 @@ describe('FootballHome (mobile NFLHome wrapper)', () => {
     expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: false });
   });
 
-  describe('create league — free-tier cap enforcement (LS-5013)', () => {
+  describe('create league — free-tier cap enforcement (LS-5025)', () => {
     it('navigates to create when the user is below the free-tier cap', () => {
       render(<FootballHome />);
       fireEvent.press(screen.getByTestId('create'));
@@ -167,20 +185,9 @@ describe('FootballHome (mobile NFLHome wrapper)', () => {
     });
 
     it('counts all leagues (all sports) against the cap', () => {
+      // 2 football + 1 baseball = 3 total → at cap (LS-5025)
       mockUseGetUserLeaguesQuery.mockReturnValue({
-        data: {
-          userLeagues: [
-            ...FOOTBALL_LEAGUES,
-            {
-              id: 3,
-              name: 'Baseball League',
-              sport: 'baseball',
-              draftStatus: null,
-              currentWeekNumber: null,
-              weekAdvanceStatus: null,
-            },
-          ],
-        },
+        data: { userLeagues: [...FOOTBALL_LEAGUES, BASEBALL_LEAGUE] },
         loading: false,
       });
       render(<FootballHome />);
@@ -253,6 +260,30 @@ describe('FootballHome (mobile NFLHome wrapper)', () => {
       fireEvent.press(screen.getByTestId('create'));
       expect(mockPush).toHaveBeenCalledWith('/football/league/create');
       expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('tracks analytics when upgrade is triggered at the cap', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...FOOTBALL_LEAGUES,
+            {
+              id: 3,
+              name: 'Third',
+              sport: 'football',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+          ],
+        },
+        loading: false,
+      });
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
+        'Unlimited Leagues',
+      );
     });
   });
 
