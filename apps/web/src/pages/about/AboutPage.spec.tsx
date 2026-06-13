@@ -533,6 +533,75 @@ describe('AboutPage — External Links card (LS-5310)', () => {
   });
 });
 
+describe('AboutPage — about-github-deeplinks feature story (LS-7741)', () => {
+  const { useFeatureValue } = jest.requireMock(
+    '../../context/GrowthBookProvider',
+  );
+  const { trackEvent } = jest.requireMock('../../utils/analytics');
+  let windowOpenSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseIsPremium.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    useFeatureValue.mockReturnValue(true);
+    windowOpenSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    setCommitSha('abc1234');
+  });
+
+  afterEach(() => {
+    windowOpenSpy.mockRestore();
+    setCommitSha('abc123');
+  });
+
+  it('reads the about-github-deeplinks flag with a default of true', () => {
+    renderAbout();
+    expect(useFeatureValue).toHaveBeenCalledWith(
+      'about-github-deeplinks',
+      true,
+    );
+  });
+
+  it('renders commit SHA as a link element with the correct aria-label', () => {
+    renderAbout();
+    const commitRow = screen.getByTestId('build-info-commit-sha');
+    const link = commitRow.querySelector('[role="link"]');
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('aria-label', 'View commit abc1234 on GitHub');
+  });
+
+  it('fires about_github_click analytics when View on GitHub is clicked', () => {
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: /view on github/i }));
+    expect(trackEvent).toHaveBeenCalledWith('about_github_click', {
+      category: 'about',
+    });
+  });
+
+  it('fires about_commit_click analytics when View Current Commit is clicked', () => {
+    renderAbout();
+    fireEvent.click(
+      screen.getByRole('button', { name: /view current commit/i }),
+    );
+    expect(trackEvent).toHaveBeenCalledWith('about_commit_click', {
+      category: 'about',
+    });
+  });
+
+  it('hides links card and renders SHA as plain text when flag is off', () => {
+    useFeatureValue.mockReturnValue(false);
+    renderAbout();
+    expect(screen.queryByTestId('github-links-card')).not.toBeInTheDocument();
+    const commitRow = screen.getByTestId('build-info-commit-sha');
+    expect(commitRow.querySelector('[role="link"]')).toBeNull();
+    expect(commitRow).toHaveTextContent('abc1234');
+  });
+});
+
 describe('AboutPage — config health warning (LS-7616)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
