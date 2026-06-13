@@ -53,6 +53,9 @@ jest.mock('./DraftTopBand', () => ({
 jest.mock('./DraftRail', () => ({
   DraftRail: () => <div data-testid="draft-rail" />,
 }));
+jest.mock('./DraftSidebar', () => ({
+  DraftSidebar: () => <div data-testid="draft-sidebar" />,
+}));
 jest.mock('./DraftChatOverlay', () => ({
   DraftChatOverlay: () => null,
 }));
@@ -193,6 +196,7 @@ function makeBaseActions(
     pauseLoading: false,
     resumeLoading: false,
     pickLoading: false,
+    commPickLoading: false,
     autoPickDisabledLoading: false,
     toggleAutoPickLoading: false,
     initDraftLoading: false,

@@ -198,9 +198,9 @@ export const CSS = `
 .d-layout {
   position: relative; z-index: 1;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 280px 1fr 320px;
   grid-template-rows: auto 1fr;
-  grid-template-areas: "topband topband" "main rail";
+  grid-template-areas: "topband topband topband" "sidebar main rail";
   height: 100%;
   overflow: hidden;
 }
@@ -487,6 +487,9 @@ export const CSS = `
 .d-pick-row.mine .d-pick-name { color: var(--d-accent); }
 
 /* ===== Sidebar ===== */
+.d-side-l {
+  grid-area: sidebar;
+}
 .d-side {
   background: #0D1526;
   padding: 20px;
@@ -1069,7 +1072,7 @@ export const CSS = `
 
 /* ===== Responsive ===== */
 @media (max-width: 1200px) {
-  .d-layout { grid-template-columns: 1fr 280px; }
+  .d-layout { grid-template-columns: 240px 1fr 280px; }
   .d-depth-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 900px) {
@@ -1078,6 +1081,7 @@ export const CSS = `
     grid-template-rows: auto auto 1fr;
     grid-template-areas: "topband" "rail" "main";
   }
+  .d-side-l { display: none; }
   .d-rail {
     border-left: none;
     border-top: 1px solid rgba(255,255,255,0.06);

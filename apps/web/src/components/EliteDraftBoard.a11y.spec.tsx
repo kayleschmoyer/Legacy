@@ -165,10 +165,10 @@ describe('EliteDraftBoardScreen a11y', () => {
 
   test('exposes timer role and shows pick status', () => {
     renderDraftBoard();
-    const timer = screen.getByRole('timer', {
+    const timers = screen.getAllByRole('timer', {
       name: /pick timer|waiting timer/i,
     });
-    expect(timer).toBeInTheDocument();
+    expect(timers.length).toBeGreaterThanOrEqual(1);
   });
 
   test('position filter is a radiogroup and updates aria-checked via keyboard', async () => {

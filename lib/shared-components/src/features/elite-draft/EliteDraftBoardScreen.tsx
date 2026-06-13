@@ -25,6 +25,7 @@ import {
   usePlayerData,
 } from './hooks';
 import { DraftChatOverlay } from './DraftChatOverlay';
+import { DraftSidebar } from './DraftSidebar';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import { useAuth } from '../../features/auth';
@@ -273,7 +274,13 @@ export function EliteDraftBoardScreen({
     handleCommissionerPick: commissionerPick,
     handleToggleQueue,
   } = actions;
-  const { handleLoadMorePlayers } = queries;
+  const {
+    handleLoadMorePlayers,
+    refetchLeague,
+    refetchCurrentPick,
+    refetchAvailablePlayers,
+    refetchPickHistory,
+  } = queries;
 
   const handleDraftPlayer = useCallback(
     (id: number) => {
@@ -296,6 +303,22 @@ export function EliteDraftBoardScreen({
   const handleLoadMore = useCallback(() => {
     void handleLoadMorePlayers();
   }, [handleLoadMorePlayers]);
+
+  const handleRefresh = useCallback(() => {
+    void refetchLeague();
+    void refetchCurrentPick();
+    void refetchAvailablePlayers();
+    void refetchPickHistory();
+  }, [
+    refetchLeague,
+    refetchCurrentPick,
+    refetchAvailablePlayers,
+    refetchPickHistory,
+  ]);
+
+  const handleRetryCurrentPick = useCallback(() => {
+    void refetchCurrentPick();
+  }, [refetchCurrentPick]);
 
   // ---- Early returns for special states ----
   if (!leagueId) return <NoLeagueScreen onNavigate={onNavigate} />;
@@ -458,6 +481,57 @@ export function EliteDraftBoardScreen({
             void actions.handleToggleAutoPickDisabled()
           }
           onToggleUserAutoPick={() => void actions.handleToggleUserAutoPick()}
+        />
+
+        <DraftSidebar
+          draftPaused={ui.draftPaused}
+          currentPick={currentPick}
+          round={round}
+          timeRemaining={timeRemaining}
+          isMyPick={isMyPick}
+          pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
+          pickDeadline={ui.pickDeadline}
+          isCommissioner={queries.isCommissioner}
+          isOwner={queries.isOwner}
+          draftId={queries.draftId}
+          commPickMode={ui.commPickMode}
+          autoPickDisabled={ui.autoPickDisabled}
+          pauseLoading={actions.pauseLoading}
+          resumeLoading={actions.resumeLoading}
+          commPickLoading={actions.commPickLoading}
+          autoPickDisabledLoading={actions.autoPickDisabledLoading}
+          initDraftLoading={actions.initDraftLoading}
+          currentPickInfo={queries.currentPickInfo}
+          currentPickTeamId={queries.currentPickTeamId}
+          currentPickLoadError={ui.currentPickLoadError}
+          myTeamId={queries.myTeamId}
+          onlineTeamIds={onlineTeamIds}
+          myTeam={playerData.myTeam}
+          myTeamPicks={playerData.myTeamPicks}
+          positionCounts={playerData.positionCounts}
+          isPremium={isPremium}
+          pickHistory={queries.pickHistory}
+          statsLookup={playerData.statsLookup}
+          chatOpen={ui.chatOpen}
+          onPauseDraft={() => void actions.handlePauseDraft()}
+          onResumeDraft={() => void actions.handleResumeDraft()}
+          onToggleCommPickMode={() => ui.setCommPickMode(!ui.commPickMode)}
+          onToggleAutoPickDisabled={() =>
+            void actions.handleToggleAutoPickDisabled()
+          }
+          onInitializeDraft={(order) =>
+            void actions.handleInitializeDraft(order)
+          }
+          onRefresh={handleRefresh}
+          onToggleUserAutoPick={() => void actions.handleToggleUserAutoPick()}
+          isMyTeamAutoPick={actions.isMyTeamAutoPick}
+          toggleAutoPickLoading={actions.toggleAutoPickLoading}
+          onToggleChat={() => ui.setChatOpen(!ui.chatOpen)}
+          onRetryCurrentPick={handleRetryCurrentPick}
+          onShowToast={ui.showToast}
+          teamNameById={queries.teamNameById}
+          onDraftPlayer={handleDraftPlayer}
+          onCommissionerPick={handleCommissionerPick}
         />
 
         <DraftPlayerBoard
