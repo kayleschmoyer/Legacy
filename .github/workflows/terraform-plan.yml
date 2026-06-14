@@ -186,6 +186,15 @@ jobs:
             echo "PLAN_EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: "Generate App Token"
+        id: app-token
+        if: always() && github.event_name == 'pull_request' && steps.plan.outputs.exit != ''
+        continue-on-error: true
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
       - name: "Comment plan result on PR"
         if: always() && github.event_name == 'pull_request' && steps.plan.outputs.exit != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -193,7 +202,7 @@ jobs:
           PLAN_EXIT: ${{ steps.plan.outputs.exit }}
           PLAN_SUMMARY: ${{ steps.summary.outputs.summary }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           script: |
             const marker = '<!-- terraform-plan-gate -->';
             const ok = process.env.PLAN_EXIT === '0';
