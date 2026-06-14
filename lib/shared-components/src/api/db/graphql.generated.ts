@@ -954,6 +954,8 @@ export type FootballPlayer = {
   /** Average draft position rank, 1 = earliest (LS-6489 / FPL-008). Null until the ADP pipeline populates it. Surfaced as a premium advanced filter. */
   adpRank?: Maybe<Scalars['Int']['output']>;
   careerStats?: Maybe<FootballCareerStats>;
+  /** All fantasy positions this player is eligible for, derived from the football_player_eligible_positions view (LS-7059). Overlap this list against league position slots to determine roster eligibility. */
+  eligiblePositions: Array<Scalars['String']['output']>;
   firstName: Scalars['String']['output'];
   /** Per-game stat log for a given season (LS-6456). Queries game_football_* tables and returns one row per game played, with only the stat categories that have data for that game. */
   gameLogs: Array<FootballPlayerGameLog>;

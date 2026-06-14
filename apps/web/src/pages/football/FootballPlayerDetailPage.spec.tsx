@@ -27,9 +27,9 @@ import {
   FOOTBALL_PLAYER_DETAIL_POLL_MS,
   FootballPlayerDetail,
 } from '@legacy-sports/shared-components/football';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 

@@ -1084,6 +1084,11 @@ type FootballPlayer {
   """
   adpRank: Int
   careerStats: FootballCareerStats
+
+  """
+  All fantasy positions this player is eligible for, derived from the football_player_eligible_positions view (LS-7059). Overlap this list against league position slots to determine roster eligibility.
+  """
+  eligiblePositions: [String!]!
   firstName: String!
 
   """

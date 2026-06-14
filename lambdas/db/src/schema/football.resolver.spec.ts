@@ -137,6 +137,10 @@ describe('football resolvers', () => {
           season: 'season',
           gameNum: 'gameNum',
         },
+        footballPlayerEligiblePositions: {
+          playerId: 'playerId',
+          position: 'position',
+        },
         careerFootballPassing: { playerId: 'playerId' },
         careerFootballRushing: { playerId: 'playerId' },
         careerFootballReceiving: { playerId: 'playerId' },
@@ -576,6 +580,40 @@ describe('football resolvers', () => {
 
       expect(result.nodes).toHaveLength(1);
       expect(result.nodes[0].position).toBe('DL');
+    });
+
+    it('uses EXISTS subquery against eligible-positions view for specific position filter', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: 'RB', nflTeam: null, search: null, after: null },
+        mockContext,
+        undefined as never,
+      );
+
+      const { sql: compiledSql } = new PgDialect().sqlToQuery(
+        mockDb.where.mock.calls[0][0],
+      );
+      expect(compiledSql).toContain('football_player_eligible_positions');
+      expect(compiledSql).toContain('EXISTS');
+    });
+
+    it('uses EXISTS subquery against eligible-positions view for FLEX position filter', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: 'FLEX', nflTeam: null, search: null, after: null },
+        mockContext,
+        undefined as never,
+      );
+
+      const { sql: compiledSql } = new PgDialect().sqlToQuery(
+        mockDb.where.mock.calls[0][0],
+      );
+      expect(compiledSql).toContain('football_player_eligible_positions');
+      expect(compiledSql).toContain('EXISTS');
     });
 
     it('throws BAD_USER_INPUT for invalid position value', async () => {

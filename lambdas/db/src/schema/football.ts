@@ -999,6 +999,7 @@ interface FootballPlayerShape {
   news: string | null;
   projectedFantasyPoints: number | null;
   adpRank: number | null;
+  eligiblePositions?: string[] | null;
 }
 
 /**
@@ -1142,6 +1143,31 @@ FootballPlayerRef.implement({
       description:
         'Average draft position rank, 1 = earliest (LS-6489 / FPL-008). Null ' +
         'until the ADP pipeline populates it. Surfaced as a premium advanced filter.',
+    }),
+    eligiblePositions: t.field({
+      type: ['String'],
+      nullable: false,
+      description:
+        'All fantasy positions this player is eligible for, derived from the ' +
+        'football_player_eligible_positions view (LS-7059). Overlap this list ' +
+        'against league position slots to determine roster eligibility.',
+      resolve: async (parent, _args, context) => {
+        if (parent.eligiblePositions != null) {
+          return parent.eligiblePositions;
+        }
+        const rows = await context.db
+          .select({
+            position: PublicSchema.footballPlayerEligiblePositions.position,
+          })
+          .from(PublicSchema.footballPlayerEligiblePositions)
+          .where(
+            eq(
+              PublicSchema.footballPlayerEligiblePositions.playerId,
+              parent.id,
+            ),
+          );
+        return rows.map((r) => r.position);
+      },
     }),
     seasonStats: t.field({
       type: FootballPlayerSeasonStatsRef,
@@ -1903,8 +1929,8 @@ builder.queryField('footballPlayers', (t) =>
 
       // Merge the single `position` and multi `positions` args into one deduped
       // filter, expanding the pseudo-positions (FLEX / SUPERFLEX / IDP) to their
-      // constituent positions. A single concrete value collapses to `eq`
-      // semantics inside `inArray`, so backward compatibility is preserved.
+      // constituent positions. Uses EXISTS against the eligible-positions view so
+      // that cross-eligible players appear in every applicable bucket (LS-7059).
       // Pseudo-positions came from LS-6489; multi-select from LS-6464.
       const requestedPositions = [
         ...(args.positions ?? []),
@@ -1923,8 +1949,13 @@ builder.queryField('footballPlayers', (t) =>
         positionFilter.push(p);
       }
       if (positionFilter.length > 0) {
+        const deduped = [...new Set(positionFilter)];
+        const inList = sql.join(
+          deduped.map((p) => sql`${p}`),
+          sql`, `,
+        );
         conditions.push(
-          inArray(PublicSchema.players.position, [...new Set(positionFilter)]),
+          sql<boolean>`EXISTS (SELECT 1 FROM "football_player_eligible_positions" ep WHERE ep.player_id = ${PublicSchema.players.id} AND ep.position IN (${inList}))`,
         );
       }
 
