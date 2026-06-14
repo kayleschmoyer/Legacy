@@ -624,6 +624,62 @@ adminTest.describe(
         await expect(page.getByText('Win %')).toBeVisible();
       },
     );
+
+    adminTest(
+      'shows Games and Losses in pitching section',
+      async ({ page }) => {
+        // "Games" also appears in the Career Batting section; asserting visibility
+        // confirms it renders in the comparison table (both rows are correct).
+        await expect(page.getByText('Games').first()).toBeVisible();
+        await expect(page.getByText('Losses', { exact: true })).toBeVisible();
+      },
+    );
+
+    adminTest('shows Saves and Walks in pitching section', async ({ page }) => {
+      await expect(page.getByText('Saves', { exact: true })).toBeVisible();
+      // "Walks" also appears in Career Batting; asserting visibility covers both.
+      await expect(page.getByText('Walks').first()).toBeVisible();
+    });
+
+    adminTest('shows correct ERA stat value for pitcher', async ({ page }) => {
+      // Ohtani mock era = '2.94' → rendered as '2.94'
+      await expect(page.getByText('2.94')).toBeVisible();
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests: Career pitching absent when no pitcher selected (LS-5571) @regression
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – career pitching absent (hitters only) @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockGraphQL(page);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+
+      // Add two pure hitters — neither has careerPitching data
+      await addPlayer(page, 'Aa', 'Aaron Judge');
+      await addPlayer(page, 'Mo', 'Mookie Betts');
+    });
+
+    adminTest(
+      'does not show Career Pitching section when no pitchers selected',
+      async ({ page }) => {
+        await expect(page.getByText(/career pitching/i)).not.toBeVisible();
+      },
+    );
+
+    adminTest(
+      'still shows Career Batting and Career Achievements when no pitchers',
+      async ({ page }) => {
+        await expect(page.getByText(/career batting/i)).toBeVisible();
+        await expect(page.getByText(/career achievements/i)).toBeVisible();
+      },
+    );
   },
 );
 
