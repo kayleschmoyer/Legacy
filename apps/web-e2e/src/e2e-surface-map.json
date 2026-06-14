@@ -471,6 +471,10 @@
       "apps/web/src/components/CareerArcSparkline.tsx",
       "lambdas/stats/**"
     ],
+    "apps/web-e2e/src/tests/players-position-filter.spec.ts": [
+      "lib/shared-components/src/features/players/PlayersScreen.tsx",
+      "apps/web/src/pages/players/**"
+    ],
     "apps/web-e2e/src/tests/playoff-bracket.spec.ts": [
       "apps/web/src/pages/standings/**",
       "apps/web/src/components/league/**",
