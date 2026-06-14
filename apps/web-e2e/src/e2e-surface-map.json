@@ -751,6 +751,12 @@
       "apps/web/src/components/league/**",
       "apps/web/src/components/leagues/**",
       "apps/web/src/features/baseball/**"
+    ],
+    "apps/web-e2e/src/tests/player-comparison-fantasy-scoring.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "lib/shared-components/src/features/players/PlayerComparison.tsx",
+      "apps/web/src/components/PremiumGate.tsx",
+      "apps/web/src/hooks/useIsPremium.ts"
     ]
   }
 }
