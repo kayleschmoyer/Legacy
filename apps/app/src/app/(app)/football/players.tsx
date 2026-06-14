@@ -31,9 +31,11 @@ type FootballPosition =
   | 'DST'
   | 'DL'
   | 'LB'
-  | 'DB';
+  | 'DB'
+  | 'SUPERFLEX'
+  | 'IDP';
 
-const POSITIONS: FootballPosition[] = [
+const BASE_POSITIONS: FootballPosition[] = [
   'All',
   'QB',
   'RB',
@@ -47,6 +49,8 @@ const POSITIONS: FootballPosition[] = [
   'DB',
 ];
 
+const PREMIUM_POSITIONS: FootballPosition[] = ['SUPERFLEX', 'IDP'];
+
 const POSITION_COLORS: Record<string, string> = {
   QB: '#4A90D9',
   RB: '#27AE60',
@@ -58,6 +62,8 @@ const POSITION_COLORS: Record<string, string> = {
   DL: '#C25A2A', // burnt orange-red (defensive line)
   LB: '#9B7A3D', // amber-brown (linebackers)
   DB: '#6B3FA0', // deep purple (defensive backs)
+  SUPERFLEX: '#D4AF37', // gold — premium composite (QB+Flex)
+  IDP: '#5B7FA6', // steel blue — premium composite (DL+LB+DB)
 };
 
 const TEAM_OPTIONS: Array<{ value: string; label: string }> = [
@@ -415,6 +421,12 @@ function ProjectionsUpsellBanner() {
 export default function FootballPlayers(): React.JSX.Element {
   const router = useRouter();
   const isPremium = useHasEntitlement(ENTITLEMENTS.football_projections);
+  const hasAdvancedFilters = useHasEntitlement(
+    ENTITLEMENTS.advanced_search_filters,
+  );
+  const visiblePositions = hasAdvancedFilters
+    ? [...BASE_POSITIONS, ...PREMIUM_POSITIONS]
+    : BASE_POSITIONS;
   const [position, setPosition] = useState<FootballPosition>('All');
   const [teamFilter, setTeamFilter] = useState('All');
   const [searchInput, setSearchInput] = useState('');
@@ -423,6 +435,12 @@ export default function FootballPlayers(): React.JSX.Element {
   const [isFilterChanging, setIsFilterChanging] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 300);
+
+  useEffect(() => {
+    if (!hasAdvancedFilters && PREMIUM_POSITIONS.includes(position)) {
+      setPosition('All');
+    }
+  }, [hasAdvancedFilters, position]);
 
   const prevFiltersRef = useRef({ position, teamFilter, debouncedSearch });
   useEffect(() => {
@@ -482,11 +500,11 @@ export default function FootballPlayers(): React.JSX.Element {
       <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
         {/* Position filter pills */}
         <FlatList
-          data={POSITIONS}
+          data={visiblePositions}
           horizontal
           showsHorizontalScrollIndicator={true}
           fadingEdgeLength={32}
-          initialNumToRender={POSITIONS.length}
+          initialNumToRender={visiblePositions.length}
           keyExtractor={(item) => item}
           renderItem={({ item: pos }) => (
             <PositionPill

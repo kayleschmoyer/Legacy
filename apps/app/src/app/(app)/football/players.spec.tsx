@@ -130,12 +130,6 @@ jest.mock('tamagui', () => {
   };
 });
 
-const mockUseFootballPlayersQuery = jest.fn();
-jest.mock('../../../api/db/graphql.generated', () => ({
-  useFootballPlayersQuery: (...args: unknown[]) =>
-    mockUseFootballPlayersQuery(...args) as Record<string, unknown>,
-}));
-
 const mockUseHasEntitlement = jest.fn().mockReturnValue(false);
 jest.mock('../../../features/subscription/useSubscription', () => ({
   useHasEntitlement: (...args: unknown[]) =>
@@ -145,7 +139,14 @@ jest.mock('../../../features/subscription/useSubscription', () => ({
 jest.mock('@legacy-sports/utils', () => ({
   ENTITLEMENTS: {
     football_projections: 'football_projections',
+    advanced_search_filters: 'advanced_search_filters',
   },
+}));
+
+const mockUseFootballPlayersQuery = jest.fn();
+jest.mock('../../../api/db/graphql.generated', () => ({
+  useFootballPlayersQuery: (...args: unknown[]) =>
+    mockUseFootballPlayersQuery(...args) as Record<string, unknown>,
 }));
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -432,6 +433,46 @@ describe('FootballPlayers', () => {
   });
 
   describe('position filter', () => {
+    it('hides SUPERFLEX and IDP pills for free users', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballPlayers />);
+      expect(screen.queryByText('SUPERFLEX')).toBeNull();
+      expect(screen.queryByText('IDP')).toBeNull();
+    });
+
+    it('shows SUPERFLEX and IDP pills for premium users', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballPlayers />);
+      expect(screen.getByText('SUPERFLEX')).toBeTruthy();
+      expect(screen.getByText('IDP')).toBeTruthy();
+    });
+
+    it('resets selected position to All when advanced_search_filters entitlement is revoked', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      const { rerender } = render(<FootballPlayers />);
+
+      // Select SUPERFLEX while premium
+      fireEvent.press(screen.getByText('SUPERFLEX'));
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      let lastCall = calls[calls.length - 1] as [
+        { variables: { position?: string } },
+      ];
+      expect(lastCall[0].variables.position).toBe('SUPERFLEX');
+
+      // Simulate entitlement revocation (downgrade)
+      mockUseHasEntitlement.mockReturnValue(false);
+      void act(() => {
+        rerender(<FootballPlayers />);
+      });
+
+      // Downgrade guard useEffect resets position to 'All' → query gets undefined
+      const calls2 = mockUseFootballPlayersQuery.mock.calls;
+      lastCall = calls2[calls2.length - 1] as [
+        { variables: { position?: string } },
+      ];
+      expect(lastCall[0].variables.position).toBeUndefined();
+    });
+
     it('passes selected position to query when a pill is pressed', () => {
       render(<FootballPlayers />);
       // Pills are rendered first in the FlatList before any player content;

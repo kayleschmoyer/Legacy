@@ -1889,6 +1889,14 @@ builder.queryField('footballPlayers', (t) =>
           conditions.push(
             inArray(PublicSchema.players.position, ['RB', 'WR', 'TE']),
           );
+        } else if (args.position === 'SUPERFLEX') {
+          conditions.push(
+            inArray(PublicSchema.players.position, ['QB', 'RB', 'WR', 'TE']),
+          );
+        } else if (args.position === 'IDP') {
+          conditions.push(
+            inArray(PublicSchema.players.position, ['DL', 'LB', 'DB']),
+          );
         } else {
           if (!isValidPosition(args.position)) {
             throw UserInputError(`Invalid position: ${args.position}`);

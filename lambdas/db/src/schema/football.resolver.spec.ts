@@ -532,6 +532,52 @@ describe('football resolvers', () => {
       expect(result.nodes[0].position).toBe('RB');
     });
 
+    it('accepts SUPERFLEX position and returns QB/RB/WR/TE players', async () => {
+      const qbRow = {
+        id: 11,
+        firstName: 'Patrick',
+        lastName: 'Mahomes',
+        pfrId: null,
+        isDst: false,
+        nflTeam: 'KC',
+        position: 'QB',
+      };
+      mockDb.then.mockImplementationOnce((resolve) => resolve([qbRow]));
+
+      const result = (await getResolver()(
+        {},
+        { position: 'SUPERFLEX', nflTeam: null, search: null, after: null },
+        mockContext,
+        undefined as never,
+      )) as FootballPlayersResult;
+
+      expect(result.nodes).toHaveLength(1);
+      expect(result.nodes[0].position).toBe('QB');
+    });
+
+    it('accepts IDP position and returns DL/LB/DB players', async () => {
+      const dlRow = {
+        id: 12,
+        firstName: 'Myles',
+        lastName: 'Garrett',
+        pfrId: null,
+        isDst: false,
+        nflTeam: 'CLE',
+        position: 'DL',
+      };
+      mockDb.then.mockImplementationOnce((resolve) => resolve([dlRow]));
+
+      const result = (await getResolver()(
+        {},
+        { position: 'IDP', nflTeam: null, search: null, after: null },
+        mockContext,
+        undefined as never,
+      )) as FootballPlayersResult;
+
+      expect(result.nodes).toHaveLength(1);
+      expect(result.nodes[0].position).toBe('DL');
+    });
+
     it('throws BAD_USER_INPUT for invalid position value', async () => {
       await expect(
         getResolver()(
