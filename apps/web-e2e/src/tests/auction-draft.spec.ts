@@ -292,6 +292,32 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
+    // useIsPremium reads subscriptionTier from GetUserById to gate the
+    // EliteDraftBoardScreenWrapper PremiumGate (LS-5030). Explicit mock ensures
+    // the premium check resolves before the draft room renders.
+    if (opName === 'getuserbyid') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            user: {
+              __typename: 'User',
+              id: 1,
+              email: 'test@example.com',
+              username: 'testuser',
+              name: 'Test User',
+              accessLevel: 'none',
+              avatarUrl: null,
+              subscriptionTier: 'premium',
+              themePreference: null,
+            },
+          },
+        }),
+      });
+      return;
+    }
+
     // Draft query — returns auction selection method to trigger AuctionDraftRoom
     if (
       opName.includes('getlivedraftleaguedraft') ||

@@ -13,9 +13,9 @@ export interface PremiumGateProps {
   /** Content to render normally for premium users (hidden for free users). */
   children: React.ReactNode;
   /**
-   * Optional upgrade callback. When provided, an "Upgrade" button is shown
-   * in the locked UI. Callers supply platform-specific navigation (web:
-   * open UpgradeModal; mobile: navigate to subscription-settings).
+   * Optional upgrade callback. When provided, an "Upgrade to Premium" button
+   * is shown in the locked UI. Callers supply platform-specific navigation
+   * (web: open UpgradeModal; mobile: navigate to subscription-settings).
    */
   onUpgrade?: () => void;
 }
@@ -26,7 +26,7 @@ export interface PremiumGateProps {
  *
  * - Premium users: children rendered normally.
  * - Free users: a locked card with lock icon, feature name, optional
- *   description, and an "Upgrade" button when `onUpgrade` is provided.
+ *   description, and an "Upgrade to Premium" button when `onUpgrade` is provided.
  *
  * Platform-specific upgrade actions are injected via the `onUpgrade` prop
  * so this component stays free of web/mobile dependencies.
@@ -63,7 +63,7 @@ export function PremiumGate({
         </Text>
         {onUpgrade ? (
           <Button size="$2" onPress={onUpgrade} alignSelf="flex-start">
-            Upgrade
+            Upgrade to Premium
           </Button>
         ) : null}
       </YStack>

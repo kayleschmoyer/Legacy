@@ -15,7 +15,10 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -143,30 +146,47 @@ async function setupCommissionerGraphQL(
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const op = extractOperationName(route);
 
-      if (
-        postData.includes('getleaguebyid') ||
-        postData.includes('"getleague"')
-      ) {
+      if (op === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              user: {
+                __typename: 'User',
+                id: 1,
+                email: 'test@example.com',
+                username: 'testuser',
+                name: 'Test User',
+                accessLevel: 'none',
+                avatarUrl: null,
+                subscriptionTier: 'premium',
+                themePreference: null,
+              },
+            },
+          }),
+        });
+      } else if (op === 'GetLeagueById') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { league } }),
         });
-      } else if (postData.includes('getleagueteams')) {
+      } else if (op === 'GetLeagueTeams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
         });
-      } else if (postData.includes('getleaguedraft')) {
+      } else if (op === 'GetLeagueDraft') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { getLeagueDraft: MOCK_DRAFT_DATA } }),
         });
-      } else if (postData.includes('getdraftteamorder')) {
+      } else if (op === 'GetDraftTeamOrder') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -174,31 +194,31 @@ async function setupCommissionerGraphQL(
             data: { getDraftTeamOrder: MOCK_DRAFT_TEAM_ORDER },
           }),
         });
-      } else if (postData.includes('getuserteamid')) {
+      } else if (op === 'GetUserTeamId') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { userTeamId: 1 } }),
         });
-      } else if (postData.includes('getpositionsforleague')) {
+      } else if (op === 'GetPositionsForLeague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { leaguePositions: [] } }),
         });
-      } else if (postData.includes('getmatchupsforleague')) {
+      } else if (op === 'GetMatchupsForLeague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
         });
-      } else if (postData.includes('getcurrentweekforleague')) {
+      } else if (op === 'GetCurrentWeekForLeague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
         });
-      } else if (postData.includes('getuserleagues')) {
+      } else if (op === 'GetUserLeagues') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -259,5 +279,114 @@ test.describe('Draft Settings Control @regression', () => {
     // Save button is rendered in the draft settings card
     const saveBtn = page.getByRole('button', { name: /save.*settings|save/i });
     await expect(saveBtn.first()).toBeVisible();
+  });
+});
+
+// ── Premium gate — free user ───────────────────────────────────────────────────
+
+async function setupFreeUserGraphQL(
+  page: import('@playwright/test').Page,
+  league: ReturnType<typeof makeLeague>,
+) {
+  await page.route(
+    (url) => isGraphQLEndpoint(url),
+    async (route) => {
+      const op = extractOperationName(route);
+
+      if (op === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              user: {
+                __typename: 'User',
+                id: 1,
+                email: 'test@example.com',
+                username: 'testuser',
+                name: 'Test User',
+                accessLevel: 'none',
+                avatarUrl: null,
+                subscriptionTier: null,
+                themePreference: null,
+              },
+            },
+          }),
+        });
+      } else if (op === 'GetLeagueById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { league } }),
+        });
+      } else if (op === 'GetLeagueTeams') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+        });
+      } else if (op === 'GetLeagueDraft') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getLeagueDraft: MOCK_DRAFT_DATA } }),
+        });
+      } else if (op === 'GetDraftTeamOrder') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getDraftTeamOrder: MOCK_DRAFT_TEAM_ORDER },
+          }),
+        });
+      } else if (op === 'GetUserTeamId') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userTeamId: 1 } }),
+        });
+      } else if (op === 'GetPositionsForLeague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leaguePositions: [] } }),
+        });
+      } else if (op === 'GetMatchupsForLeague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
+        });
+      } else if (op === 'GetCurrentWeekForLeague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getCurrentWeekForLeague: null } }),
+        });
+      } else if (op === 'GetUserLeagues') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userLeagues: [league] } }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    },
+  );
+}
+
+test.describe('Draft Settings Control — free user premium gate @regression', () => {
+  test('shows premium gate for free user on the commissioner page @regression', async ({
+    page,
+  }) => {
+    await setupFreeUserGraphQL(page, makeLeague('not-started'));
+    await page.goto('/baseball/league/1/commissioner');
+
+    // LeagueDetailPageV2 wraps the entire league shell in the web PremiumGate
+    // (apps/web/src/components/PremiumGate.tsx), which renders a blur overlay
+    // with data-testid="premium-feature-gate" for free users — not the
+    // shared-components card that shows "Available with Premium leagues."
+    await expect(page.getByTestId('premium-feature-gate')).toBeVisible();
   });
 });

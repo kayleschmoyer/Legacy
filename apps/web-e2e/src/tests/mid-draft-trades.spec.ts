@@ -382,9 +382,9 @@ async function mockDraftGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (opName.includes('getuserbyid') && aiRecs.length > 0) {
-      // When AI recommendations are included, the test user must be premium so
-      // DraftIntelligence renders (useIsPremium checks subscriptionTier).
+    } else if (opName === 'getuserbyid') {
+      // Premium required for EliteDraftBoardScreenWrapper PremiumGate (LS-5030)
+      // and for DraftIntelligence when AI recommendations are included.
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

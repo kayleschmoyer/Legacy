@@ -10,6 +10,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { Draft } from '../types';
 import { builder } from '../../builder';
 import type { Context } from '../../builder';
+import { requirePremium } from '../../authorization';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -83,6 +84,7 @@ builder.mutationField('setDraftOrder', (t) =>
       if (!context.user) {
         throw AuthenticationError();
       }
+      await requirePremium(context, 'Draft pick order');
 
       const { draftId, teamIds } = args;
       const userId = context.user.id;
@@ -273,6 +275,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
       if (!context.user) {
         throw AuthenticationError();
       }
+      await requirePremium(context, 'Draft pick order');
 
       const { draftId } = args;
       const userId = context.user.id;

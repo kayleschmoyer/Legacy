@@ -127,6 +127,7 @@ import {
 import { NextStepControl } from '../../features/commissioner';
 import { AvatarImage, AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
@@ -519,6 +520,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   >('activity');
 
   const { user, token: authToken } = useAuth();
+  const isPremium = useIsPremium();
 
   // Ref to hold refetchCurrentWeek so WebSocket callbacks can call it
   // without creating a hook-ordering dependency
@@ -3456,6 +3458,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             baseballHofOnly={league.baseballHofOnly}
             customEraStartYear={league.customEraStartYear}
             customEraEndYear={league.customEraEndYear}
+            isPremium={isPremium}
             onDirtyChange={setHasDraftSettingsChanges}
             onSuccess={showMatchupSuccess}
             onError={(err) => {
@@ -3487,6 +3490,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             <DraftOrderControl
               leagueId={leagueId}
               draftStatus={league.draftStatus}
+              isPremium={isPremium}
               onSuccess={showMatchupSuccess}
               onError={(err) => {
                 setMatchupErrorMessage(err.message);

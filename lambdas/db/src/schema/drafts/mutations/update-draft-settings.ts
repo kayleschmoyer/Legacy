@@ -14,7 +14,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
-import { requireEntitlement } from '../../authorization';
+import { requireEntitlement, requirePremium } from '../../authorization';
 import {
   isEraFreeForSport,
   normalizeSport,
@@ -36,6 +36,7 @@ builder.mutationField('updateDraftSettings', (t) =>
           'Authentication required to update draft settings',
         );
       }
+      await requirePremium(context, 'Draft settings');
 
       const {
         leagueId,

@@ -52,6 +52,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
         name: 'Test User',
         accessLevel: 'none',
         avatarUrl: null,
+        // Premium by default so the many existing league-detail / draft specs
+        // that use the default admin fixture keep seeing content after LS-5030
+        // gated those screens. Free-gate specs override GetUserById locally with
+        // subscriptionTier: null (see subscription.spec.ts freeUserByIdResponse).
         subscriptionTier: 'premium',
         themePreference: null,
       },

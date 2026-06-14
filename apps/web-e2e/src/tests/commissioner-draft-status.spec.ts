@@ -18,8 +18,29 @@ import type { APIRequestContext } from '@playwright/test';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { waitForSeasonActive } from '../integration/helpers/wait-for-season-active';
+
+/**
+ * Precise GraphQL operation-name match for a request body. Mirrors
+ * `extractOperationName` (which takes a Route) for the `waitForResponse`
+ * predicates below, where only a Response/Request is available. Parses the
+ * JSON `operationName` field instead of a broad `postData.includes()` substring
+ * scan so sibling operations (e.g. GetLeagueByIdSummary) never match.
+ */
+function isGraphQLOperation(postData: string | null, op: string): boolean {
+  try {
+    return (
+      (JSON.parse(postData ?? '') as { operationName?: string })
+        .operationName === op
+    );
+  } catch {
+    return false;
+  }
+}
 
 function makeLeague(overrides: Record<string, unknown> = {}) {
   return {
@@ -88,11 +109,7 @@ async function setupLeagueMock(
   draftStatus: string,
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
-    if (
-      postData.includes('"getleaguebyid"') ||
-      postData.includes('"getleague"')
-    ) {
+    if (extractOperationName(route) === 'GetLeagueById') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -171,11 +188,7 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
     let serveCompleted = false;
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (
-        postData.includes('"getleaguebyid"') ||
-        postData.includes('"getleague"')
-      ) {
+      if (extractOperationName(route) === 'GetLeagueById') {
         callCount += 1;
         const draftStatus = serveCompleted ? 'completed' : 'queued';
         await route.fulfill({
@@ -199,9 +212,7 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
     const firstResponse = page.waitForResponse(
       (res) =>
         res.url().includes('/graphql') &&
-        (res.request().postData() ?? '')
-          .toLowerCase()
-          .includes('"getleaguebyid"'),
+        isGraphQLOperation(res.request().postData(), 'GetLeagueById'),
       { timeout: 15_000 },
     );
     await page.goto('/baseball/league/1/commissioner');
@@ -223,9 +234,7 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
     const secondResponse = page.waitForResponse(
       (res) =>
         res.url().includes('/graphql') &&
-        (res.request().postData() ?? '')
-          .toLowerCase()
-          .includes('"getleaguebyid"'),
+        isGraphQLOperation(res.request().postData(), 'GetLeagueById'),
       { timeout: 15_000 },
     );
     await page.goto('/baseball/league/1/commissioner');
@@ -367,17 +376,34 @@ test.describe('Commissioner — draft mode save-completion guard (LS-4352)', () 
     let mutationFired = false;
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (
-        postData.includes('"getleaguebyid"') ||
-        postData.includes('"getleague"')
-      ) {
+      const op = extractOperationName(route);
+      if (op === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              user: {
+                __typename: 'User',
+                id: 1,
+                email: 'test@example.com',
+                username: 'testuser',
+                name: 'Test User',
+                accessLevel: 'none',
+                avatarUrl: null,
+                subscriptionTier: 'premium',
+                themePreference: null,
+              },
+            },
+          }),
+        });
+      } else if (op === 'GetLeagueById') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { league: makeLeague() } }),
         });
-      } else if (postData.includes('"getleaguedraft"')) {
+      } else if (op === 'GetLeagueDraft') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -399,7 +425,7 @@ test.describe('Commissioner — draft mode save-completion guard (LS-4352)', () 
             },
           }),
         });
-      } else if (postData.includes('"updatedraftsettings"')) {
+      } else if (op === 'UpdateDraftSettings') {
         mutationFired = true;
         // Simulate mutation latency (e.g. CI DB write delay)
         await new Promise<void>((r) => setTimeout(r, 800));

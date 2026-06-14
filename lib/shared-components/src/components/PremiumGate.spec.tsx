@@ -83,7 +83,7 @@ describe('PremiumGate (shared)', () => {
     expect(screen.getByText('AI-powered recommendations')).toBeTruthy();
   });
 
-  it('shows Upgrade button when onUpgrade is provided', () => {
+  it('shows Upgrade to Premium button when onUpgrade is provided', () => {
     render(
       <PremiumGate
         isPremium={false}
@@ -93,19 +93,19 @@ describe('PremiumGate (shared)', () => {
         <span>content</span>
       </PremiumGate>,
     );
-    expect(screen.getByText('Upgrade')).toBeTruthy();
+    expect(screen.getByText('Upgrade to Premium')).toBeTruthy();
   });
 
-  it('does not show Upgrade button when onUpgrade is omitted', () => {
+  it('does not show Upgrade to Premium button when onUpgrade is omitted', () => {
     render(
       <PremiumGate isPremium={false} featureName="Draft Recommendations">
         <span>content</span>
       </PremiumGate>,
     );
-    expect(screen.queryByText('Upgrade')).toBeNull();
+    expect(screen.queryByText('Upgrade to Premium')).toBeNull();
   });
 
-  it('calls onUpgrade when Upgrade button is pressed', () => {
+  it('calls onUpgrade when Upgrade to Premium button is pressed', () => {
     const onUpgrade = jest.fn();
     render(
       <PremiumGate
@@ -116,7 +116,7 @@ describe('PremiumGate (shared)', () => {
         <span>content</span>
       </PremiumGate>,
     );
-    fireEvent.click(screen.getByText('Upgrade'));
+    fireEvent.click(screen.getByText('Upgrade to Premium'));
     expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 });

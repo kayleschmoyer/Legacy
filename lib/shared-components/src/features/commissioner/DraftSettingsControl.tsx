@@ -39,7 +39,7 @@ export interface DraftSettingsControlProps {
   baseballHofOnly?: boolean | null | undefined;
   customEraStartYear?: number | null | undefined;
   customEraEndYear?: number | null | undefined;
-  /** Whether the current user has premium access. Gates auction draft and era filter controls. */
+  /** Whether the current user has premium access. When false, the control is replaced with a locked upgrade prompt. Also gates auction draft and era filter controls. Defaults to true when omitted. */
   isPremium?: boolean;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
@@ -136,7 +136,7 @@ function OptionSelector({
 }
 
 /**
- * DraftSettingsControl â€" Commissioner control for editing draft settings.
+ * DraftSettingsControl — Commissioner control for editing draft settings.
  *
  * Allows editing draft mode, selection method, draft order, and player pool
  * **only** while the draft status is `not-started`. Once the draft is queued,
@@ -151,7 +151,7 @@ export function DraftSettingsControl({
   baseballHofOnly,
   customEraStartYear,
   customEraEndYear,
-  isPremium = false,
+  isPremium = true,
   onSuccess,
   onError,
   onDirtyChange,
@@ -535,345 +535,349 @@ export function DraftSettingsControl({
   };
 
   return (
-    <Card
-      backgroundColor="$surfacePanel"
-      borderColor="$surfacePanelBorder"
-      padding="$5"
-      borderRadius="$6"
-    >
-      <YStack gap="$4">
-        {/* Header */}
-        <XStack alignItems="center" justifyContent="space-between">
-          <XStack alignItems="center" gap="$2">
-            {isDraftLocked ? (
-              <Lock size={20} color="$gray10" />
-            ) : (
-              <Settings size={20} color={BRAND_NAVY_LIGHT} />
-            )}
-            <YStack>
-              <H4 margin={0}>Draft Settings</H4>
-              <Text fontSize="$2" color="$gray10">
-                {isDraftLocked
-                  ? 'Settings are locked â€" the draft has already been started.'
-                  : 'Configure your draft before it begins. Settings lock once the draft starts.'}
-              </Text>
-            </YStack>
-          </XStack>
-        </XStack>
-
-        {/* Locked banner */}
-        {isDraftLocked && (
-          <Card
-            backgroundColor="$yellow2"
-            borderColor="$yellow6"
-            padding="$3"
-            borderRadius="$4"
-          >
+    <PremiumGate isPremium={isPremium} featureName="Draft Settings">
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        padding="$5"
+        borderRadius="$6"
+      >
+        <YStack gap="$4">
+          {/* Header */}
+          <XStack alignItems="center" justifyContent="space-between">
             <XStack alignItems="center" gap="$2">
-              <Lock size={16} color="$yellow11" />
-              <Text fontSize="$3" color="$yellow11" fontWeight="600">
-                Draft settings are locked because the draft status is &ldquo;
-                {draftStatus}&rdquo;. Settings can only be changed before the
-                draft is started.
-              </Text>
-            </XStack>
-          </Card>
-        )}
-
-        {draftLoading ? (
-          <YStack alignItems="center" padding="$4" gap="$2">
-            <Spinner size="large" />
-            <Text color="$gray10">Loading draft settings...</Text>
-          </YStack>
-        ) : (
-          <YStack gap="$5">
-            {/* Draft Mode */}
-            <OptionSelector
-              label="Draft Mode"
-              description="Live drafts happen in real-time with all managers picking. Automated drafts are processed instantly by the system."
-              options={DRAFT_MODES}
-              value={draftMode}
-              onChange={handleDraftModeChange}
-              disabled={isDraftLocked || saving}
-            />
-
-            {/* Selection Method */}
-            <OptionSelector
-              label="Selection Method"
-              description={
-                draftMode === 'automated'
-                  ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
-                  : 'Standard lets managers pick players in order. Auction gives a budget for bidding. Random assigns players automatically.'
-              }
-              options={selectionMethodOptions}
-              value={selectionMethod}
-              onChange={handleSelectionMethodChange}
-              disabled={isDraftLocked || saving || draftMode === 'automated'}
-            />
-
-            {/* Draft Order */}
-            <OptionSelector
-              label="Draft Order"
-              description="Snake reverses pick order each round (1-2-3, 3-2-1). Linear keeps the same order every round."
-              options={DRAFT_ORDERS}
-              value={draftOrder}
-              onChange={handleDraftOrderChange}
-              disabled={isDraftLocked || saving}
-            />
-
-            {/* Pick Timer */}
-            <OptionSelector
-              label="Pick Timer"
-              description="Time each manager has per pick. Use slow-mode (24h / 48h) for asynchronous email-pace drafts."
-              options={PICK_TIME_OPTIONS}
-              value={pickTimeLimitSeconds}
-              onChange={handlePickTimeLimitChange}
-              disabled={isDraftLocked || saving}
-            />
-
-            {/* Player Pool */}
-            <OptionSelector
-              label="Player Pool"
-              description="Choose which players are available to draft, or limit to one conference."
-              options={sportPlayerPools}
-              value={playerPool}
-              onChange={handlePlayerPoolChange}
-              disabled={isDraftLocked || saving}
-            />
-
-            {/* Era Filter (premium feature) */}
-            <PremiumGate
-              isPremium={isPremium}
-              featureName="Historical Era Filter"
-              featureDescription="Restrict the draft pool to players from a specific historical era."
-            >
-              <YStack gap="$4">
-                <OptionSelector
-                  label="Historical Era Filter"
-                  description="Restrict the draft pool to players from a specific era. Change before the draft starts."
-                  options={sportEraFilters}
-                  value={eraFilterLocal}
-                  onChange={handleEraFilterChange}
-                  disabled={isDraftLocked || saving}
-                />
-
-                {/* Custom era year range (LS-887) */}
-                {eraFilterLocal === 'custom' && (
-                  <XStack gap="$3" alignItems="center" flexWrap="wrap">
-                    <YStack flex={1} gap="$1">
-                      <Text fontSize="$2" color="$gray10">
-                        Start Year
-                      </Text>
-                      <Input
-                        size="$3"
-                        placeholder="e.g. 1940"
-                        value={
-                          customEraStartYearLocal !== undefined
-                            ? String(customEraStartYearLocal)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          const newVal = isNaN(year) ? undefined : year;
-                          setCustomEraStartYearLocal(newVal);
-                          checkChanges(
-                            draftMode,
-                            selectionMethod,
-                            draftOrder,
-                            playerPool,
-                            eraFilterLocal,
-                            hofOnlyLocal,
-                            scheduledAt,
-                            pickTimeLimitSeconds,
-                            newVal,
-                            customEraEndYearLocal,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={isDraftLocked || saving}
-                        borderColor="$orange8"
-                      />
-                    </YStack>
-                    <Text color="$gray10" marginTop="$4">
-                      {'—'}
-                    </Text>
-                    <YStack flex={1} gap="$1">
-                      <Text fontSize="$2" color="$gray10">
-                        End Year
-                      </Text>
-                      <Input
-                        size="$3"
-                        placeholder="e.g. 1960"
-                        value={
-                          customEraEndYearLocal !== undefined
-                            ? String(customEraEndYearLocal)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          const newVal = isNaN(year) ? undefined : year;
-                          setCustomEraEndYearLocal(newVal);
-                          checkChanges(
-                            draftMode,
-                            selectionMethod,
-                            draftOrder,
-                            playerPool,
-                            eraFilterLocal,
-                            hofOnlyLocal,
-                            scheduledAt,
-                            pickTimeLimitSeconds,
-                            customEraStartYearLocal,
-                            newVal,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={isDraftLocked || saving}
-                        borderColor="$orange8"
-                      />
-                    </YStack>
-                  </XStack>
-                )}
-              </YStack>
-            </PremiumGate>
-
-            {/* Hall of Fame Only */}
-            <YStack gap="$2">
-              <YStack gap="$1">
-                <Text fontSize="$3" fontWeight="600" color="$color">
-                  Hall of Fame Only
-                </Text>
+              {isDraftLocked ? (
+                <Lock size={20} color="$gray10" />
+              ) : (
+                <Settings size={20} color={BRAND_NAVY_LIGHT} />
+              )}
+              <YStack>
+                <H4 margin={0}>Draft Settings</H4>
                 <Text fontSize="$2" color="$gray10">
-                  When enabled, only Baseball Hall of Fame inductees can be
-                  drafted.
+                  {isDraftLocked
+                    ? 'Settings are locked — the draft has already been started.'
+                    : 'Configure your draft before it begins. Settings lock once the draft starts.'}
                 </Text>
               </YStack>
-              <XStack gap="$2">
-                {[
-                  { label: 'Off', value: false },
-                  { label: 'On', value: true },
-                ].map((opt) => {
-                  const isSelected = hofOnlyLocal === opt.value;
-                  return (
-                    <Button
-                      key={String(opt.value)}
-                      size="$3"
-                      theme={isSelected ? 'active' : 'alt2'}
-                      backgroundColor={
-                        isSelected
-                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                          : '$gray3'
-                      }
-                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                      borderWidth={1}
-                      onPress={() => {
-                        handleHofOnlyChange(opt.value);
-                      }}
-                      disabled={isDraftLocked || saving}
-                    >
-                      <Text
-                        fontWeight={isSelected ? '600' : '400'}
-                        color={isSelected ? '$color' : '$gray10'}
+            </XStack>
+          </XStack>
+
+          {/* Locked banner */}
+          {isDraftLocked && (
+            <Card
+              backgroundColor="$yellow2"
+              borderColor="$yellow6"
+              padding="$3"
+              borderRadius="$4"
+            >
+              <XStack alignItems="center" gap="$2">
+                <Lock size={16} color="$yellow11" />
+                <Text fontSize="$3" color="$yellow11" fontWeight="600">
+                  Draft settings are locked because the draft status is &ldquo;
+                  {draftStatus}&rdquo;. Settings can only be changed before the
+                  draft is started.
+                </Text>
+              </XStack>
+            </Card>
+          )}
+
+          {draftLoading ? (
+            <YStack alignItems="center" padding="$4" gap="$2">
+              <Spinner size="large" />
+              <Text color="$gray10">Loading draft settings...</Text>
+            </YStack>
+          ) : (
+            <YStack gap="$5">
+              {/* Draft Mode */}
+              <OptionSelector
+                label="Draft Mode"
+                description="Live drafts happen in real-time with all managers picking. Automated drafts are processed instantly by the system."
+                options={DRAFT_MODES}
+                value={draftMode}
+                onChange={handleDraftModeChange}
+                disabled={isDraftLocked || saving}
+              />
+
+              {/* Selection Method */}
+              <OptionSelector
+                label="Selection Method"
+                description={
+                  draftMode === 'automated'
+                    ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
+                    : 'Standard lets managers pick players in order. Auction gives a budget for bidding. Random assigns players automatically.'
+                }
+                options={selectionMethodOptions}
+                value={selectionMethod}
+                onChange={handleSelectionMethodChange}
+                disabled={isDraftLocked || saving || draftMode === 'automated'}
+              />
+
+              {/* Draft Order */}
+              <OptionSelector
+                label="Draft Order"
+                description="Snake reverses pick order each round (1-2-3, 3-2-1). Linear keeps the same order every round."
+                options={DRAFT_ORDERS}
+                value={draftOrder}
+                onChange={handleDraftOrderChange}
+                disabled={isDraftLocked || saving}
+              />
+
+              {/* Pick Timer */}
+              <OptionSelector
+                label="Pick Timer"
+                description="Time each manager has per pick. Use slow-mode (24h / 48h) for asynchronous email-pace drafts."
+                options={PICK_TIME_OPTIONS}
+                value={pickTimeLimitSeconds}
+                onChange={handlePickTimeLimitChange}
+                disabled={isDraftLocked || saving}
+              />
+
+              {/* Player Pool */}
+              <OptionSelector
+                label="Player Pool"
+                description="Choose which players are available to draft, or limit to one conference."
+                options={sportPlayerPools}
+                value={playerPool}
+                onChange={handlePlayerPoolChange}
+                disabled={isDraftLocked || saving}
+              />
+
+              {/* Era Filter (premium feature) */}
+              <PremiumGate
+                isPremium={isPremium}
+                featureName="Historical Era Filter"
+                featureDescription="Restrict the draft pool to players from a specific historical era."
+              >
+                <YStack gap="$4">
+                  <OptionSelector
+                    label="Historical Era Filter"
+                    description="Restrict the draft pool to players from a specific era. Change before the draft starts."
+                    options={sportEraFilters}
+                    value={eraFilterLocal}
+                    onChange={handleEraFilterChange}
+                    disabled={isDraftLocked || saving}
+                  />
+
+                  {/* Custom era year range (LS-887) */}
+                  {eraFilterLocal === 'custom' && (
+                    <XStack gap="$3" alignItems="center" flexWrap="wrap">
+                      <YStack flex={1} gap="$1">
+                        <Text fontSize="$2" color="$gray10">
+                          Start Year
+                        </Text>
+                        <Input
+                          size="$3"
+                          placeholder="e.g. 1940"
+                          value={
+                            customEraStartYearLocal !== undefined
+                              ? String(customEraStartYearLocal)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const year = parseInt(text, 10);
+                            const newVal = isNaN(year) ? undefined : year;
+                            setCustomEraStartYearLocal(newVal);
+                            checkChanges(
+                              draftMode,
+                              selectionMethod,
+                              draftOrder,
+                              playerPool,
+                              eraFilterLocal,
+                              hofOnlyLocal,
+                              scheduledAt,
+                              pickTimeLimitSeconds,
+                              newVal,
+                              customEraEndYearLocal,
+                            );
+                          }}
+                          keyboardType="numeric"
+                          disabled={isDraftLocked || saving}
+                          borderColor="$orange8"
+                        />
+                      </YStack>
+                      <Text color="$gray10" marginTop="$4">
+                        {'—'}
+                      </Text>
+                      <YStack flex={1} gap="$1">
+                        <Text fontSize="$2" color="$gray10">
+                          End Year
+                        </Text>
+                        <Input
+                          size="$3"
+                          placeholder="e.g. 1960"
+                          value={
+                            customEraEndYearLocal !== undefined
+                              ? String(customEraEndYearLocal)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const year = parseInt(text, 10);
+                            const newVal = isNaN(year) ? undefined : year;
+                            setCustomEraEndYearLocal(newVal);
+                            checkChanges(
+                              draftMode,
+                              selectionMethod,
+                              draftOrder,
+                              playerPool,
+                              eraFilterLocal,
+                              hofOnlyLocal,
+                              scheduledAt,
+                              pickTimeLimitSeconds,
+                              customEraStartYearLocal,
+                              newVal,
+                            );
+                          }}
+                          keyboardType="numeric"
+                          disabled={isDraftLocked || saving}
+                          borderColor="$orange8"
+                        />
+                      </YStack>
+                    </XStack>
+                  )}
+                </YStack>
+              </PremiumGate>
+
+              {/* Hall of Fame Only */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Hall of Fame Only
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    When enabled, only Baseball Hall of Fame inductees can be
+                    drafted.
+                  </Text>
+                </YStack>
+                <XStack gap="$2">
+                  {[
+                    { label: 'Off', value: false },
+                    { label: 'On', value: true },
+                  ].map((opt) => {
+                    const isSelected = hofOnlyLocal === opt.value;
+                    return (
+                      <Button
+                        key={String(opt.value)}
+                        size="$3"
+                        theme={isSelected ? 'active' : 'alt2'}
+                        backgroundColor={
+                          isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                            : '$gray3'
+                        }
+                        borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                        borderWidth={1}
+                        onPress={() => {
+                          handleHofOnlyChange(opt.value);
+                        }}
+                        disabled={isDraftLocked || saving}
                       >
-                        {opt.label}
+                        <Text
+                          fontWeight={isSelected ? '600' : '400'}
+                          color={isSelected ? '$color' : '$gray10'}
+                        >
+                          {opt.label}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </XStack>
+              </YStack>
+
+              {/* Draft Schedule (LS-423) */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Scheduled Start Time
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    Set a date and time for the draft to automatically begin.
+                    The draft room opens 30 minutes before. Leave blank for
+                    manual start. All times are in UTC.
+                  </Text>
+                </YStack>
+                <XStack gap="$2" alignItems="center">
+                  <DateTimePicker
+                    value={scheduledAt ? new Date(scheduledAt) : undefined}
+                    onChange={(date) => {
+                      // Reconstruct local-time string (YYYY-MM-DDTHH:MM) to match
+                      // the datetime-local input convention; the component treats
+                      // this string as UTC (the label says "All times are in UTC").
+                      const pad = (n: number) => String(n).padStart(2, '0');
+                      const localStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+                      handleScheduledAtChange(localStr);
+                    }}
+                    minDate={new Date(Date.now() + 60_000)}
+                    disabled={isDraftLocked || saving}
+                    inputClassName="draft-schedule-input"
+                    inputStyle={{
+                      background: isDraftLocked
+                        ? 'var(--gray3)'
+                        : 'var(--gray4)',
+                      border: `1px solid ${
+                        scheduledAt ? BRAND_NAVY_LIGHT : 'var(--gray7)'
+                      }`,
+                      fontSize: '13px',
+                      padding: '6px 10px',
+                      cursor: isDraftLocked ? 'not-allowed' : 'default',
+                    }}
+                  />
+                  {scheduledAt && !isDraftLocked && (
+                    <Button
+                      size="$2"
+                      theme="alt2"
+                      onPress={() => {
+                        handleScheduledAtChange('');
+                      }}
+                      disabled={saving}
+                    >
+                      <Text fontSize="$2" color="$gray10">
+                        Clear
                       </Text>
                     </Button>
-                  );
-                })}
-              </XStack>
-            </YStack>
-
-            {/* Draft Schedule (LS-423) */}
-            <YStack gap="$2">
-              <YStack gap="$1">
-                <Text fontSize="$3" fontWeight="600" color="$color">
-                  Scheduled Start Time
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  Set a date and time for the draft to automatically begin. The
-                  draft room opens 30 minutes before. Leave blank for manual
-                  start. All times are in UTC.
-                </Text>
-              </YStack>
-              <XStack gap="$2" alignItems="center">
-                <DateTimePicker
-                  value={scheduledAt ? new Date(scheduledAt) : undefined}
-                  onChange={(date) => {
-                    // Reconstruct local-time string (YYYY-MM-DDTHH:MM) to match
-                    // the datetime-local input convention; the component treats
-                    // this string as UTC (the label says "All times are in UTC").
-                    const pad = (n: number) => String(n).padStart(2, '0');
-                    const localStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-                    handleScheduledAtChange(localStr);
-                  }}
-                  minDate={new Date(Date.now() + 60_000)}
-                  disabled={isDraftLocked || saving}
-                  inputClassName="draft-schedule-input"
-                  inputStyle={{
-                    background: isDraftLocked ? 'var(--gray3)' : 'var(--gray4)',
-                    border: `1px solid ${
-                      scheduledAt ? BRAND_NAVY_LIGHT : 'var(--gray7)'
-                    }`,
-                    fontSize: '13px',
-                    padding: '6px 10px',
-                    cursor: isDraftLocked ? 'not-allowed' : 'default',
-                  }}
-                />
-                {scheduledAt && !isDraftLocked && (
-                  <Button
-                    size="$2"
-                    theme="alt2"
-                    onPress={() => {
-                      handleScheduledAtChange('');
-                    }}
-                    disabled={saving}
-                  >
-                    <Text fontSize="$2" color="$gray10">
-                      Clear
-                    </Text>
-                  </Button>
+                  )}
+                </XStack>
+                {scheduledAt && (
+                  <Text fontSize="$2" color="$blue10">
+                    Draft room opens at{' '}
+                    {new Date(
+                      new Date(scheduledAt).getTime() - 30 * 60 * 1000,
+                    ).toLocaleString('en-US', { timeZoneName: 'short' })}
+                    {' — '}draft starts at{' '}
+                    {new Date(scheduledAt).toLocaleString('en-US', {
+                      timeZoneName: 'short',
+                    })}
+                  </Text>
                 )}
-              </XStack>
-              {scheduledAt && (
-                <Text fontSize="$2" color="$blue10">
-                  Draft room opens at{' '}
-                  {new Date(
-                    new Date(scheduledAt).getTime() - 30 * 60 * 1000,
-                  ).toLocaleString('en-US', { timeZoneName: 'short' })}
-                  {' â€" '}draft starts at{' '}
-                  {new Date(scheduledAt).toLocaleString('en-US', {
-                    timeZoneName: 'short',
-                  })}
-                </Text>
+              </YStack>
+
+              {/* Action buttons */}
+              {!isDraftLocked && (
+                <XStack gap="$3" justifyContent="flex-end" flexWrap="wrap">
+                  <Button
+                    theme="alt2"
+                    size="$3"
+                    onPress={handleReset}
+                    disabled={!hasChanges || saving}
+                    opacity={!hasChanges ? 0.5 : 1}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    theme="blue"
+                    size="$3"
+                    onPress={() => void handleSave()}
+                    disabled={!hasChanges || saving}
+                    opacity={!hasChanges ? 0.5 : 1}
+                    icon={saving ? <Spinner size="small" /> : undefined}
+                  >
+                    {saving ? 'Saving...' : 'Save Draft Settings'}
+                  </Button>
+                </XStack>
               )}
             </YStack>
-
-            {/* Action buttons */}
-            {!isDraftLocked && (
-              <XStack gap="$3" justifyContent="flex-end" flexWrap="wrap">
-                <Button
-                  theme="alt2"
-                  size="$3"
-                  onPress={handleReset}
-                  disabled={!hasChanges || saving}
-                  opacity={!hasChanges ? 0.5 : 1}
-                >
-                  Reset
-                </Button>
-                <Button
-                  theme="blue"
-                  size="$3"
-                  onPress={() => void handleSave()}
-                  disabled={!hasChanges || saving}
-                  opacity={!hasChanges ? 0.5 : 1}
-                  icon={saving ? <Spinner size="small" /> : undefined}
-                >
-                  {saving ? 'Saving...' : 'Save Draft Settings'}
-                </Button>
-              </XStack>
-            )}
-          </YStack>
-        )}
-      </YStack>
-    </Card>
+          )}
+        </YStack>
+      </Card>
+    </PremiumGate>
   );
 }
