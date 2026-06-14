@@ -297,7 +297,10 @@ jobs:
               return
             fi
 
+            # Filter to files that actually exist on disk: partial-clone checkouts
+            # (filter: tree:0) may not materialise every blob from the diff range.
             git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
+              | (while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\0' "$f"; done) \
               | xargs -0 -r pnpm exec prettier --check --ignore-unknown
           }
           run_format 2>&1 | tee "$RUNNER_TEMP/ci-format.log"

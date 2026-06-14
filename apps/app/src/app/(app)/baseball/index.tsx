@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, H3, ScrollView, Spinner, Text, YStack } from 'tamagui';
@@ -31,6 +31,12 @@ const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
  */
 export default function BaseballHome() {
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
 
@@ -82,7 +88,9 @@ export default function BaseballHome() {
           LOGGER.debug('Share dismissed by user — keeping invite modal open');
           return;
         }
-        setInviteModalVisible(false);
+        if (mountedRef.current) {
+          setInviteModalVisible(false);
+        }
       } catch (error: unknown) {
         LOGGER.error(
           'Error while sharing league invite',

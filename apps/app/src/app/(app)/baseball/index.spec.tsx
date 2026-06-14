@@ -373,5 +373,29 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         ),
       ).toBeTruthy();
     });
+
+    it('does not update state after unmount (LS-4995 memory leak guard)', async () => {
+      let resolveShare!: (result: { action: string }) => void;
+      shareSpy.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveShare = resolve;
+          }),
+      );
+
+      const { unmount } = render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('invite'));
+      fireEvent.press(screen.getByRole('button', { name: 'Fantasy Legends' }));
+
+      // Unmount while Share.share() is still pending
+      unmount();
+
+      // Resolve the share after unmount — should not throw or update state
+      await expect(
+        Promise.resolve().then(() =>
+          resolveShare({ action: Share.sharedAction }),
+        ),
+      ).resolves.not.toThrow();
+    });
   });
 });
