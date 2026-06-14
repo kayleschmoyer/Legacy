@@ -500,22 +500,47 @@ jobs:
       # but this install-if-missing fallback keeps the job green on older AMIs
       # that predate the bake-in and on the ubuntu-latest fallback runner (which
       # already ships pwsh, so the install branch is skipped). LS-7770.
+      #
+      # This is environment setup, not a check. When the fallback does run it
+      # apt-installs on a shared runner and can hit transient dpkg/apt lock
+      # contention ("removing the lock file is always wrong" + exit 2), which
+      # previously failed the whole required check on an otherwise-green PR
+      # (LS-8015). Hardened so a setup flake retries instead of failing the gate:
+      #   - every apt-get call waits up to 5 min for the dpkg lock
+      #     (-o DPkg::Lock::Timeout=300) instead of erroring out immediately;
+      #   - the install is wrapped in a bounded retry loop;
+      #   - the step is continue-on-error so a setup flake never fails the gate —
+      #     if pwsh genuinely cannot be installed, the real signal surfaces as a
+      #     failure of the "Script Unit Tests (PowerShell)" check below, not here.
       - name: "Ensure PowerShell"
+        continue-on-error: true
         run: |
           set -o pipefail
           ensure_pwsh() {
             if command -v pwsh >/dev/null 2>&1; then
               echo "pwsh already present: $(pwsh --version)"
-              return
+              return 0
             fi
             echo "pwsh not found — installing from the Microsoft APT repo"
             export DEBIAN_FRONTEND=noninteractive
-            curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb
-            sudo dpkg -i /tmp/packages-microsoft-prod.deb
-            rm -f /tmp/packages-microsoft-prod.deb
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq powershell
-            pwsh --version
+            local attempt
+            for attempt in 1 2 3; do
+              # apt-get installs the local repo-config .deb (and respects the lock
+              # timeout, unlike `dpkg -i`), refreshes the index, then installs pwsh.
+              if curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb \
+                && sudo apt-get -o DPkg::Lock::Timeout=300 install -y -qq /tmp/packages-microsoft-prod.deb \
+                && sudo apt-get -o DPkg::Lock::Timeout=300 update -qq \
+                && sudo apt-get -o DPkg::Lock::Timeout=300 install -y -qq powershell; then
+                rm -f /tmp/packages-microsoft-prod.deb
+                pwsh --version
+                return 0
+              fi
+              rm -f /tmp/packages-microsoft-prod.deb || true
+              echo "::warning::pwsh install attempt ${attempt} failed (likely dpkg/apt lock contention) — retrying in $((attempt * 15))s"
+              sleep $((attempt * 15))
+            done
+            echo "::warning::pwsh install failed after 3 attempts; the PowerShell script tests below will surface this if pwsh is required"
+            return 1
           }
           ensure_pwsh 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
