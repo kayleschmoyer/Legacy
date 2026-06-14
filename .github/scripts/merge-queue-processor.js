@@ -12,9 +12,48 @@
  * Code Quality → No console.*).
  */
 
+const fs = require('fs');
+const path = require('path');
+
 // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
 // delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
 const EXCLUDED_CHECKS = new Set(['process-merge-queue', 'delayed-recheck']);
+
+// Config-tracked required checks (LS-7963). The checked-in .github/ruleset.json
+// can carry required-check contexts ahead of live enforcement — promoting them
+// into the live GitHub ruleset is an admin action (scripts/apply-ruleset.sh)
+// that can lag the config indefinitely. During exactly that window, PR #5110
+// merged while its head-SHA `🚀 CI Pipeline / e2e-affected` check was in flight
+// (and ultimately failing): the queue evaluates only the LIVE required set, so
+// the e2e checks were invisible to it. Reading the config here closes that gap
+// for queue-driven merges without admin privileges. Union-only: config can
+// TIGHTEN the gate beyond the live ruleset, never loosen it.
+//
+// GITHUB_WORKSPACE is always set on Actions runners (actions/checkout target);
+// it is unset in the unit-test harness unless a test opts in.
+function loadConfigRequiredChecks() {
+  const workspace = process.env.GITHUB_WORKSPACE;
+  if (!workspace) return [];
+  const rulesetPath = path.join(workspace, '.github', 'ruleset.json');
+  try {
+    const ruleset = JSON.parse(fs.readFileSync(rulesetPath, 'utf8'));
+    const contexts = [];
+    for (const rule of ruleset.rules ?? []) {
+      if (rule.type !== 'required_status_checks' || rule._staged) continue;
+      for (const check of rule.parameters?.required_status_checks ?? []) {
+        if (check._staged || !check.context) continue;
+        contexts.push(check.context);
+      }
+    }
+    return contexts;
+  } catch (e) {
+    console.log(
+      `⚠️ Could not load config-tracked required checks from ${rulesetPath} ` +
+        `(${e.message}) — relying on live required checks only`,
+    );
+    return [];
+  }
+}
 
 // Lightweight checks that auto-register on every push via pull_request.synchronize
 // (check-conflicts.yml, jira-branch-sync.yml). They complete before the CI Pipeline
@@ -462,6 +501,22 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         `⚠️ Failed to fetch branch rules for '${branch}' (${status ?? e?.message ?? 'unknown error'}) — ` +
           `ruleset checks excluded; relying on classic branch protection checks only`,
       );
+    }
+
+    // Union in the config-tracked required checks (LS-7963). Only for 'main':
+    // the checked-in ruleset targets ~DEFAULT_BRANCH, so applying its contexts
+    // to non-main bases (stacked merge-to-parent PRs) would demand checks that
+    // never register there.
+    if (branch === 'main') {
+      const liveCount = names.size;
+      for (const ctx of loadConfigRequiredChecks()) names.add(ctx);
+      const added = names.size - liveCount;
+      if (added > 0) {
+        console.log(
+          `📋 Config-tracked required checks: +${added} from .github/ruleset.json ` +
+            `not yet in the live ruleset (LS-7963) — ${names.size} total`,
+        );
+      }
     }
 
     const result = names.size > 0 ? names : null;

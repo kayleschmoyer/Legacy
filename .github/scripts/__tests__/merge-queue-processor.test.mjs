@@ -16,6 +16,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
+// The processor reads config-tracked required checks from
+// $GITHUB_WORKSPACE/.github/ruleset.json (LS-7963). GITHUB_WORKSPACE is always
+// set on Actions runners, which would make every test below pick up the REAL
+// repo ruleset and gate the mocked PRs on its contexts. Unset it so tests run
+// identically locally and in CI; the LS-7963 suite opts back in per-test with
+// a fixture workspace.
+delete process.env.GITHUB_WORKSPACE;
+
 const require = createRequire(import.meta.url);
 const processor = require(
   path.join(
@@ -844,6 +852,239 @@ describe('merge-queue-processor — Discord CODEOWNER notification (LS-4185)', (
       'should not send Discord notification for merge conflict blocker',
     );
   });
+});
+
+// ── LS-7963 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — config-tracked required checks gate (LS-7963)', () => {
+  // The live required set as returned by GET /repos/.../rules/branches/main at
+  // the time of the #5110 incident — note `🚀 CI Pipeline / e2e-affected` is
+  // tracked in .github/ruleset.json but absent here (apply-ruleset.sh not run).
+  const LIVE_REQUIRED = [
+    'bot-review',
+    'No Merge Conflicts',
+    'Verify All Migrations Applied',
+    '🚀 CI Pipeline / lint',
+    '🚀 CI Pipeline / format',
+    '🚀 CI Pipeline / build',
+    '🚀 CI Pipeline / test',
+    '🚀 CI Pipeline / custom-checks',
+  ];
+
+  const FIXTURE_WORKSPACE = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'fixtures',
+    'ls-7963-config-ruleset',
+  );
+
+  // Wires the makeGithub mock so the live ruleset API returns LIVE_REQUIRED,
+  // commit statuses cover the status-type contexts, and check runs cover the
+  // check-run-type contexts — all green — plus any extra check runs supplied
+  // (e.g. a failing e2e-affected).
+  function wireLiveChecks(github, { extraCheckRuns = [] } = {}) {
+    github.request = async (route) => {
+      if (
+        typeof route === 'string' &&
+        route.startsWith('GET /repos/{owner}/{repo}/rules/branches/{branch}')
+      ) {
+        return {
+          data: [
+            {
+              type: 'required_status_checks',
+              parameters: {
+                required_status_checks: LIVE_REQUIRED.map((context) => ({
+                  context,
+                })),
+              },
+            },
+          ],
+        };
+      }
+      return {};
+    };
+    github.rest.repos.listCommitStatusesForRef = async () => ({
+      data: [
+        {
+          context: 'bot-review',
+          state: 'success',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+    });
+    github.rest.checks.listForRef = async () => ({
+      data: {
+        check_runs: [
+          ...LIVE_REQUIRED.filter((n) => n !== 'bot-review').map((name) => ({
+            name,
+            status: 'completed',
+            conclusion: 'success',
+            completed_at: '2026-01-01T00:00:00Z',
+            started_at: '2026-01-01T00:00:00Z',
+          })),
+          ...extraCheckRuns,
+        ],
+      },
+    });
+  }
+
+  const FAILING_E2E_AFFECTED = {
+    name: '🚀 CI Pipeline / e2e-affected',
+    status: 'completed',
+    conclusion: 'failure',
+    completed_at: '2026-01-01T00:10:00Z',
+    started_at: '2026-01-01T00:00:00Z',
+  };
+
+  async function runProcessor(github) {
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+  }
+
+  function withFixtureWorkspace(fn) {
+    return async () => {
+      const original = process.env.GITHUB_WORKSPACE;
+      process.env.GITHUB_WORKSPACE = FIXTURE_WORKSPACE;
+      try {
+        await fn();
+      } finally {
+        if (original === undefined) delete process.env.GITHUB_WORKSPACE;
+        else process.env.GITHUB_WORKSPACE = original;
+      }
+    };
+  }
+
+  it('reproduces the #5110 gap: without config visibility, a failing e2e-affected check does not block merge', async () => {
+    delete process.env.GITHUB_WORKSPACE;
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    wireLiveChecks(github, { extraCheckRuns: [FAILING_E2E_AFFECTED] });
+
+    await runProcessor(github);
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'live-only required set ignores the failing e2e-affected check — the documented #5110 gap',
+    );
+  });
+
+  it(
+    'blocks merge when the config-tracked e2e-affected check is failing',
+    withFixtureWorkspace(async () => {
+      const { github, calls } = makeGithub({
+        reviews: [
+          {
+            user: { login: 'legacy-sports-review-bot[bot]' },
+            state: 'APPROVED',
+          },
+        ],
+        unresolvedThreads: [],
+      });
+      wireLiveChecks(github, { extraCheckRuns: [FAILING_E2E_AFFECTED] });
+
+      await runProcessor(github);
+
+      assert.strictEqual(calls.merges.length, 0, 'should not attempt merge');
+      assert.ok(
+        calls.comments.some((c) => c.body?.includes('e2e-affected (failure)')),
+        'blocker comment should name the failing e2e-affected check',
+      );
+    }),
+  );
+
+  it(
+    'waits (no merge) while the config-tracked e2e-affected check has not registered yet',
+    withFixtureWorkspace(async () => {
+      const { github, calls } = makeGithub({
+        reviews: [
+          {
+            user: { login: 'legacy-sports-review-bot[bot]' },
+            state: 'APPROVED',
+          },
+        ],
+        unresolvedThreads: [],
+      });
+      // Live checks all green; e2e-affected absent (CI still in flight — the
+      // exact #5110 timeline: merge fired 27s after the e2e shards started).
+      wireLiveChecks(github);
+
+      await runProcessor(github);
+
+      assert.strictEqual(calls.merges.length, 0, 'should not attempt merge');
+      assert.ok(
+        calls.comments.some(
+          (c) =>
+            c.body?.includes('Waiting') &&
+            c.body?.includes('e2e-affected (not yet registered)'),
+        ),
+        'should post a waiting comment naming the unregistered check',
+      );
+    }),
+  );
+
+  it(
+    'merges when the config-tracked e2e-affected check succeeds (and _staged entries do not gate)',
+    withFixtureWorkspace(async () => {
+      const { github, calls } = makeGithub({
+        reviews: [
+          {
+            user: { login: 'legacy-sports-review-bot[bot]' },
+            state: 'APPROVED',
+          },
+        ],
+        unresolvedThreads: [],
+      });
+      // staged-check-must-not-gate / staged-rule-must-not-gate are never
+      // posted — if they gated, this would block as "not yet registered".
+      wireLiveChecks(github, {
+        extraCheckRuns: [{ ...FAILING_E2E_AFFECTED, conclusion: 'success' }],
+      });
+
+      await runProcessor(github);
+
+      assert.strictEqual(calls.merges.length, 1, 'should merge');
+    }),
+  );
+
+  it(
+    'does not apply config contexts to non-main bases (stacked merge-to-parent PRs)',
+    withFixtureWorkspace(async () => {
+      const stackedPR = makePR({
+        base: { ref: 'claude/parent-branch' },
+        labels: [{ name: 'merge-when-ready' }, { name: 'merge-to-parent' }],
+      });
+      const { github, calls } = makeGithub({
+        reviews: [
+          {
+            user: { login: 'legacy-sports-review-bot[bot]' },
+            state: 'APPROVED',
+          },
+        ],
+        unresolvedThreads: [],
+        pr: stackedPR,
+      });
+      // Default mocks: no live protection for the parent branch, one generic
+      // passing check. If the config union applied here, e2e-affected would be
+      // "(not yet registered)" and the merge would be blocked.
+
+      await runProcessor(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'config contexts target ~DEFAULT_BRANCH and must not gate non-main bases',
+      );
+    }),
+  );
 });
 
 describe('merge-queue-processor — log sanitization (LS-4181)', () => {

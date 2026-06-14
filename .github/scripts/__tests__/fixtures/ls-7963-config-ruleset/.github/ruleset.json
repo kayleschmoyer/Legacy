@@ -1,0 +1,33 @@
+{
+  "_comment": "Test fixture for merge-queue-processor config-tracked required checks (LS-7963). Mirrors the shape of the real .github/ruleset.json: one active required_status_checks rule carrying a context not yet in the live ruleset, plus _staged entries that must be excluded from gating.",
+  "name": "Protect Main (LS-7963 test fixture)",
+  "target": "branch",
+  "enforcement": "active",
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "🚀 CI Pipeline / e2e-affected"
+          },
+          {
+            "_staged": true,
+            "context": "staged-check-must-not-gate"
+          }
+        ]
+      }
+    },
+    {
+      "_staged": true,
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "staged-rule-must-not-gate"
+          }
+        ]
+      }
+    }
+  ]
+}

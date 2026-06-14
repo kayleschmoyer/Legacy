@@ -162,3 +162,64 @@ eight previously-live required checks.
   variable-context required-check trap.
 - Promoting integration into the PR gate is deferred to **LS-7845**; this ADR
   scopes only the hermetic suite.
+
+## Addendum (2026-06-12, LS-7963): the rollout gap window merged a failing PR — closed at the merge queue
+
+### Incident
+
+PR **#5110** (LS-7825) merged to `main` on 2026-06-11 while its head commit's
+hermetic E2E checks were failing:
+
+- 19:38:39Z — `🚀 CI Pipeline / E2E Tests (Shard 1/3 & 3/3)` start on head SHA
+  `f0c44703e`
+- 19:39:06Z — the Enhanced Merge Queue merges the PR
+- 19:45–19:46Z — both shards and `🚀 CI Pipeline / e2e-affected` conclude
+  **FAILURE** (post-merge)
+
+The failures were real regressions (the LS-7960 profile-settings cluster: 22
+failed + 4 flaky at the next nightly). Selection worked exactly as designed —
+the surface map picked the right specs and `runAllWhenChanged` ran the full
+suite. The merge gate did not hold.
+
+### Root cause
+
+The Rollout section above is the root cause: `🚀 CI Pipeline / e2e-affected`
+exists in `.github/ruleset.json` (config) but had not been promoted to the
+**live** ruleset (`scripts/apply-ruleset.sh` is an admin action, deliberately
+deferred pending @critical flake stabilization — LS-7856). Two enforcement
+layers therefore both ignored it:
+
+1. **GitHub** only enforces the live ruleset's 8 required checks, all of which
+   were green on the head SHA.
+2. **The merge-queue processor** (`.github/scripts/merge-queue-processor.js`)
+   evaluates only the required-check set it reads from the live branch-rules
+   API — non-required checks are filtered out precisely so nightly/manual
+   check runs cannot block the queue. The in-flight (then failing) e2e checks
+   were invisible to it, so the queue merged 27 seconds after the e2e shards
+   started.
+
+No escape-hatch label or bypass was involved; this was the normal queue path
+operating inside the rollout gap window.
+
+### Resolution (LS-7963)
+
+The merge-queue processor now **unions the config-tracked required-check
+contexts from the checked-in `.github/ruleset.json` into the live required
+set** when evaluating PRs targeting `main` (union-only: config can tighten the
+gate beyond the live ruleset, never loosen it; `_staged` rules/checks are
+excluded, mirroring `apply-ruleset.sh` and the docs-only shim). A PR whose
+head-SHA `e2e-affected` check is failing — or has not yet registered — is now
+blocked or held pending by the queue, even before live enforcement.
+
+Trade-off accepted: this makes `e2e-affected` effectively blocking for
+queue-driven merges **before** LS-7856 lands, exposing the queue to the two
+known flaky `@critical` specs. LS-7856 explicitly sanctions this alternative
+("accept frequent `ci:run` re-runs"); the queue self-retries on the next CI
+completion, and a re-run that goes green unblocks automatically. The failure
+mode is a delayed merge, not a leaked regression.
+
+What this does **not** cover: merges performed outside the queue (manual UI
+merges by the bypass actor). Full enforcement still requires a maintainer to
+run `bash scripts/apply-ruleset.sh` once LS-7856 stabilizes the flaky specs —
+the drift check (`check-ruleset.yml`) continues to report the config/live gap
+until then.
