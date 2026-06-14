@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Text, XStack, YStack } from 'tamagui';
+import { Anchor, Image, Text, XStack, YStack } from 'tamagui';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import {
   BRAND_GOLD,
@@ -220,6 +220,18 @@ export function FootballPlayerHeader({ player }: FootballPlayerHeaderProps) {
         <XStack gap={8} alignItems="center" flexWrap="wrap">
           {positionLabel && <PositionBadge position={positionLabel} />}
           {!player.nflTeam && <FreeAgentBadge />}
+          {player.pfrId && (
+            <Anchor
+              href={`https://www.pro-football-reference.com/players/${player.pfrId[0]}/${player.pfrId}.htm`}
+              target="_blank"
+              rel="noopener noreferrer"
+              fontSize={12}
+              color={TEXT_MUTED}
+              fontFamily={FONT_BODY}
+            >
+              PFR ↗
+            </Anchor>
+          )}
         </XStack>
 
         {teamData && (

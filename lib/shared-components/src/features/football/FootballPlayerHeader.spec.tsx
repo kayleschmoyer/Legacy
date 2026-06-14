@@ -95,4 +95,23 @@ describe('FootballPlayerHeader', () => {
     );
     expect(screen.getByText('Unknown')).toBeTruthy();
   });
+
+  it('renders PFR link with correct href when pfrId is present', () => {
+    render(<FootballPlayerHeader player={QB_PLAYER} />);
+    const link = screen.getByText('PFR ↗');
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe(
+      'https://www.pro-football-reference.com/players/M/MahoP00.htm',
+    );
+  });
+
+  it('does not render PFR link when pfrId is null', () => {
+    render(<FootballPlayerHeader player={DST_PLAYER} />);
+    expect(screen.queryByText('PFR ↗')).toBeNull();
+  });
+
+  it('does not render PFR link for free agent with null pfrId', () => {
+    render(<FootballPlayerHeader player={FREE_AGENT} />);
+    expect(screen.queryByText('PFR ↗')).toBeNull();
+  });
 });
