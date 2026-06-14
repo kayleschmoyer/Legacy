@@ -29,6 +29,7 @@ import {
 import {
   hasEntitlement,
   isCommissionerOrOwner,
+  requireEntitlement,
   verifyLeagueMembership,
 } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
@@ -676,6 +677,9 @@ builder.queryField('getDraftRecommendations', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      // Draft recommendations are a Premium feature
+      // (ENTITLEMENTS.draft_recommendations).
+      await requireEntitlement(context, ENTITLEMENTS.draft_recommendations);
       const { draftId, teamId } = args;
 
       // Verify draft exists and caller is a league member

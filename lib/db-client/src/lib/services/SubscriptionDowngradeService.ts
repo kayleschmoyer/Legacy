@@ -15,9 +15,16 @@
  *   4. Active FAAB-waiver leagues: waiver type converted to standard.
  *   5. Mock-draft limit (2/week) is re-enforced by the existing check in
  *      initialize-mock-draft — no separate action needed here.
- *   6. Premium-gated features (player comparison, projections, narratives,
- *      draft recommendations) are gated at the GraphQL resolver level via
- *      getSubscriptionTier — no action needed here.
+ *   6. Premium-gated features need no downgrade action here — a tier change
+ *      flips entitlements automatically via the tier→entitlement map in
+ *      `@legacy-sports/utils`. Enforcement varies by feature:
+ *        - AI matchup recaps (`ai_matchup_recap`) and draft recommendations
+ *          (`draft_recommendations`) are enforced server-side at the GraphQL
+ *          resolver level via `requireEntitlement` / `hasEntitlement`.
+ *        - Player comparison, matchup projections, and football projections are
+ *          tracked entitlements that are currently UI-gated only (their data is
+ *          client-side or the resolver is not built yet). See
+ *          `docs/product/subscription-tiers.md` for the per-feature status.
  */
 
 import { and, asc, eq, isNull, not } from 'drizzle-orm';

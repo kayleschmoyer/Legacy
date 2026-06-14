@@ -29,7 +29,8 @@ import {
 } from '@legacy-sports/shared-components/football';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ jest.mock('../../components/UpgradeModal', () => ({
   UpgradeModal: ({ open }: { open: boolean }) =>
     open ? <span>upgrade-modal-open</span> : null,
 }));
-jest.mock('../../hooks/useIsPremium', () => ({ useIsPremium: jest.fn() }));
+jest.mock('../../hooks/useIsPremium', () => ({ useHasEntitlement: jest.fn() }));
 jest.mock('../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
 }));
@@ -70,8 +71,8 @@ const mockFootballPlayerDetail = FootballPlayerDetail as jest.MockedFunction<
 >;
 const mockUseFootballPlayerQuery =
   useFootballPlayerQuery as jest.MockedFunction<typeof useFootballPlayerQuery>;
-const mockUseIsPremium = useIsPremium as jest.MockedFunction<
-  typeof useIsPremium
+const mockUseHasEntitlement = useHasEntitlement as jest.MockedFunction<
+  typeof useHasEntitlement
 >;
 const mockStoreCameFrom = storeCameFrom as jest.MockedFunction<
   typeof storeCameFrom
@@ -115,7 +116,7 @@ beforeEach(() => {
   // Default to a valid numeric id; LS-6226 tests override per-case.
   mockUseParams.mockReturnValue({ id: '42' });
   mockFootballPlayerDetail.mockImplementation(renderDetailText);
-  mockUseIsPremium.mockReturnValue(false);
+  mockUseHasEntitlement.mockReturnValue(false);
   mockUseFootballPlayerQuery.mockReturnValue({
     data: undefined,
     loading: false,
@@ -243,18 +244,22 @@ describe('FootballPlayerDetailPage — auth error handling (LS-6227)', () => {
     }
 
     it('opens the UpgradeModal when a free user presses the teaser CTA', () => {
-      mockUseIsPremium.mockReturnValue(false);
+      mockUseHasEntitlement.mockReturnValue(false);
       mockSuccessfulLoad();
 
       render(<FootballPlayerDetailPage />);
 
+      // The gate must be keyed to the football-projections entitlement.
+      expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+        ENTITLEMENTS.football_projections,
+      );
       expect(screen.queryByText('upgrade-modal-open')).toBeNull();
       fireEvent.click(screen.getByText('teaser-upgrade'));
       expect(screen.getByText('upgrade-modal-open')).toBeTruthy();
     });
 
     it('does not render the UpgradeModal for premium users', () => {
-      mockUseIsPremium.mockReturnValue(true);
+      mockUseHasEntitlement.mockReturnValue(true);
       mockSuccessfulLoad();
 
       render(<FootballPlayerDetailPage />);

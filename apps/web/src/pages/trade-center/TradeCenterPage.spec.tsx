@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 import { TradeCenterPage } from './TradeCenterPage';
 
@@ -14,6 +15,7 @@ let mockUserTeamId: number | null;
 let mockLeague: unknown;
 let mockTeamTradeOffers: unknown[];
 let mockIsPremium = false;
+const mockUseHasEntitlement = jest.fn<boolean, [string]>();
 
 const mockNavigate = jest.fn();
 
@@ -70,7 +72,7 @@ jest.mock('../../components/PageMeta', () => ({
 }));
 
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremium: () => mockIsPremium,
+  useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
 }));
 
 jest.mock('../../components/PremiumGate', () => ({
@@ -181,6 +183,9 @@ beforeEach(() => {
   mockTeamTradeOffers = [];
   mockIsPremium = false;
   mockNavigate.mockReset();
+  mockUseHasEntitlement.mockReset();
+  // Read the current mockIsPremium value at call time (per test).
+  mockUseHasEntitlement.mockImplementation((_key: string) => mockIsPremium);
 });
 
 describe('TradeCenterPage', () => {
@@ -512,6 +517,10 @@ describe('TradeCenterPage', () => {
       expect(gate).toBeInTheDocument();
       expect(gate.getAttribute('data-is-premium')).toBe('false');
       expect(gate.getAttribute('data-feature-name')).toBe('Trade Analyzer');
+      // The gate must be keyed to the trade-analyzer entitlement.
+      expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+        ENTITLEMENTS.trade_analyzer,
+      );
     });
 
     it('passes a featureDescription to PremiumGate', () => {

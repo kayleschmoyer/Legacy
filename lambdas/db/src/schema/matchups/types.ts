@@ -11,6 +11,8 @@ import {
 } from '@legacy-sports/narrative';
 import { eq } from 'drizzle-orm';
 import { builder } from '../builder';
+import { hasEntitlement } from '../authorization';
+import { ENTITLEMENTS } from '../entitlements';
 import { Team } from '../leagues/types';
 import {
   GameBattingRef,
@@ -142,6 +144,16 @@ builder.objectType(Matchup, {
           !matchup.team1Id ||
           !matchup.team2Id
         ) {
+          return null;
+        }
+
+        // AI matchup recaps are a Premium feature (ENTITLEMENTS.ai_matchup_recap).
+        // Enforce server-side as defense-in-depth behind the UI PremiumGate: an
+        // unauthenticated or free-tier caller gets `null` rather than the
+        // generated narrative. Returning null (vs. throwing) keeps the rest of
+        // the `matchup` query intact for non-premium users.
+        if (!context.user) return null;
+        if (!(await hasEntitlement(context, ENTITLEMENTS.ai_matchup_recap))) {
           return null;
         }
 

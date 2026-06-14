@@ -34,7 +34,7 @@ export function CurrentPickPanel({
     return (
       <div
         className="d-panel"
-        data-testid="current-pick"
+        data-testid="current-pick-panel"
         style={{ textAlign: 'center' }}
       >
         <div

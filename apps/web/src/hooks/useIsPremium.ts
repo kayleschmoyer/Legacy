@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
+import { type EntitlementKey, tierHasEntitlement } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
@@ -116,4 +117,20 @@ export function useIsPremiumStatus(): {
     isPremium: data?.user?.subscriptionTier === 'premium',
     isLoading,
   };
+}
+
+/**
+ * Returns whether the current user's subscription tier grants a specific
+ * entitlement. Prefer this over `useIsPremium()` at feature gates so each gate
+ * is framed around the capability it unlocks (the Stripe entitlement) rather
+ * than the tier that happens to grant it today. The tier→entitlement mapping is
+ * the single source of truth in `@legacy-sports/utils` (`TIER_ENTITLEMENTS`),
+ * shared with backend gating and Stripe provisioning.
+ *
+ * Returns `false` while premium status is still loading (same conservative
+ * behavior as `useIsPremium`).
+ */
+export function useHasEntitlement(key: EntitlementKey): boolean {
+  const { isPremium } = useIsPremiumStatus();
+  return tierHasEntitlement(isPremium ? 'premium' : 'free', key);
 }

@@ -7,6 +7,7 @@ import {
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
 import { MatchupRosterComparison } from '@legacy-sports/shared-components';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   MatchupStatus,
   useGetUserTeamIdQuery,
@@ -15,7 +16,7 @@ import { MatchupRosterEditor } from '../components/MatchupRosterEditor';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../components/MatchupWinProbabilityPanel';
 import { PremiumGate } from '../../subscription/PremiumGate';
-import { useSubscription } from '../../subscription/useSubscription';
+import { useHasEntitlement } from '../../subscription/useSubscription';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -42,7 +43,8 @@ export default function MatchupDetailScreen() {
     skip: !leagueId,
   });
   const userTeamId = userTeamData?.userTeamId ?? null;
-  const { isPremium } = useSubscription();
+  const canSeeProjections = useHasEntitlement(ENTITLEMENTS.matchup_projections);
+  const canSeeRecap = useHasEntitlement(ENTITLEMENTS.ai_matchup_recap);
 
   const handleMatchupChange = useCallback(
     (newMatchupId: string) => {
@@ -123,7 +125,7 @@ export default function MatchupDetailScreen() {
         }
         winProbabilityPanel={
           <PremiumGate
-            isPremium={isPremium}
+            isPremium={canSeeProjections}
             featureName="Matchup Projections"
             featureDescription="See win probability and projected scores for every matchup based on remaining games."
           >
@@ -148,7 +150,7 @@ export default function MatchupDetailScreen() {
         recapPanel={
           matchup.status === MatchupStatus.Completed && matchupId != null ? (
             <PremiumGate
-              isPremium={isPremium}
+              isPremium={canSeeRecap}
               featureName="AI Matchup Recap"
               featureDescription="Get AI-generated narrative recaps that summarize your matchup story, highlights, and standout performances."
             >

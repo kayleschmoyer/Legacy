@@ -30,6 +30,12 @@ export const ENTITLEMENTS = {
   auction_draft: 'auction_draft',
   extended_trade_expiration: 'extended_trade_expiration',
   advanced_football_stats: 'advanced_football_stats',
+  player_comparison: 'player_comparison',
+  matchup_projections: 'matchup_projections',
+  ai_matchup_recap: 'ai_matchup_recap',
+  draft_recommendations: 'draft_recommendations',
+  trade_analyzer: 'trade_analyzer',
+  football_projections: 'football_projections',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -60,6 +66,12 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.auction_draft,
     ENTITLEMENTS.extended_trade_expiration,
     ENTITLEMENTS.advanced_football_stats,
+    ENTITLEMENTS.player_comparison,
+    ENTITLEMENTS.matchup_projections,
+    ENTITLEMENTS.ai_matchup_recap,
+    ENTITLEMENTS.draft_recommendations,
+    ENTITLEMENTS.trade_analyzer,
+    ENTITLEMENTS.football_projections,
   ],
 };
 
@@ -75,6 +87,12 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   extended_trade_expiration: 'Extended trade expiration',
   advanced_football_stats:
     'Advanced football stats (snap %, target share, air yards, route participation)',
+  player_comparison: 'Player comparison',
+  matchup_projections: 'Matchup projections & win probability',
+  ai_matchup_recap: 'AI matchup recaps',
+  draft_recommendations: 'Draft recommendations',
+  trade_analyzer: 'Trade analyzer',
+  football_projections: 'Fantasy scoring projections (football)',
 };
 
 export function tierHasEntitlement(

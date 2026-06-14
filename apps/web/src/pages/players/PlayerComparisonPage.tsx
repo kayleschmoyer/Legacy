@@ -3,9 +3,10 @@ import {
   PLAYER_COMPARISON_FEATURE_DESCRIPTION as FEATURE_DESCRIPTION,
   PlayerComparison,
 } from '@legacy-sports/shared-components';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PremiumGate } from '../../components/PremiumGate';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { PageMeta } from '../../components/PageMeta';
 
 /**
@@ -16,7 +17,7 @@ import { PageMeta } from '../../components/PageMeta';
 export function PlayerComparisonPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const isPremium = useIsPremium();
+  const isPremium = useHasEntitlement(ENTITLEMENTS.player_comparison);
 
   // Unauthenticated visitors see the shared sign-in prompt (no premium gate).
   if (!authLoading && !isAuthenticated) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 import MatchupDetailScreen from './MatchupDetailScreen';
 
@@ -14,6 +15,7 @@ let mockMatchupError: { message: string } | null = null;
 let mockIsPremium = true;
 let mockUserTeamId: number | null = null;
 let mockParams: Record<string, string> = { matchupId: '1', leagueId: '10' };
+const mockUseHasEntitlement = jest.fn<boolean, [string]>();
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,7 @@ jest.mock('../../../api/db/graphql.generated', () => ({
 
 jest.mock('../../subscription/useSubscription', () => ({
   useSubscription: () => ({ isPremium: mockIsPremium }),
+  useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
 }));
 
 // Pass-through gate: render children for premium users, otherwise an upgrade
@@ -177,6 +180,9 @@ beforeEach(() => {
   mockIsPremium = true;
   mockUserTeamId = null;
   mockParams = { matchupId: '1', leagueId: '10' };
+  // Re-establish the implementation after clearAllMocks so the gate reads the
+  // current mockIsPremium value at call time (per test).
+  mockUseHasEntitlement.mockImplementation((_key: string) => mockIsPremium);
 });
 
 describe('MatchupDetailScreen', () => {
@@ -222,6 +228,10 @@ describe('MatchupDetailScreen — PremiumGate wiring (LS-5021)', () => {
     render(<MatchupDetailScreen />);
     expect(screen.getByTestId('win-probability-panel')).toBeTruthy();
     expect(screen.queryByText('UPGRADE_TO_PREMIUM')).toBeNull();
+    // The win-probability gate must be keyed to matchup_projections.
+    expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+      ENTITLEMENTS.matchup_projections,
+    );
   });
 
   it('gates the win probability panel behind the upgrade prompt for free users', () => {
@@ -237,6 +247,10 @@ describe('MatchupDetailScreen — PremiumGate wiring (LS-5021)', () => {
     mockIsPremium = true;
     render(<MatchupDetailScreen />);
     expect(screen.getByTestId('recap-panel')).toBeTruthy();
+    // The recap gate must be keyed to ai_matchup_recap.
+    expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+      ENTITLEMENTS.ai_matchup_recap,
+    );
   });
 
   it('gates the recap panel behind the upgrade prompt for free users when the matchup is completed', () => {

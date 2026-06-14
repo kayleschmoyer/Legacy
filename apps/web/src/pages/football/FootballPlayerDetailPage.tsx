@@ -8,10 +8,11 @@ import {
   resolveFootballPlayerTab,
 } from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/web';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 
@@ -29,7 +30,7 @@ export function FootballPlayerDetailPage() {
   const [searchParams] = useSearchParams();
   const isValidId = !!id && /^\d+$/.test(id) && parseInt(id, 10) > 0;
   const playerId = isValidId ? parseInt(id, 10) : 0;
-  const isPremium = useIsPremium();
+  const isPremium = useHasEntitlement(ENTITLEMENTS.football_projections);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const { data, loading, error } = useFootballPlayerQuery({

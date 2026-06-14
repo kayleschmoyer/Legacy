@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils';
+import {
+  ClientNotificationType,
+  type EntitlementKey,
+  tierHasEntitlement,
+} from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
 import { config } from '@legacy-sports/app-config/native';
 import {
@@ -89,6 +93,18 @@ export function useSubscription() {
     error,
     refetch,
   };
+}
+
+/**
+ * Returns whether the current user's subscription tier grants a specific
+ * entitlement. Mobile counterpart of the web `useHasEntitlement` hook — prefer
+ * it over a bare `isPremium` check at feature gates so each gate is framed
+ * around the Stripe entitlement it unlocks. The tier→entitlement mapping is the
+ * single source of truth in `@legacy-sports/utils` (`TIER_ENTITLEMENTS`).
+ */
+export function useHasEntitlement(key: EntitlementKey): boolean {
+  const { isPremium } = useSubscription();
+  return tierHasEntitlement(isPremium ? 'premium' : 'free', key);
 }
 
 export function useCheckoutSession() {

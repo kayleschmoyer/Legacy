@@ -10,6 +10,7 @@ import {
 } from '@tamagui/lucide-icons';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { TradingCenter } from '../../features/baseball/TradingCenter';
 import {
   useGetLeagueByIdQuery,
@@ -19,7 +20,7 @@ import {
 } from '../../api/db/graphql.generated';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { BaseballIcon, FootballIcon } from '../../components/icons/SportIcons';
 import {
   BRAND_GOLD,
@@ -84,7 +85,7 @@ function getPhaseChip(
 // ── Trade Analyzer premium upsell card ───────────────────────────────────────
 
 function TradeAnalyzerCard(): React.JSX.Element {
-  const isPremium = useIsPremium();
+  const isPremium = useHasEntitlement(ENTITLEMENTS.trade_analyzer);
 
   return (
     <YStack gap="$3">

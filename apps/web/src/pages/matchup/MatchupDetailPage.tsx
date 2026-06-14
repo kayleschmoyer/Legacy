@@ -5,6 +5,7 @@ import {
   MatchupDetailLayout,
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
@@ -15,7 +16,7 @@ import {
   MatchupStatus,
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -59,7 +60,8 @@ export function MatchupDetailPage() {
     );
   }, [currentWeek, userTeamId, allLeagueMatchups]);
 
-  const isPremium = useIsPremium();
+  const canSeeProjections = useHasEntitlement(ENTITLEMENTS.matchup_projections);
+  const canSeeRecap = useHasEntitlement(ENTITLEMENTS.ai_matchup_recap);
 
   const lastTrackedMatchupViewKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -218,7 +220,7 @@ export function MatchupDetailPage() {
         }
         winProbabilityPanel={
           <PremiumGate
-            isPremium={isPremium}
+            isPremium={canSeeProjections}
             featureName="Matchup Projections"
             featureDescription="See win probability and projected scores for every matchup based on remaining games."
           >
@@ -241,7 +243,7 @@ export function MatchupDetailPage() {
         recapPanel={
           matchup.status === MatchupStatus.Completed && matchupIdNum != null ? (
             <PremiumGate
-              isPremium={isPremium}
+              isPremium={canSeeRecap}
               featureName="AI Matchup Recap"
               featureDescription="Get AI-generated narrative recaps that summarize your matchup story, highlights, and standout performances."
             >

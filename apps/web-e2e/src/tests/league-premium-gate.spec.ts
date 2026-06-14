@@ -3,10 +3,12 @@
  *
  * Covers premium gating on:
  *   - /baseball/league/:id        → LeagueDetailPageV2 wrapped in PremiumGate
- *   - /baseball/league/:id/draft  → EliteDraftBoardScreenWrapper wrapped in PremiumGate
+ *
+ * The live draft route (/baseball/league/:id/draft) is intentionally NOT gated
+ * — drafting is a free, core feature (PR #5283 un-gated EliteDraftBoard).
  *
  * Scenarios:
- *   - Free user sees premium overlay on both routes
+ *   - Free user sees premium overlay on the league detail route
  *   - Premium user sees content (no overlay) on the league detail route
  *   - "Upgrade to Premium" CTA opens the UpgradeModal
  *
@@ -255,10 +257,12 @@ freeUserTest.describe(
 // ---------------------------------------------------------------------------
 // NOTE (LS-8010): the "/baseball/league/:id/draft" premium-gate tests were
 // removed. Per product intent the live draft must be FREE — gating it (LS-5030)
-// is a bug the owner is reverting by un-gating EliteDraftBoard. Asserting the
-// draft gate here would entrench that bug and break the moment the un-gate
-// lands. Draft access is covered by the draft-* specs (draft-selection-workflow,
-// auction-draft, mid-draft-trades), which expect a FREE draft board.
+// was a bug, now reverted by un-gating EliteDraftBoard (the `PremiumGate`
+// wrapper was deleted in PR #5283). Asserting the draft gate here would
+// entrench that bug. Draft access is covered by the draft-* specs
+// (draft-selection-workflow, auction-draft, mid-draft-trades), which expect a
+// FREE draft board. Only the draft *recommendations* inside the board remain
+// premium. See docs/product/subscription-tiers.md.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------

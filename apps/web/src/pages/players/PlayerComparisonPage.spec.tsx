@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { PlayerComparisonPage } from './PlayerComparisonPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -20,9 +21,9 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: (): AuthResult => mockUseAuth(),
 }));
 
-const mockUseIsPremium = jest.fn(() => true);
+const mockUseHasEntitlement = jest.fn((_key: string) => true);
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremium: () => mockUseIsPremium(),
+  useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
 }));
 
 jest.mock('../../components/PageMeta', () => ({
@@ -65,7 +66,7 @@ describe('PlayerComparisonPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
-    mockUseIsPremium.mockReturnValue(true);
+    mockUseHasEntitlement.mockReturnValue(true);
   });
 
   it('renders the shared comparison behind the premium gate when authenticated', () => {
@@ -73,6 +74,10 @@ describe('PlayerComparisonPage', () => {
     expect(screen.getByTestId('premium-gate')).toBeTruthy();
     expect(screen.getByTestId('shared-player-comparison')).toBeTruthy();
     expect(screen.getByText('comparison tool')).toBeTruthy();
+    // The gate must be keyed to the player-comparison entitlement.
+    expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+      ENTITLEMENTS.player_comparison,
+    );
   });
 
   it('shows the sign-in prompt (no premium gate) for unauthenticated visitors', () => {

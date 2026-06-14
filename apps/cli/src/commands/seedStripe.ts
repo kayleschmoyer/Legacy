@@ -59,7 +59,7 @@ interface ProductSpec {
 const PRODUCT: ProductSpec = {
   name: 'Legacy Sports Premium',
   description:
-    'Unlock salary-cap leagues, advanced playoff formats, unlimited mock drafts, unlimited active leagues, FAAB waivers, and historical era filters.',
+    'Unlock all Legacy Sports Premium features. The authoritative feature list is the set of entitlements attached to this product (see ENTITLEMENTS in @legacy-sports/utils).',
   features: FEATURES.map((f) => f.lookup_key),
 };
 
