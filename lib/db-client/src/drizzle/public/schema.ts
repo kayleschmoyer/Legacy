@@ -6,6 +6,7 @@ export * from './models/Dues';
 export * from './models/Enums';
 export * from './models/FootballStatistics';
 export * from './models/FootballTeams';
+export * from './models/FootballTeamSeasonMetadata';
 export * from './models/Leagues';
 export * from './models/Matchups';
 export * from './models/Notifications';

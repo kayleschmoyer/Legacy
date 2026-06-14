@@ -243,3 +243,5 @@ export const tiebreakerMethod = pgEnum('tiebreaker_method', [
   'random',
   'co_champion',
 ]);
+
+export const sosTier = pgEnum('sos_tier', ['easy', 'medium', 'hard']);
