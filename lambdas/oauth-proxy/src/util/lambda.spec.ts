@@ -137,7 +137,8 @@ describe('describeErrorCause', () => {
       { cause: pgError },
     );
 
-    expect(describeErrorCause(drizzleError)).toEqual({
+    const result = describeErrorCause(drizzleError);
+    expect(result).toMatchObject({
       causeName: 'Error',
       causeMessage: 'Connection terminated',
       pgCode: '08006',
@@ -145,37 +146,93 @@ describe('describeErrorCause', () => {
       pgRoutine: 'pqReadData',
       pgDetail: 'server closed the connection unexpectedly',
     });
+    // The originating error's stack is always surfaced for diagnosability.
+    expect(result['causeStack']).toEqual(expect.stringContaining('Error'));
   });
 
-  it('returns undefined cause when the error has none', () => {
-    expect(describeErrorCause(new Error('boom'))).toEqual({
-      cause: undefined,
+  it('surfaces the SQLSTATE + message of a failing users query (LS-8008 bar)', () => {
+    // Acceptance bar: when a `users` query fails, the SQLSTATE and message are
+    // present in the log line. undefined_column (42703) is the schema-drift
+    // shape the original incident could not see.
+    const pgError = Object.assign(
+      new Error('column "canonical_email" does not exist'),
+      { code: '42703', severity: 'ERROR', column: 'canonical_email' },
+    );
+    const drizzleError = Object.assign(
+      new Error(
+        'Failed query: select "id" from "app_internal"."users" where "canonical_email" = $1',
+      ),
+      { cause: pgError },
+    );
+
+    expect(describeErrorCause(drizzleError)).toMatchObject({
+      causeMessage: 'column "canonical_email" does not exist',
+      pgCode: '42703',
+      pgColumn: 'canonical_email',
     });
   });
 
-  it('preserves an explicit null cause distinctly from absent', () => {
-    expect(
-      describeErrorCause(Object.assign(new Error('boom'), { cause: null })),
-    ).toEqual({ cause: null });
+  it('extracts pg fields when the error is thrown directly (no cause wrapper)', () => {
+    // The production shape that defeated the LS-7935 cause-only reader:
+    // `cause` is undefined because the pg error is the top-level error itself.
+    const pgError = Object.assign(new Error('statement timeout'), {
+      code: '57014',
+      severity: 'ERROR',
+    });
+
+    expect(describeErrorCause(pgError)).toMatchObject({
+      causeName: 'Error',
+      causeMessage: 'statement timeout',
+      pgCode: '57014',
+      pgSeverity: 'ERROR',
+    });
   });
 
-  it('stringifies a primitive non-Error cause', () => {
-    expect(
-      describeErrorCause(
-        Object.assign(new Error('boom'), { cause: 'pool gone' }),
-      ),
-    ).toEqual({ cause: 'pool gone' });
+  it('unwraps a nested cause chain to reach the deepest pg error', () => {
+    const pgError = Object.assign(new Error('deadlock detected'), {
+      code: '40P01',
+    });
+    const middle = Object.assign(new Error('tx failed'), { cause: pgError });
+    const top = Object.assign(new Error('Failed query: ...'), {
+      cause: middle,
+    });
+
+    expect(describeErrorCause(top)).toMatchObject({
+      causeMessage: 'deadlock detected',
+      pgCode: '40P01',
+    });
   });
 
-  it('JSON-stringifies an object non-Error cause (no "[object Object]")', () => {
-    expect(
-      describeErrorCause(
-        Object.assign(new Error('boom'), { cause: { reason: 'pool gone' } }),
-      ),
-    ).toEqual({ cause: '{"reason":"pool gone"}' });
+  it('still surfaces message + stack when no pg fields exist anywhere', () => {
+    // Genuinely opaque error: no SQLSTATE on any level. The bar drops to
+    // "at least the message and a stack are visible".
+    const result = describeErrorCause(new Error('boom'));
+    expect(result).toMatchObject({
+      causeName: 'Error',
+      causeMessage: 'boom',
+    });
+    expect(result['causeStack']).toEqual(expect.stringContaining('boom'));
+    expect(result['pgCode']).toBeUndefined();
   });
 
-  it('handles a non-Error argument without throwing', () => {
-    expect(describeErrorCause('not an error')).toEqual({ cause: undefined });
+  it('does not loop forever on a circular cause chain', () => {
+    const a = new Error('a');
+    const b = Object.assign(new Error('b'), { cause: a });
+    (a as Error & { cause?: unknown }).cause = b;
+    // Walking from `a`: a -> b -> (a already seen, stop). No pg code on either,
+    // so it falls back to the innermost reached error (`b`) without looping.
+    expect(describeErrorCause(a)).toMatchObject({ causeMessage: 'b' });
+  });
+
+  it('stringifies a primitive non-Error throw', () => {
+    expect(describeErrorCause('not an error')).toEqual({
+      cause: 'not an error',
+    });
+  });
+
+  it('JSON-stringifies an object non-Error throw (no "[object Object]")', () => {
+    expect(describeErrorCause({ reason: 'pool gone' })).toEqual({
+      cause: '{"reason":"pool gone"}',
+    });
   });
 });

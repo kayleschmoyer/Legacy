@@ -16,21 +16,36 @@ interface MigrateResult {
  * Parse the output of `pnpm run db:up` into structured data.
  *
  * The rollback-migrations.ts script outputs (via LOGGER with timestamp prefix):
- *   [...] INFO: ⬆️ Applying migration: 20260319_120000_add_league_phase.ts
- *   [...] INFO: ✅ Applied: 20260319_120000_add_league_phase.ts
+ *   [...] INFO: ⬆️ Applying migration: 20260319_120000_add_league_phase.ts  (NEW)
+ *   [...] INFO: ✅ Applied: 20260319_120000_add_league_phase.ts             (NEW)
+ *   [...] INFO: ⏭️ Already applied: 20260319_120000_add_league_phase.ts     (SKIPPED)
  *   [...] INFO: 📋 No new migrations to apply
  *   [...] INFO: ✅ Applied N new migrations
+ *
+ * `applied`/`appliedNames` MUST reflect only migrations newly applied this run.
+ * The runner is journal-based and logs `⏭️ Already applied: <file>` for every
+ * file it skips; a naive `/applied:\s*<file>/i` matches those skip lines too
+ * (the substring "applied: <file>"), inflating the count to the entire journal
+ * size. That actively misled an RCA — a no-op run reported `applied: 236`
+ * (LS-8008). The negative lookbehind excludes the `Already applied:` skip lines
+ * while still matching the `✅ Applied:` / `⬆️ Applying migration:` new ones.
  */
 export function parseUpOutput(output: string): MigrateResult {
   const appliedNames: string[] = [];
   const lines = output.split('\n');
 
   for (const line of lines) {
-    // Match "Applied: <migration>" or "Applying migration: <migration>"
-    // Also keep legacy format "applied/applying <migration>" as fallback
+    // Match the newly-applied lines only:
+    //   "✅ Applied: <migration>"  /  "⬆️ Applying migration: <migration>"
+    // but NOT the skipped line "⏭️ Already applied: <migration>".
+    // Legacy whitespace-separated formats kept as a fallback, likewise guarded.
     const migrationMatch =
-      /(?:Applied|Applying migration):\s*(\d{8}_\d{6}_\S+)/i.exec(line) ||
-      /(?:applying|applied|running)\s+(\d{8}_\d{6}_\S+)/i.exec(line);
+      /(?:Applying migration|(?<!Already )Applied):\s*(\d{8}_\d{6}_\S+)/i.exec(
+        line,
+      ) ||
+      /(?:applying|(?<!already )applied|running)\s+(\d{8}_\d{6}_\S+)/i.exec(
+        line,
+      );
     if (migrationMatch) {
       const name = migrationMatch[1];
       // Deduplicate: "Applying migration:" and "Applied:" fire for the same file

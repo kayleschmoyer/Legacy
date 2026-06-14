@@ -48,52 +48,86 @@ const SAFE_HEADER_ALLOWLIST = new Set([
   'content-length',
 ]);
 
+// Postgres driver error fields worth surfacing. Both node-postgres and
+// postgres.js expose `code` (the SQLSTATE) plus these descriptive fields on
+// their error objects; each is emitted as `pg<Field>` when present.
+const PG_ERROR_FIELDS = [
+  'code',
+  'severity',
+  'routine',
+  'detail',
+  'hint',
+  'schema',
+  'table',
+  'column',
+  'constraint',
+] as const;
+
 /**
- * Flatten the underlying cause of a handler error into a plain object for
- * logging (LS-7935).
+ * Flatten a handler error — and every `.cause` beneath it — into a plain object
+ * for logging (LS-7935, hardened in LS-8008).
  *
  * Drizzle wraps every failed query in a `DrizzleQueryError` whose `message` is
- * only `"Failed query: <sql>"` — the originating Postgres error (connection
- * reset, statement timeout, Aurora resume, "too many clients", …) is attached
- * as `cause` and carries the actionable fields (`code`, `severity`, `routine`,
- * `detail`). The logger's serializer only preserves `name`/`message`/`stack`
- * on `Error` instances, so a bare `cause` Error would still drop `code`; this
- * returns a flat object whose primitive fields always survive serialization.
+ * only `"Failed query: <sql>"`. The originating Postgres error (connection
+ * reset, statement timeout, `undefined_column`, "too many clients", …) carries
+ * the actionable SQLSTATE `code`/`severity`/`detail`/`routine`.
+ *
+ * The original LS-7935 implementation read only `error.cause`, but in
+ * production these `Failed query` 500s arrived with `cause === undefined`
+ * (LS-8008) — so it emitted nothing and the real Postgres failure stayed
+ * invisible in CloudWatch. This version is robust to where the pg fields
+ * actually live:
+ *   - it walks the full `error → error.cause → …` chain (guarding against
+ *     cycles) and inspects the top-level error itself, so a pg error thrown
+ *     directly (no Drizzle wrapper) is handled identically to a wrapped one;
+ *   - it extracts the SQLSTATE fields from whichever level carries a `code`;
+ *   - it always preserves the originating `message` and `stack`, so even a
+ *     fully opaque error (no structured pg fields anywhere) is still
+ *     diagnosable from the single log line.
+ *
+ * The logger's serializer JSON-stringifies object args but drops `undefined`
+ * fields, so absent fields are simply omitted rather than logged as noise.
  */
 export function describeErrorCause(error: unknown): Record<string, unknown> {
-  const cause =
-    error instanceof Error
-      ? (error as Error & { cause?: unknown }).cause
-      : undefined;
-
-  if (cause == null) {
-    return { cause: cause === null ? null : undefined };
+  // Walk error -> error.cause -> ... collecting every Error in the chain.
+  const chain: Error[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    chain.push(current);
+    current = (current as Error & { cause?: unknown }).cause;
   }
 
-  if (cause instanceof Error) {
-    const pg = cause as Error & {
-      code?: string;
-      detail?: string;
-      severity?: string;
-      routine?: string;
-    };
+  if (chain.length === 0) {
+    // Non-Error throw (string, plain object, …). Keep strings verbatim;
+    // JSON-stringify anything else to avoid the "[object Object]" coercion.
     return {
-      causeName: pg.name,
-      causeMessage: pg.message,
-      pgCode: pg.code,
-      pgSeverity: pg.severity,
-      pgRoutine: pg.routine,
-      pgDetail: pg.detail,
+      cause: typeof error === 'string' ? error : JSON.stringify(error),
     };
   }
 
-  // Non-Error cause (defensive): pg/drizzle always attach an Error, so this is
-  // a fallback. Keep strings verbatim; JSON-stringify anything else to avoid
-  // the "[object Object]" default coercion.
-  if (typeof cause === 'string') {
-    return { cause };
+  // The Postgres driver error is the deepest level exposing a SQLSTATE `code`;
+  // fall back to the innermost error in the chain when none expose one (the
+  // genuinely opaque case — at least its message/stack are still surfaced).
+  const pgError =
+    chain.find((e) => typeof (e as { code?: unknown }).code === 'string') ??
+    chain[chain.length - 1];
+  const pg = pgError as Error & Record<string, unknown>;
+
+  const result: Record<string, unknown> = {
+    causeName: pg.name,
+    causeMessage: pg.message,
+    // Last-resort diagnosability when no structured pg fields are present.
+    causeStack: pg.stack,
+  };
+  for (const field of PG_ERROR_FIELDS) {
+    const value = pg[field];
+    if (value !== undefined && value !== null) {
+      result[`pg${field[0].toUpperCase()}${field.slice(1)}`] = value;
+    }
   }
-  return { cause: JSON.stringify(cause) };
+  return result;
 }
 
 /**
