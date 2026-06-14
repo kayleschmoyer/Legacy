@@ -3,7 +3,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import PlayerStatsScreen from '../PlayerStats';
 import PlayerComparisonScreen from '../PlayerComparison';
-import FootballPlayers from '../football/players';
+import { FootballPlayers } from '../football/players';
 
 type Segment = 'stats' | 'compare';
 type Sport = 'baseball' | 'football';

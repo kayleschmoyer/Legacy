@@ -78,10 +78,12 @@ jest.mock('../football/players', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
+  const FootballPlayersStub = () =>
+    ReactActual.createElement(View, { testID: 'football-players-screen' });
   return {
     __esModule: true,
-    default: () =>
-      ReactActual.createElement(View, { testID: 'football-players-screen' }),
+    default: FootballPlayersStub,
+    FootballPlayers: FootballPlayersStub,
   };
 });
 

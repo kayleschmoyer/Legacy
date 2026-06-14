@@ -2,10 +2,26 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import FootballPlayers from './players';
+import PlayersRoute, { FootballPlayers } from './players';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
+
+const mockUseFeatureIsOn = jest.fn(() => false);
+jest.mock('@growthbook/growthbook-react', () => ({
+  useFeatureIsOn: (...args: unknown[]) => mockUseFeatureIsOn(...args),
+}));
+
+jest.mock('../PlayerStats', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    __esModule: true,
+    default: () =>
+      ReactActual.createElement(View, { testID: 'player-stats-screen' }),
+  };
+});
 
 // expo-apple-authentication uses ESM export syntax; stub it out so Jest's
 // CommonJS runner never tries to parse it (regardless of transformIgnorePatterns
@@ -531,12 +547,16 @@ describe('FootballPlayers', () => {
       const calls = mockUseFootballPlayersQuery.mock.calls as Array<
         [
           {
-            variables: { position?: string; nflTeam?: string; search?: string };
+            variables: {
+              positions?: string[];
+              nflTeam?: string;
+              search?: string;
+            };
           },
         ]
       >;
       const firstCall = calls[0];
-      expect(firstCall[0].variables.position).toBeUndefined();
+      expect(firstCall[0].variables.positions).toBeUndefined();
       expect(firstCall[0].variables.nflTeam).toBeUndefined();
       expect(firstCall[0].variables.search).toBeUndefined();
     });
@@ -861,6 +881,66 @@ describe('FootballPlayers', () => {
       render(<FootballPlayers />);
       fireEvent(screen.getByTestId('player-row-1'), 'longPress');
       expect(Alert.alert).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('PlayersRoute (/football/players standalone hub)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseFeatureIsOn.mockReturnValue(false);
+    mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+    mockUseHasEntitlement.mockReturnValue(false);
+    mockUseMyRosterPlayerIds.mockReturnValue({
+      playerIds: new Set<number>(),
+      loading: false,
+    });
+  });
+
+  describe('sport switcher — football_enabled = false', () => {
+    it('hides sport switcher pills when football is not enabled', () => {
+      render(<PlayersRoute />);
+      expect(screen.queryByTestId('sport-switch-baseball')).toBeNull();
+      expect(screen.queryByTestId('sport-switch-football')).toBeNull();
+    });
+
+    it('shows football player list by default when football is not enabled', () => {
+      render(<PlayersRoute />);
+      expect(screen.queryByTestId('player-stats-screen')).toBeNull();
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+    });
+  });
+
+  describe('sport switcher — football_enabled = true', () => {
+    beforeEach(() => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+    });
+
+    it('shows Baseball and Football pills', () => {
+      render(<PlayersRoute />);
+      expect(screen.getByTestId('sport-switch-baseball')).toBeTruthy();
+      expect(screen.getByTestId('sport-switch-football')).toBeTruthy();
+    });
+
+    it('defaults to football content (no baseball stats screen)', () => {
+      render(<PlayersRoute />);
+      expect(screen.queryByTestId('player-stats-screen')).toBeNull();
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+    });
+
+    it('switches to baseball stats screen when Baseball pill is pressed', () => {
+      render(<PlayersRoute />);
+      fireEvent.press(screen.getByTestId('sport-switch-baseball'));
+      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
+      expect(screen.queryByText('Patrick Mahomes')).toBeNull();
+    });
+
+    it('switches back to football when Football pill is pressed after baseball', () => {
+      render(<PlayersRoute />);
+      fireEvent.press(screen.getByTestId('sport-switch-baseball'));
+      fireEvent.press(screen.getByTestId('sport-switch-football'));
+      expect(screen.queryByTestId('player-stats-screen')).toBeNull();
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
     });
   });
 });

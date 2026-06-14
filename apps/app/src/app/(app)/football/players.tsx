@@ -9,6 +9,7 @@ import {
 import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown, Star } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
+import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import type { NflTeam } from '@legacy-sports/shared-components';
 import { BRAND_GOLD, NFL_TEAMS } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
@@ -17,6 +18,7 @@ import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useFootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
+import PlayerStatsScreen from '../PlayerStats';
 
 type FootballPlayerNode = NonNullable<
   NonNullable<FootballPlayersQuery['footballPlayers']>['nodes'][number]
@@ -493,7 +495,43 @@ function ProjectionsUpsellBanner() {
   );
 }
 
-export default function FootballPlayers(): React.JSX.Element {
+function SportSwitcherPill({
+  label,
+  active,
+  onPress,
+  testID,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  testID?: string;
+}): React.JSX.Element {
+  return (
+    <YStack
+      testID={testID}
+      paddingHorizontal={14}
+      paddingVertical={8}
+      borderRadius={20}
+      borderWidth={1}
+      onPress={onPress}
+      pressStyle={{ opacity: 0.7 }}
+      backgroundColor={active ? '#1B3A5C33' : '$glassSurface'}
+      borderColor={active ? '#1B3A5C' : '$glassBorder'}
+      justifyContent="center"
+      alignItems="center"
+    >
+      <Text
+        fontSize={14}
+        fontWeight="600"
+        color={active ? '#1B3A5C' : '$gray10'}
+      >
+        {label}
+      </Text>
+    </YStack>
+  );
+}
+
+export function FootballPlayers(): React.JSX.Element {
   const router = useRouter();
   const isPremium = useHasEntitlement(ENTITLEMENTS.football_projections);
   const hasAdvancedFilters = useHasEntitlement(
@@ -855,6 +893,32 @@ export default function FootballPlayers(): React.JSX.Element {
         )}
       </SafeAreaView>
     </KeyboardAvoidingView>
+  );
+}
+export default function PlayersRoute(): React.JSX.Element {
+  const [sport, setSport] = useState<'baseball' | 'football'>('football');
+  const footballEnabled = useFeatureIsOn('football_enabled');
+
+  return (
+    <YStack flex={1} backgroundColor="$background">
+      {footballEnabled && (
+        <XStack paddingHorizontal={12} paddingVertical={10} gap={8}>
+          <SportSwitcherPill
+            label="Baseball"
+            active={sport === 'baseball'}
+            onPress={() => setSport('baseball')}
+            testID="sport-switch-baseball"
+          />
+          <SportSwitcherPill
+            label="Football"
+            active={sport === 'football'}
+            onPress={() => setSport('football')}
+            testID="sport-switch-football"
+          />
+        </XStack>
+      )}
+      {sport === 'baseball' ? <PlayerStatsScreen /> : <FootballPlayers />}
+    </YStack>
   );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

@@ -58,6 +58,12 @@ export default function Layout() {
             options={{ title: 'Football Home' }}
           />
 
+          {/* Sport-aware Players hub — shared entry point for multi-sport users (LS-7063) */}
+          <Stack.Screen
+            name="football/players"
+            options={{ title: 'Players' }}
+          />
+
           {/* Live scoreboard */}
           <Stack.Screen
             name="baseball/scoreboard"
