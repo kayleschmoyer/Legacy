@@ -1,6 +1,16 @@
 /**
  * Entitlement lookup keys for feature gating.
  *
+ * THIS MAP IS THE SOURCE OF TRUTH, NOT A MIRROR OF STRIPE. Stripe is
+ * provisioned *from* this map (the `seed-stripe` CLI derives its Features from
+ * `Object.values(ENTITLEMENTS)`), and the runtime gates by reading the cached
+ * `users.subscription_tier` column against `TIER_ENTITLEMENTS` — it never queries
+ * Stripe's entitlements API per request. Code owns the feature catalog
+ * (`ENTITLEMENTS`/`ENTITLEMENT_LABELS`) and tier policy (`TIER_ENTITLEMENTS`);
+ * Stripe owns *who is premium right now* (subscription status → webhook → tier
+ * column) and billing/prices. To add or gate a feature, follow the end-to-end
+ * steps in `.agents/skills/add-entitlement/SKILL.md`.
+ *
  * Each `ENTITLEMENT` value is the `lookup_key` of a Stripe Feature
  * (provisioned by the `seed-stripe` CLI command,
  * `apps/cli/src/commands/seedStripe.ts`). Product tiers attach a subset
