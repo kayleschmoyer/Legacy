@@ -164,3 +164,18 @@ query FootballPlayer($id: Int!) {
     injuriesLastSyncedAt
   }
 }
+
+query FootballPlayerLeagueAvailability(
+  $playerIds: [Int!]!
+  $leagueIds: [Int!]!
+) {
+  footballPlayerLeagueAvailability(
+    playerIds: $playerIds
+    leagueIds: $leagueIds
+  ) {
+    playerId
+    leagueId
+    leagueName
+    isAvailable
+  }
+}

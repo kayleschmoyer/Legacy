@@ -1145,6 +1145,16 @@ type FootballPlayerGameLog {
 }
 
 """
+Per-league availability status for a football player (LS-7045). isAvailable is true when the player has no team_members entry in that league (i.e. not yet rostered).
+"""
+type FootballPlayerLeagueAvailability {
+  isAvailable: Boolean!
+  leagueId: Int!
+  leagueName: String!
+  playerId: Int!
+}
+
+"""
 All season stats across stat categories for a football player (LS-255)
 """
 type FootballPlayerSeasonStats {
@@ -3136,6 +3146,14 @@ type Query {
   Fetch a single football player by ID (LS-255)
   """
   footballPlayer(id: Int!): FootballPlayer
+
+  """
+  Returns per-league roster availability for a set of football players across the authenticated user's leagues (premium) (LS-7045). Only leagueIds that belong to the requesting user are considered — unknown or foreign league IDs are silently ignored.
+  """
+  footballPlayerLeagueAvailability(
+    leagueIds: [Int!]!
+    playerIds: [Int!]!
+  ): [FootballPlayerLeagueAvailability!]!
 
   """
   Paginated list of football players, optionally filtered by position (LS-255)

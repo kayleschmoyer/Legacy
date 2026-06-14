@@ -1821,4 +1821,147 @@ describe('football resolvers', () => {
       ).toBeNull();
     });
   });
+
+  // ── footballPlayerLeagueAvailability (LS-7045) ───────────────────────────────
+
+  describe('footballPlayerLeagueAvailability query', () => {
+    function getResolver() {
+      const queryType = schema.getQueryType();
+      const field = queryType?.getFields().footballPlayerLeagueAvailability;
+      if (!field?.resolve)
+        throw new Error('footballPlayerLeagueAvailability resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { playerIds: [1], leagueIds: [1] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws PREMIUM_REQUIRED when called by a free-tier user', async () => {
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ tier: 'free' }]),
+      );
+
+      await expect(
+        getResolver()(
+          {},
+          { playerIds: [1], leagueIds: [1] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+    });
+
+    it('returns empty array when playerIds is empty', async () => {
+      // Tier lookup must succeed first
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ tier: 'premium' }]),
+      );
+
+      const result = await getResolver()(
+        {},
+        { playerIds: [], leagueIds: [1] },
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toEqual([]);
+      // Only the tier lookup DB call should have run
+      expect(mockDb.then).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns empty array when leagueIds is empty', async () => {
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ tier: 'premium' }]),
+      );
+
+      const result = await getResolver()(
+        {},
+        { playerIds: [1], leagueIds: [] },
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toEqual([]);
+      expect(mockDb.then).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns empty array when none of the leagueIds belong to the user', async () => {
+      // Augment mock with innerJoin for the leagues+leagueMembers join
+      (mockDb as Record<string, unknown>).innerJoin = jest
+        .fn()
+        .mockReturnThis();
+      // Tier lookup → premium
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ tier: 'premium' }]),
+      );
+      // League membership query → none found
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([]),
+      );
+
+      const result = await getResolver()(
+        {},
+        { playerIds: [10, 20], leagueIds: [99] },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+      // Tier lookup + league query; team_members query must not run
+      expect(mockDb.then).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns availability matrix when user owns leagues', async () => {
+      (mockDb as Record<string, unknown>).innerJoin = jest
+        .fn()
+        .mockReturnThis();
+
+      // Tier lookup → premium
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ tier: 'premium' }]),
+      );
+      // League membership check → user owns league 5 named "Keeper"
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ id: 5, name: 'Keeper' }]),
+      );
+      // team_members → player 10 is already rostered in league 5
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
+        resolve([{ playerId: 10, leagueId: 5 }]),
+      );
+
+      const result = (await getResolver()(
+        {},
+        { playerIds: [10, 20], leagueIds: [5] },
+        mockContext,
+        undefined as never,
+      )) as Array<{
+        playerId: number;
+        leagueId: number;
+        leagueName: string;
+        isAvailable: boolean;
+      }>;
+
+      expect(result).toHaveLength(2);
+      expect(result).toContainEqual({
+        playerId: 10,
+        leagueId: 5,
+        leagueName: 'Keeper',
+        isAvailable: false,
+      });
+      expect(result).toContainEqual({
+        playerId: 20,
+        leagueId: 5,
+        leagueName: 'Keeper',
+        isAvailable: true,
+      });
+    });
+  });
 });

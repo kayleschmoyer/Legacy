@@ -1004,6 +1004,15 @@ export type FootballPlayerGameLog = {
   season: Scalars['Int']['output'];
 };
 
+/** Per-league availability status for a football player (LS-7045). isAvailable is true when the player has no team_members entry in that league (i.e. not yet rostered). */
+export type FootballPlayerLeagueAvailability = {
+  __typename?: 'FootballPlayerLeagueAvailability';
+  isAvailable: Scalars['Boolean']['output'];
+  leagueId: Scalars['Int']['output'];
+  leagueName: Scalars['String']['output'];
+  playerId: Scalars['Int']['output'];
+};
+
 /** All season stats across stat categories for a football player (LS-255) */
 export type FootballPlayerSeasonStats = {
   __typename?: 'FootballPlayerSeasonStats';
@@ -2912,6 +2921,8 @@ export type Query = {
   exportMyData?: Maybe<UserDataExport>;
   /** Fetch a single football player by ID (LS-255) */
   footballPlayer?: Maybe<FootballPlayer>;
+  /** Returns per-league roster availability for a set of football players across the authenticated user's leagues (premium) (LS-7045). Only leagueIds that belong to the requesting user are considered — unknown or foreign league IDs are silently ignored. */
+  footballPlayerLeagueAvailability: Array<FootballPlayerLeagueAvailability>;
   /** Paginated list of football players, optionally filtered by position (LS-255) */
   footballPlayers?: Maybe<FootballPlayersConnection>;
   freeAgents?: Maybe<Array<Player>>;
@@ -3153,6 +3164,11 @@ export type QueryDisclosureGameSessionArgs = {
 
 export type QueryFootballPlayerArgs = {
   id: Scalars['Int']['input'];
+};
+
+export type QueryFootballPlayerLeagueAvailabilityArgs = {
+  leagueIds: Array<Scalars['Int']['input']>;
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type QueryFootballPlayersArgs = {
@@ -5602,6 +5618,22 @@ export type FootballPlayerQuery = {
       }> | null;
     } | null;
   } | null;
+};
+
+export type FootballPlayerLeagueAvailabilityQueryVariables = Exact<{
+  playerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+  leagueIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+}>;
+
+export type FootballPlayerLeagueAvailabilityQuery = {
+  __typename?: 'Query';
+  footballPlayerLeagueAvailability: Array<{
+    __typename?: 'FootballPlayerLeagueAvailability';
+    playerId: number;
+    leagueId: number;
+    leagueName: string;
+    isAvailable: boolean;
+  }>;
 };
 
 export type CreateSeasonDraftGameMutationVariables = Exact<{
@@ -13248,6 +13280,108 @@ export type FootballPlayerSuspenseQueryHookResult = ReturnType<
 export type FootballPlayerQueryResult = Apollo.QueryResult<
   FootballPlayerQuery,
   FootballPlayerQueryVariables
+>;
+export const FootballPlayerLeagueAvailability = gql`
+  query FootballPlayerLeagueAvailability(
+    $playerIds: [Int!]!
+    $leagueIds: [Int!]!
+  ) {
+    footballPlayerLeagueAvailability(
+      playerIds: $playerIds
+      leagueIds: $leagueIds
+    ) {
+      playerId
+      leagueId
+      leagueName
+      isAvailable
+    }
+  }
+`;
+
+/**
+ * __useFootballPlayerLeagueAvailabilityQuery__
+ *
+ * To run a query within a React component, call `useFootballPlayerLeagueAvailabilityQuery` and pass it any options that fit your needs.
+ * When your component renders, `useFootballPlayerLeagueAvailabilityQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useFootballPlayerLeagueAvailabilityQuery({
+ *   variables: {
+ *      playerIds: // value for 'playerIds'
+ *      leagueIds: // value for 'leagueIds'
+ *   },
+ * });
+ */
+export function useFootballPlayerLeagueAvailabilityQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    FootballPlayerLeagueAvailabilityQuery,
+    FootballPlayerLeagueAvailabilityQueryVariables
+  > &
+    (
+      | {
+          variables: FootballPlayerLeagueAvailabilityQueryVariables;
+          skip?: boolean;
+        }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    FootballPlayerLeagueAvailabilityQuery,
+    FootballPlayerLeagueAvailabilityQueryVariables
+  >(FootballPlayerLeagueAvailability, options);
+}
+export function useFootballPlayerLeagueAvailabilityLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    FootballPlayerLeagueAvailabilityQuery,
+    FootballPlayerLeagueAvailabilityQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    FootballPlayerLeagueAvailabilityQuery,
+    FootballPlayerLeagueAvailabilityQueryVariables
+  >(FootballPlayerLeagueAvailability, options);
+}
+export function useFootballPlayerLeagueAvailabilitySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        FootballPlayerLeagueAvailabilityQuery,
+        FootballPlayerLeagueAvailabilityQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    FootballPlayerLeagueAvailabilityQuery,
+    FootballPlayerLeagueAvailabilityQueryVariables
+  >(
+    FootballPlayerLeagueAvailability,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          FootballPlayerLeagueAvailabilityQuery,
+          FootballPlayerLeagueAvailabilityQueryVariables
+        >,
+  );
+}
+export type FootballPlayerLeagueAvailabilityQueryHookResult = ReturnType<
+  typeof useFootballPlayerLeagueAvailabilityQuery
+>;
+export type FootballPlayerLeagueAvailabilityLazyQueryHookResult = ReturnType<
+  typeof useFootballPlayerLeagueAvailabilityLazyQuery
+>;
+export type FootballPlayerLeagueAvailabilitySuspenseQueryHookResult =
+  ReturnType<typeof useFootballPlayerLeagueAvailabilitySuspenseQuery>;
+export type FootballPlayerLeagueAvailabilityQueryResult = Apollo.QueryResult<
+  FootballPlayerLeagueAvailabilityQuery,
+  FootballPlayerLeagueAvailabilityQueryVariables
 >;
 export const CreateSeasonDraftGame = gql`
   mutation CreateSeasonDraftGame(

@@ -2383,6 +2383,120 @@ FootballMatchupPlayerRef.implement({
   }),
 });
 
+// ── Cross-league availability (LS-7045) ──────────────────────────────────────
+
+interface FootballPlayerLeagueAvailabilityShape {
+  playerId: number;
+  leagueId: number;
+  leagueName: string;
+  isAvailable: boolean;
+}
+
+const FootballPlayerLeagueAvailabilityRef =
+  builder.objectRef<FootballPlayerLeagueAvailabilityShape>(
+    'FootballPlayerLeagueAvailability',
+  );
+
+FootballPlayerLeagueAvailabilityRef.implement({
+  description:
+    'Per-league availability status for a football player (LS-7045). isAvailable is true when the player has no team_members entry in that league (i.e. not yet rostered).',
+  fields: (t) => ({
+    playerId: t.exposeInt('playerId', { nullable: false }),
+    leagueId: t.exposeInt('leagueId', { nullable: false }),
+    leagueName: t.exposeString('leagueName', { nullable: false }),
+    isAvailable: t.exposeBoolean('isAvailable', { nullable: false }),
+  }),
+});
+
+builder.queryField('footballPlayerLeagueAvailability', (t) =>
+  t.field({
+    type: [FootballPlayerLeagueAvailabilityRef],
+    nullable: false,
+    description:
+      "Returns per-league roster availability for a set of football players across the authenticated user's leagues (premium) (LS-7045). Only leagueIds that belong to the requesting user are considered — unknown or foreign league IDs are silently ignored.",
+    args: {
+      playerIds: t.arg.intList({ required: true }),
+      leagueIds: t.arg.intList({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to query league availability',
+        );
+      }
+      await requireEntitlement(context, ENTITLEMENTS.advanced_search_filters);
+
+      const { playerIds, leagueIds } = args;
+      if (playerIds.length === 0 || leagueIds.length === 0) return [];
+
+      const db = context.db;
+
+      // Resolve names and validate ownership in one pass: only return data for
+      // leagues the requesting user is actually a member of, so callers cannot
+      // probe arbitrary league rosters.
+      const userLeagueRows = await db
+        .select({
+          id: PublicSchema.leagues.id,
+          name: PublicSchema.leagues.name,
+        })
+        .from(PublicSchema.leagues)
+        .innerJoin(
+          PublicSchema.leagueMembers,
+          eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+        )
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+            inArray(PublicSchema.leagues.id, leagueIds),
+          ),
+        );
+
+      if (userLeagueRows.length === 0) return [];
+
+      const validLeagueIds = userLeagueRows
+        .map((l) => l.id)
+        .filter((id): id is number => id != null);
+
+      const leagueNameMap = new Map<number, string>();
+      for (const l of userLeagueRows) {
+        if (l.id != null) leagueNameMap.set(l.id, l.name ?? '');
+      }
+
+      // Single query: find all roster entries for the requested players in the
+      // validated leagues. Absence of a row means the player is available.
+      const rosteredRows = await db
+        .select({
+          playerId: PublicSchema.teamMembers.playerId,
+          leagueId: PublicSchema.teamMembers.leagueId,
+        })
+        .from(PublicSchema.teamMembers)
+        .where(
+          and(
+            inArray(PublicSchema.teamMembers.playerId, playerIds),
+            inArray(PublicSchema.teamMembers.leagueId, validLeagueIds),
+          ),
+        );
+
+      const rosteredSet = new Set(
+        rosteredRows.map((r) => `${r.playerId}:${r.leagueId}`),
+      );
+
+      const result: FootballPlayerLeagueAvailabilityShape[] = [];
+      for (const playerId of playerIds) {
+        for (const leagueId of validLeagueIds) {
+          result.push({
+            playerId,
+            leagueId,
+            leagueName: leagueNameMap.get(leagueId) ?? '',
+            isAvailable: !rosteredSet.has(`${playerId}:${leagueId}`),
+          });
+        }
+      }
+      return result;
+    },
+  }),
+);
+
 // ── Matchup stats type ────────────────────────────────────────────────────────
 
 export interface FootballMatchupStatsShape {

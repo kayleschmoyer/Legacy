@@ -1004,6 +1004,15 @@ export type FootballPlayerGameLog = {
   season: Scalars['Int']['output'];
 };
 
+/** Per-league availability status for a football player (LS-7045). isAvailable is true when the player has no team_members entry in that league (i.e. not yet rostered). */
+export type FootballPlayerLeagueAvailability = {
+  __typename?: 'FootballPlayerLeagueAvailability';
+  isAvailable: Scalars['Boolean']['output'];
+  leagueId: Scalars['Int']['output'];
+  leagueName: Scalars['String']['output'];
+  playerId: Scalars['Int']['output'];
+};
+
 /** All season stats across stat categories for a football player (LS-255) */
 export type FootballPlayerSeasonStats = {
   __typename?: 'FootballPlayerSeasonStats';
@@ -2912,6 +2921,8 @@ export type Query = {
   exportMyData?: Maybe<UserDataExport>;
   /** Fetch a single football player by ID (LS-255) */
   footballPlayer?: Maybe<FootballPlayer>;
+  /** Returns per-league roster availability for a set of football players across the authenticated user's leagues (premium) (LS-7045). Only leagueIds that belong to the requesting user are considered — unknown or foreign league IDs are silently ignored. */
+  footballPlayerLeagueAvailability: Array<FootballPlayerLeagueAvailability>;
   /** Paginated list of football players, optionally filtered by position (LS-255) */
   footballPlayers?: Maybe<FootballPlayersConnection>;
   freeAgents?: Maybe<Array<Player>>;
@@ -3153,6 +3164,11 @@ export type QueryDisclosureGameSessionArgs = {
 
 export type QueryFootballPlayerArgs = {
   id: Scalars['Int']['input'];
+};
+
+export type QueryFootballPlayerLeagueAvailabilityArgs = {
+  leagueIds: Array<Scalars['Int']['input']>;
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type QueryFootballPlayersArgs = {

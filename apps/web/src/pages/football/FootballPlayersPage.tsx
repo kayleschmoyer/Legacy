@@ -12,7 +12,10 @@ import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
 import type { FootballPlayerCardStats } from '@legacy-sports/shared-components/football';
 import {
   type FootballPlayersQuery,
+  Sport,
+  useFootballPlayerLeagueAvailabilityQuery,
   useFootballPlayersQuery,
+  useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
 import type { FootballPlayerSortValue } from '../../components/football/FootballPlayerSort';
 import { FootballPlayerSort } from '../../components/football/FootballPlayerSort';
@@ -34,6 +37,7 @@ import {
   BRAND_SEAM_RED,
   BRAND_SEAM_RED_LIGHT,
   getFootballPositionColor,
+  GREEN,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
   SURFACE_HOVER,
@@ -152,9 +156,74 @@ function getKeyStat(
   };
 }
 
+// ─── Cross-league availability mini-badge (LS-7045) ───────────────────────
+
+interface LeagueAvailabilityEntry {
+  leagueId: number;
+  leagueName: string;
+  isAvailable: boolean;
+}
+
+function LeagueAvailabilityBadge({
+  league,
+}: {
+  league: LeagueAvailabilityEntry;
+}) {
+  const bg = league.isAvailable
+    ? withAlpha(GREEN, 0.15)
+    : withAlpha(TEXT_MUTED, 0.1);
+  const border = league.isAvailable ? withAlpha(GREEN, 0.45) : OUTLINE_SUBTLE;
+  const color = league.isAvailable ? GREEN : TEXT_MUTED;
+  return (
+    <YStack
+      key={league.leagueId}
+      paddingHorizontal={5}
+      paddingVertical={2}
+      borderRadius={4}
+      backgroundColor={bg}
+      borderWidth={1}
+      borderColor={border}
+    >
+      <Text fontSize={10} fontWeight="600" color={color} fontFamily={FONT_BODY}>
+        {league.leagueName.slice(0, 8)}
+      </Text>
+    </YStack>
+  );
+}
+
+function LeagueAvailabilityCell({
+  entries,
+}: {
+  entries: LeagueAvailabilityEntry[];
+}) {
+  const availableCount = entries.filter((e) => e.isAvailable).length;
+  const total = entries.length;
+  if (total === 0) return null;
+
+  const summaryColor = availableCount > 0 ? GREEN : TEXT_MUTED;
+
+  return (
+    <YStack gap={4} alignItems="flex-end">
+      <Text
+        fontSize={11}
+        fontWeight="700"
+        color={summaryColor}
+        fontFamily={FONT_BODY}
+      >
+        {availableCount}/{total}
+      </Text>
+      <XStack gap={3} flexWrap="wrap" justifyContent="flex-end">
+        {entries.map((e) => (
+          <LeagueAvailabilityBadge key={e.leagueId} league={e} />
+        ))}
+      </XStack>
+    </YStack>
+  );
+}
+
 // ─── Table row ─────────────────────────────────────────────────────────────
 
-function TableHeader() {
+function TableHeader({ showAvailability }: { showAvailability: boolean }) {
   const colStyles = {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -211,6 +280,38 @@ function TableHeader() {
           CAREER STATS
         </Text>
       </XStack>
+      {showAvailability && (
+        <XStack width={160} {...colStyles} justifyContent="flex-end">
+          <XStack gap={4} alignItems="center">
+            <Text
+              fontSize={11}
+              fontWeight="700"
+              color={BRAND_GOLD}
+              fontFamily={FONT_BODY}
+              letterSpacing={0.8}
+              textAlign="right"
+            >
+              MY LEAGUES
+            </Text>
+            <YStack
+              paddingHorizontal={5}
+              paddingVertical={1}
+              borderRadius={3}
+              backgroundColor={withAlpha(BRAND_GOLD, 0.18)}
+            >
+              <Text
+                fontSize={9}
+                fontWeight="700"
+                color={BRAND_GOLD}
+                fontFamily={FONT_BODY}
+                letterSpacing={0.5}
+              >
+                PRO
+              </Text>
+            </YStack>
+          </XStack>
+        </XStack>
+      )}
     </XStack>
   );
 }
@@ -218,9 +319,11 @@ function TableHeader() {
 function TableRow({
   player,
   onNavigate,
+  leagueEntries,
 }: {
   player: PlayerListItem;
   onNavigate: (id: string) => void;
+  leagueEntries?: LeagueAvailabilityEntry[];
 }) {
   const pos = player?.position;
   const isDst = player?.isDst ?? false;
@@ -305,6 +408,17 @@ function TableRow({
           </Text>
         )}
       </XStack>
+      {leagueEntries != null && leagueEntries.length > 0 && (
+        <XStack
+          width={160}
+          paddingHorizontal={12}
+          paddingVertical={10}
+          justifyContent="flex-end"
+          alignItems="center"
+        >
+          <LeagueAvailabilityCell entries={leagueEntries} />
+        </XStack>
+      )}
     </XStack>
   );
 }
@@ -524,6 +638,20 @@ export function FootballPlayersPage() {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
   const isPremium = useIsPremium();
+
+  // Cross-league availability matrix (LS-7045). Fetch user's football leagues
+  // so we can show per-league availability for premium users.
+  const { data: userLeaguesData } = useGetUserLeaguesQuery({
+    skip: !isPremium,
+  });
+  const footballLeagues = (userLeaguesData?.userLeagues ?? []).filter(
+    (l) => l.sport === Sport.Football && !l.isMockDraft,
+  );
+  const footballLeagueIds = footballLeagues
+    .map((l) => l.id)
+    .filter((id): id is number => id != null);
+  const showAvailabilityMatrix = isPremium && footballLeagueIds.length >= 2;
+
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
   const [sort, setSort] = useState<FootballPlayerSortValue>({ dir: 'asc' });
@@ -707,6 +835,33 @@ export function FootballPlayersPage() {
   const isInitialLoad = loading && allNodes.length === 0;
 
   const players = allNodes ?? [];
+
+  // Cross-league availability query (LS-7045). Runs only for premium users
+  // with 2+ football leagues, after the player list loads.
+  const visiblePlayerIds = players
+    .map((p) => p?.id)
+    .filter((id): id is number => id != null);
+  const { data: availabilityData } = useFootballPlayerLeagueAvailabilityQuery({
+    variables: {
+      playerIds: visiblePlayerIds,
+      leagueIds: footballLeagueIds,
+    },
+    skip: !showAvailabilityMatrix || visiblePlayerIds.length === 0,
+  });
+
+  // Build a map keyed by playerId for O(1) lookup in table rows.
+  const availabilityByPlayerId = new Map<number, LeagueAvailabilityEntry[]>();
+  if (availabilityData?.footballPlayerLeagueAvailability) {
+    for (const entry of availabilityData.footballPlayerLeagueAvailability) {
+      const list = availabilityByPlayerId.get(entry.playerId) ?? [];
+      list.push({
+        leagueId: entry.leagueId,
+        leagueName: entry.leagueName,
+        isAvailable: entry.isAvailable,
+      });
+      availabilityByPlayerId.set(entry.playerId, list);
+    }
+  }
 
   return (
     <YStack flex={1} backgroundColor={BG_DARK} minHeight="100vh">
@@ -1001,13 +1156,18 @@ export function FootballPlayersPage() {
             borderRadius={10}
             overflow="hidden"
           >
-            <TableHeader />
+            <TableHeader showAvailability={showAvailabilityMatrix} />
             {players.map((player) =>
               player?.id != null ? (
                 <TableRow
                   key={player.id}
                   player={player}
                   onNavigate={(id) => navigate(`/football/players/${id}`)}
+                  leagueEntries={
+                    showAvailabilityMatrix
+                      ? availabilityByPlayerId.get(player.id)
+                      : undefined
+                  }
                 />
               ) : null,
             )}
