@@ -1,0 +1,34 @@
+query BaseballPlayers(
+  $search: String
+  $position: String
+  $limit: Int
+  $offset: Int
+) {
+  players(
+    sport: baseball
+    search: $search
+    position: $position
+    limit: $limit
+    offset: $offset
+    excludeEmptyNames: true
+  ) {
+    id
+    firstName
+    lastName
+    eligiblePositions
+    careerBatting {
+      battingAverage
+      homeRuns
+      rbi
+      stolenBases
+      hits
+    }
+    careerPitching {
+      era
+      wins
+      losses
+      strikeouts
+      saves
+    }
+  }
+}

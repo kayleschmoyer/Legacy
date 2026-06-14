@@ -6466,6 +6466,40 @@ export type MarkAllNotificationsAsReadMutation = {
   markAllNotificationsAsRead?: boolean | null;
 };
 
+export type BaseballPlayersQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type BaseballPlayersQuery = {
+  __typename?: 'Query';
+  players?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      battingAverage?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      hits?: number | null;
+    } | null;
+    careerPitching?: {
+      __typename?: 'CareerPitching';
+      era?: string | null;
+      wins?: number | null;
+      losses?: number | null;
+      strikeouts?: number | null;
+      saves?: number | null;
+    } | null;
+  }> | null;
+};
+
 export type FootballPlayersQueryVariables = Exact<{
   positions?: InputMaybe<
     Array<Scalars['String']['input']> | Scalars['String']['input']
@@ -11657,6 +11691,124 @@ export type MarkAllNotificationsAsReadMutationResult =
 export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
   MarkAllNotificationsAsReadMutation,
   MarkAllNotificationsAsReadMutationVariables
+>;
+export const BaseballPlayers = gql`
+  query BaseballPlayers(
+    $search: String
+    $position: String
+    $limit: Int
+    $offset: Int
+  ) {
+    players(
+      sport: baseball
+      search: $search
+      position: $position
+      limit: $limit
+      offset: $offset
+      excludeEmptyNames: true
+    ) {
+      id
+      firstName
+      lastName
+      eligiblePositions
+      careerBatting {
+        battingAverage
+        homeRuns
+        rbi
+        stolenBases
+        hits
+      }
+      careerPitching {
+        era
+        wins
+        losses
+        strikeouts
+        saves
+      }
+    }
+  }
+`;
+
+/**
+ * __useBaseballPlayersQuery__
+ *
+ * To run a query within a React component, call `useBaseballPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useBaseballPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useBaseballPlayersQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *      position: // value for 'position'
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *   },
+ * });
+ */
+export function useBaseballPlayersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    BaseballPlayersQuery,
+    BaseballPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<BaseballPlayersQuery, BaseballPlayersQueryVariables>(
+    BaseballPlayers,
+    options,
+  );
+}
+export function useBaseballPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    BaseballPlayersQuery,
+    BaseballPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    BaseballPlayersQuery,
+    BaseballPlayersQueryVariables
+  >(BaseballPlayers, options);
+}
+export function useBaseballPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        BaseballPlayersQuery,
+        BaseballPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    BaseballPlayersQuery,
+    BaseballPlayersQueryVariables
+  >(
+    BaseballPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          BaseballPlayersQuery,
+          BaseballPlayersQueryVariables
+        >,
+  );
+}
+export type BaseballPlayersQueryHookResult = ReturnType<
+  typeof useBaseballPlayersQuery
+>;
+export type BaseballPlayersLazyQueryHookResult = ReturnType<
+  typeof useBaseballPlayersLazyQuery
+>;
+export type BaseballPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useBaseballPlayersSuspenseQuery
+>;
+export type BaseballPlayersQueryResult = Apollo.QueryResult<
+  BaseballPlayersQuery,
+  BaseballPlayersQueryVariables
 >;
 export const FootballPlayers = gql`
   query FootballPlayers(
