@@ -40,23 +40,22 @@ Legend for **Enforcement**: 🔒 server-enforced (resolver gate) · 🖥️ UI-g
 
 ### Premium features
 
-| Feature                                                                        | Tier    | Entitlement key             | Enforcement | Backend resolver                                              | Frontend gate                |
-| ------------------------------------------------------------------------------ | ------- | --------------------------- | ----------- | ------------------------------------------------------------- | ---------------------------- |
-| Salary cap leagues                                                             | Premium | `salary_cap_leagues`        | 🔒          | `leagues/mutations.ts`                                        | league create/settings       |
-| Advanced playoff formats (6/8-team)                                            | Premium | `advanced_playoff_formats`  | 🔒          | `leagues/mutations.ts`                                        | `LeagueSettingsControl`      |
-| Unlimited active leagues                                                       | Premium | `unlimited_leagues`         | 🔒 ➖       | `leagues/mutations.ts` (cap)                                  | league create                |
-| Unlimited mock drafts                                                          | Premium | `unlimited_mock_drafts`     | 🔒 ➖       | `drafts/queries.ts`, `initialize-mock-draft.ts`               | `MockDraftPage`              |
-| FAAB waivers                                                                   | Premium | `faab_waiver_type`          | 🔒          | `leagues/mutations.ts`                                        | league create, Commish       |
-| Historical era filters                                                         | Premium | `historical_era_filters`    | 🔒          | `leagues/mutations.ts`                                        | `DraftSettingsControl`       |
-| Auction draft mode                                                             | Premium | `auction_draft`             | 🔒          | `leagues/mutations.ts`                                        | league create                |
-| Extended trade expiration                                                      | Premium | `extended_trade_expiration` | 🔒          | `trades/mutations.ts`                                         | TradingCenter                |
-| AI matchup recaps                                                              | Premium | `ai_matchup_recap`          | 🔒          | `matchups/types.ts` (`recap` field)                           | MatchupDetail recap panel    |
-| Draft recommendations                                                          | Premium | `draft_recommendations`     | 🔒          | `drafts/queries.ts` (`getDraftRecommendations`)               | `DraftSidebar`               |
-| Player comparison                                                              | Premium | `player_comparison`         | 🖥️          | _none yet — `comparePlayers` resolver not built_              | `PlayerComparisonPage`       |
-| Matchup projections & win probability                                          | Premium | `matchup_projections`       | 🖥️          | _none — computed client-side in `MatchupWinProbabilityPanel`_ | MatchupDetail win-prob panel |
-| Trade analyzer                                                                 | Premium | `trade_analyzer`            | 🖥️          | _none yet — analyzer is a “coming soon” teaser_               | `TradeCenterPage`            |
-| Fantasy scoring projections (football)                                         | Premium | `football_projections`      | 🖥️          | _none yet — `ProjectionsTeaser` is an upsell teaser_          | `FootballPlayerDetailPage`   |
-| Advanced football stats (snap %, target share, air yards, route participation) | Premium | `advanced_football_stats`   | 🖥️          | _none yet — stat fields not in schema_                        | _not surfaced yet_           |
+| Feature                                | Tier    | Entitlement key             | Enforcement | Backend resolver                                              | Frontend gate                |
+| -------------------------------------- | ------- | --------------------------- | ----------- | ------------------------------------------------------------- | ---------------------------- |
+| Salary cap leagues                     | Premium | `salary_cap_leagues`        | 🔒          | `leagues/mutations.ts`                                        | league create/settings       |
+| Advanced playoff formats (6/8-team)    | Premium | `advanced_playoff_formats`  | 🔒          | `leagues/mutations.ts`                                        | `LeagueSettingsControl`      |
+| Unlimited active leagues               | Premium | `unlimited_leagues`         | 🔒 ➖       | `leagues/mutations.ts` (cap)                                  | league create                |
+| Unlimited mock drafts                  | Premium | `unlimited_mock_drafts`     | 🔒 ➖       | `drafts/queries.ts`, `initialize-mock-draft.ts`               | `MockDraftPage`              |
+| FAAB waivers                           | Premium | `faab_waiver_type`          | 🔒          | `leagues/mutations.ts`                                        | league create, Commish       |
+| Historical era filters                 | Premium | `historical_era_filters`    | 🔒          | `leagues/mutations.ts`                                        | `DraftSettingsControl`       |
+| Auction draft mode                     | Premium | `auction_draft`             | 🔒          | `leagues/mutations.ts`                                        | league create                |
+| Extended trade expiration              | Premium | `extended_trade_expiration` | 🔒          | `trades/mutations.ts`                                         | TradingCenter                |
+| AI matchup recaps                      | Premium | `ai_matchup_recap`          | 🔒          | `matchups/types.ts` (`recap` field)                           | MatchupDetail recap panel    |
+| Draft recommendations                  | Premium | `draft_recommendations`     | 🔒          | `drafts/queries.ts` (`getDraftRecommendations`)               | `DraftSidebar`               |
+| Player comparison                      | Premium | `player_comparison`         | 🖥️          | _none yet — `comparePlayers` resolver not built_              | `PlayerComparisonPage`       |
+| Matchup projections & win probability  | Premium | `matchup_projections`       | 🖥️          | _none — computed client-side in `MatchupWinProbabilityPanel`_ | MatchupDetail win-prob panel |
+| Trade analyzer                         | Premium | `trade_analyzer`            | 🖥️          | _none yet — analyzer is a “coming soon” teaser_               | `TradeCenterPage`            |
+| Fantasy scoring projections (football) | Premium | `football_projections`      | 🖥️          | _none yet — `ProjectionsTeaser` is an upsell teaser_          | `FootballPlayerDetailPage`   |
 
 ### Free features (explicit decisions)
 
@@ -80,7 +79,6 @@ matrix becomes fully 🔒:
 - `matchup_projections` — if/when win-probability moves server-side, gate it; today it's a pure client calculation.
 - `trade_analyzer` — gate when the analyzer ships (currently a teaser).
 - `football_projections` — gate the projections resolver when built.
-- `advanced_football_stats` — add the stat fields + gate; the entitlement has existed unused.
 
 ## Planned (not yet a tier decision in code)
 
@@ -90,6 +88,7 @@ matrix becomes fully 🔒:
 
 ## Change log
 
-| Date       | Change                                                                                                                                                                                                                                                                             |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-06-13 | Initial source-of-truth. Live draft board moved to Free. Added entitlement keys `player_comparison`, `matchup_projections`, `ai_matchup_recap`, `draft_recommendations`, `trade_analyzer`, `football_projections`; server-enforced `ai_matchup_recap` and `draft_recommendations`. |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-06-14 | Dropped the `advanced_football_stats` premium feature (LS-6475 / FPL-028). The promised stats (snap %, target share, air yards, EPA, red-zone touches) exist in no schema, resolver, GraphQL, UI, or data source — Pro Football Reference does not publish them. Rather than bill for an undeliverable feature, the entitlement was removed. Re-add the key + gate if these stats are ever sourced (e.g. an nflverse / Next Gen Stats ingestion pipeline). |
+| 2026-06-13 | Initial source-of-truth. Live draft board moved to Free. Added entitlement keys `player_comparison`, `matchup_projections`, `ai_matchup_recap`, `draft_recommendations`, `trade_analyzer`, `football_projections`; server-enforced `ai_matchup_recap` and `draft_recommendations`.                                                                                                                                                                         |

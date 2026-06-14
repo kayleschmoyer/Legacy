@@ -45,28 +45,31 @@ nowhere.
 
 ## 1. Stripe entitlements (provisioned & auto-synced)
 
-These 9 keys are in `ENTITLEMENTS`, attached to the premium tier in
+These 8 keys are in `ENTITLEMENTS`, attached to the premium tier in
 `TIER_ENTITLEMENTS`, and seeded into Stripe by `seedStripe.ts`. Billing coverage
 for these is **guaranteed** (the seed derives from the same map).
 
-| Entitlement key             | Label                                                                          | Backend enforced?   | Where                                                            |
-| --------------------------- | ------------------------------------------------------------------------------ | ------------------- | ---------------------------------------------------------------- |
-| `salary_cap_leagues`        | Salary cap leagues                                                             | ✅                  | `leagues/mutations.ts` (create/update league)                    |
-| `advanced_playoff_formats`  | Advanced playoff formats (6/8-team)                                            | ✅                  | `leagues/mutations.ts`                                           |
-| `unlimited_mock_drafts`     | Unlimited mock drafts                                                          | ✅                  | `drafts/queries.ts`, `drafts/mutations/initialize-mock-draft.ts` |
-| `unlimited_leagues`         | Unlimited active leagues                                                       | ✅                  | `leagues/mutations.ts` (create/renew league cap)                 |
-| `faab_waiver_type`          | FAAB waivers                                                                   | ✅                  | `leagues/mutations.ts`                                           |
-| `historical_era_filters`    | Historical era filters                                                         | ✅                  | `leagues/mutations.ts`                                           |
-| `auction_draft`             | Auction draft mode                                                             | ✅                  | `leagues/mutations.ts`                                           |
-| `extended_trade_expiration` | Extended trade expiration                                                      | ✅                  | `trades/mutations.ts`                                            |
-| `advanced_football_stats`   | Advanced football stats (snap %, target share, air yards, route participation) | ❌ **NOT ENFORCED** | no `requireEntitlement` call site found anywhere                 |
+| Entitlement key             | Label                               | Backend enforced? | Where                                                            |
+| --------------------------- | ----------------------------------- | ----------------- | ---------------------------------------------------------------- |
+| `salary_cap_leagues`        | Salary cap leagues                  | ✅                | `leagues/mutations.ts` (create/update league)                    |
+| `advanced_playoff_formats`  | Advanced playoff formats (6/8-team) | ✅                | `leagues/mutations.ts`                                           |
+| `unlimited_mock_drafts`     | Unlimited mock drafts               | ✅                | `drafts/queries.ts`, `drafts/mutations/initialize-mock-draft.ts` |
+| `unlimited_leagues`         | Unlimited active leagues            | ✅                | `leagues/mutations.ts` (create/renew league cap)                 |
+| `faab_waiver_type`          | FAAB waivers                        | ✅                | `leagues/mutations.ts`                                           |
+| `historical_era_filters`    | Historical era filters              | ✅                | `leagues/mutations.ts`                                           |
+| `auction_draft`             | Auction draft mode                  | ✅                | `leagues/mutations.ts`                                           |
+| `extended_trade_expiration` | Extended trade expiration           | ✅                | `trades/mutations.ts`                                            |
 
-### ⚠️ Gap A — `advanced_football_stats` is billed but not enforced
+### ✅ Gap A (resolved, LS-6475) — `advanced_football_stats` removed
 
-The entitlement is seeded into Stripe and attached to the premium product, but
-**no resolver or UI gate references it**. A user could pay for it and there is
-nothing it unlocks, and conversely the data (if it exists) is not actually
-gated. Either wire the gate or remove the feature from Stripe.
+Previously the entitlement was seeded into Stripe and attached to the premium
+product, but **no resolver or UI gate referenced it**, and the underlying stats
+(snap %, target share, air yards, EPA, red-zone touches) exist nowhere in the
+schema, resolver, GraphQL, UI, or any data source — Pro Football Reference does
+not publish them. Rather than bill for a feature that could not be delivered, the
+entitlement was **removed** from `ENTITLEMENTS` (LS-6475 / FPL-028). If these
+stats are ever sourced (e.g. an nflverse / Next Gen Stats ingestion pipeline),
+re-add the key and gate it then.
 
 ---
 
@@ -138,7 +141,7 @@ It advertises:
 
 This marketing list is **internally consistent** with Stripe, but it **omits**
 several things that exist as entitlements (`auction_draft`,
-`extended_trade_expiration`, `advanced_football_stats`) and several things the
+`extended_trade_expiration`) and several things the
 app gates in the UI (Player Comparison, Matchup Projections, AI Recap, Draft
 Recommendations). Worth aligning the three lists.
 
@@ -155,8 +158,9 @@ Recommendations). Worth aligning the three lists.
 ## Summary of action items
 
 1. ~~**Gap A:** `advanced_football_stats` is in Stripe but enforced nowhere~~ —
-   still in Stripe; the stat fields/resolver don't exist yet, so enforcement
-   lands when the feature is built (tracked in `subscription-tiers.md`).
+   **resolved (LS-6475):** the stats have no data source, so the entitlement was
+   removed from `ENTITLEMENTS` rather than left billed-but-dead. Re-add when/if
+   the stats are sourced.
 2. ~~**Gap B:** … no Stripe entitlement and no backend enforcement~~ —
    **addressed by this PR:** all listed features now carry an `ENTITLEMENTS` key;
    Live Draft is Free; AI Matchup Recap + Draft Recommendations are
@@ -170,6 +174,6 @@ Recommendations). Worth aligning the three lists.
 
 **Bottom line:** Your instinct is correct. Of the features the product treats as
 premium, only the 8 league/draft/trade-configuration entitlements are fully
-covered end-to-end. One entitlement (`advanced_football_stats`) is billed but
-dead, and at least seven UI-gated "premium" features have no Stripe entitlement
-behind them at all.
+covered end-to-end. The dead `advanced_football_stats` entitlement has since been
+removed (LS-6475), and at least seven UI-gated "premium" features have no Stripe
+entitlement behind them at all.
