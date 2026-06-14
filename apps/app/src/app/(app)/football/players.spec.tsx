@@ -597,6 +597,73 @@ describe('FootballPlayers', () => {
       jest.useRealTimers();
     });
 
+    // Regression for LS-7050: when the user paginates then changes the search
+    // filter, the filter-change effect resets cursor to undefined. That cursor
+    // change fires the data effect before Apollo has refreshed data for the new
+    // variables. Without the isFilterChangingRef guard the effect's append path
+    // would commit stale paginated results into the newly-cleared allNodes,
+    // briefly showing the wrong player list.
+    it('does not restore stale paginated results after a filter change (LS-7050)', () => {
+      // Page 1 — has a next page so "Load more" appears
+      mockUseFootballPlayersQuery.mockReturnValue({
+        data: {
+          footballPlayers: {
+            nodes: [QB_PLAYER],
+            pageInfo: { hasNextPage: true, endCursor: 'cursor1' },
+          },
+        },
+        loading: false,
+        error: undefined,
+      });
+
+      const { rerender } = render(<FootballPlayers />);
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+
+      // Simulate loading page 2: update mock before pressing "Load more" so
+      // the re-render that fires from setCursor sees page-2 data, matching
+      // real Apollo behaviour where cursor change fetches new variables.
+      mockUseFootballPlayersQuery.mockReturnValue({
+        data: {
+          footballPlayers: {
+            nodes: [DST_PLAYER],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+        loading: false,
+        error: undefined,
+      });
+      fireEvent.press(screen.getByText('Load more'));
+      // After the press: cursor='cursor1', prevCursorRef='cursor1', allNodes includes DST
+
+      // Now the filter changes. The mock deliberately keeps returning DST data
+      // to simulate Apollo's observable not yet having updated for new variables
+      // (the stale-response race described in LS-7050).
+      const input = screen.getByPlaceholderText('Search players...');
+      fireEvent.changeText(input, 'Mahomes');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      // filter-change effect ran: cursor=undefined, allNodes=[], isFilterChanging=true
+      // data effect fired (cursor 'cursor1'→undefined) — the guard must have skipped
+      // the stale DST commit. If it didn't, DST_PLAYER ('Kansas City') would appear.
+      expect(screen.queryByText('Kansas City Chiefs')).toBeNull();
+
+      // Fresh search results arrive for 'Mahomes': update mock then rerender to
+      // simulate Apollo's observable emitting for the new query variables.
+      mockUseFootballPlayersQuery.mockReturnValue({
+        data: {
+          footballPlayers: {
+            nodes: [QB_PLAYER],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+        loading: false,
+        error: undefined,
+      });
+      rerender(<FootballPlayers />);
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+    });
+
     it('passes search term to query after debounce fires', () => {
       render(<FootballPlayers />);
       const input = screen.getByPlaceholderText('Search players...');

@@ -544,6 +544,10 @@ export default function FootballPlayers(): React.JSX.Element {
   // compare by value rather than array identity.
   const positionsKey = positions.join('|');
 
+  // Ref mirror of isFilterChanging used to guard the data effect without
+  // adding isFilterChanging as a dep (which would create a circular trigger).
+  const isFilterChangingRef = useRef(false);
+
   const prevFiltersRef = useRef({ positionsKey, teamFilter, debouncedSearch });
   useEffect(() => {
     const prev = prevFiltersRef.current;
@@ -553,6 +557,7 @@ export default function FootballPlayers(): React.JSX.Element {
       prev.debouncedSearch !== debouncedSearch
     ) {
       prevFiltersRef.current = { positionsKey, teamFilter, debouncedSearch };
+      isFilterChangingRef.current = true;
       setCursor(undefined);
       setAllNodes([]);
       setIsFilterChanging(true);
@@ -580,12 +585,21 @@ export default function FootballPlayers(): React.JSX.Element {
   useEffect(() => {
     const newNodes = data?.footballPlayers?.nodes;
     if (!newNodes) return;
+    // Guard: when a filter change resets cursor to undefined, the cursor dep
+    // fires this effect before Apollo has refreshed data for the new variables.
+    // Without this guard, the append path commits the previous query's results
+    // into the now-empty allNodes, showing stale data until the new query lands.
+    if (isFilterChangingRef.current && prevCursorRef.current !== cursor) {
+      prevCursorRef.current = cursor;
+      return;
+    }
     if (prevCursorRef.current !== cursor) {
       setAllNodes((prev) => [...prev, ...newNodes]);
     } else {
       setAllNodes(newNodes);
     }
     prevCursorRef.current = cursor;
+    isFilterChangingRef.current = false;
     setIsFilterChanging(false);
   }, [data, cursor]);
 
