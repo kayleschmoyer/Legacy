@@ -40,8 +40,8 @@ interface FeatureSpec {
 }
 
 // Derive the feature list from the single source of truth in
-// `lambdas/db/src/schema/entitlements.ts` so gating code and Stripe
-// provisioning cannot drift.
+// `lib/utils/src/lib/entitlements.ts` (`ENTITLEMENTS` in `@legacy-sports/utils`)
+// so gating code and Stripe provisioning cannot drift.
 const FEATURES: FeatureSpec[] = (
   Object.values(ENTITLEMENTS) as EntitlementKey[]
 ).map((lookup_key) => ({
