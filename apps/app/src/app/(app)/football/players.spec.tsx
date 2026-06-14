@@ -432,6 +432,26 @@ describe('FootballPlayers', () => {
     });
   });
 
+  describe('fresh-mount default state (LS-7065 — sport-switch reset)', () => {
+    it('starts with all filters cleared on mount, as after a sport switch', () => {
+      // When the parent switches sports, FootballPlayers is remounted with a new key.
+      // This test verifies that a fresh mount sends no position/team/search filters,
+      // i.e. the "No players found" / wrong-taxonomy bug cannot occur right after switch.
+      render(<FootballPlayers />);
+      const calls = mockUseFootballPlayersQuery.mock.calls as Array<
+        [
+          {
+            variables: { position?: string; nflTeam?: string; search?: string };
+          },
+        ]
+      >;
+      const firstCall = calls[0];
+      expect(firstCall[0].variables.position).toBeUndefined();
+      expect(firstCall[0].variables.nflTeam).toBeUndefined();
+      expect(firstCall[0].variables.search).toBeUndefined();
+    });
+  });
+
   describe('position filter', () => {
     function lastPositions(): string[] | undefined {
       const calls = mockUseFootballPlayersQuery.mock.calls;

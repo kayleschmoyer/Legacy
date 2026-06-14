@@ -79,7 +79,18 @@ function SportPill({
 export default function PlayersTab(): React.JSX.Element {
   const [segment, setSegment] = useState<Segment>('stats');
   const [sport, setSport] = useState<Sport>('baseball');
+  // Incremented on every sport change so FootballPlayers receives a new key,
+  // guaranteeing a full remount and clearing all sport-specific filter state
+  // (position, teamFilter, searchInput) whenever the user switches sports.
+  const [sportKey, setSportKey] = useState(0);
   const footballEnabled = useFeatureIsOn('football_enabled');
+
+  const handleSportChange = (newSport: Sport) => {
+    if (newSport !== sport) {
+      setSport(newSport);
+      setSportKey((k) => k + 1);
+    }
+  };
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -119,13 +130,13 @@ export default function PlayersTab(): React.JSX.Element {
             testID="sport-baseball"
             label="Baseball"
             active={sport === 'baseball'}
-            onPress={() => setSport('baseball')}
+            onPress={() => handleSportChange('baseball')}
           />
           <SportPill
             testID="sport-football"
             label="Football"
             active={sport === 'football'}
-            onPress={() => setSport('football')}
+            onPress={() => handleSportChange('football')}
           />
         </XStack>
       )}
@@ -136,7 +147,7 @@ export default function PlayersTab(): React.JSX.Element {
           <PlayerStatsScreen />
         )}
         {segment === 'stats' && sport === 'football' && footballEnabled && (
-          <FootballPlayers />
+          <FootballPlayers key={sportKey} />
         )}
         {segment === 'compare' && <PlayerComparisonScreen />}
       </YStack>

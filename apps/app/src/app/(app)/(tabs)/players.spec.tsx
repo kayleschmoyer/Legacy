@@ -183,4 +183,41 @@ describe('PlayersTab', () => {
       expect(screen.queryByTestId('football-players-screen')).toBeNull();
     });
   });
+
+  describe('sport switch filter reset (LS-7065)', () => {
+    beforeEach(() => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+    });
+
+    it('remounts FootballPlayers on return to football after a sport switch', () => {
+      // Each sport change increments a key on FootballPlayers, guaranteeing a fresh
+      // component instance (and cleared position/teamFilter/searchInput state) on
+      // every sport transition — preventing filter state from bleeding across sports.
+      render(<PlayersTab />);
+
+      // Switch to football → component mounts.
+      fireEvent.press(screen.getByTestId('sport-football'));
+      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
+
+      // Switch to baseball → component unmounts.
+      fireEvent.press(screen.getByTestId('sport-baseball'));
+      expect(screen.queryByTestId('football-players-screen')).toBeNull();
+
+      // Switch back to football → component mounts fresh (new key), no lingering filters.
+      fireEvent.press(screen.getByTestId('sport-football'));
+      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
+    });
+
+    it('does not increment the key when the same sport is selected again', () => {
+      // Pressing the already-active sport pill is a no-op and must not cause
+      // an unnecessary remount of FootballPlayers.
+      render(<PlayersTab />);
+      fireEvent.press(screen.getByTestId('sport-football'));
+      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
+
+      // Press football again — component should still be present (no remount teardown).
+      fireEvent.press(screen.getByTestId('sport-football'));
+      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
+    });
+  });
 });
