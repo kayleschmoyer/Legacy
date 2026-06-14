@@ -489,12 +489,15 @@ export function PlayerDetailPage() {
 
   useEffect(() => {
     if (brefError) {
-      LOGGER.error(
-        '[PlayerDetailPage] brefId lookup error:',
-        brefError.message,
-      );
+      LOGGER.error('[PlayerDetailPage] brefId lookup error:', brefError);
     }
   }, [brefError]);
+
+  useEffect(() => {
+    if (isNumeric && !isValidNumericId) {
+      LOGGER.warn('[PlayerDetailPage] invalid id', { identifier });
+    }
+  }, [isNumeric, isValidNumericId, identifier]);
 
   const handleBack = useCallback(() => {
     if (location.key !== 'default') {
