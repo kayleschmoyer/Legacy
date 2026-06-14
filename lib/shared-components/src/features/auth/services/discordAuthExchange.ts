@@ -1,4 +1,5 @@
 import { OAuthServiceError } from './googleAuthExchange';
+import { fetchWithRetry } from './fetchWithRetry';
 
 /**
  * Request payload accepted by the oauth-proxy `/discord` endpoint on the native
@@ -41,7 +42,7 @@ export async function exchangeDiscordCode(
 ): Promise<DiscordAuthExchangeResult> {
   const { headers, ...rest } = fetchOptions ?? {};
 
-  const response = await fetch(`${oauthProxyUrl}/discord`, {
+  const response = await fetchWithRetry(`${oauthProxyUrl}/discord`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

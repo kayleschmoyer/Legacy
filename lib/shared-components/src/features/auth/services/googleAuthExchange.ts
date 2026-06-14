@@ -1,3 +1,4 @@
+import { fetchWithRetry } from './fetchWithRetry';
 import type { OAuthResponse } from '../../../platform-components/types';
 
 /**
@@ -98,7 +99,7 @@ export async function exchangeGoogleCode(
 ): Promise<GoogleAuthExchangeResult> {
   const { headers, ...rest } = fetchOptions ?? {};
 
-  const response = await fetch(`${oauthProxyUrl}/google`, {
+  const response = await fetchWithRetry(`${oauthProxyUrl}/google`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

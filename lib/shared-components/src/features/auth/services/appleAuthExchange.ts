@@ -1,4 +1,5 @@
 import { OAuthServiceError } from './googleAuthExchange';
+import { fetchWithRetry } from './fetchWithRetry';
 
 /**
  * Request payload accepted by the oauth-proxy `/apple` endpoint.
@@ -51,7 +52,7 @@ export async function exchangeAppleCode(
 ): Promise<AppleAuthExchangeResult> {
   const { headers, ...rest } = fetchOptions ?? {};
 
-  const response = await fetch(`${oauthProxyUrl}/apple`, {
+  const response = await fetchWithRetry(`${oauthProxyUrl}/apple`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
