@@ -483,6 +483,7 @@ export function EliteDraftBoardScreen({
           pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
           isMyPick={isMyPick}
           currentPickInfo={queries.currentPickInfo}
+          leagueTeamsLength={queries.leagueTeams.length}
           isCommissioner={queries.isCommissioner}
           isOwner={queries.isOwner}
           draftId={queries.draftId}

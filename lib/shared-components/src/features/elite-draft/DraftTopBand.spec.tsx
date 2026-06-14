@@ -15,6 +15,7 @@ const baseProps = {
   pickTimeLimitSeconds: 90,
   isMyPick: false,
   currentPickInfo: null,
+  leagueTeamsLength: 10,
   draftId: 42,
   commPickMode: false,
   autoPickDisabled: false,
@@ -31,6 +32,42 @@ const baseProps = {
   onToggleAutoPickDisabled: jest.fn(),
   onToggleUserAutoPick: jest.fn(),
 };
+
+describe('DraftTopBand round meta (LS-7973)', () => {
+  it('renders the team count in the round meta', () => {
+    const { getByText } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        round={2}
+        currentPickInfo={{
+          draftId: 42,
+          pickNumber: 3,
+          teamId: 1,
+          overallPick: 13,
+          round: 2,
+          isComplete: false,
+        }}
+      />,
+    );
+    expect(getByText(/Round 2 · Pick 3 of 10/)).toBeTruthy();
+  });
+
+  it('renders a fallback dash when leagueTeamsLength is 0', () => {
+    const { getByText } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        leagueTeamsLength={0}
+        round={1}
+        currentPickInfo={null}
+      />,
+    );
+    expect(getByText(/Round 1 · Pick — of —/)).toBeTruthy();
+  });
+});
 
 describe('DraftTopBand autopick visibility (LS-7980)', () => {
   it('shows the autopick toggle for a non-commissioner team member', () => {

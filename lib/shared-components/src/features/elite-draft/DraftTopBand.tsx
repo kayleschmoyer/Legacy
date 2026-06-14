@@ -10,6 +10,7 @@ interface DraftTopBandProps {
   pickTimeLimitSeconds: number;
   isMyPick: boolean;
   currentPickInfo: CurrentDraftPickInfo | null;
+  leagueTeamsLength: number;
   isCommissioner: boolean;
   isOwner: boolean;
   draftId: number | null;
@@ -55,6 +56,7 @@ export function DraftTopBand({
   pickTimeLimitSeconds,
   isMyPick,
   currentPickInfo,
+  leagueTeamsLength,
   isCommissioner,
   isOwner: _isOwner,
   draftId,
@@ -123,7 +125,7 @@ export function DraftTopBand({
         </div>
         <div className="d-tb-round-meta">
           Round {round} · Pick {currentPickInfo?.pickNumber ?? '—'} of{' '}
-          {/* teams count omitted — not available here */}
+          {leagueTeamsLength > 0 ? leagueTeamsLength : '—'}
         </div>
       </div>
 
