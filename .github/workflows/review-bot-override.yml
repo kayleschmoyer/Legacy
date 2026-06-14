@@ -1,12 +1,21 @@
 name: Review Bot Override (W5)
 
-# Sets the bot-review commit status to success when the review-bot-override
-# label is applied by a maintainer, providing an audit-able escape hatch for
-# cases where the reviewer bot persistently misapplies a rule.
+# Sets the bot-review commit status to success when a maintainer overrides the
+# reviewer bot, providing an audit-able escape hatch for cases where the bot
+# persistently misapplies a rule.
+#
+# Two override paths:
+#   1. Human review (primary) — a maintainer/CODEOWNER submits an APPROVE review
+#      on the PR. This is the real signal: a human with admin/maintain permission
+#      vouching for the change. Flips bot-review to success + audit comment.
+#   2. review-bot-override label (fallback) — a maintainer applies the label.
+#      Kept for cases where flipping the status without a formal review is
+#      preferable. Same effect as the human-review path.
 #
 # Mirrors the security-override pattern in security-scanning.yml.
 #
 # Fires on:
+#   pull_request_review submitted — maintainer APPROVE → flip bot-review to success
 #   labeled   — override label applied → flip bot-review to success + audit comment
 #   unlabeled — override label removed → flip bot-review to pending + audit comment
 #
@@ -16,15 +25,23 @@ name: Review Bot Override (W5)
 on:
   pull_request:
     types: [labeled, unlabeled]
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   contents: read
   pull-requests: write
   statuses: write
 
+concurrency:
+  group: review-bot-override-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   override:
-    if: github.event.label.name == 'review-bot-override'
+    if: >-
+      (github.event_name == 'pull_request' && github.event.label.name == 'review-bot-override') ||
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -33,13 +50,83 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const sha = context.payload.pull_request.head.sha;
-            const prNumber = context.payload.pull_request.number;
-            const applier = context.payload.sender.login;
-            const isLabeled = context.payload.action === 'labeled';
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const sha = context.payload.pull_request.head.sha;
+            const prNumber = context.payload.pull_request.number;
             const prUrl = context.payload.pull_request.html_url;
+
+            async function setBotReview(state, description) {
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state,
+                context: 'bot-review',
+                description,
+                target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+              });
+            }
+
+            // PRIMARY PATH: a human maintainer/CODEOWNER APPROVE review overrides
+            // the bot. We only treat the review as an override if the author has
+            // admin/maintain permission on the repo — a real code-owner signal,
+            // not just any contributor approving.
+            if (context.eventName === 'pull_request_review') {
+              const review = context.payload.review;
+              const reviewer = review.user.login;
+
+              // Bot reviews (including the reviewer bot's own APPROVE) never count.
+              if (review.user.type === 'Bot') {
+                core.info(`Review by bot ${reviewer} — ignoring (only human maintainer reviews override).`);
+                return;
+              }
+
+              let role = null;
+              try {
+                const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: reviewer,
+                });
+                role = perm.role_name || perm.permission;
+              } catch (err) {
+                core.info(`Could not resolve permission for @${reviewer}: ${err.message || err} — not overriding.`);
+                return;
+              }
+
+              if (!['admin', 'maintain'].includes(role)) {
+                core.info(`@${reviewer} has role '${role}', not a maintainer/CODEOWNER — not overriding bot-review.`);
+                return;
+              }
+
+              await setBotReview('success', `Bot review overridden by human APPROVE from @${reviewer}`);
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  '> [!NOTE]',
+                  '> **Bot Review Override — Human Approval**',
+                  `> @${reviewer} (maintainer) submitted an APPROVE review, so the \`bot-review\` required check has been set to \`success\`.`,
+                  '>',
+                  '> This human approval supersedes the reviewer bot\'s blocking findings. If the approval is later' +
+                  ' dismissed or the PR is updated, re-run the reviewer (apply `bot:ready-for-review`) to re-evaluate.',
+                ].join('\n'),
+              });
+
+              core.summary.addRaw(`## ✅ Bot Review Override — Human Approval\n\n`);
+              core.summary.addRaw(`**Approved by:** @${reviewer} (maintainer)\n\n`);
+              core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
+              core.summary.addRaw(`The \`bot-review\` commit status on \`${sha.slice(0, 7)}\` has been set to \`success\`.\n`);
+              await core.summary.write();
+              return;
+            }
+
+            // FALLBACK PATH: maintainer-applied label.
+            const applier = context.payload.sender.login;
+            const isLabeled = context.payload.action === 'labeled';
 
             if (isLabeled) {
               // Flip bot-review to success
