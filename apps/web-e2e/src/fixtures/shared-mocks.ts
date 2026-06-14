@@ -9,7 +9,10 @@ import {
   userTeamIdResponse,
 } from '../mocks/graphql';
 import { mockDraft } from '../mocks/graphql/draft.mocks';
-import { unmockedGraphQLFallback as routerUnmockedFallback } from '../mocks/graphql/router';
+import {
+  isGraphQLEndpoint,
+  unmockedGraphQLFallback as routerUnmockedFallback,
+} from '../mocks/graphql/router';
 import { FIXED_NOW_ISO } from '../mocks/time';
 import { deepFreeze } from '../mocks/deep-freeze';
 
@@ -230,6 +233,63 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
  * });
  */
 export const unmockedGraphQLFallback = routerUnmockedFallback;
+
+/**
+ * Build a `GetUserById` response with an explicit subscription tier.
+ *
+ * Premium status is sourced server-side from the `GetUserById.subscriptionTier`
+ * field by `useIsPremium()` (apps/web/src/hooks/useIsPremium.ts) — NOT from the
+ * client JWT. Since LS-5030 / #5236 the baseline `getuserbyid` mock returns a
+ * **premium** user (so most specs see ungated content by default), which means a
+ * spec whose intent is to verify a premium *gate* must explicitly pin the tier
+ * back to `free`. The shape mirrors the `User` fragment in
+ * apps/web/src/api/db/users/Users.graphql.
+ */
+export function userByIdResponse(tier: 'free' | 'premium') {
+  return {
+    data: {
+      user: {
+        __typename: 'User',
+        id: 1,
+        email: 'test@example.com',
+        username: 'testuser',
+        name: 'Test User',
+        accessLevel: 'none',
+        avatarUrl: null,
+        subscriptionTier: tier === 'premium' ? 'premium' : null,
+        themePreference: null,
+      },
+    },
+  };
+}
+
+/**
+ * Register a GraphQL route that pins the current user's subscription tier and
+ * cascades every other operation to the shared baseline.
+ *
+ * Use this to force a FREE user now that the baseline `getuserbyid` mock returns
+ * a premium user (LS-5030 / #5236) — e.g. to exercise the premium gate / upgrade
+ * CTA. `mockUserTier(page, 'premium')` is also available for symmetry when a
+ * spec wants to be explicit rather than relying on the premium baseline.
+ *
+ * Must be called BEFORE `page.goto()`.
+ */
+export async function mockUserTier(
+  page: Page,
+  tier: 'free' | 'premium',
+): Promise<void> {
+  await page.route(isGraphQLEndpoint, async (route) => {
+    if (extractOperationName(route).toLowerCase() === 'getuserbyid') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(userByIdResponse(tier)),
+      });
+      return;
+    }
+    await unmockedGraphQLFallback(route);
+  });
+}
 
 /**
  * Seed GrowthBook feature flags before the app bundle loads.

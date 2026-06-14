@@ -18,6 +18,7 @@ import { test } from '../fixtures/auth';
 import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
 import {
   enableFootball,
+  mockUserTier,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -239,6 +240,9 @@ test.describe('League Creation — Sport-aware @regression', () => {
   freeUserTest(
     'free user: football mode + FAAB still triggers the premium gate',
     async ({ page }) => {
+      // Premium is sourced from GetUserById, whose baseline mock now returns a
+      // premium user (LS-5030 / #5236); pin this user to free so the gate fires.
+      await mockUserTier(page, 'free');
       await enableFootball(page);
       await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
@@ -263,6 +267,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
   freeUserTest(
     'free user: football mode + Salary Cap still surfaces the premium gate',
     async ({ page }) => {
+      await mockUserTier(page, 'free');
       await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
 
@@ -281,6 +286,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
   freeUserTest(
     'free user: football mode + premium era opens the era upgrade modal',
     async ({ page }) => {
+      await mockUserTier(page, 'free');
       await page.goto('/football/league/create');
       await page.waitForLoadState('networkidle');
 

@@ -14,7 +14,10 @@ import {
   expect,
   test,
 } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  mockUserTier,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
@@ -378,6 +381,10 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   freeUserTest(
     'should show upgrade modal when free user clicks FAAB waiver option',
     async ({ page }) => {
+      // Premium status is sourced from GetUserById, whose baseline mock now
+      // returns a premium user (LS-5030 / #5236). Pin this user back to free so
+      // the FAAB PremiumGate actually fires for this gate-verification test.
+      await mockUserTier(page, 'free');
       await page.goto('/baseball/league/create');
       await page.waitForLoadState('networkidle');
 

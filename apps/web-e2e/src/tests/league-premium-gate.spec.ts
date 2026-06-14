@@ -240,8 +240,12 @@ freeUserTest.describe(
           .getByRole('button', { name: /upgrade to premium/i })
           .click();
 
+        // The UpgradeModal renders a native <dialog> wrapping an ARIA
+        // role="dialog" div, so a bare getByRole('dialog') matches two elements
+        // (strict-mode violation). Match by the modal's accessible name to
+        // resolve the single labelled dialog.
         await expect(
-          page.getByRole('dialog').filter({ hasText: /upgrade to premium/i }),
+          page.getByRole('dialog', { name: /upgrade to premium/i }),
         ).toBeVisible();
       },
     );
@@ -249,37 +253,13 @@ freeUserTest.describe(
 );
 
 // ---------------------------------------------------------------------------
-// Tests: Free user sees premium gate on draft route @regression
+// NOTE (LS-8010): the "/baseball/league/:id/draft" premium-gate tests were
+// removed. Per product intent the live draft must be FREE — gating it (LS-5030)
+// is a bug the owner is reverting by un-gating EliteDraftBoard. Asserting the
+// draft gate here would entrench that bug and break the moment the un-gate
+// lands. Draft access is covered by the draft-* specs (draft-selection-workflow,
+// auction-draft, mid-draft-trades), which expect a FREE draft board.
 // ---------------------------------------------------------------------------
-
-freeUserTest.describe(
-  'Live Draft – premium gate for free users @regression',
-  () => {
-    freeUserTest.beforeEach(async ({ page }) => {
-      await mockLeagueGraphQL(page, 'free');
-      await page.goto('/baseball/league/1/draft');
-      await page.waitForLoadState('load');
-    });
-
-    freeUserTest(
-      'shows "Premium Feature" heading in the gate overlay',
-      async ({ page }) => {
-        await expect(page.getByText(/premium feature/i)).toBeVisible();
-      },
-    );
-
-    freeUserTest(
-      'shows "Upgrade to Premium" button in the gate overlay',
-      async ({ page }) => {
-        await expect(
-          page
-            .getByTestId('premium-feature-gate')
-            .getByRole('button', { name: /upgrade to premium/i }),
-        ).toBeVisible();
-      },
-    );
-  },
-);
 
 // ---------------------------------------------------------------------------
 // Tests: Premium user sees full content on league detail @regression
