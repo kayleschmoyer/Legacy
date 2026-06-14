@@ -3,6 +3,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import { StatCategory } from './StatCategory';
 import { NFL_TEAMS } from '../../constants/nflTeams';
 import {
+  BRAND_GOLD,
   BRAND_NAVY,
   OUTLINE_SUBTLE,
   POS_DEF,
@@ -29,6 +30,7 @@ import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
  * `FootballPlayer` node is structurally assignable to this interface.
  */
 export interface FootballPlayerCardStats {
+  fantasyPoints?: number | null;
   passing?: {
     yds?: number | null;
     td?: number | null;
@@ -391,13 +393,28 @@ export function FootballPlayerCard({
       </XStack>
 
       {/* Stats */}
-      <YStack paddingLeft={60}>
+      <YStack paddingLeft={60} gap={8}>
         {isDst ? (
           <DstStats player={player} />
         ) : isIdp ? (
           <IdpStats player={player} />
         ) : (
           <OffenseStats player={player} />
+        )}
+        {player.careerStats?.fantasyPoints != null && (
+          <XStack gap={4} alignItems="baseline">
+            <Text
+              fontSize={13}
+              fontWeight="700"
+              color={BRAND_GOLD}
+              fontVariant={['tabular-nums']}
+            >
+              {player.careerStats.fantasyPoints.toFixed(1)}
+            </Text>
+            <Text fontSize={11} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+              Career FPts
+            </Text>
+          </XStack>
         )}
       </YStack>
 

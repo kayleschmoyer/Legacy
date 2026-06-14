@@ -12,6 +12,16 @@
  * Matchup game-level stat types (LS-4765): used by LS-4151 matchup resolver.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  computeIDPScore,
+  computeScoring,
+  DEFAULT_DEFENSE_SCORING,
+  DEFAULT_IDP_SCORING,
+  DEFAULT_KICKING_SCORING,
+  DEFAULT_PASSING_SCORING,
+  DEFAULT_RECEIVING_SCORING,
+  DEFAULT_RUSHING_SCORING,
+} from '@legacy-sports/scoring';
 import { and, eq, gt, inArray, or, sql, SQL } from 'drizzle-orm';
 import { builder } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
@@ -655,6 +665,108 @@ FootballCareerStatsRef.implement({
       type: CareerIdpRef,
       nullable: true,
       resolve: (parent) => parent.idp,
+    }),
+    fantasyPoints: t.float({
+      nullable: true,
+      description:
+        'Career fantasy point total computed from career stats using default PPR scoring (LS-6469). ' +
+        'DST excludes per-game points-allowed band scoring since only season averages are stored.',
+      resolve: (stats) => {
+        // DST: flat multipliers only — ptsAllowedPerG is a season average, not
+        // per-game total, so the points-allowed band cannot be applied accurately.
+        if (stats.defense) {
+          const d = stats.defense;
+          const score = computeScoring(
+            {
+              sacks: d.sacks,
+              int: d.int,
+              fumbles_rec: d.fumRec,
+              def_td: d.defTd,
+              safeties: d.safeties,
+            },
+            DEFAULT_DEFENSE_SCORING,
+          );
+          // A present defense row means a valid total — preserve a 0 score
+          // (do not collapse it to null, which would hide the card value).
+          return score;
+        }
+
+        // IDP: career totals map cleanly to per-play multipliers.
+        if (stats.idp) {
+          const idp = stats.idp;
+          const score = computeIDPScore(
+            {
+              solo_tkl: idp.soloTkl,
+              ast_tkl: idp.astTkl,
+              sacks: idp.sacks,
+              int: idp.int,
+              pd: idp.pd,
+              ff: idp.ff,
+              fr: idp.fr,
+              def_td: idp.defTd,
+              safeties: idp.safeties,
+            },
+            DEFAULT_IDP_SCORING,
+          );
+          // A present IDP row means a valid total — preserve a 0 score
+          // (do not collapse it to null, which would hide the card value).
+          return score;
+        }
+
+        // Offense / kicking — sum across all available stat categories.
+        let total = 0;
+        let hasData = false;
+
+        if (stats.passing) {
+          total += computeScoring(
+            {
+              yds: stats.passing.yds,
+              td: stats.passing.td,
+              int: stats.passing.int,
+              sacked: stats.passing.sacked,
+            },
+            DEFAULT_PASSING_SCORING,
+          );
+          hasData = true;
+        }
+        if (stats.rushing) {
+          total += computeScoring(
+            {
+              yds: stats.rushing.yds,
+              td: stats.rushing.td,
+              fumbles: stats.rushing.fumbles,
+            },
+            DEFAULT_RUSHING_SCORING,
+          );
+          hasData = true;
+        }
+        if (stats.receiving) {
+          total += computeScoring(
+            {
+              rec: stats.receiving.rec,
+              yds: stats.receiving.yds,
+              td: stats.receiving.td,
+              fumbles: stats.receiving.fumbles,
+            },
+            DEFAULT_RECEIVING_SCORING,
+          );
+          hasData = true;
+        }
+        if (stats.kicking) {
+          // fg_50m is the 50+ yard bonus (additional pts on top of base fgm×3).
+          total += computeScoring(
+            {
+              fgm: stats.kicking.fgm,
+              fg_50m: stats.kicking.fg50m,
+              xpm: stats.kicking.xpm,
+            },
+            DEFAULT_KICKING_SCORING,
+          );
+          hasData = true;
+        }
+
+        return hasData ? total : null;
+      },
     }),
   }),
 });

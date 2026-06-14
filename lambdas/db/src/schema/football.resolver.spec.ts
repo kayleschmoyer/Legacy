@@ -889,8 +889,6 @@ describe('football resolvers', () => {
     });
   });
 
-  // ── gameLogs field (LS-6456) ──────────────────────────────────────────────────
-
   describe('gameLogs field (LS-6456)', () => {
     type GameLogRow = {
       season: number;
@@ -1134,6 +1132,199 @@ describe('football resolvers', () => {
         sacks: 2.5,
         int: 1,
       });
+    });
+  });
+
+  describe('FootballCareerStats.fantasyPoints (LS-6469)', () => {
+    function getField() {
+      const type = schema.getType('FootballCareerStats') as GraphQLObjectType;
+      const field = type.getFields().fantasyPoints;
+      if (!field?.resolve) throw new Error('fantasyPoints resolver not found');
+      return field;
+    }
+
+    const nullStats = {
+      passing: null,
+      rushing: null,
+      receiving: null,
+      kicking: null,
+      defense: null,
+      idp: null,
+    };
+
+    it('is defined on the FootballCareerStats type', () => {
+      expect(getField()).toBeDefined();
+    });
+
+    it('returns null when all stat categories are null', () => {
+      expect(
+        getField().resolve!(nullStats, {}, mockContext, undefined as never),
+      ).toBeNull();
+    });
+
+    it('computes DST fantasy points from defense stats', () => {
+      // 2 sacks × 1 + 1 INT × 2 + 1 fumRec × 2 + 1 defTd × 6 = 12
+      const result = getField().resolve!(
+        {
+          ...nullStats,
+          defense: {
+            g: 16,
+            sacks: 2,
+            int: 1,
+            fumRec: 1,
+            defTd: 1,
+            safeties: 0,
+            ptsAllowedPerG: 18,
+            ydsAllowedPerG: 320,
+          },
+        },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe(12);
+    });
+
+    it('returns 0 (not null) for a DST row with no scoring plays', () => {
+      // A present defense row with zero scoring stats is a valid 0-point total,
+      // not missing data — it must render as 0, not collapse to null.
+      const result = getField().resolve!(
+        {
+          ...nullStats,
+          defense: {
+            g: 16,
+            sacks: 0,
+            int: 0,
+            fumRec: 0,
+            defTd: 0,
+            safeties: 0,
+            ptsAllowedPerG: 18,
+            ydsAllowedPerG: 320,
+          },
+        },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe(0);
+    });
+
+    it('returns 0 (not null) for an IDP row with no scoring plays', () => {
+      // A present IDP row with zero scoring stats is a valid 0-point total.
+      const result = getField().resolve!(
+        {
+          ...nullStats,
+          idp: {
+            g: 16,
+            soloTkl: 0,
+            astTkl: 0,
+            totalTkl: 0,
+            sacks: 0,
+            int: 0,
+            pd: 0,
+            ff: 0,
+            fr: 0,
+            defTd: 0,
+            safeties: 0,
+          },
+        },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe(0);
+    });
+
+    it('computes IDP fantasy points from idp stats', () => {
+      // 10 soloTkl × 1 + 5 astTkl × 0.5 + 2 sacks × 2 + 1 INT × 3 + 1 ff × 1 = 10+2.5+4+3+1 = 20.5
+      const result = getField().resolve!(
+        {
+          ...nullStats,
+          idp: {
+            g: 16,
+            soloTkl: 10,
+            astTkl: 5,
+            totalTkl: 15,
+            sacks: 2,
+            int: 1,
+            pd: 0,
+            ff: 1,
+            fr: 0,
+            defTd: 0,
+            safeties: 0,
+          },
+        },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it('computes offensive fantasy points summing passing, rushing, and receiving', () => {
+      // Passing: 4000 yds × 0.04 + 30 td × 4 + (-10) int × -2 = 160 + 120 + 20 = 300
+      // Rushing: 100 yds × 0.1 + 1 td × 6 = 16
+      const result = getField().resolve!(
+        {
+          ...nullStats,
+          passing: {
+            g: 16,
+            cmp: 350,
+            att: 550,
+            yds: 4000,
+            td: 30,
+            int: 10,
+            sacked: null,
+            sackYds: null,
+            rating: 102,
+          },
+          rushing: {
+            g: 16,
+            att: 30,
+            yds: 100,
+            td: 1,
+            lng: null,
+            fumbles: null,
+          },
+        },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it('computes kicking fantasy points', () => {
+      // 30 fgm × 3 + 5 fg50m × 5 + 28 xpm × 1 = 90 + 25 + 28 = 143
+      const result = getField().resolve!(
+        {
+          ...nullStats,
+          kicking: {
+            g: 16,
+            fgm: 30,
+            fga: 32,
+            fg019m: 2,
+            fg019a: 2,
+            fg2029m: 5,
+            fg2029a: 5,
+            fg3039m: 8,
+            fg3039a: 8,
+            fg4049m: 10,
+            fg4049a: 11,
+            fg50m: 5,
+            fg50a: 6,
+            xpm: 28,
+            xpa: 30,
+            lng: null,
+          },
+        },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe(143);
     });
   });
 

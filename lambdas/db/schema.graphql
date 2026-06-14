@@ -949,6 +949,11 @@ Career stat totals across all stat categories (LS-250, LS-4155)
 """
 type FootballCareerStats {
   defense: FootballCareerDefense
+
+  """
+  Career fantasy point total computed from career stats using default PPR scoring (LS-6469). DST excludes per-game points-allowed band scoring since only season averages are stored.
+  """
+  fantasyPoints: Float
   idp: FootballCareerIdp
   kicking: FootballCareerKicking
   passing: FootballCareerPassing

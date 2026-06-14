@@ -831,6 +831,8 @@ export type FootballCareerRushing = {
 export type FootballCareerStats = {
   __typename?: 'FootballCareerStats';
   defense?: Maybe<FootballCareerDefense>;
+  /** Career fantasy point total computed from career stats using default PPR scoring (LS-6469). DST excludes per-game points-allowed band scoring since only season averages are stored. */
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
   idp?: Maybe<FootballCareerIdp>;
   kicking?: Maybe<FootballCareerKicking>;
   passing?: Maybe<FootballCareerPassing>;
@@ -5228,6 +5230,7 @@ export type FootballPlayerHeaderFragment = {
   previousTeams: Array<string>;
   careerStats?: {
     __typename?: 'FootballCareerStats';
+    fantasyPoints?: number | null;
     passing?: {
       __typename?: 'FootballCareerPassing';
       yds?: number | null;
@@ -5377,6 +5380,7 @@ export type FootballPlayersQuery = {
       previousTeams: Array<string>;
       careerStats?: {
         __typename?: 'FootballCareerStats';
+        fantasyPoints?: number | null;
         passing?: {
           __typename?: 'FootballCareerPassing';
           yds?: number | null;
@@ -5445,6 +5449,7 @@ export type FootballPlayerQuery = {
     previousTeams: Array<string>;
     careerStats?: {
       __typename?: 'FootballCareerStats';
+      fantasyPoints?: number | null;
       passing?: {
         __typename?: 'FootballCareerPassing';
         yds?: number | null;
@@ -10453,6 +10458,7 @@ export const FootballPlayerHeaderFragmentDoc = gql`
     headshotUrl
     previousTeams
     careerStats {
+      fantasyPoints
       passing {
         yds
         td

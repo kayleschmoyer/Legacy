@@ -9,6 +9,7 @@ fragment FootballPlayerHeader on FootballPlayer {
   headshotUrl
   previousTeams
   careerStats {
+    fantasyPoints
     passing {
       yds
       td
