@@ -404,13 +404,6 @@ export default function FootballPlayers(): React.JSX.Element {
   const isInitialLoad = loading && allNodes.length === 0;
   const isLoadingMore = loading && allNodes.length > 0;
 
-  const selectedTeamLabel =
-    teamFilter === 'All'
-      ? 'All Teams'
-      : teamFilter === 'AFC' || teamFilter === 'NFC'
-        ? teamFilter
-        : (NFL_TEAMS[teamFilter]?.abbreviation ?? teamFilter);
-
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
@@ -468,6 +461,11 @@ export default function FootballPlayers(): React.JSX.Element {
             value={teamFilter}
             onValueChange={setTeamFilter}
             disablePreventBodyScroll
+            renderValue={(v) => {
+              if (v === 'All') return 'All Teams';
+              if (v === 'AFC' || v === 'NFC') return v;
+              return NFL_TEAMS[v]?.abbreviation ?? v;
+            }}
           >
             <Select.Trigger
               width={130}
@@ -483,9 +481,7 @@ export default function FootballPlayers(): React.JSX.Element {
                 placeholder="All Teams"
                 color="$color"
                 fontSize={13}
-              >
-                {selectedTeamLabel}
-              </Select.Value>
+              />
             </Select.Trigger>
 
             <Select.Content zIndex={200000}>
