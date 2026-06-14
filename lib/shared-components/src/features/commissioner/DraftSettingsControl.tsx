@@ -21,6 +21,7 @@ import {
   SELECTION_METHODS,
   type SportKind,
 } from '../../config/sports';
+
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import {
   useGetLeagueDraftQuery,
@@ -38,7 +39,7 @@ export interface DraftSettingsControlProps {
   baseballHofOnly?: boolean | null | undefined;
   customEraStartYear?: number | null | undefined;
   customEraEndYear?: number | null | undefined;
-  /** Whether the current user has premium access. Gates the era filter controls. */
+  /** Whether the current user has premium access. Gates auction draft and era filter controls. */
   isPremium?: boolean;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
@@ -50,6 +51,8 @@ export interface DraftSettingsControlProps {
 interface SettingOption {
   label: string;
   value: string;
+  /** When true, selecting this option requires a premium subscription. */
+  locked?: boolean;
 }
 
 function OptionSelector({
@@ -80,6 +83,7 @@ function OptionSelector({
       <XStack gap="$2" flexWrap="wrap">
         {options.map((option) => {
           const isSelected = value === option.value;
+          const isLocked = option.locked ?? false;
           return (
             <Button
               key={option.value}
@@ -92,14 +96,22 @@ function OptionSelector({
               borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
               borderWidth={1}
               borderRadius="$3"
-              onPress={() => onChange(option.value)}
-              disabled={disabled}
-              opacity={disabled ? 0.5 : 1}
-              icon={isSelected ? <Check size={14} /> : undefined}
+              onPress={() => {
+                if (!isLocked) onChange(option.value);
+              }}
+              disabled={disabled || isLocked}
+              opacity={disabled ? 0.5 : isLocked ? 0.55 : 1}
+              icon={
+                isLocked ? (
+                  <Lock size={14} />
+                ) : isSelected ? (
+                  <Check size={14} />
+                ) : undefined
+              }
               aria-pressed={isSelected}
-              aria-label={`${label}: ${option.label}`}
+              aria-label={`${label}: ${option.label}${isLocked ? ' (premium)' : ''}`}
               hoverStyle={
-                disabled
+                disabled || isLocked
                   ? undefined
                   : {
                       backgroundColor: isSelected
@@ -147,6 +159,11 @@ export function DraftSettingsControl({
   const sportPlayerPools = PLAYER_POOLS_BY_SPORT[sport];
   const sportEraFilters = ERA_FILTERS_BY_SPORT[sport];
   const isDraftLocked = draftStatus !== 'not-started';
+
+  const selectionMethodOptions = SELECTION_METHODS.map((m) => ({
+    ...m,
+    locked: m.value === 'auction' && !isPremium,
+  }));
 
   // Fetch the current draft record (if any)
   const {
@@ -588,7 +605,7 @@ export function DraftSettingsControl({
                   ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
                   : 'Standard lets managers pick players in order. Auction gives a budget for bidding. Random assigns players automatically.'
               }
-              options={SELECTION_METHODS}
+              options={selectionMethodOptions}
               value={selectionMethod}
               onChange={handleSelectionMethodChange}
               disabled={isDraftLocked || saving || draftMode === 'automated'}

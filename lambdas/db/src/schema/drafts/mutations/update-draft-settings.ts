@@ -4,11 +4,21 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 
 import { UpdateDraftSettingsInput, UpdateDraftSettingsPayload } from '../types';
 import { builder } from '../../builder';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
+import { requireEntitlement } from '../../authorization';
+import {
+  isEraFreeForSport,
+  normalizeSport,
+} from '../../leagues/sport-validation';
 
 /**
  * Mutation: Update draft settings (mode, selection method, order, player pool).
@@ -49,6 +59,7 @@ builder.mutationField('updateDraftSettings', (t) =>
             id: PublicSchema.leagues.id,
             owner: PublicSchema.leagues.owner,
             draftStatus: PublicSchema.leagues.draftStatus,
+            sport: PublicSchema.leagues.sport,
             playerPool: PublicSchema.leagues.playerPool,
             eraFilter: PublicSchema.leagues.baseballEraFilter,
             baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
@@ -60,7 +71,7 @@ builder.mutationField('updateDraftSettings', (t) =>
           .limit(1);
 
         if (!league) {
-          throw new Error('League not found');
+          throw UserInputError('League not found');
         }
 
         if (league.owner !== userId) {
@@ -71,7 +82,7 @@ builder.mutationField('updateDraftSettings', (t) =>
 
         // Prevent changes after draft has started
         if (league.draftStatus !== 'not-started') {
-          throw new Error(
+          throw UserInputError(
             'Draft settings cannot be changed after the draft has been started',
           );
         }
@@ -83,7 +94,7 @@ builder.mutationField('updateDraftSettings', (t) =>
         const validPlayerPools = ['all', 'nl', 'al'];
 
         if (draftMode && !validDraftModes.includes(draftMode)) {
-          throw new Error(
+          throw UserInputError(
             `Invalid draft mode: ${draftMode}. Must be one of: ${validDraftModes.join(', ')}`,
           );
         }
@@ -91,17 +102,17 @@ builder.mutationField('updateDraftSettings', (t) =>
           selectionMethod &&
           !validSelectionMethods.includes(selectionMethod)
         ) {
-          throw new Error(
+          throw UserInputError(
             `Invalid selection method: ${selectionMethod}. Must be one of: ${validSelectionMethods.join(', ')}`,
           );
         }
         if (draftOrder && !validDraftOrders.includes(draftOrder)) {
-          throw new Error(
+          throw UserInputError(
             `Invalid draft order: ${draftOrder}. Must be one of: ${validDraftOrders.join(', ')}`,
           );
         }
         if (playerPool && !validPlayerPools.includes(playerPool)) {
-          throw new Error(
+          throw UserInputError(
             `Invalid player pool: ${playerPool}. Must be one of: ${validPlayerPools.join(', ')}`,
           );
         }
@@ -117,18 +128,18 @@ builder.mutationField('updateDraftSettings', (t) =>
           'custom',
         ];
         if (eraFilter && !validEraFilters.includes(eraFilter)) {
-          throw new Error(
+          throw UserInputError(
             `Invalid era filter: ${eraFilter}. Must be one of: ${validEraFilters.join(', ')}`,
           );
         }
         if (eraFilter === 'custom') {
           if (customEraStartYear == null || customEraEndYear == null) {
-            throw new Error(
+            throw UserInputError(
               'Both start year and end year are required for a custom era.',
             );
           }
           if (customEraStartYear > customEraEndYear) {
-            throw new Error(
+            throw UserInputError(
               'Custom era start year must be less than or equal to end year',
             );
           }
@@ -139,7 +150,7 @@ builder.mutationField('updateDraftSettings', (t) =>
           pickTimeLimitSeconds !== null
         ) {
           if (pickTimeLimitSeconds < 30 || pickTimeLimitSeconds > 172800) {
-            throw new Error(
+            throw UserInputError(
               'Pick time limit must be between 30 and 172800 seconds',
             );
           }
@@ -154,15 +165,36 @@ builder.mutationField('updateDraftSettings', (t) =>
           } else {
             const parsed = new Date(scheduledAtInput);
             if (isNaN(parsed.getTime())) {
-              throw new Error(
+              throw UserInputError(
                 `Invalid scheduledAt value: "${scheduledAtInput}". Must be a valid ISO-8601 datetime.`,
               );
             }
             if (parsed.getTime() <= Date.now()) {
-              throw new Error('scheduledAt must be a future date and time.');
+              throw UserInputError(
+                'scheduledAt must be a future date and time.',
+              );
             }
             parsedScheduledAt = parsed;
           }
+        }
+
+        // Premium entitlement gates (LS-5017)
+        if (selectionMethod === 'auction') {
+          await requireEntitlement(
+            context,
+            ENTITLEMENTS.auction_draft,
+            'Auction draft mode requires a premium subscription.',
+          );
+        }
+        if (
+          eraFilter &&
+          !isEraFreeForSport(normalizeSport(league.sport), eraFilter)
+        ) {
+          await requireEntitlement(
+            context,
+            ENTITLEMENTS.historical_era_filters,
+            'Era-based filtering requires a premium subscription.',
+          );
         }
 
         // Update player-eligibility fields on the league if any provided
@@ -213,7 +245,7 @@ builder.mutationField('updateDraftSettings', (t) =>
           effectiveSelectionMethod &&
           effectiveSelectionMethod !== 'random'
         ) {
-          throw new Error(
+          throw UserInputError(
             "Automated drafts only support the 'random' selection method.",
           );
         }

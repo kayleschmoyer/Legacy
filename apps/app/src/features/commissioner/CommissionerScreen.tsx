@@ -123,6 +123,7 @@ export function CommissionerScreen({
             baseballHofOnly={league.baseballHofOnly ?? undefined}
             customEraStartYear={league.customEraStartYear ?? undefined}
             customEraEndYear={league.customEraEndYear ?? undefined}
+            isPremium={isPremium}
             onSuccess={handleAlert('Success')}
             onError={handleError}
           />

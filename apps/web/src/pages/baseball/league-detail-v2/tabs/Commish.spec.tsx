@@ -67,7 +67,12 @@ jest.mock(
   }),
 );
 jest.mock('../../../../components/commissioner/DraftSettingsControl', () => ({
-  DraftSettingsControl: () => <div data-testid="draft-settings-control" />,
+  DraftSettingsControl: (props: any) => (
+    <div
+      data-testid="draft-settings-control"
+      data-ispremium={String(props.isPremium)}
+    />
+  ),
 }));
 jest.mock('../../../../components/commissioner/LeagueSettingsControl', () => ({
   LeagueSettingsControl: (props: any) => (
@@ -198,6 +203,32 @@ describe('CommishTab — premium gating (LS-5205)', () => {
     renderCommish({ sport: 'baseball' });
     fireEvent.click(screen.getByText('League Settings'));
     expect(screen.getByTestId('league-settings-control')).toHaveAttribute(
+      'data-ispremium',
+      'true',
+    );
+  });
+});
+
+describe('CommishTab — DraftSettingsControl premium wiring (LS-5017)', () => {
+  afterEach(() => {
+    mockIsPremium = false;
+  });
+
+  it('wires isPremium=false into DraftSettingsControl for free commissioners so auction draft stays locked', () => {
+    mockIsPremium = false;
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByText('Draft Settings'));
+    expect(screen.getByTestId('draft-settings-control')).toHaveAttribute(
+      'data-ispremium',
+      'false',
+    );
+  });
+
+  it('wires isPremium=true into DraftSettingsControl for premium commissioners so auction draft unlocks', () => {
+    mockIsPremium = true;
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByText('Draft Settings'));
+    expect(screen.getByTestId('draft-settings-control')).toHaveAttribute(
       'data-ispremium',
       'true',
     );
