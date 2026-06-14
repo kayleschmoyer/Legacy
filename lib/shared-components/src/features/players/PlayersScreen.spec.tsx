@@ -249,6 +249,30 @@ describe('buildViewSearch (LS-4650)', () => {
   });
 });
 
+describe('activeFilterChips — availability hidden when no active league (LS-7043)', () => {
+  it('emits no avail chip when avail is reset to "all" (zero-league user)', () => {
+    // When hasActiveLeague is false the component resets avail to 'all' so a
+    // previously-selected availability value never survives as a ghost filter.
+    const chips = activeFilterChips({
+      searchTerm: '',
+      era: 'all',
+      pos: 'all',
+      avail: 'all',
+    });
+    expect(chips.some((c) => c.key === 'avail')).toBe(false);
+  });
+
+  it('does emit an avail chip when avail is non-default (active-league user)', () => {
+    const chips = activeFilterChips({
+      searchTerm: '',
+      era: 'all',
+      pos: 'all',
+      avail: 'free',
+    });
+    expect(chips).toEqual([{ key: 'avail', label: 'Free Agents' }]);
+  });
+});
+
 describe('rankLabel (LS-4650)', () => {
   it('zero-pads the human-readable rank derived from the 0-based index', () => {
     expect(rankLabel(0)).toBe('01');

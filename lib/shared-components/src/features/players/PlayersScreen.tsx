@@ -122,6 +122,14 @@ export interface PlayersScreenProps {
   viewMode?: PlayersViewMode;
   /** Retry handler invoked from the ErrorState card. Defaults to Apollo refetch. */
   onRetry?: () => void;
+  /**
+   * Whether the user belongs to at least one active league for this sport.
+   * When `false`, the availability (Status) filter is hidden because "Free
+   * Agent", "Rostered", and "Waivers" have no meaning without a roster
+   * context. Defaults to `true` (filter visible) when omitted so existing
+   * call sites remain unaffected. (LS-7043)
+   */
+  hasActiveLeague?: boolean;
 }
 
 /**
@@ -263,6 +271,7 @@ function PlayersScreen({
   state,
   viewMode: viewModeProp = 'cards',
   onRetry,
+  hasActiveLeague = true,
 }: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
     (player: PlayerFragment) => {
@@ -323,6 +332,15 @@ function PlayersScreen({
   const handleResultStats = useCallback((stats: PlayersGridResultStats) => {
     setResultStats(stats);
   }, []);
+
+  // LS-7043: when the user has no active league the availability filter has no
+  // meaning. Reset avail to 'all' so a previously-selected value doesn't
+  // persist as a hidden ghost filter.
+  useEffect(() => {
+    if (!hasActiveLeague) {
+      setAvail('all');
+    }
+  }, [hasActiveLeague]);
 
   const clearAllFilters = useCallback(() => {
     setSearchTerm('');
@@ -750,6 +768,7 @@ function PlayersScreen({
               setPos={setPos}
               avail={avail}
               setAvail={setAvail}
+              hasActiveLeague={hasActiveLeague}
             />
             <ActiveSummary chips={chips} onClear={clearChip} />
           </YStack>
@@ -861,6 +880,7 @@ interface FilterRailProps {
   setPos: (v: PositionId) => void;
   avail: AvailabilityId;
   setAvail: (v: AvailabilityId) => void;
+  hasActiveLeague: boolean;
 }
 
 function FilterRail({
@@ -870,6 +890,7 @@ function FilterRail({
   setPos,
   avail,
   setAvail,
+  hasActiveLeague,
 }: FilterRailProps) {
   return (
     <XStack
@@ -900,17 +921,21 @@ function FilterRail({
           />
         ))}
       </RailGroup>
-      <YStack className="pp-rail-divider" aria-hidden={true} />
-      <RailGroup label="Status">
-        {AVAILABILITY.map((a) => (
-          <RailPill
-            key={a.id}
-            label={a.label}
-            active={avail === a.id}
-            onPress={() => setAvail(a.id)}
-          />
-        ))}
-      </RailGroup>
+      {hasActiveLeague && (
+        <>
+          <YStack className="pp-rail-divider" aria-hidden={true} />
+          <RailGroup label="Status">
+            {AVAILABILITY.map((a) => (
+              <RailPill
+                key={a.id}
+                label={a.label}
+                active={avail === a.id}
+                onPress={() => setAvail(a.id)}
+              />
+            ))}
+          </RailGroup>
+        </>
+      )}
     </XStack>
   );
 }
