@@ -4,18 +4,24 @@ This is the **canonical ordering** for taking a ticket to merge. It is environme
 
 > **Why this file exists.** The ordering used to be restated in full in both the local and cloud skills, and the two copies drifted — the cloud copy dropped the task-graph enforcement (below), so cloud agents ran validation before opening a draft PR. There is now **one** source of truth for the order. Do not re-state the sequence in an environment skill; link here instead.
 
-## Read first: the enforcement that survives compaction
+## Read first: why ordering breaks, and what actually holds it
 
-**Prose ordering does not survive context compaction; a task graph does.** A future agent (or this agent after a `/compact`) holds a _gist_ of the workflow, not the literal numbered steps — and the gist of "validate, then open a PR" is a strong prior that overrides a buried "open the draft PR first" instruction. The defense is mechanical, not prose:
+**Prose ordering does not survive context compaction.** A future agent (or this agent after a `/compact`) holds a _gist_ of the workflow, not the literal numbered steps — and the gist of "validate, then open a PR" is a strong prior that overrides a buried "open the draft PR first" instruction. The numbered [sequence](#the-sequence) below reads like a checklist, but it is **reference prose**: nothing tracks which step you are on or refuses to start the next one early, so it is itself exactly the kind of buried instruction the gist overrides. Do not mistake a numbered list for an executed plan.
 
-**Before writing any code, create the workflow tracking tasks with `TaskCreate` and chain them with `TaskUpdate(addBlockedBy: [...])`** so the ordering is enforced by the task graph rather than remembered:
+Defenses against this come in three tiers, weakest to strongest. **The common failure is mistaking the middle tier for the strongest** — calling the task graph "mechanical enforcement" when it is not.
 
-1. **Implement + commit**
-2. **Push + open draft PR + apply `agent-in-progress` + post continuation checkpoint** — `blockedBy` (1)
-3. **Migrations + validation (`make pc`)** — `blockedBy` (2)
-4. **Self-review green + mark ready + watch to merge** — `blockedBy` (3)
+1. **Prose (weakest).** The numbered sequence and the gates table. Survives only as a gist; the failure above is its failure. Necessary for first reads and for humans, insufficient as enforcement.
+2. **Task graph (durable, but still agent-honored).** Before writing any code, create the workflow tracking tasks with `TaskCreate` and chain them with `TaskUpdate(addBlockedBy: [...])`:
+   1. **Implement + commit**
+   2. **Push + open draft PR + apply `agent-in-progress` + post continuation checkpoint** — `blockedBy` (1)
+   3. **Migrations + validation (`make pc`)** — `blockedBy` (2)
+   4. **Self-review green + mark ready + watch to merge** — `blockedBy` (3)
 
-Task (3) being `blockedBy` task (2) is the load-bearing edge: the durable checkpoint (pushed branch + draft PR) exists **before** the long validation, so a container kill mid-`make pc` is recoverable. Never start a blocked task, and never delete a dependency to "unblock" yourself — that defeats the only mechanism that survives compaction. This enforcement is **mandatory in every environment**, local and cloud alike.
+   Task (3) being `blockedBy` task (2) is the load-bearing edge: the durable checkpoint (pushed branch + draft PR) exists **before** the long validation, so a container kill mid-`make pc` is recoverable. This beats prose because it persists as explicit state across compaction rather than as a gist — but be honest about its limit: it is **agent-honored, not tool-enforced.** Nothing refuses to start a blocked task; "never start a blocked task, and never delete a dependency to unblock yourself" is still an instruction the agent must _choose_ to obey. A graph that was never created, or created without the edge, enforces nothing — and that, not a defiant agent, is the usual real-world failure (an agent ran `make pc` before opening the PR because no graph gated the `make pc` call).
+
+3. **Tool-enforced gate (strongest, and the only true enforcement).** A `PreToolUse` hook that refuses the action regardless of the agent's intent — e.g. blocking `make pc` until a draft PR exists for the current branch. This is the only tier that holds when the gist, the graph, and the agent's judgment all fail, because it lives in the tool-call path rather than in the agent's head. Where such a hook exists it _is_ the enforcement; the tiers above are then advisory scaffolding around it. Where one does not yet exist for a given ordering, treat that ordering as **unenforced** — a known gap to close, not a rule you can assume holds.
+
+Creating the task graph is **mandatory in every environment**, local and cloud alike — it is the floor, not the ceiling. It makes the ordering durable and reviewable; it does not make it unbreakable.
 
 ## Critical gates (preconditions)
 
