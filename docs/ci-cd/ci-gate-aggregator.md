@@ -53,10 +53,14 @@ semantics as [`collect-results`](../../.github/actions/collect-results/action.ym
    clean. Until then, `check-ruleset.yml` (a non-required drift check) reports
    drift — **expected**, mirroring the `e2e-affected` precedent. _(Prepared in
    LS-7991.)_
-3. **Cutover (NOT in LS-7991 — needs owner sign-off)** — reduce the required set
+3. **Cutover (LS-8014)** — the required set is reduced in `.github/ruleset.json`
    to `CI Gate` + `bot-review` + `No Merge Conflicts` + `Verify All Migrations
-Applied` (the granular `🚀 CI Pipeline / *` names removed). Apply during a
-   quiet window.
+Applied` (the 6 granular `🚀 CI Pipeline / {lint,format,build,test,custom-checks,e2e-affected}`
+   names removed; e2e merge-gate semantics from LS-7846 now fold into `CI Gate`).
+   The owner runs `bash scripts/apply-ruleset.sh` during a quiet window to push
+   the reduced set live — this PR merging only updates the checked-in config; it
+   does not change the live ruleset. Until the apply runs, `check-ruleset.yml`
+   (non-required drift check) reports drift — expected.
 
 ## Rollback
 
