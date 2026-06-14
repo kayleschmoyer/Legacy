@@ -25,8 +25,14 @@ resource "aws_db_instance" "postgres" {
   identifier = "${local.name_prefix}-postgres"
 
   # Engine configuration
+  # Pin only the MAJOR version: with auto_minor_version_upgrade = true, AWS
+  # bumps the minor version automatically (e.g. to 16.13). Pinning a full
+  # minor (e.g. "16.8") makes Terraform try to downgrade on the next apply,
+  # which RDS rejects ("Cannot find upgrade path from 16.13 to 16.8"). A
+  # major-only value lets the provider treat it as a prefix and only act on
+  # major-version changes.
   engine         = "postgres"
-  engine_version = "16.8"
+  engine_version = "16"
   instance_class = var.db_instance_class
 
   # Storage configuration - Optimized for dev
