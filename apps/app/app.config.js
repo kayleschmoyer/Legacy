@@ -31,19 +31,15 @@
 
 const path = require('path');
 
-// Load root .env first, then apps/app/.env / .env.local on top. `override: false`
-// means values already in process.env (e.g. from the shell, CI, EAS secrets)
-// win over .env file contents — standard 12-factor precedence.
-require('dotenv').config({
-  path: path.resolve(__dirname, '../../.env'),
-  override: false,
-});
+// Load env files in priority order (highest first). `override: false` means a
+// var already in process.env (shell, CI, EAS secrets) is never overwritten.
+// Priority: shell/CI env > apps/app/.env.local > root .env
 require('dotenv').config({
   path: path.resolve(__dirname, '.env.local'),
   override: false,
 });
 require('dotenv').config({
-  path: path.resolve(__dirname, '.env'),
+  path: path.resolve(__dirname, '../../.env'),
   override: false,
 });
 
