@@ -1137,7 +1137,9 @@ async function escalateToHumanArbitration(
   // stay intact so the next labeled event can still self-heal.
   try {
     await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
-    cleanupOperationalLabels(prNumber);
+    // LS-ARBITRATION-PRESERVE: keep bot:ready-for-review so a post-arbitration
+    // push triggers Reviewer (W1) via synchronize, enabling the auto-reset path.
+    cleanupOperationalLabels(prNumber, { preserveReadyLabel: true });
   } catch (err) {
     process.stderr.write(
       `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,

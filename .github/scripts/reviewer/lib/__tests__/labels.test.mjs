@@ -166,3 +166,29 @@ describe('reviewer terminal cleanup (LS-4678)', () => {
     );
   });
 });
+
+// Regression guard for the escalation path. escalateToHumanArbitration must
+// also preserve bot:ready-for-review so a post-arbitration fix push triggers
+// Reviewer (W1) via the synchronize event — enabling the auto-reset path in
+// index.mjs without any manual maintainer action. Stripping the label here
+// breaks the push-based cycle-counter reset (regression: PR #5260).
+describe('reviewer arbitration cleanup', () => {
+  it('passes preserveReadyLabel: true at the escalation call site', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    const indexPath = join(here, '..', '..', 'index.mjs');
+    const src = await readFile(indexPath, 'utf8');
+
+    // Anchor to the LS-ARBITRATION-PRESERVE comment so the check is not
+    // coupled to line numbers and survives surrounding refactors.
+    const pattern =
+      /LS-ARBITRATION-PRESERVE[\s\S]{0,300}?cleanupOperationalLabels\([^)]*?preserveReadyLabel:\s*true/m;
+    assert.match(
+      src,
+      pattern,
+      'escalateToHumanArbitration cleanup in index.mjs must pass preserveReadyLabel: true.',
+    );
+  });
+});
