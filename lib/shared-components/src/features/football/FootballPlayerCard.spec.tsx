@@ -108,6 +108,38 @@ describe('FootballPlayerCard', () => {
     });
   });
 
+  describe('LS-6472 — QB rushing TDs shown prominently alongside passing TDs', () => {
+    it('labels passing TDs as "Pass TD" for a QB with rushing data', () => {
+      render(<FootballPlayerCard player={DUAL_THREAT_QB} />);
+      expect(screen.getByText('Pass TD')).toBeTruthy();
+    });
+
+    it('shows "Rush TD" inline in the passing section for a dual-threat QB', () => {
+      render(<FootballPlayerCard player={DUAL_THREAT_QB} />);
+      expect(screen.getByText('Rush TD')).toBeTruthy();
+      // The rush TD value (15) appears in the Pass section.
+      expect(screen.getByText('15')).toBeTruthy();
+    });
+
+    it('still shows the Rush row with rushing yards for a dual-threat QB', () => {
+      render(<FootballPlayerCard player={DUAL_THREAT_QB} />);
+      expect(screen.getByText('Rush')).toBeTruthy();
+      expect(screen.getByText('762')).toBeTruthy();
+    });
+
+    it('uses "Pass TD" label even for a single-category pocket QB', () => {
+      render(<FootballPlayerCard player={QB_PLAYER} />);
+      expect(screen.getByText('Pass TD')).toBeTruthy();
+      expect(screen.queryByText('Rush TD')).toBeNull();
+    });
+
+    it('uses generic "TD" label for a non-QB player with rushing stats', () => {
+      render(<FootballPlayerCard player={PASS_CATCHING_RB} />);
+      // RBs use the standard "TD" label in the Rush section, not "Rush TD".
+      expect(screen.queryByText('Rush TD')).toBeNull();
+    });
+  });
+
   it('renders DST stats for a defense without offense rows', () => {
     render(<FootballPlayerCard player={DST_PLAYER} />);
     expect(screen.getByText('Sacks')).toBeTruthy();

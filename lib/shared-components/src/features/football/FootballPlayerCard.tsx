@@ -186,9 +186,16 @@ function fmtFloat(n: number | null | undefined, decimals = 1): string {
  * with rushing data shows both a Pass and a Rush row, an RB with receptions
  * shows Rush and Rec, etc. Gating on category presence rather than the position
  * label stops multi-category stats from being silently discarded.
+ *
+ * QB rushing-TD fix (LS-6472): for QBs the passing "TD" label is renamed to
+ * "Pass TD" and a "Rush TD" chip is inlined in the passing section when rushing
+ * data is present, so dual-threat QBs (Lamar Jackson, Jalen Hurts, etc.) show
+ * both values side-by-side rather than burying rush TDs in a separate row.
+ * The Rush row for QBs keeps the YDS context but omits TD to avoid duplication.
  */
 function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
   const stats = player.careerStats;
+  const isQb = player.position === 'QB';
 
   if (!stats) {
     return (
@@ -215,7 +222,10 @@ function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
       {passing && (
         <StatCategory label="Pass">
           <StatLine value={fmt(passing.yds)} label="YDS" />
-          <StatLine value={fmt(passing.td)} label="TD" />
+          <StatLine value={fmt(passing.td)} label={isQb ? 'Pass TD' : 'TD'} />
+          {isQb && rushing?.td != null && (
+            <StatLine value={fmt(rushing.td)} label="Rush TD" />
+          )}
           <StatLine value={fmt(passing.int)} label="INT" />
           <StatLine value={fmtFloat(passing.rating)} label="RTG" />
         </StatCategory>
@@ -223,7 +233,9 @@ function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
       {rushing && (
         <StatCategory label="Rush">
           <StatLine value={fmt(rushing.yds)} label="YDS" />
-          <StatLine value={fmt(rushing.td)} label="TD" />
+          {(!isQb || !passing) && (
+            <StatLine value={fmt(rushing.td)} label="TD" />
+          )}
         </StatCategory>
       )}
       {receiving && (
