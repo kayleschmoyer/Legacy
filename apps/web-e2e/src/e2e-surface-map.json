@@ -195,6 +195,12 @@
       "apps/web/src/pages/football/**",
       "apps/web/src/components/football/**"
     ],
+    "apps/web-e2e/src/tests/football-player-row-navigation.spec.ts": [
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/football/**",
+      "lib/shared-components/src/features/football/FootballPlayerHeader.tsx",
+      "lib/shared-components/src/features/football/FootballPlayerDetail.tsx"
+    ],
     "apps/web-e2e/src/tests/football-players-name-search.spec.ts": [
       "apps/web/src/pages/football/**",
       "apps/web/src/components/football/**",
