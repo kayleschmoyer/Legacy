@@ -140,6 +140,52 @@ describe('FootballPlayerCard', () => {
     });
   });
 
+  describe('LS-6470 / LS-6471 — kicker FG% label and NaN guard', () => {
+    const KICKER_BASE: FootballPlayerCardPlayer = {
+      id: 5,
+      firstName: 'Harrison',
+      lastName: 'Butker',
+      position: 'K',
+      isDst: false,
+      nflTeam: 'KC',
+      careerStats: {
+        kicking: { fgm: 30, fga: 33, fgPct: 90.9 },
+      },
+    };
+
+    it('renders FG% label and formatted percentage for a valid fgPct', () => {
+      render(<FootballPlayerCard player={KICKER_BASE} />);
+      expect(screen.getByText('FG%')).toBeTruthy();
+      expect(screen.getByText('90.9%')).toBeTruthy();
+    });
+
+    it('renders "—" for FG% when fgPct is null', () => {
+      render(
+        <FootballPlayerCard
+          player={{
+            ...KICKER_BASE,
+            careerStats: { kicking: { fgm: 0, fga: 0, fgPct: null } },
+          }}
+        />,
+      );
+      expect(screen.getByText('FG%')).toBeTruthy();
+      expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    });
+
+    it('renders "—" for FG% when fgPct is NaN (zero attempts)', () => {
+      render(
+        <FootballPlayerCard
+          player={{
+            ...KICKER_BASE,
+            careerStats: { kicking: { fgm: 0, fga: 0, fgPct: NaN } },
+          }}
+        />,
+      );
+      expect(screen.getByText('FG%')).toBeTruthy();
+      expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    });
+  });
+
   it('renders DST stats for a defense without offense rows', () => {
     render(<FootballPlayerCard player={DST_PLAYER} />);
     expect(screen.getByText('Sacks')).toBeTruthy();

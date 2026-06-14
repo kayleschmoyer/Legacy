@@ -251,7 +251,10 @@ function OffenseStats({ player }: { player: FootballPlayerCardPlayer }) {
             value={`${fmt(kicking.fgm)}/${fmt(kicking.fga)}`}
             label="FG"
           />
-          <StatLine value={`${fmtFloat(fgPct)}%`} label="" />
+          <StatLine
+            value={fgPct == null || isNaN(fgPct) ? '—' : `${fmtFloat(fgPct)}%`}
+            label="FG%"
+          />
         </StatCategory>
       )}
     </YStack>
