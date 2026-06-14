@@ -283,6 +283,9 @@ export * from './constants/presets';
 // NFL team reference data
 export * from './constants/nflTeams';
 
+// MLB franchise reference data
+export * from './constants/teams/mlb';
+
 // Chat components
 export * from './features/chat/GifPicker';
 

@@ -5,187 +5,99 @@ import {
   SafeAreaView,
   TextInput,
 } from 'react-native';
-import { Spinner, Text, XStack, YStack } from 'tamagui';
-import { useRouter } from 'expo-router';
-import type { BaseballPlayersQuery } from '../../../api/db/graphql.generated';
-import { useBaseballPlayersQuery } from '../../../api/db/graphql.generated';
+import { Button, Select, Spinner, Text, XStack, YStack } from 'tamagui';
+import { ChevronDown } from '@tamagui/lucide-icons';
+import {
+  BattingStatsTableWithData,
+  FieldingStatsTableWithData,
+  MLB_TEAMS,
+  PitchingStatsTableWithData,
+} from '@legacy-sports/shared-components';
+import {
+  useGetCareerBattingStatsQuery,
+  useGetCareerFieldingStatsQuery,
+  useGetCareerPitchingStatsQuery,
+} from '../../../api/db/graphql.generated';
 
-type BaseballPlayerNode = NonNullable<
-  NonNullable<BaseballPlayersQuery['players']>[number]
->;
+enum TableView {
+  BATTING,
+  PITCHING,
+  FIELDING,
+}
 
 type BaseballPosition =
   | 'All'
-  | 'P'
   | 'C'
   | '1B'
   | '2B'
   | '3B'
   | 'SS'
   | 'OF'
+  | 'SP'
+  | 'RP'
   | 'DH';
 
 const POSITIONS: BaseballPosition[] = [
   'All',
-  'P',
   'C',
   '1B',
   '2B',
   '3B',
   'SS',
   'OF',
+  'SP',
+  'RP',
   'DH',
 ];
 
 const POSITION_COLORS: Record<string, string> = {
-  P: '#C41E3A',
-  C: '#E67E22',
+  C: '#4A90D9',
   '1B': '#27AE60',
-  '2B': '#27AE60',
-  '3B': '#27AE60',
-  SS: '#27AE60',
-  OF: '#4A90D9',
-  DH: '#9B59B6',
-  RP: '#C41E3A',
-  SP: '#C41E3A',
+  '2B': '#9B59B6',
+  '3B': '#E67E22',
+  SS: '#C41E3A',
+  OF: '#1B3A5C',
+  SP: '#D4AF37',
+  RP: '#5B7FA6',
+  DH: '#95A5A6',
 };
 
-const PITCHER_POSITIONS = new Set(['SP', 'RP', 'P']);
+const LEAGUE_ORDER: Record<string, number> = { AL: 0, NL: 1 };
+const DIVISION_ORDER: Record<string, number> = { East: 0, Central: 1, West: 2 };
 
-const PAGE_SIZE = 50;
+const TEAM_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'All', label: 'All Teams' },
+  { value: 'AL', label: 'AL' },
+  { value: 'NL', label: 'NL' },
+  ...MLB_TEAMS.slice()
+    .sort((a, b) => {
+      const lDiff =
+        (LEAGUE_ORDER[a.league] ?? 99) - (LEAGUE_ORDER[b.league] ?? 99);
+      if (lDiff !== 0) return lDiff;
+      const dDiff =
+        (DIVISION_ORDER[a.division] ?? 99) - (DIVISION_ORDER[b.division] ?? 99);
+      if (dDiff !== 0) return dDiff;
+      return a.currentName.localeCompare(b.currentName);
+    })
+    .map((t) => ({
+      value: t.currentAbbr,
+      label: `${t.currentAbbr} — ${t.currentName}`,
+    })),
+];
 
-function isPitcher(positions: string[] | null | undefined): boolean {
-  if (!positions || positions.length === 0) return false;
-  return PITCHER_POSITIONS.has(positions[0]);
-}
-
-function fmtAvg(n: number | null | undefined): string {
-  if (n == null) return '—';
-  return n.toFixed(3).replace(/^0/, '');
-}
-
-function fmt(n: number | null | undefined): string {
-  if (n == null) return '—';
-  return n.toLocaleString();
-}
-
-function StatChip({ label, value }: { label: string; value: string }) {
-  return (
-    <XStack gap={3} alignItems="baseline">
-      <Text
-        fontSize={13}
-        fontWeight="700"
-        color="$color"
-        fontVariant={['tabular-nums']}
-      >
-        {value}
-      </Text>
-      <Text fontSize={11} color="$gray10">
-        {label}
-      </Text>
-    </XStack>
-  );
-}
-
-function PlayerStats({ player }: { player: BaseballPlayerNode }) {
-  const pitcher = isPitcher(player.eligiblePositions);
-
-  if (pitcher) {
-    const p = player.careerPitching;
-    if (!p) {
-      return (
-        <Text fontSize={12} color="$gray9">
-          No stats available
-        </Text>
-      );
-    }
-    return (
-      <XStack flexWrap="wrap" gap={10}>
-        <StatChip value={p.era ?? '—'} label="ERA" />
-        <StatChip value={`${fmt(p.wins)}-${fmt(p.losses)}`} label="W-L" />
-        <StatChip value={fmt(p.strikeouts)} label="SO" />
-        <StatChip value={fmt(p.saves)} label="SV" />
-      </XStack>
-    );
-  }
-
-  const b = player.careerBatting;
-  if (!b) {
-    return (
-      <Text fontSize={12} color="$gray9">
-        No stats available
-      </Text>
-    );
-  }
-  return (
-    <XStack flexWrap="wrap" gap={10}>
-      <StatChip value={fmtAvg(b.battingAverage)} label="AVG" />
-      <StatChip value={fmt(b.homeRuns)} label="HR" />
-      <StatChip value={fmt(b.rbi)} label="RBI" />
-      <StatChip value={fmt(b.stolenBases)} label="SB" />
-    </XStack>
-  );
-}
-
-function PlayerRow({
-  player,
-  onPress,
-}: {
-  player: BaseballPlayerNode;
-  onPress: () => void;
-}) {
-  const positions = player.eligiblePositions ?? [];
-  const primaryPos = positions[0] ?? '?';
-  const accentColor = POSITION_COLORS[primaryPos] ?? '#1B3A5C';
-
-  return (
-    <YStack
-      backgroundColor="$glassSurface"
-      borderWidth={1}
-      borderColor="$glassBorder"
-      borderRadius="$3"
-      padding="$3"
-      marginBottom="$2"
-      gap="$2"
-      onPress={onPress}
-      pressStyle={{ opacity: 0.7 }}
-      testID={`player-row-${player.id ?? 0}`}
-      accessibilityRole="button"
-      accessibilityLabel={`View ${player.firstName ?? ''} ${player.lastName ?? ''}`}
-    >
-      <XStack gap="$3" alignItems="flex-start">
-        <YStack flex={1} gap="$1">
-          <Text fontSize={15} fontWeight="700" color="$color" numberOfLines={1}>
-            {[player.firstName, player.lastName].filter(Boolean).join(' ') ||
-              'Unknown Player'}
-          </Text>
-          <XStack gap="$2" alignItems="center">
-            {positions.slice(0, 3).map((pos) => (
-              <YStack
-                key={pos}
-                paddingHorizontal={7}
-                paddingVertical={2}
-                borderRadius="$1"
-                backgroundColor={`${POSITION_COLORS[pos] ?? '#1B3A5C'}26`}
-                borderWidth={1}
-                borderColor={`${POSITION_COLORS[pos] ?? '#1B3A5C'}80`}
-              >
-                <Text
-                  fontSize={11}
-                  fontWeight="700"
-                  color={POSITION_COLORS[pos] ?? accentColor}
-                >
-                  {pos}
-                </Text>
-              </YStack>
-            ))}
-          </XStack>
-        </YStack>
-      </XStack>
-
-      <PlayerStats player={player} />
-    </YStack>
-  );
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) setDebounced(value);
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [value, delay]);
+  return debounced;
 }
 
 function PositionPill({
@@ -228,92 +140,202 @@ function PositionPill({
   );
 }
 
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    let cancelled = false;
-    const t = setTimeout(() => {
-      if (!cancelled) setDebounced(value);
-    }, delay);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [value, delay]);
-  return debounced;
-}
-
-export default function BaseballPlayers(): React.JSX.Element {
-  const router = useRouter();
-  const [position, setPosition] = useState<BaseballPosition>('All');
+export default function Players(): React.JSX.Element {
+  const [selectedView, setSelectedView] = useState(TableView.BATTING);
   const [searchInput, setSearchInput] = useState('');
-  const [offset, setOffset] = useState(0);
-  const [allNodes, setAllNodes] = useState<BaseballPlayerNode[]>([]);
-  const [isFilterChanging, setIsFilterChanging] = useState(false);
+  const [position, setPosition] = useState<BaseballPosition>('All');
+  const [teamFilter, setTeamFilter] = useState('All');
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
-  const prevFiltersRef = useRef({ position, debouncedSearch });
-  useEffect(() => {
-    const prev = prevFiltersRef.current;
-    if (
-      prev.position !== position ||
-      prev.debouncedSearch !== debouncedSearch
-    ) {
-      prevFiltersRef.current = { position, debouncedSearch };
-      setOffset(0);
-      setAllNodes([]);
-      setIsFilterChanging(true);
-    }
-  }, [position, debouncedSearch]);
+  const searchTerm = debouncedSearch.length >= 2 ? debouncedSearch : undefined;
+  const positionVar = position !== 'All' ? position : undefined;
+  const isLeague = teamFilter === 'AL' || teamFilter === 'NL';
+  const teamVar = teamFilter !== 'All' && !isLeague ? teamFilter : undefined;
 
-  const { data, loading, error } = useBaseballPlayersQuery({
+  const [battingCursor, setBattingCursor] = useState<string | undefined>(
+    undefined,
+  );
+  const [allBattingEdges, setAllBattingEdges] = useState<
+    Array<{
+      player?: { firstName?: string | null; lastName?: string | null } | null;
+      primaryPosition?: string | null;
+      atBats?: number | null;
+      hits?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      runs?: number | null;
+      stolenBases?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      battingAverage?: number | null;
+      onBasePercentage?: number | null;
+      sluggingPercentage?: number | null;
+    }>
+  >([]);
+
+  const prevBattingFiltersRef = useRef({ searchTerm, positionVar, teamVar });
+  useEffect(() => {
+    const prev = prevBattingFiltersRef.current;
+    if (
+      prev.searchTerm !== searchTerm ||
+      prev.positionVar !== positionVar ||
+      prev.teamVar !== teamVar
+    ) {
+      prevBattingFiltersRef.current = { searchTerm, positionVar, teamVar };
+      setBattingCursor(undefined);
+      setAllBattingEdges([]);
+    }
+  }, [searchTerm, positionVar, teamVar]);
+
+  const {
+    data: battingData,
+    loading: battingLoading,
+    error: battingError,
+  } = useGetCareerBattingStatsQuery({
     variables: {
-      search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
-      position: position !== 'All' ? position : undefined,
-      limit: PAGE_SIZE,
-      offset,
+      searchTerm,
+      position: positionVar,
+      team: teamVar,
+      after: battingCursor,
     },
     notifyOnNetworkStatusChange: true,
   });
 
-  const prevOffsetRef = useRef(offset);
+  const prevBattingCursorRef = useRef(battingCursor);
   useEffect(() => {
-    const newNodes = data?.players;
-    if (!newNodes) return;
-    if (prevOffsetRef.current !== offset) {
-      setAllNodes((prev) => [...prev, ...newNodes]);
+    const newEdges = battingData?.careerBattingStats?.edges;
+    if (!newEdges) return;
+    if (prevBattingCursorRef.current !== battingCursor) {
+      setAllBattingEdges(
+        (prev) =>
+          [
+            ...prev,
+            ...newEdges.map((e) => e?.node).filter(Boolean),
+          ] as typeof allBattingEdges,
+      );
     } else {
-      setAllNodes(newNodes);
+      setAllBattingEdges(
+        newEdges.map((e) => e?.node).filter(Boolean) as typeof allBattingEdges,
+      );
     }
-    prevOffsetRef.current = offset;
-    setIsFilterChanging(false);
-  }, [data, offset]);
+    prevBattingCursorRef.current = battingCursor;
+  }, [battingData, battingCursor]);
 
-  const hasMore = (data?.players?.length ?? 0) === PAGE_SIZE;
+  const battingPageInfo = battingData?.careerBattingStats?.pageInfo;
+  const hasBattingMore = battingPageInfo?.hasNextPage ?? false;
 
-  const loadMore = useCallback(() => {
-    setOffset((prev) => prev + PAGE_SIZE);
-  }, []);
+  const loadMoreBatting = useCallback(() => {
+    if (battingPageInfo?.endCursor) {
+      setBattingCursor(battingPageInfo.endCursor);
+    }
+  }, [battingPageInfo?.endCursor]);
 
-  const isInitialLoad = loading && allNodes.length === 0;
-  const isLoadingMore = loading && allNodes.length > 0;
+  const {
+    data: pitchingData,
+    loading: pitchingLoading,
+    error: pitchingError,
+  } = useGetCareerPitchingStatsQuery({
+    variables: {
+      searchTerm,
+      position: positionVar,
+      team: teamVar,
+    },
+  });
+
+  const {
+    data: fieldingData,
+    loading: fieldingLoading,
+    error: fieldingError,
+  } = useGetCareerFieldingStatsQuery();
+
+  const battingNodes = allBattingEdges.map((node) => ({
+    player: node.player
+      ? {
+          name:
+            [node.player.firstName, node.player.lastName]
+              .filter(Boolean)
+              .join(' ') || undefined,
+        }
+      : undefined,
+    ab: node.atBats,
+    h: node.hits,
+    hr: node.homeRuns,
+    rbi: node.rbi,
+    r: node.runs,
+    sb: node.stolenBases,
+    bb: node.baseOnBalls,
+    so: node.strikeouts,
+    avg: node.battingAverage,
+    obp: node.onBasePercentage,
+    slg: node.sluggingPercentage,
+  }));
+
+  const pitchingNodes = pitchingData?.careerPitchingStats
+    ?.map((s) =>
+      s
+        ? {
+            player: s.player
+              ? {
+                  name:
+                    [s.player.firstName, s.player.lastName]
+                      .filter(Boolean)
+                      .join(' ') || undefined,
+                }
+              : undefined,
+            w: s.wins,
+            l: s.losses,
+            era: s.era != null ? parseFloat(s.era) : null,
+            g: s.games,
+            gs: s.gamesStarted,
+            sv: s.saves,
+            h: s.hits,
+            er: s.earnedRuns,
+            hr: s.homeRuns,
+            bb: s.baseOnBalls,
+            so: s.strikeouts,
+          }
+        : null,
+    )
+    .filter((n): n is NonNullable<typeof n> => n != null);
+
+  const fieldingNodes = fieldingData?.careerFieldingStats
+    ?.map((s) =>
+      s
+        ? {
+            a: s.assists,
+            cg: s.completeGames,
+            chances: s.chances,
+            cs: s.caughtStealing,
+            dpDef: s.doublePlays,
+            eDef: s.errors,
+            g: s.games,
+            gs: s.gamesStarted,
+            innDef: s.inningsDefended,
+            pickoffs: s.pickoffs,
+            po: s.putouts,
+            pos: s.positions,
+            sb: s.stolenBases,
+            wp: s.wildPitches,
+          }
+        : null,
+    )
+    .filter((n): n is NonNullable<typeof n> => n != null);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+      <SafeAreaView style={{ backgroundColor: '#0A0F1A', flex: 1 }}>
         {/* Position filter pills */}
         <FlatList
           data={POSITIONS}
           horizontal
           showsHorizontalScrollIndicator={true}
-          fadingEdgeLength={32}
           initialNumToRender={POSITIONS.length}
           keyExtractor={(item) => item}
           renderItem={({ item: pos }) => (
             <PositionPill
               pos={pos}
-              selected={pos === position}
+              selected={position === pos}
               onPress={() => setPosition(pos)}
             />
           )}
@@ -325,8 +347,13 @@ export default function BaseballPlayers(): React.JSX.Element {
           style={{ flexGrow: 0 }}
         />
 
-        {/* Search input */}
-        <XStack paddingHorizontal={12} paddingBottom={10} alignItems="center">
+        {/* Search + team filter row */}
+        <XStack
+          paddingHorizontal={12}
+          paddingBottom={10}
+          gap={8}
+          alignItems="center"
+        >
           <XStack
             flex={1}
             backgroundColor="$glassSurface"
@@ -346,69 +373,129 @@ export default function BaseballPlayers(): React.JSX.Element {
               style={{ flex: 1, color: '#fff', fontSize: 14, height: 44 }}
             />
           </XStack>
+
+          <Select
+            value={teamFilter}
+            onValueChange={setTeamFilter}
+            disablePreventBodyScroll
+            renderValue={(v) => {
+              if (v === 'All') return 'All Teams';
+              if (v === 'AL' || v === 'NL') return v;
+              const team = MLB_TEAMS.find((t) => t.currentAbbr === v);
+              return team?.currentAbbr ?? v;
+            }}
+          >
+            <Select.Trigger
+              width={130}
+              borderColor="$glassBorder"
+              backgroundColor="$glassSurface"
+              color="$color"
+              iconAfter={ChevronDown}
+              borderRadius="$2"
+              paddingHorizontal={8}
+              height={36}
+            >
+              <Select.Value
+                placeholder="All Teams"
+                color="$color"
+                fontSize={13}
+              />
+            </Select.Trigger>
+
+            <Select.Content zIndex={200000}>
+              <Select.ScrollUpButton />
+              <Select.Viewport
+                backgroundColor="$background"
+                borderColor="$glassBorder"
+                borderWidth={1}
+                borderRadius="$3"
+                minWidth={220}
+              >
+                <Select.Group>
+                  {TEAM_OPTIONS.map((opt, i) => (
+                    <Select.Item
+                      key={opt.value}
+                      index={i}
+                      value={opt.value}
+                      backgroundColor="$background"
+                      hoverStyle={{ backgroundColor: '$glassSurface' }}
+                    >
+                      <Select.ItemText color="$color" fontSize={13}>
+                        {opt.label}
+                      </Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Group>
+              </Select.Viewport>
+              <Select.ScrollDownButton />
+            </Select.Content>
+          </Select>
         </XStack>
 
-        {/* Error banner */}
-        {error && (
-          <YStack
-            marginHorizontal={12}
-            marginBottom={8}
-            padding={12}
-            borderRadius="$2"
-            backgroundColor="$red2"
-            borderWidth={1}
-            borderColor="$red6"
-          >
-            <Text fontSize={13} color="$red10">
-              Failed to load players. Please try again.
-            </Text>
-          </YStack>
-        )}
-
-        {/* Player list */}
-        {isInitialLoad || isFilterChanging ? (
-          <YStack flex={1} alignItems="center" justifyContent="center">
-            <Spinner size="large" color="$orange9" />
-          </YStack>
-        ) : (
-          <FlatList
-            data={allNodes}
-            keyExtractor={(item, index) => String(item.id ?? `idx-${index}`)}
-            renderItem={({ item }) => (
-              <PlayerRow
-                player={item}
-                onPress={() => {
-                  if (item.id == null) return;
-                  router.push({
-                    pathname: '/PlayerDetail',
-                    params: {
-                      playerId: String(item.id),
-                      playerName: [item.firstName, item.lastName]
-                        .filter(Boolean)
-                        .join(' '),
-                    },
-                  });
-                }}
-              />
-            )}
-            windowSize={10}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
-            ListEmptyComponent={
-              !loading ? (
-                <YStack alignItems="center" padding={40} gap="$3">
-                  <Text fontSize={16} color="$gray10">
-                    No players found
-                  </Text>
-                  <Text fontSize={13} color="$gray9">
-                    Try adjusting your filters or search.
-                  </Text>
-                </YStack>
-              ) : null
+        {/* Tab buttons */}
+        <XStack borderTopColor="#333333" borderTopWidth={1}>
+          <Button
+            alignItems="center"
+            flex={1}
+            height={50}
+            justifyContent="center"
+            backgroundColor={
+              selectedView === TableView.BATTING ? '$blue8' : 'transparent'
             }
-            ListFooterComponent={
-              hasMore ? (
+            borderRadius={0}
+            onPress={() => setSelectedView(TableView.BATTING)}
+          >
+            <Text color="$color" fontSize="$6" fontWeight="bold">
+              Batting
+            </Text>
+          </Button>
+          <Button
+            alignItems="center"
+            flex={1}
+            height={50}
+            justifyContent="center"
+            backgroundColor={
+              selectedView === TableView.PITCHING ? '$blue8' : 'transparent'
+            }
+            borderRadius={0}
+            onPress={() => setSelectedView(TableView.PITCHING)}
+          >
+            <Text color="$color" fontSize="$6" fontWeight="bold">
+              Pitching
+            </Text>
+          </Button>
+          <Button
+            alignItems="center"
+            flex={1}
+            height={50}
+            justifyContent="center"
+            backgroundColor={
+              selectedView === TableView.FIELDING ? '$blue8' : 'transparent'
+            }
+            borderRadius={0}
+            onPress={() => setSelectedView(TableView.FIELDING)}
+          >
+            <Text color="$color" fontSize="$6" fontWeight="bold">
+              Fielding
+            </Text>
+          </Button>
+        </XStack>
+
+        {selectedView === TableView.BATTING &&
+          (battingLoading && allBattingEdges.length === 0 ? (
+            <YStack flex={1} alignItems="center" justifyContent="center">
+              <Spinner size="large" color="$orange9" />
+            </YStack>
+          ) : (
+            <>
+              <BattingStatsTableWithData
+                data={{ nodes: battingNodes }}
+                loading={false}
+                error={battingError}
+              />
+              {hasBattingMore && (
                 <YStack alignItems="center" paddingVertical={16}>
-                  {isLoadingMore ? (
+                  {battingLoading ? (
                     <Spinner size="small" color="$orange9" />
                   ) : (
                     <YStack
@@ -418,7 +505,7 @@ export default function BaseballPlayers(): React.JSX.Element {
                       backgroundColor="$glassSurface"
                       borderWidth={1}
                       borderColor="$glassBorder"
-                      onPress={loadMore}
+                      onPress={loadMoreBatting}
                       pressStyle={{ opacity: 0.7 }}
                     >
                       <Text fontSize={14} color="$color" fontWeight="600">
@@ -427,8 +514,21 @@ export default function BaseballPlayers(): React.JSX.Element {
                     </YStack>
                   )}
                 </YStack>
-              ) : null
-            }
+              )}
+            </>
+          ))}
+        {selectedView === TableView.PITCHING && (
+          <PitchingStatsTableWithData
+            data={{ nodes: pitchingNodes }}
+            loading={pitchingLoading}
+            error={pitchingError}
+          />
+        )}
+        {selectedView === TableView.FIELDING && (
+          <FieldingStatsTableWithData
+            data={{ nodes: fieldingNodes }}
+            loading={fieldingLoading}
+            error={fieldingError}
           />
         )}
       </SafeAreaView>

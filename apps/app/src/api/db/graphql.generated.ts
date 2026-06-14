@@ -7019,7 +7019,10 @@ export type CareerPitchingStatsFragment = {
 };
 
 export type GetCareerBattingStatsQueryVariables = Exact<{
-  [key: string]: never;
+  searchTerm?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerBattingStatsQuery = {
@@ -7030,6 +7033,7 @@ export type GetCareerBattingStatsQuery = {
       __typename?: 'CareerBattingEdge';
       node?: {
         __typename?: 'CareerBatting';
+        primaryPosition?: string | null;
         atBats?: number | null;
         baseOnBalls?: number | null;
         caughtStealing?: number | null;
@@ -7052,8 +7056,18 @@ export type GetCareerBattingStatsQuery = {
         onBasePercentage?: number | null;
         sluggingPercentage?: number | null;
         playerId?: number | null;
+        player?: {
+          __typename?: 'Player';
+          firstName?: string | null;
+          lastName?: string | null;
+        } | null;
       } | null;
     } | null> | null;
+    pageInfo: {
+      __typename?: 'PageInfo';
+      hasNextPage: boolean;
+      endCursor?: string | null;
+    };
   } | null;
 };
 
@@ -7085,13 +7099,16 @@ export type GetCareerFieldingStatsQuery = {
 };
 
 export type GetCareerPitchingStatsQueryVariables = Exact<{
-  [key: string]: never;
+  searchTerm?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerPitchingStatsQuery = {
   __typename?: 'Query';
   careerPitchingStats?: Array<{
     __typename?: 'CareerPitching';
+    primaryPosition?: string | null;
     battersFaced?: number | null;
     baseOnBalls?: number | null;
     balks?: number | null;
@@ -7116,6 +7133,11 @@ export type GetCareerPitchingStatsQuery = {
     wildPitches?: number | null;
     winPercentage?: number | null;
     playerId?: number | null;
+    player?: {
+      __typename?: 'Player';
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -12762,12 +12784,31 @@ export type UpdateLeagueScoringProfileMutationOptions = BaseMutationOptions<
   UpdateLeagueScoringProfileMutationVariables
 >;
 export const GetCareerBattingStats = gql`
-  query GetCareerBattingStats {
-    careerBattingStats {
+  query GetCareerBattingStats(
+    $searchTerm: String
+    $position: String
+    $team: String
+    $after: String
+  ) {
+    careerBattingStats(
+      searchTerm: $searchTerm
+      position: $position
+      team: $team
+      after: $after
+    ) {
       edges {
         node {
           ...CareerBattingStats
+          player {
+            firstName
+            lastName
+          }
+          primaryPosition
         }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }
@@ -12786,6 +12827,10 @@ export const GetCareerBattingStats = gql`
  * @example
  * const { data, loading, error } = useGetCareerBattingStatsQuery({
  *   variables: {
+ *      searchTerm: // value for 'searchTerm'
+ *      position: // value for 'position'
+ *      team: // value for 'team'
+ *      after: // value for 'after'
  *   },
  * });
  */
@@ -12938,9 +12983,22 @@ export type GetCareerFieldingStatsQueryResult = Apollo.QueryResult<
   GetCareerFieldingStatsQueryVariables
 >;
 export const GetCareerPitchingStats = gql`
-  query GetCareerPitchingStats {
-    careerPitchingStats {
+  query GetCareerPitchingStats(
+    $searchTerm: String
+    $position: String
+    $team: String
+  ) {
+    careerPitchingStats(
+      searchTerm: $searchTerm
+      position: $position
+      team: $team
+    ) {
       ...CareerPitchingStats
+      player {
+        firstName
+        lastName
+      }
+      primaryPosition
     }
   }
   ${CareerPitchingStatsFragmentDoc}
@@ -12958,6 +13016,9 @@ export const GetCareerPitchingStats = gql`
  * @example
  * const { data, loading, error } = useGetCareerPitchingStatsQuery({
  *   variables: {
+ *      searchTerm: // value for 'searchTerm'
+ *      position: // value for 'position'
+ *      team: // value for 'team'
  *   },
  * });
  */
