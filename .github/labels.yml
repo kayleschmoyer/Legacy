@@ -224,6 +224,12 @@
   color: "d93f0b"
   description: "PR status doesn't match its Jira ticket status — manual reconciliation needed"
 
+# Author-applied opt-out consumed by jira-link-check.yml: a PR declaring
+# `primary: none` in its jira-link marker must carry this label.
+- name: no-jira
+  color: "ededed"
+  description: "PR deliberately has no Jira ticket (jira-link marker declares primary: none)"
+
 # ---------------------------------------------------------------------------
 # Dependabot Labels
 # Applied automatically by Dependabot to dependency-bump PRs. Listed here so

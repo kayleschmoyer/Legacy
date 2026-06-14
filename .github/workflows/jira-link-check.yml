@@ -1,0 +1,66 @@
+name: "Jira Link Check"
+
+# =============================================================================
+# Validates the declared jira-link marker on every PR (LS-7896, phase 3 of
+# RFC docs/rfcs/draft-declared-ticket-linkage.md).
+#
+# The marker (emitted by github_create_pr and the PR-creation skills since
+# LS-7895) is the single source of truth for "which ticket is this PR for?":
+#
+#   <!-- jira-link
+#   primary: LS-1234
+#   -->
+#
+# Assertions (see .github/scripts/jira-link-check.mjs):
+#   - exactly one marker with exactly one `primary:` (LS-#### or `none`),
+#   - `primary: none` requires the `no-jira` label (visible opt-out),
+#   - the primary key appears in the PR title,
+#   - the primary ticket exists in Jira (single GET — kills the
+#     404-after-merge failure class in jira-branch-sync).
+#
+# Failure output includes a copy-pasteable marker block; fix by editing the
+# PR body — no push needed.
+#
+# STAGED DEPLOYMENT (per the ticket): runs non-required for ~3 days of agent
+# PR volume, then the repo owner adds the "Jira Link Check" context to
+# .github/ruleset.json and runs scripts/apply-ruleset.sh (adding it to
+# ruleset.json before applying intentionally shows Check Ruleset Drift red).
+#
+# Triggers include `synchronize` and `ready_for_review` in addition to the
+# body/title-relevant events: required status checks are recorded per head
+# SHA, so a check that does not re-run on push would leave every new commit
+# stuck at "Expected" once this becomes required (the same failure class
+# required-checks-lint guards against). `labeled`/`unlabeled` are included so
+# adding the `no-jira` label re-runs the check for `primary: none` PRs —
+# otherwise a failed opt-out PR has no way to go green without a body edit.
+#
+# Authentication: JIRA_CREDENTIALS secret (same JSON object as
+# jira-branch-sync.yml). Absent on fork PRs — the script then skips the
+# Jira existence GET with a warning; structural validation still applies.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+concurrency:
+  group: jira-link-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  jira-link-check:
+    name: "Jira Link Check"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Validate jira-link marker
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+        run: node .github/scripts/jira-link-check.mjs
