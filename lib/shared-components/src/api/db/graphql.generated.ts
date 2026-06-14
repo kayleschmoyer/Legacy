@@ -2975,6 +2975,8 @@ export type Query = {
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
+  /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
+  hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
   /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
@@ -3375,6 +3377,10 @@ export type QueryGetTiebreakerHistoryArgs = {
 
 export type QueryGetTiebreakerRulesArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryHasEntitlementArgs = {
+  key: Scalars['String']['input'];
 };
 
 export type QueryLeagueArgs = {

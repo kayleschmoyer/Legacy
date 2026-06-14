@@ -33,6 +33,7 @@ import './disclosure-game';
 import './twenty-questions';
 import './sports';
 import './football';
+import './entitlement-check';
 
 // Export the final schema
 export const schema = builder.toSchema();

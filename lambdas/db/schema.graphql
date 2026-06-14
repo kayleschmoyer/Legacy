@@ -3265,6 +3265,11 @@ type Query {
   getUserDeviceTokens: [DeviceToken!]
   getUserLeagueSummaries: [UserLeagueSummary!]!
   getUserNotificationPreferences: NotificationPreference
+
+  """
+  Returns true when the authenticated user holds the given entitlement. Admin users always return true.
+  """
+  hasEntitlement(key: String!): Boolean!
   hello: String
   league(id: Int!): League
 
