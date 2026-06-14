@@ -2,7 +2,11 @@ import * as React from 'react';
 import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
 import { Slot } from 'expo-router';
-import { GrowthBook, GrowthBookProvider } from '@growthbook/growthbook-react';
+import {
+  GrowthBook,
+  GrowthBookProvider,
+  useGrowthBook,
+} from '@growthbook/growthbook-react';
 import { ApolloProvider } from '@apollo/client/react';
 import {
   getRollbarConfigFromEnv,
@@ -22,31 +26,35 @@ import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
-const growthbook = new GrowthBook({
-  apiHost: 'https://cdn.growthbook.io',
-  clientKey: config.growthbookClientKey ?? '',
-  enableDevMode: isDev,
-  trackingCallback: (
-    experiment: { key: string },
-    result: { variationId: string | number },
-  ) => {
-    LOGGER.info('[GrowthBook] Experiment viewed:', {
-      experiment: experiment.key,
-      variationId: result.variationId,
-    });
-  },
-});
+// Construct the GrowthBook instance lazily rather than at module-evaluation
+// time. `config.growthbookClientKey` resolves `Constants.expoConfig?.extra`,
+// which on Android cold-starts / prebuilds may be undefined or stale when JS
+// modules are first evaluated — before the native bridge is ready. Calling this
+// from a render-time `useMemo` defers the read until the bridge is up (LS-4965).
+function createGrowthbook(): GrowthBook {
+  return new GrowthBook({
+    apiHost: 'https://cdn.growthbook.io',
+    clientKey: config.growthbookClientKey ?? '',
+    enableDevMode: isDev,
+    trackingCallback: (
+      experiment: { key: string },
+      result: { variationId: string | number },
+    ) => {
+      LOGGER.info('[GrowthBook] Experiment viewed:', {
+        experiment: experiment.key,
+        variationId: result.variationId,
+      });
+    },
+  });
+}
 
-// Initialize Rollbar for mobile app
+// Initialize Rollbar for mobile app. Safe at module-evaluation time: the config
+// is sourced from `EXPO_PUBLIC_*` env vars (inlined into the bundle by
+// babel-preset-expo at build time), not from `Constants.expoConfig`.
 const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
-
-// Modern OAuth configuration for mobile — resolved by the single shared helper
-// so the AuthProvider config and the imperative googleLogin flow stay in sync
-// and the app.json placeholder client ID can never leak into GoogleSignin.
-const authConfig: OAuthConfig = getMobileOAuthConfig();
 
 /**
  * Runs inside AppProvider (Apollo context) to set analytics identity and
@@ -54,6 +62,10 @@ const authConfig: OAuthConfig = getMobileOAuthConfig();
  * database.
  */
 function AnalyticsIdentify({ userId }: { userId: number }): null {
+  // Read the GrowthBook instance from context (provided by GrowthBookProvider)
+  // rather than a module-level singleton, so this module never constructs one at
+  // evaluation time (LS-4965).
+  const growthbook = useGrowthBook();
   const { data } = useGetUserByIdQuery({
     variables: { id: userId },
     skip: !userId,
@@ -64,7 +76,7 @@ function AnalyticsIdentify({ userId }: { userId: number }): null {
     const tier = data.user.subscriptionTier === 'premium' ? 'premium' : 'free';
     void setUserProperties({ userId, subscriptionTier: tier });
     void growthbook.setAttributes({ id: userId, subscriptionTier: tier });
-  }, [userId, data]);
+  }, [userId, data, growthbook]);
 
   return null;
 }
@@ -106,6 +118,18 @@ function AuthenticatedContent(): React.JSX.Element {
  * inert on native and performs no network calls.
  */
 function InnerLayout(): React.JSX.Element {
+  // Resolve the OAuth config at render time, not module-evaluation time:
+  // getMobileOAuthConfig() reads config.googleClientId / discordClientId /
+  // oauthProxy, each of which resolves Constants.expoConfig?.extra. Deferring to
+  // a useMemo keeps that read off the import path so it runs once the native
+  // bridge is ready (LS-4965). The single shared helper keeps the AuthProvider
+  // config and the imperative googleLogin flow in sync, and prevents the
+  // app.json placeholder client ID from leaking into GoogleSignin.
+  const authConfig = React.useMemo<OAuthConfig>(
+    () => getMobileOAuthConfig(),
+    [],
+  );
+
   return (
     <AuthProvider config={authConfig}>
       <AuthenticatedContent />
@@ -119,6 +143,10 @@ function InnerLayout(): React.JSX.Element {
  * via the native secure-store JWT), not a top-level guard (LS-7942).
  */
 export default function Layout() {
+  // Build the GrowthBook instance once, at render time. See createGrowthbook()
+  // for why this must not happen at module-evaluation time (LS-4965).
+  const growthbook = React.useMemo(() => createGrowthbook(), []);
+
   useEffect(() => {
     if (!config.growthbookClientKey) return;
     growthbook.loadFeatures({ autoRefresh: true }).catch((err: unknown) => {
@@ -127,7 +155,7 @@ export default function Layout() {
         err as Error,
       );
     });
-  }, []);
+  }, [growthbook]);
 
   return (
     // TamaguiProvider must wrap ErrorBoundary: ErrorBoundary's fallback UI

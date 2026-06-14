@@ -10,14 +10,19 @@ import Layout from './_layout';
 jest.mock('@growthbook/growthbook-react', () => {
   const setAttributesSpy = jest.fn().mockResolvedValue(undefined);
   const loadFeaturesSpy = jest.fn().mockResolvedValue(undefined);
+  const instance = {
+    setAttributes: setAttributesSpy,
+    loadFeatures: loadFeaturesSpy,
+  };
 
   return {
-    GrowthBook: jest.fn().mockImplementation(() => ({
-      setAttributes: setAttributesSpy,
-      loadFeatures: loadFeaturesSpy,
-    })),
+    GrowthBook: jest.fn().mockImplementation(() => instance),
     GrowthBookProvider: ({ children }: { children: React.ReactNode }) =>
       children,
+    // AnalyticsIdentify now reads the instance from context via useGrowthBook()
+    // rather than a module-level singleton (LS-4965), so the mock must return
+    // the same instance the spies belong to.
+    useGrowthBook: jest.fn(() => instance),
     // Non-standard exports so tests can access the spies
     _setAttributesSpy: setAttributesSpy,
     _loadFeaturesSpy: loadFeaturesSpy,
