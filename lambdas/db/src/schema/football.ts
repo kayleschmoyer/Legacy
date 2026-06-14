@@ -1955,8 +1955,8 @@ builder.queryField('footballPlayers', (t) =>
           const escaped = token.replace(/[\\%_]/g, '\\$&');
           const pattern = `%${escaped}%`;
           return or(
-            sql<boolean>`${PublicSchema.players.firstName} ILIKE ${pattern} ESCAPE '\\'`,
-            sql<boolean>`${PublicSchema.players.lastName} ILIKE ${pattern} ESCAPE '\\'`,
+            sql<boolean>`unaccent(${PublicSchema.players.firstName}) ILIKE unaccent(${pattern}) ESCAPE '\\'`,
+            sql<boolean>`unaccent(${PublicSchema.players.lastName}) ILIKE unaccent(${pattern}) ESCAPE '\\'`,
           )!;
         });
         conditions.push(

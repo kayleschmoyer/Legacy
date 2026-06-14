@@ -754,6 +754,32 @@ describe('football resolvers', () => {
         expect(params).not.toContain('%%%');
         expect(sql).toContain('ESCAPE');
       });
+
+      it('wraps columns with unaccent() for accent-insensitive search (LS-6484)', async () => {
+        await getResolver()(
+          {},
+          { position: null, search: 'Pena', after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql } = compileWhere();
+        expect(sql).toContain('unaccent(');
+      });
+
+      it('parameterizes the search term — user input never appears in raw SQL text (LS-6484)', async () => {
+        const injection = "O'Malley";
+        await getResolver()(
+          {},
+          { position: null, search: injection, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql, params } = compileWhere();
+        expect(sql).not.toContain(injection);
+        expect(params).toEqual(expect.arrayContaining([`%${injection}%`]));
+      });
     });
 
     it('throws BAD_USER_INPUT for invalid conference value', async () => {
