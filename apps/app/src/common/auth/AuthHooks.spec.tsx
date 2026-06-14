@@ -213,6 +213,7 @@ const TEST_USER: LegacySportsJwt = {
   username: 'testuser',
   isAdmin: false,
   about: null,
+  subscriptionTier: 'free',
 };
 
 const TEST_JWT = createFakeJwt(TEST_USER);

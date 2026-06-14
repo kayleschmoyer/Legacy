@@ -30,6 +30,7 @@ export async function createJwt(
     email: user.canonicalEmail,
     id: user.id,
     mfaEnabled: user.mfaEnabled,
+    subscriptionTier: user.subscriptionTier,
     username: user.username,
     ...(picture && { picture }),
   };

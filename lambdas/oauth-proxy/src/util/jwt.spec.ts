@@ -25,11 +25,20 @@ describe('createJwt — algorithm pinning (LS-2544)', () => {
     avatarUrl: null,
     passwordHash: null,
     privacyPolicyAcceptedAt: null,
-    subscriptionTier: null,
+    subscriptionTier: 'free' as const,
+    discordId: null,
+    discordUsername: null,
+    discordAvatar: null,
     googleId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   } as unknown as InternalUser;
+
+  it('embeds subscriptionTier in the JWT payload', async () => {
+    const token = await createJwt(user);
+    const payload = decode(token) as Record<string, unknown>;
+    expect(payload['subscriptionTier']).toBe('free');
+  });
 
   it('signs tokens with the HS256 algorithm', async () => {
     const token = await createJwt(user);

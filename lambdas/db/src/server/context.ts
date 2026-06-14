@@ -15,6 +15,7 @@ export interface JWTPayload {
   username: string;
   accessLevel?: string;
   isAdmin?: boolean;
+  subscriptionTier?: string;
   impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown; // For other JWT standard fields
 }
@@ -24,6 +25,7 @@ export interface User {
   email?: string;
   username: string;
   isAdmin: boolean;
+  subscriptionTier?: 'free' | 'premium';
   /** Present when this session was created by an admin via impersonation. */
   impersonatedBy?: ImpersonatedBy;
 }
@@ -115,11 +117,16 @@ export function parseUserFromJwtPayload(payload: JWTPayload): User {
     };
   }
 
+  const rawTier = payload.subscriptionTier;
+  const subscriptionTier: 'free' | 'premium' | undefined =
+    rawTier === 'free' || rawTier === 'premium' ? rawTier : undefined;
+
   return {
     id,
     email: typeof payload.email === 'string' ? payload.email : undefined,
     username: payload.username,
     isAdmin: payload.isAdmin === true || accessLevel === 'admin',
+    subscriptionTier,
     impersonatedBy,
   };
 }

@@ -50,6 +50,7 @@ export interface LegacySportsJwt {
   isAdmin: boolean;
   about: string | null | undefined;
   mfaEnabled?: boolean;
+  subscriptionTier?: 'free' | 'premium';
 }
 
 export enum Secret {
@@ -409,6 +410,7 @@ const LOCAL_USER: LegacySportsJwt = {
   email: null,
   id: -1,
   isAdmin: false,
+  subscriptionTier: 'free',
   username: 'LOCAL USER',
 };
 

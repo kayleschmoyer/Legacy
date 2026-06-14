@@ -24,6 +24,7 @@ export interface Context {
     email?: string | null;
     username?: string | null;
     isAdmin?: boolean;
+    subscriptionTier?: 'free' | 'premium';
     impersonatedBy?: {
       id: number;
       email?: string;
