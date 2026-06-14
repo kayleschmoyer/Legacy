@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input, Spinner, Text, useMedia, XStack, YStack } from 'tamagui';
-import { LayoutGrid, LayoutList, Search } from '@tamagui/lucide-icons';
+import { LayoutGrid, LayoutList, Search, X } from '@tamagui/lucide-icons';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
 import type { FootballPlayerCardStats } from '@legacy-sports/shared-components/football';
 import {
@@ -505,7 +505,31 @@ export function FootballPlayersPage() {
               height={40}
               paddingHorizontal={0}
               focusStyle={{ outlineWidth: 0 }}
+              aria-label="Search players"
+              accessibilityLabel="Search players"
             />
+            {searchInput.length > 0 && (
+              <XStack
+                role="button"
+                tabIndex={0}
+                onPress={() => setSearchInput('')}
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSearchInput('');
+                  }
+                }}
+                cursor="pointer"
+                padding={4}
+                borderRadius={4}
+                hoverStyle={{ backgroundColor: OUTLINE_SUBTLE }}
+                focusStyle={{ outlineWidth: 0 }}
+                aria-label="Clear search"
+                accessibilityLabel="Clear search"
+              >
+                <X size={16} color={TEXT_MUTED} />
+              </XStack>
+            )}
           </XStack>
 
           {/* View toggle */}

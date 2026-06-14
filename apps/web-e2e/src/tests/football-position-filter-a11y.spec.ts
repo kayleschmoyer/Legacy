@@ -171,3 +171,51 @@ test.describe('FootballPositionFilter — keyboard navigation @regression', () =
     }
   });
 });
+
+test.describe('Football players search — clear button & a11y @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockFootballPlayers(page);
+    await page.goto(PAGE_URL);
+  });
+
+  test('search input exposes an accessible name (LS-6488)', async ({
+    page,
+  }) => {
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await expect(search).toBeVisible();
+  });
+
+  test('clear button is hidden while the search input is empty (LS-6487)', async ({
+    page,
+  }) => {
+    await expect(
+      page.getByRole('button', { name: 'Clear search' }),
+    ).toHaveCount(0);
+  });
+
+  test('clear button appears once text is entered and clears it on click (LS-6487)', async ({
+    page,
+  }) => {
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('mahomes');
+
+    const clear = page.getByRole('button', { name: 'Clear search' });
+    await expect(clear).toBeVisible();
+
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(clear).toHaveCount(0);
+  });
+
+  test('clear button is keyboard operable (LS-6487)', async ({ page }) => {
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('allen');
+
+    const clear = page.getByRole('button', { name: 'Clear search' });
+    await clear.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(search).toHaveValue('');
+    await expect(clear).toHaveCount(0);
+  });
+});
