@@ -215,6 +215,10 @@
       "apps/web/src/constants/colors.ts",
       "lib/shared-components/src/utils/colors.ts"
     ],
+    "apps/web-e2e/src/tests/football-players-team-filter.spec.ts": [
+      "apps/web/src/components/football/**",
+      "apps/web/src/pages/football/**"
+    ],
     "apps/web-e2e/src/tests/football-team-filter.spec.ts": [
       "apps/web/src/components/football/**",
       "apps/web/src/pages/football/**"
