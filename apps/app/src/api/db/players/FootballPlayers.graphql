@@ -22,6 +22,7 @@ query FootballPlayers(
       pfrId
       headshotUrl
       previousTeams
+      projectedFantasyPoints
       careerStats {
         passing {
           yds

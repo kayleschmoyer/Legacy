@@ -15,9 +15,10 @@ import type {
   PlayerWithStats,
 } from '@legacy-sports/shared-components/players';
 import { LOGGER } from '@legacy-sports/logging';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -112,7 +113,7 @@ const TOAST_DURATION_MS = 2400;
 export function PlayerStatsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
-  const isPremium = useIsPremium();
+  const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
 
   // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
   // sr-only live region populated (screen readers re-announce changes; the
@@ -389,7 +390,11 @@ export function PlayerStatsRoute() {
           {liveMsg}
         </div>
       )}
-      <PremiumGate isPremium={isPremium} featureName="Player Statistics">
+      <PremiumGate
+        isPremium={isPremium}
+        featureName="Player Statistics & Projections"
+        featureDescription="Unlock advanced player statistics, projected fantasy points, ADP rankings, and injury-status filters with Premium."
+      >
         <PlayerStatsPage
           title="MLB Player Statistics"
           initialViewMode={initialState.viewMode}
@@ -427,7 +432,7 @@ export function PlayerDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: identifier } = useParams<{ id: string }>();
-  const isPremium = useIsPremium();
+  const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
 
   const isNumeric = !!identifier && /^\d+$/.test(identifier);
   const parsedNumericId = isNumeric ? Number(identifier) : null;

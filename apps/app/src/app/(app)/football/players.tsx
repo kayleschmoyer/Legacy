@@ -9,10 +9,12 @@ import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import type { NflTeam } from '@legacy-sports/shared-components';
-import { NFL_TEAMS } from '@legacy-sports/shared-components';
+import { BRAND_GOLD, NFL_TEAMS } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useFootballPlayersQuery } from '../../../api/db/graphql.generated';
+import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
 type FootballPlayerNode = NonNullable<
   NonNullable<FootballPlayersQuery['footballPlayers']>['nodes'][number]
@@ -93,6 +95,42 @@ function StatChip({ label, value }: { label: string; value: string }) {
       </Text>
       <Text fontSize={11} color="$gray10">
         {label}
+      </Text>
+    </XStack>
+  );
+}
+
+function ProjectionChip({ value }: { value: number | null | undefined }) {
+  const display = value != null ? value.toFixed(1) : '—';
+  return (
+    <XStack gap={4} alignItems="center">
+      <YStack
+        paddingHorizontal={6}
+        paddingVertical={2}
+        borderRadius={4}
+        backgroundColor={`${BRAND_GOLD}26`}
+        borderWidth={1}
+        borderColor={`${BRAND_GOLD}80`}
+      >
+        <Text
+          fontSize={10}
+          fontWeight="700"
+          color={BRAND_GOLD}
+          letterSpacing={0.5}
+        >
+          PROJ
+        </Text>
+      </YStack>
+      <Text
+        fontSize={13}
+        fontWeight="700"
+        color={BRAND_GOLD}
+        fontVariant={['tabular-nums']}
+      >
+        {display}
+      </Text>
+      <Text fontSize={11} color="$gray10">
+        pts
       </Text>
     </XStack>
   );
@@ -201,9 +239,11 @@ function PlayerStats({ player }: { player: FootballPlayerNode }) {
 function PlayerRow({
   player,
   onPress,
+  isPremium,
 }: {
   player: FootballPlayerNode;
   onPress?: () => void;
+  isPremium: boolean;
 }) {
   const pos = player.position;
   const isDst = player.isDst;
@@ -278,8 +318,9 @@ function PlayerRow({
         </YStack>
       </XStack>
 
-      <YStack paddingLeft={56}>
+      <YStack paddingLeft={56} gap="$2">
         <PlayerStats player={player} />
+        {isPremium && <ProjectionChip value={player.projectedFantasyPoints} />}
       </YStack>
     </YStack>
   );
@@ -340,8 +381,40 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+const PROJECTIONS_UPSELL_DESCRIPTION =
+  'Upgrade to Premium to unlock weekly projected fantasy points for every player.';
+
+function ProjectionsUpsellBanner() {
+  return (
+    <XStack
+      marginHorizontal={12}
+      marginBottom={8}
+      padding={12}
+      borderRadius="$3"
+      backgroundColor={`${BRAND_GOLD}12`}
+      borderWidth={1}
+      borderColor={`${BRAND_GOLD}4D`}
+      gap="$3"
+      alignItems="center"
+    >
+      <Text fontSize={18} color={BRAND_GOLD}>
+        ★
+      </Text>
+      <YStack flex={1} gap="$1">
+        <Text fontSize={13} fontWeight="700" color={BRAND_GOLD}>
+          Fantasy Projections — Premium
+        </Text>
+        <Text fontSize={12} color="$gray10">
+          {PROJECTIONS_UPSELL_DESCRIPTION}
+        </Text>
+      </YStack>
+    </XStack>
+  );
+}
+
 export default function FootballPlayers(): React.JSX.Element {
   const router = useRouter();
+  const isPremium = useHasEntitlement(ENTITLEMENTS.football_projections);
   const [position, setPosition] = useState<FootballPosition>('All');
   const [teamFilter, setTeamFilter] = useState('All');
   const [searchInput, setSearchInput] = useState('');
@@ -514,6 +587,9 @@ export default function FootballPlayers(): React.JSX.Element {
           </Select>
         </XStack>
 
+        {/* Projections upsell — shown to free users to surface the premium feature */}
+        {!isPremium && <ProjectionsUpsellBanner />}
+
         {/* Error banner */}
         {error && (
           <YStack
@@ -544,6 +620,7 @@ export default function FootballPlayers(): React.JSX.Element {
               <PlayerRow
                 player={item}
                 onPress={() => router.push(`/football/players/${item.id}`)}
+                isPremium={isPremium}
               />
             )}
             windowSize={10}

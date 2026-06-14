@@ -136,6 +136,18 @@ jest.mock('../../../api/db/graphql.generated', () => ({
     mockUseFootballPlayersQuery(...args) as Record<string, unknown>,
 }));
 
+const mockUseHasEntitlement = jest.fn().mockReturnValue(false);
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: (...args: unknown[]) =>
+    mockUseHasEntitlement(...args) as boolean,
+}));
+
+jest.mock('@legacy-sports/utils', () => ({
+  ENTITLEMENTS: {
+    football_projections: 'football_projections',
+  },
+}));
+
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 const QB_PLAYER = {
@@ -490,6 +502,86 @@ describe('FootballPlayers', () => {
       render(<FootballPlayers />);
       fireEvent.press(screen.getByText('Patrick Mahomes'));
       expect(mockPush).toHaveBeenCalledWith('/football/players/1');
+    });
+  });
+
+  describe('premium projections gating (LS-7066)', () => {
+    it('shows projections upsell banner for free users', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballPlayers />);
+      expect(screen.getByText('Fantasy Projections — Premium')).toBeTruthy();
+    });
+
+    it('hides projections upsell banner for premium users', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballPlayers />);
+      expect(screen.queryByText('Fantasy Projections — Premium')).toBeNull();
+    });
+
+    it('shows PROJ chip for premium users with projected points', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      const playerWithProjection = {
+        ...QB_PLAYER,
+        projectedFantasyPoints: 312.5,
+      };
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [playerWithProjection],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      expect(screen.getByText('PROJ')).toBeTruthy();
+      expect(screen.getByText('312.5')).toBeTruthy();
+    });
+
+    it('does not show PROJ chip for free users', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      const playerWithProjection = {
+        ...QB_PLAYER,
+        projectedFantasyPoints: 312.5,
+      };
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [playerWithProjection],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      expect(screen.queryByText('PROJ')).toBeNull();
+    });
+
+    it('shows em-dash for premium users when projectedFantasyPoints is null', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      const playerWithoutProjection = {
+        ...QB_PLAYER,
+        projectedFantasyPoints: null,
+      };
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [playerWithoutProjection],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      expect(screen.getByText('PROJ')).toBeTruthy();
+      expect(screen.getByText('—')).toBeTruthy();
+    });
+
+    it('gates on football_projections entitlement', () => {
+      render(<FootballPlayers />);
+      expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+        'football_projections',
+      );
     });
   });
 });

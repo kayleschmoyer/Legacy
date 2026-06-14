@@ -6479,6 +6479,7 @@ export type FootballPlayersQuery = {
       pfrId?: string | null;
       headshotUrl?: string | null;
       previousTeams: Array<string>;
+      projectedFantasyPoints?: number | null;
       careerStats?: {
         __typename?: 'FootballCareerStats';
         passing?: {
@@ -11669,6 +11670,7 @@ export const FootballPlayers = gql`
         pfrId
         headshotUrl
         previousTeams
+        projectedFantasyPoints
         careerStats {
           passing {
             yds
