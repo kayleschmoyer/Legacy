@@ -130,7 +130,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Roster & Schedule section
     await expandSection(page, 'roster-schedule');
@@ -149,7 +149,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   test('should select a roster size when clicked', async ({ page }) => {
     await mockCreateLeagueSuccess(page);
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Roster & Schedule section
     await expandSection(page, 'roster-schedule');
@@ -167,7 +167,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should display all player pool options', async ({ page }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Roster & Schedule section
     await expandSection(page, 'roster-schedule');
@@ -190,7 +190,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await mockCreateLeagueSuccess(page);
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Roster & Schedule section
     await expandSection(page, 'roster-schedule');
@@ -205,7 +205,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should display all scheduling strategy options', async ({ page }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Roster & Schedule section
     await expandSection(page, 'roster-schedule');
@@ -231,7 +231,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await expect(page.getByText('Number of Divisions')).toBeVisible();
     await expect(page.getByText('How many divisions to split')).toBeVisible();
@@ -243,7 +243,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
@@ -264,7 +264,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
@@ -288,7 +288,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
@@ -309,7 +309,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
@@ -327,7 +327,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
@@ -349,7 +349,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
@@ -369,7 +369,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should display Standard and FAAB waiver options', async ({ page }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Waivers, Budget & Salary Cap section
     await expandSection(page, 'waiver-budget');
@@ -386,7 +386,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // the FAAB PremiumGate actually fires for this gate-verification test.
       await mockUserTier(page, 'free');
       await page.goto('/baseball/league/create');
-      await page.waitForLoadState('networkidle');
+      await expect(
+        page.getByPlaceholder('Enter your league name'),
+      ).toBeVisible();
 
       // Expand the Waivers, Budget & Salary Cap section
       await expandSection(page, 'waiver-budget');
@@ -408,7 +410,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should toggle Hall of Fame Only mode text', async ({ page }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Era & History section
     await expandSection(page, 'era-history');
@@ -430,7 +432,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should display Historical Era Filter section', async ({ page }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Era & History section
     await expandSection(page, 'era-history');
@@ -452,7 +454,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Custom Era is a premium-gated control — establish premium before nav.
     await mockPremiumUser(page);
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Era & History section
     await expandSection(page, 'era-history');
@@ -477,7 +479,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Custom Era is a premium-gated control — establish premium before nav.
     await mockPremiumUser(page);
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Era & History section
     await expandSection(page, 'era-history');
@@ -496,7 +498,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await expect(page.getByText('League Visibility')).toBeVisible();
     await expect(page.getByText('🔒 Private')).toBeVisible();
@@ -512,7 +514,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await page.getByText('🌐 Public').click();
 
@@ -525,7 +527,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should display Salary Cap toggle', async ({ page }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Expand the Waivers, Budget & Salary Cap section
     await expandSection(page, 'waiver-budget');
@@ -545,7 +547,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // so the gate overlay does not intercept the toggle click.
       await mockPremiumUser(page);
       await page.goto('/baseball/league/create');
-      await page.waitForLoadState('networkidle');
+      await expect(
+        page.getByPlaceholder('Enter your league name'),
+      ).toBeVisible();
 
       // Expand the Waivers, Budget & Salary Cap section
       await expandSection(page, 'waiver-budget');
@@ -572,7 +576,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     // The button is always enabled — validation fires on submit (LS-2953).
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await page.getByPlaceholder('Enter your league name').fill('Ab');
     const createButton = page.getByRole('button', { name: /create league/i });
@@ -590,7 +594,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await page.getByPlaceholder('Enter your league name').fill('A'.repeat(51));
     await page.getByRole('button', { name: /create league/i }).click();
@@ -605,7 +609,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     // The button is always enabled — validation fires on submit (LS-2953).
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Short name — button is still enabled (validation fires on submit)
     await page.getByPlaceholder('Enter your league name').fill('Ab');
@@ -647,7 +651,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     });
 
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
     await page.getByPlaceholder('Enter your league name').fill('My League');
     await page.getByRole('button', { name: /create league/i }).click();
 
@@ -671,7 +675,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       unmockedGraphQLFallback(route),
     );
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await page.getByRole('button', { name: /^cancel$/i }).click();
     await expect(page).toHaveURL('/baseball');
@@ -683,7 +687,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     await expect(page.getByText('What happens next?')).toBeVisible();
     await expect(
@@ -735,7 +739,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     });
 
     await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
     await page
       .getByPlaceholder('Enter your league name')
       .fill('My Fast League');
