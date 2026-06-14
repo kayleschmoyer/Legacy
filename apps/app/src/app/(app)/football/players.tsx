@@ -10,8 +10,11 @@ import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown, Star } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
-import type { NflTeam } from '@legacy-sports/shared-components';
-import { BRAND_GOLD, NFL_TEAMS } from '@legacy-sports/shared-components';
+import {
+  BRAND_GOLD,
+  NFL_TEAMS,
+  TEAM_FILTER_OPTIONS_BY_SPORT,
+} from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
@@ -83,22 +86,25 @@ const TEAM_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'FREE_AGENT', label: 'Free Agents' },
   { value: 'AFC', label: 'AFC' },
   { value: 'NFC', label: 'NFC' },
-  ...Object.values(NFL_TEAMS)
-    .filter((t): t is NflTeam => t != null)
+  ...TEAM_FILTER_OPTIONS_BY_SPORT['football']
+    .filter(
+      (opt) =>
+        opt.value !== 'All' && opt.value !== 'AFC' && opt.value !== 'NFC',
+    )
     .sort((a, b) => {
+      const ta = NFL_TEAMS[a.value];
+      const tb = NFL_TEAMS[b.value];
+      if (!ta || !tb) return 0;
       const cDiff =
-        (CONFERENCE_ORDER[a.conference] ?? 99) -
-        (CONFERENCE_ORDER[b.conference] ?? 99);
+        (CONFERENCE_ORDER[ta.conference] ?? 99) -
+        (CONFERENCE_ORDER[tb.conference] ?? 99);
       if (cDiff !== 0) return cDiff;
       const dDiff =
-        (DIVISION_ORDER[a.division] ?? 99) - (DIVISION_ORDER[b.division] ?? 99);
+        (DIVISION_ORDER[ta.division] ?? 99) -
+        (DIVISION_ORDER[tb.division] ?? 99);
       if (dDiff !== 0) return dDiff;
-      return a.city.localeCompare(b.city);
-    })
-    .map((t) => ({
-      value: t.abbreviation,
-      label: `${t.abbreviation} — ${t.fullName}`,
-    })),
+      return ta.city.localeCompare(tb.city);
+    }),
 ];
 
 function fmt(n: number | null | undefined): string {

@@ -283,8 +283,8 @@ export * from './constants/presets';
 // NFL team reference data
 export * from './constants/nflTeams';
 
-// MLB franchise reference data
-export * from './constants/teams/mlb';
+// Sport-keyed team filter options (TEAM_FILTER_OPTIONS_BY_SPORT) — also re-exports MLB/NFL reference data
+export * from './constants/teams';
 
 // Chat components
 export * from './features/chat/GifPicker';

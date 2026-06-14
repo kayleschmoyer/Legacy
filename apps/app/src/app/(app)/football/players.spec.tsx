@@ -61,6 +61,16 @@ jest.mock('@legacy-sports/shared-components', () => ({
       secondaryColor: '#869397',
     },
   },
+  TEAM_FILTER_OPTIONS_BY_SPORT: {
+    football: [
+      { value: 'All', label: 'All Teams' },
+      { value: 'AFC', label: 'AFC' },
+      { value: 'NFC', label: 'NFC' },
+      { value: 'KC', label: 'KC — Kansas City Chiefs' },
+      { value: 'DAL', label: 'DAL — Dallas Cowboys' },
+    ],
+    baseball: [{ value: 'All', label: 'All Teams' }],
+  },
 }));
 
 jest.mock('@legacy-sports/utils', () => ({
