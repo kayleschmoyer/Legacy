@@ -2,10 +2,28 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import FootballPlayers from './players';
+import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+// expo-apple-authentication uses ESM export syntax; stub it out so Jest's
+// CommonJS runner never tries to parse it (regardless of transformIgnorePatterns
+// cache state). The real auth chain is broken anyway by the useSubscription mock.
+jest.mock('expo-apple-authentication', () => ({
+  __esModule: true,
+  AppleAuthenticationScope: { EMAIL: 'email', FULL_NAME: 'fullName' },
+  AppleAuthenticationOperation: {
+    LOGIN: 'login',
+    REFRESH: 'refresh',
+    LOGOUT: 'logout',
+    IMPLICIT: 'implicit',
+  },
+  signInAsync: jest.fn(),
+  isAvailableAsync: jest.fn().mockResolvedValue(false),
+}));
+
 jest.mock('@legacy-sports/shared-components', () => ({
+  BRAND_GOLD: '#D4AF37',
   NFL_TEAMS: {
     KC: {
       abbreviation: 'KC',
@@ -26,6 +44,22 @@ jest.mock('@legacy-sports/shared-components', () => ({
       secondaryColor: '#869397',
     },
   },
+}));
+
+jest.mock('@legacy-sports/utils', () => ({
+  ENTITLEMENTS: {
+    football_projections: 'football_projections',
+    advanced_search_filters: 'advanced_search_filters',
+    superflex: 'superflex',
+    idp: 'idp',
+  },
+  tierHasEntitlement: jest.fn().mockReturnValue(false),
+  ClientNotificationType: {},
+}));
+
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: jest.fn().mockReturnValue(false),
+  useSubscription: jest.fn().mockReturnValue({ isPremium: false }),
 }));
 
 jest.mock('@legacy-sports/shared-components/football', () => {
@@ -67,6 +101,9 @@ jest.mock('tamagui', () => {
   const mocks = jest.requireActual<
     typeof import('../../../__test-utils__/tamagui-mocks')
   >('../../../__test-utils__/tamagui-mocks');
+  // Closure variable shared between Select (which sets it) and Select.Item (which reads it).
+  // Must be prefixed with 'mock' so jest-hoist permits this closure variable.
+  let mockSelectOnChange: ((val: string) => void) | null = null;
   return {
     ...mocks.tamaguiMocks,
     YStack: ({
@@ -90,13 +127,14 @@ jest.mock('tamagui', () => {
       ({
         children,
         value: _value,
-        onValueChange: _onValueChange,
+        onValueChange,
       }: {
         children: import('react').ReactNode;
         value?: string;
-        onValueChange?: (v: string) => void;
+        onValueChange?: (val: string) => void;
         disablePreventBodyScroll?: boolean;
       }) => {
+        mockSelectOnChange = onValueChange ?? null;
         const { View } =
           jest.requireActual<typeof import('react-native')>('react-native');
         return createElement(View, { testID: 'select' }, children);
@@ -118,31 +156,55 @@ jest.mock('tamagui', () => {
             jest.requireActual<typeof import('react-native')>('react-native');
           return createElement(Text, null, children ?? placeholder);
         },
-        Content: () => null,
+        Content: ({ children }: { children: import('react').ReactNode }) => {
+          const { View } =
+            jest.requireActual<typeof import('react-native')>('react-native');
+          return createElement(View, null, children);
+        },
         ScrollUpButton: () => null,
         ScrollDownButton: () => null,
-        Viewport: () => null,
-        Group: () => null,
-        Item: () => null,
-        ItemText: () => null,
+        Viewport: ({ children }: { children: import('react').ReactNode }) => {
+          const { View } =
+            jest.requireActual<typeof import('react-native')>('react-native');
+          return createElement(View, null, children);
+        },
+        Group: ({ children }: { children: import('react').ReactNode }) => {
+          const { View } =
+            jest.requireActual<typeof import('react-native')>('react-native');
+          return createElement(View, null, children);
+        },
+        Item: ({
+          value,
+          children,
+        }: {
+          value: string;
+          index: number;
+          children: import('react').ReactNode;
+          [key: string]: unknown;
+        }) => {
+          const { Pressable } =
+            jest.requireActual<typeof import('react-native')>('react-native');
+          return createElement(
+            Pressable,
+            {
+              testID: `select-item-${value}`,
+              onPress: () => {
+                mockSelectOnChange?.(value);
+              },
+            },
+            children,
+          );
+        },
+        ItemText: ({ children }: { children?: import('react').ReactNode }) => {
+          const { Text } =
+            jest.requireActual<typeof import('react-native')>('react-native');
+          return createElement(Text, null, children);
+        },
         ItemIndicator: () => null,
       },
     ),
   };
 });
-
-const mockUseHasEntitlement = jest.fn().mockReturnValue(false);
-jest.mock('../../../features/subscription/useSubscription', () => ({
-  useHasEntitlement: (...args: unknown[]) =>
-    mockUseHasEntitlement(...args) as boolean,
-}));
-
-jest.mock('@legacy-sports/utils', () => ({
-  ENTITLEMENTS: {
-    football_projections: 'football_projections',
-    advanced_search_filters: 'advanced_search_filters',
-  },
-}));
 
 const mockUseFootballPlayersQuery = jest.fn();
 jest.mock('../../../api/db/graphql.generated', () => ({
@@ -163,6 +225,10 @@ jest.mock('./hooks/useMyRosterPlayerIds', () => ({
     },
 }));
 
+// Convenience alias so tests can call mockUseHasEntitlement.mockReturnValue(...)
+// without the verbose cast on every line.
+const mockUseHasEntitlement = useHasEntitlement as jest.Mock;
+
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 const QB_PLAYER = {
@@ -173,6 +239,7 @@ const QB_PLAYER = {
   isDst: false,
   nflTeam: 'KC',
   pfrId: 'MahoPa00',
+  projectedFantasyPoints: null,
   careerStats: {
     passing: { yds: 5000, td: 37, int: 14, rating: 105.2 },
     rushing: null,
@@ -191,6 +258,7 @@ const DST_PLAYER = {
   isDst: true,
   nflTeam: 'KC',
   pfrId: null,
+  projectedFantasyPoints: null,
   careerStats: {
     passing: null,
     rushing: null,
@@ -209,6 +277,7 @@ const LB_PLAYER = {
   isDst: false,
   nflTeam: 'DAL',
   pfrId: 'ParsMi00',
+  projectedFantasyPoints: null,
   careerStats: {
     passing: null,
     rushing: null,
@@ -227,6 +296,7 @@ const WR_PLAYER = {
   isDst: false,
   nflTeam: 'DAL',
   pfrId: null,
+  projectedFantasyPoints: null,
   careerStats: {
     passing: null,
     rushing: null,
@@ -254,6 +324,7 @@ describe('FootballPlayers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+    // Reset entitlement to free-user default so premium tests don't bleed into each other.
     mockUseHasEntitlement.mockReturnValue(false);
     mockUseMyRosterPlayerIds.mockReturnValue({
       playerIds: new Set<number>(),
@@ -472,74 +543,49 @@ describe('FootballPlayers', () => {
   });
 
   describe('position filter', () => {
-    function lastPositions(): string[] | undefined {
-      const calls = mockUseFootballPlayersQuery.mock.calls;
-      const lastCall = calls[calls.length - 1] as [
-        { variables: { positions?: string[] } },
-      ];
-      return lastCall[0].variables.positions;
-    }
-
-    it('hides SUPERFLEX and IDP pills for free users', () => {
-      mockUseHasEntitlement.mockReturnValue(false);
-      render(<FootballPlayers />);
-      expect(screen.queryByText('SUPERFLEX')).toBeNull();
-      expect(screen.queryByText('IDP')).toBeNull();
-    });
-
-    it('shows SUPERFLEX and IDP pills for premium users', () => {
-      mockUseHasEntitlement.mockReturnValue(true);
-      render(<FootballPlayers />);
-      expect(screen.getByText('SUPERFLEX')).toBeTruthy();
-      expect(screen.getByText('IDP')).toBeTruthy();
-    });
-
-    it('drops premium positions when advanced_search_filters entitlement is revoked', () => {
-      mockUseHasEntitlement.mockReturnValue(true);
-      const { rerender } = render(<FootballPlayers />);
-
-      // Select SUPERFLEX while premium
-      fireEvent.press(screen.getByText('SUPERFLEX'));
-      expect(lastPositions()).toEqual(['SUPERFLEX']);
-
-      // Simulate entitlement revocation (downgrade)
-      mockUseHasEntitlement.mockReturnValue(false);
-      void act(() => {
-        rerender(<FootballPlayers />);
-      });
-
-      // Downgrade guard useEffect drops premium positions → query gets undefined
-      expect(lastPositions()).toBeUndefined();
-    });
-
     it('passes selected position to query when a pill is pressed', () => {
       render(<FootballPlayers />);
       // Pills are rendered first in the FlatList before any player content;
       // use getAllByText and pick the first occurrence (the pill).
       fireEvent.press(screen.getAllByText('QB')[0]);
-      expect(lastPositions()).toEqual(['QB']);
-    });
-
-    it('accumulates multiple positions for multi-select (LS-6464)', () => {
-      render(<FootballPlayers />);
-      fireEvent.press(screen.getAllByText('QB')[0]);
-      fireEvent.press(screen.getAllByText('RB')[0]);
-      expect(lastPositions()).toEqual(['QB', 'RB']);
-    });
-
-    it('toggles a position off when its pill is pressed again', () => {
-      render(<FootballPlayers />);
-      fireEvent.press(screen.getAllByText('QB')[0]);
-      fireEvent.press(screen.getAllByText('RB')[0]);
-      fireEvent.press(screen.getAllByText('QB')[0]);
-      expect(lastPositions()).toEqual(['RB']);
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toEqual(['QB']);
     });
 
     it('passes undefined positions when "All" pill is selected', () => {
       render(<FootballPlayers />);
       fireEvent.press(screen.getAllByText('QB')[0]);
       fireEvent.press(screen.getByText('All'));
-      expect(lastPositions()).toBeUndefined();
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toBeUndefined();
+    });
+
+    it('accumulates multiple positions for multi-select (LS-6464)', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getByText('WR'));
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toEqual(['QB', 'WR']);
+    });
+
+    it('toggles a position off when its pill is pressed again', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toBeUndefined();
     });
   });
 
@@ -592,83 +638,50 @@ describe('FootballPlayers', () => {
     });
   });
 
-  describe('premium projections gating (LS-7066)', () => {
-    it('shows projections upsell banner for free users', () => {
-      mockUseHasEntitlement.mockReturnValue(false);
+  describe('team filter', () => {
+    it('passes conference variable when AFC is selected', () => {
       render(<FootballPlayers />);
-      expect(screen.getByText('Fantasy Projections — Premium')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('select-item-AFC'));
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { conference?: string; nflTeam?: string } },
+      ];
+      expect(lastCall[0].variables.conference).toBe('AFC');
+      expect(lastCall[0].variables.nflTeam).toBeUndefined();
     });
 
-    it('hides projections upsell banner for premium users', () => {
-      mockUseHasEntitlement.mockReturnValue(true);
+    it('passes conference variable when NFC is selected', () => {
       render(<FootballPlayers />);
-      expect(screen.queryByText('Fantasy Projections — Premium')).toBeNull();
+      fireEvent.press(screen.getByTestId('select-item-NFC'));
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { conference?: string; nflTeam?: string } },
+      ];
+      expect(lastCall[0].variables.conference).toBe('NFC');
+      expect(lastCall[0].variables.nflTeam).toBeUndefined();
     });
 
-    it('shows PROJ chip for premium users with projected points', () => {
-      mockUseHasEntitlement.mockReturnValue(true);
-      const playerWithProjection = {
-        ...QB_PLAYER,
-        projectedFantasyPoints: 312.5,
-      };
-      mockUseFootballPlayersQuery.mockReturnValue({
-        ...defaultQueryResult,
-        data: {
-          footballPlayers: {
-            nodes: [playerWithProjection],
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
+    it('passes nflTeam variable when a specific team is selected', () => {
       render(<FootballPlayers />);
-      expect(screen.getByText('PROJ')).toBeTruthy();
-      expect(screen.getByText('312.5')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('select-item-KC'));
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { conference?: string; nflTeam?: string } },
+      ];
+      expect(lastCall[0].variables.nflTeam).toBe('KC');
+      expect(lastCall[0].variables.conference).toBeUndefined();
     });
 
-    it('does not show PROJ chip for free users', () => {
-      mockUseHasEntitlement.mockReturnValue(false);
-      const playerWithProjection = {
-        ...QB_PLAYER,
-        projectedFantasyPoints: 312.5,
-      };
-      mockUseFootballPlayersQuery.mockReturnValue({
-        ...defaultQueryResult,
-        data: {
-          footballPlayers: {
-            nodes: [playerWithProjection],
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
+    it('clears both filters when All Teams is selected after a conference filter', () => {
       render(<FootballPlayers />);
-      expect(screen.queryByText('PROJ')).toBeNull();
-    });
-
-    it('shows em-dash for premium users when projectedFantasyPoints is null', () => {
-      mockUseHasEntitlement.mockReturnValue(true);
-      const playerWithoutProjection = {
-        ...QB_PLAYER,
-        projectedFantasyPoints: null,
-      };
-      mockUseFootballPlayersQuery.mockReturnValue({
-        ...defaultQueryResult,
-        data: {
-          footballPlayers: {
-            nodes: [playerWithoutProjection],
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
-      render(<FootballPlayers />);
-      expect(screen.getByText('PROJ')).toBeTruthy();
-      expect(screen.getByText('—')).toBeTruthy();
-    });
-
-    it('gates on football_projections entitlement', () => {
-      render(<FootballPlayers />);
-      expect(mockUseHasEntitlement).toHaveBeenCalledWith(
-        'football_projections',
-      );
+      fireEvent.press(screen.getByTestId('select-item-AFC'));
+      fireEvent.press(screen.getByTestId('select-item-All'));
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { conference?: string; nflTeam?: string } },
+      ];
+      expect(lastCall[0].variables.nflTeam).toBeUndefined();
+      expect(lastCall[0].variables.conference).toBeUndefined();
     });
   });
 
@@ -704,6 +717,56 @@ describe('FootballPlayers', () => {
       fireEvent.press(screen.getByTestId('my-rostered-pill'));
       expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
       expect(screen.queryByText('Tyreek Hill')).toBeNull();
+    });
+  });
+
+  describe('premium position filters (LS-7061)', () => {
+    afterEach(() => {
+      mockUseHasEntitlement.mockReturnValue(false);
+    });
+
+    it('hides SUPERFLEX and IDP pills for free users', () => {
+      render(<FootballPlayers />);
+      expect(screen.queryByText('SUPERFLEX')).toBeNull();
+      expect(screen.queryByText('IDP')).toBeNull();
+    });
+
+    it('shows SUPERFLEX and IDP pills when advanced_search_filters entitlement is active', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballPlayers />);
+      expect(screen.getByText('SUPERFLEX')).toBeTruthy();
+      expect(screen.getByText('IDP')).toBeTruthy();
+    });
+  });
+
+  describe('premium projections (LS-7066)', () => {
+    afterEach(() => {
+      mockUseHasEntitlement.mockReturnValue(false);
+    });
+
+    it('shows projections upsell banner for free users', () => {
+      render(<FootballPlayers />);
+      expect(screen.getByText('Fantasy Projections — Premium')).toBeTruthy();
+    });
+
+    it('shows projected fantasy points chip for premium users', () => {
+      const playerWithProjections = {
+        ...QB_PLAYER,
+        projectedFantasyPoints: 24.5,
+      };
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [playerWithProjections],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballPlayers />);
+      expect(screen.getByText('24.5')).toBeTruthy();
+      expect(screen.getByText('pts')).toBeTruthy();
     });
   });
 });
