@@ -6445,6 +6445,7 @@ export type MarkAllNotificationsAsReadMutation = {
 export type FootballPlayersQueryVariables = Exact<{
   position?: InputMaybe<Scalars['String']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
+  conference?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
 }>;
@@ -11633,12 +11634,14 @@ export const FootballPlayers = gql`
   query FootballPlayers(
     $position: String
     $nflTeam: String
+    $conference: String
     $search: String
     $after: String
   ) {
     footballPlayers(
       position: $position
       nflTeam: $nflTeam
+      conference: $conference
       search: $search
       after: $after
     ) {
@@ -11709,6 +11712,7 @@ export const FootballPlayers = gql`
  *   variables: {
  *      position: // value for 'position'
  *      nflTeam: // value for 'nflTeam'
+ *      conference: // value for 'conference'
  *      search: // value for 'search'
  *      after: // value for 'after'
  *   },

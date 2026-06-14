@@ -363,15 +363,13 @@ export default function FootballPlayers(): React.JSX.Element {
     }
   }, [position, teamFilter, debouncedSearch]);
 
+  const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
+
   const { data, loading, error } = useFootballPlayersQuery({
     variables: {
       position: position === 'All' ? undefined : position,
-      nflTeam:
-        teamFilter === 'All'
-          ? undefined
-          : teamFilter === 'AFC' || teamFilter === 'NFC'
-            ? undefined
-            : teamFilter,
+      nflTeam: !isConference && teamFilter !== 'All' ? teamFilter : undefined,
+      conference: isConference ? teamFilter : undefined,
       search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
       after: cursor,
     },
@@ -382,20 +380,14 @@ export default function FootballPlayers(): React.JSX.Element {
   useEffect(() => {
     const newNodes = data?.footballPlayers?.nodes;
     if (!newNodes) return;
-    const filtered =
-      teamFilter === 'AFC' || teamFilter === 'NFC'
-        ? newNodes.filter(
-            (p) => p.nflTeam && NFL_TEAMS[p.nflTeam]?.conference === teamFilter,
-          )
-        : newNodes;
     if (prevCursorRef.current !== cursor) {
-      setAllNodes((prev) => [...prev, ...filtered]);
+      setAllNodes((prev) => [...prev, ...newNodes]);
     } else {
-      setAllNodes(filtered);
+      setAllNodes(newNodes);
     }
     prevCursorRef.current = cursor;
     setIsFilterChanging(false);
-  }, [data, cursor, teamFilter]);
+  }, [data, cursor]);
 
   const pageInfo = data?.footballPlayers?.pageInfo;
   const hasMore = pageInfo?.hasNextPage ?? false;
