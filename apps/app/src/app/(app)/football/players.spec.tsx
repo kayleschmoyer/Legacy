@@ -53,6 +53,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
 
 jest.mock('@tamagui/lucide-icons', () => ({
   ChevronDown: 'ChevronDown',
+  Star: 'Star',
 }));
 
 const mockPush = jest.fn();
@@ -147,6 +148,19 @@ const mockUseFootballPlayersQuery = jest.fn();
 jest.mock('../../../api/db/graphql.generated', () => ({
   useFootballPlayersQuery: (...args: unknown[]) =>
     mockUseFootballPlayersQuery(...args) as Record<string, unknown>,
+  Sport: { Football: 'football', Baseball: 'baseball' },
+}));
+
+const mockUseMyRosterPlayerIds = jest.fn(() => ({
+  playerIds: new Set<number>(),
+  loading: false,
+}));
+jest.mock('./hooks/useMyRosterPlayerIds', () => ({
+  useMyRosterPlayerIds: (...args: unknown[]) =>
+    mockUseMyRosterPlayerIds(...args) as {
+      playerIds: Set<number>;
+      loading: boolean;
+    },
 }));
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -240,6 +254,11 @@ describe('FootballPlayers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+    mockUseHasEntitlement.mockReturnValue(false);
+    mockUseMyRosterPlayerIds.mockReturnValue({
+      playerIds: new Set<number>(),
+      loading: false,
+    });
   });
 
   describe('rendering', () => {
@@ -650,6 +669,41 @@ describe('FootballPlayers', () => {
       expect(mockUseHasEntitlement).toHaveBeenCalledWith(
         'football_projections',
       );
+    });
+  });
+
+  describe('My Rostered premium filter', () => {
+    it('does not render the My Rostered pill for free users', () => {
+      render(<FootballPlayers />);
+      expect(screen.queryByTestId('my-rostered-pill')).toBeNull();
+    });
+
+    it('renders the My Rostered pill for premium users', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballPlayers />);
+      expect(screen.getByTestId('my-rostered-pill')).toBeTruthy();
+    });
+
+    it('filters to rostered players when pill is pressed by a premium user', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      // Player 1 (QB_PLAYER id=1) is rostered; WR_PLAYER (id=4) is not.
+      mockUseMyRosterPlayerIds.mockReturnValue({
+        playerIds: new Set([1]),
+        loading: false,
+      });
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [QB_PLAYER, WR_PLAYER],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('my-rostered-pill'));
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+      expect(screen.queryByText('Tyreek Hill')).toBeNull();
     });
   });
 });

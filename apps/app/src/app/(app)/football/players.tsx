@@ -6,12 +6,13 @@ import {
   TextInput,
 } from 'react-native';
 import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronDown } from '@tamagui/lucide-icons';
+import { ChevronDown, Star } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import type { NflTeam } from '@legacy-sports/shared-components';
 import { BRAND_GOLD, NFL_TEAMS } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useFootballPlayersQuery } from '../../../api/db/graphql.generated';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
@@ -391,6 +392,50 @@ function PositionPill({
   );
 }
 
+const PREMIUM_GOLD = '#C5A55A';
+
+function MyRosteredPill({
+  selected,
+  onPress,
+}: {
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <YStack
+      paddingHorizontal={14}
+      paddingVertical={8}
+      borderRadius={20}
+      borderWidth={1}
+      onPress={onPress}
+      pressStyle={{ opacity: 0.7 }}
+      backgroundColor={selected ? `${PREMIUM_GOLD}33` : '$glassSurface'}
+      borderColor={selected ? PREMIUM_GOLD : '$glassBorder'}
+      justifyContent="center"
+      alignItems="center"
+      testID="my-rostered-pill"
+      accessibilityLabel="Filter by My Rostered Players"
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+    >
+      <XStack gap={5} alignItems="center">
+        <Star
+          size={13}
+          color={selected ? PREMIUM_GOLD : '$gray10'}
+          fill={selected ? PREMIUM_GOLD : 'transparent'}
+        />
+        <Text
+          fontSize={13}
+          fontWeight="600"
+          color={selected ? PREMIUM_GOLD : '$gray10'}
+        >
+          My Rostered
+        </Text>
+      </XStack>
+    </YStack>
+  );
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -464,6 +509,10 @@ export default function FootballPlayers(): React.JSX.Element {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<FootballPlayerNode[]>([]);
   const [isFilterChanging, setIsFilterChanging] = useState(false);
+  const [showMyRostered, setShowMyRostered] = useState(false);
+
+  const { playerIds: rosteredPlayerIds, loading: rosterLoading } =
+    useMyRosterPlayerIds(!isPremium || !showMyRostered);
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -541,6 +590,11 @@ export default function FootballPlayers(): React.JSX.Element {
   const isInitialLoad = loading && allNodes.length === 0;
   const isLoadingMore = loading && allNodes.length > 0;
 
+  const displayNodes =
+    isPremium && showMyRostered
+      ? allNodes.filter((p) => rosteredPlayerIds.has(p.id))
+      : allNodes;
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
@@ -568,6 +622,24 @@ export default function FootballPlayers(): React.JSX.Element {
           }}
           style={{ flexGrow: 0 }}
         />
+
+        {/* Premium cross-league roster filter (LS-7071) */}
+        {isPremium && (
+          <XStack
+            paddingHorizontal={12}
+            paddingBottom={8}
+            gap={8}
+            alignItems="center"
+          >
+            <MyRosteredPill
+              selected={showMyRostered}
+              onPress={() => setShowMyRostered((v) => !v)}
+            />
+            {rosterLoading && showMyRostered && (
+              <Spinner size="small" color={PREMIUM_GOLD} />
+            )}
+          </XStack>
+        )}
 
         {/* Search + team filter row */}
         <XStack
@@ -681,7 +753,7 @@ export default function FootballPlayers(): React.JSX.Element {
           </YStack>
         ) : (
           <FlatList
-            data={allNodes}
+            data={displayNodes}
             keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => (
               <PlayerRow
