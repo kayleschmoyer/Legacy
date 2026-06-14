@@ -182,6 +182,10 @@
       "apps/web/src/pages/help/**",
       "apps/web/src/pages/pricing/**"
     ],
+    "apps/web-e2e/src/tests/football-availability-filter.spec.ts": [
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/football/**"
+    ],
     "apps/web-e2e/src/tests/football-game-logs.spec.ts": [
       "apps/web/src/pages/football/**",
       "lib/shared-components/src/features/stats/**",
