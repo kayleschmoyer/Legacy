@@ -347,6 +347,18 @@ builder.mutationField('makeDraftPick', (t) =>
               playerId,
               pickId: existingOwnPick.id,
             });
+            // Fetch the actual next-pick info so that re-sending the WS
+            // notification includes a valid nextPick payload. Previously,
+            // nextPickInfo was hardcoded to null here, which caused the outer
+            // heuristic (!isDraftComplete && nextPickInfo === null) to suppress
+            // the notification entirely. Observers who missed the original
+            // broadcast then never received the pick via WebSocket (LS-7977).
+            // With a real nextPickInfo, the notification IS re-sent, and the
+            // frontend de-dupes via notifiedPicksRef so no duplicate toasts appear.
+            const idempotentNextPickInfo = await getCurrentDraftPickInfo(
+              tx,
+              draftId,
+            );
             return {
               draftPick: existingOwnPick,
               isDraftComplete: false,
@@ -354,7 +366,9 @@ builder.mutationField('makeDraftPick', (t) =>
               isMockDraft: league.isMockDraft,
               selectionMethod: draft.selection_method,
               currentPickInfo,
-              nextPickInfo: null,
+              nextPickInfo: idempotentNextPickInfo,
+              nextDeadline: null,
+              isIdempotentPick: true,
             };
           }
 
@@ -412,6 +426,7 @@ builder.mutationField('makeDraftPick', (t) =>
             currentPickInfo,
             nextPickInfo,
             nextDeadline,
+            isIdempotentPick: false,
           };
         });
 
@@ -427,17 +442,19 @@ builder.mutationField('makeDraftPick', (t) =>
 
         // Track effective draft completion across the manual pick + any auto-pick chain.
         let effectiveDraftComplete = result.isDraftComplete;
-        let chainedNextPickInfo = result.nextPickInfo;
+        // For idempotent picks, suppress auto-pick chaining — the pick was
+        // already committed in a prior request, so we must not advance the draft.
+        let chainedNextPickInfo = result.isIdempotentPick
+          ? null
+          : result.nextPickInfo;
 
-        // Idempotent picks (same player already drafted this slot) return
-        // nextPickInfo:null with isDraftComplete:false. Sending a WS notification
-        // for those causes the frontend to prematurely call setDraftComplete(true)
-        // because handleDraftPickMade treats !nextPick as "draft is over" (LS-4286).
-        const isIdempotentPick =
-          !result.isDraftComplete && result.nextPickInfo === null;
-
-        // Send WebSocket notification for the pick (outside transaction)
-        if (context.notificationService && !isIdempotentPick) {
+        // Send WebSocket notification for the pick (outside transaction).
+        // Sent for both new and idempotent picks. Idempotent picks now carry
+        // the actual nextPickInfo (fetched inside the transaction), so the
+        // frontend receives a valid nextPick and won't prematurely mark the
+        // draft complete (LS-4286). The frontend de-dupes notifications via
+        // notifiedPicksRef, so no duplicate toasts are shown (LS-7977).
+        if (context.notificationService) {
           await context.notificationService.notifyDraftPickMade(
             result.leagueId,
             draftId,
