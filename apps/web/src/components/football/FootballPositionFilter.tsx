@@ -45,7 +45,7 @@ interface Props {
 
 const Pill = styled(Text, {
   paddingHorizontal: 14,
-  paddingVertical: 7,
+  paddingVertical: 14,
   borderRadius: 20,
   fontSize: 13,
   fontWeight: '600',

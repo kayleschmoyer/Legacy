@@ -1647,6 +1647,8 @@ importers:
 
   lib/mcp-bearer-auth: {}
 
+  lib/mcp-format: {}
+
   lib/mlb-client:
     dependencies:
       tslib:
