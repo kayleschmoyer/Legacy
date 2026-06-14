@@ -47,10 +47,12 @@ export function buildStatsSearchParams(state: {
   viewMode: PlayerStatsViewMode;
   pageSize: number;
   filters: PlayerStatsFilters;
+  sport?: 'mlb' | 'nfl';
 }): URLSearchParams {
   const next = new URLSearchParams();
   next.set('view', state.viewMode);
   next.set('pageSize', String(state.pageSize));
+  if (state.sport) next.set('sport', state.sport);
   if (state.filters.searchTerm)
     next.set('searchTerm', state.filters.searchTerm);
   if (state.filters.position) next.set('position', state.filters.position);
@@ -112,8 +114,21 @@ const TOAST_DURATION_MS = 2400;
 
 export function PlayerStatsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [liveMsg, setLiveMsg] = React.useState('');
   const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
+
+  // Derive sport from URL param, default to 'mlb'. Validates against known values so an
+  // unrecognised param doesn't silently corrupt filter state.
+  const sportParam = searchParams.get('sport');
+  const sport: 'mlb' | 'nfl' = sportParam === 'nfl' ? 'nfl' : 'mlb';
+
+  // Redirect NFL links to the football players page — this route is MLB-only.
+  useEffect(() => {
+    if (sport === 'nfl') {
+      navigate('/football/players', { replace: true });
+    }
+  }, [sport, navigate]);
 
   // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
   // sr-only live region populated (screen readers re-announce changes; the
@@ -256,63 +271,73 @@ export function PlayerStatsRoute() {
   );
 
   // Mirror committed filter state into URL params so reload restores the view.
+  // sport is included so shared links preserve the active sport context.
   const handleFiltersChange = useCallback(
     (state: {
       viewMode: PlayerStatsViewMode;
       pageSize: number;
       filters: PlayerStatsFilters;
     }) => {
-      setSearchParams(buildStatsSearchParams(state), { replace: true });
+      setSearchParams(buildStatsSearchParams({ ...state, sport }), {
+        replace: true,
+      });
     },
-    [setSearchParams],
+    [setSearchParams, sport],
   );
 
-  // Handle share functionality — shared component passes a relative URL; prepend origin here
-  const handleShare = useCallback((relativeUrl: string) => {
-    const url = `${window.location.origin}${relativeUrl}`;
-    setLiveMsg('');
-    void (async () => {
-      try {
-        if (navigator.share) {
-          await navigator.share({
-            title: 'Player Statistics - Legacy Sports',
-            text: 'Check out these player statistics from Legacy Sports',
-            url: url,
-          });
-        } else if (navigator.clipboard) {
-          await navigator.clipboard.writeText(url);
-          setLiveMsg('Link copied to clipboard.');
-        } else {
-          setLiveMsg('Could not share link. Please copy the URL manually.');
-        }
-      } catch (error) {
-        // AbortError means the user dismissed the native share sheet — not an error
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
-        LOGGER.error(
-          'Error sharing:',
-          error instanceof Error ? error : String(error),
-        );
-        if (navigator.clipboard) {
-          try {
+  // Handle share functionality — shared component passes a relative URL; prepend origin here.
+  // Sport is appended so the recipient lands on the correct sport variant.
+  const handleShare = useCallback(
+    (relativeUrl: string) => {
+      const [path, qs] = relativeUrl.split('?');
+      const params = new URLSearchParams(qs ?? '');
+      params.set('sport', sport);
+      const url = `${window.location.origin}${path}?${params.toString()}`;
+      setLiveMsg('');
+      void (async () => {
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: 'Player Statistics - Legacy Sports',
+              text: 'Check out these player statistics from Legacy Sports',
+              url: url,
+            });
+          } else if (navigator.clipboard) {
             await navigator.clipboard.writeText(url);
             setLiveMsg('Link copied to clipboard.');
-          } catch (clipboardError) {
-            LOGGER.error(
-              'Clipboard error:',
-              clipboardError instanceof Error
-                ? clipboardError
-                : String(clipboardError),
-            );
+          } else {
             setLiveMsg('Could not share link. Please copy the URL manually.');
           }
-        } else {
-          setLiveMsg('Could not share link. Please copy the URL manually.');
+        } catch (error) {
+          // AbortError means the user dismissed the native share sheet — not an error
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+          LOGGER.error(
+            'Error sharing:',
+            error instanceof Error ? error : String(error),
+          );
+          if (navigator.clipboard) {
+            try {
+              await navigator.clipboard.writeText(url);
+              setLiveMsg('Link copied to clipboard.');
+            } catch (clipboardError) {
+              LOGGER.error(
+                'Clipboard error:',
+                clipboardError instanceof Error
+                  ? clipboardError
+                  : String(clipboardError),
+              );
+              setLiveMsg('Could not share link. Please copy the URL manually.');
+            }
+          } else {
+            setLiveMsg('Could not share link. Please copy the URL manually.');
+          }
         }
-      }
-    })();
-  }, []);
+      })();
+    },
+    [sport],
+  );
 
   // Sport detection — redirect football users to their dedicated page.
   // Placed after all hooks to satisfy Rules of Hooks.

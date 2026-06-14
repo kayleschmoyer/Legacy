@@ -75,4 +75,31 @@ describe('buildStatsSearchParams', () => {
     expect(roundTripped.get('searchTerm')).toBe('judge');
     expect(roundTripped.get('maxERA')).toBe('4.25');
   });
+
+  it('includes sport in URL when provided', () => {
+    const mlb = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {},
+      sport: 'mlb',
+    });
+    expect(mlb.get('sport')).toBe('mlb');
+
+    const nfl = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {},
+      sport: 'nfl',
+    });
+    expect(nfl.get('sport')).toBe('nfl');
+  });
+
+  it('omits sport from URL when not provided', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {},
+    });
+    expect(out.has('sport')).toBe(false);
+  });
 });
