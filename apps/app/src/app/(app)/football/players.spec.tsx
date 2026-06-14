@@ -584,8 +584,8 @@ describe('FootballPlayers', () => {
     });
   });
 
-  describe('navigation', () => {
-    it('navigates to the player detail screen when a card is pressed', () => {
+  describe('navigation (LS-7053)', () => {
+    it('navigates to the player detail screen when a row is pressed', () => {
       render(<FootballPlayers />);
       fireEvent.press(screen.getByText('Patrick Mahomes'));
       expect(mockPush).toHaveBeenCalledWith('/football/players/1');
