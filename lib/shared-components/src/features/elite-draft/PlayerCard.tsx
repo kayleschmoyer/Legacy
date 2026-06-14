@@ -217,10 +217,10 @@ export const PlayerCard = React.memo(function PlayerCard({
           </>
         )}
 
-        {/* Career PPG */}
+        {/* Career Pts/Matchup */}
         {player.ppg != null && (
           <div className="d-ppg-bar">
-            <span className="d-ppg-label">Career PPG</span>
+            <span className="d-ppg-label">Career Pts/Matchup</span>
             <span className="d-ppg-value">{player.ppg.toFixed(2)}</span>
           </div>
         )}

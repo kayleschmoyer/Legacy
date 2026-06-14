@@ -27,7 +27,7 @@ export interface DraftPlayer {
   whip?: number;
   winPct?: number;
   gamesStarted?: number;
-  /** Career average points per game (hitter PPG for batters, pitching PPG for pitchers) */
+  /** Projected fantasy points per matchup (hitter_avg_ppg * gamesPerMatchup + pitching_avg_ppg * pitcherStartsPerMatchup) */
   ppg?: number | null;
   /** First MLB season (4-digit year). When paired with careerEndYear, drives the career-span sub-line. */
   careerStartYear?: number | null;
@@ -44,6 +44,7 @@ export interface AvailableDraftPlayer {
   eligiblePositions?: string[] | null;
   hitterAvgPointsPerGame?: number | null;
   pitchingAvgPointsPerGame?: number | null;
+  projectedMatchupPoints?: number | null;
 }
 
 /** Stats lookup entry built from careerBattingStats connection */

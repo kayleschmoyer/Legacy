@@ -132,10 +132,10 @@ export function BaseballCard({
           </div>
         )}
 
-        {/* PPG footer */}
+        {/* Pts/Matchup footer */}
         {player.ppg != null && (
           <div className="bc-ppg">
-            <span className="bc-ppg-lbl">PPG</span>
+            <span className="bc-ppg-lbl">Pts/Matchup</span>
             <span className="bc-ppg-val">{player.ppg.toFixed(2)}</span>
           </div>
         )}

@@ -74,6 +74,7 @@ export interface MockDraftPlayer {
   eligiblePositions: string[];
   hitterAvgPointsPerGame: number | null;
   pitchingAvgPointsPerGame: number | null;
+  projectedMatchupPoints: number | null;
 }
 
 export function mockDraftPlayer(
@@ -88,6 +89,7 @@ export function mockDraftPlayer(
     eligiblePositions: ['CF'],
     hitterAvgPointsPerGame: 5.0,
     pitchingAvgPointsPerGame: null,
+    projectedMatchupPoints: 25.0,
     ...overrides,
   };
 }

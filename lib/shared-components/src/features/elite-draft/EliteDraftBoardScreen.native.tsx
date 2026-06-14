@@ -417,7 +417,7 @@ function PlayerRow({
             )}
             {player.ppg != null && (
               <Text fontSize="$2" color="$brandNavyLight" fontWeight="600">
-                {player.ppg.toFixed(1)} PPG
+                {player.ppg.toFixed(1)} Pts/Matchup
               </Text>
             )}
           </XStack>
@@ -1010,7 +1010,7 @@ export function EliteDraftBoardScreen({
                           color="$brandNavyLight"
                           fontWeight="600"
                         >
-                          {player.ppg.toFixed(1)} PPG
+                          {player.ppg.toFixed(1)} Pts/Matchup
                         </Text>
                       )}
                     </XStack>

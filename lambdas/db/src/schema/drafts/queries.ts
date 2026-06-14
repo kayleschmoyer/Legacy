@@ -319,6 +319,14 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const offsetVal = Math.max(0, resultOffset ?? 0);
 
       // ---- Build SELECT fragments ----
+      // Matchup schedule settings for projected points calculation.
+      // sql.raw is safe: gpm and spm are integers sourced from our own DB, not user input.
+      const gpm = league?.gamesPerMatchup ?? 5;
+      const spm = league?.pitcherStartsPerMatchup ?? 1;
+      const projMatchupExpr = sql.raw(
+        `COALESCE(cs.hitter_avg_ppg, 0) * ${gpm} + COALESCE(cs.pitching_avg_ppg, 0) * ${spm}`,
+      );
+
       // Base SELECT — no scoring join (used for non-scoring sorts).
       const basePlayerSelect = sql`
         SELECT
@@ -339,7 +347,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
           p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
           COALESCE(cs.hitter_avg_ppg, 0) AS hitter_avg_ppg,
-          COALESCE(cs.pitching_avg_ppg, 0) AS pitching_avg_ppg
+          COALESCE(cs.pitching_avg_ppg, 0) AS pitching_avg_ppg,
+          ${projMatchupExpr} AS projected_matchup_pts
         FROM public.players p
         LEFT JOIN public.player_scoring_cache cs
           ON cs.player_id = p.id AND cs.league_id IS NULL
@@ -362,6 +371,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         // Present only for scoring-joined queries
         hitter_avg_ppg?: string | null;
         pitching_avg_ppg?: string | null;
+        projected_matchup_pts?: string | null;
       };
 
       const mapRow = (row: RawPlayerRow) => ({
@@ -384,6 +394,10 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           row.hitter_avg_ppg != null ? Number(row.hitter_avg_ppg) : null,
         pitchingAvgPointsPerGame:
           row.pitching_avg_ppg != null ? Number(row.pitching_avg_ppg) : null,
+        projectedMatchupPoints:
+          row.projected_matchup_pts != null
+            ? Number(row.projected_matchup_pts)
+            : null,
       });
 
       const orderByKey = orderBy ?? 'hitterAvgPointsPerGame';
@@ -414,27 +428,22 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       }
 
       if (orderByKey === 'projectedMatchupPoints') {
-        // Sort by projected fantasy points per matchup: accounts for the league's schedule
-        // (gamesPerMatchup for batters/fielders, pitcherStartsPerMatchup for pitchers).
-        // Uses pre-computed per-game category rates from player_scoring_cache (*_ppg columns).
-        // sql.raw is safe here: gpm and spm are integers sourced from our own DB.
-        const gpm = league?.gamesPerMatchup ?? 5;
-        const spm = league?.pitcherStartsPerMatchup ?? 1;
-        const projExpr = sql.raw(
-          `COALESCE(cs.batting_ppg, 0) * ${gpm} + COALESCE(cs.pitching_ppg, 0) * ${spm} + COALESCE(cs.fielding_ppg, 0) * ${gpm}`,
-        );
+        // Sort by the SAME expression that produces the displayed projected_matchup_pts
+        // column (projMatchupExpr) so the board order always matches the value shown on
+        // each card. Using a different formula here would let players sort in an order
+        // that contradicts their displayed Pts/Matchup value.
         const rawQuery = sql`
           ${basePlayerSelectWithScoring}
           ${whereClause}
-          ORDER BY ${projExpr} DESC
+          ORDER BY ${projMatchupExpr} DESC
           LIMIT ${limitVal} OFFSET ${offsetVal}
         `;
         try {
           const result = await context.db.execute(rawQuery);
           return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
         } catch (err) {
-          // Fall back to hitterAvgPointsPerGame if the *_ppg columns are unavailable
-          // (e.g. migration 20260310_120000_add_category_ppg_to_scoring_cache not yet applied).
+          // Fall back to hitterAvgPointsPerGame if the scoring-cache columns are
+          // unavailable (e.g. player_scoring_cache not yet populated).
           LOGGER.error(
             '[Draft] projectedMatchupPoints sort failed — falling back to hitterAvgPointsPerGame',
             err instanceof Error ? err : new Error(String(err)),

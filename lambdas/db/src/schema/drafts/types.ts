@@ -160,6 +160,7 @@ export const DraftPlayer = builder.objectRef<{
   brefId: string;
   hitterAvgPointsPerGame?: number | null;
   pitchingAvgPointsPerGame?: number | null;
+  projectedMatchupPoints?: number | null;
 }>('DraftPlayer');
 
 DraftPlayer.implement({
@@ -178,6 +179,11 @@ DraftPlayer.implement({
       nullable: true,
       description:
         'Career pitching average points per game (pitching score / career games)',
+    }),
+    projectedMatchupPoints: t.exposeFloat('projectedMatchupPoints', {
+      nullable: true,
+      description:
+        'Projected fantasy points per matchup, accounting for the league schedule (hitter_avg_ppg * gamesPerMatchup + pitching_avg_ppg * pitcherStartsPerMatchup)',
     }),
     eligiblePositions: t.stringList({
       description:

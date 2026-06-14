@@ -682,6 +682,8 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
   /** Career pitching average points per game (pitching score / career games) */
   pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+  /** Projected fantasy points per matchup, accounting for the league schedule (hitter_avg_ppg * gamesPerMatchup + pitching_avg_ppg * pitcherStartsPerMatchup) */
+  projectedMatchupPoints?: Maybe<Scalars['Float']['output']>;
 };
 
 /** A prioritised entry in a team's draft queue. Auto-pick picks the first available entry before falling back to the FPG algorithm. */
@@ -7413,6 +7415,7 @@ export type GetAvailableDraftPlayersQuery = {
     eligiblePositions?: Array<string> | null;
     hitterAvgPointsPerGame?: number | null;
     pitchingAvgPointsPerGame?: number | null;
+    projectedMatchupPoints?: number | null;
   }> | null;
 };
 
@@ -16810,6 +16813,7 @@ export const GetAvailableDraftPlayers = gql`
       eligiblePositions
       hitterAvgPointsPerGame
       pitchingAvgPointsPerGame
+      projectedMatchupPoints
     }
   }
 `;

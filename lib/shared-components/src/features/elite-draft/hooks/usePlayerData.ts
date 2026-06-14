@@ -111,9 +111,7 @@ export function usePlayerData({
         whip: ps?.whip,
         winPct: ps?.winPct,
         gamesStarted: ps?.gamesStarted,
-        ppg: pitcher
-          ? (ap.pitchingAvgPointsPerGame ?? null)
-          : (ap.hitterAvgPointsPerGame ?? null),
+        ppg: ap.projectedMatchupPoints ?? null,
       });
     }
     // Seed from pick history for drafted players absent from stats, and fix
@@ -207,9 +205,7 @@ export function usePlayerData({
         whip: ps?.whip,
         winPct: ps?.winPct,
         gamesStarted: ps?.gamesStarted,
-        ppg: pitcher
-          ? (ap.pitchingAvgPointsPerGame ?? null)
-          : (ap.hitterAvgPointsPerGame ?? null),
+        ppg: ap.projectedMatchupPoints ?? null,
       };
     });
   }, [availablePlayers, playerStatsMap, pitchingStatsMap]);
