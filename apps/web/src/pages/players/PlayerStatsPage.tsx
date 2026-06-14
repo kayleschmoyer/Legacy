@@ -151,13 +151,6 @@ export function PlayerStatsRoute() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Player detail modal state
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-
   // Parse URL parameters for initial state
   const initialState = useMemo(() => {
     const viewMode =
@@ -230,14 +223,12 @@ export function PlayerStatsRoute() {
     };
   }, [searchParams]);
 
-  // Handle player detail — open modal instead of navigating
-  const handlePlayerDetails = useCallback((player: PlayerWithStats) => {
-    setSelectedPlayer({
-      id: typeof player.id === 'string' ? parseInt(player.id, 10) : player.id,
-      name: player.name,
-    });
-    setDetailModalOpen(true);
-  }, []);
+  const handlePlayerDetails = useCallback(
+    (player: PlayerWithStats) => {
+      navigate(`/players/${player.id}`);
+    },
+    [navigate],
+  );
 
   // Handle export functionality
   const handleExport = useCallback(
@@ -432,14 +423,6 @@ export function PlayerStatsRoute() {
           onExport={handleExport}
           onShare={handleShare}
           onFiltersChange={handleFiltersChange}
-        />
-
-        {/* Player detail modal */}
-        <PlayerDetailModal
-          open={detailModalOpen}
-          onOpenChange={setDetailModalOpen}
-          playerId={selectedPlayer?.id ?? null}
-          playerName={selectedPlayer?.name ?? ''}
         />
       </PremiumGate>
     </div>
