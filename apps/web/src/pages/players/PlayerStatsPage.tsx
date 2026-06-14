@@ -15,6 +15,8 @@ import type {
 } from '@legacy-sports/shared-components/players';
 import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -98,6 +100,7 @@ const TOAST_DURATION_MS = 2400;
 export function PlayerStatsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
+  const isPremium = useIsPremium();
 
   // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
   // sr-only live region populated (screen readers re-announce changes; the
@@ -368,27 +371,29 @@ export function PlayerStatsRoute() {
           {liveMsg}
         </div>
       )}
-      <PlayerStatsPage
-        title="MLB Player Statistics"
-        initialViewMode={initialState.viewMode}
-        initialFilters={initialState.filters}
-        initialPageSize={initialState.pageSize}
-        showHeader={true}
-        showActions={true}
-        statsFormat={statsFormat}
-        onPlayerDetails={handlePlayerDetails}
-        onExport={handleExport}
-        onShare={handleShare}
-        onFiltersChange={handleFiltersChange}
-      />
+      <PremiumGate isPremium={isPremium} featureName="Player Statistics">
+        <PlayerStatsPage
+          title="MLB Player Statistics"
+          initialViewMode={initialState.viewMode}
+          initialFilters={initialState.filters}
+          initialPageSize={initialState.pageSize}
+          showHeader={true}
+          showActions={true}
+          statsFormat={statsFormat}
+          onPlayerDetails={handlePlayerDetails}
+          onExport={handleExport}
+          onShare={handleShare}
+          onFiltersChange={handleFiltersChange}
+        />
 
-      {/* Player detail modal */}
-      <PlayerDetailModal
-        open={detailModalOpen}
-        onOpenChange={setDetailModalOpen}
-        playerId={selectedPlayer?.id ?? null}
-        playerName={selectedPlayer?.name ?? ''}
-      />
+        {/* Player detail modal */}
+        <PlayerDetailModal
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          playerId={selectedPlayer?.id ?? null}
+          playerName={selectedPlayer?.name ?? ''}
+        />
+      </PremiumGate>
     </div>
   );
 }
@@ -404,6 +409,7 @@ export function PlayerDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: identifier } = useParams<{ id: string }>();
+  const isPremium = useIsPremium();
 
   const isNumeric = !!identifier && /^\d+$/.test(identifier);
   const parsedNumericId = isNumeric ? Number(identifier) : null;
@@ -549,16 +555,58 @@ export function PlayerDetailPage() {
           </div>
         )}
 
-      {resolvedId !== null && !brefError && (
-        <PlayerDetailModal
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) handleBack();
-          }}
-          playerId={resolvedId}
-          playerName={resolvedName}
-        />
-      )}
+      {resolvedId !== null &&
+        !brefError &&
+        (isPremium ? (
+          <PlayerDetailModal
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) handleBack();
+            }}
+            playerId={resolvedId}
+            playerName={resolvedName}
+          />
+        ) : (
+          // Free users: the detail modal renders its content in a Dialog portal
+          // (outside any wrapper), so gating the modal directly would leak the
+          // stats. Instead render an inline, non-portal panel behind PremiumGate
+          // so the blur + upgrade CTA actually cover the career-stats surface.
+          <PremiumGate
+            isPremium={false}
+            featureName="Player Career Stats"
+            featureDescription="Unlock full career statistics, season-by-season splits, and advanced metrics for every player."
+          >
+            <div
+              style={{
+                minHeight: 360,
+                borderRadius: '16px',
+                border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+                backgroundColor: SURFACE_CARD,
+                padding: '2rem',
+              }}
+            >
+              <h1
+                style={{
+                  fontFamily: "'Big Shoulders Display', sans-serif",
+                  color: WHITE,
+                  margin: 0,
+                }}
+              >
+                {resolvedName}
+              </h1>
+              <p
+                style={{
+                  fontFamily: "'Literata', serif",
+                  color: TEXT_HIGH_CONTRAST,
+                  marginTop: '0.75rem',
+                }}
+              >
+                Career statistics — season-by-season batting, pitching, and
+                fielding splits — are a Premium feature.
+              </p>
+            </div>
+          </PremiumGate>
+        ))}
     </div>
   );
 }

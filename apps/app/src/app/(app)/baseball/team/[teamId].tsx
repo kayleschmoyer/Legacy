@@ -30,6 +30,7 @@ import { LineupEditor } from '../../../../features/roster/LineupEditor';
 import { PositionSlot } from '../../../../common/models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
+import { useSubscription } from '../../../../features/subscription/useSubscription';
 
 interface MatchupPlayerStats {
   playerId?: number | null;
@@ -97,6 +98,8 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     leagueId,
     brandingTeam,
   } = props;
+
+  const { isPremium } = useSubscription();
 
   const { data: statsData, loading: loadingStats } = useGetMatchupPlayersQuery({
     skip: !matchup?.id,
@@ -254,7 +257,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           onPlayerAdded={isOwner ? onPlayerAdded : noOp}
           onPlayerMoved={isOwner ? onPlayerMoved : noOp}
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
-          projections={hitterProjections}
+          projections={isPremium ? hitterProjections : {}}
           team={hitters}
           actual={hittersActual}
         />
@@ -266,7 +269,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           onPlayerAdded={isOwner ? onPlayerAdded : noOp}
           onPlayerMoved={isOwner ? onPlayerMoved : noOp}
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
-          projections={pitcherProjections}
+          projections={isPremium ? pitcherProjections : {}}
           team={pitchers}
           actual={pitchersActual}
         />

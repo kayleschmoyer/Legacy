@@ -17,6 +17,18 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+// Mock the premium gate so the screen's subscription dependency graph
+// (PremiumGate → utils/analytics → @react-native-firebase, useSubscription →
+// websocket-client/rollbar) is not pulled into this unit test. The gate is
+// rendered transparently; gating behavior is covered by its own tests.
+jest.mock('../../features/subscription/PremiumGate', () => ({
+  PremiumGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock('../../features/subscription/useSubscription', () => ({
+  useSubscription: () => ({ isPremium: true }),
+}));
+
 let capturedOnPlayerDetails: ((player: PlayerWithStats) => void) | undefined;
 let capturedOnShare: ((url: string) => void) | undefined;
 let capturedOnExport:

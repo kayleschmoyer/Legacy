@@ -9,6 +9,8 @@ import {
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
+import { PremiumGate } from '../../features/subscription/PremiumGate';
+import { useSubscription } from '../../features/subscription/useSubscription';
 
 // Web origin used to turn the shared component's relative share path into a
 // fully-qualified deep link (matches the SalaryCapManagementCard pattern).
@@ -24,6 +26,7 @@ const APP_BASE_URL = config.appBaseUrl ?? 'https://legacysports.app';
  */
 export default function PlayerStatsScreen() {
   const router = useRouter();
+  const { isPremium } = useSubscription();
 
   const handlePlayerDetails = useCallback(
     (player: PlayerWithStats) => {
@@ -84,14 +87,16 @@ export default function PlayerStatsScreen() {
   );
 
   return (
-    <PlayerStatsPage
-      onPlayerDetails={handlePlayerDetails}
-      onShare={(url) => void handleShare(url)}
-      onExport={(filters, viewMode) => void handleExport(filters, viewMode)}
-      showHeader={true}
-      showActions={true}
-      statsFormat="expanded"
-    />
+    <PremiumGate isPremium={isPremium} featureName="Player Statistics">
+      <PlayerStatsPage
+        onPlayerDetails={handlePlayerDetails}
+        onShare={(url) => void handleShare(url)}
+        onExport={(filters, viewMode) => void handleExport(filters, viewMode)}
+        showHeader={true}
+        showActions={true}
+        statsFormat="expanded"
+      />
+    </PremiumGate>
   );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

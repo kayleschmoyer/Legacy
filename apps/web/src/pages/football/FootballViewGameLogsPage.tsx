@@ -2,6 +2,8 @@ import React from 'react';
 import { GameLogsTable } from '@legacy-sports/shared-components/stats';
 import { config } from '@legacy-sports/app-config/web';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import { BG_DARK, TEXT_HIGH_CONTRAST } from '../../constants/colors';
 
 const STATS_API_BASE =
@@ -9,6 +11,7 @@ const STATS_API_BASE =
 const FOOTBALL_GAME_LOGS_ENDPOINT = `${STATS_API_BASE}/nfl-game-logs`;
 
 export function FootballViewGameLogsPage() {
+  const isPremium = useIsPremium();
   return (
     <div
       style={{
@@ -21,7 +24,9 @@ export function FootballViewGameLogsPage() {
         title="Football Game Logs"
         description="Filter an NFL player's per-game logs by date, opponent, and home/away venue."
       />
-      <GameLogsTable apiEndpoint={FOOTBALL_GAME_LOGS_ENDPOINT} sport="nfl" />
+      <PremiumGate isPremium={isPremium} featureName="Football Game Logs">
+        <GameLogsTable apiEndpoint={FOOTBALL_GAME_LOGS_ENDPOINT} sport="nfl" />
+      </PremiumGate>
     </div>
   );
 }

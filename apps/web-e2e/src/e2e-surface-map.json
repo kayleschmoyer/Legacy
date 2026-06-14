@@ -469,6 +469,12 @@
       "apps/web/src/pages/profile/**",
       "apps/web/src/pages/preferences/**"
     ],
+    "apps/web-e2e/src/tests/premium-gating.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/PremiumGate.tsx",
+      "apps/web/src/hooks/useIsPremium.ts"
+    ],
     "apps/web-e2e/src/tests/pricing-page.spec.ts": [
       "apps/web/src/pages/pricing/**",
       "apps/web/src/pages/donate/**"

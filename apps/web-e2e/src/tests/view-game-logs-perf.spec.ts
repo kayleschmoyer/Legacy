@@ -1,4 +1,5 @@
-import { expect, type Route, test } from '@playwright/test';
+import { type Route } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 // LS-7474 — render-time guardrail for the Game Logs table.
 //
