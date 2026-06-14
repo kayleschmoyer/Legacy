@@ -1,0 +1,135 @@
+{
+  "summary": {
+    "total": 5,
+    "conflicting": 1,
+    "ciFailing": 2,
+    "ciPending": 2,
+    "ciPassing": 1,
+    "withUnresolvedThreads": 0,
+    "drafts": 0,
+    "approved": 0,
+    "withStaleChecks": 5
+  },
+  "recommendBatchStatus": true,
+  "note": "5 PR(s) had stale CI checks that were deduplicated (#5289, #5068, #3396, #4743, #5226). Use github_pr_batch_status for job-level CI details on these PRs.",
+  "prs": [
+    {
+      "number": 5289,
+      "title": "LS-6489 feat(football): premium-only advanced search filters",
+      "branch": "claude/relaxed-wright-owhd9w",
+      "base": "main",
+      "author": "legacy-sports-code-bot",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "ciStatus": "pending",
+      "hadStaleChecks": true,
+      "reviewDecision": null,
+      "unresolvedThreads": 0,
+      "totalThreads": 0,
+      "threadCountTruncated": false,
+      "labels": [
+        "merge-when-ready",
+        "CI: Test Failure",
+        "CI: Migration",
+        "agent-in-progress",
+        "CI: Conflicts",
+        "bot:ready-for-review",
+        "run:integration"
+      ],
+      "updatedAt": "2026-06-14T06:24:15Z",
+      "url": "https://github.com/bkrupa/legacy-sports/pull/5289"
+    },
+    {
+      "number": 5068,
+      "title": "feat(web): profile-settings UI to enable/disable optional 2FA (LS-7833)",
+      "branch": "claude/tender-lovelace-gmgmbi",
+      "base": "main",
+      "author": "legacy-sports-code-bot",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "ciStatus": "pending",
+      "hadStaleChecks": true,
+      "reviewDecision": "CHANGES_REQUESTED",
+      "unresolvedThreads": 0,
+      "totalThreads": 3,
+      "threadCountTruncated": false,
+      "labels": [
+        "CI: E2E Failure",
+        "bot:ready-for-review",
+        "bot:reset-cycle-counter",
+        "review-bot-override"
+      ],
+      "updatedAt": "2026-06-14T06:23:46Z",
+      "url": "https://github.com/bkrupa/legacy-sports/pull/5068"
+    },
+    {
+      "number": 3396,
+      "title": "ci(deps): bump actions/upload-pages-artifact from 4.0.0 to 5.0.0",
+      "branch": "dependabot/github_actions/actions/upload-pages-artifact-5.0.0",
+      "base": "main",
+      "author": "dependabot",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "ciStatus": "pass",
+      "hadStaleChecks": true,
+      "reviewDecision": null,
+      "unresolvedThreads": 0,
+      "totalThreads": 0,
+      "threadCountTruncated": false,
+      "labels": [
+        "dependencies",
+        "github_actions",
+        "merge-when-ready",
+        "bot:ready-for-review"
+      ],
+      "updatedAt": "2026-06-14T06:23:33Z",
+      "url": "https://github.com/bkrupa/legacy-sports/pull/3396"
+    },
+    {
+      "number": 4743,
+      "title": "LS-5305 — Fix Application Info Card (LS-5706..LS-5709)",
+      "branch": "LS-5305/about-application-info-fixes",
+      "base": "main",
+      "author": "legacy-sports-code-bot",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "ciStatus": "fail",
+      "hadStaleChecks": true,
+      "reviewDecision": "CHANGES_REQUESTED",
+      "unresolvedThreads": 0,
+      "totalThreads": 2,
+      "threadCountTruncated": false,
+      "labels": [
+        "merge-when-ready",
+        "CI: E2E Failure",
+        "CI: Conflicts",
+        "needs-human-arbitration"
+      ],
+      "updatedAt": "2026-06-14T06:23:28Z",
+      "url": "https://github.com/bkrupa/legacy-sports/pull/4743"
+    },
+    {
+      "number": 5226,
+      "title": "LS-7966 fix(web): add time-per-pick setting to league create form",
+      "branch": "claude/sleepy-knuth-3h4eah",
+      "base": "main",
+      "author": "legacy-sports-code-bot",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "ciStatus": "fail",
+      "hadStaleChecks": true,
+      "reviewDecision": null,
+      "unresolvedThreads": 0,
+      "totalThreads": 0,
+      "threadCountTruncated": false,
+      "labels": [
+        "merge-when-ready",
+        "CI: E2E Failure",
+        "agent-in-progress",
+        "bot:ready-for-review"
+      ],
+      "updatedAt": "2026-06-14T06:23:27Z",
+      "url": "https://github.com/bkrupa/legacy-sports/pull/5226"
+    }
+  ]
+}

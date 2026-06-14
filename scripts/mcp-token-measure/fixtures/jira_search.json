@@ -1,0 +1,101 @@
+{
+  "returned": 12,
+  "issues": [
+    {
+      "key": "LS-8019",
+      "summary": "Define MCP response-format standard + shared formatting helper",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8020",
+      "summary": "Build MCP response token-measurement harness (before/after baseline)",
+      "status": "In Progress",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8021",
+      "summary": "Migrate github-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8022",
+      "summary": "Migrate ci-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8023",
+      "summary": "Migrate jira-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8024",
+      "summary": "Migrate worktree-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8025",
+      "summary": "Migrate db-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8026",
+      "summary": "Migrate nx-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8027",
+      "summary": "Migrate aws-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8028",
+      "summary": "Migrate make-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8029",
+      "summary": "Migrate dev-process-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    },
+    {
+      "key": "LS-8030",
+      "summary": "Migrate browser-server tool responses to token-efficient format",
+      "status": "To Do",
+      "type": "Task",
+      "assignee": "",
+      "priority": "Medium"
+    }
+  ]
+}
