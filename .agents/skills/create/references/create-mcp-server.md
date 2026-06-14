@@ -102,7 +102,9 @@ Write tool descriptions as if an agent reads them to decide when to call the too
 
 ### Return Values
 
-Return structured JSON in `text` field. Set `isError: true` for errors. See [mcp-setup-patterns.md](mcp-setup-patterns.md) for examples.
+Return the payload in the `text` field and set `isError: true` for errors. See [mcp-setup-patterns.md](mcp-setup-patterns.md) for envelope examples.
+
+**Use the token-efficient response format.** Do **not** emit `JSON.stringify(x, null, 2)`. Per [mcp-response-format.md](mcp-response-format.md), prune fields first (`pickFields`), truncate long blobs (`truncate`), then format by shape — `markdownTable` for flat uniform lists, `minifiedJson` for single objects / nested / heterogeneous data — all via the shared `@legacy-sports/mcp-format` helper. Reviewers enforce this as pattern #45.
 
 ### Batch / bulk tools
 

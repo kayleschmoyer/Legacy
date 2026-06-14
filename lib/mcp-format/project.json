@@ -1,0 +1,22 @@
+{
+  "name": "mcp-format",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/mcp-format/src",
+  "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:util"],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/lib/mcp-format"],
+      "options": {
+        "jestConfig": "lib/mcp-format/jest.config.ts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p lib/mcp-format/tsconfig.json"
+      }
+    }
+  }
+}
