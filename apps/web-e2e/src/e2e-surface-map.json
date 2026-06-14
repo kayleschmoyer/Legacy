@@ -592,6 +592,12 @@
       "apps/web/src/pages/profile/**",
       "apps/web/src/pages/preferences/**"
     ],
+    "apps/web-e2e/src/tests/sport-aware-player-list.spec.ts": [
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/football/**",
+      "apps/web/src/pages/players/**",
+      "lib/shared-components/src/features/players/**"
+    ],
     "apps/web-e2e/src/tests/standings.spec.ts": [
       "apps/web/src/pages/standings/**",
       "apps/web/src/components/league/**"
