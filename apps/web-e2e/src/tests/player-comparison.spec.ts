@@ -580,6 +580,87 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Tests: Search threshold & slot selection @regression (LS-5574)
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – search threshold & slot selection @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockPlayerComparisonGraphQL(page);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    });
+
+    adminTest(
+      'dropdown does not appear when query has fewer than 2 characters',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('A');
+        // With only 1 character, showDropdown is false (query.trim().length < 2)
+        // — no results should be visible
+        await expect(page.getByLabel('Player suggestions')).not.toBeVisible({
+          timeout: 2000,
+        });
+      },
+    );
+
+    adminTest(
+      'search input is cleared after selecting a player from dropdown',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await expect(page.getByText('Aaron Judge')).toBeVisible();
+        await page.getByText('Aaron Judge').click();
+        await expect(input).toHaveValue('');
+      },
+    );
+
+    adminTest(
+      'empty slot indicators appear for unfilled slots when a player is added',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await page.getByText('Aaron Judge').click();
+        // After adding 1 player, 3 empty slot chips should appear for slots 2–4
+        await expect(page.getByText('Slot 2 · empty')).toBeVisible();
+        await expect(page.getByText('Slot 3 · empty')).toBeVisible();
+        await expect(page.getByText('Slot 4 · empty')).toBeVisible();
+      },
+    );
+
+    adminTest(
+      'already-selected player does not appear in dropdown on subsequent search',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        // Add Aaron Judge first
+        await input.fill('Aa');
+        await expect(page.getByText('Aaron Judge')).toBeVisible();
+        await page.getByText('Aaron Judge').click();
+
+        // Search again — mock returns all players but component filters out selected ones
+        await expect(async () => {
+          await input.fill('Aa');
+          await expect(page.getByLabel('Player suggestions')).toBeVisible({
+            timeout: 3000,
+          });
+        }).toPass({ timeout: 10000 });
+
+        // Aaron Judge should not appear in the dropdown (he's already selected)
+        await expect(
+          page.getByLabel('Player suggestions').getByText('Aaron Judge'),
+        ).not.toBeVisible();
+        // Other players (not selected) still appear
+        await expect(
+          page.getByLabel('Player suggestions').getByText('Shohei Ohtani'),
+        ).toBeVisible();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Tests: Unauthenticated visitor – Get Started Free CTA @regression
 // ---------------------------------------------------------------------------
 
