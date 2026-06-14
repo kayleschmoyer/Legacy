@@ -1078,6 +1078,10 @@ type FootballMatchupStats {
 A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255)
 """
 type FootballPlayer {
+  """
+  Average draft position rank, 1 = earliest (LS-6489 / FPL-008). Null until the ADP pipeline populates it. Surfaced as a premium advanced filter.
+  """
+  adpRank: Int
   careerStats: FootballCareerStats
   firstName: String!
 
@@ -1106,6 +1110,11 @@ type FootballPlayer {
   Distinct team codes from season-stats records that differ from the current nflTeam. Non-empty when the player was traded mid-season or changed teams across seasons (LS-6238).
   """
   previousTeams: [String!]!
+
+  """
+  Projected season fantasy points (LS-6489 / FPL-008). Null until the projections pipeline populates it. Surfaced as a premium advanced filter.
+  """
+  projectedFantasyPoints: Float
   seasonStats(season: Int): FootballPlayerSeasonStats
 
   """
@@ -3129,6 +3138,9 @@ type Query {
     after: String
     conference: String
     first: Int
+    injuryStatus: String
+    maxAdpRank: Int
+    minProjectedPoints: Float
     nflTeam: String
     position: String
     search: String

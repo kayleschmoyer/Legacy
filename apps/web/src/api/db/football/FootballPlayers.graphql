@@ -8,6 +8,9 @@ fragment FootballPlayerHeader on FootballPlayer {
   pfrId
   headshotUrl
   previousTeams
+  injuryStatus
+  projectedFantasyPoints
+  adpRank
   careerStats {
     fantasyPoints
     passing {
@@ -124,6 +127,9 @@ query FootballPlayers(
   $conference: String
   $search: String
   $after: String
+  $injuryStatus: String
+  $minProjectedPoints: Float
+  $maxAdpRank: Int
 ) {
   footballPlayers(
     position: $position
@@ -131,6 +137,9 @@ query FootballPlayers(
     conference: $conference
     search: $search
     after: $after
+    injuryStatus: $injuryStatus
+    minProjectedPoints: $minProjectedPoints
+    maxAdpRank: $maxAdpRank
   ) {
     nodes {
       ...FootballPlayerHeader

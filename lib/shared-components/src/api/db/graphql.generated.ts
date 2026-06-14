@@ -950,6 +950,8 @@ export type FootballMatchupStats = {
 /** A football player (skill, IDP, or synthetic DST) with optional season and career stats (LS-255) */
 export type FootballPlayer = {
   __typename?: 'FootballPlayer';
+  /** Average draft position rank, 1 = earliest (LS-6489 / FPL-008). Null until the ADP pipeline populates it. Surfaced as a premium advanced filter. */
+  adpRank?: Maybe<Scalars['Int']['output']>;
   careerStats?: Maybe<FootballCareerStats>;
   firstName: Scalars['String']['output'];
   /** Per-game stat log for a given season (LS-6456). Queries game_football_* tables and returns one row per game played, with only the stat categories that have data for that game. */
@@ -969,6 +971,8 @@ export type FootballPlayer = {
   position?: Maybe<Scalars['String']['output']>;
   /** Distinct team codes from season-stats records that differ from the current nflTeam. Non-empty when the player was traded mid-season or changed teams across seasons (LS-6238). */
   previousTeams: Array<Scalars['String']['output']>;
+  /** Projected season fantasy points (LS-6489 / FPL-008). Null until the projections pipeline populates it. Surfaced as a premium advanced filter. */
+  projectedFantasyPoints?: Maybe<Scalars['Float']['output']>;
   seasonStats?: Maybe<FootballPlayerSeasonStats>;
   /** Per-week game log for the given season (LS-6233). Bye weeks appear as explicit rows with isBye:true — never a gap. */
   weeklyGameLogs: Array<FootballWeeklyGameLog>;
@@ -3156,6 +3160,9 @@ export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  injuryStatus?: InputMaybe<Scalars['String']['input']>;
+  maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
+  minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;

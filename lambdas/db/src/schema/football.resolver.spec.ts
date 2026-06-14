@@ -76,6 +76,12 @@ describe('football resolvers', () => {
           pfrId: 'pfrId',
           position: 'position',
           jerseyNumber: 'jerseyNumber',
+          injuriesLastSyncedAt: 'injuriesLastSyncedAt',
+          injuryStatus: 'injuryStatus',
+          injuryDesignation: 'injuryDesignation',
+          news: 'news',
+          projectedFantasyPoints: 'projectedFantasyPoints',
+          adpRank: 'adpRank',
         },
         footballSeasonPassing: { playerId: 'playerId', season: 'season' },
         footballSeasonRushing: { playerId: 'playerId', season: 'season' },
@@ -542,6 +548,121 @@ describe('football resolvers', () => {
       );
 
       expect(mockDb.where).toHaveBeenCalled();
+    });
+
+    // ── Premium advanced filters (LS-6489 / FPL-008) ──────────────────────────
+    describe('premium advanced filters', () => {
+      it('does NOT perform a tier lookup when no advanced filter is supplied', async () => {
+        // Only the players query should run — a single awaited query. The basic
+        // list stays open to all tiers (no entitlement enforcement).
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.then).toHaveBeenCalledTimes(1);
+      });
+
+      it('throws PREMIUM_REQUIRED when a free user filters by injuryStatus', async () => {
+        // First awaited query is the subscription-tier lookup → free tier.
+        mockDb.then.mockImplementationOnce((resolve) =>
+          resolve([{ tier: 'free' }]),
+        );
+
+        await expect(
+          getResolver()(
+            {},
+            { position: null, search: null, after: null, injuryStatus: 'Out' },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+      });
+
+      it('throws PREMIUM_REQUIRED when a free user filters by minProjectedPoints', async () => {
+        mockDb.then.mockImplementationOnce((resolve) =>
+          resolve([{ tier: 'free' }]),
+        );
+
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              minProjectedPoints: 150,
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+      });
+
+      it('throws PREMIUM_REQUIRED when a free user filters by maxAdpRank', async () => {
+        mockDb.then.mockImplementationOnce((resolve) =>
+          resolve([{ tier: 'free' }]),
+        );
+
+        await expect(
+          getResolver()(
+            {},
+            { position: null, search: null, after: null, maxAdpRank: 50 },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+      });
+
+      it('applies the filters for a premium user', async () => {
+        // First awaited query: tier lookup → premium. Second: players query.
+        mockDb.then
+          .mockImplementationOnce((resolve) => resolve([{ tier: 'premium' }]))
+          .mockImplementationOnce((resolve) => resolve([]));
+
+        const result = (await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            injuryStatus: 'Questionable',
+            minProjectedPoints: 100,
+            maxAdpRank: 75,
+          },
+          mockContext,
+          undefined as never,
+        )) as FootballPlayersResult;
+
+        expect(result).toEqual({
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        });
+        // Tier lookup + players query both ran.
+        expect(mockDb.then).toHaveBeenCalledTimes(2);
+        expect(mockDb.where).toHaveBeenCalled();
+      });
+
+      it('treats an admin as premium without a tier lookup', async () => {
+        mockContext.user = { id: 1, isAdmin: true };
+        // No tier-lookup row queued — only the players query runs.
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        const result = (await getResolver()(
+          {},
+          { position: null, search: null, after: null, injuryStatus: 'IR' },
+          mockContext,
+          undefined as never,
+        )) as FootballPlayersResult;
+
+        expect(result.nodes).toEqual([]);
+        // Admin short-circuit means a single query (players), no tier lookup.
+        expect(mockDb.then).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

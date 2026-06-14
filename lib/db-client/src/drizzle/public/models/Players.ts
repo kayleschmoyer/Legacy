@@ -12,6 +12,7 @@ import {
   timestamp,
   bigint,
   boolean,
+  real,
 } from 'drizzle-orm/pg-core';
 import { playerPosition, sportKind } from './Enums';
 import { sql } from 'drizzle-orm';
@@ -65,6 +66,12 @@ export const players = pgTable(
     injuryStatus: text('injury_status'),
     injuryDesignation: text('injury_designation'),
     news: text('news'),
+    // Premium advanced-search filter fields for football players (LS-6489 /
+    // FPL-008). Populated by a projections/ADP data pipeline; null until a feed
+    // is connected. Gated behind the `advanced_search_filters` entitlement when
+    // used as search filters.
+    projectedFantasyPoints: real('projected_fantasy_points'),
+    adpRank: integer('adp_rank'),
   },
   (table) => {
     return {

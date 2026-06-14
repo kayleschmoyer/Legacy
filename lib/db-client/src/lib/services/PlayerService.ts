@@ -76,6 +76,9 @@ interface ScoringResultRow {
   injury_status: string | null;
   injury_designation: string | null;
   news: string | null;
+  // Football premium advanced-search filter columns (LS-6489)
+  projected_fantasy_points: number | null;
+  adp_rank: number | null;
 }
 
 export interface PlayerFilters {
@@ -613,6 +616,7 @@ export class PlayerService {
             p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
             p.injuries_last_synced_at,
             p.injury_status, p.injury_designation, p.news,
+            p.projected_fantasy_points, p.adp_rank,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
             ${fieldingScoreExpr} AS fielding_score,
@@ -668,6 +672,8 @@ export class PlayerService {
           injuryStatus: row.injury_status ?? null,
           injuryDesignation: row.injury_designation ?? null,
           news: row.news ?? null,
+          projectedFantasyPoints: row.projected_fantasy_points ?? null,
+          adpRank: row.adp_rank ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

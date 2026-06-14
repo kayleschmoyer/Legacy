@@ -63,6 +63,8 @@ async function loadPlayerGameStats(
     injuryStatus: string | null;
     injuryDesignation: string | null;
     news: string | null;
+    projectedFantasyPoints: number | null;
+    adpRank: number | null;
   } = {
     id: playerId,
     firstName: '',
@@ -91,6 +93,8 @@ async function loadPlayerGameStats(
     injuryStatus: null,
     injuryDesignation: null,
     news: null,
+    projectedFantasyPoints: null,
+    adpRank: null,
   };
 
   // Load batting stats

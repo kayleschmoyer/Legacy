@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input, Spinner, Text, useMedia, XStack, YStack } from 'tamagui';
-import { LayoutGrid, LayoutList, Search, X } from '@tamagui/lucide-icons';
+import {
+  LayoutGrid,
+  LayoutList,
+  Search,
+  SlidersHorizontal,
+  X,
+} from '@tamagui/lucide-icons';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
 import type { FootballPlayerCardStats } from '@legacy-sports/shared-components/football';
 import {
@@ -16,6 +22,8 @@ import {
 import type { TeamFilter } from '../../components/football/FootballTeamFilter';
 import { FootballTeamFilter } from '../../components/football/FootballTeamFilter';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -41,6 +49,17 @@ type PlayerListItem = NonNullable<
 type ViewMode = 'cards' | 'table';
 
 const VIEW_MODE_KEY = 'football_players_view_mode';
+
+// Premium advanced-search filter options (LS-6489 / FPL-008). `null` = "Any"
+// (no injury filter). The non-null values match the `injury_status` strings the
+// injury pipeline writes to the players table.
+const INJURY_STATUS_OPTIONS: { label: string; value: string | null }[] = [
+  { label: 'Any', value: null },
+  { label: 'Questionable', value: 'Questionable' },
+  { label: 'Doubtful', value: 'Doubtful' },
+  { label: 'Out', value: 'Out' },
+  { label: 'IR', value: 'IR' },
+];
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -320,6 +339,141 @@ function ViewToggleButton({
   );
 }
 
+// ─── Advanced (premium) filters ──────────────────────────────────────────────
+
+interface AdvancedFiltersPanelProps {
+  injuryStatus: string | null;
+  onInjuryStatusChange: (value: string | null) => void;
+  minProjected: string;
+  onMinProjectedChange: (value: string) => void;
+  maxAdp: string;
+  onMaxAdpChange: (value: string) => void;
+}
+
+const numericInputStyles = {
+  backgroundColor: SURFACE_CARD,
+  borderWidth: 1,
+  borderColor: OUTLINE_SUBTLE,
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  height: 36,
+  color: TEXT_PRIMARY,
+  fontSize: 13,
+  fontFamily: FONT_BODY,
+  width: 120,
+} as const;
+
+function AdvancedFiltersPanel({
+  injuryStatus,
+  onInjuryStatusChange,
+  minProjected,
+  onMinProjectedChange,
+  maxAdp,
+  onMaxAdpChange,
+}: AdvancedFiltersPanelProps) {
+  return (
+    <YStack
+      gap={12}
+      padding={12}
+      backgroundColor={SURFACE_PANEL}
+      borderWidth={1}
+      borderColor={OUTLINE_SUBTLE}
+      borderRadius={10}
+    >
+      {/* Injury status */}
+      <YStack gap={6}>
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          fontFamily={FONT_BODY}
+          letterSpacing={0.8}
+        >
+          INJURY STATUS
+        </Text>
+        <XStack gap={6} flexWrap="wrap">
+          {INJURY_STATUS_OPTIONS.map((opt) => {
+            const active = injuryStatus === opt.value;
+            return (
+              <YStack
+                key={opt.label}
+                paddingHorizontal={12}
+                paddingVertical={6}
+                borderRadius={6}
+                backgroundColor={
+                  active ? withAlpha(BRAND_GOLD, 0.18) : 'transparent'
+                }
+                borderWidth={1}
+                borderColor={active ? BRAND_GOLD : OUTLINE_SUBTLE}
+                cursor="pointer"
+                onPress={() => onInjuryStatusChange(opt.value)}
+                hoverStyle={{ borderColor: BRAND_GOLD }}
+                pressStyle={{ opacity: 0.8 }}
+                animation="quick"
+              >
+                <Text
+                  fontSize={12}
+                  fontWeight="600"
+                  color={active ? BRAND_GOLD : TEXT_MUTED}
+                  fontFamily={FONT_BODY}
+                >
+                  {opt.label}
+                </Text>
+              </YStack>
+            );
+          })}
+        </XStack>
+      </YStack>
+
+      {/* Numeric thresholds */}
+      <XStack gap={16} flexWrap="wrap">
+        <YStack gap={6}>
+          <Text
+            fontSize={11}
+            fontWeight="700"
+            color={TEXT_MUTED}
+            fontFamily={FONT_BODY}
+            letterSpacing={0.8}
+          >
+            MIN PROJECTED PTS
+          </Text>
+          <Input
+            {...numericInputStyles}
+            keyboardType="numeric"
+            inputMode="decimal"
+            placeholder="e.g. 150"
+            placeholderTextColor={TEXT_MUTED}
+            value={minProjected}
+            onChangeText={onMinProjectedChange}
+            focusStyle={{ borderColor: BRAND_GOLD, outlineWidth: 0 }}
+          />
+        </YStack>
+        <YStack gap={6}>
+          <Text
+            fontSize={11}
+            fontWeight="700"
+            color={TEXT_MUTED}
+            fontFamily={FONT_BODY}
+            letterSpacing={0.8}
+          >
+            MAX ADP RANK
+          </Text>
+          <Input
+            {...numericInputStyles}
+            keyboardType="numeric"
+            inputMode="numeric"
+            placeholder="e.g. 50"
+            placeholderTextColor={TEXT_MUTED}
+            value={maxAdp}
+            onChangeText={onMaxAdpChange}
+            focusStyle={{ borderColor: BRAND_GOLD, outlineWidth: 0 }}
+          />
+        </YStack>
+      </XStack>
+    </YStack>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 const VALID_POSITIONS = new Set<string>(FOOTBALL_POSITIONS);
@@ -349,11 +503,20 @@ export function FootballPlayersPage() {
     },
     [setSearchParams],
   );
+  const isPremium = useIsPremium();
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<PlayerListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // Premium advanced-search filters (LS-6489 / FPL-008).
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [injuryStatusFilter, setInjuryStatusFilter] = useState<string | null>(
+    null,
+  );
+  const [minProjectedInput, setMinProjectedInput] = useState('');
+  const [maxAdpInput, setMaxAdpInput] = useState('');
 
   function handleSelectPlayer(playerId: number) {
     setSelectedIds((prev) => {
@@ -400,21 +563,64 @@ export function FootballPlayersPage() {
   }
 
   const debouncedSearch = useDebounce(searchInput, 300);
+  const debouncedMinProjected = useDebounce(minProjectedInput, 300);
+  const debouncedMaxAdp = useDebounce(maxAdpInput, 300);
+
+  // Premium advanced filters are only applied for premium users; empty or
+  // invalid numeric input yields `undefined` (no filter sent to the server).
+  const injuryStatusArg =
+    isPremium && injuryStatusFilter ? injuryStatusFilter : undefined;
+  const parsedMinProjected =
+    isPremium && debouncedMinProjected.trim() !== ''
+      ? Number(debouncedMinProjected)
+      : NaN;
+  const minProjectedArg = Number.isFinite(parsedMinProjected)
+    ? parsedMinProjected
+    : undefined;
+  const parsedMaxAdp =
+    isPremium && debouncedMaxAdp.trim() !== ''
+      ? Number.parseInt(debouncedMaxAdp, 10)
+      : NaN;
+  const maxAdpArg = Number.isFinite(parsedMaxAdp) ? parsedMaxAdp : undefined;
 
   // Reset pagination when filters change
-  const prevFiltersRef = useRef({ position, teamFilter, debouncedSearch });
+  const prevFiltersRef = useRef({
+    position,
+    teamFilter,
+    debouncedSearch,
+    injuryStatusArg,
+    minProjectedArg,
+    maxAdpArg,
+  });
   useEffect(() => {
     const prev = prevFiltersRef.current;
     if (
       prev.position !== position ||
       prev.teamFilter !== teamFilter ||
-      prev.debouncedSearch !== debouncedSearch
+      prev.debouncedSearch !== debouncedSearch ||
+      prev.injuryStatusArg !== injuryStatusArg ||
+      prev.minProjectedArg !== minProjectedArg ||
+      prev.maxAdpArg !== maxAdpArg
     ) {
-      prevFiltersRef.current = { position, teamFilter, debouncedSearch };
+      prevFiltersRef.current = {
+        position,
+        teamFilter,
+        debouncedSearch,
+        injuryStatusArg,
+        minProjectedArg,
+        maxAdpArg,
+      };
       setCursor(undefined);
       setAllNodes([]);
     }
-  }, [position, teamFilter, debouncedSearch]);
+  }, [
+    position,
+    teamFilter,
+    debouncedSearch,
+    injuryStatusArg,
+    minProjectedArg,
+    maxAdpArg,
+  ]);
 
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
   const queryVars = {
@@ -423,6 +629,9 @@ export function FootballPlayersPage() {
     conference: isConference ? teamFilter : undefined,
     search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
     after: cursor,
+    injuryStatus: injuryStatusArg,
+    minProjectedPoints: minProjectedArg,
+    maxAdpRank: maxAdpArg,
   };
 
   const { data, loading, error } = useFootballPlayersQuery({
@@ -591,6 +800,81 @@ export function FootballPlayersPage() {
           </Text>
           <FootballTeamFilter selected={teamFilter} onChange={setTeamFilter} />
         </XStack>
+
+        {/* Advanced (premium) filters toggle */}
+        <XStack
+          alignItems="center"
+          gap={8}
+          alignSelf="flex-start"
+          paddingHorizontal={10}
+          paddingVertical={6}
+          borderRadius={8}
+          borderWidth={1}
+          borderColor={showAdvanced ? BRAND_GOLD : OUTLINE_SUBTLE}
+          backgroundColor={
+            showAdvanced ? withAlpha(BRAND_GOLD, 0.12) : 'transparent'
+          }
+          cursor="pointer"
+          onPress={() => setShowAdvanced((v) => !v)}
+          role="button"
+          aria-expanded={showAdvanced}
+          tabIndex={0}
+          onKeyDown={(e: { key: string; preventDefault: () => void }) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setShowAdvanced((v) => !v);
+            }
+          }}
+          hoverStyle={{ borderColor: BRAND_GOLD }}
+          pressStyle={{ opacity: 0.85 }}
+          animation="quick"
+        >
+          <SlidersHorizontal
+            size={15}
+            color={showAdvanced ? BRAND_GOLD : TEXT_MUTED}
+          />
+          <Text
+            fontSize={13}
+            fontWeight="600"
+            color={showAdvanced ? BRAND_GOLD : TEXT_MUTED}
+            fontFamily={FONT_BODY}
+          >
+            Advanced filters
+          </Text>
+          <YStack
+            paddingHorizontal={6}
+            paddingVertical={1}
+            borderRadius={4}
+            backgroundColor={withAlpha(BRAND_GOLD, 0.18)}
+          >
+            <Text
+              fontSize={10}
+              fontWeight="700"
+              color={BRAND_GOLD}
+              fontFamily={FONT_BODY}
+              letterSpacing={0.5}
+            >
+              PREMIUM
+            </Text>
+          </YStack>
+        </XStack>
+
+        {showAdvanced && (
+          <PremiumGate
+            isPremium={isPremium}
+            featureName="Advanced search filters"
+            featureDescription="Filter players by projected fantasy points, ADP rank, and injury status with Premium."
+          >
+            <AdvancedFiltersPanel
+              injuryStatus={injuryStatusFilter}
+              onInjuryStatusChange={setInjuryStatusFilter}
+              minProjected={minProjectedInput}
+              onMinProjectedChange={setMinProjectedInput}
+              maxAdp={maxAdpInput}
+              onMaxAdpChange={setMaxAdpInput}
+            />
+          </PremiumGate>
+        )}
       </YStack>
 
       {/* Content */}
