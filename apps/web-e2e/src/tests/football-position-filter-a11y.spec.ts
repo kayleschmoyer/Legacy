@@ -1,10 +1,11 @@
 /**
- * FootballPositionFilter — ARIA radiogroup & keyboard navigation E2E tests
- * (LS-6466)
+ * FootballPositionFilter — multi-select toggle group a11y & keyboard tests
+ * (LS-6466, multi-select promoted in LS-6464)
  *
- * Verifies that the position pill row on /football/players exposes the correct
- * ARIA radiogroup pattern and supports full keyboard navigation (roving
- * tabindex, arrow keys).
+ * The position pill row on /football/players is a multi-select toggle-button
+ * group: each pill is a `role=button` with `aria-pressed`, the container is a
+ * `role=group`, and keyboard users get roving tabindex (arrow keys move focus)
+ * with Space/Enter toggling the focused pill. "All" clears the selection.
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -18,8 +19,8 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const PAGE_URL = '/football/players';
 
+// Selectable position pills, excluding the leading "All" pill.
 const POSITIONS = [
-  'All',
   'QB',
   'RB',
   'WR',
@@ -31,6 +32,8 @@ const POSITIONS = [
   'LB',
   'DB',
 ] as const;
+
+const ALL_PILLS = ['All', ...POSITIONS] as const;
 
 // ── Minimal mock data ────────────────────────────────────────────────────────
 
@@ -67,39 +70,112 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-test.describe('FootballPositionFilter — ARIA radiogroup @regression', () => {
+test.describe('FootballPositionFilter — toggle group ARIA @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockFootballPlayers(page);
     await page.goto(PAGE_URL);
   });
 
-  test('pill container has role=radiogroup with accessible label', async ({
+  test('pill container has role=group with accessible label', async ({
     page,
   }) => {
-    const group = page.getByRole('radiogroup', { name: 'Filter by position' });
+    const group = page.getByRole('group', { name: 'Filter by position' });
     await expect(group).toBeVisible();
   });
 
-  test('all position pills are role=radio', async ({ page }) => {
-    const radios = page.getByRole('radio');
-    await expect(radios).toHaveCount(POSITIONS.length);
+  test('every pill is a role=button toggle', async ({ page }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    await expect(group.getByRole('button')).toHaveCount(ALL_PILLS.length);
   });
 
-  test('"All" pill is checked and in tab order by default', async ({
+  test('"All" pill is pressed and in tab order by default', async ({
     page,
   }) => {
-    const allPill = page.getByRole('radio', { name: 'All' });
-    await expect(allPill).toHaveAttribute('aria-checked', 'true');
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    const allPill = group.getByRole('button', { name: 'All' });
+    await expect(allPill).toHaveAttribute('aria-pressed', 'true');
     await expect(allPill).toHaveAttribute('tabindex', '0');
   });
 
-  test('non-active pills have aria-checked=false and tabindex=-1', async ({
+  test('position pills are unpressed and out of tab order by default', async ({
     page,
   }) => {
-    for (const pos of POSITIONS.slice(1)) {
-      const pill = page.getByRole('radio', { name: pos });
-      await expect(pill).toHaveAttribute('aria-checked', 'false');
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    for (const pos of POSITIONS) {
+      const pill = group.getByRole('button', { name: pos });
+      await expect(pill).toHaveAttribute('aria-pressed', 'false');
       await expect(pill).toHaveAttribute('tabindex', '-1');
+    }
+  });
+});
+
+test.describe('FootballPositionFilter — multi-select @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockFootballPlayers(page);
+    await page.goto(PAGE_URL);
+  });
+
+  test('clicking a position selects it and deselects "All"', async ({
+    page,
+  }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    await group.getByRole('button', { name: 'QB' }).click();
+
+    await expect(group.getByRole('button', { name: 'QB' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  test('multiple positions can be selected at once (QB + RB)', async ({
+    page,
+  }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    await group.getByRole('button', { name: 'QB' }).click();
+    await group.getByRole('button', { name: 'RB' }).click();
+
+    await expect(group.getByRole('button', { name: 'QB' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(group.getByRole('button', { name: 'RB' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  test('clicking a selected position toggles it back off', async ({ page }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    const qbPill = group.getByRole('button', { name: 'QB' });
+    await qbPill.click();
+    await expect(qbPill).toHaveAttribute('aria-pressed', 'true');
+    await qbPill.click();
+    await expect(qbPill).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('"All" clears the current multi-selection', async ({ page }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    await group.getByRole('button', { name: 'QB' }).click();
+    await group.getByRole('button', { name: 'RB' }).click();
+    await group.getByRole('button', { name: 'All' }).click();
+
+    await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    for (const pos of POSITIONS) {
+      await expect(group.getByRole('button', { name: pos })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
     }
   });
 });
@@ -110,62 +186,57 @@ test.describe('FootballPositionFilter — keyboard navigation @regression', () =
     await page.goto(PAGE_URL);
   });
 
-  test('ArrowRight moves selection from All → QB', async ({ page }) => {
-    const allPill = page.getByRole('radio', { name: 'All' });
+  test('ArrowRight moves roving focus from All → QB', async ({ page }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    const allPill = group.getByRole('button', { name: 'All' });
     await allPill.focus();
     await page.keyboard.press('ArrowRight');
 
-    const qbPill = page.getByRole('radio', { name: 'QB' });
-    await expect(qbPill).toHaveAttribute('aria-checked', 'true');
+    const qbPill = group.getByRole('button', { name: 'QB' });
     await expect(qbPill).toHaveAttribute('tabindex', '0');
-    await expect(allPill).toHaveAttribute('aria-checked', 'false');
+    await expect(qbPill).toBeFocused();
+    await expect(allPill).toHaveAttribute('tabindex', '-1');
   });
 
-  test('ArrowLeft wraps from All → DB (last item)', async ({ page }) => {
-    const allPill = page.getByRole('radio', { name: 'All' });
+  test('ArrowLeft wraps roving focus from All → DB (last item)', async ({
+    page,
+  }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    const allPill = group.getByRole('button', { name: 'All' });
     await allPill.focus();
     await page.keyboard.press('ArrowLeft');
 
-    const dbPill = page.getByRole('radio', { name: 'DB' });
-    await expect(dbPill).toHaveAttribute('aria-checked', 'true');
-    await expect(allPill).toHaveAttribute('aria-checked', 'false');
+    const dbPill = group.getByRole('button', { name: 'DB' });
+    await expect(dbPill).toHaveAttribute('tabindex', '0');
+    await expect(dbPill).toBeFocused();
   });
 
-  test('ArrowDown moves selection forward', async ({ page }) => {
-    const allPill = page.getByRole('radio', { name: 'All' });
-    await allPill.focus();
-    await page.keyboard.press('ArrowDown');
-
-    const qbPill = page.getByRole('radio', { name: 'QB' });
-    await expect(qbPill).toHaveAttribute('aria-checked', 'true');
-  });
-
-  test('ArrowRight wraps from DB → All', async ({ page }) => {
-    // Navigate to DB first via click
-    await page.getByRole('radio', { name: 'DB' }).click();
-    const dbPill = page.getByRole('radio', { name: 'DB' });
-    await dbPill.focus();
-    await page.keyboard.press('ArrowRight');
-
-    const allPill = page.getByRole('radio', { name: 'All' });
-    await expect(allPill).toHaveAttribute('aria-checked', 'true');
-  });
-
-  test('only selected pill has tabindex=0 after keyboard navigation', async ({
+  test('Space toggles the focused pill without moving selection', async ({
     page,
   }) => {
-    const allPill = page.getByRole('radio', { name: 'All' });
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    const allPill = group.getByRole('button', { name: 'All' });
     await allPill.focus();
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight'); // focus QB
+    await page.keyboard.press(' '); // toggle QB on
 
-    // Should now be on RB (index 2)
-    const rbPill = page.getByRole('radio', { name: 'RB' });
+    const qbPill = group.getByRole('button', { name: 'QB' });
+    await expect(qbPill).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('only the focused pill has tabindex=0 after keyboard navigation', async ({
+    page,
+  }) => {
+    const group = page.getByRole('group', { name: 'Filter by position' });
+    await group.getByRole('button', { name: 'All' }).focus();
+    await page.keyboard.press('ArrowRight'); // QB
+    await page.keyboard.press('ArrowRight'); // RB
+
+    const rbPill = group.getByRole('button', { name: 'RB' });
     await expect(rbPill).toHaveAttribute('tabindex', '0');
 
-    // All others should be -1
-    for (const pos of POSITIONS.filter((p) => p !== 'RB')) {
-      await expect(page.getByRole('radio', { name: pos })).toHaveAttribute(
+    for (const label of ALL_PILLS.filter((p) => p !== 'RB')) {
+      await expect(group.getByRole('button', { name: label })).toHaveAttribute(
         'tabindex',
         '-1',
       );

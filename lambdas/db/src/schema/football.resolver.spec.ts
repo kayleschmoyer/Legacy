@@ -600,6 +600,74 @@ describe('football resolvers', () => {
       ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
     });
 
+    describe('positions multi-select (LS-6464)', () => {
+      // Serialize the WHERE SQL passed to db.where() into bind params using
+      // drizzle's own dialect so we can assert the real compiled query.
+      function compileWhereParams(): unknown[] {
+        const whereArg = mockDb.where.mock.calls[0][0];
+        return new PgDialect().sqlToQuery(whereArg).params;
+      }
+
+      it('filters with inArray over multiple positions', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { positions: ['QB', 'RB'], search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const params = compileWhereParams();
+        expect(params).toContain('QB');
+        expect(params).toContain('RB');
+      });
+
+      it('still supports the legacy single position arg', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: 'WR', search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(compileWhereParams()).toContain('WR');
+      });
+
+      it('merges the single position and positions array into one filter', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: 'TE',
+            positions: ['QB', 'RB'],
+            search: null,
+            after: null,
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(compileWhereParams()).toEqual(
+          expect.arrayContaining(['QB', 'RB', 'TE']),
+        );
+      });
+
+      it('throws BAD_USER_INPUT when any position in the array is invalid', async () => {
+        await expect(
+          getResolver()(
+            {},
+            { positions: ['QB', 'INVALID_POS'], search: null, after: null },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      });
+    });
+
     describe('search parameter handling', () => {
       // Serialize the WHERE SQL passed to db.where() into { sql, params }
       // using drizzle's own dialect, so assertions read the real compiled

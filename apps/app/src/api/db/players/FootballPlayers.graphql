@@ -1,12 +1,12 @@
 query FootballPlayers(
-  $position: String
+  $positions: [String!]
   $nflTeam: String
   $conference: String
   $search: String
   $after: String
 ) {
   footballPlayers(
-    position: $position
+    positions: $positions
     nflTeam: $nflTeam
     conference: $conference
     search: $search

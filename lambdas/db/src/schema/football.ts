@@ -1717,6 +1717,15 @@ function isValidPosition(p: string): p is PlayerPosition {
   return (VALID_FOOTBALL_POSITIONS as readonly string[]).includes(p);
 }
 
+// Pseudo-positions are not stored player positions — they expand to the
+// concrete positions eligible for a roster slot (LS-6489). A request for any of
+// these keys matches every constituent position.
+const PSEUDO_POSITION_EXPANSIONS: Record<string, readonly PlayerPosition[]> = {
+  FLEX: ['RB', 'WR', 'TE'],
+  SUPERFLEX: ['QB', 'RB', 'WR', 'TE'],
+  IDP: ['DL', 'LB', 'DB'],
+};
+
 const VALID_NFL_TEAMS = [
   'ARI',
   'ATL',
@@ -1823,7 +1832,13 @@ builder.queryField('footballPlayers', (t) =>
     description:
       'Paginated list of football players, optionally filtered by position (LS-255)',
     args: {
+      // `position` (single) is retained for backward compatibility with
+      // existing clients (e.g. the shared-components draft preview). `positions`
+      // (multi) supersedes it for the players-list filter so callers can view
+      // several positions at once, e.g. QB + RB (LS-6464). When both are
+      // supplied they are merged into one `inArray` filter (OR semantics).
       position: t.arg.string({ required: false }),
+      positions: t.arg.stringList({ required: false }),
       nflTeam: t.arg.string({ required: false }),
       conference: t.arg.string({ required: false }),
       search: t.arg.string({ required: false }),
@@ -1884,25 +1899,31 @@ builder.queryField('footballPlayers', (t) =>
 
       const conditions: SQL[] = [eq(PublicSchema.players.sport, 'football')];
 
-      if (args.position) {
-        if (args.position === 'FLEX') {
-          conditions.push(
-            inArray(PublicSchema.players.position, ['RB', 'WR', 'TE']),
-          );
-        } else if (args.position === 'SUPERFLEX') {
-          conditions.push(
-            inArray(PublicSchema.players.position, ['QB', 'RB', 'WR', 'TE']),
-          );
-        } else if (args.position === 'IDP') {
-          conditions.push(
-            inArray(PublicSchema.players.position, ['DL', 'LB', 'DB']),
-          );
-        } else {
-          if (!isValidPosition(args.position)) {
-            throw UserInputError(`Invalid position: ${args.position}`);
-          }
-          conditions.push(eq(PublicSchema.players.position, args.position));
+      // Merge the single `position` and multi `positions` args into one deduped
+      // filter, expanding the pseudo-positions (FLEX / SUPERFLEX / IDP) to their
+      // constituent positions. A single concrete value collapses to `eq`
+      // semantics inside `inArray`, so backward compatibility is preserved.
+      // Pseudo-positions came from LS-6489; multi-select from LS-6464.
+      const requestedPositions = [
+        ...(args.positions ?? []),
+        ...(args.position != null ? [args.position] : []),
+      ];
+      const positionFilter: PlayerPosition[] = [];
+      for (const p of requestedPositions) {
+        const expansion = PSEUDO_POSITION_EXPANSIONS[p];
+        if (expansion) {
+          positionFilter.push(...expansion);
+          continue;
         }
+        if (!isValidPosition(p)) {
+          throw UserInputError(`Invalid position: ${p}`);
+        }
+        positionFilter.push(p);
+      }
+      if (positionFilter.length > 0) {
+        conditions.push(
+          inArray(PublicSchema.players.position, [...new Set(positionFilter)]),
+        );
       }
 
       if (args.nflTeam) {

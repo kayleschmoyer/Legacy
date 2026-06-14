@@ -427,8 +427,20 @@ export default function FootballPlayers(): React.JSX.Element {
   const visiblePositions = hasAdvancedFilters
     ? [...BASE_POSITIONS, ...PREMIUM_POSITIONS]
     : BASE_POSITIONS;
-  const [position, setPosition] = useState<FootballPosition>('All');
+  // Multi-select positions (LS-6464). Empty array means "All" (no filter);
+  // 'All' is never stored in the array — it is the clear affordance.
+  const [positions, setPositions] = useState<FootballPosition[]>([]);
   const [teamFilter, setTeamFilter] = useState('All');
+
+  const handlePositionPress = useCallback((pos: FootballPosition) => {
+    if (pos === 'All') {
+      setPositions([]);
+      return;
+    }
+    setPositions((prev) =>
+      prev.includes(pos) ? prev.filter((p) => p !== pos) : [...prev, pos],
+    );
+  }, []);
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<FootballPlayerNode[]>([]);
@@ -436,32 +448,43 @@ export default function FootballPlayers(): React.JSX.Element {
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
+  // If the user loses the advanced-search entitlement while premium positions
+  // (SUPERFLEX/IDP) are selected, drop just those — the multi-select equivalent
+  // of resetting a single premium selection to "All".
   useEffect(() => {
-    if (!hasAdvancedFilters && PREMIUM_POSITIONS.includes(position)) {
-      setPosition('All');
+    if (!hasAdvancedFilters) {
+      setPositions((prev) =>
+        prev.some((p) => PREMIUM_POSITIONS.includes(p))
+          ? prev.filter((p) => !PREMIUM_POSITIONS.includes(p))
+          : prev,
+      );
     }
-  }, [hasAdvancedFilters, position]);
+  }, [hasAdvancedFilters]);
 
-  const prevFiltersRef = useRef({ position, teamFilter, debouncedSearch });
+  // Stable key for the multi-select positions array so the reset effect can
+  // compare by value rather than array identity.
+  const positionsKey = positions.join('|');
+
+  const prevFiltersRef = useRef({ positionsKey, teamFilter, debouncedSearch });
   useEffect(() => {
     const prev = prevFiltersRef.current;
     if (
-      prev.position !== position ||
+      prev.positionsKey !== positionsKey ||
       prev.teamFilter !== teamFilter ||
       prev.debouncedSearch !== debouncedSearch
     ) {
-      prevFiltersRef.current = { position, teamFilter, debouncedSearch };
+      prevFiltersRef.current = { positionsKey, teamFilter, debouncedSearch };
       setCursor(undefined);
       setAllNodes([]);
       setIsFilterChanging(true);
     }
-  }, [position, teamFilter, debouncedSearch]);
+  }, [positionsKey, teamFilter, debouncedSearch]);
 
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
 
   const { data, loading, error } = useFootballPlayersQuery({
     variables: {
-      position: position === 'All' ? undefined : position,
+      positions: positions.length > 0 ? positions : undefined,
       nflTeam: !isConference && teamFilter !== 'All' ? teamFilter : undefined,
       conference: isConference ? teamFilter : undefined,
       search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
@@ -509,8 +532,10 @@ export default function FootballPlayers(): React.JSX.Element {
           renderItem={({ item: pos }) => (
             <PositionPill
               pos={pos}
-              selected={pos === position}
-              onPress={() => setPosition(pos)}
+              selected={
+                pos === 'All' ? positions.length === 0 : positions.includes(pos)
+              }
+              onPress={() => handlePositionPress(pos)}
             />
           )}
           contentContainerStyle={{

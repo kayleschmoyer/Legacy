@@ -122,7 +122,7 @@ fragment FootballPlayerDetailExtras on FootballPlayer {
 }
 
 query FootballPlayers(
-  $position: String
+  $positions: [String!]
   $nflTeam: String
   $conference: String
   $search: String
@@ -134,7 +134,7 @@ query FootballPlayers(
   $sortDir: String
 ) {
   footballPlayers(
-    position: $position
+    positions: $positions
     nflTeam: $nflTeam
     conference: $conference
     search: $search

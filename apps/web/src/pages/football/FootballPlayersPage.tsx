@@ -480,31 +480,49 @@ function AdvancedFiltersPanel({
 
 const VALID_POSITIONS = new Set<string>(FOOTBALL_POSITIONS);
 
+// Parse the comma-encoded `position` search param into a validated list.
+function parsePositions(raw: string | null): FootballPosition[] {
+  return (raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s): s is FootballPosition => s !== '' && VALID_POSITIONS.has(s));
+}
+
 export function FootballPlayersPage() {
   const navigate = useNavigate();
   const media = useMedia();
+  // Multi-select positions are URL-synced via the `position` search param,
+  // comma-encoded (e.g. ?position=QB,RB). Single-value deep links from LS-6489
+  // continue to work unchanged; multi-select is additive (LS-6464).
   const [searchParams, setSearchParams] = useSearchParams();
-  const positionParam = searchParams.get('position') ?? 'All';
-  const position: FootballPosition = VALID_POSITIONS.has(positionParam)
-    ? (positionParam as FootballPosition)
-    : 'All';
-  const setPosition = useCallback(
+  const positions = parsePositions(searchParams.get('position'));
+  // Resolve toggles against the live committed URL (window.location.search,
+  // which history.replaceState updates synchronously) rather than React's
+  // `searchParams` snapshot. Two rapid clicks fire before React re-renders, so
+  // a snapshot-based updater would race and drop the first selection; reading
+  // the live URL makes successive toggles accumulate deterministically
+  // (LS-6464).
+  const togglePosition = useCallback(
     (pos: FootballPosition) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (pos === 'All') {
-            next.delete('position');
-          } else {
-            next.set('position', pos);
-          }
-          return next;
-        },
-        { replace: true },
-      );
+      const params = new URLSearchParams(window.location.search);
+      const current = parsePositions(params.get('position'));
+      const next = current.includes(pos)
+        ? current.filter((p) => p !== pos)
+        : [...current, pos];
+      if (next.length === 0) {
+        params.delete('position');
+      } else {
+        params.set('position', next.join(','));
+      }
+      setSearchParams(params, { replace: true });
     },
     [setSearchParams],
   );
+  const clearPositions = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('position');
+    setSearchParams(params, { replace: true });
+  }, [setSearchParams]);
   const isPremium = useIsPremium();
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
@@ -586,10 +604,14 @@ export function FootballPlayersPage() {
       : NaN;
   const maxAdpArg = Number.isFinite(parsedMaxAdp) ? parsedMaxAdp : undefined;
 
+  // Stable key for the multi-select positions array so the reset effect can
+  // compare by value rather than array identity.
+  const positionsKey = positions.join('|');
+
   // Reset pagination when filters or sort change — the offset cursor is only
   // valid for the result set that produced it.
   const prevFiltersRef = useRef({
-    position,
+    positionsKey,
     teamFilter,
     debouncedSearch,
     injuryStatusArg,
@@ -601,7 +623,7 @@ export function FootballPlayersPage() {
   useEffect(() => {
     const prev = prevFiltersRef.current;
     if (
-      prev.position !== position ||
+      prev.positionsKey !== positionsKey ||
       prev.teamFilter !== teamFilter ||
       prev.debouncedSearch !== debouncedSearch ||
       prev.injuryStatusArg !== injuryStatusArg ||
@@ -611,7 +633,7 @@ export function FootballPlayersPage() {
       prev.sortDir !== sort.dir
     ) {
       prevFiltersRef.current = {
-        position,
+        positionsKey,
         teamFilter,
         debouncedSearch,
         injuryStatusArg,
@@ -624,7 +646,7 @@ export function FootballPlayersPage() {
       setAllNodes([]);
     }
   }, [
-    position,
+    positionsKey,
     teamFilter,
     debouncedSearch,
     injuryStatusArg,
@@ -636,7 +658,7 @@ export function FootballPlayersPage() {
 
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
   const queryVars = {
-    position: position === 'All' ? undefined : position,
+    positions: positions.length > 0 ? positions : undefined,
     nflTeam: teamFilter === 'All' || isConference ? undefined : teamFilter,
     conference: isConference ? teamFilter : undefined,
     search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
@@ -805,7 +827,11 @@ export function FootballPlayersPage() {
         </XStack>
 
         {/* Position pills */}
-        <FootballPositionFilter selected={position} onChange={setPosition} />
+        <FootballPositionFilter
+          selected={positions}
+          onToggle={togglePosition}
+          onClear={clearPositions}
+        />
 
         {/* Team filter */}
         <XStack alignItems="center" gap={8}>

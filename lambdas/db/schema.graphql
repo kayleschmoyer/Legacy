@@ -3144,6 +3144,7 @@ type Query {
     minProjectedPoints: Float
     nflTeam: String
     position: String
+    positions: [String!]
     search: String
     sortBy: String
     sortDir: String

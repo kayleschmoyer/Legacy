@@ -433,6 +433,14 @@ describe('FootballPlayers', () => {
   });
 
   describe('position filter', () => {
+    function lastPositions(): string[] | undefined {
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      return lastCall[0].variables.positions;
+    }
+
     it('hides SUPERFLEX and IDP pills for free users', () => {
       mockUseHasEntitlement.mockReturnValue(false);
       render(<FootballPlayers />);
@@ -447,17 +455,13 @@ describe('FootballPlayers', () => {
       expect(screen.getByText('IDP')).toBeTruthy();
     });
 
-    it('resets selected position to All when advanced_search_filters entitlement is revoked', () => {
+    it('drops premium positions when advanced_search_filters entitlement is revoked', () => {
       mockUseHasEntitlement.mockReturnValue(true);
       const { rerender } = render(<FootballPlayers />);
 
       // Select SUPERFLEX while premium
       fireEvent.press(screen.getByText('SUPERFLEX'));
-      const calls = mockUseFootballPlayersQuery.mock.calls;
-      let lastCall = calls[calls.length - 1] as [
-        { variables: { position?: string } },
-      ];
-      expect(lastCall[0].variables.position).toBe('SUPERFLEX');
+      expect(lastPositions()).toEqual(['SUPERFLEX']);
 
       // Simulate entitlement revocation (downgrade)
       mockUseHasEntitlement.mockReturnValue(false);
@@ -465,12 +469,8 @@ describe('FootballPlayers', () => {
         rerender(<FootballPlayers />);
       });
 
-      // Downgrade guard useEffect resets position to 'All' → query gets undefined
-      const calls2 = mockUseFootballPlayersQuery.mock.calls;
-      lastCall = calls2[calls2.length - 1] as [
-        { variables: { position?: string } },
-      ];
-      expect(lastCall[0].variables.position).toBeUndefined();
+      // Downgrade guard useEffect drops premium positions → query gets undefined
+      expect(lastPositions()).toBeUndefined();
     });
 
     it('passes selected position to query when a pill is pressed', () => {
@@ -478,22 +478,29 @@ describe('FootballPlayers', () => {
       // Pills are rendered first in the FlatList before any player content;
       // use getAllByText and pick the first occurrence (the pill).
       fireEvent.press(screen.getAllByText('QB')[0]);
-      const calls = mockUseFootballPlayersQuery.mock.calls;
-      const lastCall = calls[calls.length - 1] as [
-        { variables: { position?: string } },
-      ];
-      expect(lastCall[0].variables.position).toBe('QB');
+      expect(lastPositions()).toEqual(['QB']);
     });
 
-    it('passes undefined position when "All" pill is selected', () => {
+    it('accumulates multiple positions for multi-select (LS-6464)', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getAllByText('RB')[0]);
+      expect(lastPositions()).toEqual(['QB', 'RB']);
+    });
+
+    it('toggles a position off when its pill is pressed again', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getAllByText('RB')[0]);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      expect(lastPositions()).toEqual(['RB']);
+    });
+
+    it('passes undefined positions when "All" pill is selected', () => {
       render(<FootballPlayers />);
       fireEvent.press(screen.getAllByText('QB')[0]);
       fireEvent.press(screen.getByText('All'));
-      const calls = mockUseFootballPlayersQuery.mock.calls;
-      const lastCall = calls[calls.length - 1] as [
-        { variables: { position?: string } },
-      ];
-      expect(lastCall[0].variables.position).toBeUndefined();
+      expect(lastPositions()).toBeUndefined();
     });
   });
 

@@ -12,7 +12,6 @@ import {
 } from '../../constants/colors';
 
 export type FootballPosition =
-  | 'All'
   | 'QB'
   | 'RB'
   | 'WR'
@@ -24,8 +23,8 @@ export type FootballPosition =
   | 'LB'
   | 'DB';
 
+/** Selectable positions, in display order. `All` is rendered separately. */
 export const POSITIONS: FootballPosition[] = [
-  'All',
   'QB',
   'RB',
   'WR',
@@ -38,9 +37,21 @@ export const POSITIONS: FootballPosition[] = [
   'DB',
 ];
 
+// Pills (including the leading "All" pill) for roving-tabindex navigation.
+const PILL_COUNT = POSITIONS.length + 1;
+
 interface Props {
-  selected: FootballPosition;
-  onChange: (pos: FootballPosition) => void;
+  /** Currently-selected positions. Empty means "All" (no position filter). */
+  selected: FootballPosition[];
+  /**
+   * Toggle a single position on/off. Intent-based (rather than emitting a full
+   * array) so the parent can resolve the new set against its authoritative
+   * state — this keeps rapid successive toggles from racing on a stale
+   * `selected` snapshot (LS-6464).
+   */
+  onToggle: (pos: FootballPosition) => void;
+  /** Clear the whole selection ("All"). */
+  onClear: () => void;
 }
 
 const Pill = styled(Text, {
@@ -72,8 +83,73 @@ const Pill = styled(Text, {
   } as const,
 });
 
-export function FootballPositionFilter({ selected, onChange }: Props) {
+export function FootballPositionFilter({ selected, onToggle, onClear }: Props) {
   const pillRefs = React.useRef<(HTMLElement | null)[]>([]);
+  // Roving tabindex: only one pill is in the tab order at a time. Index 0 is
+  // the "All" pill; positions follow at index 1..N. Defaults to "All".
+  const [focusIndex, setFocusIndex] = React.useState(0);
+
+  // Activating a pill: index 0 clears the filter ("All"), others toggle.
+  const activate = (index: number) => {
+    if (index === 0) {
+      onClear();
+    } else {
+      onToggle(POSITIONS[index - 1]);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let nextIndex: number | null = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextIndex = (index + 1) % PILL_COUNT;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextIndex = (index - 1 + PILL_COUNT) % PILL_COUNT;
+    } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      activate(index);
+      return;
+    }
+    if (nextIndex !== null) {
+      setFocusIndex(nextIndex);
+      pillRefs.current[nextIndex]?.focus();
+    }
+  };
+
+  const renderPill = (
+    label: string,
+    index: number,
+    isActive: boolean,
+    accentColor: string,
+  ) => (
+    <Pill
+      key={label}
+      ref={(el: HTMLElement | null) => {
+        pillRefs.current[index] = el;
+      }}
+      active={isActive}
+      onPress={() => {
+        setFocusIndex(index);
+        activate(index);
+      }}
+      role="button"
+      aria-pressed={isActive}
+      tabIndex={focusIndex === index ? 0 : -1}
+      onKeyDown={(e: React.KeyboardEvent) => handleKeyDown(e, index)}
+      style={
+        isActive
+          ? {
+              backgroundColor: withAlpha(accentColor, 0.15),
+              borderColor: accentColor,
+              color: label === 'All' ? TEXT_PRIMARY : accentColor,
+            }
+          : undefined
+      }
+    >
+      {label}
+    </Pill>
+  );
 
   return (
     <ScrollView
@@ -84,52 +160,19 @@ export function FootballPositionFilter({ selected, onChange }: Props) {
       <XStack
         gap={8}
         paddingVertical={4}
-        role="radiogroup"
+        role="group"
         aria-label="Filter by position"
       >
-        {POSITIONS.map((pos, index) => {
-          const isActive = pos === selected;
-          const accentColor =
-            pos === 'All' ? BRAND_NAVY : FOOTBALL_POSITION_COLORS[pos];
-          return (
-            <Pill
-              key={pos}
-              ref={(el: HTMLElement | null) => {
-                pillRefs.current[index] = el;
-              }}
-              active={isActive}
-              onPress={() => onChange(pos)}
-              role="radio"
-              aria-checked={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                let nextIndex: number | null = null;
-                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  nextIndex = (index + 1) % POSITIONS.length;
-                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  nextIndex = (index - 1 + POSITIONS.length) % POSITIONS.length;
-                }
-                if (nextIndex !== null) {
-                  onChange(POSITIONS[nextIndex]);
-                  pillRefs.current[nextIndex]?.focus();
-                }
-              }}
-              style={
-                isActive
-                  ? {
-                      backgroundColor: withAlpha(accentColor, 0.15),
-                      borderColor: accentColor,
-                      color: pos === 'All' ? TEXT_PRIMARY : accentColor,
-                    }
-                  : undefined
-              }
-            >
-              {pos}
-            </Pill>
-          );
-        })}
+        {/* "All" clears the multi-select; active when nothing is selected. */}
+        {renderPill('All', 0, selected.length === 0, BRAND_NAVY)}
+        {POSITIONS.map((pos, i) =>
+          renderPill(
+            pos,
+            i + 1,
+            selected.includes(pos),
+            FOOTBALL_POSITION_COLORS[pos],
+          ),
+        )}
       </XStack>
     </ScrollView>
   );

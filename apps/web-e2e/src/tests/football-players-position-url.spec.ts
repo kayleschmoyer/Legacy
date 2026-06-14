@@ -11,6 +11,8 @@
  * never used per project hermetic-test policy.
  */
 
+// Position pills are multi-select toggle buttons (role=button + aria-pressed)
+// since LS-6464; single-value `?position=` deep links still select exactly one.
 import { expect, test } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -62,10 +64,10 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   test('deep-link ?position=QB pre-selects the QB pill', async ({ page }) => {
     await page.goto(`${PAGE_URL}?position=QB`);
 
-    const qbPill = page.getByRole('radio', { name: 'QB' });
-    const allPill = page.getByRole('radio', { name: 'All' });
-    await expect(qbPill).toHaveAttribute('aria-checked', 'true');
-    await expect(allPill).toHaveAttribute('aria-checked', 'false');
+    const qbPill = page.getByRole('button', { name: 'QB' });
+    const allPill = page.getByRole('button', { name: 'All' });
+    await expect(qbPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(allPill).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('deep-link ?position=FLEX pre-selects the FLEX pill', async ({
@@ -73,8 +75,8 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   }) => {
     await page.goto(`${PAGE_URL}?position=FLEX`);
 
-    const flexPill = page.getByRole('radio', { name: 'FLEX' });
-    await expect(flexPill).toHaveAttribute('aria-checked', 'true');
+    const flexPill = page.getByRole('button', { name: 'FLEX' });
+    await expect(flexPill).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('invalid ?position= param falls back to All being selected', async ({
@@ -82,8 +84,8 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   }) => {
     await page.goto(`${PAGE_URL}?position=INVALID`);
 
-    const allPill = page.getByRole('radio', { name: 'All' });
-    await expect(allPill).toHaveAttribute('aria-checked', 'true');
+    const allPill = page.getByRole('button', { name: 'All' });
+    await expect(allPill).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('selecting a position writes ?position= to the URL', async ({
@@ -91,11 +93,11 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   }) => {
     await page.goto(PAGE_URL);
 
-    await page.getByRole('radio', { name: 'RB' }).click();
+    await page.getByRole('button', { name: 'RB' }).click();
 
     await expect(page).toHaveURL(/[?&]position=RB/);
-    await expect(page.getByRole('radio', { name: 'RB' })).toHaveAttribute(
-      'aria-checked',
+    await expect(page.getByRole('button', { name: 'RB' })).toHaveAttribute(
+      'aria-pressed',
       'true',
     );
   });
@@ -105,11 +107,11 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   }) => {
     await page.goto(`${PAGE_URL}?position=QB`);
 
-    await page.getByRole('radio', { name: 'All' }).click();
+    await page.getByRole('button', { name: 'All' }).click();
 
     await expect(page).not.toHaveURL(/[?&]position=/);
-    await expect(page.getByRole('radio', { name: 'All' })).toHaveAttribute(
-      'aria-checked',
+    await expect(page.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
       'true',
     );
   });
@@ -120,7 +122,7 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
     await page.goto(PAGE_URL);
 
     // Select QB — writes ?position=QB in-place (replace: true)
-    await page.getByRole('radio', { name: 'QB' }).click();
+    await page.getByRole('button', { name: 'QB' }).click();
     await expect(page).toHaveURL(/[?&]position=QB/);
 
     // Navigate forward to a player detail page (simulates clicking a player card)
@@ -129,8 +131,8 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
     // Browser back returns to /football/players?position=QB
     await page.goBack();
 
-    await expect(page.getByRole('radio', { name: 'QB' })).toHaveAttribute(
-      'aria-checked',
+    await expect(page.getByRole('button', { name: 'QB' })).toHaveAttribute(
+      'aria-pressed',
       'true',
       { timeout: 5000 },
     );

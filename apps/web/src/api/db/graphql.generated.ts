@@ -3160,6 +3160,7 @@ export type QueryFootballPlayersArgs = {
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  positions?: InputMaybe<Array<Scalars['String']['input']>>;
   search?: InputMaybe<Scalars['String']['input']>;
   sortBy?: InputMaybe<Scalars['String']['input']>;
   sortDir?: InputMaybe<Scalars['String']['input']>;
@@ -5371,7 +5372,9 @@ export type FootballPlayerDetailExtrasFragment = {
 };
 
 export type FootballPlayersQueryVariables = Exact<{
-  position?: InputMaybe<Scalars['String']['input']>;
+  positions?: InputMaybe<
+    Array<Scalars['String']['input']> | Scalars['String']['input']
+  >;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -13017,7 +13020,7 @@ export type CastAwardVoteMutationOptions = BaseMutationOptions<
 >;
 export const FootballPlayers = gql`
   query FootballPlayers(
-    $position: String
+    $positions: [String!]
     $nflTeam: String
     $conference: String
     $search: String
@@ -13029,7 +13032,7 @@ export const FootballPlayers = gql`
     $sortDir: String
   ) {
     footballPlayers(
-      position: $position
+      positions: $positions
       nflTeam: $nflTeam
       conference: $conference
       search: $search
@@ -13064,7 +13067,7 @@ export const FootballPlayers = gql`
  * @example
  * const { data, loading, error } = useFootballPlayersQuery({
  *   variables: {
- *      position: // value for 'position'
+ *      positions: // value for 'positions'
  *      nflTeam: // value for 'nflTeam'
  *      conference: // value for 'conference'
  *      search: // value for 'search'
