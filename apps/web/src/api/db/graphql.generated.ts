@@ -3155,6 +3155,7 @@ export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
   injuryStatus?: InputMaybe<Scalars['String']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
@@ -5377,6 +5378,7 @@ export type FootballPlayersQueryVariables = Exact<{
   >;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
+  freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
   injuryStatus?: InputMaybe<Scalars['String']['input']>;
@@ -13023,6 +13025,7 @@ export const FootballPlayers = gql`
     $positions: [String!]
     $nflTeam: String
     $conference: String
+    $freeAgent: Boolean
     $search: String
     $after: String
     $injuryStatus: String
@@ -13035,6 +13038,7 @@ export const FootballPlayers = gql`
       positions: $positions
       nflTeam: $nflTeam
       conference: $conference
+      freeAgent: $freeAgent
       search: $search
       after: $after
       injuryStatus: $injuryStatus
@@ -13070,6 +13074,7 @@ export const FootballPlayers = gql`
  *      positions: // value for 'positions'
  *      nflTeam: // value for 'nflTeam'
  *      conference: // value for 'conference'
+ *      freeAgent: // value for 'freeAgent'
  *      search: // value for 'search'
  *      after: // value for 'after'
  *      injuryStatus: // value for 'injuryStatus'

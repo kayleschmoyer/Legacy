@@ -659,8 +659,12 @@ export function FootballPlayersPage() {
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
   const queryVars = {
     positions: positions.length > 0 ? positions : undefined,
-    nflTeam: teamFilter === 'All' || isConference ? undefined : teamFilter,
+    nflTeam:
+      teamFilter === 'All' || isConference || teamFilter === 'FREE_AGENT'
+        ? undefined
+        : teamFilter,
     conference: isConference ? teamFilter : undefined,
+    freeAgent: teamFilter === 'FREE_AGENT' ? true : undefined,
     search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
     after: cursor,
     injuryStatus: injuryStatusArg,

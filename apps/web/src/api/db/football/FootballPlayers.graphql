@@ -125,6 +125,7 @@ query FootballPlayers(
   $positions: [String!]
   $nflTeam: String
   $conference: String
+  $freeAgent: Boolean
   $search: String
   $after: String
   $injuryStatus: String
@@ -137,6 +138,7 @@ query FootballPlayers(
     positions: $positions
     nflTeam: $nflTeam
     conference: $conference
+    freeAgent: $freeAgent
     search: $search
     after: $after
     injuryStatus: $injuryStatus

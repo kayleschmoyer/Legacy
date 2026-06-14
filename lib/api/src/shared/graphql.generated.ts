@@ -3155,6 +3155,7 @@ export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
   injuryStatus?: InputMaybe<Scalars['String']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;

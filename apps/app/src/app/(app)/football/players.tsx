@@ -66,12 +66,31 @@ const POSITION_COLORS: Record<string, string> = {
   IDP: '#5B7FA6', // steel blue — premium composite (DL+LB+DB)
 };
 
+const CONFERENCE_ORDER: Record<string, number> = { AFC: 0, NFC: 1 };
+const DIVISION_ORDER: Record<string, number> = {
+  East: 0,
+  North: 1,
+  South: 2,
+  West: 3,
+};
+
 const TEAM_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'All', label: 'All Teams' },
+  { value: 'FREE_AGENT', label: 'Free Agents' },
   { value: 'AFC', label: 'AFC' },
   { value: 'NFC', label: 'NFC' },
   ...Object.values(NFL_TEAMS)
     .filter((t): t is NflTeam => t != null)
+    .sort((a, b) => {
+      const cDiff =
+        (CONFERENCE_ORDER[a.conference] ?? 99) -
+        (CONFERENCE_ORDER[b.conference] ?? 99);
+      if (cDiff !== 0) return cDiff;
+      const dDiff =
+        (DIVISION_ORDER[a.division] ?? 99) - (DIVISION_ORDER[b.division] ?? 99);
+      if (dDiff !== 0) return dDiff;
+      return a.city.localeCompare(b.city);
+    })
     .map((t) => ({
       value: t.abbreviation,
       label: `${t.abbreviation} — ${t.fullName}`,
@@ -485,8 +504,12 @@ export default function FootballPlayers(): React.JSX.Element {
   const { data, loading, error } = useFootballPlayersQuery({
     variables: {
       positions: positions.length > 0 ? positions : undefined,
-      nflTeam: !isConference && teamFilter !== 'All' ? teamFilter : undefined,
+      nflTeam:
+        !isConference && teamFilter !== 'All' && teamFilter !== 'FREE_AGENT'
+          ? teamFilter
+          : undefined,
       conference: isConference ? teamFilter : undefined,
+      freeAgent: teamFilter === 'FREE_AGENT' ? true : undefined,
       search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
       after: cursor,
     },
@@ -579,6 +602,7 @@ export default function FootballPlayers(): React.JSX.Element {
             disablePreventBodyScroll
             renderValue={(v) => {
               if (v === 'All') return 'All Teams';
+              if (v === 'FREE_AGENT') return 'Free Agents';
               if (v === 'AFC' || v === 'NFC') return v;
               return NFL_TEAMS[v]?.abbreviation ?? v;
             }}

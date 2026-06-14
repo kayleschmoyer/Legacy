@@ -29,6 +29,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   lte,
   or,
   sql,
@@ -1841,6 +1842,7 @@ builder.queryField('footballPlayers', (t) =>
       positions: t.arg.stringList({ required: false }),
       nflTeam: t.arg.string({ required: false }),
       conference: t.arg.string({ required: false }),
+      freeAgent: t.arg.boolean({ required: false }),
       search: t.arg.string({ required: false }),
       after: t.arg.string({ required: false }),
       first: t.arg.int({ required: false }),
@@ -1926,7 +1928,9 @@ builder.queryField('footballPlayers', (t) =>
         );
       }
 
-      if (args.nflTeam) {
+      if (args.freeAgent) {
+        conditions.push(isNull(PublicSchema.players.nflTeam));
+      } else if (args.nflTeam) {
         if (!isValidNflTeam(args.nflTeam)) {
           throw UserInputError(`Invalid NFL team: ${args.nflTeam}`);
         }
