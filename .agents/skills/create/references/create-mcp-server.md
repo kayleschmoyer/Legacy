@@ -104,6 +104,10 @@ Write tool descriptions as if an agent reads them to decide when to call the too
 
 Return structured JSON in `text` field. Set `isError: true` for errors. See [mcp-setup-patterns.md](mcp-setup-patterns.md) for examples.
 
+### Batch / bulk tools
+
+Any operation an agent routinely calls N times in a loop (create N tickets, transition N tickets, merge N PRs) should get an **array-accepting batch variant** alongside the retained single-item tool. Batch tools follow one convention across all in-repo servers — naming (`bulk_*` / `*_batch`), partial-failure result shape (`{ total, succeeded, failed: [{ index/key, error }] }` — one item erroring never fails the whole call), a max batch size (default 50) with a clear over-limit error, and a copy-paste helper. **Read [mcp-batch-tool-convention.md](mcp-batch-tool-convention.md) before adding one.**
+
 ### Safety
 
 - Default to **read-only** for data access tools — require explicit opt-in for writes
@@ -115,13 +119,14 @@ Return structured JSON in `text` field. Set `isError: true` for errors. See [mcp
 
 If your server needs to:
 
-| Need                       | Pattern                                                      |
-| -------------------------- | ------------------------------------------------------------ |
-| Run shell commands         | See `db-server/src/run-command.ts` — `execFile` with timeout |
-| Connect to PostgreSQL      | See `db-server/src/db-connection.ts` — lazy `postgres` pool  |
-| Call Jira REST API         | See `jira-server/src/jira-api.ts` — fetch with Basic Auth    |
-| Read Atlassian credentials | See `jira-server/src/netrc.ts` — parse `~/.netrc`            |
-| Run acli commands          | See `jira-server/src/acli.ts` — `execFile` wrapper           |
+| Need                       | Pattern                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Run shell commands         | See `db-server/src/run-command.ts` — `execFile` with timeout                                                |
+| Connect to PostgreSQL      | See `db-server/src/db-connection.ts` — lazy `postgres` pool                                                 |
+| Call Jira REST API         | See `jira-server/src/jira-api.ts` — fetch with Basic Auth                                                   |
+| Read Atlassian credentials | See `jira-server/src/netrc.ts` — parse `~/.netrc`                                                           |
+| Run acli commands          | See `jira-server/src/acli.ts` — `execFile` wrapper                                                          |
+| Batch/bulk tool result     | See [mcp-batch-tool-convention.md](mcp-batch-tool-convention.md) — `checkBatchSize` + `assembleBatchResult` |
 
 Copy and adapt these patterns rather than importing across MCP servers — each server should be self-contained.
 
