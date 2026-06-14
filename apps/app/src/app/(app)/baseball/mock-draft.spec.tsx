@@ -54,6 +54,10 @@ jest.mock('@growthbook/growthbook-react', () => ({
   useFeatureIsOn: (): boolean => mockUseFeatureIsOn(),
 }));
 
+jest.mock('../_screenErrorBoundary', () => ({
+  ScreenErrorBoundary: () => null,
+}));
+
 // GraphQL mutation + usage query
 const mockInitMutate = jest.fn();
 let mockInitState: { loading: boolean; error?: { message: string } } = {

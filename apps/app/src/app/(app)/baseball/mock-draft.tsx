@@ -275,3 +275,5 @@ export function MockDraftPage(): React.JSX.Element {
 }
 
 export default MockDraftPage;
+
+export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';
