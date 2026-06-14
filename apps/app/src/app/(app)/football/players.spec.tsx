@@ -675,7 +675,7 @@ describe('FootballPlayers', () => {
       const lastCall = calls[calls.length - 1] as [
         { variables: { search?: string } },
       ];
-      expect(lastCall[0].variables.search).toBe('Mahomes');
+      expect(lastCall[0].variables.search).toBe('mahomes');
     });
 
     it('passes undefined search when input is cleared after debounce', () => {

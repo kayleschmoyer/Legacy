@@ -526,6 +526,7 @@ export default function FootballPlayers(): React.JSX.Element {
     useMyRosterPlayerIds(!isPremium || !showMyRostered);
 
   const debouncedSearch = useDebounce(searchInput, 300);
+  const normalizedSearch = debouncedSearch.trim().toLowerCase();
 
   // If the user loses the advanced-search entitlement while premium positions
   // (SUPERFLEX/IDP) are selected, drop just those — the multi-select equivalent
@@ -548,21 +549,21 @@ export default function FootballPlayers(): React.JSX.Element {
   // adding isFilterChanging as a dep (which would create a circular trigger).
   const isFilterChangingRef = useRef(false);
 
-  const prevFiltersRef = useRef({ positionsKey, teamFilter, debouncedSearch });
+  const prevFiltersRef = useRef({ positionsKey, teamFilter, normalizedSearch });
   useEffect(() => {
     const prev = prevFiltersRef.current;
     if (
       prev.positionsKey !== positionsKey ||
       prev.teamFilter !== teamFilter ||
-      prev.debouncedSearch !== debouncedSearch
+      prev.normalizedSearch !== normalizedSearch
     ) {
-      prevFiltersRef.current = { positionsKey, teamFilter, debouncedSearch };
+      prevFiltersRef.current = { positionsKey, teamFilter, normalizedSearch };
       isFilterChangingRef.current = true;
       setCursor(undefined);
       setAllNodes([]);
       setIsFilterChanging(true);
     }
-  }, [positionsKey, teamFilter, debouncedSearch]);
+  }, [positionsKey, teamFilter, normalizedSearch]);
 
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
 
@@ -575,7 +576,7 @@ export default function FootballPlayers(): React.JSX.Element {
           : undefined,
       conference: isConference ? teamFilter : undefined,
       freeAgent: teamFilter === 'FREE_AGENT' ? true : undefined,
-      search: debouncedSearch.length >= 2 ? debouncedSearch : undefined,
+      search: normalizedSearch.length >= 2 ? normalizedSearch : undefined,
       after: cursor,
     },
     notifyOnNetworkStatusChange: true,
