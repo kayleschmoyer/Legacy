@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Navigate,
   useLocation,
   useNavigate,
   useParams,
@@ -83,6 +84,17 @@ function readStatsFormat(): 'standard' | 'expanded' {
     return 'standard';
   } catch {
     return 'standard';
+  }
+}
+
+function readDefaultSport(): 'baseball' | 'football' {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    if (!raw) return 'baseball';
+    const parsed = JSON.parse(raw) as { defaultSport?: string };
+    return parsed.defaultSport === 'football' ? 'football' : 'baseball';
+  } catch {
+    return 'baseball';
   }
 }
 
@@ -301,6 +313,12 @@ export function PlayerStatsRoute() {
     })();
   }, []);
 
+  // Sport detection — redirect football users to their dedicated page.
+  // Placed after all hooks to satisfy Rules of Hooks.
+  if (readDefaultSport() === 'football') {
+    return <Navigate to="/football/players" replace />;
+  }
+
   return (
     <div
       style={{
@@ -467,7 +485,7 @@ export function PlayerDetailPage() {
     >
       <PageMeta
         title="Player Profile"
-        description="View detailed career statistics and performance history for this MLB player on Legacy Sports."
+        description="View detailed career statistics and performance history for this baseball player on Legacy Sports."
       />
       <button
         className="player-back-btn"
