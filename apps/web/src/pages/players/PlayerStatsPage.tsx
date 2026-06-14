@@ -482,6 +482,12 @@ export function PlayerDetailPage() {
     }
   }, [isNumeric, isValidNumericId, identifier]);
 
+  useEffect(() => {
+    if (brefId && identifier && identifier !== brefId) {
+      navigate(`/players/${brefId}`, { replace: true });
+    }
+  }, [brefId, identifier, navigate]);
+
   const handleBack = useCallback(() => {
     if (location.key !== 'default') {
       navigate(-1);
