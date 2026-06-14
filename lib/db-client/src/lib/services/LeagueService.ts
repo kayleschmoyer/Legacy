@@ -101,6 +101,8 @@ export interface CreateLeagueOptions {
   scoringFormat?: 'standard' | 'half_ppr' | 'ppr';
   /** Number of games per matchup week. Defaults to 5. Per-sport max: baseball 162, football 17. */
   gamesPerMatchup?: number;
+  /** Seconds allocated per pick in a live draft (30–172800). Defaults to 120 (2 minutes). */
+  pickTimeLimitSeconds?: number;
   /**
    * If set, the insert is guarded by a per-user advisory lock that atomically
    * checks this limit before proceeding. Throws 'LEAGUE_LIMIT_EXCEEDED' if the
@@ -201,6 +203,7 @@ export class LeagueService {
       startDate,
       scoringFormat = 'ppr',
       gamesPerMatchup,
+      pickTimeLimitSeconds = 120,
       leagueLimit,
     } = input;
 
@@ -381,6 +384,7 @@ export class LeagueService {
           draftMode,
           selectionMethod,
           draftOrder,
+          pickTimeLimitSeconds,
           ...(startDate
             ? {
                 scheduledAt: new Date(startDate),

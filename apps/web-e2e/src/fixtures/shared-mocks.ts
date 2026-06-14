@@ -124,6 +124,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
     data: { careerBattingStats: { edges: [], totalCount: 0 } },
   },
   getdraftpitchingstats: { data: { careerPitchingStats: [] } },
+  getdraftpitcherstats: { data: { careerPitchingStats: [] } },
+  getdraftteamautopickstatuses: {
+    data: { getDraftTeamAutoPickStatuses: [] },
+  },
 
   // ── Subscription ──────────────────────────────────────────────────
   getmysubscription: { data: { mySubscription: null } },

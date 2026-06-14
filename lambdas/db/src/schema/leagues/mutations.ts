@@ -68,6 +68,17 @@ import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 // League service instance for create operations
 const leagueService = createLeagueService(getDbOptions());
 
+/** Throws a UserInputError when seconds is outside the 30–172800 range. */
+export function validatePickTimeLimitSeconds(
+  seconds: number | null | undefined,
+): void {
+  if (seconds != null && (seconds < 30 || seconds > 172800)) {
+    throw UserInputError(
+      'Pick time limit must be between 30 and 172800 seconds',
+    );
+  }
+}
+
 // Server-side validation limits — kept in sync with apps/web/src/constants/league.ts
 const MAX_LEAGUE_NAME_LENGTH = 50;
 const MIN_NUMBER_OF_TEAMS = 2;
@@ -119,6 +130,7 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       salaryDecayPct: t.int({ required: false }),
       auctionBudget: t.int({ required: false }),
       auctionMinBid: t.int({ required: false }),
+      pickTimeLimitSeconds: t.int({ required: false }), // seconds per pick (default 120)
     }),
   },
 );
@@ -246,6 +258,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         auctionMinBid: inputAuctionMinBid,
         startDate: inputStartDate,
         gamesPerMatchup: inputGamesPerMatchup,
+        pickTimeLimitSeconds: inputPickTimeLimitSeconds,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -425,6 +438,9 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         }
       }
 
+      // ── Pick time limit validation ───────────────────────────────────────
+      validatePickTimeLimitSeconds(inputPickTimeLimitSeconds);
+
       try {
         const result = await leagueService.createLeague({
           name: leagueName,
@@ -484,6 +500,9 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           startDate: inputStartDate ?? undefined,
           ...(inputGamesPerMatchup != null
             ? { gamesPerMatchup: inputGamesPerMatchup }
+            : {}),
+          ...(inputPickTimeLimitSeconds != null
+            ? { pickTimeLimitSeconds: inputPickTimeLimitSeconds }
             : {}),
           leagueLimit,
         });

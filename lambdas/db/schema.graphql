@@ -512,6 +512,7 @@ input CreateLeagueAndTeamsInput {
   minSalary: Int
   numberOfDivisions: Int
   numberOfTeams: Int!
+  pickTimeLimitSeconds: Int
   playerPool: String!
   salaryCap: Int
   salaryCapEnabled: Boolean

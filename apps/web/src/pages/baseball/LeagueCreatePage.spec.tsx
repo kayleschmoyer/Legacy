@@ -14,7 +14,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return -- mock factories return untyped JSX */
 /* eslint-disable react/jsx-no-useless-fragment -- single-child fragments are intentional in mocks */
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
@@ -342,5 +348,89 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
     expect(
       screen.queryByTestId('selection-reset-notice'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — Pick Timer (LS-7966)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+  });
+
+  it('shows "Time Per Pick" field when draft mode is live (default)', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(screen.getByText('Time Per Pick')).toBeInTheDocument();
+  });
+
+  it('hides "Time Per Pick" field when switching to automated draft mode', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(screen.getByText('Time Per Pick')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    expect(screen.queryByText('Time Per Pick')).not.toBeInTheDocument();
+  });
+
+  it('restores "Time Per Pick" field when switching back to live draft mode', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    expect(screen.queryByText('Time Per Pick')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Live Draft$/i }));
+    expect(screen.getByText('Time Per Pick')).toBeInTheDocument();
+  });
+
+  it('defaults pick timer to 2 min (120 s) for live drafts', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    // The ButtonGroup renders one option button per PICK_TIME_OPTIONS entry.
+    // "2 min" corresponds to 120 s (the DB default).
+    expect(screen.getByRole('button', { name: '2 min' })).toBeInTheDocument();
+  });
+
+  it('includes the pick timer label in the draft settings collapsed summary', () => {
+    renderPage('/baseball/league/create');
+    // The summary span is rendered even when the section is collapsed.
+    expect(screen.getByText(/2 min\/pick/)).toBeInTheDocument();
+  });
+
+  it('passes pickTimeLimitSeconds to mutation for live draft', async () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    expect(mockCreateLeague).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          input: expect.objectContaining({
+            pickTimeLimitSeconds: 120,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('omits pickTimeLimitSeconds from mutation for automated draft', async () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    expect(mockCreateLeague).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          input: expect.objectContaining({
+            pickTimeLimitSeconds: undefined,
+          }),
+        }),
+      }),
+    );
   });
 });

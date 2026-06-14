@@ -20,7 +20,10 @@ import {
 import { AlertCircle, Check, ChevronRight } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
-import { GAMES_PER_MATCHUP_BY_SPORT } from '@legacy-sports/shared-components/sports';
+import {
+  GAMES_PER_MATCHUP_BY_SPORT,
+  PICK_TIME_OPTIONS,
+} from '@legacy-sports/shared-components/sports';
 import {
   CustomEraRange,
   EraFilterGrid,
@@ -152,6 +155,7 @@ interface CreateLeagueFormData {
   salaryCap?: number;
   auctionBudget: number;
   auctionMinBid: number;
+  pickTimeLimitSeconds: number;
   // Football-only (LS-4158)
   scoringFormat: ScoringFormat;
   defensiveFormat: DefensiveFormat;
@@ -1041,6 +1045,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       salaryCap: undefined,
       auctionBudget: 200,
       auctionMinBid: 1,
+      pickTimeLimitSeconds: 120,
       scoringFormat: 'ppr',
       defensiveFormat: 'dst',
     };
@@ -1230,6 +1235,10 @@ export function LeagueCreatePage(): React.JSX.Element {
             auctionMinBid:
               formData.selectionMethod === 'auction'
                 ? formData.auctionMinBid
+                : undefined,
+            pickTimeLimitSeconds:
+              formData.draftMode === 'live'
+                ? formData.pickTimeLimitSeconds
                 : undefined,
             gamesPerMatchup: formData.gamesPerMatchup,
           },
@@ -1905,6 +1914,14 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <span>
                     {formData.draftMode === 'live' ? 'Live' : 'Automated'} ·{' '}
                     {formData.selectionMethod} · {formData.draftOrder}
+                    {formData.draftMode === 'live' &&
+                      (() => {
+                        const opt = PICK_TIME_OPTIONS.find(
+                          (o) =>
+                            o.value === String(formData.pickTimeLimitSeconds),
+                        );
+                        return opt ? ` · ${opt.label}/pick` : '';
+                      })()}
                   </span>
                 }
                 open={openSections.has('draft')}
@@ -2010,6 +2027,29 @@ export function LeagueCreatePage(): React.JSX.Element {
                       disabled={isFormDisabled}
                     />
                   </FieldRow>
+
+                  {/* Pick Timer — live drafts only */}
+                  {formData.draftMode === 'live' && (
+                    <FieldRow
+                      label="Time Per Pick"
+                      hint="How long each manager has to make a pick."
+                    >
+                      <ButtonGroup
+                        value={String(formData.pickTimeLimitSeconds)}
+                        options={PICK_TIME_OPTIONS.map((o) => ({
+                          value: o.value,
+                          label: o.label,
+                        }))}
+                        onChange={(v) =>
+                          handleInputChange(
+                            'pickTimeLimitSeconds',
+                            parseInt(v, 10),
+                          )
+                        }
+                        disabled={isFormDisabled}
+                      />
+                    </FieldRow>
+                  )}
 
                   {/* Draft Date */}
                   <FieldRow

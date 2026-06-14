@@ -283,10 +283,7 @@ async function mockDraftGraphQL(
           },
         }),
       });
-    } else if (
-      opName.includes('getleaguedraft') ||
-      opName.includes('getdraft')
-    ) {
+    } else if (opName.includes('getleaguedraft') || opName === 'getdraft') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -361,20 +358,17 @@ async function mockDraftGraphQL(
         }),
       });
       // --- League queries ---
-    } else if (
-      opName.includes('getleaguebyid') ||
-      opName.includes('getleague')
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
-      });
     } else if (opName.includes('getleagueteams')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
+    } else if (opName.includes('getleaguebyid') || opName === 'getleague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
       });
     } else if (opName.includes('getpositionsforleague')) {
       await route.fulfill({
@@ -465,13 +459,10 @@ test.describe('Mid-draft trade proposals — draft board shows trade button @reg
     await page.waitForLoadState('networkidle');
 
     // Draft is in-progress — verify the page loaded the draft context.
-    // Look for draft-related content (pick number, team names, or status).
-    // Use Playwright auto-waiting to give the UI time to hydrate.
-    const leagueName = page.getByText('Test Draft League');
-    const draftIndicator = page.getByText(/round|pick|draft/i).first();
-
-    await expect(leagueName.or(draftIndicator)).toBeVisible({
-      timeout: 10000,
+    // The DraftTopBand always renders data-testid="current-pick" when the live
+    // board is active; this is a reliable, CSS-class-independent anchor.
+    await expect(page.getByTestId('current-pick')).toBeVisible({
+      timeout: 15_000,
     });
   });
 });
@@ -487,11 +478,19 @@ test.describe('Mid-draft trade proposals — AI suggestions panel @regression', 
       'Unexpected Application Error',
     );
 
+    // Wait for the live board to confirm the draft is active before asserting
+    // on DraftIntelligence content (which mounts after isPremium resolves).
+    await expect(page.getByTestId('current-pick')).toBeVisible({
+      timeout: 15_000,
+    });
+
     // The DraftIntelligence panel renders when recommendations are available.
     // The mock pins three recommendation names (Mike Trout, Freddie Freeman,
     // Aaron Judge); the panel must surface at least one.
-    await expect(page.getByText('DRAFT INTELLIGENCE')).toBeVisible({
-      timeout: 10_000,
+    await expect(
+      page.getByText('BEST AVAILABLE', { exact: true }).first(),
+    ).toBeVisible({
+      timeout: 15_000,
     });
     await expect(
       page

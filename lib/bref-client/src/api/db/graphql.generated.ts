@@ -465,6 +465,7 @@ export type CreateLeagueAndTeamsInput = {
   minSalary?: InputMaybe<Scalars['Int']['input']>;
   numberOfDivisions?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool: Scalars['String']['input'];
   salaryCap?: InputMaybe<Scalars['Int']['input']>;
   salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
