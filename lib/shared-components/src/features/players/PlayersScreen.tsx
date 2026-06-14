@@ -48,6 +48,46 @@ const BG_ELEVATED = STATS_PAGE_TOKENS.BG_ELEVATED;
 // import cycle).
 export { fullName, initialsOf };
 
+// ── Availability-league picker persistence (LS-7044) ─────────────────
+// Web-only localStorage helpers — swallowed silently in SSR/private-mode
+// so callers never need a try/catch.
+
+const AVAIL_LEAGUE_STORAGE_KEY = 'ls_players_avail_league';
+
+/**
+ * Read the last-selected league ID for the availability filter from
+ * localStorage. Returns `null` when unset, unparseable, or unavailable.
+ * Exported for unit testing.
+ */
+export function readAvailLeague(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(AVAIL_LEAGUE_STORAGE_KEY);
+    if (raw === null) return null;
+    const id = parseInt(raw, 10);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist or clear the selected league ID for the availability filter.
+ * Exported for unit testing.
+ */
+export function writeAvailLeague(id: number | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (id === null) {
+      window.localStorage.removeItem(AVAIL_LEAGUE_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(AVAIL_LEAGUE_STORAGE_KEY, String(id));
+    }
+  } catch {
+    /* storage unavailable (private browsing, quota) — swallow */
+  }
+}
+
 // ── Filter rail option sets (LS-4649) ────────────────────────────────
 // Mirrors docs/design/F89Q4j6WFCFqqsZpQ4VhlQ/legacy-sports-players-page/
 // project/players-data.jsx. Era and Position filters are scaffold-only in
@@ -91,6 +131,12 @@ const SORT_OPTIONS = [
   { value: 'NAME_DESC', label: 'Sort: Name (Z → A)' },
 ] as const;
 
+/** A league entry shown in the availability-filter league picker (LS-7044). */
+export interface LeagueOption {
+  id: number;
+  name: string;
+}
+
 /**
  * Shell-level conditional state for the Players Page. When omitted, the page
  * derives state from the peek Apollo query (loading / error / empty) — see
@@ -130,6 +176,12 @@ export interface PlayersScreenProps {
    * call sites remain unaffected. (LS-7043)
    */
   hasActiveLeague?: boolean;
+  /**
+   * Leagues available to the current user for the availability-filter league
+   * picker (LS-7044). When omitted or empty the picker is hidden. Pass the
+   * caller's league list (e.g. from a `myLeagues` query) to enable it.
+   */
+  leagues?: ReadonlyArray<LeagueOption>;
 }
 
 /**
@@ -272,6 +324,7 @@ function PlayersScreen({
   viewMode: viewModeProp = 'cards',
   onRetry,
   hasActiveLeague = true,
+  leagues,
 }: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
     (player: PlayerFragment) => {
@@ -324,6 +377,11 @@ function PlayersScreen({
   const [era, setEra] = useState<EraId>('all');
   const [pos, setPos] = useState<PositionId>('all');
   const [avail, setAvail] = useState<AvailabilityId>('all');
+  // Availability-filter league picker (LS-7044): hydrate from localStorage so
+  // the selection survives navigation and page refreshes (AC2).
+  const [leagueId, setLeagueId] = useState<number | null>(() =>
+    Platform.OS === 'web' ? readAvailLeague() : null,
+  );
   const [resultStats, setResultStats] = useState<PlayersGridResultStats>({
     matched: 0,
     total: 0,
@@ -334,19 +392,28 @@ function PlayersScreen({
   }, []);
 
   // LS-7043: when the user has no active league the availability filter has no
-  // meaning. Reset avail to 'all' so a previously-selected value doesn't
-  // persist as a hidden ghost filter.
+  // meaning. Reset avail (and the league picker) so previously-selected values
+  // don't persist as hidden ghost filters.
   useEffect(() => {
     if (!hasActiveLeague) {
       setAvail('all');
+      setLeagueId(null);
+      if (Platform.OS === 'web') writeAvailLeague(null);
     }
   }, [hasActiveLeague]);
+
+  const handleLeagueChange = useCallback((id: number | null) => {
+    setLeagueId(id);
+    if (Platform.OS === 'web') writeAvailLeague(id);
+  }, []);
 
   const clearAllFilters = useCallback(() => {
     setSearchTerm('');
     setEra('all');
     setPos('all');
     setAvail('all');
+    setLeagueId(null);
+    if (Platform.OS === 'web') writeAvailLeague(null);
   }, []);
 
   const clearChip = useCallback(
@@ -358,7 +425,14 @@ function PlayersScreen({
       if (key === 'q') setSearchTerm('');
       if (key === 'era') setEra('all');
       if (key === 'pos') setPos('all');
-      if (key === 'avail') setAvail('all');
+      if (key === 'avail') {
+        setAvail('all');
+        // Clearing the avail filter makes the league picker irrelevant —
+        // reset it too so stale context doesn't re-appear if avail is
+        // reactivated with a different league selection.
+        setLeagueId(null);
+        if (Platform.OS === 'web') writeAvailLeague(null);
+      }
     },
     [clearAllFilters],
   );
@@ -557,6 +631,28 @@ function PlayersScreen({
             cursor: pointer;
           }
           .pp-clear-all:hover { color: ${BRAND_GOLD_LIGHT}; }
+          .pp-league-sel {
+            background: ${SURFACE_PANEL};
+            border: 1px solid ${withAlpha(BRAND_GOLD_LIGHT, 0.45)};
+            border-radius: 10px;
+            color: ${TEXT_PRIMARY};
+            font-family: ${FONT_DISPLAY};
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 6px 30px 6px 10px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CAAC5' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+          }
+          .pp-league-sel:focus {
+            outline: 0;
+            border-color: ${BRAND_GOLD_LIGHT};
+            box-shadow: 0 0 0 3px rgba(197, 165, 90, 0.18);
+          }
           @media (max-width: 640px) {
             .pp-screen-inner { padding: 20px 16px 56px; gap: 20px; }
             .pp-head { gap: 12px; }
@@ -769,6 +865,9 @@ function PlayersScreen({
               avail={avail}
               setAvail={setAvail}
               hasActiveLeague={hasActiveLeague}
+              leagues={leagues}
+              leagueId={leagueId}
+              onLeagueChange={handleLeagueChange}
             />
             <ActiveSummary chips={chips} onClear={clearChip} />
           </YStack>
@@ -881,6 +980,10 @@ interface FilterRailProps {
   avail: AvailabilityId;
   setAvail: (v: AvailabilityId) => void;
   hasActiveLeague: boolean;
+  /** Leagues for the availability-filter league picker (LS-7044). */
+  leagues?: ReadonlyArray<LeagueOption>;
+  leagueId: number | null;
+  onLeagueChange: (id: number | null) => void;
 }
 
 function FilterRail({
@@ -891,7 +994,12 @@ function FilterRail({
   avail,
   setAvail,
   hasActiveLeague,
+  leagues,
+  leagueId,
+  onLeagueChange,
 }: FilterRailProps) {
+  const showLeaguePicker = avail !== 'all' && !!leagues && leagues.length > 0;
+
   return (
     <XStack
       className="pp-rail"
@@ -934,6 +1042,43 @@ function FilterRail({
               />
             ))}
           </RailGroup>
+          {showLeaguePicker && (
+            <>
+              <YStack className="pp-rail-divider" aria-hidden={true} />
+              <XStack className="pp-rail-group" alignItems="center">
+                <Text
+                  className="pp-rail-label"
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '700',
+                    fontSize: 10,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: TEXT_MUTED,
+                    marginRight: 4,
+                  }}
+                >
+                  League
+                </Text>
+                <select
+                  className="pp-league-sel"
+                  aria-label="Select league for availability filter"
+                  value={leagueId ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    onLeagueChange(raw === '' ? null : parseInt(raw, 10));
+                  }}
+                >
+                  <option value="">All Leagues</option>
+                  {(leagues ?? []).map((lg) => (
+                    <option key={lg.id} value={lg.id}>
+                      {lg.name}
+                    </option>
+                  ))}
+                </select>
+              </XStack>
+            </>
+          )}
         </>
       )}
     </XStack>

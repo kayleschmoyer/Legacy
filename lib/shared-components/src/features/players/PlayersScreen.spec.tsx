@@ -5,6 +5,8 @@ import {
   fullName,
   initialsOf,
   parseViewParam,
+  readAvailLeague,
+  writeAvailLeague,
 } from './PlayersScreen';
 import { rankLabel } from './PlayerListRow';
 import type { PlayerFragment } from './PlayersApi';
@@ -279,5 +281,53 @@ describe('rankLabel (LS-4650)', () => {
     expect(rankLabel(8)).toBe('09');
     expect(rankLabel(9)).toBe('10');
     expect(rankLabel(99)).toBe('100');
+  });
+});
+
+describe('readAvailLeague / writeAvailLeague (LS-7044)', () => {
+  const storage: Record<string, string> = {};
+
+  beforeEach(() => {
+    Object.keys(storage).forEach((k) => delete storage[k]);
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: (k: string) => storage[k] ?? null,
+        setItem: (k: string, v: string) => {
+          storage[k] = v;
+        },
+        removeItem: (k: string) => {
+          delete storage[k];
+        },
+      },
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  it('returns null when nothing has been written yet', () => {
+    expect(readAvailLeague()).toBeNull();
+  });
+
+  it('round-trips a positive integer id', () => {
+    writeAvailLeague(42);
+    expect(readAvailLeague()).toBe(42);
+  });
+
+  it('returns null after the value is cleared with writeAvailLeague(null)', () => {
+    writeAvailLeague(7);
+    writeAvailLeague(null);
+    expect(readAvailLeague()).toBeNull();
+  });
+
+  it('returns null for a zero or negative id stored by a buggy caller', () => {
+    storage['ls_players_avail_league'] = '0';
+    expect(readAvailLeague()).toBeNull();
+    storage['ls_players_avail_league'] = '-5';
+    expect(readAvailLeague()).toBeNull();
+  });
+
+  it('returns null for non-numeric garbage', () => {
+    storage['ls_players_avail_league'] = 'nope';
+    expect(readAvailLeague()).toBeNull();
   });
 });
