@@ -31,16 +31,36 @@ jest.mock('../../components/PageMeta', () => ({
 }));
 
 // PremiumGate — passthrough so the gated child renders for the authed path.
+// Props are forwarded as data attributes so tests can assert on them without
+// importing the real component (which has Stripe/router deps).
 jest.mock('../../components/PremiumGate', () => ({
-  PremiumGate: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="premium-gate">{children}</div>
+  PremiumGate: ({
+    children,
+    featureName,
+    featureDescription,
+  }: {
+    children: React.ReactNode;
+    featureName?: string;
+    featureDescription?: string;
+  }) => (
+    <div
+      data-testid="premium-gate"
+      data-feature-name={featureName}
+      data-feature-description={featureDescription}
+    >
+      {children}
+    </div>
   ),
 }));
+
+const EXPECTED_FEATURE_DESCRIPTION =
+  'Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns.';
 
 // Shared PlayerComparison — stubbed; exposes the onSignIn callback via a button
 // so the wrapper's navigation wiring can be asserted in isolation.
 jest.mock('@legacy-sports/shared-components', () => ({
-  PLAYER_COMPARISON_FEATURE_DESCRIPTION: 'feature description',
+  PLAYER_COMPARISON_FEATURE_DESCRIPTION:
+    'Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns.',
   PlayerComparison: ({
     isAuthenticated,
     onSignIn,
@@ -78,6 +98,18 @@ describe('PlayerComparisonPage', () => {
     expect(mockUseHasEntitlement).toHaveBeenCalledWith(
       ENTITLEMENTS.player_comparison,
     );
+  });
+
+  it('passes "Player Comparison" as featureName to PremiumGate (AC1)', () => {
+    render(<PlayerComparisonPage />);
+    const gate = screen.getByTestId('premium-gate');
+    expect(gate.dataset.featureName).toBe('Player Comparison');
+  });
+
+  it('passes the canonical feature description to PremiumGate (AC1)', () => {
+    render(<PlayerComparisonPage />);
+    const gate = screen.getByTestId('premium-gate');
+    expect(gate.dataset.featureDescription).toBe(EXPECTED_FEATURE_DESCRIPTION);
   });
 
   it('shows the sign-in prompt (no premium gate) for unauthenticated visitors', () => {
