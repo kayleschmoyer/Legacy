@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   SafeAreaView,
@@ -265,10 +266,12 @@ function PlayerStats({ player }: { player: FootballPlayerNode }) {
 function PlayerRow({
   player,
   onPress,
+  onLongPress,
   isPremium,
 }: {
   player: FootballPlayerNode;
   onPress?: () => void;
+  onLongPress?: (name: string) => void;
   isPremium: boolean;
 }) {
   const pos = player.position;
@@ -279,8 +282,15 @@ function PlayerRow({
   const teamBg = teamData?.primaryColor ?? '#1B3A5C';
   const teamFg = teamData?.secondaryColor ?? '#C5A55A';
 
+  const playerName =
+    [player.firstName, player.lastName].filter(Boolean).join(' ') ||
+    'Unknown Player';
+
   return (
     <YStack
+      testID={`player-row-${player.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Player: ${playerName}`}
       backgroundColor="$glassSurface"
       borderWidth={1}
       borderColor="$glassBorder"
@@ -289,7 +299,8 @@ function PlayerRow({
       marginBottom="$2"
       gap="$2"
       onPress={onPress}
-      pressStyle={onPress ? { opacity: 0.7 } : undefined}
+      onLongPress={onLongPress ? () => onLongPress(playerName) : undefined}
+      pressStyle={(onPress ?? onLongPress) ? { opacity: 0.7 } : undefined}
     >
       <XStack gap="$3" alignItems="flex-start">
         {/* Team badge */}
@@ -587,6 +598,30 @@ export default function FootballPlayers(): React.JSX.Element {
     }
   }, [pageInfo?.endCursor]);
 
+  const handlePlayerLongPress = useCallback(
+    (name: string) => {
+      if (!isPremium) return;
+      Alert.alert(name, 'Quick actions', [
+        {
+          text: 'Add to Compare',
+          onPress: () => Alert.alert('Compare', `${name} added to comparison.`),
+        },
+        {
+          text: 'Add to Watchlist',
+          onPress: () =>
+            Alert.alert('Watchlist', `${name} added to watchlist.`),
+        },
+        {
+          text: 'Add to Draft Queue',
+          onPress: () =>
+            Alert.alert('Draft Queue', `${name} added to draft queue.`),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [isPremium],
+  );
+
   const isInitialLoad = loading && allNodes.length === 0;
   const isLoadingMore = loading && allNodes.length > 0;
 
@@ -759,6 +794,7 @@ export default function FootballPlayers(): React.JSX.Element {
               <PlayerRow
                 player={item}
                 onPress={() => router.push(`/football/players/${item.id}`)}
+                onLongPress={handlePlayerLongPress}
                 isPremium={isPremium}
               />
             )}

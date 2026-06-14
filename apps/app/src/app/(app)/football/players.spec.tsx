@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import FootballPlayers from './players';
@@ -109,19 +110,18 @@ jest.mock('tamagui', () => {
     YStack: ({
       children,
       onPress,
+      onLongPress,
       testID,
     }: {
       children: import('react').ReactNode;
       onPress?: () => void;
+      onLongPress?: () => void;
       testID?: string;
       [key: string]: unknown;
     }) => {
-      const { View, Pressable } =
+      const { View } =
         jest.requireActual<typeof import('react-native')>('react-native');
-      if (onPress) {
-        return createElement(Pressable, { onPress, testID }, children);
-      }
-      return createElement(View, { testID }, children);
+      return createElement(View, { onPress, onLongPress, testID }, children);
     },
     Select: Object.assign(
       ({
@@ -767,6 +767,33 @@ describe('FootballPlayers', () => {
       render(<FootballPlayers />);
       expect(screen.getByText('24.5')).toBeTruthy();
       expect(screen.getByText('pts')).toBeTruthy();
+    });
+  });
+
+  describe('premium long-press quick-actions', () => {
+    it('shows the quick-action sheet when a premium user long-presses a player row', () => {
+      jest.spyOn(Alert, 'alert');
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballPlayers />);
+      fireEvent(screen.getByTestId('player-row-1'), 'longPress');
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Patrick Mahomes',
+        'Quick actions',
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Add to Compare' }),
+          expect.objectContaining({ text: 'Add to Watchlist' }),
+          expect.objectContaining({ text: 'Add to Draft Queue' }),
+          expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+        ]),
+      );
+    });
+
+    it('does not show the quick-action sheet when a non-premium user long-presses a player row', () => {
+      jest.spyOn(Alert, 'alert');
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballPlayers />);
+      fireEvent(screen.getByTestId('player-row-1'), 'longPress');
+      expect(Alert.alert).not.toHaveBeenCalled();
     });
   });
 });
