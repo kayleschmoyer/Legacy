@@ -39,6 +39,7 @@ describe('football resolvers', () => {
     where: jest.Mock;
     orderBy: jest.Mock;
     limit: jest.Mock;
+    offset: jest.Mock;
     then: jest.Mock;
   };
   let mockContext: {
@@ -55,6 +56,7 @@ describe('football resolvers', () => {
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
       then: jest.fn((resolve) => resolve([])),
     };
 
@@ -223,7 +225,15 @@ describe('football resolvers', () => {
     jest.doMock('drizzle-orm', () => {
       const actual =
         jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm');
-      return { ...actual };
+      // Override asc/desc with readable sentinels so orderBy assertions can
+      // check the exact column + direction the resolver requested. The mocked
+      // PublicSchema columns are plain strings (e.g. 'id', 'lastName'), so
+      // these produce values like 'asc:id'.
+      return {
+        ...actual,
+        asc: (col: unknown) => `asc:${String(col)}`,
+        desc: (col: unknown) => `desc:${String(col)}`,
+      };
     });
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -367,7 +377,7 @@ describe('football resolvers', () => {
       expect(result.pageInfo.endCursor).toBe(String(pageSize));
     });
 
-    it('passes after cursor as id filter condition', async () => {
+    it('applies the after cursor as an offset', async () => {
       mockDb.then.mockImplementationOnce((resolve) => resolve([]));
 
       await getResolver()(
@@ -377,7 +387,126 @@ describe('football resolvers', () => {
         undefined as never,
       );
 
-      expect(mockDb.where).toHaveBeenCalled();
+      expect(mockDb.offset).toHaveBeenCalledWith(42);
+    });
+
+    it('defaults the offset to 0 when no cursor is provided', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: null, search: null, after: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.offset).toHaveBeenCalledWith(0);
+    });
+
+    it('advances endCursor by the page offset', async () => {
+      mockDb.then.mockImplementationOnce((resolve) =>
+        resolve([
+          {
+            id: 99,
+            firstName: 'Justin',
+            lastName: 'Jefferson',
+            pfrId: null,
+            isDst: false,
+            nflTeam: 'MIN',
+            position: 'WR',
+          },
+        ]),
+      );
+
+      const result = (await getResolver()(
+        {},
+        { position: null, search: null, after: '25' },
+        mockContext,
+        undefined as never,
+      )) as FootballPlayersResult;
+
+      // offset (25) + nodes on this page (1) → next offset cursor is 26,
+      // not the row's id (99).
+      expect(result.pageInfo.endCursor).toBe('26');
+    });
+
+    it('orders by id when no sortBy is provided', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: null, search: null, after: null, sortBy: null },
+        mockContext,
+        undefined as never,
+      );
+
+      // Default order: a single id ordering term.
+      expect(mockDb.orderBy).toHaveBeenCalledWith('asc:id');
+    });
+
+    it('orders by lastName, firstName, id for sortBy=name', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        { position: null, search: null, after: null, sortBy: 'name' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.orderBy).toHaveBeenCalledWith(
+        'asc:lastName',
+        'asc:firstName',
+        'asc:id',
+      );
+    });
+
+    it('applies descending direction to the sort column', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+      await getResolver()(
+        {},
+        {
+          position: null,
+          search: null,
+          after: null,
+          sortBy: 'team',
+          sortDir: 'desc',
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      // Sort column descends; id tiebreaker stays ascending for stability.
+      expect(mockDb.orderBy).toHaveBeenCalledWith('desc:nflTeam', 'asc:id');
+    });
+
+    it('throws BAD_USER_INPUT for invalid sortBy value', async () => {
+      await expect(
+        getResolver()(
+          {},
+          { position: null, search: null, after: null, sortBy: 'fpts' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
+
+    it('throws BAD_USER_INPUT for invalid sortDir value', async () => {
+      await expect(
+        getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'name',
+            sortDir: 'sideways',
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
     });
 
     it('accepts FLEX position and returns matching players', async () => {

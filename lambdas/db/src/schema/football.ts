@@ -22,7 +22,18 @@ import {
   DEFAULT_RECEIVING_SCORING,
   DEFAULT_RUSHING_SCORING,
 } from '@legacy-sports/scoring';
-import { and, eq, gt, gte, inArray, lte, or, sql, SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  or,
+  sql,
+  SQL,
+} from 'drizzle-orm';
 import { builder } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import { requireEntitlement } from './authorization';
@@ -1795,6 +1806,17 @@ const CONFERENCE_TEAMS: Record<NflConference, NflTeamAbbr[]> = {
   ],
 };
 
+// Sortable columns that live directly on the `players` table (LS-6473). Stat-
+// based sorts (yards, TDs, fantasy points) would require joining the season-
+// stats tables and are intentionally out of scope here.
+const VALID_FOOTBALL_PLAYER_SORTS = ['name', 'position', 'team'] as const;
+
+type FootballPlayerSort = (typeof VALID_FOOTBALL_PLAYER_SORTS)[number];
+
+function isValidPlayerSort(s: string): s is FootballPlayerSort {
+  return (VALID_FOOTBALL_PLAYER_SORTS as readonly string[]).includes(s);
+}
+
 builder.queryField('footballPlayers', (t) =>
   t.field({
     type: FootballPlayersConnectionRef,
@@ -1813,6 +1835,11 @@ builder.queryField('footballPlayers', (t) =>
       injuryStatus: t.arg.string({ required: false }),
       minProjectedPoints: t.arg.float({ required: false }),
       maxAdpRank: t.arg.int({ required: false }),
+      // Sort over columns on the players table only — 'name' (lastName,
+      // firstName), 'position', or 'team' (nflTeam). Unset preserves the
+      // historical default of ordering by id (LS-6473).
+      sortBy: t.arg.string({ required: false }),
+      sortDir: t.arg.string({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -1834,7 +1861,26 @@ builder.queryField('footballPlayers', (t) =>
 
       const db = context.db;
       const limit = Math.min(args.first ?? FOOTBALL_PLAYERS_PAGE_SIZE, 100);
-      const afterId = args.after != null ? parseInt(args.after, 10) : null;
+
+      // Sorting by a non-id column means id is no longer monotonic with the
+      // result order, so the previous keyset cursor (`id > after`) can't be
+      // reused. Switch to an offset cursor: `after` is the count of rows
+      // already consumed, and `endCursor` advances it by the page size. The
+      // frontend treats the cursor as opaque, so this is transparent to it.
+      const parsedOffset = args.after != null ? parseInt(args.after, 10) : null;
+      const offset =
+        parsedOffset != null && !isNaN(parsedOffset) && parsedOffset > 0
+          ? parsedOffset
+          : 0;
+
+      if (args.sortBy != null && !isValidPlayerSort(args.sortBy)) {
+        throw UserInputError(`Invalid sortBy: ${args.sortBy}`);
+      }
+      const sortDir = args.sortDir ?? 'asc';
+      if (sortDir !== 'asc' && sortDir !== 'desc') {
+        throw UserInputError(`Invalid sortDir: ${args.sortDir}`);
+      }
+      const dir = sortDir === 'desc' ? desc : asc;
 
       const conditions: SQL[] = [eq(PublicSchema.players.sport, 'football')];
 
@@ -1868,10 +1914,6 @@ builder.queryField('footballPlayers', (t) =>
             CONFERENCE_TEAMS[args.conference],
           ),
         );
-      }
-
-      if (afterId != null && !isNaN(afterId)) {
-        conditions.push(gt(PublicSchema.players.id, afterId));
       }
 
       if (args.search) {
@@ -1914,6 +1956,34 @@ builder.queryField('footballPlayers', (t) =>
         conditions.push(lte(PublicSchema.players.adpRank, args.maxAdpRank));
       }
 
+      // Append id as a stable tiebreaker so pages don't overlap or skip rows
+      // when the sort column has duplicate values (e.g. many WRs, same team).
+      const orderBy: SQL[] = [];
+      switch (args.sortBy) {
+        case 'name':
+          orderBy.push(
+            dir(PublicSchema.players.lastName),
+            dir(PublicSchema.players.firstName),
+            asc(PublicSchema.players.id),
+          );
+          break;
+        case 'position':
+          orderBy.push(
+            dir(PublicSchema.players.position),
+            asc(PublicSchema.players.id),
+          );
+          break;
+        case 'team':
+          orderBy.push(
+            dir(PublicSchema.players.nflTeam),
+            asc(PublicSchema.players.id),
+          );
+          break;
+        default:
+          orderBy.push(dir(PublicSchema.players.id));
+          break;
+      }
+
       const rows = await db
         .select({
           id: PublicSchema.players.id,
@@ -1933,13 +2003,13 @@ builder.queryField('footballPlayers', (t) =>
         })
         .from(PublicSchema.players)
         .where(and(...conditions))
-        .orderBy(PublicSchema.players.id)
-        .limit(limit + 1);
+        .orderBy(...orderBy)
+        .limit(limit + 1)
+        .offset(offset);
 
       const hasNextPage = rows.length > limit;
       const nodes = rows.slice(0, limit);
-      const endCursor =
-        nodes.length > 0 ? String(nodes[nodes.length - 1].id) : null;
+      const endCursor = nodes.length > 0 ? String(offset + nodes.length) : null;
 
       return {
         nodes,

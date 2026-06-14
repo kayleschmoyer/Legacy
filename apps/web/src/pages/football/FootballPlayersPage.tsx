@@ -14,6 +14,8 @@ import {
   type FootballPlayersQuery,
   useFootballPlayersQuery,
 } from '../../api/db/graphql.generated';
+import type { FootballPlayerSortValue } from '../../components/football/FootballPlayerSort';
+import { FootballPlayerSort } from '../../components/football/FootballPlayerSort';
 import type { FootballPosition } from '../../components/football/FootballPositionFilter';
 import {
   POSITIONS as FOOTBALL_POSITIONS,
@@ -506,6 +508,7 @@ export function FootballPlayersPage() {
   const isPremium = useIsPremium();
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
+  const [sort, setSort] = useState<FootballPlayerSortValue>({ dir: 'asc' });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<PlayerListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -583,7 +586,8 @@ export function FootballPlayersPage() {
       : NaN;
   const maxAdpArg = Number.isFinite(parsedMaxAdp) ? parsedMaxAdp : undefined;
 
-  // Reset pagination when filters change
+  // Reset pagination when filters or sort change — the offset cursor is only
+  // valid for the result set that produced it.
   const prevFiltersRef = useRef({
     position,
     teamFilter,
@@ -591,6 +595,8 @@ export function FootballPlayersPage() {
     injuryStatusArg,
     minProjectedArg,
     maxAdpArg,
+    sortField: sort.field,
+    sortDir: sort.dir,
   });
   useEffect(() => {
     const prev = prevFiltersRef.current;
@@ -600,7 +606,9 @@ export function FootballPlayersPage() {
       prev.debouncedSearch !== debouncedSearch ||
       prev.injuryStatusArg !== injuryStatusArg ||
       prev.minProjectedArg !== minProjectedArg ||
-      prev.maxAdpArg !== maxAdpArg
+      prev.maxAdpArg !== maxAdpArg ||
+      prev.sortField !== sort.field ||
+      prev.sortDir !== sort.dir
     ) {
       prevFiltersRef.current = {
         position,
@@ -609,6 +617,8 @@ export function FootballPlayersPage() {
         injuryStatusArg,
         minProjectedArg,
         maxAdpArg,
+        sortField: sort.field,
+        sortDir: sort.dir,
       };
       setCursor(undefined);
       setAllNodes([]);
@@ -620,6 +630,8 @@ export function FootballPlayersPage() {
     injuryStatusArg,
     minProjectedArg,
     maxAdpArg,
+    sort.field,
+    sort.dir,
   ]);
 
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
@@ -632,6 +644,8 @@ export function FootballPlayersPage() {
     injuryStatus: injuryStatusArg,
     minProjectedPoints: minProjectedArg,
     maxAdpRank: maxAdpArg,
+    sortBy: sort.field,
+    sortDir: sort.field ? sort.dir : undefined,
   };
 
   const { data, loading, error } = useFootballPlayersQuery({
@@ -875,6 +889,9 @@ export function FootballPlayersPage() {
             />
           </PremiumGate>
         )}
+
+        {/* Sort control */}
+        <FootballPlayerSort value={sort} onChange={setSort} />
       </YStack>
 
       {/* Content */}

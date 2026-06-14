@@ -3167,6 +3167,8 @@ export type QueryFootballPlayersArgs = {
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<Scalars['String']['input']>;
+  sortDir?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryFreeAgentsArgs = {

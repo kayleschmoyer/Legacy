@@ -3145,6 +3145,8 @@ type Query {
     nflTeam: String
     position: String
     search: String
+    sortBy: String
+    sortDir: String
   ): FootballPlayersConnection
   freeAgents(leagueId: Int!): [Player!]
 

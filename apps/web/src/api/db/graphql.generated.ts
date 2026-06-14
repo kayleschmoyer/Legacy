@@ -3161,6 +3161,8 @@ export type QueryFootballPlayersArgs = {
   nflTeam?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<Scalars['String']['input']>;
+  sortDir?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryFreeAgentsArgs = {
@@ -5377,6 +5379,8 @@ export type FootballPlayersQueryVariables = Exact<{
   injuryStatus?: InputMaybe<Scalars['String']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
+  sortBy?: InputMaybe<Scalars['String']['input']>;
+  sortDir?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type FootballPlayersQuery = {
@@ -13021,6 +13025,8 @@ export const FootballPlayers = gql`
     $injuryStatus: String
     $minProjectedPoints: Float
     $maxAdpRank: Int
+    $sortBy: String
+    $sortDir: String
   ) {
     footballPlayers(
       position: $position
@@ -13031,6 +13037,8 @@ export const FootballPlayers = gql`
       injuryStatus: $injuryStatus
       minProjectedPoints: $minProjectedPoints
       maxAdpRank: $maxAdpRank
+      sortBy: $sortBy
+      sortDir: $sortDir
     ) {
       nodes {
         ...FootballPlayerHeader
@@ -13064,6 +13072,8 @@ export const FootballPlayers = gql`
  *      injuryStatus: // value for 'injuryStatus'
  *      minProjectedPoints: // value for 'minProjectedPoints'
  *      maxAdpRank: // value for 'maxAdpRank'
+ *      sortBy: // value for 'sortBy'
+ *      sortDir: // value for 'sortDir'
  *   },
  * });
  */

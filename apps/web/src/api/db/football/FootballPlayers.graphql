@@ -130,6 +130,8 @@ query FootballPlayers(
   $injuryStatus: String
   $minProjectedPoints: Float
   $maxAdpRank: Int
+  $sortBy: String
+  $sortDir: String
 ) {
   footballPlayers(
     position: $position
@@ -140,6 +142,8 @@ query FootballPlayers(
     injuryStatus: $injuryStatus
     minProjectedPoints: $minProjectedPoints
     maxAdpRank: $maxAdpRank
+    sortBy: $sortBy
+    sortDir: $sortDir
   ) {
     nodes {
       ...FootballPlayerHeader
