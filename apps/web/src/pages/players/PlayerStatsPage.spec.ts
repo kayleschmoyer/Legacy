@@ -1,4 +1,41 @@
-import { buildStatsSearchParams } from './PlayerStatsPage';
+import { buildStatsSearchParams, sanitizeSearchParam } from './PlayerStatsPage';
+
+describe('sanitizeSearchParam', () => {
+  it('returns null for null input', () => {
+    expect(sanitizeSearchParam(null)).toBeNull();
+  });
+
+  it('returns null for a string that is only control characters', () => {
+    expect(sanitizeSearchParam('\x00\x01\x1f')).toBeNull();
+  });
+
+  it('passes through a clean alphanumeric string unchanged', () => {
+    expect(sanitizeSearchParam('trout')).toBe('trout');
+  });
+
+  it('strips ASCII control characters (0x00–0x1f)', () => {
+    expect(sanitizeSearchParam('abc\x00def\x1f')).toBe('abcdef');
+  });
+
+  it('strips DEL and C1 control characters (0x7f–0x9f)', () => {
+    expect(sanitizeSearchParam('abc\x7fdef\x9f')).toBe('abcdef');
+  });
+
+  it('caps the result at 64 characters', () => {
+    const long = 'a'.repeat(100);
+    expect(sanitizeSearchParam(long)).toBe('a'.repeat(64));
+  });
+
+  it('strips control chars before capping length', () => {
+    // 50 real chars + 20 control chars = 70 chars total; after stripping 20 controls, 50 remain < 64
+    const value = 'a'.repeat(50) + '\x00'.repeat(20);
+    expect(sanitizeSearchParam(value)).toBe('a'.repeat(50));
+  });
+
+  it('preserves printable special characters', () => {
+    expect(sanitizeSearchParam('Mike Trout (OF)')).toBe('Mike Trout (OF)');
+  });
+});
 
 describe('buildStatsSearchParams', () => {
   it('emits view + pageSize for a bare snapshot', () => {

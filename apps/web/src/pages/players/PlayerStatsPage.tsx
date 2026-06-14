@@ -36,6 +36,26 @@ import { useGetPlayerIdByBrefIdQuery } from '../../api/db/graphql.generated';
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
 
+const SEARCH_PARAM_MAX_LENGTH = 64;
+
+/**
+ * Sanitize a URL search parameter value before forwarding to filters.
+ * Strips control characters (U+0000–U+001F, U+007F–U+009F) and enforces a
+ * maximum length to prevent injection via string-concatenating audit paths.
+ */
+export function sanitizeSearchParam(value: string | null): string | null {
+  if (value === null) return null;
+  let stripped = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code > 0x1f && (code < 0x7f || code > 0x9f)) {
+      stripped += value[i];
+    }
+  }
+  if (!stripped) return null;
+  return stripped.slice(0, SEARCH_PARAM_MAX_LENGTH);
+}
+
 /**
  * Build URL search params from a committed filter snapshot. Exported for unit
  * testing — the host component wraps this with `setSearchParams(...)`.
@@ -177,13 +197,12 @@ export function PlayerStatsRoute() {
     const minSO = searchParams.get('minStrikeouts');
     const maxSO = searchParams.get('maxStrikeouts');
 
-    // Player info filters
-    const position = searchParams.get('position');
-    const team = searchParams.get('team');
-    const playerType = searchParams.get(
-      'playerType',
-    ) as PlayerStatsFilters['playerType'];
-    const searchTerm = searchParams.get('searchTerm');
+    // Player info filters — sanitized to strip control chars and cap length
+    const position = sanitizeSearchParam(searchParams.get('position'));
+    const team = sanitizeSearchParam(searchParams.get('team'));
+    const playerType: PlayerStatsFilters['playerType'] =
+      sanitizeSearchParam(searchParams.get('playerType')) ?? undefined;
+    const searchTerm = sanitizeSearchParam(searchParams.get('searchTerm'));
 
     // Apply batting filters
     if (minHR)
