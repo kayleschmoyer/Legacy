@@ -136,61 +136,62 @@ See [`docs/dev-process/skill-routing.md`](docs/dev-process/skill-routing.md) for
 
 **Before starting work, and again whenever your task moves into a new directory, `Read` every skill whose scope matches the files you're touching.**
 
-| Scope                                                | Skill                                           | Load when                                                                                |
-| ---------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `**`                                                 | `.agents/skills/architecture/`                  | understanding code layout, cross-project features, import/dependency issues              |
-| `**`                                                 | `.agents/skills/add-entitlement/`               | adding/gating a premium feature, editing entitlements.ts, requireEntitlement/PremiumGate |
-| `**`                                                 | `.agents/skills/branch-naming/`                 | creating branches, first push to remote, naming remote branches                          |
-| `**`                                                 | `.agents/skills/ci-event-response/`             | CI check fails, workflow fails, review comment arrives, merge conflict detected          |
-| `**`                                                 | `.agents/skills/cloud-agent-mode/`              | operating in a cloud environment, troubleshooting cloud agent auth                       |
-| `**`                                                 | `.agents/skills/cloud-teleport/`                | cloud agent reaches AWS/infra/DB capability boundary                                     |
-| `**`                                                 | `.agents/skills/credentials/`                   | before any workflow touching PRs, tickets, cloud resources, or CI runs                   |
-| `**`                                                 | `.agents/skills/create/`                        | scaffolding a new project, library, lambda, app, MCP server, or skill                    |
-| `**`                                                 | `.agents/skills/database/`                      | writing or applying migrations, running SQL, checking schema, DB connectivity            |
-| `**`                                                 | `.agents/skills/debugging/`                     | CI pipeline failure, distributed failure, bug report, dev environment issue              |
-| `**`                                                 | `.agents/skills/define/`                        | user wants to formalize a spec before implementation starts                              |
-| `**`                                                 | `.agents/skills/dev-process/`                   | starting any task — pick entrypoint, evaluate which gates apply                          |
-| `**`                                                 | `.agents/skills/drive-pr/`                      | asked to drive, land, ship, or get a specific PR merged                                  |
-| `**`                                                 | `.agents/skills/fix-pr/`                        | "fix PR", "clean up PR #N", multiple unresolved issues on a PR                           |
-| `**`                                                 | `.agents/skills/fix-problem/`                   | user reports a bug, unexpected behavior, or something is broken                          |
-| `**`                                                 | `.agents/skills/jira-rollover/`                 | sprint close, syncing bucket epic project properties ⚠ may be unused                     |
-| `**`                                                 | `.agents/skills/mcp-diagnostics/`               | MCP server fails to connect, ToolSearch returns empty for known tools                    |
-| `**`                                                 | `.agents/skills/mcp-first/`                     | choosing between shell and MCP tools, any Jira/GitHub/CI/DB/AWS operation                |
-| `**`                                                 | `.agents/skills/mcp-gaps/`                      | PR merged (run audit); working through the MCP backlog                                   |
-| `**`                                                 | `.agents/skills/open-prs/`                      | sweep all open PRs, rebase/review/label pass across the board                            |
-| `**`                                                 | `.agents/skills/plan-ticket/`                   | planning new work that does not yet have a Jira ticket                                   |
-| `**`                                                 | `.agents/skills/planning/`                      | structured planning phase before implementation (Phase 0)                                |
-| `**`                                                 | `.agents/skills/pr-lifecycle/`                  | creating PRs, replying to reviews, fixing review comments, managing PR labels            |
-| `**`                                                 | `.agents/skills/rebase/`                        | rebasing a branch, resolving merge conflicts, updating a branch                          |
-| `**`                                                 | `.agents/skills/repo-tooling/`                  | lint/typecheck/build, GraphQL codegen, package management, Make targets                  |
-| `**`                                                 | `.agents/skills/secrets-handling/`              | writing, reading, or populating secret values (API keys, tokens, private keys)           |
-| `**`                                                 | `.agents/skills/skill-authoring/`               | writing or restructuring a SKILL.md file                                                 |
-| `**`                                                 | `.agents/skills/slice/`                         | decomposing an epic or story into structured child tasks                                 |
-| `**`                                                 | `.agents/skills/standards/`                     | writing new code, reviewing configs, handling lint errors, codegen policy                |
-| `**`                                                 | `.agents/skills/subagent-templates/`            | spawning subagents or dispatching parallel work via chips                                |
-| `**`                                                 | `.agents/skills/sweep-dependabot/`              | sweeping, triaging, or unsticking Dependabot PRs                                         |
-| `**`                                                 | `.agents/skills/unblock-prs/`                   | stuck PRs, false-positive CI, Expected CI state, merge queue issues                      |
-| `**`                                                 | `.agents/skills/work-ticket/`                   | given a Jira ticket key, implementing it end-to-end autonomously                         |
-| `**`                                                 | `.agents/skills/workflow-overview/`             | following the step-by-step ticket-to-merge agent runbook (Steps 0-16)                    |
-| `**`                                                 | `.agents/skills/worktree-workflow/`             | starting any ticket that needs an isolated branch or worktree                            |
-| `apps/web/**, apps/app/**, lib/shared-components/**` | `.agents/skills/frontend-design/`               | any UI work — components, pages, design system, visual styles                            |
-| `apps/web/**, apps/app/**, lib/shared-components/**` | `.agents/skills/ui/`                            | choosing brand colors, layout patterns, UI component standards                           |
-| `apps/web/**, apps/app/**`                           | `.agents/skills/shared-components-first/`       | building or reviewing UI in an app directory                                             |
-| `apps/web/**, apps/app/**`                           | `.agents/skills/ui-audit/`                      | full UI audit, visual regression check, design compliance sweep                          |
-| `apps/web/**, apps/app/**`                           | `.agents/skills/promote-shared-components/`     | moving UI code from an app to lib/shared-components                                      |
-| `apps/web-e2e/**`                                    | `.agents/skills/testing/`                       | writing, running, or debugging E2E, unit, or integration tests                           |
-| `apps/web-e2e/**`                                    | `.agents/skills/fix-integration-tests/`         | fixing a failing Playwright integration test                                             |
-| `apps/web-e2e/**`                                    | `.agents/skills/read-playwright-report/`        | reading or analyzing Playwright HTML test results                                        |
-| `lib/shared-components/**`                           | `.agents/skills/storybook/`                     | adding or running Storybook stories, writing interaction tests                           |
-| `lambdas/**`                                         | `.agents/skills/cloudwatch-archaeology/`        | debugging opaque distributed or Lambda failures (test stdout is misleading)              |
-| `lambdas/**, apps/**, lib/**`                        | `.agents/skills/dev-environment/`               | spinning up local dev services, debugging the full stack                                 |
-| `lambdas/**, terraform/**`                           | `.agents/skills/infrastructure/`                | AWS operations, Lambda deployment, cloud infrastructure changes                          |
-| `terraform/**`                                       | `.agents/skills/terraform-permission-planning/` | adding or modifying any Terraform resource — BEFORE push                                 |
-| `terraform/**`                                       | `.agents/skills/terraform-local-apply/`         | running terraform plan/apply locally against AWS dev                                     |
-| `terraform/**, .github/workflows/**, lambdas/**`     | `.agents/skills/add-secret-or-env-var/`         | adding any new secret or environment variable to the project                             |
-| `lib/db-client/**, lambdas/**`                       | `.agents/skills/apply-pr-migrations/`           | "Verify All Migrations Applied" CI check failing, `CI: Migration` label                  |
-| `apps/cli/**`                                        | `.agents/skills/cli-usage/`                     | running CLI commands or performing CLI-based admin tasks                                 |
-| `docs/design/**`                                     | `.agents/skills/design-sync/`                   | `/sync-designs` (cloud) or `/implement-design` (local), design-to-code pipeline          |
+| Scope                                                | Skill                                           | Load when                                                                                      |
+| ---------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `**`                                                 | `.agents/skills/architecture/`                  | understanding code layout, cross-project features, import/dependency issues                    |
+| `**`                                                 | `.agents/skills/add-entitlement/`               | adding/gating a premium feature, editing entitlements.ts, requireEntitlement/PremiumGate       |
+| `**`                                                 | `.agents/skills/branch-naming/`                 | creating branches, first push to remote, naming remote branches                                |
+| `**`                                                 | `.agents/skills/ci-event-response/`             | CI check fails, workflow fails, review comment arrives, merge conflict detected                |
+| `**`                                                 | `.agents/skills/cloud-agent-mode/`              | operating in a cloud environment, troubleshooting cloud agent auth                             |
+| `**`                                                 | `.agents/skills/cloud-teleport/`                | cloud agent reaches AWS/infra/DB capability boundary                                           |
+| `**`                                                 | `.agents/skills/credentials/`                   | before any workflow touching PRs, tickets, cloud resources, or CI runs                         |
+| `**`                                                 | `.agents/skills/create/`                        | scaffolding a new project, library, lambda, app, MCP server, or skill                          |
+| `**`                                                 | `.agents/skills/create-ticket/`                 | creating any Jira ticket — pick the archetype (task, bug, story, QA coverage, epic) + template |
+| `**`                                                 | `.agents/skills/database/`                      | writing or applying migrations, running SQL, checking schema, DB connectivity                  |
+| `**`                                                 | `.agents/skills/debugging/`                     | CI pipeline failure, distributed failure, bug report, dev environment issue                    |
+| `**`                                                 | `.agents/skills/define/`                        | user wants to formalize a spec before implementation starts                                    |
+| `**`                                                 | `.agents/skills/dev-process/`                   | starting any task — pick entrypoint, evaluate which gates apply                                |
+| `**`                                                 | `.agents/skills/drive-pr/`                      | asked to drive, land, ship, or get a specific PR merged                                        |
+| `**`                                                 | `.agents/skills/fix-pr/`                        | "fix PR", "clean up PR #N", multiple unresolved issues on a PR                                 |
+| `**`                                                 | `.agents/skills/fix-problem/`                   | user reports a bug, unexpected behavior, or something is broken                                |
+| `**`                                                 | `.agents/skills/jira-rollover/`                 | sprint close, syncing bucket epic project properties ⚠ may be unused                           |
+| `**`                                                 | `.agents/skills/mcp-diagnostics/`               | MCP server fails to connect, ToolSearch returns empty for known tools                          |
+| `**`                                                 | `.agents/skills/mcp-first/`                     | choosing between shell and MCP tools, any Jira/GitHub/CI/DB/AWS operation                      |
+| `**`                                                 | `.agents/skills/mcp-gaps/`                      | PR merged (run audit); working through the MCP backlog                                         |
+| `**`                                                 | `.agents/skills/open-prs/`                      | sweep all open PRs, rebase/review/label pass across the board                                  |
+| `**`                                                 | `.agents/skills/plan-ticket/`                   | planning new work that does not yet have a Jira ticket                                         |
+| `**`                                                 | `.agents/skills/planning/`                      | structured planning phase before implementation (Phase 0)                                      |
+| `**`                                                 | `.agents/skills/pr-lifecycle/`                  | creating PRs, replying to reviews, fixing review comments, managing PR labels                  |
+| `**`                                                 | `.agents/skills/rebase/`                        | rebasing a branch, resolving merge conflicts, updating a branch                                |
+| `**`                                                 | `.agents/skills/repo-tooling/`                  | lint/typecheck/build, GraphQL codegen, package management, Make targets                        |
+| `**`                                                 | `.agents/skills/secrets-handling/`              | writing, reading, or populating secret values (API keys, tokens, private keys)                 |
+| `**`                                                 | `.agents/skills/skill-authoring/`               | writing or restructuring a SKILL.md file                                                       |
+| `**`                                                 | `.agents/skills/slice/`                         | decomposing an epic or story into structured child tasks                                       |
+| `**`                                                 | `.agents/skills/standards/`                     | writing new code, reviewing configs, handling lint errors, codegen policy                      |
+| `**`                                                 | `.agents/skills/subagent-templates/`            | spawning subagents or dispatching parallel work via chips                                      |
+| `**`                                                 | `.agents/skills/sweep-dependabot/`              | sweeping, triaging, or unsticking Dependabot PRs                                               |
+| `**`                                                 | `.agents/skills/unblock-prs/`                   | stuck PRs, false-positive CI, Expected CI state, merge queue issues                            |
+| `**`                                                 | `.agents/skills/work-ticket/`                   | given a Jira ticket key, implementing it end-to-end autonomously                               |
+| `**`                                                 | `.agents/skills/workflow-overview/`             | following the step-by-step ticket-to-merge agent runbook (Steps 0-16)                          |
+| `**`                                                 | `.agents/skills/worktree-workflow/`             | starting any ticket that needs an isolated branch or worktree                                  |
+| `apps/web/**, apps/app/**, lib/shared-components/**` | `.agents/skills/frontend-design/`               | any UI work — components, pages, design system, visual styles                                  |
+| `apps/web/**, apps/app/**, lib/shared-components/**` | `.agents/skills/ui/`                            | choosing brand colors, layout patterns, UI component standards                                 |
+| `apps/web/**, apps/app/**`                           | `.agents/skills/shared-components-first/`       | building or reviewing UI in an app directory                                                   |
+| `apps/web/**, apps/app/**`                           | `.agents/skills/ui-audit/`                      | full UI audit, visual regression check, design compliance sweep                                |
+| `apps/web/**, apps/app/**`                           | `.agents/skills/promote-shared-components/`     | moving UI code from an app to lib/shared-components                                            |
+| `apps/web-e2e/**`                                    | `.agents/skills/testing/`                       | writing, running, or debugging E2E, unit, or integration tests                                 |
+| `apps/web-e2e/**`                                    | `.agents/skills/fix-integration-tests/`         | fixing a failing Playwright integration test                                                   |
+| `apps/web-e2e/**`                                    | `.agents/skills/read-playwright-report/`        | reading or analyzing Playwright HTML test results                                              |
+| `lib/shared-components/**`                           | `.agents/skills/storybook/`                     | adding or running Storybook stories, writing interaction tests                                 |
+| `lambdas/**`                                         | `.agents/skills/cloudwatch-archaeology/`        | debugging opaque distributed or Lambda failures (test stdout is misleading)                    |
+| `lambdas/**, apps/**, lib/**`                        | `.agents/skills/dev-environment/`               | spinning up local dev services, debugging the full stack                                       |
+| `lambdas/**, terraform/**`                           | `.agents/skills/infrastructure/`                | AWS operations, Lambda deployment, cloud infrastructure changes                                |
+| `terraform/**`                                       | `.agents/skills/terraform-permission-planning/` | adding or modifying any Terraform resource — BEFORE push                                       |
+| `terraform/**`                                       | `.agents/skills/terraform-local-apply/`         | running terraform plan/apply locally against AWS dev                                           |
+| `terraform/**, .github/workflows/**, lambdas/**`     | `.agents/skills/add-secret-or-env-var/`         | adding any new secret or environment variable to the project                                   |
+| `lib/db-client/**, lambdas/**`                       | `.agents/skills/apply-pr-migrations/`           | "Verify All Migrations Applied" CI check failing, `CI: Migration` label                        |
+| `apps/cli/**`                                        | `.agents/skills/cli-usage/`                     | running CLI commands or performing CLI-based admin tasks                                       |
+| `docs/design/**`                                     | `.agents/skills/design-sync/`                   | `/sync-designs` (cloud) or `/implement-design` (local), design-to-code pipeline                |
 
 **Writing or editing a skill**: load `.agents/skills/skill-authoring/SKILL.md` before drafting or restructuring any `SKILL.md`.
 
