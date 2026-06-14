@@ -162,6 +162,12 @@ After a deep audit, summarize:
 
 ---
 
+## References
+
+- [`references/batch-tool-inventory.md`](references/batch-tool-inventory.md) — full inventory of every tool across the 10 in-repo MCP servers, classified as already-batched / needs-batch / single-use, with a prioritized list of batch-variant candidates (grounds epic LS-8031).
+
+---
+
 ## Gotchas
 
 - **No duplicate tickets** — always search the current bucket epic's children first, matching on underlying capability
