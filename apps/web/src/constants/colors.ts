@@ -81,6 +81,7 @@ export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
   RB: POS_RB,
   WR: POS_WR,
   TE: POS_TE,
+  FLEX: POS_FLEX,
   K: POS_K,
   DST: POS_DST,
   DL: POS_DL,

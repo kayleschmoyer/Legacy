@@ -24,6 +24,7 @@ type FootballPosition =
   | 'RB'
   | 'WR'
   | 'TE'
+  | 'FLEX'
   | 'K'
   | 'DST'
   | 'DL'
@@ -36,6 +37,7 @@ const POSITIONS: FootballPosition[] = [
   'RB',
   'WR',
   'TE',
+  'FLEX',
   'K',
   'DST',
   'DL',
@@ -48,6 +50,7 @@ const POSITION_COLORS: Record<string, string> = {
   RB: '#27AE60',
   WR: '#9B59B6',
   TE: '#E67E22',
+  FLEX: '#C49A6C',
   K: '#95A5A6',
   DST: '#C41E3A', // seam red (team defense unit)
   DL: '#C25A2A', // burnt orange-red (defensive line)
@@ -417,6 +420,7 @@ export default function FootballPlayers(): React.JSX.Element {
           horizontal
           showsHorizontalScrollIndicator={true}
           fadingEdgeLength={32}
+          initialNumToRender={POSITIONS.length}
           keyExtractor={(item) => item}
           renderItem={({ item: pos }) => (
             <PositionPill

@@ -17,18 +17,20 @@ export type FootballPosition =
   | 'RB'
   | 'WR'
   | 'TE'
+  | 'FLEX'
   | 'K'
   | 'DST'
   | 'DL'
   | 'LB'
   | 'DB';
 
-const POSITIONS: FootballPosition[] = [
+export const POSITIONS: FootballPosition[] = [
   'All',
   'QB',
   'RB',
   'WR',
   'TE',
+  'FLEX',
   'K',
   'DST',
   'DL',

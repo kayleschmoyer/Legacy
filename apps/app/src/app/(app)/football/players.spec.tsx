@@ -236,6 +236,7 @@ describe('FootballPlayers', () => {
       expect(screen.getByText('RB')).toBeTruthy();
       expect(screen.getByText('WR')).toBeTruthy();
       expect(screen.getByText('TE')).toBeTruthy();
+      expect(screen.getByText('FLEX')).toBeTruthy();
       expect(screen.getByText('K')).toBeTruthy();
       expect(screen.getByText('DST')).toBeTruthy();
       expect(screen.getByText('DL')).toBeTruthy();

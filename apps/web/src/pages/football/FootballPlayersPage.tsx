@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input, Spinner, Text, useMedia, XStack, YStack } from 'tamagui';
 import { LayoutGrid, LayoutList, Search, X } from '@tamagui/lucide-icons';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
@@ -9,7 +9,10 @@ import {
   useFootballPlayersQuery,
 } from '../../api/db/graphql.generated';
 import type { FootballPosition } from '../../components/football/FootballPositionFilter';
-import { FootballPositionFilter } from '../../components/football/FootballPositionFilter';
+import {
+  POSITIONS as FOOTBALL_POSITIONS,
+  FootballPositionFilter,
+} from '../../components/football/FootballPositionFilter';
 import type { TeamFilter } from '../../components/football/FootballTeamFilter';
 import { FootballTeamFilter } from '../../components/football/FootballTeamFilter';
 import { PageMeta } from '../../components/PageMeta';
@@ -319,10 +322,33 @@ function ViewToggleButton({
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 
+const VALID_POSITIONS = new Set<string>(FOOTBALL_POSITIONS);
+
 export function FootballPlayersPage() {
   const navigate = useNavigate();
   const media = useMedia();
-  const [position, setPosition] = useState<FootballPosition>('All');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const positionParam = searchParams.get('position') ?? 'All';
+  const position: FootballPosition = VALID_POSITIONS.has(positionParam)
+    ? (positionParam as FootballPosition)
+    : 'All';
+  const setPosition = useCallback(
+    (pos: FootballPosition) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (pos === 'All') {
+            next.delete('position');
+          } else {
+            next.set('position', pos);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);

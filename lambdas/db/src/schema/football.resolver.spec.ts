@@ -374,6 +374,29 @@ describe('football resolvers', () => {
       expect(mockDb.where).toHaveBeenCalled();
     });
 
+    it('accepts FLEX position and returns matching players', async () => {
+      const rbRow = {
+        id: 10,
+        firstName: 'Christian',
+        lastName: 'McCaffrey',
+        pfrId: null,
+        isDst: false,
+        nflTeam: 'SF',
+        position: 'RB',
+      };
+      mockDb.then.mockImplementationOnce((resolve) => resolve([rbRow]));
+
+      const result = (await getResolver()(
+        {},
+        { position: 'FLEX', nflTeam: null, search: null, after: null },
+        mockContext,
+        undefined as never,
+      )) as FootballPlayersResult;
+
+      expect(result.nodes).toHaveLength(1);
+      expect(result.nodes[0].position).toBe('RB');
+    });
+
     it('throws BAD_USER_INPUT for invalid position value', async () => {
       await expect(
         getResolver()(

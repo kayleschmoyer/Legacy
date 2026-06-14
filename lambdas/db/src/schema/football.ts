@@ -1694,10 +1694,16 @@ builder.queryField('footballPlayers', (t) =>
       const conditions: SQL[] = [eq(PublicSchema.players.sport, 'football')];
 
       if (args.position) {
-        if (!isValidPosition(args.position)) {
-          throw UserInputError(`Invalid position: ${args.position}`);
+        if (args.position === 'FLEX') {
+          conditions.push(
+            inArray(PublicSchema.players.position, ['RB', 'WR', 'TE']),
+          );
+        } else {
+          if (!isValidPosition(args.position)) {
+            throw UserInputError(`Invalid position: ${args.position}`);
+          }
+          conditions.push(eq(PublicSchema.players.position, args.position));
         }
-        conditions.push(eq(PublicSchema.players.position, args.position));
       }
 
       if (args.nflTeam) {

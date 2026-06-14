@@ -24,6 +24,7 @@ const POSITIONS = [
   'RB',
   'WR',
   'TE',
+  'FLEX',
   'K',
   'DST',
   'DL',
