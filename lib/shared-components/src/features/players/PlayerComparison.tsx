@@ -1673,9 +1673,18 @@ export function PlayerComparison({
   const careerPitchingRows = useMemo<StatRow[]>(() => {
     if (!isPremium) return [];
     const hasPitching = activePlayers.some(
-      (p) => (p.summary.careerPitching?.games ?? 0) > 0,
+      (p) => p.summary.careerPitching != null,
     );
     if (!hasPitching) return [];
+
+    activePlayers.forEach((p) => {
+      if (p.summary.careerPitching != null && !p.summary.careerPitching.games) {
+        LOGGER.debug(
+          '[PCM-018] careerPitching present but games is null/0 — two-way player data gap',
+          { playerId: p.id, games: p.summary.careerPitching.games },
+        );
+      }
+    });
 
     const defs: [
       string,
@@ -1737,7 +1746,7 @@ export function PlayerComparison({
 
   const achievementRows = useMemo<StatRow[]>(() => {
     const hasPitching = activePlayers.some(
-      (p) => (p.summary.careerPitching?.games ?? 0) > 0,
+      (p) => p.summary.careerPitching != null,
     );
     const defs: [
       string,
