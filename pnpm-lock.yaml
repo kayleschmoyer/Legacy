@@ -772,6 +772,9 @@ importers:
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../../lib/env-utilities
+      '@legacy-sports/graphql':
+        specifier: workspace:*
+        version: link:../../lib/graphql
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
