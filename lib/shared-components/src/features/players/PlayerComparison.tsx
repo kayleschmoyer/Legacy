@@ -1686,6 +1686,9 @@ export function PlayerComparison({
   }, [activePlayers]);
 
   const achievementRows = useMemo<StatRow[]>(() => {
+    const hasPitching = activePlayers.some(
+      (p) => (p.summary.careerPitching?.games ?? 0) > 0,
+    );
     const defs: [
       string,
       string | undefined,
@@ -1724,16 +1727,18 @@ export function PlayerComparison({
         (p) => p.careerAchievements?.worldSeriesRings,
       ],
     ];
-    return defs.map(([label, desc, lowerIsBetter, ext]) => {
-      const nums = activePlayers.map((p) => ext(p.summary));
-      return {
-        label,
-        desc,
-        lowerIsBetter,
-        vals: nums.map((n) => (n == null ? '—' : String(n))),
-        nums,
-      };
-    });
+    return defs
+      .filter(([label]) => label !== 'Cy Young Awards' || hasPitching)
+      .map(([label, desc, lowerIsBetter, ext]) => {
+        const nums = activePlayers.map((p) => ext(p.summary));
+        return {
+          label,
+          desc,
+          lowerIsBetter,
+          vals: nums.map((n) => (n == null ? '—' : String(n))),
+          nums,
+        };
+      });
   }, [activePlayers]);
 
   const statGroups = useMemo<StatGroup[]>(() => {

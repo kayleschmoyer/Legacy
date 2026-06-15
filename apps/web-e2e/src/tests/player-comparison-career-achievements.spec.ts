@@ -532,6 +532,46 @@ adminTest.describe(
 // World Series Rings:   Betts=2 (BEST)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Tests: Cy Young row hidden for hitter vs hitter (LS-7003) @regression
+//
+// Judge and Betts both have careerPitching: null — hasPitching is false, so
+// the Cy Young Awards row must not appear.
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – Cy Young row hidden for hitter vs hitter (LS-7003) @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockGraphQL(page);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+
+      await addPlayer(page, 'Aa', 'Aaron Judge');
+      await addPlayer(page, 'Mo', 'Mookie Betts');
+    });
+
+    adminTest(
+      'Cy Young Awards row is not rendered when neither player has pitched',
+      async ({ page }) => {
+        await expect(page.getByText('Cy Young Awards')).not.toBeVisible();
+      },
+    );
+
+    adminTest(
+      'other achievement rows are still visible when neither player has pitched',
+      async ({ page }) => {
+        await expect(page.getByText('All-Star Selections')).toBeVisible();
+        await expect(page.getByText('MVP Awards')).toBeVisible();
+        await expect(page.getByText('Gold Gloves')).toBeVisible();
+        await expect(page.getByText('Silver Sluggers')).toBeVisible();
+        await expect(page.getByText('World Series Rings')).toBeVisible();
+      },
+    );
+  },
+);
+
 adminTest.describe(
   'Player Comparison – career achievements three-player comparison @regression',
   () => {
