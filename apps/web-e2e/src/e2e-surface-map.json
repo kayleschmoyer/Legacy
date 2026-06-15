@@ -431,6 +431,12 @@
       "apps/web/src/components/PremiumGate.tsx",
       "apps/web/src/hooks/useIsPremium.ts"
     ],
+    "apps/web-e2e/src/tests/player-comparison-color-chips.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "lib/shared-components/src/features/players/PlayerComparison.tsx",
+      "apps/web/src/components/PremiumGate.tsx",
+      "apps/web/src/hooks/useIsPremium.ts"
+    ],
     "apps/web-e2e/src/tests/player-comparison-career-achievements.spec.ts": [
       "apps/web/src/pages/players/**",
       "apps/web/src/components/baseball/**",
