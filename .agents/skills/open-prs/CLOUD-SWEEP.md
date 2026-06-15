@@ -22,6 +22,8 @@ The response includes a `summary` object with counts (`total`, `conflicting`, `c
 
 For detailed inspection of specific PRs, use `github_pr_batch_status` with an array of PR numbers.
 
+> **Workflow triage (read-only) — strong fit in cloud.** A cloud sweep is entirely read-only/API, so the scan + per-PR classification maps cleanly onto the deterministic `pipeline()` in [SKILL.md → Read-Only Triage via the Workflow Primitive](SKILL.md#read-only-triage-via-the-workflow-primitive). It returns a `verdicts[]` triage report the cloud agent drives Cloud Steps 2–6 against. Use it for large/ambiguous PR sets; the single `github_pr_dashboard` call above is the simple path for trivial scans.
+
 > For a **scan-only** request, stop here and report the results.
 
 ## Cloud Step 2: Verify Reviewer Bot Labeling

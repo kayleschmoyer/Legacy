@@ -23,6 +23,8 @@ Use the `taskId` returned by `TaskCreate` (or, if reusing an existing sweep task
 
 Every operation starts with a scan. This produces a single snapshot used by all passes.
 
+> **Workflow triage (read-only).** For large or ambiguous PR sets, run the scan **and** per-PR classification as the deterministic `pipeline()` documented in [SKILL.md → Read-Only Triage via the Workflow Primitive](SKILL.md#read-only-triage-via-the-workflow-primitive). That Workflow uses read-only tools only and returns a `verdicts[]` triage report; the orchestrator then drives Passes 0–3 against it. The single `github_pr_dashboard` call below is the simple path for trivial scans where deep per-PR classification is unnecessary. **Passes 1–3 (rebase, fix-review, fix-CI) are git-mutating and run outside the Workflow** — never inside it.
+
 **MCP (preferred):**
 
 ```

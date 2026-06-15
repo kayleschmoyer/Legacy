@@ -164,12 +164,92 @@ When an MCP tool fails, **do not assume the entire server is down**. Different t
 > - Run `make_run({ target: "pc" })` in a PR's worktree from the orchestrator context
 > - Call `ci_get_logs` / `ci_search_logs` to diagnose CI failures inline in the orchestrator
 >
-> **Permitted orchestrator actions**: `github_pr_scan`, `github_pr_dashboard`, `github_pr_batch_status`, `github_manage_labels`, `github_request_review`, `github_get_review_threads` (summary only — to count threads and build the sub-agent prompt), `ci_list_runs` / `ci_view_run` (summary/status only — not full log fetch), `ci_rerun` (for obviously transient failures), `worktree_list` (to discover worktree paths for sub-agent prompts), and the `Agent()` dispatch call itself.
+> **Permitted orchestrator actions**: `github_pr_scan`, `github_pr_dashboard`, `github_pr_batch_status`, `github_manage_labels`, `github_request_review`, `github_get_review_threads` (summary only — to count threads and build the sub-agent prompt), `ci_list_runs` / `ci_view_run` (summary/status only — not full log fetch), `ci_rerun` (for obviously transient failures), `worktree_list` (to discover worktree paths for sub-agent prompts), and the `Agent()` / `Workflow()` dispatch calls.
+
+## Read-Only Triage via the Workflow Primitive
+
+The sweep's **read-only front half — scan every open PR, classify each into a bucket, and build the triage report — runs as a single deterministic Workflow `pipeline()`** (the Claude Code `Workflow` tool). The **git-mutating fix passes (Passes 1–3) are NOT part of the Workflow** — they require a worktree, `git commit`/`push`, and (for multi-ticket execution) chips that own a worktree and drive a PR to merge, none of which a Workflow agent can do. This is the **read/execute split**: the Workflow produces the classified snapshot; the passes consume it and take every write action.
+
+**Why a Workflow here**: scanning is one `github_pr_dashboard` call, but turning ambiguous PRs into settled buckets needs per-PR deep inspection — review-thread counts, stale `COMMENTED`-review detection, and classifying CI failures as flaky-vs-code from logs. Doing that inline blows the orchestrator's context (see the Orchestrator Footprint Principle above); fanning it out one agent per PR keeps orchestrator cost `O(PRs × dispatch)` and makes the classification deterministic and schema-validated. The `pipeline()` has no barrier — each PR classifies as soon as the scan returns.
+
+**When to invoke**: invoking `/open-prs` (or `/sweep-prs`) authorizes this scoped Workflow call — pass the read-only triage script below. For a trivial scan (few PRs, dashboard data already unambiguous) the single `github_pr_dashboard` call in [PASSES.md Step 1](PASSES.md) is sufficient and the Workflow adds no value; reach for the Workflow when the PR set is large or per-PR classification is ambiguous.
+
+**Read-only contract**: the Workflow uses **read-only tools only** — `github_pr_dashboard`, `github_pr_batch_status`, `github_get_review_threads`, and `ci_get_logs` / `ci_search_logs` for log inspection. It **never** labels, comments, re-runs CI, rebases, or pushes. All of those write actions stay in Pass 0 (API writes) and Passes 1–3 (git fixes), exactly as today — so behavior and the read/execute split are preserved.
+
+**Script shape** (classification only — no git, no labels, no comments):
+
+```js
+export const meta = {
+  name: 'open-prs-triage',
+  description:
+    'Scan open PRs and classify each into a sweep bucket (read-only)',
+  phases: [{ title: 'Scan' }, { title: 'Classify' }, { title: 'Report' }],
+};
+
+const VERDICT = {
+  type: 'object',
+  required: ['number', 'bucket', 'settled'],
+  properties: {
+    number: { type: 'number' },
+    bucket: {
+      enum: [
+        'clean',
+        'conflicting',
+        'reviews',
+        'ci-failing',
+        'ci-pending',
+        'dependabot',
+      ],
+    },
+    settled: { type: 'boolean' },
+    reason: { type: 'string' },
+    recommendedAction: { type: 'string' }, // e.g. "@dependabot rebase", "rebase", "fix-review", "ci-rerun"
+  },
+};
+
+phase('Scan');
+// One read-only call; excludeDrafts at the source.
+const dashboard = await agent(
+  'Call github_pr_dashboard(state:"open", limit:100, excludeDrafts:true) and return its prs[] array verbatim as JSON.',
+  {
+    label: 'scan',
+    schema: {
+      type: 'object',
+      required: ['prs'],
+      properties: { prs: { type: 'array' } },
+    },
+  },
+);
+
+// Fan out per-PR deep classification. Read-only tools ONLY: github_pr_batch_status,
+// github_get_review_threads, ci_get_logs / ci_search_logs (logs only — never ci_rerun here).
+const verdicts = (
+  await pipeline(dashboard.prs, (pr) =>
+    agent(
+      `Classify PR #${pr.number} into a sweep bucket using READ-ONLY tools only ` +
+        `(github_pr_batch_status, github_get_review_threads(unresolvedOnly:true), ci_get_logs/ci_search_logs for log inspection). ` +
+        `Detect Dependabot by branch prefix "dependabot/". Treat a stale COMMENTED Copilot review with 0 open threads as needing re-review. ` +
+        `Classify CI failures as flaky/infrastructure vs code (type/lint/test) from logs. Do NOT label, comment, rerun, rebase, or push anything.`,
+      { label: `classify:#${pr.number}`, phase: 'Classify', schema: VERDICT },
+    ),
+  )
+).filter(Boolean);
+
+phase('Report');
+const settled = verdicts.filter((v) => v.settled);
+const workable = verdicts.filter((v) => !v.settled);
+log(
+  `Triage: ${verdicts.length} PRs — ${workable.length} workable, ${settled.length} settled`,
+);
+return { verdicts }; // feeds Pass 0–3; the orchestrator takes ALL write actions
+```
+
+The returned `verdicts` array **is** the triage report. The orchestrator then runs Pass 0 (API-write actions) and Passes 1–3 (git fixes) against it exactly as before — all label changes, Dependabot comments, CI re-runs, rebases, and pushes happen **outside** the Workflow.
 
 ## High-Level Pass Order (Local)
 
 1. **Step 0** — Create sweep task
-2. **Step 1** — Scan all open PRs
+2. **Step 1** — Scan + classify all open PRs (read-only; run as the [Workflow triage pipeline](#read-only-triage-via-the-workflow-primitive) for large/ambiguous sets, or the single `github_pr_dashboard` call for trivial scans)
 3. **Step 2** — Find/enter PR worktree
 4. **Pass 0** — API-fast triage: Copilot reviews, Dependabot commands, label clean PRs, re-run transient CI, resolve meta threads
 5. **Pass 1** — Rebase conflicting PRs (parallel for disjoint files, sequential for overlapping)
