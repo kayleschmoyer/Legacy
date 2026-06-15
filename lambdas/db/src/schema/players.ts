@@ -249,7 +249,15 @@ PlayerRef.implement({
         'Fantasy scoring data (only populated when using scoring-based sort)',
       type: PlayerScoringRef,
       nullable: true,
-      resolve: (parent) => {
+      resolve: async (parent, _args, context) => {
+        // scoring.* is a Premium feature (ENTITLEMENTS.player_comparison) — PCM-022.
+        // Enforce server-side as defense-in-depth behind the UI PremiumGate: an
+        // unauthenticated or free-tier caller gets null rather than the data.
+        // Returning null (vs. throwing) keeps the rest of the players query intact.
+        if (!context.user) return null;
+        if (!(await hasEntitlement(context, ENTITLEMENTS.player_comparison))) {
+          return null;
+        }
         return parent.scoring ?? null;
       },
     }),
