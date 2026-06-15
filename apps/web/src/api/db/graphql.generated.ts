@@ -268,21 +268,21 @@ export type BulkDropPlayersInput = {
 export type CareerAchievements = {
   __typename?: 'CareerAchievements';
   /** Number of All-Star game selections */
-  allStarSelections?: Maybe<Scalars['Int']['output']>;
+  allStarSelections: Scalars['Int']['output'];
   /** Number of Cy Young Awards */
-  cyYoungAwards?: Maybe<Scalars['Int']['output']>;
+  cyYoungAwards: Scalars['Int']['output'];
   /** Number of Gold Glove Awards */
-  goldGloves?: Maybe<Scalars['Int']['output']>;
+  goldGloves: Scalars['Int']['output'];
   /** Whether the player is in the Baseball Hall of Fame */
   hallOfFame?: Maybe<Scalars['Boolean']['output']>;
   /** Number of Most Valuable Player Awards (AL or NL) */
-  mvpAwards?: Maybe<Scalars['Int']['output']>;
+  mvpAwards: Scalars['Int']['output'];
   /** Whether the player won the Rookie of the Year Award */
   rookieOfTheYear?: Maybe<Scalars['Boolean']['output']>;
   /** Number of Silver Slugger Awards */
-  silverSluggers?: Maybe<Scalars['Int']['output']>;
+  silverSluggers: Scalars['Int']['output'];
   /** Number of World Series Championship rings */
-  worldSeriesRings?: Maybe<Scalars['Int']['output']>;
+  worldSeriesRings: Scalars['Int']['output'];
 };
 
 export type CareerBatting = {
@@ -383,6 +383,7 @@ export type CareerPitching = {
   saves?: Maybe<Scalars['Int']['output']>;
   shutouts?: Maybe<Scalars['Int']['output']>;
   strikeouts?: Maybe<Scalars['Int']['output']>;
+  whip?: Maybe<Scalars['Float']['output']>;
   wildPitches?: Maybe<Scalars['Int']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
@@ -8889,11 +8890,11 @@ export type GetPlayerCareerArcQuery = {
     eligiblePositions?: Array<string> | null;
     careerAchievements?: {
       __typename?: 'CareerAchievements';
-      allStarSelections?: number | null;
-      goldGloves?: number | null;
-      silverSluggers?: number | null;
-      mvpAwards?: number | null;
-      cyYoungAwards?: number | null;
+      allStarSelections: number;
+      goldGloves: number;
+      silverSluggers: number;
+      mvpAwards: number;
+      cyYoungAwards: number;
       hallOfFame?: boolean | null;
       rookieOfTheYear?: boolean | null;
     } | null;
@@ -9080,12 +9081,12 @@ export type GetPlayersWithStatsQuery = {
     } | null;
     careerAchievements?: {
       __typename?: 'CareerAchievements';
-      allStarSelections?: number | null;
-      mvpAwards?: number | null;
-      cyYoungAwards?: number | null;
-      goldGloves?: number | null;
-      silverSluggers?: number | null;
-      worldSeriesRings?: number | null;
+      allStarSelections: number;
+      mvpAwards: number;
+      cyYoungAwards: number;
+      goldGloves: number;
+      silverSluggers: number;
+      worldSeriesRings: number;
       hallOfFame?: boolean | null;
       rookieOfTheYear?: boolean | null;
     } | null;

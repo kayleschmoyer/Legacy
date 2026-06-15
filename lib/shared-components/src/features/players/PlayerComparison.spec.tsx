@@ -10,6 +10,7 @@ import {
   fmt,
   fmtAvg,
   fmtCount,
+  fmtScoreRow,
   tiedIndices,
 } from './PlayerComparison';
 
@@ -60,6 +61,33 @@ describe('fmtCount', () => {
   it('renders positive integer counts as strings', () => {
     expect(fmtCount(3)).toBe('3');
     expect(fmtCount(14)).toBe('14');
+  });
+});
+
+describe('fmtScoreRow', () => {
+  it('uses 1 decimal place when any value is ≥ 1', () => {
+    expect(fmtScoreRow([12.5, 8.3])).toEqual(['12.5', '8.3']);
+  });
+
+  it('uses 2 decimal places when all non-null values are < 1 — distinguishes micro-differences', () => {
+    expect(fmtScoreRow([0.04, 0.0])).toEqual(['0.04', '0.00']);
+  });
+
+  it('renders "—" for null/undefined entries regardless of precision tier', () => {
+    expect(fmtScoreRow([null, 0.5, undefined])).toEqual(['—', '0.50', '—']);
+  });
+
+  it('defaults to 1 decimal when all values are null (no non-null max to compare)', () => {
+    // All nulls → all dashes; decimals choice is irrelevant but must not throw.
+    expect(fmtScoreRow([null, null])).toEqual(['—', '—']);
+  });
+
+  it('uses 2 decimals when the mix of null and sub-1 values — null does not pollute max', () => {
+    expect(fmtScoreRow([null, 0.04, 0.08])).toEqual(['—', '0.04', '0.08']);
+  });
+
+  it('uses 1 decimal when values span both sides of 1 (mixed precision not needed)', () => {
+    expect(fmtScoreRow([0.04, 1.5])).toEqual(['0.0', '1.5']);
   });
 });
 

@@ -117,6 +117,15 @@ export function fmtCount(n: number | null | undefined): string {
   return String(n);
 }
 
+// Formats an entire scoring row with adaptive precision: uses 2 decimal places
+// when all non-null values in the row are <1, so micro-differences like 0.04 vs
+// 0.00 aren't both collapsed to "0.0".
+export function fmtScoreRow(nums: (number | null | undefined)[]): string[] {
+  const nonNull = nums.filter((n): n is number => n != null);
+  const decimals = nonNull.length > 0 && Math.max(...nonNull) < 1 ? 2 : 1;
+  return nums.map((n) => (n == null ? '—' : n.toFixed(decimals)));
+}
+
 export function bestIndex(
   values: (number | null | undefined)[],
   lowerIsBetter = false,
@@ -1615,7 +1624,7 @@ export function PlayerComparison({
         label,
         desc,
         lowerIsBetter,
-        vals: nums.map((n) => (n == null ? '—' : n.toFixed(1))),
+        vals: fmtScoreRow(nums),
         nums,
       };
     });
