@@ -362,6 +362,111 @@ describe('players resolver', () => {
     );
   });
 
+  // ── players (search — auth + premium gate, LS-7019) ──────────────────────
+
+  it('players: throws AuthenticationError when search is provided but user is unauthenticated', async () => {
+    mockContext.user = null;
+
+    await expect(
+      getQueryResolver('players')(
+        {},
+        {
+          limit: null,
+          offset: null,
+          orderBy: null,
+          orderDirection: null,
+          position: null,
+          search: 'Ruth',
+          excludeEmptyNames: false,
+          leagueId: null,
+        },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+
+    expect(mockPlayersService.getPlayers).not.toHaveBeenCalled();
+  });
+
+  it('players: throws PremiumRequiredError when search is provided but user is free tier', async () => {
+    mockContext.user = { id: 7, isAdmin: false };
+    // Subscription tier lookup returns free
+    mockDb.limit.mockResolvedValueOnce([{ tier: 'free' }]);
+
+    await expect(
+      getQueryResolver('players')(
+        {},
+        {
+          limit: null,
+          offset: null,
+          orderBy: null,
+          orderDirection: null,
+          position: null,
+          search: 'Ruth',
+          excludeEmptyNames: false,
+          leagueId: null,
+        },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+
+    expect(mockPlayersService.getPlayers).not.toHaveBeenCalled();
+  });
+
+  it('players: allows search when user has player_comparison entitlement', async () => {
+    mockContext.user = { id: 7, isAdmin: false };
+    // Subscription tier lookup returns premium
+    mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]);
+    mockPlayersService.getPlayers.mockResolvedValueOnce([MOCK_PLAYER]);
+
+    const result = await getQueryResolver('players')(
+      {},
+      {
+        limit: 8,
+        offset: null,
+        orderBy: null,
+        orderDirection: null,
+        position: null,
+        search: 'Ruth',
+        excludeEmptyNames: false,
+        leagueId: null,
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual([MOCK_PLAYER]);
+    expect(mockPlayersService.getPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.objectContaining({ fullNameLike: 'Ruth' }),
+      }),
+    );
+  });
+
+  it('players: skips search gate when no search arg is provided', async () => {
+    mockContext.user = null;
+    mockPlayersService.getPlayers.mockResolvedValueOnce([MOCK_PLAYER]);
+
+    const result = await getQueryResolver('players')(
+      {},
+      {
+        limit: null,
+        offset: null,
+        orderBy: null,
+        orderDirection: null,
+        position: null,
+        search: null,
+        excludeEmptyNames: false,
+        leagueId: null,
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual([MOCK_PLAYER]);
+  });
+
   // ── player ────────────────────────────────────────────────────────────────
 
   it('player: returns the player when found', async () => {

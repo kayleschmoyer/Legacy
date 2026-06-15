@@ -7,9 +7,9 @@ import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
-import { hasEntitlement } from './authorization';
+import { hasEntitlement, requireEntitlement } from './authorization';
 import { ENTITLEMENTS } from './entitlements';
-import { UserInputError } from './graphql-errors';
+import { AuthenticationError, UserInputError } from './graphql-errors';
 import { SportKindEnum } from './leagues/types';
 import { CareerBattingRef, CareerPitchingRef } from './statistics';
 
@@ -342,6 +342,13 @@ builder.queryField('players', (t) =>
       }),
     },
     resolve: async (root, args, context) => {
+      // Player-name search drives the Player Comparison feature, which is
+      // premium-only. Enforce auth + entitlement server-side (LS-7019).
+      if (args.search) {
+        if (!context.user) throw AuthenticationError();
+        await requireEntitlement(context, ENTITLEMENTS.player_comparison);
+      }
+
       const orderBy = (args.orderBy || 'careerGames') as PlayerOrderBy;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
 

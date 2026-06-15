@@ -365,12 +365,18 @@ function PlayerSearchInput({
   filledSlots?: React.ReactNode;
 }) {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
 
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(id);
+  }, [query]);
+
   const { data, loading, error } = useGetPlayersWithStatsQuery({
-    variables: { search: query, limit: 8 },
-    skip: query.trim().length < 2,
+    variables: { search: debouncedQuery, limit: 8 },
+    skip: debouncedQuery.trim().length < 2,
   });
 
   React.useEffect(() => {
