@@ -636,6 +636,33 @@ adminTest.describe(
     );
 
     adminTest(
+      'selection succeeds when blur fires before click fires on the suggestion (PCM-030 regression)',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        const suggestion = page
+          .getByLabel('Player suggestions')
+          .getByText('Aaron Judge')
+          .first();
+        await expect(suggestion).toBeVisible();
+
+        // Simulate the blur-before-click race that PCM-030 describes: blur the
+        // input (as mousedown on the suggestion would) BEFORE clicking it.
+        // Prior to the fix, onBlur called setOpen(false) and destroyed the
+        // dropdown before the click could land. Now onBlur only calls
+        // setFocused(false), so the dropdown must survive the blur.
+        await input.blur();
+        await expect(suggestion).toBeVisible({ timeout: 500 });
+
+        // Click the suggestion — must succeed even though input is already blurred.
+        await suggestion.click();
+        await expect(
+          page.getByRole('button', { name: /remove aaron judge/i }),
+        ).toBeVisible();
+      },
+    );
+
+    adminTest(
       'already-selected player does not appear in dropdown on subsequent search',
       async ({ page }) => {
         const input = page.getByLabel('Search players to compare');

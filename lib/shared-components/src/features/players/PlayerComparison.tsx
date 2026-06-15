@@ -543,6 +543,11 @@ function PlayerSearchInput({
                   key={p.id}
                   role="option"
                   aria-label={name}
+                  onPressIn={() => {
+                    onSelect(p);
+                    setQuery('');
+                    setOpen(false);
+                  }}
                   onPress={() => {
                     onSelect(p);
                     setQuery('');
