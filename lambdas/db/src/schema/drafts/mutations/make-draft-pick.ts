@@ -5,9 +5,7 @@
 import {
   createBadgeService,
   filterPlayerIdsByLeagueEligibility,
-  isPlayerInPool,
-  playerMeetsMinCareerGames,
-  playerMeetsMinCareerSeasons,
+  findFailedEligibilityRule,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
@@ -159,94 +157,26 @@ builder.mutationField('makeDraftPick', (t) =>
           throw UserInputError('Player not found');
         }
 
-        if (
-          !(await isPlayerInPool(context.db, playerId, leaguePre.playerPool))
-        ) {
-          throw UserInputError(
-            `Player is not in the ${leaguePre.playerPool.toUpperCase()} player pool`,
-          );
-        }
-
-        // Validate Hall of Fame eligibility (LS-295)
-        if (leaguePre.baseballHofOnly && !player.hallOfFame) {
-          throw UserInputError(
-            'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
-          );
-        }
-
-        // Validate era eligibility (LS-295)
-        if (
-          leaguePre.baseballEraFilter &&
-          leaguePre.baseballEraFilter !== 'all'
-        ) {
-          const ERA_RANGES: Record<string, [number, number]> = {
-            dead_ball: [1871, 1919],
-            golden_age: [1920, 1960],
-            expansion: [1961, 1976],
-            free_agency: [1977, 1993],
-            steroid_era: [1994, 2005],
-            modern: [2006, 9999],
-          };
-          let eraStart: number | null = null;
-          let eraEnd: number | null = null;
-          if (leaguePre.baseballEraFilter === 'custom') {
-            eraStart = leaguePre.customEraStartYear ?? null;
-            eraEnd = leaguePre.customEraEndYear ?? null;
-          } else {
-            const range = ERA_RANGES[leaguePre.baseballEraFilter];
-            if (range) {
-              [eraStart, eraEnd] = range;
-            }
-          }
-          if (eraStart != null && eraEnd != null) {
-            const eraCheckResult = await context.db.execute(
-              sql`SELECT 1 FROM (
-                SELECT player_id FROM season_batting
-                  WHERE player_id = ${playerId}
-                    AND lg_id IN ('AL', 'NL')
-                    AND season >= ${eraStart}
-                    AND season <= ${eraEnd}
-                UNION
-                SELECT player_id FROM season_pitching
-                  WHERE player_id = ${playerId}
-                    AND lg_id IN ('AL', 'NL')
-                    AND season >= ${eraStart}
-                    AND season <= ${eraEnd}
-              ) era_check LIMIT 1`,
-            );
-            if (!eraCheckResult.rows[0]) {
-              const eraLabel = leaguePre.baseballEraFilter
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, (c: string) => c.toUpperCase());
-              throw UserInputError(
-                `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
-              );
-            }
-          }
-        }
-
-        if (
-          !(await playerMeetsMinCareerGames(
-            context.db,
-            playerId,
-            leaguePre.minCareerGames,
-          ))
-        ) {
-          throw UserInputError(
-            `Player does not meet the minimum career games requirement (${leaguePre.minCareerGames})`,
-          );
-        }
-
-        if (
-          !(await playerMeetsMinCareerSeasons(
-            context.db,
-            playerId,
-            leaguePre.minCareerSeasons,
-          ))
-        ) {
-          throw UserInputError(
-            `Player does not meet the minimum career seasons requirement (${leaguePre.minCareerSeasons})`,
-          );
+        // Static league-eligibility (pool, career games/seasons, HoF, era).
+        // Evaluated through the SAME shared predicate set the draft board uses
+        // (LS-8071), so a player shown as available can never be rejected here
+        // — and the failing rule maps to a specific user-facing message.
+        const failedRule = await findFailedEligibilityRule(
+          context.db,
+          playerId,
+          {
+            playerPool: leaguePre.playerPool,
+            minCareerGames: leaguePre.minCareerGames,
+            minCareerSeasons: leaguePre.minCareerSeasons,
+            baseballHofOnly: leaguePre.baseballHofOnly,
+            baseballEraFilter: leaguePre.baseballEraFilter,
+            customEraStartYear: leaguePre.customEraStartYear,
+            customEraEndYear: leaguePre.customEraEndYear,
+            sport: leaguePre.sport,
+          },
+        );
+        if (failedRule) {
+          throw UserInputError(failedRule.message);
         }
 
         // ── LS-4692: Phase 2 — Short locked write transaction ─────────────

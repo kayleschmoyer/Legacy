@@ -3,8 +3,7 @@
  */
 
 import {
-  careerGamesCondition,
-  careerSeasonsCondition,
+  buildEligibilityConditions,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
@@ -214,15 +213,20 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // Verify user is a member of this league
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
 
-      // Get league's player pool setting, career minimums, and matchup schedule
+      // Get league's player pool setting, career minimums, eligibility filters,
+      // and matchup schedule
       const [league] = await context.db
         .select({
+          sport: PublicSchema.leagues.sport,
           playerPool: PublicSchema.leagues.playerPool,
           minCareerGames: PublicSchema.leagues.minCareerGames,
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
           baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+          baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+          customEraStartYear: PublicSchema.leagues.customEraStartYear,
+          customEraEndYear: PublicSchema.leagues.customEraEndYear,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
@@ -236,17 +240,6 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         SELECT 1 FROM public.draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )`);
-
-      // Apply player pool filter (AL/NL restriction)
-      if (league && league.playerPool !== 'all') {
-        const poolUpper = league.playerPool.toUpperCase();
-        sqlConditions.push(
-          sql`EXISTS (
-            SELECT 1 FROM season_batting sb
-            WHERE sb.player_id = p.id AND sb.lg_id = ${poolUpper}
-          )`,
-        );
-      }
 
       // Apply optional name filter
       if (search && search.trim().length > 0) {
@@ -289,24 +282,24 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         }
       }
 
-      // Apply career games minimum (defaults to 50 if the league has no setting)
-      const minCareerGames = league?.minCareerGames ?? 50;
-      if (minCareerGames > 0) {
-        sqlConditions.push(careerGamesCondition(minCareerGames));
-      }
-
-      // Apply career seasons minimum (defaults to 3 if the league has no setting)
-      const minCareerSeasons = league?.minCareerSeasons ?? 3;
-      if (minCareerSeasons > 0) {
-        sqlConditions.push(careerSeasonsCondition(minCareerSeasons));
-      }
-
-      // Apply Hall of Fame restriction when the league is configured HoF-only
-      // (LS-4826). makeDraftPick already rejects non-HoF picks server-side via
-      // the same flag; aligning the available-players query keeps the draft
-      // board from showing players the user can't actually draft.
-      if (league?.baseballHofOnly) {
-        sqlConditions.push(sql`p.hall_of_fame = true`);
+      // Apply the league's static eligibility predicates (player pool, career
+      // games/seasons, Hall-of-Fame, era) via the SAME shared builder the pick
+      // endpoints use (LS-8071). The board layers its undrafted/search/position
+      // filters on top of this set, so it can only ever narrow the pool — never
+      // show a player the pick endpoints would reject. Career minimums default
+      // to 50 games / 3 seasons when the league has no explicit setting.
+      const eligibilityConditions = buildEligibilityConditions({
+        sport: league?.sport ?? 'baseball',
+        playerPool: league?.playerPool ?? 'all',
+        minCareerGames: league?.minCareerGames ?? 50,
+        minCareerSeasons: league?.minCareerSeasons ?? 3,
+        baseballHofOnly: league?.baseballHofOnly ?? false,
+        baseballEraFilter: league?.baseballEraFilter ?? undefined,
+        customEraStartYear: league?.customEraStartYear ?? null,
+        customEraEndYear: league?.customEraEndYear ?? null,
+      });
+      for (const { condition } of eligibilityConditions) {
+        sqlConditions.push(condition);
       }
 
       const whereClause =

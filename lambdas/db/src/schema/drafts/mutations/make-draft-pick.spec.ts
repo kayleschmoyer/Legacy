@@ -186,9 +186,7 @@ function setupResolver(options: {
     filterPlayerIdsByLeagueEligibility: jest
       .fn()
       .mockResolvedValue({ eligibleIds: new Set([42]) }),
-    isPlayerInPool: jest.fn().mockResolvedValue(true),
-    playerMeetsMinCareerGames: jest.fn().mockResolvedValue(true),
-    playerMeetsMinCareerSeasons: jest.fn().mockResolvedValue(true),
+    findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
     PublicSchema: {
       leagues: { id: 'id', draftStatus: 'draftStatus' },
       leagueMembers: { leagueId: 'leagueId', userId: 'userId' },

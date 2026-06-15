@@ -329,69 +329,170 @@ export interface EligibilityFilterResult {
 }
 
 /**
- * Check whether a single player passes the league's player-pool restriction.
+ * One league-eligibility rule, expressed as a reusable SQL predicate.
  *
- * Use this in the live-draft `makeDraftPick` path where you validate one
- * player at a time inside a transaction.
+ * `condition` is a Drizzle SQL fragment that evaluates to TRUE when a player
+ * passes the rule. It references the table alias `p` (i.e. `players p`), so
+ * callers must provide a query context where that alias exists. `message` is
+ * the user-facing error a pick endpoint throws when the rule fails.
  */
-export async function isPlayerInPool(
-  db: PublicDb,
-  playerId: number,
-  playerPool: string,
-): Promise<boolean> {
-  if (playerPool === 'all') return true;
-
-  // Check both batting AND pitching records so that pure pitchers (who have
-  // no season_batting rows in the DH era) are correctly included in their pool.
-  const poolUpper = playerPool.toUpperCase();
-  const result = await db.execute(
-    sql`SELECT 1 FROM (
-          SELECT player_id FROM season_batting
-            WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
-          UNION
-          SELECT player_id FROM season_pitching
-            WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
-        ) pool_check
-        LIMIT 1`,
-  );
-  return result.rows.length > 0;
+export interface EligibilityCondition {
+  key: 'pool' | 'careerGames' | 'careerSeasons' | 'hofOnly' | 'era';
+  condition: SQL;
+  message: string;
 }
 
 /**
- * Check whether a single player meets the minimum career games threshold.
+ * Resolve a league's era filter to a concrete [startYear, endYear] range, or
+ * null when no era restriction applies (era = 'all' / unset, or a custom era
+ * missing one of its bounds).
  */
-export async function playerMeetsMinCareerGames(
-  db: PublicDb,
-  playerId: number,
-  minCareerGames: number,
-): Promise<boolean> {
-  if (minCareerGames <= 0) return true;
+export function resolveEraRange(
+  settings: LeagueEligibilitySettings,
+): [number, number] | null {
+  const eraFilter = settings.baseballEraFilter;
+  if (!eraFilter || eraFilter === 'all') return null;
+  if (eraFilter === 'custom') {
+    const start = settings.customEraStartYear ?? null;
+    const end = settings.customEraEndYear ?? null;
+    return start != null && end != null ? [start, end] : null;
+  }
+  return ERA_RANGES[eraFilter] ?? null;
+}
 
-  const result = await db.execute(
-    sql`SELECT total_games FROM players WHERE id = ${playerId}`,
-  );
-  return Number(result.rows[0]?.total_games ?? 0) >= minCareerGames;
+/** Humanise an era key ('steroid_era' → 'Steroid Era') for error messages. */
+function formatEraLabel(eraFilter: string): string {
+  return eraFilter.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
- * Check whether a single player meets the minimum career seasons threshold.
+ * Build the league's static player-eligibility predicates as reusable,
+ * `p`-aliased SQL fragments — the single source of truth consumed by every
+ * endpoint that decides whether a player is draftable:
+ *
+ *  - the draft-board query (`getAvailableDraftPlayers`) AND-joins them and
+ *    layers its own undrafted / search / position / sort filters on top, and
+ *  - the pick mutations (`makeDraftPick`, `commissioner-pick`) evaluate the
+ *    same predicates against the single candidate player via
+ *    {@link findFailedEligibilityRule}.
+ *
+ * Because both paths consume the identical predicate set, a player shown as
+ * available on the board can never be rejected by a pick on eligibility, and
+ * vice-versa. Only rules that actually apply (given the league config) are
+ * returned, in display order.
+ *
+ * All rules are baseball-specific; football leagues get an empty list.
  */
-export async function playerMeetsMinCareerSeasons(
+export function buildEligibilityConditions(
+  settings: LeagueEligibilitySettings,
+): EligibilityCondition[] {
+  if (settings.sport === 'football') return [];
+
+  const conditions: EligibilityCondition[] = [];
+
+  // Player pool (AL / NL restriction). Check season_batting AND season_pitching
+  // so pure pitchers (no batting rows in the DH era) stay in their pool.
+  if (settings.playerPool !== 'all') {
+    const poolUpper = settings.playerPool.toUpperCase();
+    conditions.push({
+      key: 'pool',
+      condition: sql`EXISTS (
+        SELECT 1 FROM season_batting sb
+          WHERE sb.player_id = p.id AND sb.lg_id = ${poolUpper}
+        UNION ALL
+        SELECT 1 FROM season_pitching sp
+          WHERE sp.player_id = p.id AND sp.lg_id = ${poolUpper}
+      )`,
+      message: `Player is not in the ${poolUpper} player pool`,
+    });
+  }
+
+  // Minimum career games (career_batting.g — pure pitchers pass automatically).
+  if (settings.minCareerGames > 0) {
+    conditions.push({
+      key: 'careerGames',
+      condition: careerGamesCondition(settings.minCareerGames),
+      message: `Player does not meet the minimum career games requirement (${settings.minCareerGames})`,
+    });
+  }
+
+  // Minimum career seasons (distinct AL / NL batting seasons).
+  if (settings.minCareerSeasons > 0) {
+    conditions.push({
+      key: 'careerSeasons',
+      condition: careerSeasonsCondition(settings.minCareerSeasons),
+      message: `Player does not meet the minimum career seasons requirement (${settings.minCareerSeasons})`,
+    });
+  }
+
+  // Hall of Fame only.
+  if (settings.baseballHofOnly) {
+    conditions.push({
+      key: 'hofOnly',
+      condition: sql`p.hall_of_fame = TRUE`,
+      message:
+        'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
+    });
+  }
+
+  // Era filter — player must have at least one AL / NL season in range.
+  const eraRange = resolveEraRange(settings);
+  if (eraRange) {
+    const [eraStart, eraEnd] = eraRange;
+    conditions.push({
+      key: 'era',
+      condition: sql`EXISTS (
+        SELECT 1 FROM season_batting sb
+          WHERE sb.player_id = p.id AND sb.lg_id IN ('AL', 'NL')
+            AND sb.season >= ${eraStart} AND sb.season <= ${eraEnd}
+        UNION ALL
+        SELECT 1 FROM season_pitching sp
+          WHERE sp.player_id = p.id AND sp.lg_id IN ('AL', 'NL')
+            AND sp.season >= ${eraStart} AND sp.season <= ${eraEnd}
+      )`,
+      message: `Player has no recorded seasons in the ${formatEraLabel(
+        settings.baseballEraFilter ?? '',
+      )} era and is not eligible for this league.`,
+    });
+  }
+
+  return conditions;
+}
+
+/**
+ * Evaluate every applicable eligibility rule for a single player in one query
+ * and return the first rule the player fails, or null if the player is
+ * eligible (or no rules apply). Use this in the pick endpoints
+ * (`makeDraftPick`, `commissioner-pick`) so they accept exactly the players
+ * the draft board shows.
+ *
+ * Assumes the player exists; returns null when no row is found (callers verify
+ * existence separately to surface a distinct "Player not found" error).
+ */
+export async function findFailedEligibilityRule(
   db: PublicDb,
   playerId: number,
-  minCareerSeasons: number,
-): Promise<boolean> {
-  if (minCareerSeasons <= 0) return true;
+  settings: LeagueEligibilitySettings,
+): Promise<EligibilityCondition | null> {
+  const conditions = buildEligibilityConditions(settings);
+  if (conditions.length === 0) return null;
 
-  const result = await db.execute(
-    sql`SELECT COUNT(DISTINCT season) AS season_count
-        FROM (
-          SELECT season FROM season_batting  WHERE player_id = ${playerId}
-          UNION
-          SELECT season FROM season_pitching WHERE player_id = ${playerId}
-        ) s`,
+  // Evaluate all predicates in a single round-trip; alias each TRUE/FALSE
+  // result as rule_<n> so we can report the first failing rule by index.
+  const selectList = sql.join(
+    conditions.map((c, i) => sql`(${c.condition}) AS ${sql.raw(`rule_${i}`)}`),
+    sql`, `,
   );
-  return Number(result.rows[0]?.season_count ?? 0) >= minCareerSeasons;
+  const result = await db.execute(
+    sql`SELECT ${selectList} FROM players p WHERE p.id = ${playerId}`,
+  );
+  const row = result.rows[0] as Record<string, boolean | null> | undefined;
+  if (!row) return null;
+
+  for (let i = 0; i < conditions.length; i++) {
+    if (row[`rule_${i}`] !== true) return conditions[i];
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

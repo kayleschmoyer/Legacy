@@ -20,9 +20,7 @@ jest.mock('@legacy-sports/logging', () => ({
 function captureCommissionerPickResolver(overrides?: {
   checkRosterCapacity?: jest.Mock;
   getCurrentDraftPickInfo?: jest.Mock;
-  isPlayerInPool?: jest.Mock;
-  playerMeetsMinCareerGames?: jest.Mock;
-  playerMeetsMinCareerSeasons?: jest.Mock;
+  findFailedEligibilityRule?: jest.Mock;
 }): (...args: unknown[]) => Promise<unknown> {
   jest.resetModules();
   let capturedFn: ((...args: unknown[]) => Promise<unknown>) | undefined;
@@ -52,13 +50,8 @@ function captureCommissionerPickResolver(overrides?: {
     createBadgeService: jest.fn(() => ({
       evaluateDraftBadges: jest.fn().mockResolvedValue([]),
     })),
-    isPlayerInPool:
-      overrides?.isPlayerInPool ?? jest.fn().mockResolvedValue(true),
-    playerMeetsMinCareerGames:
-      overrides?.playerMeetsMinCareerGames ?? jest.fn().mockResolvedValue(true),
-    playerMeetsMinCareerSeasons:
-      overrides?.playerMeetsMinCareerSeasons ??
-      jest.fn().mockResolvedValue(true),
+    findFailedEligibilityRule:
+      overrides?.findFailedEligibilityRule ?? jest.fn().mockResolvedValue(null),
     PublicSchema: {
       leagueMembers: {
         leagueId: 'leagueId',
@@ -118,9 +111,7 @@ describe('commissionerPick resolver', () => {
   let resolve: (...args: unknown[]) => Promise<unknown>;
   let mockCheckRosterCapacity: jest.Mock;
   let mockGetCurrentDraftPickInfo: jest.Mock;
-  let mockIsPlayerInPool: jest.Mock;
-  let mockPlayerMeetsMinCareerGames: jest.Mock;
-  let mockPlayerMeetsMinCareerSeasons: jest.Mock;
+  let mockFindFailedEligibilityRule: jest.Mock;
 
   beforeEach(() => {
     jest.resetModules();
@@ -133,9 +124,7 @@ describe('commissionerPick resolver', () => {
       pickNumber: 1,
       isComplete: false,
     });
-    mockIsPlayerInPool = jest.fn().mockResolvedValue(true);
-    mockPlayerMeetsMinCareerGames = jest.fn().mockResolvedValue(true);
-    mockPlayerMeetsMinCareerSeasons = jest.fn().mockResolvedValue(true);
+    mockFindFailedEligibilityRule = jest.fn().mockResolvedValue(null);
 
     let capturedFn: ((...args: unknown[]) => Promise<unknown>) | undefined;
 
@@ -166,9 +155,7 @@ describe('commissionerPick resolver', () => {
       createBadgeService: jest.fn(() => ({
         evaluateDraftBadges: jest.fn().mockResolvedValue([]),
       })),
-      isPlayerInPool: mockIsPlayerInPool,
-      playerMeetsMinCareerGames: mockPlayerMeetsMinCareerGames,
-      playerMeetsMinCareerSeasons: mockPlayerMeetsMinCareerSeasons,
+      findFailedEligibilityRule: mockFindFailedEligibilityRule,
       PublicSchema: {
         leagueMembers: {
           leagueId: 'leagueId',
