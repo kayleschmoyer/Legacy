@@ -58,9 +58,14 @@ describe('fmtCount', () => {
 });
 
 describe('bestIndex', () => {
-  it('returns null when fewer than two values are present', () => {
-    expect(bestIndex([5, null, undefined])).toBeNull();
+  it('returns null when no valid values are present', () => {
     expect(bestIndex([])).toBeNull();
+    expect(bestIndex([null, undefined])).toBeNull();
+  });
+
+  it('returns the index of the sole valid value when only one player has data', () => {
+    expect(bestIndex([5, null, undefined])).toBe(0);
+    expect(bestIndex([null, 40, undefined])).toBe(1);
   });
 
   it('returns the index of the highest value by default', () => {

@@ -122,7 +122,7 @@ export function bestIndex(
   lowerIsBetter = false,
 ): number | null {
   const valid = values.filter((v) => v != null);
-  if (valid.length < 2) return null;
+  if (valid.length === 0) return null;
   const best = lowerIsBetter ? Math.min(...valid) : Math.max(...valid);
   const bests = values.filter((v) => v === best);
   if (bests.length > 1) return null; // tied — no leader
