@@ -1381,7 +1381,7 @@ function OnePlayerNudge() {
           lineHeight: 44,
         }}
       >
-        1/4
+        {`1/${MAX_PLAYERS}`}
       </Text>
       <View style={{ flex: 1 }}>
         <Text
