@@ -1588,7 +1588,7 @@ export function PlayerComparison({
       ['RBI', undefined, false, (p) => p.careerBatting?.rbi],
       ['Runs', undefined, false, (p) => p.careerBatting?.runs],
       ['Stolen Bases', undefined, false, (p) => p.careerBatting?.stolenBases],
-      ['Walks', undefined, false, (p) => p.careerBatting?.baseOnBalls],
+      ['Walks Drawn', undefined, false, (p) => p.careerBatting?.baseOnBalls],
       ['Total Bases', undefined, false, (p) => p.careerBatting?.totalBases],
       [
         'oWAR',
@@ -1649,7 +1649,12 @@ export function PlayerComparison({
       ['Losses', undefined, true, (p) => p.careerPitching?.losses],
       ['Saves', undefined, false, (p) => p.careerPitching?.saves],
       ['Strikeouts', undefined, false, (p) => p.careerPitching?.strikeouts],
-      ['Walks', undefined, true, (p) => p.careerPitching?.baseOnBalls],
+      [
+        'Walks Issued',
+        'Walks issued to batters — lower is better; fewer walks means better command',
+        true,
+        (p) => p.careerPitching?.baseOnBalls,
+      ],
       ['Win %', undefined, false, (p) => p.careerPitching?.winPercentage],
     ];
     const baseRows: StatRow[] = defs.map(
