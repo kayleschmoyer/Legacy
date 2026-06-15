@@ -202,8 +202,14 @@ runs:
         # ABI filtering — Reanimated v4 C++ worklet compilation is expensive
         # Debug:   arm64-v8a only (single ABI, fast iteration)
         # Release: arm64-v8a (99%+ devices) + x86_64 (emulators/ChromeOS)
+        #
+        # debugSignRelease: the committed release buildType is unsigned by default
+        # (LS-4960, so a real upload keystore can be supplied). These CI builds are
+        # sideloaded via QR / GitHub Releases and booted on an emulator, so they
+        # opt in to debug-signing — otherwise assembleRelease emits an uninstallable
+        # `app-release-unsigned.apk` and the APK existence check below fails (LS-8061).
         if [ "$BUILD_TYPE" = "release" ]; then
-          ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64"
+          ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64 -PdebugSignRelease=true"
         else
           ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
         fi

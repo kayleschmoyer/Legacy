@@ -133,6 +133,18 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
+            //
+            // By default the release buildType is left unsigned so a real
+            // production/upload keystore can be supplied without this override
+            // getting in the way (LS-4960). CI distribution builds — which are
+            // sideloaded via QR / GitHub Releases and booted on an emulator for
+            // the smoke test, never uploaded to the Play Store — opt in with
+            // `-PdebugSignRelease=true` so Gradle emits an installable,
+            // correctly-named `app-release.apk` instead of `app-release-unsigned.apk`
+            // (LS-8061).
+            if ((findProperty('debugSignRelease') ?: 'false').toBoolean()) {
+                signingConfig signingConfigs.debug
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
