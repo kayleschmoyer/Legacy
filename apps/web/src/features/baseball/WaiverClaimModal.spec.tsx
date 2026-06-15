@@ -98,7 +98,7 @@ jest.mock('@tamagui/lucide-icons', () => ({
   UserPlus: () => null,
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useClaimFreeAgentMutation: jest.fn(() => [mockClaimFn, { loading: false }]),
   useGetUserTeamIdQuery: jest.fn(() => ({
     data: { userTeamId: 99 },

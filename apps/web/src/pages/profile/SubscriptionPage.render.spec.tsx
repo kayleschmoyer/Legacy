@@ -90,7 +90,7 @@ jest.mock('../../utils/analytics', () => ({
 }));
 
 const mockUseGetMySubscriptionQuery = jest.fn<MySubscriptionQueryMock, []>();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: (): MySubscriptionQueryMock =>
     mockUseGetMySubscriptionQuery(),
   useCreateCheckoutSessionMutation: () => [jest.fn(), { loading: false }],

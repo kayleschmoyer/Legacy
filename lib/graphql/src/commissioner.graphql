@@ -1,0 +1,181 @@
+fragment CommissionerActionResult on CommissionerActionResult {
+  success
+  message
+}
+
+fragment CommissionerAuditLog on CommissionerAuditLog {
+  id
+  leagueId
+  userId
+  action
+  targetType
+  targetId
+  reason
+  createdAt
+}
+
+query GetCommissionerAuditLogs($leagueId: Int!, $limit: Int) {
+  commissionerAuditLogs(leagueId: $leagueId, limit: $limit) {
+    ...CommissionerAuditLog
+  }
+}
+
+mutation ForceAddPlayer($input: ForceAddPlayerInput!) {
+  forceAddPlayer(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation ForceDropPlayer($input: ForceDropPlayerInput!) {
+  forceDropPlayer(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation EditMatchupScore($input: EditMatchupScoreInput!) {
+  editMatchupScore(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation SwapMatchupTeams($input: SwapMatchupTeamsInput!) {
+  swapMatchupTeams(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation UpdateCommissionerNote($input: UpdateCommissionerNoteInput!) {
+  updateCommissionerNote(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation SetTeamLock($input: SetTeamLockInput!) {
+  setTeamLock(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation BulkDropTeamPlayers($input: BulkDropPlayersInput!) {
+  bulkDropTeamPlayers(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation RecalculateLeagueMatchupScores(
+  $input: RecalculateMatchupScoresInput!
+) {
+  recalculateLeagueMatchupScores(input: $input) {
+    success
+    message
+    matchupsRecalculated
+    matchupsFailed
+  }
+}
+
+mutation DeleteLeague($leagueId: Int!) {
+  deleteLeague(leagueId: $leagueId)
+}
+
+fragment AchievementRestriction on AchievementRestriction {
+  id
+  leagueId
+  achievementType
+  isRepeatable
+  playerMinCount
+  rosterMin
+  rosterMax
+  repeatableRosterMax
+  createdAt
+  updatedAt
+}
+
+query GetAchievementRestrictions($leagueId: Int!) {
+  achievementRestrictions(leagueId: $leagueId) {
+    ...AchievementRestriction
+  }
+}
+
+mutation UpsertAchievementRestriction(
+  $input: UpsertAchievementRestrictionInput!
+) {
+  upsertAchievementRestriction(input: $input) {
+    ...AchievementRestriction
+  }
+}
+
+mutation DeleteAchievementRestriction(
+  $leagueId: Int!
+  $achievementType: String!
+) {
+  deleteAchievementRestriction(
+    leagueId: $leagueId
+    achievementType: $achievementType
+  )
+}
+
+query GetLeagueDraft($leagueId: Int!) {
+  getLeagueDraft(leagueId: $leagueId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    draftStartedAt
+    draftCompletedAt
+    scheduledAt
+  }
+}
+
+mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
+  updateDraftSettings(input: $input) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    playerPool
+    draftStartedAt
+    draftCompletedAt
+    scheduledAt
+  }
+}
+
+mutation UpdateLeagueBranding($input: UpdateLeagueSettingsInput!) {
+  updateLeagueSettings(input: $input) {
+    id
+    name
+    logoUrl
+    bannerUrl
+    primaryColor
+    secondaryColor
+  }
+}
+
+mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
+  updateLeagueSettings(input: $input) {
+    ...League
+    id
+    gamesPerMatchup
+    pitcherStartsPerMatchup
+    minCareerGames
+    minCareerSeasons
+    totalMatchups
+    playoffEnabled
+    playoffFormat
+    playoffMultiWeek
+    salaryCapEnabled
+    salaryCap
+    salaryFloor
+    luxuryTaxThreshold
+    minSalary
+    salaryEscalationPct
+    salaryDecayPct
+    auctionBudget
+    auctionMinBid
+  }
+}

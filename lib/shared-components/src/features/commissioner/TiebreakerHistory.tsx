@@ -4,7 +4,7 @@ import { Clock, Scale, Trophy, User } from '@tamagui/lucide-icons';
 import {
   TiebreakerMethod,
   useGetTiebreakerHistoryQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
 export interface TiebreakerHistoryProps {

@@ -5,14 +5,14 @@ import {
   type QuickCreateLeagueInput,
 } from '@legacy-sports/shared-components/baseball';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { PageMeta } from '../PageMeta';
-import { formatDisplayName } from '../../lib/formatDisplayName';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
   useCreateLeagueAndTeamsMutation,
   useGetUserLeaguesQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PageMeta } from '../PageMeta';
+import { formatDisplayName } from '../../lib/formatDisplayName';
 
 /**
  * Web data wrapper for the shared `MLBHome` (LS-7716). Mirrors the football

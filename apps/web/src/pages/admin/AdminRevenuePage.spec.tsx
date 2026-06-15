@@ -91,7 +91,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 
 const mockUseAdminRevenueStatsQuery = jest.fn<RevenueStatsMock, [unknown?]>();
 const mockUseGetUserByIdQuery = jest.fn<ServerUserMock, [unknown?]>();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useAdminRevenueStatsQuery: (opts?: unknown): RevenueStatsMock =>
     mockUseAdminRevenueStatsQuery(opts),
   useGetUserByIdQuery: (opts?: unknown): ServerUserMock =>

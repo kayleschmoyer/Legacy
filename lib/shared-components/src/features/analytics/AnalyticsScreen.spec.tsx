@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import { GetLeagueAnalytics } from '@legacy-sports/graphql';
 import { AnalyticsScreen } from './AnalyticsScreen';
-import { GetLeagueAnalytics } from '../../api/db/graphql.generated';
 import { MockedProvider } from '../../test-utils/MockedProvider';
 
 const mockAnalyticsData = {

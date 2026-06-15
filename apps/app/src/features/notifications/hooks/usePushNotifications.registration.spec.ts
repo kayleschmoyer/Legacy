@@ -84,7 +84,7 @@ jest.mock('../../../common/utilities/DeviceUtils', () => ({
   isPhysicalDevice: true,
 }));
 
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useRegisterDeviceTokenMutation: () => [mockRegisterDeviceToken],
 }));
 

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, H1, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Circle, Stack } from './primitives';
-import { SPORT_LOBBY_CHROME, toSportKind } from './sportChrome';
 import {
   SeasonDraftGameMode,
   SeasonDraftGameStatus,
   SeasonDraftPlayerType,
   useGetSeasonDraftGameByInviteCodeQuery,
   useJoinSeasonDraftGameMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { Circle, Stack } from './primitives';
+import { SPORT_LOBBY_CHROME, toSportKind } from './sportChrome';
 import { BRAND_GOLD, withAlpha } from '../../utils/colors';
 
 const STAT_LABELS: Record<string, string> = {

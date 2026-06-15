@@ -1,5 +1,0 @@
-query GetLeagueTradeBlock($leagueId: Int!) {
-  leagueTradeBlock(leagueId: $leagueId) {
-    ...TeamMember
-  }
-}

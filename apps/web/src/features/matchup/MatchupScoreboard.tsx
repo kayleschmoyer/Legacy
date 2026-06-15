@@ -10,7 +10,7 @@ import {
   type MatchupPlayerFragment,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   type ScoringSettings,
   useLeagueScoringSettings,

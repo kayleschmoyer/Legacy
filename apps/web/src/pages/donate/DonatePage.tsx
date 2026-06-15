@@ -3,8 +3,8 @@ import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Button, ScrollView, styled } from 'tamagui';
 import { Heart } from '@tamagui/lucide-icons';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useGetDonationPaymentLinkQuery } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
-import { useGetDonationPaymentLinkQuery } from '../../api/db/graphql.generated';
 import {
   BG_DARK,
   BRAND_GOLD,

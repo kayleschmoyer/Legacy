@@ -71,7 +71,7 @@ jest.mock('@legacy-sports/logging', () => ({
 
 // ── GraphQL mutation mock ─────────────────────────────────────────────────────
 const mockMutation = jest.fn();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useDeleteAllLeaguesMutation: () => [
     mockMutation,
     { loading: false, error: undefined },

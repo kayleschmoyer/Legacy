@@ -47,7 +47,7 @@ jest.mock('../../features/baseball/TeamAssistantManagerSettings', () => ({
 const mockUpdateBranding = jest.fn();
 const mockRefetchTeams = jest.fn();
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamMembersQuery: jest.fn(() => ({
     data: {
       teamMembers: [

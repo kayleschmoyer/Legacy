@@ -30,7 +30,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({ user: { id: 1, email: 'test@example.com' } }),
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: () => ({
     data: mockUserLeagues,
     previousData: mockUserLeaguesPreviousData,

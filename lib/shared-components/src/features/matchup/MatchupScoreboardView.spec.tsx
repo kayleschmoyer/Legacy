@@ -1,11 +1,11 @@
 import React from 'react';
 import { screen } from '@testing-library/react';
 
+import { MatchupStatus } from '@legacy-sports/graphql';
 import {
   MatchupScoreboardView,
   type MatchupScoreboardViewProps,
 } from './MatchupScoreboardView';
-import { MatchupStatus } from '../../api/db/graphql.generated';
 import { render } from '../../test-utils';
 
 const baseProps = (

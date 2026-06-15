@@ -5,7 +5,7 @@ import { ArrowLeft } from '@tamagui/lucide-icons';
 import {
   type FootballPlayerQuery,
   useFootballPlayerQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,

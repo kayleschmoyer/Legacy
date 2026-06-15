@@ -27,7 +27,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetLeagueByIdQuery,
   useGetUserLeaguesQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 
 function LeagueCommissionerTools({

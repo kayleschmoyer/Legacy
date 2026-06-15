@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BarChart2, Bell, Users, Zap } from '@tamagui/lucide-icons';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useGetUnreadNotificationCountQuery } from '@legacy-sports/graphql';
 import { FONT_DISPLAY } from './NavDropdownShared';
 import {
   BRAND_NAVY,
@@ -9,7 +10,6 @@ import {
   GRADIENT_AVATAR,
   OUTLINE_SUBTLE,
 } from '../../constants/colors';
-import { useGetUnreadNotificationCountQuery } from '../../api/db/graphql.generated';
 
 interface MobileTab {
   id: string;

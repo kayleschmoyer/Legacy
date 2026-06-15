@@ -1,6 +1,6 @@
+import type { TradeOffer } from '@legacy-sports/graphql';
 import { PendingTradeOffers } from './PendingTradeOffers';
 import { fireEvent, render, waitFor } from '../../test-utils';
-import type { TradeOffer } from '../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Mock the GraphQL hooks
@@ -17,7 +17,7 @@ let mockQueryReturn: {
   refetch: jest.Mock;
 };
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamTradeOffersQuery: jest.fn(() => mockQueryReturn),
   useAcceptTradeMutation: () => [mockAcceptTrade],
   useRejectTradeMutation: () => [mockRejectTrade],

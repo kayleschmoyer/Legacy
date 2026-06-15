@@ -130,7 +130,7 @@ const mockUseGetUserByIdQuery = jest.fn<
   { data: { user: { accessLevel: string } } | undefined; loading: boolean },
   [unknown?]
 >();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetAllUsersQuery: (opts?: unknown) => mockUseGetAllUsersQuery(opts),
   useGetUsersCountQuery: (opts?: unknown) => mockUseGetUsersCountQuery(opts),
   useUpdateUserRoleMutation: () => mockUseUpdateUserRoleMutation(),

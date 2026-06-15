@@ -2,11 +2,11 @@ import React, { useCallback, useState } from 'react';
 import { Card, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { AlertTriangle, Clock, Trash2, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-import { Button } from '../../Button';
 import {
   useCancelWaiverClaimMutation,
   useGetTeamWaiverClaimsQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { Button } from '../../Button';
 
 export interface PendingWaiverClaimsProps {
   teamId: number;

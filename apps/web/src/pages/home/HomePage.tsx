@@ -6,15 +6,15 @@ import {
   HomeScreen,
 } from '@legacy-sports/shared-components';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
-import { formatDisplayName } from '../../lib/formatDisplayName';
-import { OnboardingTutorial } from '../../components/onboarding';
-import { PageMeta } from '../../components/PageMeta';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
   useGetUserLeagueSummariesQuery,
   type UserLeagueSummaryFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { formatDisplayName } from '../../lib/formatDisplayName';
+import { OnboardingTutorial } from '../../components/onboarding';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD,
   BRAND_NAVY,

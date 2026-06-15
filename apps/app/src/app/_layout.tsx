@@ -17,12 +17,12 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
+import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { useCurrentUserInfo } from '../common/auth/AuthHooks';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import { ThemeProvider } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
-import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 const isDev = process.env.NODE_ENV !== 'production';
 

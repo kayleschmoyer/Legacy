@@ -43,10 +43,6 @@ import {
   Zap,
 } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-import { PremiumTradeTools } from './PremiumTradeTools';
-import { Button } from '../../Button';
-import { Dropdown } from '../../Dropdown';
-import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
 import {
   GetLeagueTradeOffers,
   type GetLeagueTradeOffersQuery,
@@ -65,7 +61,11 @@ import {
   useProposeTradeMutation,
   useRejectTradeMutation,
   useVetoTradeMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PremiumTradeTools } from './PremiumTradeTools';
+import { Button } from '../../Button';
+import { Dropdown } from '../../Dropdown';
+import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
 import {
   BLACK,
   BRAND_GOLD_LIGHT,

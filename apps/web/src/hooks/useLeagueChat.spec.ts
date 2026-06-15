@@ -9,7 +9,7 @@ jest.mock('./useLeagueWebSocket', () => ({
   useLeagueWebSocket: jest.fn(),
 }));
 
-jest.mock('../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   GetLeagueChatMessages: 'GET_LEAGUE_CHAT_MESSAGES',
   useSendLeagueChatMessageMutation: jest.fn(),
 }));
@@ -17,7 +17,7 @@ jest.mock('../api/db/graphql.generated', () => ({
 const { useQuery } = jest.requireMock('@apollo/client/react');
 const { useLeagueWebSocket } = jest.requireMock('./useLeagueWebSocket');
 const { useSendLeagueChatMessageMutation } = jest.requireMock(
-  '../api/db/graphql.generated',
+  '@legacy-sports/graphql',
 );
 
 const makeRawMessages = (leagueId: number, count: number) =>

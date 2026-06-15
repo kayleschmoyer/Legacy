@@ -27,7 +27,7 @@ jest.mock('@legacy-sports/utils', () => ({
 }));
 
 const mockUseGetMySubscriptionQuery = jest.fn();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: (...args: unknown[]): unknown =>
     mockUseGetMySubscriptionQuery(...args),
   useCreateBillingPortalSessionMutation: jest.fn(() => [jest.fn(), {}]),

@@ -23,6 +23,15 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+// Static namespace import of the (jest.mock-hoisted) generated module. Using a
+// static import instead of require() keeps nx's enforce-module-boundaries happy
+// — a cross-project require() is treated as a lazy load and forbids the static
+// imports the rest of the app uses.
+import * as GraphqlApi from '@legacy-sports/graphql';
+
+// The top-level jest.mock() below replaces every export with a jest.fn(); this
+// typed alias exposes them as mocks without per-call-site casts.
+const gqlMock = GraphqlApi as unknown as Record<string, jest.Mock>;
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -89,7 +98,7 @@ jest.mock('tamagui', () => ({
 const mockJoinLeague = jest.fn();
 const mockValidateCode = jest.fn();
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useJoinLeagueByCodeMutation: jest.fn(() => [
     mockJoinLeague,
     { loading: false },
@@ -106,7 +115,7 @@ jest.mock('../../api/db/graphql.generated', () => ({
 
 function renderPage() {
   const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
-    require('../../api/db/graphql.generated') as {
+    gqlMock as {
       useJoinLeagueByCodeMutation: jest.Mock;
       useValidateInviteCodeLazyQuery: jest.Mock;
     };
@@ -142,10 +151,8 @@ describe('JoinLeagueByCodePage', () => {
     jest.clearAllMocks();
     mockJoinLeague.mockResolvedValue({ data: undefined });
 
-    const {
-      useJoinLeagueByCodeMutation,
-      useValidateInviteCodeLazyQuery,
-    } = require('../../api/db/graphql.generated');
+    const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
+      gqlMock;
 
     useJoinLeagueByCodeMutation.mockReturnValue([
       mockJoinLeague,
@@ -200,10 +207,9 @@ describe('JoinLeagueByCodePage', () => {
     // The button is disabled until leagueInfo is present and both inputs are
     // filled — provide mock data so we can actually click it and verify that
     // onPress invokes handleJoin without a ReferenceError.
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
       {
@@ -251,10 +257,9 @@ describe('JoinLeagueByCodePage', () => {
   it('shows validation error when invite code is empty and form is submitted', () => {
     // leagueInfo must be present for handleJoin to proceed past the guard.
     // This simulates: user validated a code, then cleared the code field.
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
       {
@@ -283,10 +288,9 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('shows validation error when team name is empty', () => {
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
       {
@@ -316,10 +320,9 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('shows validation error for invalid invite code format', () => {
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
       {
@@ -358,10 +361,9 @@ describe('JoinLeagueByCodePage', () => {
       data: { joinLeagueByCode: { leagueId: 42 } },
     });
 
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
       {
@@ -414,10 +416,9 @@ describe('JoinLeagueByCodePage', () => {
    * previous result.
    */
   it('clears league preview when the invite code is shortened below 8 chars (LS-1296 regression)', () => {
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
 
     // Start with a successful validation result so leagueInfo is populated
     useValidateInviteCodeLazyQuery.mockReturnValue([
@@ -475,10 +476,9 @@ describe('JoinLeagueByCodePage', () => {
    * still pending, bypassing the disabled Join League button.
    */
   it('does not submit the join mutation while invite-code validation is pending (LS-1297 regression)', () => {
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
     // Simulate validating state: loading=true, no data yet
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
@@ -523,10 +523,9 @@ describe('JoinLeagueByCodePage', () => {
    * Regression: LS-1298 — network error banner must show when validateInviteCode returns an error
    */
   it('shows network error when validateInviteCode query returns an error (LS-1298 regression)', () => {
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
 
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
@@ -554,7 +553,7 @@ describe('JoinLeagueByCodePage', () => {
    */
   it('clears invite-code error when user edits the code field (LS-1299 regression)', async () => {
     const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
+      gqlMock as {
         useJoinLeagueByCodeMutation: jest.Mock;
         useValidateInviteCodeLazyQuery: jest.Mock;
       };
@@ -617,7 +616,7 @@ describe('JoinLeagueByCodePage', () => {
 
   it('does not clear unrelated errors when user edits the invite code field (LS-1299 regression)', async () => {
     const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
+      gqlMock as {
         useJoinLeagueByCodeMutation: jest.Mock;
         useValidateInviteCodeLazyQuery: jest.Mock;
       };
@@ -674,10 +673,9 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('shows already-member banner and disables submit when user is already in the league (LS-1301)', () => {
-    const { useValidateInviteCodeLazyQuery } =
-      require('../../api/db/graphql.generated') as {
-        useValidateInviteCodeLazyQuery: jest.Mock;
-      };
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
 
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
@@ -729,7 +727,7 @@ describe('JoinLeagueByCodePage', () => {
    * jest.mock() setup.
    */
   it('does not show deep-link banner when invite code from URL is not yet validated (LS-1295 regression)', () => {
-    jest.doMock('../../api/db/graphql.generated', () => ({
+    jest.doMock('@legacy-sports/graphql', () => ({
       useJoinLeagueByCodeMutation: jest.fn(() => [
         mockJoinLeague,
         { loading: false },

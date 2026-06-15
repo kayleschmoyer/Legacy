@@ -100,7 +100,7 @@ const mockUseGetUserLeaguesQuery = jest.fn(() => ({
   loading: false,
 }));
 
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: (...args: unknown[]) =>
     mockUseGetUserLeaguesQuery(...args),
 }));

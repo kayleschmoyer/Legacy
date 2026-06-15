@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
+import { MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -16,7 +17,6 @@ import {
 } from '../../utils/colors';
 import { FONT_DISPLAY, FONT_MONO } from '../../utils/typography';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
-import { MatchupStatus } from '../../api/db/graphql.generated';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;

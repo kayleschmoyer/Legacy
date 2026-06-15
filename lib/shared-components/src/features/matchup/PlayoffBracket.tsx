@@ -11,10 +11,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
-import {
-  PlayoffMatchupStatus,
-  PlayoffRound,
-} from '../../api/db/graphql.generated';
+import { PlayoffMatchupStatus, PlayoffRound } from '@legacy-sports/graphql';
 import { BRAND_GOLD, BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 /**

@@ -42,7 +42,7 @@ jest.mock('../../common/auth/AuthHooks', () => ({
   Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: () => ({
     data: mockUserLeagues,
     loading: mockLeaguesLoading,

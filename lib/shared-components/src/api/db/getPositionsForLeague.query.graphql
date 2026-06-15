@@ -1,7 +1,0 @@
-query GetPositionsForLeague($leagueId: Int!) {
-  leaguePositions(leagueId: $leagueId) {
-    id
-    leagueId
-    positionType
-  }
-}

@@ -25,6 +25,12 @@ import {
   Trophy,
 } from '@tamagui/lucide-icons';
 import { ScrollView, Spinner, styled } from 'tamagui';
+import {
+  GetUserNotificationPreferences,
+  type GetUserNotificationPreferencesQuery,
+  useGetUserNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -34,12 +40,6 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
-import {
-  GetUserNotificationPreferences,
-  type GetUserNotificationPreferencesQuery,
-  useGetUserNotificationPreferencesQuery,
-  useUpdateNotificationPreferencesMutation,
-} from '../../api/db/graphql.generated';
 
 /* ─── Brand typography ─── */
 

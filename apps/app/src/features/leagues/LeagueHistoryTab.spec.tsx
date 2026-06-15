@@ -17,7 +17,7 @@ let mockLoggerError: jest.Mock;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetLeagueHistoryQuery: () => mockHistoryResult,
   useGetLeagueStandingsQuery: () => mockStandingsResult,
   useGetAllTimeRecordsQuery: () => mockRecordsResult,

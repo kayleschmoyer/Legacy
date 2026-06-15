@@ -11,7 +11,7 @@ import { fireEvent, render, screen } from '../../test-utils';
 // Capture the draftMode the test wants to inject
 let mockDraftMode = 'automated';
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: { Completed: 'COMPLETED' },
   StatsLoadingStatus: {
     NotStarted: 'NOT_STARTED',

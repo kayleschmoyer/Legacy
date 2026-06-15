@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 
+import { MatchupStatus } from '@legacy-sports/graphql';
+import type { MatchupFragment } from '@legacy-sports/graphql';
 import { MatchupCard } from './MatchupCard';
-import { MatchupStatus } from '../../api/db/graphql.generated';
-import type { MatchupFragment } from '../../api/db/graphql.generated';
 import { render } from '../../test-utils';
 
 const createMatchup = (

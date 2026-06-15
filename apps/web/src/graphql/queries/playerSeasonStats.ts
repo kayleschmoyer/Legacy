@@ -4,4 +4,4 @@ export {
   GetAllPlayerSeasonStats as GET_ALL_PLAYER_SEASON_STATS,
   useGetAllPlayerSeasonStatsQuery,
   useGetAllPlayerSeasonStatsLazyQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';

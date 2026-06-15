@@ -12,7 +12,7 @@ jest.mock('@apollo/client/react', () => ({
 }));
 
 const mockUseGetUserLeaguesQuery = jest.fn();
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   GetTeamMembers: 'GetTeamMembers',
   Sport: { Football: 'football', Baseball: 'baseball' },
   useGetUserLeaguesQuery: (...args: unknown[]) =>

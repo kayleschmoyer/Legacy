@@ -10,7 +10,7 @@ import { act, fireEvent, render, screen } from '../../test-utils';
 
 const mockRenameTeam = jest.fn(() => Promise.resolve({ data: {} }));
 const mockUpdateBranding = jest.fn(() => Promise.resolve({ data: {} }));
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useRenameTeamMutation: () => [mockRenameTeam, { loading: false }],
   useUpdateTeamBrandingMutation: () => [mockUpdateBranding, { loading: false }],
 }));

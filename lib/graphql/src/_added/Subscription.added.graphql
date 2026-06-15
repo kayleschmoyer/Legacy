@@ -1,0 +1,49 @@
+fragment SubscriptionInfo on SubscriptionInfo {
+  status
+  tier
+  currentPeriodEnd
+  cancelAtPeriodEnd
+  gracePeriodEndsAt
+}
+
+query GetMySubscription {
+  mySubscription {
+    ...SubscriptionInfo
+  }
+}
+
+query GetStripePrices {
+  stripePrices {
+    monthlyPriceCents
+    annualTotalCents
+    monthlyPriceId
+    annualPriceId
+    trialPeriodDays
+  }
+}
+
+mutation CreateCheckoutSession(
+  $priceId: String!
+  $successUrl: String!
+  $cancelUrl: String!
+) {
+  createCheckoutSession(
+    priceId: $priceId
+    successUrl: $successUrl
+    cancelUrl: $cancelUrl
+  ) {
+    url
+  }
+}
+
+mutation CreateBillingPortalSession($returnUrl: String!) {
+  createBillingPortalSession(returnUrl: $returnUrl) {
+    url
+  }
+}
+
+query GetDonationPaymentLink {
+  donationPaymentLink {
+    url
+  }
+}

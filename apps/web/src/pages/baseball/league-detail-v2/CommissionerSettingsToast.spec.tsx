@@ -22,8 +22,8 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { LeagueFragment } from '@legacy-sports/graphql';
 import { CommishTab } from './tabs/Commish';
-import type { LeagueFragment } from '../../../api/db/graphql.generated';
 
 // Drop heavy children that CommishTab pulls in. Each is replaced by a minimal
 // stub that exposes only the wiring this test cares about (LeagueSettingsControl's

@@ -41,7 +41,7 @@ jest.mock('@apollo/client/react', () => ({
   },
 }));
 
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   AddToDraftQueue: 'AddToDraftQueue',
   CommissionerPick: 'CommissionerPick',
   CommissionerSetDraftAutoPickDisabled: 'CommissionerSetDraftAutoPickDisabled',

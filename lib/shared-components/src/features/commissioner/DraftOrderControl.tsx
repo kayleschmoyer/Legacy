@@ -27,14 +27,14 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
-import { PremiumGate } from '../../components/PremiumGate';
 import {
   useGetDraftTeamOrderQuery,
   useGetLeagueDraftQuery,
   useRandomizeDraftOrderMutation,
   useSetDraftOrderMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
+import { PremiumGate } from '../../components/PremiumGate';
 
 export interface DraftOrderControlProps {
   leagueId: number;

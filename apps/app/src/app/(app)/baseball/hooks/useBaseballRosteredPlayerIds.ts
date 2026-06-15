@@ -7,7 +7,7 @@ import {
   type GetTeamMembersQueryVariables,
   Sport,
   useGetUserLeaguesQuery,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export interface BaseballRosteredPlayerIdsResult {
   readonly playerIds: Set<number>;

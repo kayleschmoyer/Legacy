@@ -8,7 +8,7 @@ import {
   type TeamMemberFragment,
   useGetLeagueDuesStatusQuery,
   useGetLeagueStandingsQuery,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
 import { LeagueActivityFeed } from '../../../../features/baseball/LeagueActivityFeed';
 import { LeagueChatTab } from '../../../../features/baseball/LeagueChatTab';

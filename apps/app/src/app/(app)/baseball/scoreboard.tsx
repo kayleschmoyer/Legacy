@@ -15,7 +15,7 @@ import {
   todayISO,
   useScoreboardLivePolling,
 } from '@legacy-sports/shared-components';
-import { useGetScoreboardQuery } from '../../../api/db/graphql.generated';
+import { useGetScoreboardQuery } from '@legacy-sports/graphql';
 import { ScoreboardDateNav } from '../../../components/scoreboard/ScoreboardDateNav';
 
 export default function ScoreboardScreen(): React.JSX.Element {

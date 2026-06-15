@@ -38,7 +38,7 @@ jest.mock('@apollo/client/react', () => {
   };
 });
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUnreadNotificationCountQuery: (...args: unknown[]): UnreadCountResult =>
     mockUseGetUnreadNotificationCountQuery(...args),
   useGetNotificationHistoryQuery: (...args: unknown[]): HistoryResult =>

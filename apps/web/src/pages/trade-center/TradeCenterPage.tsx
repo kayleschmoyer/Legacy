@@ -11,13 +11,13 @@ import {
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { TradingCenter } from '../../features/baseball/TradingCenter';
 import {
   useGetLeagueByIdQuery,
   useGetTeamTradeOffersQuery,
   useGetUserLeaguesQuery,
   useGetUserTeamIdQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { TradingCenter } from '../../features/baseball/TradingCenter';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
@@ -656,6 +656,11 @@ export function TradeCenterPage(): React.JSX.Element {
             {!error &&
               leagues.map((league) => {
                 if (!league.id) return null;
+                // Capture the narrowed id: control-flow narrowing from the
+                // guard above does not persist into the onClick/onKeyDown
+                // closures (the consolidated league fragment types id as
+                // nullable).
+                const leagueId = league.id;
                 const phaseChip = getPhaseChip(
                   league.leaguePhase,
                   league.draftStatus,
@@ -665,7 +670,7 @@ export function TradeCenterPage(): React.JSX.Element {
                   <div
                     key={league.id}
                     onClick={() =>
-                      handleLeagueSelect(league.id!, league.name ?? 'League')
+                      handleLeagueSelect(leagueId, league.name ?? 'League')
                     }
                     role="button"
                     tabIndex={0}
@@ -673,7 +678,7 @@ export function TradeCenterPage(): React.JSX.Element {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        handleLeagueSelect(league.id!, league.name ?? 'League');
+                        handleLeagueSelect(leagueId, league.name ?? 'League');
                       }
                     }}
                     style={{

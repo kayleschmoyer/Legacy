@@ -15,7 +15,7 @@ import {
   MatchupStatus,
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 type Matchup = NonNullable<GetMatchupByIdQuery['getMatchupById']>;
 type MatchupPlayer = NonNullable<

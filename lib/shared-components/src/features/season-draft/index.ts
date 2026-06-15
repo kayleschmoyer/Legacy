@@ -24,4 +24,4 @@ export {
   useStartSeasonDraftGameMutation,
   useMakeSeasonDraftPickMutation,
   useCancelSeasonDraftGameMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';

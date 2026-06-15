@@ -10,7 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
-import { useUpdateCommissionerNoteMutation } from '../../api/db/graphql.generated';
+import { useUpdateCommissionerNoteMutation } from '@legacy-sports/graphql';
 
 export interface CommissionerNoteControlProps {
   leagueId: number;

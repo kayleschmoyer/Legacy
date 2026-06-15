@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { MatchupStatus } from '@legacy-sports/graphql';
+import type { AppMatchupFragment } from '@legacy-sports/graphql';
 import { MatchupCard } from './MatchupCard';
-import { MatchupStatus } from '../../../api/db/graphql.generated';
-import type { AppMatchupFragment } from '../../../api/db/graphql.generated';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock(

@@ -5,8 +5,8 @@ import {
   PlayoffBracket,
   StandingsTable,
 } from '@legacy-sports/shared-components';
+import { useGetPlayoffBracketQuery } from '@legacy-sports/graphql';
 import { useStandings } from '../../hooks/useStandings';
-import { useGetPlayoffBracketQuery } from '../../api/db/graphql.generated';
 
 /**
  * StandingsPage - League standings page with sortable table

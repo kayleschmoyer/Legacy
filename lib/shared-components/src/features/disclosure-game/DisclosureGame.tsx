@@ -9,6 +9,14 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import {
+  useActiveDisclosureGameLazyQuery,
+  useGiveUpDisclosureGameMutation,
+  useNextClueMutation,
+  useSearchPlayersForDisclosureLazyQuery,
+  useStartDisclosureGameMutation,
+  useSubmitGuessMutation,
+} from '@legacy-sports/graphql';
 import { Circle, Stack } from '../season-draft/primitives';
 import {
   BRAND_GOLD,
@@ -17,14 +25,6 @@ import {
   BRAND_SEAM_RED_LIGHT,
   withAlpha,
 } from '../../utils/colors';
-import {
-  useActiveDisclosureGameLazyQuery,
-  useGiveUpDisclosureGameMutation,
-  useNextClueMutation,
-  useSearchPlayersForDisclosureLazyQuery,
-  useStartDisclosureGameMutation,
-  useSubmitGuessMutation,
-} from '../../api/db/graphql.generated';
 
 /**
  * Progressive Disclosure Minigame — "Who Am I?"

@@ -19,7 +19,7 @@ import {
   todayISO,
   useScoreboardLivePolling,
 } from '@legacy-sports/shared-components';
-import { useGetScoreboardQuery } from '../../api/db/graphql.generated';
+import { useGetScoreboardQuery } from '@legacy-sports/graphql';
 
 // Re-export so existing unit tests (and callers) can keep importing the pure
 // bucketing helper from this module; the implementation now lives in shared.

@@ -17,7 +17,7 @@ import { Lock } from '@tamagui/lucide-icons';
 import {
   useGetMyMockDraftUsageQuery,
   useInitializeMockDraftMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { PageMeta } from '../../components/PageMeta';
 import { useFeatureIsOn } from '../../context/GrowthBookProvider';

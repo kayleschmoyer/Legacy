@@ -21,6 +21,7 @@ import {
 } from '@tamagui/lucide-icons';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
+import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { FONT_DISPLAY } from './NavDropdownShared';
 import {
   BRAND_GOLD,
@@ -28,7 +29,6 @@ import {
   OUTLINE_SUBTLE,
   PANEL_BORDER,
 } from '../../constants/colors';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 
 interface Props {
   isOpen: boolean;

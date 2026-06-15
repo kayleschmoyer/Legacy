@@ -32,7 +32,7 @@ jest.mock('../../components/PlayerDetailModal', () => ({
   PlayerDetailModal: () => null,
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetPlayerIdByBrefIdQuery: () => ({ data: null, loading: false }),
   useGetUserLeaguesQuery: () => ({ data: null, loading: false }),
   Sport: { Baseball: 'Baseball', Football: 'Football' },

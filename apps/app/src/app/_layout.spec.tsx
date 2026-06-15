@@ -37,7 +37,7 @@ jest.mock('../utils/analytics', () => ({
 
 let mockUserData: { user: { subscriptionTier: string } } | null = null;
 const mockUseGetUserByIdQuery = jest.fn(() => ({ data: mockUserData }));
-jest.mock('../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: (...args: unknown[]): unknown =>
     mockUseGetUserByIdQuery(...args),
 }));

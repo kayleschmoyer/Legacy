@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import { handleFindDuplicateAccounts } from './findDuplicateAccounts';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -35,8 +36,6 @@ jest.mock('drizzle-orm', () => ({
     { raw: (s: string) => s },
   ),
 }));
-
-import { LOGGER } from '@legacy-sports/logging';
 
 describe('handleFindDuplicateAccounts', () => {
   beforeEach(() => jest.clearAllMocks());

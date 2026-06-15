@@ -114,7 +114,7 @@ let mockUsageResult: {
   loading: boolean;
 } = { data: undefined, loading: false };
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetMyMockDraftUsageQuery: () => mockUsageResult,
   useInitializeMockDraftMutation: () => [
     jest.fn(() => Promise.resolve({ data: undefined })),

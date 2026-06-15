@@ -23,7 +23,7 @@ jest.mock('../../../../features/subscription/useSubscription', () => ({
 }));
 
 const mockUseFootballPlayerQuery = jest.fn();
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useFootballPlayerQuery: (...args: unknown[]) =>
     mockUseFootballPlayerQuery(...args) as Record<string, unknown>,
 }));

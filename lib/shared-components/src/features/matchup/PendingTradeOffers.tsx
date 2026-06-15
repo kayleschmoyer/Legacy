@@ -17,6 +17,12 @@ import {
 } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  useAcceptTradeMutation,
+  useCancelTradeMutation,
+  useGetTeamTradeOffersQuery,
+  useRejectTradeMutation,
+} from '@legacy-sports/graphql';
+import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   GREEN,
@@ -26,12 +32,6 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { Button } from '../../Button';
-import {
-  useAcceptTradeMutation,
-  useCancelTradeMutation,
-  useGetTeamTradeOffersQuery,
-  useRejectTradeMutation,
-} from '../../api/db/graphql.generated';
 
 // -- Types ------------------------------------------------------------
 

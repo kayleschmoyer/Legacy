@@ -80,7 +80,7 @@ jest.mock('@legacy-sports/logging', () => ({
 // GraphQL hooks + enum.
 const mockUseGetMatchupPlayersQuery = jest.fn();
 const mockUseGetLeagueTeamsQuery = jest.fn();
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
     Scheduled: 'SCHEDULED',
     InProgress: 'IN_PROGRESS',

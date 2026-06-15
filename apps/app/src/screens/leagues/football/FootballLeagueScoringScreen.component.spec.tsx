@@ -66,7 +66,7 @@ jest.mock('@legacy-sports/scoring', () => ({
 }));
 
 const mockUpdateScoring = jest.fn().mockResolvedValue({});
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useUpdateLeagueScoringProfileMutation: jest.fn(() => [
     mockUpdateScoring,
     { loading: false },

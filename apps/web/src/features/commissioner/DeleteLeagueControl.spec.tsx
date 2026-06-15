@@ -29,7 +29,7 @@ const mockDeleteLeague = jest.fn(
 // drives the button-disabled state from its own `useState` local. The test's
 // disabled-button assertion therefore reads the local React state directly,
 // not this mock field.
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useDeleteLeagueMutation: () => [mockDeleteLeague, { loading: false }],
 }));
 

@@ -134,7 +134,7 @@ const mockUseGetUserLeaguesQuery: jest.MockedFunction<
   (options?: { skip?: boolean }) => { data: unknown; loading: boolean }
 > = jest.fn();
 const mockCreateLeague = jest.fn();
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: (options?: { skip?: boolean }) =>
     mockUseGetUserLeaguesQuery(options),
   useCreateLeagueMutation: () => [mockCreateLeague, { loading: false }],

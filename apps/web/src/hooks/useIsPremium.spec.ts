@@ -6,7 +6,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: jest.fn(),
 }));
 
-jest.mock('../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: jest.fn(),
 }));
 
@@ -23,7 +23,7 @@ const { useAuth } = jest.requireMock(
 ) as unknown as { useAuth: jest.Mock };
 
 const { useGetUserByIdQuery } = jest.requireMock(
-  '../api/db/graphql.generated',
+  '@legacy-sports/graphql',
 ) as unknown as { useGetUserByIdQuery: jest.Mock };
 
 const { useLeagueWebSocket } = jest.requireMock('./useLeagueWebSocket');

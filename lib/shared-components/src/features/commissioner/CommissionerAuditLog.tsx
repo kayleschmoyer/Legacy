@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, H4, Spinner, Text, YStack } from 'tamagui';
-import { useGetCommissionerAuditLogsQuery } from '../../api/db/graphql.generated';
+import { useGetCommissionerAuditLogsQuery } from '@legacy-sports/graphql';
 
 export interface CommissionerAuditLogProps {
   leagueId: number;

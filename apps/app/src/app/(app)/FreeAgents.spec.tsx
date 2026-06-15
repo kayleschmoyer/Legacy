@@ -32,7 +32,7 @@ jest.mock('../../common/auth/AuthorizedUserContext', () => ({
 // read from the mutable mock state so individual tests can drive the league /
 // waiver-type scenarios. The player pool + filters now live in the shared
 // LeagueDetailFreeAgentsTab (mocked below), so no player-pool query is needed.
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: () => ({ data: mockUserLeagues, loading: false }),
   useGetLeagueByIdQuery: () => ({ data: mockLeague }),
   useGetTeamMembersQuery: () => ({ data: mockTeamMembers }),

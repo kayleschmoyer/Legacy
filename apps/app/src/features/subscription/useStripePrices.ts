@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { captureWarning } from '@legacy-sports/rollbar/native';
+import { useGetStripePricesQuery } from '@legacy-sports/graphql';
 import {
   derivePricing,
   FALLBACK_ANNUAL_TOTAL_CENTS,
   FALLBACK_MONTHLY_PRICE_CENTS,
 } from './pricingUtils';
-import { useGetStripePricesQuery } from '../../api/db/graphql.generated';
 
 export { derivePricing } from './pricingUtils';
 

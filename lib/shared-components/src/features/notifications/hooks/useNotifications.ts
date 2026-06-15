@@ -8,7 +8,7 @@ import {
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
   useUpdateNotificationPreferencesMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 /**

@@ -7,7 +7,7 @@ import {
   type TeamFragment,
   useGetLeagueStandingsQuery,
   useGetPlayoffBracketQuery,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { I } from '../Icons';
 import { Banner, colorFromString, initialsFromName, Section } from '../Shared';
 

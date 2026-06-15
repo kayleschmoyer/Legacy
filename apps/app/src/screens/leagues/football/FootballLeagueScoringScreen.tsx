@@ -27,7 +27,7 @@ import {
 import {
   type GetLeagueScoringProfileQuery,
   useUpdateLeagueScoringProfileMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useKeyboardActivation } from '../../../common/hooks/useKeyboardActivation';
 
 type LeagueScoringProfile = NonNullable<

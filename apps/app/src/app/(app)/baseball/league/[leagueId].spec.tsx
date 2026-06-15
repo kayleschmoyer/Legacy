@@ -284,7 +284,7 @@ const mockGetUserTeamIdLazyQuery = jest.fn(() => [
 ]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
 
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
   useGetLeagueByIdQuery: (...args: unknown[]) =>
     mockGetLeagueByIdQuery(...args),

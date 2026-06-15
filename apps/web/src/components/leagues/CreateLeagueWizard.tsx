@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  GetUserLeagues,
+  GetUserLeaguesQuery,
+  DefensiveFormat as GqlDefensiveFormat,
+  Sport,
+  useCreateLeagueAndTeamsMutation,
+} from '@legacy-sports/graphql';
 import { StepConfirmation } from './wizard/StepConfirmation';
 import {
   type DefensiveFormat,
@@ -28,13 +35,6 @@ import {
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../../constants/colors';
-import {
-  GetUserLeagues,
-  GetUserLeaguesQuery,
-  DefensiveFormat as GqlDefensiveFormat,
-  Sport,
-  useCreateLeagueAndTeamsMutation,
-} from '../../api/db/graphql.generated';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

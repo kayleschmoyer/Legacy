@@ -1,6 +1,6 @@
 import React from 'react';
 import { Paragraph, ScrollView, Text, XStack, YStack } from 'tamagui';
-import { TwentyQuestionsCategory } from '../../api/db/graphql.generated';
+import { TwentyQuestionsCategory } from '@legacy-sports/graphql';
 
 export interface QuestionRecord {
   questionNumber: number;

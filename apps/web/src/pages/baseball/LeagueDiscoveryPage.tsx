@@ -10,12 +10,12 @@ import {
   Search,
   Trophy,
 } from '@tamagui/lucide-icons';
-import { PageMeta } from '../../components/PageMeta';
 import {
   GetPublicLeagues,
   useGetPublicLeaguesQuery,
   useJoinPublicLeagueMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PageMeta } from '../../components/PageMeta';
 import {
   AMBER_DARK,
   BG_DARK,

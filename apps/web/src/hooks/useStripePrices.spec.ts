@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { useStripePrices } from './useStripePrices';
 
-jest.mock('../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetStripePricesQuery: jest.fn(),
 }));
 
@@ -10,7 +10,7 @@ jest.mock('@legacy-sports/rollbar/web', () => ({
 }));
 
 const { useGetStripePricesQuery } = jest.requireMock(
-  '../api/db/graphql.generated',
+  '@legacy-sports/graphql',
 ) as unknown as { useGetStripePricesQuery: jest.Mock };
 
 const { captureWarning } = jest.requireMock(

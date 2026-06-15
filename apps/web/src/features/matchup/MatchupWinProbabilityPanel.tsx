@@ -7,18 +7,18 @@ import {
 } from '@legacy-sports/scoring';
 import { calculateMatchupWinProbability } from '@legacy-sports/analytics';
 import {
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  withAlpha,
-} from '../../constants/colors';
-import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  withAlpha,
+} from '../../constants/colors';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,

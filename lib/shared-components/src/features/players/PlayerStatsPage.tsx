@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, TextInput } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
+import type { CareerPitchingFragment } from '@legacy-sports/graphql';
 import { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 import { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
 import type {
@@ -24,7 +25,6 @@ import {
   TEXT_PRIMARY,
   withAlpha,
 } from '../../utils/colors';
-import type { CareerPitchingFragment } from '../../api/db/graphql.generated';
 
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";

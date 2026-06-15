@@ -1,7 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useMutation } from '@apollo/client/react';
-import type { LeagueTeam } from '../types';
 import {
   AddToDraftQueue as ADD_TO_DRAFT_QUEUE,
   CommissionerPick as COMMISSIONER_PICK,
@@ -17,7 +16,8 @@ import {
   ResumeDraft as RESUME_DRAFT,
   SetDraftOrder as SET_DRAFT_ORDER,
   ToggleDraftAutoPick as TOGGLE_DRAFT_AUTO_PICK,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import type { LeagueTeam } from '../types';
 
 interface UseDraftActionsParams {
   leagueId: number | null;

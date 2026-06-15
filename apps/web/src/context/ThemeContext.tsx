@@ -22,7 +22,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   useGetUserByIdQuery,
   useUpdateUserThemeMutation,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 

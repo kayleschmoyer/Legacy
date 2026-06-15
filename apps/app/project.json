@@ -105,27 +105,6 @@
         "cwd": "apps/app"
       }
     },
-    "codegen": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "inputs": [
-        "{projectRoot}/src/api/db/**/*.graphql",
-        "{projectRoot}/codegen.ts",
-        "{projectRoot}/tsconfig*.json",
-        "{workspaceRoot}/tsconfig.base.json",
-        "{workspaceRoot}/lib/codegen/codegen.base.ts",
-        "{workspaceRoot}/lambdas/db/schema.graphql",
-        { "externalDependencies": ["@graphql-codegen/cli", "tsconfig-paths"] }
-      ],
-      "outputs": ["{projectRoot}/src/api/db/graphql.generated.ts"],
-      "options": {
-        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-        "cwd": "apps/app"
-      }
-    },
-    "codegen:db": {
-      "dependsOn": ["codegen"]
-    },
     "android": {
       "executor": "nx:run-commands",
       "options": {
@@ -141,7 +120,7 @@
       }
     },
     "typecheck": {
-      "dependsOn": ["codegen"],
+      "dependsOn": [{ "projects": ["graphql"], "target": "codegen" }],
       "options": {
         "command": "tsc --noEmit -p tsconfig.app.json",
         "cwd": "apps/app"

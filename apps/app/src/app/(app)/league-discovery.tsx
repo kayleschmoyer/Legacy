@@ -15,7 +15,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetPublicLeaguesQuery,
   useJoinPublicLeagueMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useIsMounted } from '../../common/hooks/useIsMounted';
 
 const DRAFT_STATUS_FILTERS = ['All', 'Open', 'Queued', 'In Progress'] as const;

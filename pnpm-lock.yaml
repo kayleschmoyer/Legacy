@@ -1643,6 +1643,8 @@ importers:
         specifier: '*'
         version: 2.8.1
 
+  lib/graphql: {}
+
   lib/logging: {}
 
   lib/mcp-bearer-auth: {}
@@ -1694,6 +1696,9 @@ importers:
       '@legacy-sports/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
+      '@legacy-sports/graphql':
+        specifier: workspace:*
+        version: link:../graphql
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../logging

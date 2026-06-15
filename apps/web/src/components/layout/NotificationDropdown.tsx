@@ -7,8 +7,6 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
-import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
-import { categorize } from '../../utils/notificationUtils';
 import {
   GetNotificationHistory,
   type GetNotificationHistoryQuery,
@@ -19,7 +17,9 @@ import {
   useGetUnreadNotificationCountQuery,
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
+import { categorize } from '../../utils/notificationUtils';
 import { BRAND_NAVY_LIGHT, BRAND_SEAM_RED } from '../../constants/colors';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 

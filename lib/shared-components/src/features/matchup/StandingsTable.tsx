@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { type GetLeagueStandingsQuery } from '@legacy-sports/graphql';
 import { BRAND_GOLD, BRAND_GOLD_LIGHT, withAlpha } from '../../utils/colors';
 import { AvatarImage } from '../../components/AvatarImage';
-import { type GetLeagueStandingsQuery } from '../../api/db/graphql.generated';
 
 type StandingRecord = NonNullable<
   GetLeagueStandingsQuery['getLeagueStandings']

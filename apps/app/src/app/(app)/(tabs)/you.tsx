@@ -4,11 +4,11 @@ import { Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { getExpoPushTokenAsync } from 'expo-notifications';
 import { LOGGER } from '@legacy-sports/logging';
-import { useAuthHandlers } from '../../../common/auth/AuthHooks';
 import {
   useDisableDeviceTokenMutation,
   useGetUnreadNotificationCountQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { useAuthHandlers } from '../../../common/auth/AuthHooks';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 import { getEasProjectId } from '../../../features/notifications/getEasProjectId';
 

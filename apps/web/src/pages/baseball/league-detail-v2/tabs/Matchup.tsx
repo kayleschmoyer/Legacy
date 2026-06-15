@@ -10,7 +10,7 @@ import {
   MatchupStatus,
   Sport,
   useGetMatchupPlayersQuery,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   useCurrentWeek,
   useMatchupById,

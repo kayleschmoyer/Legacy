@@ -11,7 +11,7 @@ import {
   YStack,
 } from 'tamagui';
 import { AlertTriangle, Check, Lock, Settings } from '@tamagui/lucide-icons';
-import { useUpdateLeagueSettingsMutation } from '../../api/db/graphql.generated';
+import { useUpdateLeagueSettingsMutation } from '@legacy-sports/graphql';
 import { GAMES_PER_MATCHUP_BY_SPORT } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import { PremiumGate } from '../../components/PremiumGate';

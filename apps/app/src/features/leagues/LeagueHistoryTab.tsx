@@ -6,7 +6,7 @@ import {
   useGetAllTimeRecordsQuery,
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 const RECORD_LABELS: Record<string, string> = {
   highest_score: 'Highest Single-Matchup Score',

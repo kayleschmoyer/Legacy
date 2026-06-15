@@ -7,15 +7,15 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import { isStatsLoading } from '@legacy-sports/shared-components/roster';
-import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
-import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
+import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,

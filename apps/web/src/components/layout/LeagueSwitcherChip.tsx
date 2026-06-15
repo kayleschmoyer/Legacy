@@ -8,8 +8,8 @@ import {
   Plus,
   Ticket,
 } from '@tamagui/lucide-icons';
+import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { FONT_DISPLAY, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,

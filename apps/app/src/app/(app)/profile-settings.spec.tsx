@@ -61,7 +61,7 @@ jest.mock('../../features/subscription', () => ({
   useSubscription: () => ({ isPremium: false, tier: null }),
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: (...args: unknown[]): unknown =>
     mockUseGetUserByIdQuery(...args),
   useUpdateUsernameMutation: () => [

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import type { GetLiveDraftLeagueDraftQuery } from '@legacy-sports/graphql';
 import type { CurrentDraftPickInfo } from '../types';
-import type { GetLiveDraftLeagueDraftQuery } from '../../../api/db/graphql.generated';
 
 interface UseDraftTimerParams {
   draftId: number | null;

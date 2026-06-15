@@ -13,8 +13,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { FootballPlayersComparePage } from './FootballPlayersComparePage';
-import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ jest.mock('react-router-dom', () => ({
 }));
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('@tamagui/lucide-icons', () => ({ ArrowLeft: () => null }));
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useFootballPlayerQuery: jest.fn(),
 }));
 jest.mock('tamagui', () => {

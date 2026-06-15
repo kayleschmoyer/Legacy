@@ -19,14 +19,15 @@ const path = require('path');
 
 // Files to fix (relative to workspace root)
 const FILES_TO_FIX = [
-  'lib/shared-components/src/api/db/graphql.generated.ts',
+  // Canonical, monorepo-wide GraphQL operations/hooks (web, app, shared-components
+  // all consume this single generated module via @legacy-sports/graphql).
+  'lib/graphql/src/graphql.generated.ts',
+  // Backend / non-React-bundle packages keep their own generated files.
   'lib/bref-client/src/api/db/graphql.generated.ts',
   'lib/data-loaders/src/api/db/graphql.generated.ts',
   'lib/api/src/api/db/graphql.generated.ts',
   'lib/api/src/shared/graphql.generated.ts',
-  'apps/web/src/api/db/graphql.generated.ts',
   'apps/cli/src/api/db/graphql.generated.ts',
-  'apps/app/src/api/db/graphql.generated.ts',
 ];
 
 function fixApolloImports(content) {

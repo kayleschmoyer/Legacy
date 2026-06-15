@@ -13,6 +13,13 @@ import {
   isStatsLoading,
   POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components/roster';
+import {
+  type MatchupFragment,
+  type MatchupPlayerFragment,
+  useGetLeagueTeamsQuery,
+  useGetMatchupPlayersQuery,
+  useGetPositionsForLeagueQuery,
+} from '@legacy-sports/graphql';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
@@ -20,13 +27,6 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-import {
-  type MatchupFragment,
-  type MatchupPlayerFragment,
-  useGetLeagueTeamsQuery,
-  useGetMatchupPlayersQuery,
-  useGetPositionsForLeagueQuery,
-} from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,

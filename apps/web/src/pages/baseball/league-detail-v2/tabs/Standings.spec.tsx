@@ -23,7 +23,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
   StandingsTable: jest.fn(() => <div data-testid="standings-table" />),
 }));
 
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   PlayoffMatchupStatus: { Completed: 'completed' },
   Sport: { Baseball: 'baseball', Football: 'football' },
   useGetLeagueStandingsQuery: jest.fn(() => ({

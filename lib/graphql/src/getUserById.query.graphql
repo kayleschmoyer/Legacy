@@ -1,0 +1,7 @@
+query GetUserById($id: Int!) {
+  user(id: $id) {
+    ...User
+    id
+    subscriptionTier
+  }
+}

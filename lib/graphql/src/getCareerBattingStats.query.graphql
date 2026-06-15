@@ -1,0 +1,46 @@
+# Query to fetch career batting statistics with pagination and sorting support
+# This is distinct from GetPlayersWithStats (in web), which fetches player objects.
+# Use this query when STATS are the primary entity (e.g. leaderboards, advanced filtering).
+#import "./careerBatting.fragment.graphql"
+
+query GetCareerBattingStats(
+  $first: Int
+  $after: String
+  $orderBy: String
+  $orderDirection: String
+  $minGames: Int
+  $minHomeRuns: Int
+  $minRBI: Int
+  $minBattingAvg: Float
+  $searchTerm: String
+  $position: String
+  $team: String
+) {
+  careerBattingStats(
+    first: $first
+    after: $after
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    minGames: $minGames
+    minHomeRuns: $minHomeRuns
+    minRBI: $minRBI
+    minBattingAvg: $minBattingAvg
+    searchTerm: $searchTerm
+    position: $position
+    team: $team
+  ) {
+    edges {
+      node {
+        ...CareerBatting
+        ...CareerBattingStats
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    totalCount
+  }
+}

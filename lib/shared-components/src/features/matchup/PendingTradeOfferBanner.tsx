@@ -11,12 +11,12 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeftRight, Check, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
-import { Button } from '../../Button';
 import {
   useGetTeamTradeOffersQuery,
   useRejectTradeMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
+import { Button } from '../../Button';
 
 export interface PendingTradeOfferBannerProps {
   /** The viewer's team id; incoming offers are those received by this team. */

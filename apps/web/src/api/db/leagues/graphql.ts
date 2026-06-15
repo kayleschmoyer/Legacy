@@ -18,4 +18,4 @@ export {
   useGetLeagueDraftQuery,
   GetLeagueDraftQuery,
   GetLeagueDraftQueryVariables,
-} from '../graphql.generated';
+} from '@legacy-sports/graphql';

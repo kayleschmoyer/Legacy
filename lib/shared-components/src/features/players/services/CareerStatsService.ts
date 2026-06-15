@@ -23,7 +23,7 @@ import {
   PlayerFragment,
   useGetCareerBattingStatsLazyQuery,
   useGetCareerBattingStatsQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // =============================================================================
 // GraphQL Operations (Using Codegen Generated Queries)

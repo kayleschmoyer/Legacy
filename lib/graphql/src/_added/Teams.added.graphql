@@ -1,0 +1,112 @@
+fragment Team on Team {
+  id
+  leagueId
+  name
+  waiverOrder
+  faabBudget
+  isLocked
+  logoUrl
+  primaryColor
+  secondaryColor
+  avatarUrl
+  bannerUrl
+  # Salary cap computed fields (LS-646)
+  totalPayroll
+  capSpace
+}
+
+query GetTeamById($teamId: Int!) {
+  team: teamById(teamId: $teamId) {
+    ...Team
+    managerId
+  }
+}
+
+mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
+  updateTeamMemberPosition(
+    teamMemberId: $teamMemberId
+    positionId: $positionId
+  ) {
+    ...TeamMember
+    ...AppTeamMember
+  }
+}
+
+mutation SwapTeamMemberPositions(
+  $teamMemberIdA: Int!
+  $positionIdA: Int
+  $teamMemberIdB: Int!
+  $positionIdB: Int
+) {
+  swapTeamMemberPositions(
+    teamMemberIdA: $teamMemberIdA
+    positionIdA: $positionIdA
+    teamMemberIdB: $teamMemberIdB
+    positionIdB: $positionIdB
+  ) {
+    ...TeamMember
+    ...AppTeamMember
+  }
+}
+
+mutation ClaimFreeAgent(
+  $leagueId: Int!
+  $playerId: Int!
+  $dropPlayerId: Int
+  $faabBid: Int
+) {
+  claimFreeAgent(
+    leagueId: $leagueId
+    playerId: $playerId
+    dropPlayerId: $dropPlayerId
+    faabBid: $faabBid
+  ) {
+    id
+    leagueId
+    teamId
+    playerId
+    dropPlayerId
+    faabBid
+    status
+    errorMessage
+    createdAt
+  }
+}
+
+query GetTeamLeagueMembers($teamId: Int!) {
+  teamLeagueMembers(teamId: $teamId) {
+    ...LeagueMember
+  }
+}
+
+mutation InviteAssistantManager($teamId: Int!, $username: String!) {
+  inviteAssistantManager(teamId: $teamId, username: $username) {
+    ...LeagueMember
+  }
+}
+
+mutation RemoveAssistantManager($teamId: Int!, $userId: Int!) {
+  removeAssistantManager(teamId: $teamId, userId: $userId)
+}
+
+mutation SetNickname($teamMemberId: Int!, $nickname: String) {
+  setNickname(teamMemberId: $teamMemberId, nickname: $nickname) {
+    ...TeamMember
+  }
+}
+
+fragment AppTeamMember on TeamMember {
+  id
+  playerId
+  positionId
+  teamId
+  leagueId
+  onTradeBlock
+  player {
+    id
+    firstName
+    lastName
+    brefId
+    eligiblePositions
+  }
+}

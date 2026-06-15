@@ -44,7 +44,7 @@ jest.mock('../../../../lib/scoring/mapGraphQLToScoringFormat', () => ({
 }));
 
 // --- generated types -------------------------------------------------------
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
     InProgress: 'in_progress',
     Scheduled: 'scheduled',

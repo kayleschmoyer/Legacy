@@ -4,7 +4,7 @@ import {
   type FreeAgentClaimPlayer,
   LeagueDetailFreeAgentsTab,
 } from '@legacy-sports/shared-components/baseball';
-import { type LeagueFragment } from '../../../../api/db/graphql.generated';
+import { type LeagueFragment } from '@legacy-sports/graphql';
 import { WaiverClaimModal } from '../../../../features/baseball/WaiverClaimModal';
 import { I } from '../Icons';
 

@@ -15,7 +15,7 @@ import {
   useGetTeamMembersQuery,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { PendingWaiverClaims } from '../../../../features/roster';
 import { Empty } from '../Shared';
 import { I } from '../Icons';

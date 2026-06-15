@@ -11,7 +11,7 @@ import {
   YStack,
 } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
-import { useDeleteLeagueMutation } from '../../api/db/graphql.generated';
+import { useDeleteLeagueMutation } from '@legacy-sports/graphql';
 
 export interface DeleteLeagueControlProps {
   leagueId: number;

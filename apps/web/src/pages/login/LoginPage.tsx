@@ -13,6 +13,10 @@ import {
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { lastVisitedLeaguePath } from '@legacy-sports/shared-components/utils';
 import { LoginPage as AuthCard } from '@legacy-sports/shared-components';
+import {
+  useGetOnThisDayQuery,
+  useGetPlayerCountQuery,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
@@ -20,10 +24,6 @@ import { getSafeRedirectTarget } from '../../lib/safe-redirect';
 import { consumeCameFrom, storeCameFrom } from '../../lib/came-from';
 import { getLastVisitedLeague } from '../../lib/last-visited-league';
 import { env } from '../../config/environment';
-import {
-  useGetOnThisDayQuery,
-  useGetPlayerCountQuery,
-} from '../../api/db/graphql.generated';
 import './LoginPage.css';
 
 /* ── Icons ── */

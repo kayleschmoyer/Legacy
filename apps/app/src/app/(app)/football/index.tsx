@@ -1,11 +1,8 @@
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { NFLHome } from '@legacy-sports/shared-components/football';
+import { Sport, useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
-import {
-  Sport,
-  useGetUserLeaguesQuery,
-} from '../../../api/db/graphql.generated';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
-import { useLeagueWebSocket } from './useLeagueWebSocket';
 import {
   GetLeagueChatMessages,
   type GetLeagueChatMessagesQuery,
   useSendLeagueChatMessageMutation,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { useLeagueWebSocket } from './useLeagueWebSocket';
 
 // ---------------------------------------------------------------------------
 // GraphQL documents are defined in src/api/db/leagues/Chat.graphql and

@@ -1,5 +1,11 @@
 import React from 'react';
 import {
+  SeasonDraftGameStatus,
+  useGetDisclosureGameBestScoreQuery,
+  useGetMinigamesStatsQuery,
+  useGetSeasonDraftGamesQuery,
+} from '@legacy-sports/graphql';
+import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -8,12 +14,6 @@ import {
   SURFACE_CARD,
   withAlpha,
 } from '../../utils/colors';
-import {
-  SeasonDraftGameStatus,
-  useGetDisclosureGameBestScoreQuery,
-  useGetMinigamesStatsQuery,
-  useGetSeasonDraftGamesQuery,
-} from '../../api/db/graphql.generated';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

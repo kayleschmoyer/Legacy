@@ -15,15 +15,15 @@ import { useRouter } from 'expo-router';
 import { AvatarImage, AvatarPicker } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  useGetUserByIdQuery,
+  useUpdateUserAvatarMutation,
+  useUpdateUsernameMutation,
+} from '@legacy-sports/graphql';
+import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
 import { useSubscription } from '../../features/subscription';
-import {
-  useGetUserByIdQuery,
-  useUpdateUserAvatarMutation,
-  useUpdateUsernameMutation,
-} from '../../api/db/graphql.generated';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
 const BRAND_NAVY_LIGHT = '#2C4A7C';

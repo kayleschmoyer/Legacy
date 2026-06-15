@@ -15,7 +15,7 @@ import {
   useGetPositionsForLeagueQuery,
   useSwapMatchupPlayerPositionsMutation,
   useUpdateMatchupPlayerPositionMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 const parseId = (id: string | null | undefined): number | null => {
   if (!id) return null;

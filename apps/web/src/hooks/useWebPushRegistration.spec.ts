@@ -11,7 +11,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: (...args: unknown[]) => mockUseAuth(...args),
 }));
 
-jest.mock('../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useRegisterDeviceTokenMutation: () => [mockRegisterToken],
 }));
 

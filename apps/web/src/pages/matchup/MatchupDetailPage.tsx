@@ -6,16 +6,13 @@ import {
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { MatchupStatus, useGetUserTeamIdQuery } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../../features/matchup/MatchupWinProbabilityPanel';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
 import { MatchupRosterEditor } from '../../features/matchup/MatchupRosterEditor';
-import {
-  MatchupStatus,
-  useGetUserTeamIdQuery,
-} from '../../api/db/graphql.generated';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
   useCurrentWeek,

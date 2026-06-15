@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Button, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-import { BaseModal } from './BaseModal';
-import type { CareerArcMode } from './CareerArcChart';
 import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayerCareerArcQuery,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { BaseModal } from './BaseModal';
+import type { CareerArcMode } from './CareerArcChart';
 import {
   ipToDecimalInnings,
   ipToOuts,

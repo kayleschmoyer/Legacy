@@ -21,8 +21,8 @@ import {
   TrendingUp,
   Zap,
 } from '@tamagui/lucide-icons';
+import type { TradeOfferFragment } from '@legacy-sports/graphql';
 import { Button } from '../../Button';
-import type { TradeOfferFragment } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,

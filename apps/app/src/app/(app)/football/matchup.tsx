@@ -1,8 +1,8 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { Card, Text } from 'tamagui';
+import { useGetLeagueByIdQuery } from '@legacy-sports/graphql';
 import { FootballMatchupScreen } from '../../../screens/leagues/football/FootballMatchupScreen';
-import { useGetLeagueByIdQuery } from '../../../api/db/graphql.generated';
 import { toIntId } from '../../../common/utilities/RouteUtils';
 
 export default function FootballMatchupRoute(): React.JSX.Element {

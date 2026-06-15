@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { GameResult } from './GameResult';
-import { PlayerGuess } from './PlayerGuess';
-import { type AskPayload, QuestionBuilder } from './QuestionBuilder';
-import { QuestionHistory, type QuestionRecord } from './QuestionHistory';
-import { TwentyQuestionsEntry } from './TwentyQuestionsEntry';
 import {
   Sport,
   TwentyQuestionsCategory,
@@ -15,7 +10,12 @@ import {
   useTwentyQuestionsAskMutation,
   useTwentyQuestionsGuessMutation,
   useTwentyQuestionsStartMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { GameResult } from './GameResult';
+import { PlayerGuess } from './PlayerGuess';
+import { type AskPayload, QuestionBuilder } from './QuestionBuilder';
+import { QuestionHistory, type QuestionRecord } from './QuestionHistory';
+import { TwentyQuestionsEntry } from './TwentyQuestionsEntry';
 
 /**
  * 20 Questions Minigame (LS-1793)

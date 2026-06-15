@@ -1,0 +1,14 @@
+mutation SetTradeBlock(
+  $teamMemberId: Int!
+  $onTradeBlock: Boolean!
+  $askingPrice: String
+) {
+  setTradeBlock(
+    teamMemberId: $teamMemberId
+    onTradeBlock: $onTradeBlock
+    askingPrice: $askingPrice
+  ) {
+    ...TeamMember
+    ...AppTeamMember
+  }
+}

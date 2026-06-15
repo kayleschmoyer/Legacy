@@ -20,8 +20,6 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Circle, Stack } from './primitives';
-import { SPORT_LOBBY_CHROME, type SportKind, toSportKind } from './sportChrome';
 import {
   SeasonDraftGameMode,
   SeasonDraftPlayerType,
@@ -34,7 +32,9 @@ import {
   useSearchPlayersForDraftLazyQuery,
   useStartSeasonDraftGameMutation,
   useTriggerSeasonDraftStatLoadingMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { Circle, Stack } from './primitives';
+import { SPORT_LOBBY_CHROME, type SportKind, toSportKind } from './sportChrome';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { BRAND_GOLD, BRAND_SEAM_RED, withAlpha } from '../../utils/colors';
 

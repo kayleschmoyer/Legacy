@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
+import type { AppLeagueFragment } from '@legacy-sports/graphql';
 import { CommissionerScreen } from './CommissionerScreen';
-import type { AppLeagueFragment } from '../../api/db/graphql.generated';
 
 type RNComponents = {
   View: typeof RNView;
@@ -88,7 +88,7 @@ jest.mock('../subscription', () => ({
   useSubscription: jest.fn(() => ({ isPremium: false })),
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useRenameTeamMutation,
   useUpdateTeamBrandingMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 /**
  * Shared team-branding editor logic (LS-7809).

@@ -1,0 +1,40 @@
+mutation RenameTeam($teamId: Int!, $leagueId: Int!, $newName: String!) {
+  renameTeam(teamId: $teamId, leagueId: $leagueId, newName: $newName) {
+    id
+    name
+    leagueId
+  }
+}
+
+mutation UpdateTeamBranding(
+  $teamId: Int!
+  $leagueId: Int!
+  $logoUrl: String
+  $primaryColor: String
+  $secondaryColor: String
+  $avatarUrl: String
+  $bannerUrl: String
+) {
+  updateTeamBranding(
+    teamId: $teamId
+    leagueId: $leagueId
+    logoUrl: $logoUrl
+    primaryColor: $primaryColor
+    secondaryColor: $secondaryColor
+    avatarUrl: $avatarUrl
+    bannerUrl: $bannerUrl
+  ) {
+    ...Team
+    id
+    name
+    leagueId
+    isLocked
+    waiverOrder
+    faabBudget
+    logoUrl
+    primaryColor
+    secondaryColor
+    avatarUrl
+    bannerUrl
+  }
+}

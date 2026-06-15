@@ -11,13 +11,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Circle, Stack } from './primitives';
 import {
   SeasonDraftGameMode,
   SeasonDraftGameStatus,
   SeasonDraftPlayerType,
   useGetSeasonDraftGamesQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { Circle, Stack } from './primitives';
 import { BRAND_GOLD, WHITE, withAlpha } from '../../utils/colors';
 
 const STAT_LABELS: Record<string, string> = {

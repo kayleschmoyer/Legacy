@@ -6,7 +6,7 @@ import {
   type LeagueFragment,
   Sport,
   type TeamFragment,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   useCurrentWeek,
   useMatchupsForLeague,

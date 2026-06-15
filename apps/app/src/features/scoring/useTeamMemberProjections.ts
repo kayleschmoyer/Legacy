@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import type { PlayerFragment } from '@legacy-sports/shared-components';
 import { usePlayerProjections } from '@legacy-sports/shared-components';
+import type { AppTeamMemberFragment } from '@legacy-sports/graphql';
 import { useCareerAverageStats } from './careerAverages';
-import type { AppTeamMemberFragment } from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../common/scoring';
 
 export interface TeamMemberProjectionsResult {

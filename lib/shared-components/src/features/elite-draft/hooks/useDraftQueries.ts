@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useApolloClient, useQuery } from '@apollo/client/react';
-import type {
-  AvailableDraftPlayer,
-  CurrentDraftPickInfo,
-  DraftPickRecord,
-  LeagueTeam,
-  PlayerStatsEntry,
-} from '../types';
-import { normalizeTeamId } from '../utils';
 import {
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
@@ -38,7 +30,15 @@ import {
   type GetLiveDraftLeagueDraftQuery,
   type GetMyDraftQueueQuery,
   type GetMyDraftQueueQueryVariables,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import type {
+  AvailableDraftPlayer,
+  CurrentDraftPickInfo,
+  DraftPickRecord,
+  LeagueTeam,
+  PlayerStatsEntry,
+} from '../types';
+import { normalizeTeamId } from '../utils';
 
 const PLAYER_PAGE_SIZE = 200;
 

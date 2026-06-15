@@ -1,5 +1,0 @@
-query GetMatchupPlayers($matchupId: Int!) {
-  getMatchupPlayers(matchupId: $matchupId) {
-    ...MatchupPlayer
-  }
-}

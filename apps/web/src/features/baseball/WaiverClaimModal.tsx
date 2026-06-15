@@ -24,7 +24,7 @@ import {
   useClaimFreeAgentMutation,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useAppSelector } from '../../store/hooks';
 import {
   BRAND_GOLD_LIGHT,

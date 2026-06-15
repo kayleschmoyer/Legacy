@@ -1,0 +1,175 @@
+fragment LeaguePosition on LeaguePosition {
+  id
+  leagueId
+  positionType
+}
+
+mutation CreateLeagueAndTeams($input: CreateLeagueAndTeamsInput!) {
+  createLeagueAndTeams(input: $input) {
+    league {
+      ...League
+    }
+  }
+}
+
+query GetUserLeagues {
+  userLeagues {
+    ...League
+    ...AppLeague
+  }
+}
+
+mutation DeleteAllLeagues {
+  deleteAllLeagues
+}
+
+mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
+  startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
+    ...League
+    ...AppLeague
+  }
+}
+
+mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
+  joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
+    id
+    name
+    leagueId
+  }
+}
+
+query ValidateInviteCode($code: String!) {
+  validateInviteCode(code: $code) {
+    leagueId
+    leagueName
+    totalSpots
+    availableSpots
+    isFull
+    isAlreadyMember
+  }
+}
+
+query GetPublicLeagues(
+  $search: String
+  $draftStatus: String
+  $playerPool: String
+  $limit: Int
+  $offset: Int
+) {
+  publicLeagues(
+    search: $search
+    draftStatus: $draftStatus
+    playerPool: $playerPool
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    name
+    owner
+    maxRosterSize
+    draftStatus
+    playerPool
+    isPublic
+    totalSpots
+    availableSpots
+    isFull
+    isAlreadyMember
+  }
+}
+
+mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
+  joinPublicLeague(leagueId: $leagueId, teamName: $teamName) {
+    success
+    message
+    leagueId
+    teamId
+  }
+}
+
+mutation StartSeason($leagueId: Int!) {
+  startSeason(leagueId: $leagueId) {
+    ...League
+  }
+}
+
+fragment AppLeague on League {
+  id
+  name
+  owner
+  maxRosterSize
+  gamesPerMatchup
+  currentMatchup
+  currentWeekNumber
+  draftStatus
+  leaguePhase
+  inviteCode
+  lmNotes
+  playerPool
+  waiverEnabled
+  waiverType
+  weekAdvanceStatus
+  sport
+  defensiveFormat
+  pitcherStartsPerMatchup
+  minCareerGames
+  minCareerSeasons
+  totalMatchups
+  playoffEnabled
+  playoffFormat
+  playoffMultiWeek
+  salaryCapEnabled
+  salaryCap
+  eraFilter
+  baseballHofOnly
+  customEraStartYear
+  customEraEndYear
+  frozenAt
+  seasonNumber
+  logoUrl
+  bannerUrl
+  primaryColor
+  secondaryColor
+  userMembership {
+    ...AppLeagueMember
+  }
+  # teams field not available in deployed schema - needs Lambda deployment
+  # teams {
+  #   id
+  #   name
+  #   leagueId
+  # }
+  # leagueMembers field not available
+  # leagueMembers @include(if: $withMembers) {
+  #   nodes {
+  #     ...AppLeagueMember
+  #   }
+  # }
+  # matchupByCurrentMatchup field not available
+  # matchupByCurrentMatchup @include(if: $withMatchup) {
+  #   ...AppMatchup
+  # }
+}
+
+fragment AppLeagueMember on LeagueMember {
+  leagueId
+  permissionLevel
+  teamId
+  userId
+  # user field not available, only userId
+  # user {
+  #   ...User
+  # }
+}
+
+mutation CreateLeague(
+  $input: CreateLeagueAndTeamsInput!
+  $withMembers: Boolean = false
+  $withTeams: Boolean = false
+  $withMatchup: Boolean = false
+) {
+  createLeagueAndTeams(input: $input) {
+    league {
+      ...AppLeague
+    }
+  }
+}

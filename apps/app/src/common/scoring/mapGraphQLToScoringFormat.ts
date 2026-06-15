@@ -14,7 +14,7 @@ import type {
   GameBatting,
   GameFielding,
   GamePitching,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export interface ScoringBattingStats {
   [key: string]: number | null | undefined;

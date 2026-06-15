@@ -19,8 +19,8 @@ import {
   Users,
   X,
 } from '@tamagui/lucide-icons';
+import { useGetPlayersWithStatsQuery } from '@legacy-sports/graphql';
 import { WaiverClaimModal } from './WaiverClaimModal';
-import { useGetPlayersWithStatsQuery } from '../../api/db/graphql.generated';
 import { useLeagueTakenPlayers } from '../../hooks/useLeagueTakenPlayers';
 import {
   BRAND_GOLD_LIGHT,

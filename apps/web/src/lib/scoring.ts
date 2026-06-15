@@ -8,7 +8,7 @@ import {
   type GetLeagueScoringProfileQuery,
   ScoringStatGroup,
   useGetLeagueScoringProfileQuery,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export type ScoringSettings = {
   batting: Partial<Record<string, number>>;

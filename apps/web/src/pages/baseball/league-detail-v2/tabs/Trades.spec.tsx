@@ -18,8 +18,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
+import type { LeagueFragment } from '@legacy-sports/graphql';
 import { TradesTab } from './Trades';
-import type { LeagueFragment } from '../../../../api/db/graphql.generated';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 

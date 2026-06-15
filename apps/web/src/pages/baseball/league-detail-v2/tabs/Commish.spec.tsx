@@ -48,7 +48,7 @@ jest.mock('../../../../lib/scoring', () => ({
 }));
 
 // --- generated enums -------------------------------------------------------
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));

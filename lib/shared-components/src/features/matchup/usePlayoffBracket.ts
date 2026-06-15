@@ -1,4 +1,4 @@
-import { useGetPlayoffBracketQuery } from '../../api/db/graphql.generated';
+import { useGetPlayoffBracketQuery } from '@legacy-sports/graphql';
 
 /**
  * Fetches the playoff bracket for a league. Returns the bracket (or null) plus

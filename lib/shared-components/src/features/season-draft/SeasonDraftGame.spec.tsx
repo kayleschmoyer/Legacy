@@ -1,5 +1,4 @@
 import React from 'react';
-import { SeasonDraftGame } from './SeasonDraftGame';
 import {
   useCancelSeasonDraftGameMutation,
   useGetSeasonDraftGamePlayerOptionsLazyQuery,
@@ -9,7 +8,8 @@ import {
   useSearchPlayersForDraftLazyQuery,
   useStartSeasonDraftGameMutation,
   useTriggerSeasonDraftStatLoadingMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { SeasonDraftGame } from './SeasonDraftGame';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { fireEvent, render, waitFor } from '../../test-utils';
 
@@ -23,7 +23,7 @@ const mockMakePickMutation = jest.fn();
 const mockTriggerStatMutation = jest.fn();
 const mockRefetch = jest.fn().mockResolvedValue({});
 
-jest.mock('../../api/db/graphql.generated');
+jest.mock('@legacy-sports/graphql');
 jest.mock('../../hooks/useWebSocket');
 
 jest.mock('@legacy-sports/logging', () => ({

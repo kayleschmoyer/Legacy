@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
 import { Activity, CheckCircle, Clock, XCircle } from '@tamagui/lucide-icons';
+import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -8,10 +9,6 @@ import {
 } from '../../utils/colors';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
 import { AvatarImage } from '../../components/AvatarImage';
-import {
-  type MatchupFragment,
-  MatchupStatus,
-} from '../../api/db/graphql.generated';
 
 export interface MatchupCardProps {
   matchup: MatchupFragment | null | undefined;

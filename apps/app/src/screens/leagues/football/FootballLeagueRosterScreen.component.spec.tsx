@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
+import * as graphqlLib from '@legacy-sports/graphql';
 import { FootballLeagueRosterScreen } from './FootballLeagueRosterScreen';
-import * as graphqlLib from '../../../api/db/graphql.generated';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
@@ -16,7 +16,7 @@ const mockPlayer = {
 
 const mockMember = { id: 101, playerId: 1, player: mockPlayer };
 
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamMembersQuery: jest.fn(() => ({
     data: { teamMembers: [mockMember] },
     loading: false,

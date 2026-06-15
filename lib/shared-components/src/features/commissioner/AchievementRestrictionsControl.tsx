@@ -13,12 +13,12 @@ import {
   YStack,
 } from 'tamagui';
 import { Award, Check, Trash2 } from '@tamagui/lucide-icons';
-import { withAlpha } from '../../utils/colors';
 import {
   useDeleteAchievementRestrictionMutation,
   useGetAchievementRestrictionsQuery,
   useUpsertAchievementRestrictionMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { withAlpha } from '../../utils/colors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

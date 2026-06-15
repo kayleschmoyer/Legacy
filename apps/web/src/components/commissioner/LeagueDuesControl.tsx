@@ -14,7 +14,7 @@ import { AlertTriangle, Check, DollarSign } from '@tamagui/lucide-icons';
 import {
   useGetLeagueDuesSettingsQuery,
   useUpdateDuesSettingsMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 
 export interface LeagueDuesControlProps {

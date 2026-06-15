@@ -27,7 +27,7 @@ jest.mock('../../features/auth', () => ({
   useAuth: jest.fn(),
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: jest.fn(() => ({ data: undefined })),
 }));
 

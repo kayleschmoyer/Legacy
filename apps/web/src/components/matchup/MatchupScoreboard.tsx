@@ -7,7 +7,7 @@ import {
   MatchupStatus,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,

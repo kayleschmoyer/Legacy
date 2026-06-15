@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { useGetLeagueAnalyticsQuery } from '../../api/db/graphql.generated';
+import { useGetLeagueAnalyticsQuery } from '@legacy-sports/graphql';
 
 export interface AnalyticsScreenProps {
   leagueId: number;

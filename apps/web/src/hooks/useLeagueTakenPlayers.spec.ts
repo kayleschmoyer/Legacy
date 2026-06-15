@@ -5,15 +5,13 @@ jest.mock('@apollo/client/react', () => ({
   useApolloClient: jest.fn(),
 }));
 
-jest.mock('../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   GetTeamMembers: 'GET_TEAM_MEMBERS',
   useGetLeagueTeamsQuery: jest.fn(),
 }));
 
 const { useApolloClient } = jest.requireMock('@apollo/client/react');
-const { useGetLeagueTeamsQuery } = jest.requireMock(
-  '../api/db/graphql.generated',
-);
+const { useGetLeagueTeamsQuery } = jest.requireMock('@legacy-sports/graphql');
 
 describe('useLeagueTakenPlayers — refreshKey re-fetches roster (LS-4032)', () => {
   beforeEach(() => {

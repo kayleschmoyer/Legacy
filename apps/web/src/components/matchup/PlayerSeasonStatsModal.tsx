@@ -13,8 +13,8 @@ import {
 } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { useGetAllPlayerSeasonStatsQuery } from '@legacy-sports/graphql';
 import { WHITE, withAlpha } from '../../constants/colors';
-import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
 import { ipToDecimalInnings } from '../../lib/scoring/ipUtils';
 
 export interface PlayerSeasonStatsModalProps {

@@ -1,6 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { LeagueActivityEventType } from '@legacy-sports/graphql';
 import { eventToActivityItem } from './LeagueActivityFeed';
-import { LeagueActivityEventType } from '../../api/db/graphql.generated';
 
 describe('eventToActivityItem', () => {
   const baseEvent = {

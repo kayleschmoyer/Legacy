@@ -12,7 +12,7 @@ import {
   YStack,
 } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
-import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
+import { useDeleteAllLeaguesMutation } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,

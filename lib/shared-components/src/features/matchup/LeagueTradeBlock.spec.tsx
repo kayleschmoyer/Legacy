@@ -1,12 +1,12 @@
 import React from 'react';
-import { LeagueTradeBlock } from './LeagueTradeBlock';
-import { act, fireEvent, render, waitFor } from '../../test-utils';
 import {
   useGetLeagueTradeBlockQuery,
   useSetTradeBlockMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { LeagueTradeBlock } from './LeagueTradeBlock';
+import { act, fireEvent, render, waitFor } from '../../test-utils';
 
-jest.mock('../../api/db/graphql.generated');
+jest.mock('@legacy-sports/graphql');
 
 // The default tamagui mock in jest-setup.js strips onPress without binding to
 // onClick, making it impossible to drive press handlers in tests. Provide a

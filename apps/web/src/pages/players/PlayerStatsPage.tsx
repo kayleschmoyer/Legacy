@@ -35,7 +35,7 @@ import {
   Sport,
   useGetPlayerIdByBrefIdQuery,
   useGetUserLeaguesQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors

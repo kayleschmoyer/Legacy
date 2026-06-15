@@ -6,9 +6,9 @@ import {
   LeagueScoringSummary,
   OnThisDayFeed,
 } from '@legacy-sports/shared-components';
+import { Sport } from '@legacy-sports/graphql';
 import { LeagueDuesPaymentStatus } from '../commissioner/LeagueDuesPaymentStatus';
 import type { ScoringSettings } from '../../common/scoring';
-import { Sport } from '../../api/db/graphql.generated';
 
 interface RankedStanding {
   rank: number;

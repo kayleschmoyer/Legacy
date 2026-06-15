@@ -9,8 +9,8 @@
  */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import { GetDraftRecommendations } from '@legacy-sports/graphql';
 import { DraftIntelligence } from './DraftIntelligence';
-import { GetDraftRecommendations } from '../../api/db/graphql.generated';
 import { MockedProvider } from '../../test-utils/MockedProvider';
 
 const variables = { draftId: 1, teamId: 2 };

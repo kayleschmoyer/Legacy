@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type {
   LeaguePositionFragment,
   TeamMemberFragment,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 interface LeagueState {
   leagueId: number | null;

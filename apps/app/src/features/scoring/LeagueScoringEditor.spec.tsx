@@ -10,10 +10,10 @@ import { Alert } from 'react-native';
 
 // ── Component under test ─────────────────────────────────────────────────────
 import * as scoringLib from '@legacy-sports/scoring';
+import * as graphqlLib from '@legacy-sports/graphql';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
 
 // ── Typed module imports for jest.mocked() ───────────────────────────────────
-import * as graphqlLib from '../../api/db/graphql.generated';
 
 // ── Mock type helpers ────────────────────────────────────────────────────────
 type RNComponents = {
@@ -95,7 +95,7 @@ jest.mock('@legacy-sports/scoring', () => ({
 
 // Mock the mutation
 const mockUpdateScoring = jest.fn().mockResolvedValue({});
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useUpdateLeagueScoringProfileMutation: jest.fn(() => [
     mockUpdateScoring,
     { loading: false },

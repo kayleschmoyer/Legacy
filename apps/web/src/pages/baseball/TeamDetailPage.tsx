@@ -12,7 +12,6 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { PageMeta } from '../../components/PageMeta';
 import {
   TeamMemberFragment,
   useGetLeagueByIdQuery,
@@ -22,7 +21,8 @@ import {
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
   useUpdateTeamBrandingMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PageMeta } from '../../components/PageMeta';
 import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
 import {
   BRAND_GOLD_LIGHT,
@@ -85,7 +85,7 @@ export function TeamDetailPage() {
 
   // leagueId: prefer from members (populated after draft), fall back to teamById
   const leagueId =
-    membersData?.teamMembers?.[0]?.leagueId ?? teamByIdData?.teamById?.leagueId;
+    membersData?.teamMembers?.[0]?.leagueId ?? teamByIdData?.team?.leagueId;
   const {
     data: teamsData,
     loading: teamsLoading,
@@ -218,7 +218,7 @@ export function TeamDetailPage() {
   const team =
     teamsData?.leagueTeams?.find(
       (t: { id?: number | null }) => t?.id === teamIdNum,
-    ) ?? teamByIdData?.teamById;
+    ) ?? teamByIdData?.team;
   const teamMembers = membersData.teamMembers;
 
   const currentAvatarUrl = team?.avatarUrl ?? null;

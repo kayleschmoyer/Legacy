@@ -1,0 +1,19 @@
+fragment PlayoffSeed on PlayoffSeed {
+  id
+  bracketId
+  teamId
+  seedNumber
+  regularSeasonWins
+  regularSeasonLosses
+  pointsFor
+  team {
+    id
+    name
+  }
+}
+
+query GetPlayoffSeeds($bracketId: Int!) {
+  getPlayoffSeeds(bracketId: $bracketId) {
+    ...PlayoffSeed
+  }
+}

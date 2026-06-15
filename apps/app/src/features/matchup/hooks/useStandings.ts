@@ -1,4 +1,4 @@
-import { useGetLeagueStandingsQuery } from '../../../api/db/graphql.generated';
+import { useGetLeagueStandingsQuery } from '@legacy-sports/graphql';
 
 /**
  * Hook for fetching league standings

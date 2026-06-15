@@ -1,8 +1,8 @@
 import React, { type ReactNode } from 'react';
 import { Text, YStack } from 'tamagui';
+import { type MatchupFragment } from '@legacy-sports/graphql';
 import { GamesRemaining } from './GamesRemaining';
 import { MatchupNavigationControls } from './MatchupNavigationControls';
-import { type MatchupFragment } from '../../api/db/graphql.generated';
 
 export interface MatchupDetailLayoutProps {
   matchup: MatchupFragment;

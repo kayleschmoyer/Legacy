@@ -10,6 +10,10 @@ import {
   YStack,
 } from 'tamagui';
 import { Check, Lock, Settings } from '@tamagui/lucide-icons';
+import {
+  useGetLeagueDraftQuery,
+  useUpdateDraftSettingsMutation,
+} from '@legacy-sports/graphql';
 import { DateTimePicker } from '../../components/DateTimePicker';
 import { PremiumGate } from '../../components/PremiumGate';
 import {
@@ -23,10 +27,6 @@ import {
 } from '../../config/sports';
 
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
-import {
-  useGetLeagueDraftQuery,
-  useUpdateDraftSettingsMutation,
-} from '../../api/db/graphql.generated';
 
 export interface DraftSettingsControlProps {
   leagueId: number;

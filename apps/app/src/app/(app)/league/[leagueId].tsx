@@ -26,7 +26,7 @@ import {
   useGetUserTeamIdLazyQuery,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { LeagueRosterManagement } from '../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../features/leagues/LeagueChatTab';
 import { CommissionerScreen } from '../../../features/commissioner/CommissionerScreen';

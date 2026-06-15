@@ -1,0 +1,73 @@
+fragment LeagueChatMessageFields on LeagueChatMessage {
+  id
+  leagueId
+  userId
+  messageText
+  timestamp
+  messageType
+  gifUrl
+  sender {
+    id
+    username
+  }
+}
+
+fragment DirectMessageFields on DirectMessage {
+  id
+  fromUserId
+  toUserId
+  leagueId
+  messageText
+  readAt
+  deletedAt
+  createdAt
+  updatedAt
+  sender {
+    id
+    username
+  }
+  recipient {
+    id
+    username
+  }
+}
+
+query GetLeagueMessages($leagueId: Int!, $limit: Int) {
+  getLeagueMessages(leagueId: $leagueId, limit: $limit) {
+    ...LeagueChatMessageFields
+  }
+}
+
+query GetDirectMessages($otherUserId: Int!, $limit: Int) {
+  getDirectMessages(otherUserId: $otherUserId, limit: $limit) {
+    ...DirectMessageFields
+  }
+}
+
+mutation SendLeagueMessage(
+  $leagueId: Int!
+  $messageText: String!
+  $gifUrl: String
+) {
+  sendLeagueMessage(
+    leagueId: $leagueId
+    messageText: $messageText
+    gifUrl: $gifUrl
+  ) {
+    ...LeagueChatMessageFields
+  }
+}
+
+mutation SendDirectMessage(
+  $toUserId: Int!
+  $messageText: String!
+  $leagueId: Int
+) {
+  sendDirectMessage(
+    toUserId: $toUserId
+    messageText: $messageText
+    leagueId: $leagueId
+  ) {
+    ...DirectMessageFields
+  }
+}

@@ -1,8 +1,8 @@
+import { ScoringStatGroup } from '@legacy-sports/graphql';
 import {
   applyMultiplierGroups,
   createDefaultScoringSettings,
 } from './LeagueScoringProvider';
-import { ScoringStatGroup } from '../../api/db/graphql.generated';
 
 describe('applyMultiplierGroups', () => {
   it('returns defaults when groups are empty', () => {

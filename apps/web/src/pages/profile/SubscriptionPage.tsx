@@ -17,13 +17,13 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import { useStepUpGate } from '@legacy-sports/shared-components/auth';
-import { PageMeta } from '../../components/PageMeta';
-import { StepUpModal } from '../../components/StepUpModal';
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
   useGetMySubscriptionQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PageMeta } from '../../components/PageMeta';
+import { StepUpModal } from '../../components/StepUpModal';
 import {
   AMBER,
   BG_DARK,

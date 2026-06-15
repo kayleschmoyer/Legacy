@@ -28,8 +28,8 @@ import {
   FootballPlayerDetail,
 } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
-import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { storeCameFrom } from '../../lib/came-from';
 
@@ -60,7 +60,7 @@ jest.mock('../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
 }));
 jest.mock('../../lib/came-from', () => ({ storeCameFrom: jest.fn() }));
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useFootballPlayerQuery: jest.fn(),
 }));
 

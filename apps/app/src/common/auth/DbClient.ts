@@ -12,8 +12,8 @@ import { setContext } from '@apollo/client/link/context';
 import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
 import { SecureStorageProvider } from '@legacy-sports/shared-components';
+import { GetUserById, UserFragment } from '@legacy-sports/graphql';
 import { emitSessionExpired } from './sessionEvents';
-import { GetUserById, UserFragment } from '../../api/db/graphql.generated';
 
 const INTERNAL_JWT_KEY = 'INTERNAL_JWT';
 

@@ -10,17 +10,17 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  type Matchup,
+  useAutoAdvanceMatchupsMutation,
+  useGetMatchupsForLeagueQuery,
+} from '@legacy-sports/graphql';
+import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../utils/colors';
-import {
-  type Matchup,
-  useAutoAdvanceMatchupsMutation,
-  useGetMatchupsForLeagueQuery,
-} from '../../api/db/graphql.generated';
 
 export interface MatchupControlProps {
   leagueId: number;

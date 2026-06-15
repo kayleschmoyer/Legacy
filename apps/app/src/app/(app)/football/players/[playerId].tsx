@@ -4,7 +4,7 @@ import {
   FOOTBALL_PLAYER_DETAIL_POLL_MS,
   FootballPlayerDetail,
 } from '@legacy-sports/shared-components/football';
-import { useFootballPlayerQuery } from '../../../../api/db/graphql.generated';
+import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
 

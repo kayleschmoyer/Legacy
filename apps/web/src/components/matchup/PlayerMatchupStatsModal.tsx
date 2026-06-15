@@ -14,6 +14,7 @@ import {
 import { X } from '@tamagui/lucide-icons';
 import type { BaseballScoringSettings } from '@legacy-sports/scoring';
 
+import type { MatchupPlayerFragment } from '@legacy-sports/graphql';
 import {
   mapBattingStats,
   mapFieldingStats,
@@ -22,7 +23,6 @@ import {
   type ScoringFieldingStats,
   type ScoringPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
-import type { MatchupPlayerFragment } from '../../api/db/graphql.generated';
 
 export interface PlayerMatchupStatsModalProps {
   /** Player data with games and stats */

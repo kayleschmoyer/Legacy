@@ -23,7 +23,7 @@ import {
   useCancelTradeMutation,
   useGetTeamTradeOffersQuery,
   useRejectTradeMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,

@@ -1,9 +1,6 @@
 import React from 'react';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
-import {
-  Sport,
-  TwentyQuestionsDifficulty,
-} from '../../api/db/graphql.generated';
+import { Sport, TwentyQuestionsDifficulty } from '@legacy-sports/graphql';
 
 export interface TwentyQuestionsEntryProps {
   difficulty: TwentyQuestionsDifficulty;

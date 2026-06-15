@@ -1,6 +1,6 @@
 import { Gamepad2, Home, Trophy, User, Users } from '@tamagui/lucide-icons';
 import { Tabs } from 'expo-router';
-import { useGetUnreadNotificationCountQuery } from '../../../api/db/graphql.generated';
+import { useGetUnreadNotificationCountQuery } from '@legacy-sports/graphql';
 
 export default function TabsLayout() {
   const { data: unreadData } = useGetUnreadNotificationCountQuery();

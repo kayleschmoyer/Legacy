@@ -12,7 +12,7 @@ jest.mock('@legacy-sports/rollbar/native', () => ({
 }));
 
 const mockUseGetStripePricesQuery = jest.fn();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetStripePricesQuery: (...args: unknown[]): unknown =>
     mockUseGetStripePricesQuery(...args),
 }));

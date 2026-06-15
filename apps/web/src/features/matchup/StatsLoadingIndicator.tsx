@@ -6,7 +6,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-// import { StatsLoadingStatus } from '../../api/db/graphql.generated';
+// import { StatsLoadingStatus } from '@legacy-sports/graphql';
 enum StatsLoadingStatus {
   NotStarted = 'NOT_STARTED',
   Loading = 'LOADING',

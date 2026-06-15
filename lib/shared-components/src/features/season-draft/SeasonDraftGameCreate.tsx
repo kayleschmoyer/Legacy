@@ -12,12 +12,12 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Stack } from './primitives';
-import { SPORT_LOBBY_CHROME, type SportKind } from './sportChrome';
 import {
   Sport,
   useCreateSeasonDraftGameMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { Stack } from './primitives';
+import { SPORT_LOBBY_CHROME, type SportKind } from './sportChrome';
 import { BRAND_GOLD, withAlpha } from '../../utils/colors';
 
 interface StatDef {

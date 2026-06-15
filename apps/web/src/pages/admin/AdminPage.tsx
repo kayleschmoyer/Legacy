@@ -4,6 +4,11 @@ import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Spinner } from 'tamagui';
+import {
+  useGetAllUsersQuery,
+  useGetUserByIdQuery,
+  useGetUsersCountQuery,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from '../../constants/typography';
 import {
@@ -31,11 +36,6 @@ import {
   WHITE,
   withAlpha,
 } from '../../constants/colors';
-import {
-  useGetAllUsersQuery,
-  useGetUserByIdQuery,
-  useGetUsersCountQuery,
-} from '../../api/db/graphql.generated';
 
 // ─── JWT helpers ──────────────────────────────────────────────────────────────
 

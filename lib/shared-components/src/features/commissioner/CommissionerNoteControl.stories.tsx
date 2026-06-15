@@ -2,12 +2,12 @@ import type { MockedResponse } from '@apollo/client/testing';
 import { MockedProvider } from '@apollo/client/testing/react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { CommissionerNoteControl } from './CommissionerNoteControl';
 import {
   UpdateCommissionerNote,
   type UpdateCommissionerNoteMutation,
   type UpdateCommissionerNoteMutationVariables,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { CommissionerNoteControl } from './CommissionerNoteControl';
 
 const updateCommissionerNoteMock: MockedResponse<
   UpdateCommissionerNoteMutation,

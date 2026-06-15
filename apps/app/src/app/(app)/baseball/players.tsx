@@ -7,13 +7,13 @@ import {
 } from 'react-native';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
-import { useBaseballRosteredPlayerIds } from './hooks/useBaseballRosteredPlayerIds';
-import type { BaseballPlayersQuery } from '../../../api/db/graphql.generated';
+import type { BaseballPlayersQuery } from '@legacy-sports/graphql';
 import {
   Sport,
   useBaseballPlayersQuery,
   useGetUserLeaguesQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { useBaseballRosteredPlayerIds } from './hooks/useBaseballRosteredPlayerIds';
 
 type BaseballPlayerNode = NonNullable<
   NonNullable<BaseballPlayersQuery['players']>[number]

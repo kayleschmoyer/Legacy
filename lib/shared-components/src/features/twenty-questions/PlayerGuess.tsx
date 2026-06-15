@@ -3,7 +3,7 @@ import { Button, Input, Text, XStack, YStack } from 'tamagui';
 import {
   Sport,
   useSearchPlayersForTwentyQuestionsLazyQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 interface PlayerSuggestion {
   id: number;

@@ -3,7 +3,7 @@ import {
   GetAllPlayers,
   type GetAllPlayersQuery,
   type GetAllPlayersQueryVariables,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // Local interface definition
 interface PlayerStatsColumn {
@@ -31,7 +31,7 @@ export {
   type GetCareerBattingStatsQueryVariables,
   useGetCareerBattingStatsQuery,
   useGetCareerBattingStatsLazyQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // Extract Player type from GraphQL query result
 type PlayerFromQuery = NonNullable<GetAllPlayersQuery['players']>[number];

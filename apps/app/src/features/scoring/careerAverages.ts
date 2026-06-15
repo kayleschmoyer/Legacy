@@ -8,7 +8,7 @@ import {
   GetPlayerCareerStats,
   type GetPlayerCareerStatsQuery,
   type GetPlayerCareerStatsQueryVariables,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export interface CareerAverageStatsResult {
   readonly records: Map<number, PlayerCareerStats>;

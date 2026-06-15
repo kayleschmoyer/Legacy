@@ -1,3 +1,7 @@
+import type {
+  LeaguePositionFragment,
+  TeamMemberFragment,
+} from '@legacy-sports/graphql';
 import leagueReducer, {
   resetLeagueState,
   setIsCommissioner,
@@ -13,10 +17,6 @@ import leagueReducer, {
   setUserTeamId,
   updateTeamMember,
 } from './leagueSlice';
-import type {
-  LeaguePositionFragment,
-  TeamMemberFragment,
-} from '../api/db/graphql.generated';
 
 describe('leagueSlice', () => {
   const initialState = {

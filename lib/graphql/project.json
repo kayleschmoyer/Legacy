@@ -1,0 +1,27 @@
+{
+  "name": "graphql",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/graphql/src",
+  "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:data"],
+  "targets": {
+    "typecheck": {},
+    "codegen": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/src/**/*.graphql",
+        "{projectRoot}/codegen.ts",
+        "{workspaceRoot}/scripts/fix-apollo-codegen.js",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/lambdas/db/schema.graphql",
+        { "externalDependencies": ["@graphql-codegen/cli"] }
+      ],
+      "outputs": ["{projectRoot}/src/graphql.generated.ts"],
+      "options": {
+        "command": "graphql-codegen --config codegen.ts",
+        "cwd": "lib/graphql"
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@ import { Alert, FlatList } from 'react-native';
 import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronRight, Plus, Trophy } from '@tamagui/lucide-icons';
 
-import { useGetUserLeaguesQuery } from '../../../api/db/graphql.generated';
+import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 
 function sportBadge(sport: string | null | undefined): string {

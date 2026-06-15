@@ -11,7 +11,7 @@ import {
 import {
   useGetMyMockDraftUsageQuery,
   useInitializeMockDraftMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
 

@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { GetPlayerCareerArcQuery } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -25,7 +26,6 @@ import {
   WHITE,
   withAlpha,
 } from '../constants/colors';
-import type { GetPlayerCareerArcQuery } from '../api/db/graphql.generated';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

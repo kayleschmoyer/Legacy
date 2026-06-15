@@ -1,4 +1,4 @@
-import type { UserLeagueSummaryFragment } from '../../api/db/graphql.generated';
+import type { UserLeagueSummaryFragment } from '@legacy-sports/graphql';
 
 /** Maps an era-filter enum value to a "<Name> · <year range>" label. */
 export const ERA_LABELS: Record<string, string> = {

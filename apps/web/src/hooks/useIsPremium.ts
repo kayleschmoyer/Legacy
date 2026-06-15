@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { type EntitlementKey, tierHasEntitlement } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
-import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 /**
  * Returns whether the current user has premium access.

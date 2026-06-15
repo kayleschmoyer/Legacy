@@ -1,9 +1,9 @@
 import React from 'react';
+import { useGetLeagueActivityQuery } from '@legacy-sports/graphql';
 import { LeagueActivityFeed } from './LeagueActivityFeed';
 import { render } from '../../test-utils';
-import { useGetLeagueActivityQuery } from '../../api/db/graphql.generated';
 
-jest.mock('../../api/db/graphql.generated');
+jest.mock('@legacy-sports/graphql');
 
 const mockEvents = [
   {

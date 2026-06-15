@@ -27,6 +27,7 @@
       "@legacy-sports/db-client": ["lib/db-client/src/index.ts"],
       "@legacy-sports/db-client/src/*": ["lib/db-client/src/*"],
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
+      "@legacy-sports/graphql": ["lib/graphql/src/index.ts"],
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
       "@legacy-sports/logging/server": ["lib/logging/src/server.ts"],
       "@legacy-sports/mcp-bearer-auth": ["lib/mcp-bearer-auth/src/index.ts"],

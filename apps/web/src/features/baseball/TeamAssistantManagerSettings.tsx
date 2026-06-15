@@ -14,7 +14,7 @@ import {
   useGetTeamLeagueMembersQuery,
   useInviteAssistantManagerMutation,
   useRemoveAssistantManagerMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,

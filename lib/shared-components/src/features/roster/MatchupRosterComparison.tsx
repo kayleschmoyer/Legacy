@@ -2,16 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { Card, H4, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Users } from '@tamagui/lucide-icons';
 import {
-  getPositionColors,
-  isStatsLoading,
-  POSITION_SLOT_ORDER,
-} from './rosterUtils';
-import {
   type StatsLoadingStatus,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import {
+  getPositionColors,
+  isStatsLoading,
+  POSITION_SLOT_ORDER,
+} from './rosterUtils';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,

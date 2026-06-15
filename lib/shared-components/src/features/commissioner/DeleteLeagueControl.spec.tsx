@@ -15,7 +15,7 @@ const mockDeleteLeague = jest.fn(
       mockResolveMutation = () => resolve({ data: { deleteLeague: true } });
     }),
 );
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useDeleteLeagueMutation: () => [mockDeleteLeague, { loading: false }],
 }));
 

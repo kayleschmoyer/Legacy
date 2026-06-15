@@ -1,13 +1,13 @@
 import React from 'react';
-import { TradingCenter } from './TradingCenter';
-import { act, fireEvent, render, waitFor } from '../../test-utils';
 import type {
   GetLeagueTeamsQuery,
   GetLeagueTradeOffersQuery,
   GetTeamMembersQuery,
   GetTeamTradeOffersQuery,
   TradeOffer,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { TradingCenter } from './TradingCenter';
+import { act, fireEvent, render, waitFor } from '../../test-utils';
 
 // ---------------------------------------------------------------------------
 // Mutable state for GraphQL hook mocks (set per-test)
@@ -70,7 +70,7 @@ let mockProposeTradeFn: jest.Mock;
 const mockLoadProposerRoster = jest.fn();
 const mockRefetch = jest.fn().mockResolvedValue({});
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetLeagueByIdQuery: jest.fn(() => mockLeagueByIdReturn),
   useGetTeamTradeOffersQuery: jest.fn(
     (options: { variables?: { status?: string } }) => {

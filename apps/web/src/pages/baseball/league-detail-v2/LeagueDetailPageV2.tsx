@@ -7,6 +7,14 @@ import {
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import './styles.css';
+import {
+  type LeagueFragment,
+  type TeamFragment,
+  useGetLeagueByIdQuery,
+  useGetLeagueTeamsLazyQuery,
+  useGetTeamMembersQuery,
+  useGetUserTeamIdLazyQuery,
+} from '@legacy-sports/graphql';
 import { TAB_IDS, type TabId, WEB_LEAGUE_TABS } from './tabConfig';
 import { OverviewTab } from './tabs/Overview';
 import { MatchupTab } from './tabs/Matchup';
@@ -20,14 +28,6 @@ import { CommishTab } from './tabs/Commish';
 import { setUserTeamId } from '../../../store/leagueSlice';
 import { useAppDispatch } from '../../../store/hooks';
 import { PageMeta } from '../../../components/PageMeta';
-import {
-  type LeagueFragment,
-  type TeamFragment,
-  useGetLeagueByIdQuery,
-  useGetLeagueTeamsLazyQuery,
-  useGetTeamMembersQuery,
-  useGetUserTeamIdLazyQuery,
-} from '../../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../../lib/scoring';
 import { setLastVisitedLeague } from '../../../lib/last-visited-league';
 import { LeagueWebSocketContext } from '../../../context/LeagueWebSocketContext';

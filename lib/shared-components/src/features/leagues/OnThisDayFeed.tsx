@@ -20,6 +20,10 @@ import {
   stripDiacritics,
 } from '@legacy-sports/utils';
 import {
+  useGetOnThisDayEventsQuery,
+  useGetOnThisDayQuery,
+} from '@legacy-sports/graphql';
+import {
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -29,10 +33,6 @@ import {
   BRAND_SEAM_RED_LIGHT,
   withAlpha,
 } from '../../utils/colors';
-import {
-  useGetOnThisDayEventsQuery,
-  useGetOnThisDayQuery,
-} from '../../api/db/graphql.generated';
 
 // ─── Styled components ───────────────────────────────────────────────────────
 

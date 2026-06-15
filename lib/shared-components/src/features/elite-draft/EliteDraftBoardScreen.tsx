@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
+import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
 import { DraftPlayerBoard } from './DraftPlayerBoard';
@@ -29,7 +30,6 @@ import { DraftSidebar } from './DraftSidebar';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import { useAuth } from '../../features/auth';
-import { useGetUserByIdQuery } from '../../api/db/graphql.generated';
 import type { SportKind } from '../../config/sports';
 
 export interface EliteDraftBoardScreenProps {

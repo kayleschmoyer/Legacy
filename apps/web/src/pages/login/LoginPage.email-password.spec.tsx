@@ -84,7 +84,7 @@ jest.mock('../../lib/session-precache', () => ({
 jest.mock('../../config/environment', () => ({
   env: { baseUrl: '/', oauthProxyUrl: 'http://localhost:5001' },
 }));
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetOnThisDayQuery: () => ({ data: undefined }),
   useGetPlayerCountQuery: () => ({ data: undefined }),
 }));

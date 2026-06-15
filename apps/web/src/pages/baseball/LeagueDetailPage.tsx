@@ -68,18 +68,6 @@ import {
 } from '@legacy-sports/shared-components/roster';
 import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
 import {
-  handleRosterMutationError,
-  MATCHUP_LOCK_POLL_INTERVAL_MS,
-} from './matchup-lock-refresh';
-import { PageMeta } from '../../components/PageMeta';
-import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
-import { LeagueHistory } from '../../features/baseball/LeagueHistory';
-import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
-import { LeagueTradeBlock } from '../../features/baseball/LeagueTradeBlock';
-import { TradingCenter } from '../../features/baseball/TradingCenter';
-import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
-import { env } from '../../config/environment';
-import {
   GetMatchupPlayers,
   LeagueFragment,
   LeaguePositionFragment,
@@ -99,7 +87,19 @@ import {
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import {
+  handleRosterMutationError,
+  MATCHUP_LOCK_POLL_INTERVAL_MS,
+} from './matchup-lock-refresh';
+import { PageMeta } from '../../components/PageMeta';
+import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
+import { LeagueHistory } from '../../features/baseball/LeagueHistory';
+import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
+import { LeagueTradeBlock } from '../../features/baseball/LeagueTradeBlock';
+import { TradingCenter } from '../../features/baseball/TradingCenter';
+import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
+import { env } from '../../config/environment';
 import {
   BG_DARK,
   BRAND_GOLD_LIGHT,

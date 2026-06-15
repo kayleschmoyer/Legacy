@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { MockedProvider } from '@apollo/client/testing/react';
+import { GetMatchupRecap } from '@legacy-sports/graphql';
 import { MatchupRecapPanel } from './MatchupRecapPanel';
-import { GetMatchupRecap } from '../../api/db/graphql.generated';
 
 const matchupRecapMock = {
   request: {

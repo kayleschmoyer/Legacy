@@ -67,7 +67,7 @@ jest.mock('../../../common/auth/AuthHooks', () => ({
 
 let mockUnreadCount = 0;
 
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetUnreadNotificationCountQuery: () => ({
     data: { getUnreadNotificationCount: mockUnreadCount },
   }),

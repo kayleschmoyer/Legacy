@@ -29,7 +29,7 @@ import {
   useGetAuctionStateQuery,
   useNominatePlayerMutation,
   usePlaceBidMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   AMBER,
   BRAND_GOLD_LIGHT,

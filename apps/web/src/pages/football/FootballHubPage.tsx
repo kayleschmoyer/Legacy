@@ -2,10 +2,10 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NFLHome } from '@legacy-sports/shared-components/football';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { Sport, useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
-import { Sport, useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 
 // Free accounts may participate in at most this many non-mock leagues before a
 // premium subscription is required. Mirrors FREE_TIER_LEAGUE_LIMIT in the db

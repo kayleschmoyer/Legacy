@@ -13,7 +13,7 @@ import { Settings } from '@tamagui/lucide-icons';
 import {
   type NotificationPreference,
   type NotificationPreferenceInput,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 /** Keys of NotificationPreference that are user-updatable boolean fields. */
 type UpdatableNotificationKey = Extract<

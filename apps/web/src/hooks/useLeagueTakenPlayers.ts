@@ -6,7 +6,7 @@ import {
   GetTeamMembersQuery,
   GetTeamMembersQueryVariables,
   useGetLeagueTeamsQuery,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 /**
  * @param leagueId

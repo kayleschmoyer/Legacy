@@ -14,16 +14,16 @@
  *   7. One banner renders per incoming offer.
  */
 import React from 'react';
+import type { TradeOffer } from '@legacy-sports/graphql';
 import { PendingTradeOfferBanner } from './PendingTradeOfferBanner';
 import { fireEvent, render, waitFor } from '../../test-utils';
-import type { TradeOffer } from '../../api/db/graphql.generated';
 
 const mockRefetch = jest.fn().mockResolvedValue({});
 const mockRejectTrade = jest.fn();
 
 let mockTradeOffers: TradeOffer[] = [];
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamTradeOffersQuery: jest.fn(() => ({
     data: { teamTradeOffers: mockTradeOffers },
     refetch: mockRefetch,

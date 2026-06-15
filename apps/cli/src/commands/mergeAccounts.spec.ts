@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import {
   buildMergePreview,
   executeMerge,
@@ -96,8 +97,6 @@ jest.mock('drizzle-orm', () => ({
     { raw: (s: string) => s },
   ),
 }));
-
-import { LOGGER } from '@legacy-sports/logging';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

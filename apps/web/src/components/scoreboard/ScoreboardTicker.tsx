@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { styled, Text, XStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { useGetScoreboardQuery } from '../../api/db/graphql.generated';
+import { useGetScoreboardQuery } from '@legacy-sports/graphql';
 import {
   NAV_HEIGHT_PX,
   TICKER_HEIGHT_PX,

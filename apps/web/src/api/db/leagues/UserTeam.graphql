@@ -1,3 +1,0 @@
-query GetUserTeamId($leagueId: Int!) {
-  userTeamId(leagueId: $leagueId)
-}

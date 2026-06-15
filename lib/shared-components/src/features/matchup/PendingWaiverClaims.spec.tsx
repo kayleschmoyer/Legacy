@@ -1,6 +1,6 @@
+import type { WaiverClaim } from '@legacy-sports/graphql';
 import { PendingWaiverClaims } from './PendingWaiverClaims';
 import { fireEvent, render, waitFor } from '../../test-utils';
-import type { WaiverClaim } from '../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Mock the GraphQL hooks
@@ -16,7 +16,7 @@ let mockQueryReturn: {
   refetch: jest.Mock;
 };
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamWaiverClaimsQuery: jest.fn(() => mockQueryReturn),
   useCancelWaiverClaimMutation: () => [mockCancelClaim],
 }));

@@ -8,11 +8,11 @@ import {
 } from '@legacy-sports/shared-components/baseball';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
-import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import {
   useCreateLeagueMutation,
   useGetUserLeaguesQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../../../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';

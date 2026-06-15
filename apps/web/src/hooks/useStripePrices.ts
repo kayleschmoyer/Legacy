@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { captureWarning } from '@legacy-sports/rollbar/web';
-import { useGetStripePricesQuery } from '../api/db/graphql.generated';
+import { useGetStripePricesQuery } from '@legacy-sports/graphql';
 import {
   derivePricing,
   FALLBACK_ANNUAL_TOTAL_CENTS,

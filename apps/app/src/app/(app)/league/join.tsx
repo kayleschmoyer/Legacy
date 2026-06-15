@@ -17,7 +17,7 @@ import {
   useJoinLeagueByCodeMutation,
   useValidateInviteCodeLazyQuery,
   type ValidateInviteCodeQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 type SportChoice = 'baseball' | 'football';
 

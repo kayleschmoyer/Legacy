@@ -34,6 +34,14 @@ import {
   WaiverSystemField,
 } from '@legacy-sports/shared-components/leagues';
 import {
+  GetUserLeagues,
+  GetUserLeaguesQuery,
+  DefensiveFormat as GqlDefensiveFormat,
+  Sport,
+  useCreateLeagueAndTeamsMutation,
+  useGetUserLeaguesQuery,
+} from '@legacy-sports/graphql';
+import {
   formatDateAsUTC,
   formatDraftDate,
   getUserTimezoneLabel,
@@ -48,14 +56,6 @@ import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { useFeatureIsOn } from '../../context/GrowthBookProvider';
-import {
-  GetUserLeagues,
-  GetUserLeaguesQuery,
-  DefensiveFormat as GqlDefensiveFormat,
-  Sport,
-  useCreateLeagueAndTeamsMutation,
-  useGetUserLeaguesQuery,
-} from '../../api/db/graphql.generated';
 import {
   AMBER,
   BG_DARK,

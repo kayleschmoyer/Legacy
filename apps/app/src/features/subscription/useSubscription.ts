@@ -11,7 +11,7 @@ import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
   useGetMySubscriptionQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 
 export interface SubscriptionData {

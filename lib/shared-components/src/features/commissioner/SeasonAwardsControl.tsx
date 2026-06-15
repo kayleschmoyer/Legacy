@@ -18,14 +18,6 @@ import {
 } from 'tamagui';
 import { Award, Check, Trash2 } from '@tamagui/lucide-icons';
 import {
-  BRAND_GOLD,
-  BRAND_NAVY_LIGHT,
-  GREEN,
-  SURFACE_CARD,
-  SURFACE_PANEL,
-  withAlpha,
-} from '../../utils/colors';
-import {
   LeagueSeasonAwardFragment,
   useCloseAwardVotingMutation,
   useDeleteLeagueSeasonAwardMutation,
@@ -35,7 +27,15 @@ import {
   useGetPlayersWithStatsQuery,
   useOpenAwardVotingMutation,
   useUpsertLeagueSeasonAwardMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import {
+  BRAND_GOLD,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  SURFACE_CARD,
+  SURFACE_PANEL,
+  withAlpha,
+} from '../../utils/colors';
 
 // ─── Award definitions ─────────────────────────────────────────────────────────
 

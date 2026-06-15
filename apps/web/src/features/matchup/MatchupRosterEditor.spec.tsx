@@ -14,25 +14,22 @@
 import React from 'react';
 import { act, render } from '@testing-library/react';
 import { MatchupRosterEditorView } from '@legacy-sports/shared-components/roster';
-import { MatchupRosterEditor } from './MatchupRosterEditor';
-import {
-  type MatchupFragment,
-  MatchupStatus,
-} from '../../api/db/graphql.generated';
-import {
-  useSwapMatchupPlayerPositions,
-  useUpdateMatchupPlayerPosition,
-} from '../../hooks/useMatchup';
+import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
 import {
   useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { MatchupRosterEditor } from './MatchupRosterEditor';
+import {
+  useSwapMatchupPlayerPositions,
+  useUpdateMatchupPlayerPosition,
+} from '../../hooks/useMatchup';
 
-jest.mock('../../api/db/graphql.generated', () => {
-  const actual = jest.requireActual<
-    typeof import('../../api/db/graphql.generated')
-  >('../../api/db/graphql.generated');
+jest.mock('@legacy-sports/graphql', () => {
+  const actual = jest.requireActual<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
   return {
     ...actual,
     useGetMatchupByIdLazyQuery: jest.fn(),

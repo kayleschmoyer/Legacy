@@ -14,10 +14,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useNavigate } from 'react-router-dom';
 import { NFLHome } from '@legacy-sports/shared-components/football';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { FootballHubPage } from './FootballHubPage';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Module mocks (factories must not reference outer scope — configured per-test)
@@ -35,7 +35,7 @@ jest.mock('../../components/UpgradeModal', () => ({ UpgradeModal: jest.fn() }));
 jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremiumStatus: jest.fn(),
 }));
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
   useGetUserLeaguesQuery: jest.fn(),
 }));

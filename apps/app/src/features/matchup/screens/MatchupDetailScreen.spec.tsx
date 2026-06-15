@@ -34,7 +34,7 @@ jest.mock('../hooks/useMatchup', () => ({
   useMatchupsForLeague: () => ({ matchups: [] }),
 }));
 
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
     Completed: 'completed',
     InProgress: 'in_progress',

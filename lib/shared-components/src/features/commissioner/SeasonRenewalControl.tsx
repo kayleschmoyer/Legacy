@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { useRenewLeagueMutation } from '../../api/db/graphql.generated';
+import { useRenewLeagueMutation } from '@legacy-sports/graphql';
 
 export interface SeasonRenewalControlProps {
   leagueId: number;

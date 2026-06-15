@@ -79,7 +79,13 @@ jest.mock('../../config/environment', () => ({
     googleClientId: 'test',
   },
 }));
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
+  // Preserve real exports (enums like TwentyQuestionsCategory are used by
+  // shared-components code pulled in via requireActual); override only the
+  // hooks this page calls.
+  ...jest.requireActual<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  ),
   useGetOnThisDayQuery: () => ({ data: undefined }),
   useGetPlayerCountQuery: () => ({ data: undefined }),
 }));

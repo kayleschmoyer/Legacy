@@ -16,9 +16,9 @@ import {
   SeasonAwardsControl,
   WaiverProcessControl,
 } from '@legacy-sports/shared-components/commissioner';
+import { Sport } from '@legacy-sports/graphql';
+import type { AppLeagueFragment } from '@legacy-sports/graphql';
 import { LeagueDuesSetup } from './LeagueDuesSetup';
-import { Sport } from '../../api/db/graphql.generated';
-import type { AppLeagueFragment } from '../../api/db/graphql.generated';
 import { LeagueScoringEditor } from '../scoring/LeagueScoringEditor';
 import { useLeagueScoringSettings } from '../../common/scoring/LeagueScoringProvider';
 import {

@@ -22,7 +22,7 @@ import {
   useGetLeagueByIdQuery,
   useGetUserLeaguesQuery,
   useGetUserTeamIdQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 import { useSubscription } from '../../features/subscription/useSubscription';

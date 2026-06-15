@@ -27,7 +27,7 @@ import {
   DefensiveFormat as DefensiveFormatEnum,
   Sport,
   useCreateLeagueMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { PremiumGate, useSubscription } from '../../../features/subscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
 

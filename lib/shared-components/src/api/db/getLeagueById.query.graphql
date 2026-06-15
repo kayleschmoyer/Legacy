@@ -1,5 +1,0 @@
-query GetLeagueById($id: Int!) {
-  league(id: $id) {
-    ...League
-  }
-}

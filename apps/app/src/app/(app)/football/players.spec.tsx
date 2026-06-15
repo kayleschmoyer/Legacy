@@ -234,7 +234,7 @@ jest.mock('tamagui', () => {
 
 const mockUseFootballPlayersQuery = jest.fn();
 const mockUseGetUserLeaguesQuery = jest.fn();
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useFootballPlayersQuery: (...args: unknown[]) =>
     mockUseFootballPlayersQuery(...args) as Record<string, unknown>,
   useGetUserLeaguesQuery: (...args: unknown[]) =>

@@ -2,11 +2,11 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
-import { LeagueRosterManagement } from './LeagueRosterManagement';
 import type {
   AppTeamMemberFragment,
   LeaguePositionFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { LeagueRosterManagement } from './LeagueRosterManagement';
 
 type RNComponents = {
   View: typeof RNView;

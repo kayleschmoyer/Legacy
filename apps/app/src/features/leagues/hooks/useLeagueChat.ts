@@ -5,12 +5,12 @@ import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
 import { config } from '@legacy-sports/app-config/native';
-import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import {
   GetLeagueMessages,
   type GetLeagueMessagesQuery,
   useSendLeagueMessageMutation,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -10,7 +10,7 @@ import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
   useGetUserLeagueSummariesQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 
 /**

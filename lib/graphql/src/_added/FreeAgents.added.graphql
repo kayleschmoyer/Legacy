@@ -1,0 +1,14 @@
+query GetFreeAgentPlayers($leagueId: Int!) {
+  freeAgents(leagueId: $leagueId) {
+    id
+    firstName
+    lastName
+    eligiblePositions
+    scoring {
+      hitterAvgPointsPerGame
+      pitchingAvgPointsPerGame
+      avgPointsPerGame
+      careerGames
+    }
+  }
+}

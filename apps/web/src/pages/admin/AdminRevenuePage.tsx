@@ -21,11 +21,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { PageMeta } from '../../components/PageMeta';
 import {
   useAdminRevenueStatsQuery,
   useGetUserByIdQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PageMeta } from '../../components/PageMeta';
 import { useFeatureValue } from '../../context/GrowthBookProvider';
 import {
   BRAND_GOLD_LIGHT,

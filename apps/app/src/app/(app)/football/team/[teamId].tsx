@@ -13,7 +13,7 @@ import {
   useGetUserTeamIdQuery,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { FootballLeagueRosterScreen } from '../../../../screens/leagues/football/FootballLeagueRosterScreen';
 import { LineupEditor } from '../../../../features/roster/LineupEditor';
 import { handleError } from '../../../../common/utilities/ErrorHandler';

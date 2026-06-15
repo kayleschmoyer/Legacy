@@ -10,7 +10,7 @@ import {
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export interface LeagueRosterManagementProps {
   positions: readonly LeaguePositionFragment[];

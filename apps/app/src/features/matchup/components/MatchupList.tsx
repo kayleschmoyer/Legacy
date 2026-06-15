@@ -1,8 +1,8 @@
 import React from 'react';
 import { FlatList } from 'react-native';
 import { Text, YStack } from 'tamagui';
+import type { AppMatchupFragment } from '@legacy-sports/graphql';
 import { MatchupCard } from './MatchupCard';
-import type { AppMatchupFragment } from '../../../api/db/graphql.generated';
 
 export interface MatchupListProps {
   matchups: AppMatchupFragment[];

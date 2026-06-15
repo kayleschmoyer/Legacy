@@ -17,13 +17,13 @@ import {
 } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
-import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
+import type { FootballPlayersQuery } from '@legacy-sports/graphql';
 import {
   Sport,
   useFootballPlayersQuery,
   useGetUserLeaguesQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import PlayerStatsScreen from '../PlayerStats';
 

@@ -9,7 +9,7 @@ import {
   useGetUserByIdQuery,
   useGetUsersCountQuery,
   useUpdateUserRoleMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   BRAND_GOLD,
   BRAND_NAVY,

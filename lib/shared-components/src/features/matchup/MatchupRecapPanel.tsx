@@ -17,13 +17,13 @@ import {
   YStack,
 } from 'tamagui';
 import { BookOpen, Star, Trophy } from '@tamagui/lucide-icons';
+import { useGetMatchupRecapQuery } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../utils/colors';
-import { useGetMatchupRecapQuery } from '../../api/db/graphql.generated';
 
 // -- Props ------------------------------------------------------------
 

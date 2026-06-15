@@ -17,7 +17,7 @@ const mockEditScore = jest.fn();
 const mockSwap = jest.fn();
 const mockGetMatchupsQuery = jest.fn();
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetMatchupsForLeagueQuery: (...args: unknown[]): unknown =>
     mockGetMatchupsQuery(...args),
   useEditMatchupScoreMutation: () => [mockEditScore, { loading: false }],

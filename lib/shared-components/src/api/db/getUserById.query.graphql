@@ -1,6 +1,0 @@
-query GetUserById($id: Int!) {
-  user(id: $id) {
-    id
-    subscriptionTier
-  }
-}

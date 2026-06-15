@@ -11,15 +11,12 @@
  * The fix is to honour the query's error state and fall back to the
  * matchup's server-stored `team1Score`/`team2Score` fields.
  */
-import { computeMatchupScores } from './MatchupScoreboard';
 import type {
   MatchupFragment,
   MatchupPlayerFragment,
-} from '../../api/db/graphql.generated';
-import {
-  MatchupStatus,
-  StatsLoadingStatus,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { MatchupStatus, StatsLoadingStatus } from '@legacy-sports/graphql';
+import { computeMatchupScores } from './MatchupScoreboard';
 import type { ScoringSettings } from '../../lib/scoring';
 
 function makeMatchup(

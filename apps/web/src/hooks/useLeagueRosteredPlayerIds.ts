@@ -7,7 +7,7 @@ import {
   type GetTeamMembersQueryVariables,
   type Sport,
   useGetUserLeaguesQuery,
-} from '../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 /**
  * Returns the set of player IDs rostered on the current user's teams across

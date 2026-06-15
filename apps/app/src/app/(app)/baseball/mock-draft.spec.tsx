@@ -72,7 +72,7 @@ interface MockDraftUsage {
 }
 let mockUsageData: { getMyMockDraftUsage: MockDraftUsage | null } | undefined =
   undefined;
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useInitializeMockDraftMutation: () => [mockInitMutate, mockInitState],
   useGetMyMockDraftUsageQuery: () => ({ data: mockUsageData }),
 }));

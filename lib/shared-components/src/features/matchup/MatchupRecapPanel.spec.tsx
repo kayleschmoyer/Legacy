@@ -1,9 +1,9 @@
 import React from 'react';
+import { useGetMatchupRecapQuery } from '@legacy-sports/graphql';
 import { MatchupRecapPanel } from './MatchupRecapPanel';
 import { render } from '../../test-utils';
-import { useGetMatchupRecapQuery } from '../../api/db/graphql.generated';
 
-jest.mock('../../api/db/graphql.generated');
+jest.mock('@legacy-sports/graphql');
 
 const mockRecapData = {
   getMatchupById: {

@@ -15,7 +15,7 @@ import {
   TiebreakerMethod,
   useCreateTiebreakerRulesMutation,
   useGetTiebreakerRulesQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 export interface TiebreakerConfigProps {

@@ -12,7 +12,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   type GetTeamMembersQuery,
   useGetTeamMembersQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 type TeamMember = NonNullable<
   NonNullable<GetTeamMembersQuery['teamMembers']>[number]

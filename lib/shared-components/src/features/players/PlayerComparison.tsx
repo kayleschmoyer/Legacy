@@ -22,7 +22,7 @@ import {
   type GetPlayersWithStatsQuery,
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayersWithStatsQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   BG_DARK,
   BRAND_GOLD,

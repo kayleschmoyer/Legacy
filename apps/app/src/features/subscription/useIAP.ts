@@ -27,7 +27,7 @@ import {
   useGetMySubscriptionQuery,
   useRestoreApplePurchasesMutation,
   useVerifyApplePurchaseMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 /**
  * Minimal interface for the subscription handle returned by react-native-iap

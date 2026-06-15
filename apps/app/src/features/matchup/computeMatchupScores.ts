@@ -6,7 +6,7 @@ import {
 import {
   type AppMatchupFragment,
   type AppMatchupPlayerFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { type ScoringSettings } from '../../common/scoring';
 import {
   mapBattingStats,

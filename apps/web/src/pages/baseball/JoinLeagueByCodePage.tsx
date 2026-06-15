@@ -9,16 +9,16 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  useJoinLeagueByCodeMutation,
+  useValidateInviteCodeLazyQuery,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-import {
-  useJoinLeagueByCodeMutation,
-  useValidateInviteCodeLazyQuery,
-} from '../../api/db/graphql.generated';
 
 export function JoinLeagueByCodePage(): React.JSX.Element {
   const navigate = useNavigate();

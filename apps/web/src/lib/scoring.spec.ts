@@ -1,15 +1,15 @@
 import { act, renderHook } from '@testing-library/react';
+import { ScoringStatGroup } from '@legacy-sports/graphql';
 import {
   applyMultiplierGroups,
   createDefaultScoringSettings,
   useLeagueScoringSettings,
 } from './scoring';
-import { ScoringStatGroup } from '../api/db/graphql.generated';
 
-jest.mock('../api/db/graphql.generated', () => {
-  const actual = jest.requireActual<
-    typeof import('../api/db/graphql.generated')
-  >('../api/db/graphql.generated');
+jest.mock('@legacy-sports/graphql', () => {
+  const actual = jest.requireActual<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
   return {
     ...actual,
     useGetLeagueScoringProfileQuery: jest.fn(),
@@ -17,7 +17,7 @@ jest.mock('../api/db/graphql.generated', () => {
 });
 
 const { useGetLeagueScoringProfileQuery } = jest.requireMock(
-  '../api/db/graphql.generated',
+  '@legacy-sports/graphql',
 );
 
 describe('applyMultiplierGroups', () => {

@@ -1,7 +1,7 @@
 import React from 'react';
+import type { TradeOfferFragment } from '@legacy-sports/graphql';
 import { getVerdict, PremiumTradeTools, tradeValue } from './PremiumTradeTools';
 import { render } from '../../test-utils';
-import type { TradeOfferFragment } from '../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Helpers

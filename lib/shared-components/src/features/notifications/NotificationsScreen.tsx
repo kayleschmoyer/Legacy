@@ -12,10 +12,10 @@ import {
 } from 'tamagui';
 import { Bell } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { type NotificationHistoryItem } from '@legacy-sports/graphql';
 import { NotificationList } from './components/NotificationList';
 import { NotificationSettings } from './components/NotificationSettings';
 import { useNotifications } from './hooks/useNotifications';
-import { type NotificationHistoryItem } from '../../api/db/graphql.generated';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
 

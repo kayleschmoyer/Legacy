@@ -3,7 +3,7 @@ import {
   useGetMatchupByIdQuery,
   useGetMatchupsByWeekQuery,
   useGetMatchupsForLeagueQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 /**
  * Hook for fetching a single matchup by ID

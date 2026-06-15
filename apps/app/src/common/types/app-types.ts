@@ -4,7 +4,7 @@
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // Event handler types for form events
 export type FormEventHandler = (event: {

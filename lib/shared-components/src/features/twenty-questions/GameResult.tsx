@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Paragraph, Text, YStack } from 'tamagui';
-import { TwentyQuestionsStatus } from '../../api/db/graphql.generated';
+import { TwentyQuestionsStatus } from '@legacy-sports/graphql';
 
 interface TargetPlayer {
   id?: number | null;

@@ -14,7 +14,7 @@ import {
   useGetLeagueDuesStatusQuery,
   useMarkMemberPaidMutation,
   useMarkMemberUnpaidMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export interface LeagueDuesPaymentStatusProps {
   leagueId: number;

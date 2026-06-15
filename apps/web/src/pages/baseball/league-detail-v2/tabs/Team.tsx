@@ -4,7 +4,7 @@ import {
   type LeagueFragment,
   type TeamFragment,
   useGetTeamMembersQuery,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { colorFromString, Empty, initialsFromName, Section } from '../Shared';
 import { I } from '../Icons';
 

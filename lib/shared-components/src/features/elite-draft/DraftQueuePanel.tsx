@@ -6,7 +6,7 @@ import {
   type GetMyDraftQueueQueryVariables,
   RemoveFromDraftQueue as REMOVE_FROM_DRAFT_QUEUE,
   ReorderDraftQueue as REORDER_DRAFT_QUEUE,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // ---------------------------------------------------------------------------
 // DraftQueuePanel

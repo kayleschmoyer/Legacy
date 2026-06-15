@@ -1,0 +1,88 @@
+fragment CareerBattingStats on CareerBatting {
+  atBats
+  baseOnBalls
+  caughtStealing
+  doubles
+  games
+  groundedIntoDoublePlays
+  hits
+  hitByPitch
+  homeRuns
+  intentionalBaseOnBalls
+  plateAppearances
+  runs
+  rbi
+  stolenBases
+  sacrificeHits
+  strikeouts
+  totalBases
+  triples
+  battingAverage
+  onBasePercentage
+  sluggingPercentage
+  playerId
+}
+
+fragment CareerFieldingStats on CareerFielding {
+  assists
+  completeGames
+  chances
+  caughtStealing
+  doublePlays
+  errors
+  fieldingPercentage
+  games
+  gamesStarted
+  inningsDefended
+  pickoffs
+  putouts
+  positions
+  stolenBases
+  wildPitches
+  playerId
+}
+
+fragment CareerPitchingStats on CareerPitching {
+  battersFaced
+  baseOnBalls
+  balks
+  completeGames
+  earnedRuns
+  era
+  games
+  gamesFinished
+  gamesStarted
+  hits
+  hitByPitch
+  homeRuns
+  intentionalBaseOnBalls
+  losses
+  outRate
+  outsRecorded
+  runs
+  shutouts
+  strikeouts
+  saves
+  wins
+  wildPitches
+  winPercentage
+  playerId
+}
+
+query GetCareerFieldingStats {
+  careerFieldingStats {
+    ...CareerFieldingStats
+  }
+}
+
+query GetPlayerCareerStats($playerId: Int!) {
+  batting: playerCareerBatting(playerId: $playerId) {
+    ...CareerBattingStats
+  }
+  fielding: playerCareerFielding(playerId: $playerId) {
+    ...CareerFieldingStats
+  }
+  pitching: playerCareerPitching(playerId: $playerId) {
+    ...CareerPitchingStats
+  }
+}

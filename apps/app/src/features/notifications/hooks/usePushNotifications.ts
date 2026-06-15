@@ -17,7 +17,7 @@ import type { EventSubscription } from 'expo-modules-core';
 import { useRouter } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import { PermissionStatus } from 'expo-modules-core';
-import { useRegisterDeviceTokenMutation } from '../../../api/db/graphql.generated';
+import { useRegisterDeviceTokenMutation } from '@legacy-sports/graphql';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 import { getEasProjectId } from '../getEasProjectId';
 

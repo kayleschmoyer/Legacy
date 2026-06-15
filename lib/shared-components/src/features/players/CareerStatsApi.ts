@@ -6,7 +6,7 @@ import {
   GetCareerBattingStatsQuery,
   GetCareerBattingStatsQueryVariables,
   useGetCareerBattingStatsQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // Use generated types instead of manual interfaces
 export type CareerBattingStats = CareerBattingFragment;

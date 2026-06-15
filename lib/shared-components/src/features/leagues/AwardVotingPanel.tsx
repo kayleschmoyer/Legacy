@@ -17,18 +17,18 @@ import {
 } from 'tamagui';
 import { Award, Check } from '@tamagui/lucide-icons';
 import {
-  BRAND_GOLD,
-  BRAND_NAVY_LIGHT,
-  GREEN,
-  withAlpha,
-} from '../../utils/colors';
-import {
   useCastAwardVoteMutation,
   useGetAwardVoteResultsQuery,
   useGetAwardVotingPeriodQuery,
   useGetMyAwardVotesQuery,
   useGetPlayersWithStatsQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import {
+  BRAND_GOLD,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  withAlpha,
+} from '../../utils/colors';
 
 // ─── Award definitions (same as commissioner) ────────────────────────────────
 

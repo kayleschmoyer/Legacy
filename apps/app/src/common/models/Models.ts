@@ -5,7 +5,7 @@ import {
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export { ALLOWED_POSITIONS, PITCHING_POSITIONS };
 

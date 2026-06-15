@@ -1,8 +1,0 @@
-fragment AppPlayer on Player {
-  id
-  firstName
-  lastName
-  brefId
-}
-
-# PlayerEligiblePosition type not available in current schema

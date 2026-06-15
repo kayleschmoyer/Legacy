@@ -12,7 +12,7 @@ import {
   useGetLeagueTeamsForDmQuery,
   useGetUserLeaguesQuery,
   useSendDirectMessageMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 
 const MESSAGE_MAX_LENGTH = 2000;

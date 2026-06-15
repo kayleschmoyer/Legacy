@@ -18,7 +18,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 const mockMutation = jest.fn(() =>
   Promise.resolve({ data: { deleteAllLeagues: 'ok' } }),
 );
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useDeleteAllLeaguesMutation: () => [
     mockMutation,
     { loading: false, error: undefined },

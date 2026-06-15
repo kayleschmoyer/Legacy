@@ -14,7 +14,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetLeagueDuesSettingsQuery,
   useUpdateDuesSettingsMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 export function parseDollarsToCents(value: string): number {
   const s = (value ?? '').trim();

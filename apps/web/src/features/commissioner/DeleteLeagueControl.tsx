@@ -10,7 +10,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { useDeleteLeagueMutation } from '../../api/db/graphql.generated';
+import { useDeleteLeagueMutation } from '@legacy-sports/graphql';
 
 export interface DeleteLeagueControlProps {
   leagueId: number;

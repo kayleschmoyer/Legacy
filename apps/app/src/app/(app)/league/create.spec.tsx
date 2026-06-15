@@ -92,7 +92,7 @@ jest.mock('tamagui', () => {
 
 const mockCreateLeagueMutate = jest.fn();
 const mockCreateLeagueState = { loading: false, error: undefined };
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Football: 'football' },
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   useCreateLeagueMutation: (options?: {

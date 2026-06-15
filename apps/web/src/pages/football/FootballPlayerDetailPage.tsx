@@ -9,7 +9,7 @@ import {
 } from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/web';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { useFootballPlayerQuery } from '../../api/db/graphql.generated';
+import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useHasEntitlement } from '../../hooks/useIsPremium';

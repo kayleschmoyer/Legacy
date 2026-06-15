@@ -28,14 +28,14 @@ import {
   computeScoring,
   DEFAULT_PITCHING_SCORING,
 } from '@legacy-sports/scoring';
-import { getPageRange } from './paginationUtils';
-import { formatPositionsPlayed } from './services/CareerStatsService';
 import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
   useGetCareerPitchingStatsCountQuery,
   useGetCareerPitchingStatsQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { getPageRange } from './paginationUtils';
+import { formatPositionsPlayed } from './services/CareerStatsService';
 
 // ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
 const BRAND_NAVY = '#1B3A5C';

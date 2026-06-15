@@ -20,7 +20,7 @@ import { AlertTriangle, Edit3, Info, Lock } from '@tamagui/lucide-icons';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import type { PlayerMatchupData } from '../../pages/baseball/LeagueDetailPage';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
 import {

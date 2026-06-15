@@ -1,0 +1,8 @@
+query GetPositionsForLeague($leagueId: Int!) {
+  leaguePositions(leagueId: $leagueId) {
+    ...LeaguePosition
+    id
+    leagueId
+    positionType
+  }
+}

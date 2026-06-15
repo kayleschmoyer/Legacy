@@ -6,11 +6,11 @@ import {
   ALLOWED_POSITIONS,
   PITCHING_POSITIONS,
 } from '@legacy-sports/shared-components';
-import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { normalizeNumericIdentifier } from '../../common/types/app-types';
 
 const getEligiblePositions = (player: AppTeamMemberFragment): string[] =>
   player.player?.eligiblePositions ?? [];

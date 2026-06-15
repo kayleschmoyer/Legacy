@@ -60,7 +60,7 @@ const mockUseGetUserByIdQuery = jest.fn<
   },
   [unknown?]
 >();
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useAdminGetUsersQuery: () => ({
     data: undefined,
     loading: false,

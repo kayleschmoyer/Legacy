@@ -36,7 +36,7 @@ import { Platform } from 'react-native';
 import {
   useRestoreGooglePurchasesMutation,
   useVerifyGooglePurchaseMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // Product IDs as configured in Google Play Console
 export const GOOGLE_PLAY_PRODUCTS = {

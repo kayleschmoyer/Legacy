@@ -117,7 +117,7 @@ jest.mock('tamagui', () => {
 
 const mockCreateLeague = jest.fn();
 let mockLeagueCount = 0;
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   GetUserLeagues: 'GetUserLeagues',
   Sport: { Baseball: 'baseball', Football: 'football' },
   useCreateLeagueAndTeamsMutation: jest.fn(() => [

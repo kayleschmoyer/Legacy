@@ -6,7 +6,7 @@ import {
   type AppMatchupPlayerFragment,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useLeagueScoringSettings } from '../../../common/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../common/scoring/mapGraphQLToScoringFormat';
 import { computeMatchupScores } from '../computeMatchupScores';

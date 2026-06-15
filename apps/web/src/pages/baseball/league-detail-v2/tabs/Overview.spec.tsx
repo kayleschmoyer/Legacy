@@ -15,16 +15,16 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { DuesCompact, OverviewTab, Snapshot } from './Overview';
 import {
   type GetLeagueDuesStatusQuery,
   type LeagueFragment,
   Sport,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { DuesCompact, OverviewTab, Snapshot } from './Overview';
 
 let mockData: GetLeagueDuesStatusQuery | null = null;
 
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetLeagueDuesStatusQuery: jest.fn(() => ({ data: mockData })),
   useGetLeagueStandingsQuery: jest.fn(() => ({ data: null })),
   Sport: { Baseball: 'baseball', Football: 'football' },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { type LeagueFragment } from '../../../../api/db/graphql.generated';
+import { type LeagueFragment } from '@legacy-sports/graphql';
 import { TradingCenter } from '../../../../features/baseball/TradingCenter';
 import { I } from '../Icons';
 import { Banner, Empty, Section } from '../Shared';

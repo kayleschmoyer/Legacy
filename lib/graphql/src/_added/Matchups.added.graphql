@@ -1,0 +1,220 @@
+query GetMatchupById($id: Int!) {
+  getMatchupById(id: $id) {
+    ...Matchup
+    ...AppMatchup
+  }
+}
+
+query GetCurrentWeekForLeague($leagueId: Int!) {
+  getCurrentWeekForLeague(leagueId: $leagueId)
+}
+
+query GetMatchupHistory(
+  $leagueId: Int!
+  $season: Int
+  $teamId: Int
+  $status: MatchupStatus
+  $limit: Int
+) {
+  getMatchupHistory(
+    leagueId: $leagueId
+    season: $season
+    teamId: $teamId
+    status: $status
+    limit: $limit
+  ) {
+    ...Matchup
+    ...AppMatchup
+  }
+}
+
+query GetMatchupRoster($matchupId: Int!, $teamId: Int!) {
+  getMatchupRoster(matchupId: $matchupId, teamId: $teamId) {
+    ...MatchupPlayer
+  }
+}
+
+query GetTeamMatchupHistory($leagueId: Int!, $teamId: Int!, $limit: Int) {
+  getTeamMatchupHistory(leagueId: $leagueId, teamId: $teamId, limit: $limit) {
+    ...Matchup
+  }
+}
+
+mutation UpdateMatchupPlayerPosition($matchupPlayerId: Int!, $positionId: Int) {
+  updateMatchupPlayerPosition(
+    matchupPlayerId: $matchupPlayerId
+    positionId: $positionId
+  ) {
+    ...MatchupPlayer
+    ...AppMatchupPlayer
+  }
+}
+
+mutation SwapMatchupPlayerPositions(
+  $matchupPlayerIdA: Int!
+  $positionIdA: Int
+  $matchupPlayerIdB: Int!
+  $positionIdB: Int
+) {
+  swapMatchupPlayerPositions(
+    matchupPlayerIdA: $matchupPlayerIdA
+    positionIdA: $positionIdA
+    matchupPlayerIdB: $matchupPlayerIdB
+    positionIdB: $positionIdB
+  ) {
+    ...MatchupPlayer
+    ...AppMatchupPlayer
+  }
+}
+
+fragment AppMatchup on Matchup {
+  id
+  weekNumber
+  leagueId
+  team1Id
+  team2Id
+  team1Score
+  team2Score
+  status
+  statsLoadingStatus
+  gamesPerMatchup
+  pitcherStartsPerMatchup
+  selectedGamesCount
+  startTime
+  endTime
+}
+
+fragment AppMatchupPlayer on MatchupPlayer {
+  id
+  matchupId
+  playerId
+  teamId
+  positionId
+  season
+  numberOfGames
+  player {
+    id
+    firstName
+    lastName
+    eligiblePositions
+  }
+  seasonBatting {
+    games
+    plateAppearances
+    atBats
+    runs
+    hits
+    doubles
+    triples
+    homeRuns
+    rbi
+    stolenBases
+    caughtStealing
+    baseOnBalls
+    strikeouts
+    groundedIntoDoublePlays
+    hitByPitch
+    sacrificeHits
+    intentionalBaseOnBalls
+  }
+  seasonPitching {
+    wins
+    losses
+    games
+    gamesStarted
+    gamesFinished
+    completeGames
+    shutouts
+    saves
+    inningsPitched
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    intentionalBaseOnBalls
+    strikeouts
+    hitByPitch
+    battersFaced
+    outsRecorded
+  }
+  seasonFielding {
+    games
+    inningsDefended
+    chances
+    putouts
+    assists
+    errors
+    doublePlays
+  }
+  games {
+    id
+    matchupPlayerId
+    gameNum
+    gameIdentifier
+    gamePosition
+    statsLoadingStatus
+    pitcherStartSkipped
+    battingGame {
+      playerId
+      season
+      gameNum
+      gameIdentifier
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      groundedIntoDoublePlays
+      hitByPitch
+      sacrificeHits
+      sacrificeFlies
+      intentionalBaseOnBalls
+    }
+    pitchingGame {
+      playerId
+      season
+      gameNum
+      gameIdentifier
+      wins
+      losses
+      gamesStarted
+      gamesFinished
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      intentionalBaseOnBalls
+      strikeouts
+      hitByPitch
+      battersFaced
+      outsRecorded
+    }
+    fieldingGame {
+      playerId
+      season
+      gameNum
+      gameIdentifier
+      position
+      games
+      gamesStarted
+      inningsPlayed
+      putouts
+      assists
+      errors
+      doublePlays
+    }
+  }
+}

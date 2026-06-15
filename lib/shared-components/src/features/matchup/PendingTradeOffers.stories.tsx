@@ -2,14 +2,14 @@ import type { ComponentType } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { MockedProvider } from '@apollo/client/testing/react';
 import type { MockedResponse } from '@apollo/client/testing';
-import { PendingTradeOffers } from './PendingTradeOffers';
 import {
   AcceptTrade,
   CancelTrade,
   GetTeamTradeOffers,
   type GetTeamTradeOffersQuery,
   RejectTrade,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { PendingTradeOffers } from './PendingTradeOffers';
 
 // ---------------------------------------------------------------------------
 // Mock data

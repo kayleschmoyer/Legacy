@@ -5,7 +5,7 @@ import {
   useGetAllTimeRecordsQuery,
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { I } from '../Icons';
 import {
   colorFromString,

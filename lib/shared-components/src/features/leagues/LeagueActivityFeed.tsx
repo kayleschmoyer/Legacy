@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
-import { useGetLeagueActivityQuery } from '../../api/db/graphql.generated';
+import { useGetLeagueActivityQuery } from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 export interface LeagueActivityFeedProps {

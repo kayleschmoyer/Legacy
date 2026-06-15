@@ -16,7 +16,7 @@ import {
   useFootballPlayerLeagueAvailabilityQuery,
   useFootballPlayersQuery,
   useGetUserLeaguesQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 import type { FootballPlayerSortValue } from '../../components/football/FootballPlayerSort';
 import { FootballPlayerSort } from '../../components/football/FootballPlayerSort';

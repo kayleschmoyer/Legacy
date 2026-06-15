@@ -12,7 +12,6 @@ import {
   POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components/roster';
 import { LOGGER } from '@legacy-sports/logging';
-import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
@@ -20,7 +19,8 @@ import {
   useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 import {
   useSwapMatchupPlayerPositions,
   useUpdateMatchupPlayerPosition,

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import type { CurrentDraftPickInfo } from '../types';
 import type {
   GetLeagueByIdQuery,
   GetLiveDraftLeagueDraftQuery,
-} from '../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import type { CurrentDraftPickInfo } from '../types';
 
 interface UseDraftEffectsParams {
   league: GetLeagueByIdQuery['league'];

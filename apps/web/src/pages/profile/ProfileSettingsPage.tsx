@@ -29,7 +29,7 @@ import {
   useSetCanonicalEmailMutation,
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import { AvatarPicker } from '../../components/common';
 import {
   type ThemePreference,

@@ -32,7 +32,7 @@ import {
 import {
   type GetLeagueScoringProfileQuery,
   useUpdateLeagueScoringProfileMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

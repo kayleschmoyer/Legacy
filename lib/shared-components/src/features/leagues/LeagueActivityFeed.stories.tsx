@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { MockedProvider } from '@apollo/client/testing/react';
+import { GetLeagueActivity } from '@legacy-sports/graphql';
 import { LeagueActivityFeed } from './LeagueActivityFeed';
-import { GetLeagueActivity } from '../../api/db/graphql.generated';
 
 const activityMock = {
   request: {

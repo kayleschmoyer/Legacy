@@ -15,7 +15,7 @@ import { fireEvent, render, screen } from '../../test-utils';
 
 let mockPlayers: ReadonlyArray<Record<string, unknown>> = [];
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetPlayersWithStatsQuery: jest.fn(() => ({
     data: { players: mockPlayers },
     loading: false,

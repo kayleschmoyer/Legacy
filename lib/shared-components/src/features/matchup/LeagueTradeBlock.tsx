@@ -8,15 +8,15 @@ import {
   DollarSign,
 } from '@tamagui/lucide-icons';
 import {
+  useGetLeagueTradeBlockQuery,
+  useSetTradeBlockMutation,
+} from '@legacy-sports/graphql';
+import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../utils/colors';
 import { Button } from '../../Button';
-import {
-  useGetLeagueTradeBlockQuery,
-  useSetTradeBlockMutation,
-} from '../../api/db/graphql.generated';
 
 export interface LeagueTradeBlockProps {
   leagueId: number;

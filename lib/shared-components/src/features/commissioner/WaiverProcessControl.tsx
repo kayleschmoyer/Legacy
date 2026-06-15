@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Card, Dialog, Spinner, Text, XStack, YStack } from 'tamagui';
-import { useProcessWaiverClaimsMutation } from '../../api/db/graphql.generated';
+import { useProcessWaiverClaimsMutation } from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
 export interface WaiverProcessControlProps {

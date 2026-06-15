@@ -5,6 +5,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 import { ChevronDown, ChevronUp, Trophy } from '@tamagui/lucide-icons';
+import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import {
   DROPDOWN_BORDER,
   DropdownButton,
@@ -13,7 +14,6 @@ import {
   MenuItem,
   NAV_DROPDOWN_ANIMATION,
 } from './NavDropdownShared';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 import { BRAND_SEAM_RED } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';

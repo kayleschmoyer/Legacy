@@ -10,4 +10,4 @@ export {
   GetAllPlayers as GET_ALL_PLAYERS,
   useGetAllPlayersQuery,
   useGetAllPlayersLazyQuery,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';

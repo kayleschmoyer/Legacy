@@ -21,15 +21,15 @@ import {
 } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  LeagueActivityEventType,
+  useGetLeagueActivityQuery,
+} from '@legacy-sports/graphql';
+import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-import {
-  LeagueActivityEventType,
-  useGetLeagueActivityQuery,
-} from '../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Types

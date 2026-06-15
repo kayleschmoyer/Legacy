@@ -183,7 +183,7 @@ const mockUseUpdateTeamBrandingMutation = jest.fn(() => [
   { loading: false },
 ]);
 
-jest.mock('../../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamByIdQuery: (...args: unknown[]) => mockUseGetTeamByIdQuery(...args),
   useGetUserTeamIdQuery: (...args: unknown[]) =>
     mockUseGetUserTeamIdQuery(...args),

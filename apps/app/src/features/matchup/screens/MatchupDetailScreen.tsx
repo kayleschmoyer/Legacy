@@ -8,10 +8,7 @@ import {
 } from '@legacy-sports/shared-components/matchup';
 import { MatchupRosterComparison } from '@legacy-sports/shared-components';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import {
-  MatchupStatus,
-  useGetUserTeamIdQuery,
-} from '../../../api/db/graphql.generated';
+import { MatchupStatus, useGetUserTeamIdQuery } from '@legacy-sports/graphql';
 import { MatchupRosterEditor } from '../components/MatchupRosterEditor';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../components/MatchupWinProbabilityPanel';

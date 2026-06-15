@@ -19,7 +19,7 @@ import {
   type GetLeagueScoringProfileQuery,
   ScoringStatGroup,
   useUpdateLeagueScoringProfileMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
 import {
   BLACK,
   BRAND_GOLD_LIGHT,

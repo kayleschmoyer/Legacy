@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Modal } from 'react-native';
 import { Button, Input, Spinner, View, XStack, YStack } from 'tamagui';
+import { useCreateLeagueMutation } from '@legacy-sports/graphql';
 import { addDays } from '../../common/utilities/DateUtilities';
-import { useCreateLeagueMutation } from '../../api/db/graphql.generated';
 import { Dropdown, DropdownItem } from '../../common/components/Dropdown';
 import { handleError } from '../../common/utilities/ErrorHandler';
 

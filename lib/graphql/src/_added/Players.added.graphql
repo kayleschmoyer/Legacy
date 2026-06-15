@@ -1,0 +1,6 @@
+fragment AppPlayer on Player {
+  id
+  firstName
+  lastName
+  brefId
+}

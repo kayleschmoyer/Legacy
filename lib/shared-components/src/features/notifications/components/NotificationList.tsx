@@ -11,7 +11,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons';
-import { type NotificationHistoryItem } from '../../../api/db/graphql.generated';
+import { type NotificationHistoryItem } from '@legacy-sports/graphql';
 import { groupNotificationsByDay } from '../utils/dayGrouping';
 
 export interface NotificationListProps {

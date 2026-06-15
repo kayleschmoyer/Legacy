@@ -26,7 +26,6 @@ import {
   UserMinus,
   UserPlus,
 } from '@tamagui/lucide-icons';
-import { StepUpModal } from '../StepUpModal';
 import {
   GetLeagueTeamsQuery,
   useBulkDropTeamPlayersMutation,
@@ -41,7 +40,8 @@ import {
   useSetTeamLockMutation,
   useSwapMatchupTeamsMutation,
   useUpdateCommissionerNoteMutation,
-} from '../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { StepUpModal } from '../StepUpModal';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 
 export interface CommissionerToolsControlProps {

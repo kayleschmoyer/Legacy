@@ -29,7 +29,6 @@
     "./utils": "./src/entry/utils.ts"
   },
   "scripts": {
-    "codegen": "graphql-codegen --config codegen.ts",
     "storybook": "storybook dev -p 6009 -c .storybook",
     "build-storybook": "storybook build -c .storybook -o ../../dist/storybook",
     "ui-previews": "pnpm exec nx run shared-components:ui-previews",
@@ -48,6 +47,7 @@
     "@legacy-sports/api": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "@legacy-sports/design-tokens": "workspace:*",
+    "@legacy-sports/graphql": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/tamagui-config": "workspace:*",
     "@legacy-sports/test-fixtures": "workspace:*",

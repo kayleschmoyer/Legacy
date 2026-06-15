@@ -8,7 +8,6 @@ import {
   type TeamBrandingTeam,
   UnifiedLoadingPanel,
 } from '@legacy-sports/shared-components';
-import { applyMultiplierGroups } from '../../../../common/scoring';
 import {
   AppMatchupFragment,
   AppTeamMemberFragment,
@@ -19,7 +18,8 @@ import {
   useGetTeamByIdQuery,
   useGetUserTeamIdQuery,
   useUpdateTeamMemberPositionMutation,
-} from '../../../../api/db/graphql.generated';
+} from '@legacy-sports/graphql';
+import { applyMultiplierGroups } from '../../../../common/scoring';
 import {
   isBatter,
   isBattingSlot,

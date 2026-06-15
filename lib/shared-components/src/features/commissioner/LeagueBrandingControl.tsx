@@ -12,7 +12,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Image as ImageIcon } from '@tamagui/lucide-icons';
-import { useUpdateLeagueBrandingMutation } from '../../api/db/graphql.generated';
+import { useUpdateLeagueBrandingMutation } from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 import { AvatarPicker } from '../../components/AvatarPicker';
 import { BannerPicker } from '../../components/BannerPicker';

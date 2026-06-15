@@ -35,7 +35,7 @@ jest.mock('tamagui', () => {
 
 const mockJoinLeague = jest.fn();
 const mockValidateCode = jest.fn();
-jest.mock('../../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   useJoinLeagueByCodeMutation: () => [mockJoinLeague, { loading: false }],
   useValidateInviteCodeLazyQuery: () => [mockValidateCode, { loading: false }],
 }));

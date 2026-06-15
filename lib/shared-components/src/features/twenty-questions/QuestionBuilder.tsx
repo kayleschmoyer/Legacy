@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Input, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { TwentyQuestionsCategory } from '../../api/db/graphql.generated';
+import { TwentyQuestionsCategory } from '@legacy-sports/graphql';
 
 export interface AskPayload {
   category: TwentyQuestionsCategory;

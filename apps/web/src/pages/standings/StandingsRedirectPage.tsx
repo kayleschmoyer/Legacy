@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { Spinner, Text, YStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
+import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 
 export function StandingsRedirectPage() {
   const { user, isLoading: authLoading } = useAuth();

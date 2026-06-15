@@ -15,7 +15,7 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
-jest.mock('../../api/db/graphql.generated', () => ({
+jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   GetUserLeagues: {},

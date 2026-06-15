@@ -3,7 +3,7 @@ import { YStack } from 'tamagui';
 import { Platform } from 'react-native';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
-import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
+import { useDeleteAllLeaguesMutation } from '@legacy-sports/graphql';
 import {
   BG_DARK,
   BORDER_STRONG,
