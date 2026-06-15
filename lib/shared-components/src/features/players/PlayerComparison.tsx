@@ -2004,7 +2004,9 @@ export function PlayerComparison({
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
       <View style={containerStyle}>
-        <PremiumBanner isPremium={isPremium} onUpgrade={onUpgrade} />
+        {(isPremium || onUpgrade != null) && (
+          <PremiumBanner isPremium={isPremium} onUpgrade={onUpgrade} />
+        )}
         <Masthead />
 
         <PlayerSearchInput
