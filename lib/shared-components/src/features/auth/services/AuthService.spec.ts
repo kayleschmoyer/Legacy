@@ -100,6 +100,126 @@ describe('AuthService.refreshJwt', () => {
   });
 });
 
+describe('AuthService MFA methods', () => {
+  let service: AuthService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new AuthService(testConfig);
+  });
+
+  describe('startMfaEnrollment', () => {
+    it('returns secret and otpauthUri on success', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          secret: 'ABC123',
+          otpauthUri: 'otpauth://totp/test',
+        }),
+      });
+
+      const result = await service.startMfaEnrollment();
+
+      expect(result).toEqual({
+        secret: 'ABC123',
+        otpauthUri: 'otpauth://totp/test',
+      });
+    });
+
+    it('throws with body.error message on non-ok response', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: jest.fn().mockResolvedValue({ error: 'Not authenticated' }),
+      });
+
+      await expect(service.startMfaEnrollment()).rejects.toThrow(
+        'Not authenticated',
+      );
+    });
+
+    it('throws fallback message when body has no error field', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: jest.fn().mockResolvedValue({}),
+      });
+
+      await expect(service.startMfaEnrollment()).rejects.toThrow(
+        'MFA enroll failed: 500',
+      );
+    });
+  });
+
+  describe('verifyMfaSetup', () => {
+    it('resolves without error on success', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      });
+
+      await expect(service.verifyMfaSetup('123456')).resolves.toBeUndefined();
+    });
+
+    it('throws with body.error message on invalid code', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: jest.fn().mockResolvedValue({ error: 'Invalid code' }),
+      });
+
+      await expect(service.verifyMfaSetup('000000')).rejects.toThrow(
+        'Invalid code',
+      );
+    });
+
+    it('throws fallback message when body has no error field', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: jest.fn().mockResolvedValue({}),
+      });
+
+      await expect(service.verifyMfaSetup('123456')).rejects.toThrow(
+        'MFA verify failed: 400',
+      );
+    });
+  });
+
+  describe('disableMfa', () => {
+    it('resolves without error on success', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      });
+
+      await expect(service.disableMfa()).resolves.toBeUndefined();
+    });
+
+    it('throws with body.error message on non-ok response', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: jest.fn().mockResolvedValue({ error: 'Forbidden' }),
+      });
+
+      await expect(service.disableMfa()).rejects.toThrow('Forbidden');
+    });
+
+    it('throws fallback message when body has no error field', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: jest.fn().mockResolvedValue({}),
+      });
+
+      await expect(service.disableMfa()).rejects.toThrow(
+        'MFA disable failed: 500',
+      );
+    });
+  });
+});
+
 describe('AuthService.unlinkProvider', () => {
   let service: AuthService;
 

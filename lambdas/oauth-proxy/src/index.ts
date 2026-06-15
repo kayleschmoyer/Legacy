@@ -49,7 +49,12 @@ import {
   handleImpersonate,
   handleStopImpersonate,
 } from './handlers/Impersonate';
-import { handleMfaEnroll, handleMfaVerifySetup } from './handlers/Mfa';
+import {
+  handleMfaDisable,
+  handleMfaEnroll,
+  handleMfaStatus,
+  handleMfaVerifySetup,
+} from './handlers/Mfa';
 import { handleStepUpVerify } from './handlers/StepUp';
 import { withRateLimit } from './util/rate-limit';
 import { describeErrorCause, sanitizeHeaders } from './util/lambda';
@@ -279,8 +284,10 @@ const baseOAuthHandler = async (
               '/oauth/discord/link (link Discord to existing account)',
               '/oauth/discord/unlink (unlink Discord from account)',
               '/oauth/step-up/verify (re-authenticate before sensitive actions)',
+              '/oauth/mfa/status (get TOTP enrollment status)',
               '/oauth/mfa/enroll (begin TOTP enrollment)',
               '/oauth/mfa/verify-setup (confirm TOTP enrollment)',
+              '/oauth/mfa/disable (disable TOTP 2FA)',
             ],
             security:
               'New users are automatically created on first OAuth login with default access level',
@@ -486,6 +493,18 @@ const baseOAuthHandler = async (
         }
         break;
 
+      case '/oauth/mfa/status':
+      case '/dev/oauth/mfa/status':
+        if (event.httpMethod === 'GET') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.mfa.status', ...AUTH_RATE_LIMIT },
+            () => handleMfaStatus(event),
+          );
+          return cors(result);
+        }
+        break;
+
       case '/oauth/mfa/enroll':
       case '/dev/oauth/mfa/enroll':
         if (event.httpMethod === 'POST') {
@@ -505,6 +524,18 @@ const baseOAuthHandler = async (
             event,
             { route: 'oauth.mfa.verify-setup', ...AUTH_RATE_LIMIT },
             () => handleMfaVerifySetup(event),
+          );
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/mfa/disable':
+      case '/dev/oauth/mfa/disable':
+        if (event.httpMethod === 'POST') {
+          const result = await withRateLimit(
+            event,
+            { route: 'oauth.mfa.disable', ...AUTH_RATE_LIMIT },
+            () => handleMfaDisable(event),
           );
           return cors(result);
         }

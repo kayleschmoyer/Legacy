@@ -152,6 +152,54 @@ export const handleMfaEnroll = async (
 };
 
 /**
+ * GET /oauth/mfa/status
+ *
+ * Returns the MFA enrollment state for the authenticated user.
+ *
+ * Auth: ls_jwt cookie (+ CSRF) or Authorization: Bearer <jwt>.
+ * Response: { mfaEnabled: boolean }.
+ */
+export const handleMfaStatus = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  LOGGER.debug('handleMfaStatus: starting');
+
+  const auth = await authenticateUser(event);
+  if (!auth.ok) return auth.response;
+  const { id: userId } = auth.user;
+
+  return await withDbClient(async (db) => {
+    const mfa = await getUserMfa(db, userId);
+    return jsonResponse(200, { mfaEnabled: mfa?.mfaEnabled ?? false });
+  });
+};
+
+/**
+ * POST /oauth/mfa/disable
+ *
+ * Disables TOTP 2FA for the authenticated user. Clears the stored secret
+ * and sets mfa_enabled = false.
+ *
+ * Auth: ls_jwt cookie (+ CSRF) or Authorization: Bearer <jwt>.
+ * Response: { success: true }.
+ */
+export const handleMfaDisable = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  LOGGER.debug('handleMfaDisable: starting');
+
+  const auth = await authenticateUser(event);
+  if (!auth.ok) return auth.response;
+  const { id: userId } = auth.user;
+
+  return await withDbClient(async (db) => {
+    await setUserMfa(db, userId, { mfaEnabled: false, totpSecret: null });
+    LOGGER.info('handleMfaDisable: MFA disabled', { userId });
+    return jsonResponse(200, { success: true });
+  });
+};
+
+/**
  * POST /oauth/mfa/verify-setup
  *
  * Confirms TOTP enrollment for the authenticated user. Enables MFA only when

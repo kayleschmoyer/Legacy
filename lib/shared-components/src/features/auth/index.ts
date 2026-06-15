@@ -32,6 +32,8 @@ export type {
   DiscordAuthExchangeResult,
 } from './services/discordAuthExchange';
 export * from './EnhancedAuthGuard';
+export { useMfa } from './hooks/useMfa';
+export type { UseMfaResult, MfaEnrollData } from './hooks/useMfa';
 
 // Platform types (convenience re-exports)
 export type {

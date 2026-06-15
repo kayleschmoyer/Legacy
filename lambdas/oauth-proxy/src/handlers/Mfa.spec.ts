@@ -2,7 +2,12 @@ import { APIGatewayEvent } from 'aws-lambda';
 import { verify } from 'jsonwebtoken';
 import { authenticator } from 'otplib';
 import { getUserMfa, setUserMfa } from '@legacy-sports/db-client';
-import { handleMfaEnroll, handleMfaVerifySetup } from './Mfa';
+import {
+  handleMfaDisable,
+  handleMfaEnroll,
+  handleMfaStatus,
+  handleMfaVerifySetup,
+} from './Mfa';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -47,12 +52,21 @@ const mockSetUserMfa = jest.mocked(setUserMfa);
 // (not unbound class methods), avoiding @typescript-eslint/unbound-method.
 const mockAuth = jest.mocked(authenticator);
 
-/** Build a Bearer-authenticated event with the given JSON body. */
+/** Build a Bearer-authenticated POST event with the given JSON body. */
 function makeEvent(body?: unknown): APIGatewayEvent {
   return {
     httpMethod: 'POST',
     headers: { Authorization: 'Bearer valid-jwt' },
     body: body === undefined ? null : JSON.stringify(body),
+  } as unknown as APIGatewayEvent;
+}
+
+/** Build a Bearer-authenticated GET event. */
+function makeGetEvent(): APIGatewayEvent {
+  return {
+    httpMethod: 'GET',
+    headers: { Authorization: 'Bearer valid-jwt' },
+    body: null,
   } as unknown as APIGatewayEvent;
 }
 
@@ -174,6 +188,70 @@ describe('handleMfaVerifySetup', () => {
       httpMethod: 'POST',
       headers: {},
       body: JSON.stringify({ code: '123456' }),
+    } as unknown as APIGatewayEvent);
+
+    expect(result.statusCode).toBe(401);
+    expect(mockSetUserMfa).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleMfaStatus', () => {
+  it('returns mfaEnabled: true when MFA is enabled', async () => {
+    mockGetUserMfa.mockResolvedValue({ mfaEnabled: true, totpSecret: 'SEC' });
+
+    const result = await handleMfaStatus(makeGetEvent());
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toEqual({ mfaEnabled: true });
+  });
+
+  it('returns mfaEnabled: false when MFA is disabled', async () => {
+    mockGetUserMfa.mockResolvedValue({ mfaEnabled: false, totpSecret: null });
+
+    const result = await handleMfaStatus(makeGetEvent());
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toEqual({ mfaEnabled: false });
+  });
+
+  it('returns mfaEnabled: false when the user has no MFA record', async () => {
+    mockGetUserMfa.mockResolvedValue(null);
+
+    const result = await handleMfaStatus(makeGetEvent());
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toEqual({ mfaEnabled: false });
+  });
+
+  it('returns 401 when the request is unauthenticated', async () => {
+    const result = await handleMfaStatus({
+      httpMethod: 'GET',
+      headers: {},
+      body: null,
+    } as unknown as APIGatewayEvent);
+
+    expect(result.statusCode).toBe(401);
+    expect(mockGetUserMfa).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleMfaDisable', () => {
+  it('clears the TOTP secret and sets mfa_enabled = false', async () => {
+    const result = await handleMfaDisable(makeEvent());
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toEqual({ success: true });
+    expect(mockSetUserMfa).toHaveBeenCalledWith(expect.anything(), 7, {
+      mfaEnabled: false,
+      totpSecret: null,
+    });
+  });
+
+  it('returns 401 when the request is unauthenticated', async () => {
+    const result = await handleMfaDisable({
+      httpMethod: 'POST',
+      headers: {},
+      body: null,
     } as unknown as APIGatewayEvent);
 
     expect(result.statusCode).toBe(401);

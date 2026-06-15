@@ -29,7 +29,7 @@ const MOCK_USER_DATA = {
     __typename: 'User',
     id: 1,
     username: 'testuser',
-    email: 'testuser@example.com',
+    email: 'e2e-test@legacysports.dev',
     avatarUrl: null,
     accessLevel: 'none',
     subscriptionTier: null,
@@ -309,7 +309,7 @@ const MOCK_IDENTITIES_GOOGLE_CANONICAL = [
     __typename: 'UserIdentity',
     id: 1,
     provider: 'google',
-    providerEmail: 'testuser@example.com',
+    providerEmail: 'e2e-test@legacysports.dev',
     providerEmailVerified: true,
     providerUsername: null,
     providerAvatar: null,
@@ -322,7 +322,7 @@ const MOCK_IDENTITIES_MULTI = [
     __typename: 'UserIdentity',
     id: 1,
     provider: 'google',
-    providerEmail: 'testuser@example.com',
+    providerEmail: 'e2e-test@legacysports.dev',
     providerEmailVerified: true,
     providerUsername: null,
     providerAvatar: null,
@@ -546,6 +546,267 @@ test.describe('Profile Settings Page — accessibility @regression', () => {
 
     await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
       { timeout: 15_000 },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-7833: Two-Factor Authentication section — enable/disable 2FA flow
+// ---------------------------------------------------------------------------
+
+// Route MFA traffic through the static server port so the _apiIsolation
+// catch-all (which blocks everything not on port 4280) doesn't swallow
+// these requests before the per-test handlers can fulfill them.
+const E2E_ORIGIN = `http://localhost:${process.env['E2E_PORT'] ?? 4280}`;
+const MFA_STATUS_URL = `${E2E_ORIGIN}/mfa/status`;
+const MFA_ENROLL_URL = `${E2E_ORIGIN}/mfa/enroll`;
+const MFA_VERIFY_URL = `${E2E_ORIGIN}/mfa/verify-setup`;
+const MFA_DISABLE_URL = `${E2E_ORIGIN}/mfa/disable`;
+
+async function setupMfaRoutes(
+  page: import('@playwright/test').Page,
+  { mfaEnabled }: { mfaEnabled: boolean },
+) {
+  // Inject the override before any scripts run so getMfaStatus() uses the
+  // same origin as the static server (port 4280), bypassing the catch-all.
+  await page.addInitScript((origin: string) => {
+    window.__e2eOauthProxyUrl = origin;
+  }, E2E_ORIGIN);
+
+  await page.route(MFA_STATUS_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ mfaEnabled }),
+    }),
+  );
+}
+
+test.describe('Profile Settings — Two-Factor Authentication @regression', () => {
+  test('shows the Two-Factor Authentication section', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: false });
+    await page.goto('/profile/settings');
+
+    await expect(page.getByText('Two-Factor Authentication')).toBeVisible();
+    await expect(
+      page.getByText('Add an extra layer of security to your account'),
+    ).toBeVisible();
+  });
+
+  test('shows Enable 2FA button when MFA is disabled', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: false });
+    await page.goto('/profile/settings');
+
+    await expect(page.getByRole('button', { name: /Enable 2FA/i })).toBeVisible(
+      { timeout: 10_000 },
+    );
+    await expect(
+      page.getByRole('button', { name: /Disable 2FA/i }),
+    ).not.toBeVisible();
+  });
+
+  test('shows QR code and verification input after clicking Enable 2FA', async ({
+    page,
+  }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: false });
+
+    await page.route(MFA_ENROLL_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauthUri:
+            'otpauth://totp/Legacy%20Sports:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Legacy%20Sports',
+        }),
+      }),
+    );
+
+    await page.goto('/profile/settings');
+
+    const enableBtn = page.getByRole('button', { name: /Enable 2FA/i });
+    await expect(enableBtn).toBeVisible({ timeout: 10_000 });
+    await enableBtn.click();
+
+    await expect(page.getByTestId('2fa-enroll-flow')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('2fa-code-input')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Verify/i })).toBeVisible();
+  });
+
+  test('shows enrollment error when verify-setup returns invalid code', async ({
+    page,
+  }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: false });
+
+    await page.route(MFA_ENROLL_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauthUri: 'otpauth://totp/Legacy%20Sports:user@example.com',
+        }),
+      }),
+    );
+    await page.route(MFA_VERIFY_URL, (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Invalid code' }),
+      }),
+    );
+
+    await page.goto('/profile/settings');
+
+    await page.getByRole('button', { name: /Enable 2FA/i }).click();
+    await expect(page.getByTestId('2fa-code-input')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await page.getByTestId('2fa-code-input').fill('000000');
+    await page.getByRole('button', { name: /Verify/i }).click();
+
+    await expect(page.getByRole('alert')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('alert')).toHaveText('Invalid code');
+  });
+
+  test('shows Disable 2FA button when MFA is enabled', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: true });
+    await page.goto('/profile/settings');
+
+    await expect(
+      page.getByRole('button', { name: /Disable 2FA/i }),
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('returns to disabled state after disabling 2FA', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: true });
+
+    await page.route(MFA_DISABLE_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      }),
+    );
+
+    await page.goto('/profile/settings');
+
+    const disableBtn = page.getByRole('button', { name: /Disable 2FA/i });
+    await expect(disableBtn).toBeVisible({ timeout: 10_000 });
+
+    page.once('dialog', (dialog) => void dialog.accept());
+    await disableBtn.click();
+
+    // useMfa sets mfaEnabled: false directly on success, so the Enable button
+    // should appear without a page reload.
+    await expect(page.getByRole('button', { name: /Enable 2FA/i })).toBeVisible(
+      { timeout: 10_000 },
+    );
+  });
+
+  test('flips to Enabled state after successful enrollment with valid code', async ({
+    page,
+  }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: false });
+
+    await page.route(MFA_ENROLL_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauthUri:
+            'otpauth://totp/Legacy%20Sports:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Legacy%20Sports',
+        }),
+      }),
+    );
+    await page.route(MFA_VERIFY_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{}',
+      }),
+    );
+
+    await page.goto('/profile/settings');
+
+    await page.getByRole('button', { name: /Enable 2FA/i }).click();
+    await expect(page.getByTestId('2fa-code-input')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await page.getByTestId('2fa-code-input').fill('123456');
+    await page.getByRole('button', { name: /Verify/i }).click();
+
+    // useMfa.verifySetup sets mfaEnabled: true on success — Disable button must appear.
+    await expect(
+      page.getByRole('button', { name: /Disable 2FA/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByRole('button', { name: /Enable 2FA/i }),
+    ).not.toBeVisible();
+  });
+
+  test('full cycle: enables 2FA then disables it in the same session', async ({
+    page,
+  }) => {
+    await setupProfileGraphQL(page);
+    await setupMfaRoutes(page, { mfaEnabled: false });
+
+    await page.route(MFA_ENROLL_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauthUri:
+            'otpauth://totp/Legacy%20Sports:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Legacy%20Sports',
+        }),
+      }),
+    );
+    await page.route(MFA_VERIFY_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{}',
+      }),
+    );
+    await page.route(MFA_DISABLE_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      }),
+    );
+
+    await page.goto('/profile/settings');
+
+    // — Enable phase —
+    await page.getByRole('button', { name: /Enable 2FA/i }).click();
+    await expect(page.getByTestId('2fa-code-input')).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByTestId('2fa-code-input').fill('123456');
+    await page.getByRole('button', { name: /Verify/i }).click();
+    await expect(
+      page.getByRole('button', { name: /Disable 2FA/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // — Disable phase —
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.getByRole('button', { name: /Disable 2FA/i }).click();
+    await expect(page.getByRole('button', { name: /Enable 2FA/i })).toBeVisible(
+      { timeout: 10_000 },
     );
   });
 });

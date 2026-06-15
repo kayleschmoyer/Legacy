@@ -13,10 +13,15 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { AuthService, useAuth } from '@legacy-sports/shared-components/auth';
+import {
+  AuthService,
+  useAuth,
+  useMfa,
+} from '@legacy-sports/shared-components/auth';
 import { BrandIcon } from '@legacy-sports/shared-components/icons';
 import { Input, ScrollView, Spinner, styled, Theme } from 'tamagui';
 import { Monitor, Moon, Sun } from '@tamagui/lucide-icons';
+import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
 import {
   useGetUserByIdQuery,
@@ -266,6 +271,8 @@ const ProfileSettingsPage: React.FC = () => {
   const userName = user?.username ?? '';
   const userImage = user?.picture ?? null;
   const accessLevel = user?.accessLevel ?? 'none';
+
+  const mfa = useMfa(authService);
 
   const { data: userData, refetch: refetchUser } = useGetUserByIdQuery({
     variables: { id: user?.id ?? 0 },
@@ -866,6 +873,36 @@ const ProfileSettingsPage: React.FC = () => {
                     </XStack>
                   </FieldRow>
                 </YStack>
+              </SectionBody>
+            </SectionCard>
+
+            {/* ── Two-Factor Authentication ── */}
+            <SectionCard
+              data-testid="profile-2fa-section"
+              style={{
+                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
+              }}
+            >
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={16} lineHeight={18}>
+                    <span role="img" aria-label="two-factor authentication">
+                      🛡️
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    Two-Factor Authentication
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Add an extra layer of security to your account
+                  </Paragraph>
+                </YStack>
+              </SectionHeader>
+
+              <SectionBody>
+                <TwoFactorSection mfa={mfa} />
               </SectionBody>
             </SectionCard>
 

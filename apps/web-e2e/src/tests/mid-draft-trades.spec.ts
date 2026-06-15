@@ -283,7 +283,7 @@ async function mockDraftGraphQL(
           },
         }),
       });
-    } else if (opName.includes('getleaguedraft') || opName === 'getdraft') {
+    } else if (opName === 'getleaguedraft' || opName === 'getdraft') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -358,6 +358,12 @@ async function mockDraftGraphQL(
         }),
       });
       // --- League queries ---
+    } else if (opName === 'getleaguebyid' || opName === 'getleague') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+      });
     } else if (opName.includes('getleagueteams')) {
       await route.fulfill({
         status: 200,
@@ -406,7 +412,7 @@ async function mockDraftGraphQL(
           },
         }),
       });
-    } else if (opName.includes('getautopick')) {
+    } else if (opName.includes('autopick')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

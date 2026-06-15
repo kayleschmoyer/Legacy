@@ -460,8 +460,6 @@ test.describe('Form field accessibility @regression', () => {
           });
         },
       );
-
-      // The profile settings page renders display-only field rows by default;
       // form inputs are revealed by clicking the inline Edit affordance on the
       // username row. Trigger Edit mode so the editable Input is in the DOM
       // before we audit form-field accessibility.

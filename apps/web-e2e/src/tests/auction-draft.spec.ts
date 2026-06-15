@@ -425,9 +425,9 @@ test.describe('Auction Draft Board — budget display @regression', () => {
     );
 
     // Auction Draft Room heading
-    await expect(
-      page.getByRole('region', { name: /auction draft room/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Auction Draft Room')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Budget Tracker section
     await expect(page.getByText('Budget Tracker')).toBeVisible();
@@ -451,9 +451,9 @@ test.describe('Auction Draft — nomination & bid interface @regression', () => 
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByRole('region', { name: /auction draft room/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Auction Draft Room')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Nomination prompt (NominationPanel heading — exact match avoids the "!" variant)
     await expect(
@@ -474,9 +474,9 @@ test.describe('Auction Draft — nomination & bid interface @regression', () => 
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByRole('region', { name: /auction draft room/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Auction Draft Room')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Player name on the block
     await expect(page.getByText('Mike Trout')).toBeVisible();
@@ -537,9 +537,9 @@ test.describe('Auction Draft — budget tracking updates @regression', () => {
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByRole('region', { name: /auction draft room/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Auction Draft Room')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Initial budget for Bid Warriors: $200
     await expect(page.getByText('$200').first()).toBeVisible();
@@ -561,9 +561,9 @@ test.describe('Auction Draft — outbid notification @regression', () => {
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByRole('region', { name: /auction draft room/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Auction Draft Room')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Player still on the block
     await expect(page.getByText('Mike Trout')).toBeVisible();
@@ -603,9 +603,9 @@ test.describe('Auction Draft — outbid notification @regression', () => {
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByRole('region', { name: /auction draft room/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Auction Draft Room')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Current bid amount
     await expect(page.getByText('$20').first()).toBeVisible();

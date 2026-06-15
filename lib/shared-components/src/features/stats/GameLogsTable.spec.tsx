@@ -161,6 +161,12 @@ describe('validateDateRange', () => {
     expect(result.ready).toBe(false);
     expect(result.error).toMatch(/future/i);
   });
+
+  it('rejects a future start date even when end date is empty (LS-7452)', () => {
+    const result = validateDateRange('2099-12-31', '', FIXED_TODAY);
+    expect(result.ready).toBe(false);
+    expect(result.error).toMatch(/Start date cannot be in the future/i);
+  });
 });
 
 describe('reshapeGameLogs (LS-7472)', () => {

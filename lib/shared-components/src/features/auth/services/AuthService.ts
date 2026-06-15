@@ -976,7 +976,95 @@ export class AuthService {
     return result.user;
   }
 
-  // ─── Server-side logout ─────────────────────────────────────────────────────
+  // ─── TOTP / MFA ─────────────────────────────────────────────────────────
+
+  /** Return the current MFA enrollment state for the authenticated user. */
+  async getMfaStatus(): Promise<{ mfaEnabled: boolean }> {
+    const headers: Record<string, string> = {};
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/mfa/status`, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`MFA status check failed: ${response.status}`);
+    }
+    return response.json() as Promise<{ mfaEnabled: boolean }>;
+  }
+
+  /** Begin TOTP enrollment. Returns the otpauth URI (for a QR code) and raw secret. */
+  async startMfaEnrollment(): Promise<{ secret: string; otpauthUri: string }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/mfa/enroll`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      throw new Error(body.error ?? `MFA enroll failed: ${response.status}`);
+    }
+    return response.json() as Promise<{ secret: string; otpauthUri: string }>;
+  }
+
+  /** Verify a TOTP code to complete enrollment and enable MFA. */
+  async verifyMfaSetup(code: string): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/mfa/verify-setup`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      throw new Error(body.error ?? `MFA verify failed: ${response.status}`);
+    }
+  }
+
+  /** Disable TOTP 2FA for the authenticated user. */
+  async disableMfa(): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/mfa/disable`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      throw new Error(body.error ?? `MFA disable failed: ${response.status}`);
+    }
+  }
+
+  // ─── Server-side logout ─────────────────────────────────────────────────
 
   /**
    * Call the server logout endpoint to clear HttpOnly cookies.
