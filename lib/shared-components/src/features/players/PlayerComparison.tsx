@@ -1884,16 +1884,12 @@ export function PlayerComparison({
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : null;
     });
-    const eraQualifyingCount = eraNums.filter((n) => n != null).length;
     baseRows.push({
       label: 'ERA',
       desc: 'Min. 50 IP required',
       lowerIsBetter: true,
       vals: eraNums.map((n) => (n != null ? n.toFixed(2) : '—')),
-      // Suppress BEST/TIE when fewer than 2 pitchers clear the qualifier —
-      // bestIndex on a single value crowns the sole qualifier with nothing
-      // to compare against (regression from LS-7000 removing the <2 guard).
-      nums: eraQualifyingCount >= 2 ? eraNums : eraNums.map(() => null),
+      nums: eraNums,
     });
     const whipNums = activePlayers.map((p) => {
       const n = p.summary.careerPitching?.whip;
@@ -2044,7 +2040,11 @@ export function PlayerComparison({
           <View>
             <SectionHead
               title="Head-to-Head"
-              meta="Gold ▲ marks the leader in each row · ties show no leader"
+              meta={
+                isPremium
+                  ? 'Gold ▲ marks the leader in each row · ties show no leader'
+                  : undefined
+              }
             />
             <ComparisonTable
               players={activePlayers}

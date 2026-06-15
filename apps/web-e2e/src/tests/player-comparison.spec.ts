@@ -551,22 +551,25 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
   });
 
   freeUserTest(
-    'shows Premium Feature overlay for non-premium users',
+    'shows inline premium upgrade CTA for non-premium users (LS-7012)',
     async ({ page }) => {
-      await expect(page.getByText(/premium feature/i)).toBeVisible();
+      // PremiumGate overlay removed (LS-7012): free users now see the full page
+      // with the inline PremiumBanner instead of a blur overlay. The banner
+      // renders an "Upgrade" pill button that is always visible on the page.
+      await expect(
+        page.getByRole('button', { name: /upgrade/i }),
+      ).toBeVisible();
     },
   );
 
   freeUserTest(
-    'shows upgrade button in premium gate overlay',
+    'shows Upgrade button in the inline premium banner (LS-7012)',
     async ({ page }) => {
-      // Scope to the gate overlay: the blurred PlayerComparison behind it also
-      // renders an "Upgrade" pill (shared-components inline banner), so an
-      // unscoped /upgrade/i button query is ambiguous (LS-7843).
+      // The page-level PremiumGate overlay is removed (LS-7012); the shared-
+      // components PremiumBanner is the single "Upgrade" CTA, so no scoping
+      // to a gate testid is needed — the button is unambiguous.
       await expect(
-        page
-          .getByTestId('premium-feature-gate')
-          .getByRole('button', { name: /upgrade/i }),
+        page.getByRole('button', { name: /upgrade/i }),
       ).toBeVisible();
     },
   );

@@ -441,43 +441,43 @@ test.describe('Fantasy Scoring – requires 2+ players @regression', () => {
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 
-freeUserTest.describe('Fantasy Scoring – premium gate @regression', () => {
-  freeUserTest.beforeEach(async ({ page }) => {
-    await page.route(
-      (url) => isGraphQLEndpoint(url),
-      async (route) => {
-        if (extractOperationName(route).toLowerCase() === 'getmysubscription') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { mySubscription: null } }),
-          });
-        } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: {} }),
-          });
-        }
+freeUserTest.describe(
+  'Fantasy Scoring Projections – premium gate @regression',
+  () => {
+    freeUserTest.beforeEach(async ({ page }) => {
+      await page.route(
+        (url) => isGraphQLEndpoint(url),
+        async (route) => {
+          if (
+            extractOperationName(route).toLowerCase() === 'getmysubscription'
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ data: { mySubscription: null } }),
+            });
+          } else {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ data: {} }),
+            });
+          }
+        },
+      );
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+    });
+
+    freeUserTest(
+      'non-premium users see the inline premium upgrade CTA (LS-7012)',
+      async ({ page }) => {
+        // PremiumGate overlay removed (LS-7012): free users now see the full
+        // page. The inline PremiumBanner's Upgrade button is the premium signal.
+        await expect(
+          page.getByRole('button', { name: /upgrade/i }),
+        ).toBeVisible();
       },
     );
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-  });
-
-  freeUserTest(
-    'non-premium users see the Premium Feature gate overlay',
-    async ({ page }) => {
-      await expect(page.getByText(/premium feature/i)).toBeVisible();
-    },
-  );
-
-  freeUserTest(
-    'Fantasy Scoring rows are not accessible behind the gate',
-    async ({ page }) => {
-      await expect(
-        page.getByText('Fantasy Scoring', { exact: true }),
-      ).not.toBeVisible();
-    },
-  );
-});
+  },
+);

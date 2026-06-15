@@ -30,43 +30,45 @@ jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
 }));
 
-// PremiumGate — passthrough so the gated child renders for the authed path.
-// Props are forwarded as data attributes so tests can assert on them without
-// importing the real component (which has Stripe/router deps).
-jest.mock('../../components/PremiumGate', () => ({
-  PremiumGate: ({
-    children,
+// UpgradeModal — stubbed to expose open state and feature props for assertions.
+jest.mock('../../components/UpgradeModal', () => ({
+  UpgradeModal: ({
+    open,
     featureName,
     featureDescription,
+    onOpenChange,
   }: {
-    children: React.ReactNode;
+    open: boolean;
     featureName?: string;
     featureDescription?: string;
-  }) => (
-    <div
-      data-testid="premium-gate"
-      data-feature-name={featureName}
-      data-feature-description={featureDescription}
-    >
-      {children}
-    </div>
-  ),
+    onOpenChange?: (v: boolean) => void;
+  }) =>
+    open ? (
+      <div
+        data-testid="upgrade-modal"
+        data-feature-name={featureName}
+        data-feature-description={featureDescription}
+        onClick={() => onOpenChange?.(false)}
+      />
+    ) : null,
 }));
 
 const EXPECTED_FEATURE_DESCRIPTION =
   'Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns.';
 
-// Shared PlayerComparison — stubbed; exposes the onSignIn callback via a button
-// so the wrapper's navigation wiring can be asserted in isolation.
+// Shared PlayerComparison — stubbed; exposes onSignIn and onUpgrade callbacks
+// via buttons so the wrapper's navigation/modal wiring can be asserted.
 jest.mock('@legacy-sports/shared-components', () => ({
   PLAYER_COMPARISON_FEATURE_DESCRIPTION:
     'Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns.',
   PlayerComparison: ({
     isAuthenticated,
     onSignIn,
+    onUpgrade,
   }: {
     isAuthenticated?: boolean;
     onSignIn?: () => void;
+    onUpgrade?: () => void;
   }) => (
     <div data-testid="shared-player-comparison">
       {isAuthenticated === false ? (
@@ -74,7 +76,14 @@ jest.mock('@legacy-sports/shared-components', () => ({
           Get Started Free
         </button>
       ) : (
-        <span>comparison tool</span>
+        <>
+          <span>comparison tool</span>
+          {onUpgrade ? (
+            <button type="button" onClick={onUpgrade}>
+              Upgrade
+            </button>
+          ) : null}
+        </>
       )}
     </div>
   ),
@@ -89,33 +98,68 @@ describe('PlayerComparisonPage', () => {
     mockUseHasEntitlement.mockReturnValue(true);
   });
 
-  it('renders the shared comparison behind the premium gate when authenticated', () => {
+  it('renders the shared comparison without a blur gate when authenticated', () => {
     render(<PlayerComparisonPage />);
-    expect(screen.getByTestId('premium-gate')).toBeTruthy();
     expect(screen.getByTestId('shared-player-comparison')).toBeTruthy();
     expect(screen.getByText('comparison tool')).toBeTruthy();
-    // The gate must be keyed to the player-comparison entitlement.
     expect(mockUseHasEntitlement).toHaveBeenCalledWith(
       ENTITLEMENTS.player_comparison,
     );
   });
 
-  it('passes "Player Comparison" as featureName to PremiumGate (AC1)', () => {
+  it('does not render the UpgradeModal by default for premium users', () => {
     render(<PlayerComparisonPage />);
-    const gate = screen.getByTestId('premium-gate');
-    expect(gate.dataset.featureName).toBe('Player Comparison');
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();
   });
 
-  it('passes the canonical feature description to PremiumGate (AC1)', () => {
+  it('does not pass onUpgrade to PlayerComparison for premium users', () => {
     render(<PlayerComparisonPage />);
-    const gate = screen.getByTestId('premium-gate');
-    expect(gate.dataset.featureDescription).toBe(EXPECTED_FEATURE_DESCRIPTION);
+    // No "Upgrade" button rendered by the stub when onUpgrade is undefined.
+    expect(screen.queryByText('Upgrade')).toBeNull();
   });
 
-  it('shows the sign-in prompt (no premium gate) for unauthenticated visitors', () => {
+  it('passes onUpgrade to PlayerComparison for free users (AC1)', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<PlayerComparisonPage />);
+    expect(screen.getByText('Upgrade')).toBeTruthy();
+  });
+
+  it('opens the UpgradeModal when the inline Upgrade CTA is triggered (AC1)', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<PlayerComparisonPage />);
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();
+    fireEvent.click(screen.getByText('Upgrade'));
+    expect(screen.getByTestId('upgrade-modal')).toBeTruthy();
+  });
+
+  it('passes "Player Comparison" as featureName to UpgradeModal (AC1)', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<PlayerComparisonPage />);
+    fireEvent.click(screen.getByText('Upgrade'));
+    const modal = screen.getByTestId('upgrade-modal');
+    expect(modal.dataset.featureName).toBe('Player Comparison');
+  });
+
+  it('passes the canonical feature description to UpgradeModal (AC1)', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<PlayerComparisonPage />);
+    fireEvent.click(screen.getByText('Upgrade'));
+    const modal = screen.getByTestId('upgrade-modal');
+    expect(modal.dataset.featureDescription).toBe(EXPECTED_FEATURE_DESCRIPTION);
+  });
+
+  it('does not render UpgradeModal for free users until triggered', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<PlayerComparisonPage />);
+    // No blur/overlay on initial render — EmptyState is visible (LS-7012).
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();
+    expect(screen.getByTestId('shared-player-comparison')).toBeTruthy();
+  });
+
+  it('shows the sign-in prompt (no upgrade modal) for unauthenticated visitors', () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
     render(<PlayerComparisonPage />);
-    expect(screen.queryByTestId('premium-gate')).toBeNull();
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();
     expect(screen.getByText('Get Started Free')).toBeTruthy();
   });
 

@@ -714,10 +714,13 @@ adminTest.describe(
     );
 
     adminTest(
-      'ERA row shows no BEST badge when only one pitcher qualifies',
+      'ERA row awards BEST to the sole qualifying pitcher (LS-7000)',
       async ({ page }) => {
+        // LS-7000 changed bestIndex so the sole valid value wins the BEST badge
+        // (valid.length===0 guard). When one pitcher is suppressed (<50 IP) the
+        // qualifying pitcher's ERA is the only valid value and correctly gets BEST.
         const row = page.getByRole('row').filter({ hasText: 'ERA' });
-        await expect(row.getByText('BEST', { exact: true })).toHaveCount(0);
+        await expect(row.getByText('BEST', { exact: true })).toHaveCount(1);
       },
     );
 
