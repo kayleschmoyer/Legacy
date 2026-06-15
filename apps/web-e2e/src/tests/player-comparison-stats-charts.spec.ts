@@ -7,6 +7,7 @@
  *   - Stat value verification & "▲ best" highlighting
  *   - Max players (4/4) behavior — search disabled
  *   - Empty state card ("No players selected")
+ *   - Career batting comparison rows (LS-5570)
  *
  * All GraphQL responses are mocked so no live backend is required.
  */
@@ -957,6 +958,147 @@ adminTest.describe(
         await expect(
           page.getByPlaceholder('Search player name…'),
         ).toBeVisible();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests: Career batting comparison rows (LS-5570) @regression
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – career batting comparison rows (LS-5570) @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockGraphQL(page);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+
+      // Add Judge (hitter) and Ohtani (two-way — also has batting stats)
+      await addPlayer(page, 'Aa', 'Aaron Judge');
+      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+    });
+
+    adminTest(
+      'shows "Career Batting" section header in comparison table',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('rowgroup').filter({ hasText: 'Career Batting' }),
+        ).toBeVisible();
+      },
+    );
+
+    adminTest('shows all career batting stat row labels', async ({ page }) => {
+      // Scope to the Career Batting rowgroup — "Walks" appears in both career
+      // batting and career pitching sections, so page-level lookups are ambiguous.
+      const section = page
+        .getByRole('rowgroup')
+        .filter({ hasText: 'Career Batting' });
+      for (const label of [
+        'Games',
+        'Hits',
+        'Home Runs',
+        'RBI',
+        'Runs',
+        'Stolen Bases',
+        'Walks',
+        'Total Bases',
+        'oWAR',
+        'Avg Season AVG',
+        'Avg Season OBP',
+        'Avg Season SLG',
+      ]) {
+        await expect(
+          section.getByRole('row').filter({ hasText: label }).first(),
+        ).toBeVisible();
+      }
+    });
+
+    adminTest(
+      'shows career batting values for each player column',
+      async ({ page }) => {
+        // Judge: 900 games, Ohtani: 760 games
+        await expect(page.getByText('900').first()).toBeVisible();
+        await expect(page.getByText('760').first()).toBeVisible();
+        // Home Runs: Judge 220, Ohtani 175
+        await expect(page.getByText('220').first()).toBeVisible();
+        await expect(page.getByText('175').first()).toBeVisible();
+        // RBI: Judge 600, Ohtani 480
+        await expect(page.getByText('600').first()).toBeVisible();
+        await expect(page.getByText('480').first()).toBeVisible();
+      },
+    );
+
+    adminTest(
+      'formats rate stats (Avg Season AVG/OBP/SLG) without leading zero',
+      async ({ page }) => {
+        // Judge: .282 AVG, .387 OBP, .579 SLG
+        await expect(page.getByText('.282')).toBeVisible();
+        await expect(page.getByText('.387')).toBeVisible();
+        await expect(page.getByText('.579')).toBeVisible();
+        // Ohtani: .274 AVG, .377 OBP, .564 SLG
+        await expect(page.getByText('.274')).toBeVisible();
+        await expect(page.getByText('.377')).toBeVisible();
+        await expect(page.getByText('.564')).toBeVisible();
+      },
+    );
+
+    adminTest('formats oWAR with one decimal place', async ({ page }) => {
+      // Judge: 42.0 oWAR, Ohtani: 38.5 oWAR
+      await expect(page.getByText('42.0').first()).toBeVisible();
+      await expect(page.getByText('38.5')).toBeVisible();
+    });
+
+    adminTest(
+      'BEST indicator appears on the higher career batting value',
+      async ({ page }) => {
+        // Judge has more Home Runs (220 vs 175) — his HR cell should be marked BEST.
+        // Locate the Home Runs row and assert the BEST badge is near the 220 value.
+        const table = page.getByRole('table', { name: 'Player comparison' });
+        const hrRow = table.getByRole('row').filter({ hasText: 'Home Runs' });
+        await expect(hrRow.getByText('BEST', { exact: true })).toBeVisible();
+        // The BEST badge should be in the same cell as the higher value (220)
+        const bestCell = hrRow.getByRole('cell').filter({ hasText: 'BEST' });
+        await expect(bestCell).toContainText('220');
+      },
+    );
+
+    adminTest(
+      'BEST indicator is absent from the lower value in a career batting row',
+      async ({ page }) => {
+        // In the Home Runs row, Ohtani (175) should NOT have the BEST badge
+        const table = page.getByRole('table', { name: 'Player comparison' });
+        const hrRow = table.getByRole('row').filter({ hasText: 'Home Runs' });
+        const cells = hrRow.getByRole('cell');
+        // The cell containing 175 must not contain BEST
+        const ohtaniCell = cells.filter({ hasText: '175' });
+        await expect(ohtaniCell).not.toContainText('BEST');
+      },
+    );
+
+    adminTest(
+      'Walks stat row displays career base-on-balls totals',
+      async ({ page }) => {
+        // Judge: 400 walks, Ohtani: 310 walks
+        const table = page.getByRole('table', { name: 'Player comparison' });
+        const walksRow = table
+          .getByRole('row')
+          .filter({ hasText: 'Walks' })
+          .first();
+        await expect(walksRow).toBeVisible();
+        await expect(walksRow).toContainText('400');
+        await expect(walksRow).toContainText('310');
+      },
+    );
+
+    adminTest(
+      'Total Bases row shows correct career totals',
+      async ({ page }) => {
+        // Judge: 1,800 total bases, Ohtani: 1,400 total bases
+        await expect(page.getByText('1,800')).toBeVisible();
+        await expect(page.getByText('1,400')).toBeVisible();
       },
     );
   },
