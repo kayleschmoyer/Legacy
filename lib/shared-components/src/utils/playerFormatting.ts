@@ -35,6 +35,17 @@ export function getPlayerName(
 }
 
 /**
+ * Format an eligiblePositions array into the canonical slash-separated display
+ * string (e.g. ['1B', 'OF'] → '1B/OF'). Returns an em dash when the list is
+ * empty or absent, matching the fallback used across position display contexts.
+ */
+export function formatEligiblePositions(
+  positions: string[] | null | undefined,
+): string {
+  return (positions ?? []).join('/') || '—';
+}
+
+/**
  * Format a player's abbreviated name (e.g. "M. Trout").
  */
 export function getPlayerAbbreviatedName(

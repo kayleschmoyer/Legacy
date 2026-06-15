@@ -38,6 +38,7 @@ import {
   WHITE,
   withAlpha,
 } from '../../utils/colors';
+import { formatEligiblePositions } from '../../utils/playerFormatting';
 
 // RN's Role type omits 'listbox' (a valid WAI-ARIA 1.2 role). This local alias
 // widens the role prop so the combobox dropdown can carry role="listbox" on web.
@@ -549,7 +550,7 @@ function PlayerSearchInput({
             ) : null}
             {results.map((p) => {
               const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
-              const pos = (p.eligiblePositions ?? []).join(', ') || '—';
+              const pos = formatEligiblePositions(p.eligiblePositions);
               return (
                 <Pressable
                   key={p.id}
@@ -1669,7 +1670,7 @@ export function PlayerComparison({
     const id = p.id;
     if (id == null) return;
     const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
-    const position = (p.eligiblePositions ?? []).join(', ') || '—';
+    const position = formatEligiblePositions(p.eligiblePositions);
     setSelected((prev) =>
       addPlayerToSlots(prev, { id, name, position, summary: p }),
     );
