@@ -1641,6 +1641,7 @@ export function PlayerComparison({
   }, [activePlayers]);
 
   const careerPitchingRows = useMemo<StatRow[]>(() => {
+    if (!isPremium) return [];
     const hasPitching = activePlayers.some(
       (p) => (p.summary.careerPitching?.games ?? 0) > 0,
     );
@@ -1691,7 +1692,7 @@ export function PlayerComparison({
       nums: eraNums,
     });
     return baseRows;
-  }, [activePlayers]);
+  }, [activePlayers, isPremium]);
 
   const achievementRows = useMemo<StatRow[]>(() => {
     const hasPitching = activePlayers.some(
