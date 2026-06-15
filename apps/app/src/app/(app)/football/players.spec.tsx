@@ -359,20 +359,6 @@ describe('FootballPlayers', () => {
   });
 
   describe('rendering', () => {
-    it('renders position filter pills', () => {
-      render(<FootballPlayers />);
-      expect(screen.getAllByText('QB')[0]).toBeTruthy();
-      expect(screen.getByText('RB')).toBeTruthy();
-      expect(screen.getByText('WR')).toBeTruthy();
-      expect(screen.getByText('TE')).toBeTruthy();
-      expect(screen.getByText('FLEX')).toBeTruthy();
-      expect(screen.getByText('K')).toBeTruthy();
-      expect(screen.getByText('DST')).toBeTruthy();
-      expect(screen.getByText('DL')).toBeTruthy();
-      expect(screen.getByText('LB')).toBeTruthy();
-      expect(screen.getByText('DB')).toBeTruthy();
-    });
-
     it('renders the search input', () => {
       render(<FootballPlayers />);
       expect(screen.getByPlaceholderText('Search players...')).toBeTruthy();

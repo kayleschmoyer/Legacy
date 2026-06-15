@@ -280,6 +280,45 @@ export function getEraValueFromYear(
   return 'all';
 }
 
+/**
+ * Position filter options shown as quick-filter pills on the players list,
+ * keyed by sport. 'All' is always first and means "no position filter applied".
+ * Football positions cover skill, kicker, team defense, and IDP slots.
+ * Baseball positions cover standard fantasy batting/pitching slots.
+ */
+export const PLAYER_FILTER_POSITIONS_BY_SPORT = {
+  baseball: [
+    'All',
+    'SP',
+    'RP',
+    'C',
+    '1B',
+    '2B',
+    '3B',
+    'SS',
+    'OF',
+    'DH',
+  ] as const,
+  football: [
+    'All',
+    'QB',
+    'RB',
+    'WR',
+    'TE',
+    'FLEX',
+    'K',
+    'DST',
+    'DL',
+    'LB',
+    'DB',
+  ] as const,
+} as const;
+
+export type BaseballFilterPosition =
+  (typeof PLAYER_FILTER_POSITIONS_BY_SPORT.baseball)[number];
+export type FootballFilterPosition =
+  (typeof PLAYER_FILTER_POSITIONS_BY_SPORT.football)[number];
+
 export const SORT_DIRECTIONS = ['ASC', 'DESC'] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 
