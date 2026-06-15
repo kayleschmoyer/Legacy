@@ -1717,15 +1717,19 @@ export function PlayerComparison({
       },
     );
 
+    // 50 IP is the conventional sabermetric qualifier for ERA leaderboards
+    const ERA_MIN_OUTS = 150;
     const eraNums = activePlayers.map((p) => {
-      const s = p.summary.careerPitching?.era;
+      const cp = p.summary.careerPitching;
+      if ((cp?.outsRecorded ?? 0) < ERA_MIN_OUTS) return null;
+      const s = cp?.era;
       if (!s) return null;
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : null;
     });
     baseRows.push({
       label: 'ERA',
-      desc: undefined,
+      desc: 'Min. 50 IP required',
       lowerIsBetter: true,
       vals: eraNums.map((n) => (n != null ? n.toFixed(2) : '—')),
       nums: eraNums,

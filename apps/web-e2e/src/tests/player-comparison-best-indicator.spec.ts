@@ -155,6 +155,160 @@ const MOCK_PLAYERS = [
   },
 ];
 
+/**
+ * Unqualified-pitcher variant: Koufax (ERA 3.85, 2880 IP — qualified) vs a
+ * short-sample pitcher with ERA 1.50 over just 30 IP (90 outsRecorded).
+ * Used to verify ERA suppression and the 50-IP qualifier guard (LS-7009).
+ */
+const MOCK_UNQUALIFIED_PITCHER_PLAYERS = [
+  {
+    __typename: 'Player',
+    id: 5,
+    firstName: 'Sandy',
+    lastName: 'Koufax',
+    brefId: 'koufasa01',
+    eligiblePositions: ['SP'],
+    primaryEra: 'classic',
+    scoring: {
+      __typename: 'PlayerScoring',
+      battingScore: 0,
+      pitchingScore: 90,
+      fieldingScore: 2,
+      hitterScore: 0,
+      hitterAvgPointsPerGame: 0,
+      pitchingAvgPointsPerGame: 4.5,
+      totalScore: 920,
+      careerGames: 397,
+      avgPointsPerGame: 4.5,
+    },
+    averageSeasonBatting: {
+      seasons: 12,
+      games: 28,
+      atBats: 55,
+      runs: 4,
+      hits: 10,
+      homeRuns: 0,
+      rbi: 5,
+      stolenBases: 0,
+      battingAverage: 0.097,
+      onBasePercentage: 0.109,
+      sluggingPercentage: 0.102,
+    },
+    careerBatting: {
+      games: 397,
+      runs: 41,
+      homeRuns: 2,
+      rbi: 48,
+      stolenBases: 2,
+      hits: 75,
+      atBats: 776,
+      plateAppearances: 800,
+      baseOnBalls: 33,
+      hitByPitch: 3,
+      sacrificeHits: 30,
+      totalBases: 83,
+      offensiveWAR: -1.2,
+    },
+    careerPitching: {
+      wins: 165,
+      losses: 87,
+      era: '3.85',
+      games: 397,
+      gamesStarted: 314,
+      saves: 9,
+      strikeouts: 2396,
+      baseOnBalls: 817,
+      hits: 1754,
+      earnedRuns: 713,
+      outsRecorded: 8640, // 2880 IP — well above 50-IP threshold
+      winPercentage: 0.655,
+    },
+    careerAchievements: {
+      allStarSelections: 6,
+      mvpAwards: 0,
+      cyYoungAwards: 3,
+      goldGloves: 0,
+      silverSluggers: 0,
+      worldSeriesRings: 4,
+      hallOfFame: true,
+      rookieOfTheYear: false,
+    },
+  },
+  {
+    __typename: 'Player',
+    id: 6,
+    firstName: 'Short',
+    lastName: 'Sample',
+    brefId: 'sampls01',
+    eligiblePositions: ['SP'],
+    primaryEra: 'modern',
+    scoring: {
+      __typename: 'PlayerScoring',
+      battingScore: 0,
+      pitchingScore: 10,
+      fieldingScore: 0,
+      hitterScore: 0,
+      hitterAvgPointsPerGame: 0,
+      pitchingAvgPointsPerGame: 1.0,
+      totalScore: 100,
+      careerGames: 10,
+      avgPointsPerGame: 1.0,
+    },
+    averageSeasonBatting: {
+      seasons: 1,
+      games: 5,
+      atBats: 10,
+      runs: 0,
+      hits: 1,
+      homeRuns: 0,
+      rbi: 0,
+      stolenBases: 0,
+      battingAverage: 0.1,
+      onBasePercentage: 0.1,
+      sluggingPercentage: 0.1,
+    },
+    careerBatting: {
+      games: 10,
+      runs: 0,
+      homeRuns: 0,
+      rbi: 0,
+      stolenBases: 0,
+      hits: 1,
+      atBats: 10,
+      plateAppearances: 10,
+      baseOnBalls: 0,
+      hitByPitch: 0,
+      sacrificeHits: 0,
+      totalBases: 1,
+      offensiveWAR: -0.1,
+    },
+    careerPitching: {
+      wins: 2,
+      losses: 1,
+      era: '1.50', // misleadingly low ERA over a tiny sample
+      games: 5,
+      gamesStarted: 5,
+      saves: 0,
+      strikeouts: 25,
+      baseOnBalls: 10,
+      hits: 20,
+      earnedRuns: 5,
+      outsRecorded: 90, // 30 IP — below the 50-IP (150-out) threshold
+      winPercentage: 0.667,
+    },
+    careerAchievements: {
+      allStarSelections: 0,
+      mvpAwards: 0,
+      cyYoungAwards: 0,
+      goldGloves: 0,
+      silverSluggers: 0,
+      worldSeriesRings: 0,
+      hallOfFame: false,
+      rookieOfTheYear: false,
+    },
+  },
+];
+
 /** Two-pitcher variant: Ohtani (ERA 2.94) vs Sandy Koufax (ERA 3.85) */
 const MOCK_TWO_PITCHER_PLAYERS = [
   {
@@ -235,9 +389,12 @@ const MOCK_TWO_PITCHER_PLAYERS = [
   },
 ];
 
-function makeMockPlayersResponse(
-  players: typeof MOCK_PLAYERS | typeof MOCK_TWO_PITCHER_PLAYERS,
-) {
+type MockPlayers =
+  | typeof MOCK_PLAYERS
+  | typeof MOCK_TWO_PITCHER_PLAYERS
+  | typeof MOCK_UNQUALIFIED_PITCHER_PLAYERS;
+
+function makeMockPlayersResponse(players: MockPlayers) {
   return { data: { players } };
 }
 
@@ -259,7 +416,7 @@ function makeMockUserResponse() {
 
 async function mockGraphQL(
   page: import('@playwright/test').Page,
-  players: typeof MOCK_PLAYERS | typeof MOCK_TWO_PITCHER_PLAYERS = MOCK_PLAYERS,
+  players: MockPlayers = MOCK_PLAYERS,
 ) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
@@ -498,5 +655,59 @@ adminTest.describe(
       const row = page.getByRole('row').filter({ hasText: 'ERA' });
       await expect(row.getByText('BEST', { exact: true })).toHaveCount(1);
     });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests: ERA suppression for pitchers below 50 IP threshold (LS-7009) @regression
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – ERA suppression below 50 IP threshold @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockGraphQL(page, MOCK_UNQUALIFIED_PITCHER_PLAYERS);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+
+      // Koufax (qualified, 2880 IP) and Short Sample (unqualified, 30 IP)
+      await addPlayer(page, 'Sa', 'Sandy Koufax');
+      await addPlayer(page, 'Sh', 'Short Sample');
+    });
+
+    adminTest(
+      'ERA row is visible in the Career Pitching section',
+      async ({ page }) => {
+        await expect(page.getByText(/career pitching/i)).toBeVisible();
+        const row = page.getByRole('row').filter({ hasText: 'ERA' });
+        await expect(row).toBeVisible();
+      },
+    );
+
+    adminTest(
+      'ERA shows — for a pitcher below the 50 IP threshold',
+      async ({ page }) => {
+        const row = page.getByRole('row').filter({ hasText: 'ERA' });
+        // The unqualified pitcher's ERA is suppressed — row must contain a dash
+        await expect(row.getByText('—').first()).toBeVisible();
+      },
+    );
+
+    adminTest(
+      'ERA row shows no BEST badge when only one pitcher qualifies',
+      async ({ page }) => {
+        const row = page.getByRole('row').filter({ hasText: 'ERA' });
+        await expect(row.getByText('BEST', { exact: true })).toHaveCount(0);
+      },
+    );
+
+    adminTest(
+      'ERA row shows the Min. 50 IP required qualifier note',
+      async ({ page }) => {
+        const row = page.getByRole('row').filter({ hasText: 'ERA' });
+        await expect(row.getByText(/min\. 50 ip required/i)).toBeVisible();
+      },
+    );
   },
 );
