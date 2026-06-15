@@ -5,7 +5,13 @@
  * highlighting and value rendering — the extract-and-test pattern used across
  * the players feature (see PlayersStatsTable.spec.tsx).
  */
-import { bestIndex, fmt, fmtAvg, fmtCount } from './PlayerComparison';
+import {
+  bestIndex,
+  fmt,
+  fmtAvg,
+  fmtCount,
+  tiedIndices,
+} from './PlayerComparison';
 
 describe('fmt', () => {
   it('renders an em dash for nullish values', () => {
@@ -87,5 +93,33 @@ describe('bestIndex', () => {
   it('treats 0 as a valid value, not as absent data', () => {
     expect(bestIndex([0, 3, 1])).toBe(1);
     expect(bestIndex([0, 0])).toBeNull();
+  });
+});
+
+describe('tiedIndices', () => {
+  it('returns empty array when fewer than two valid values are present', () => {
+    expect(tiedIndices([5, null, undefined])).toEqual([]);
+    expect(tiedIndices([])).toEqual([]);
+  });
+
+  it('returns empty array when there is a unique leader', () => {
+    expect(tiedIndices([10, 25, 18])).toEqual([]);
+    expect(tiedIndices([3.2, 2.9, 4.1], true)).toEqual([]);
+  });
+
+  it('returns indices of all players tied for best', () => {
+    expect(tiedIndices([50, 50, 10])).toEqual([0, 1]);
+  });
+
+  it('handles a 3-way tie', () => {
+    expect(tiedIndices([20, 20, 20])).toEqual([0, 1, 2]);
+  });
+
+  it('handles ties when lowerIsBetter', () => {
+    expect(tiedIndices([2.5, 2.5, 4.1], true)).toEqual([0, 1]);
+  });
+
+  it('ignores nullish values when detecting ties', () => {
+    expect(tiedIndices([null, 40, 40, undefined])).toEqual([1, 2]);
   });
 });

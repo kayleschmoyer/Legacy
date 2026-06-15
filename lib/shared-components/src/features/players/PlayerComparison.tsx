@@ -129,6 +129,25 @@ export function bestIndex(
   return values.findIndex((v) => v === best);
 }
 
+/**
+ * Returns the indices of all values tied for best when there is no single
+ * leader. An empty array means either a unique leader exists (use bestIndex)
+ * or fewer than two valid values are present.
+ */
+export function tiedIndices(
+  values: (number | null | undefined)[],
+  lowerIsBetter = false,
+): number[] {
+  const valid = values.filter((v): v is number => v != null);
+  if (valid.length < 2) return [];
+  const best = lowerIsBetter ? Math.min(...valid) : Math.max(...valid);
+  const tied = values.reduce<number[]>((acc, v, i) => {
+    if (v === best) acc.push(i);
+    return acc;
+  }, []);
+  return tied.length > 1 ? tied : [];
+}
+
 // ---------------------------------------------------------------------------
 // Empty-state illustration
 // ---------------------------------------------------------------------------
@@ -855,6 +874,7 @@ function ComparisonTable({
               </YStack>
               {g.rows.map((row, ri) => {
                 const bi = bestIndex(row.nums, row.lowerIsBetter);
+                const tieIdxs = tiedIndices(row.nums, row.lowerIsBetter);
                 const isLast = ri === g.rows.length - 1;
                 return (
                   <YStack
@@ -900,6 +920,7 @@ function ComparisonTable({
                     </YStack>
                     {row.vals.map((val, vi) => {
                       const isBest = bi === vi;
+                      const isTied = tieIdxs.includes(vi);
                       return (
                         <YStack
                           tag="td"
@@ -917,7 +938,7 @@ function ComparisonTable({
                           justifyContent="flex-end"
                           gap={6}
                         >
-                          {isBest ? (
+                          {isBest || isTied ? (
                             <Text style={{ color: BRAND_GOLD, fontSize: 9 }}>
                               ▲
                             </Text>
@@ -927,7 +948,8 @@ function ComparisonTable({
                               fontFamily: FONT_DISPLAY,
                               fontWeight: '600',
                               fontSize: 16,
-                              color: isBest ? BRAND_GOLD_LIGHT : WHITE,
+                              color:
+                                isBest || isTied ? BRAND_GOLD_LIGHT : WHITE,
                               textAlign: 'right',
                               fontVariant: ['tabular-nums'],
                             }}
@@ -950,6 +972,23 @@ function ComparisonTable({
                               }}
                             >
                               BEST
+                            </Text>
+                          ) : isTied ? (
+                            <Text
+                              style={{
+                                fontFamily: FONT_DISPLAY,
+                                fontWeight: '800',
+                                fontSize: 9,
+                                letterSpacing: 1.4,
+                                color: BRAND_GOLD,
+                                backgroundColor: withAlpha(BRAND_GOLD, 0.14),
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 3,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              TIE
                             </Text>
                           ) : null}
                         </YStack>
@@ -1641,12 +1680,14 @@ export function PlayerComparison({
         'Defensive Wins Above Replacement',
         false,
         (p) => p.careerBatting?.defensiveWAR,
+        'war',
       ],
       [
         'WAR',
         'Total Wins Above Replacement',
         false,
         (p) => p.careerBatting?.totalWAR,
+        'war',
       ],
       [
         'Avg Season AVG',
@@ -1739,12 +1780,16 @@ export function PlayerComparison({
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : null;
     });
+    const eraQualifyingCount = eraNums.filter((n) => n != null).length;
     baseRows.push({
       label: 'ERA',
       desc: 'Min. 50 IP required',
       lowerIsBetter: true,
       vals: eraNums.map((n) => (n != null ? n.toFixed(2) : '—')),
-      nums: eraNums,
+      // Suppress BEST/TIE when fewer than 2 pitchers clear the qualifier —
+      // bestIndex on a single value crowns the sole qualifier with nothing
+      // to compare against (regression from LS-7000 removing the <2 guard).
+      nums: eraQualifyingCount >= 2 ? eraNums : eraNums.map(() => null),
     });
     const whipNums = activePlayers.map((p) => {
       const n = p.summary.careerPitching?.whip;
