@@ -575,8 +575,8 @@ test.describe('Player Comparison – empty state @smoke', () => {
     await page.waitForLoadState('load');
   });
 
-  test('shows "Nobody on deck yet." empty state card', async ({ page }) => {
-    await expect(page.getByText('Nobody on deck yet.')).toBeVisible();
+  test('shows "Nobody on deck yet" empty state card', async ({ page }) => {
+    await expect(page.getByText('Nobody on deck yet')).toBeVisible();
   });
 
   test('shows comparison hint in empty state', async ({ page }) => {
@@ -587,7 +587,7 @@ test.describe('Player Comparison – empty state @smoke', () => {
 
   test('empty state disappears after adding first player', async ({ page }) => {
     await addPlayer(page, 'Aa', 'Aaron Judge');
-    await expect(page.getByText('Nobody on deck yet.')).not.toBeVisible();
+    await expect(page.getByText('Nobody on deck yet')).not.toBeVisible();
   });
 });
 

@@ -1481,7 +1481,7 @@ function EmptyState() {
           textAlign: 'center',
         }}
       >
-        Nobody on deck yet.
+        Nobody on deck yet
       </Text>
       <Text
         style={{

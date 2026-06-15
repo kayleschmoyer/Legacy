@@ -4,7 +4,7 @@
  * QA Feature Story under epic LS-5286 (QA — Page: Player Comparison).
  *
  * Covers the three player-count states before/at minimum selection:
- *   - 0 players: large dashed empty-state card ("Nobody on deck yet.")
+ *   - 0 players: large dashed empty-state card ("Nobody on deck yet")
  *   - 1 player: minimum-selection nudge ("One player on deck.") + no comparison table
  *   - 2+ players: empty state and nudge are gone; comparison table appears
  *
@@ -180,10 +180,10 @@ test.describe('Player Comparison – empty state (0 players) @smoke', () => {
     await expect(page.getByRole('status')).toBeVisible();
   });
 
-  test('empty-state card contains "Nobody on deck yet." heading', async ({
+  test('empty-state card contains "Nobody on deck yet" heading', async ({
     page,
   }) => {
-    await expect(page.getByText('Nobody on deck yet.')).toBeVisible();
+    await expect(page.getByText('Nobody on deck yet')).toBeVisible();
   });
 
   test('empty-state card prompts user to add at least two players', async ({
@@ -245,7 +245,7 @@ adminTest.describe(
     adminTest(
       'empty-state card is not shown when 1 player is selected',
       async ({ page }) => {
-        await expect(page.getByText('Nobody on deck yet.')).not.toBeVisible();
+        await expect(page.getByText('Nobody on deck yet')).not.toBeVisible();
       },
     );
 
@@ -298,7 +298,7 @@ adminTest.describe(
     adminTest(
       'empty-state card is not shown when 2 players are selected',
       async ({ page }) => {
-        await expect(page.getByText('Nobody on deck yet.')).not.toBeVisible();
+        await expect(page.getByText('Nobody on deck yet')).not.toBeVisible();
       },
     );
 
@@ -370,7 +370,7 @@ adminTest.describe(
         await page
           .getByRole('button', { name: /remove shohei ohtani/i })
           .click();
-        await expect(page.getByText('Nobody on deck yet.')).toBeVisible();
+        await expect(page.getByText('Nobody on deck yet')).toBeVisible();
       },
     );
   },
