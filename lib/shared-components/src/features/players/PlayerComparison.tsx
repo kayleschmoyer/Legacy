@@ -393,6 +393,7 @@ function PlayerSearchInput({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const searchInputRef = React.useRef<TextInput>(null);
 
   React.useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), 300);
@@ -469,6 +470,7 @@ function PlayerSearchInput({
         >
           <Plus size={16} color={TEXT_MUTED} />
           <TextInput
+            ref={searchInputRef}
             aria-label="Search players to compare"
             accessibilityLabel="Search players to compare"
             role="combobox"
@@ -648,43 +650,58 @@ function PlayerSearchInput({
           aria-label="Selected players"
         >
           {filledSlots}
-          {Array.from({ length: MAX_PLAYERS - usedCount }).map((_, i) => (
-            <View
-              key={`empty-${i}`}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                paddingVertical: 6,
-                paddingLeft: 8,
-                paddingRight: 10,
-                borderWidth: 1,
-                borderStyle: 'dashed',
-                borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.3),
-                borderRadius: 9999,
-              }}
-            >
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.4),
-                }}
-              />
-              <Text
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontWeight: '500',
-                  fontStyle: 'italic',
-                  fontSize: 12,
-                  color: TEXT_MUTED,
-                }}
+          {Array.from({ length: MAX_PLAYERS - usedCount }).map((_, i) => {
+            const slotNumber = usedCount + i + 1;
+            // The dashed pill reads as clickable, so make it genuinely
+            // actionable rather than de-emphasizing it: pressing or pressing
+            // Enter/Space focuses the search input so the user can fill the
+            // slot. The button label announces this affordance to screen
+            // readers instead of presenting static "empty" text (PCM-046).
+            return (
+              <Pressable
+                key={`empty-${i}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Slot ${slotNumber} empty — add a player`}
+                accessibilityLabel={`Slot ${slotNumber} empty — add a player`}
+                onPress={() => searchInputRef.current?.focus()}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingVertical: 6,
+                  paddingLeft: 8,
+                  paddingRight: 10,
+                  borderWidth: 1,
+                  borderStyle: 'dashed',
+                  borderColor: withAlpha(BRAND_NAVY_LIGHT, pressed ? 0.6 : 0.3),
+                  borderRadius: 9999,
+                  cursor: 'pointer',
+                })}
               >
-                Slot {usedCount + i + 1} · empty
-              </Text>
-            </View>
-          ))}
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.4),
+                  }}
+                />
+                <Text
+                  aria-hidden
+                  style={{
+                    fontFamily: FONT_BODY,
+                    fontWeight: '500',
+                    fontStyle: 'italic',
+                    fontSize: 12,
+                    color: TEXT_MUTED,
+                  }}
+                >
+                  Slot {slotNumber} · empty
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
     </View>

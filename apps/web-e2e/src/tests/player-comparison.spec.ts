@@ -636,6 +636,42 @@ adminTest.describe(
     );
 
     adminTest(
+      'empty slot chip is an actionable button that focuses the search input (PCM-046)',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await page.getByText('Aaron Judge').click();
+
+        // The empty slot chips are announced as actionable buttons rather than
+        // static text — the dashed pill now matches its (real) clickability.
+        const emptySlot = page.getByRole('button', {
+          name: 'Slot 2 empty — add a player',
+        });
+        await expect(emptySlot).toBeVisible();
+
+        // Activating it focuses the search input so the user can fill the slot.
+        await emptySlot.click();
+        await expect(input).toBeFocused();
+      },
+    );
+
+    adminTest(
+      'empty slot chip focuses the search input via the keyboard (PCM-046)',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await page.getByText('Aaron Judge').click();
+
+        const emptySlot = page.getByRole('button', {
+          name: 'Slot 2 empty — add a player',
+        });
+        await emptySlot.focus();
+        await page.keyboard.press('Enter');
+        await expect(input).toBeFocused();
+      },
+    );
+
+    adminTest(
       'selection succeeds when blur fires before click fires on the suggestion (PCM-030 regression)',
       async ({ page }) => {
         const input = page.getByLabel('Search players to compare');
