@@ -8,6 +8,7 @@ import {
   TextInput,
   type TextStyle,
   View,
+  type ViewProps,
   type ViewStyle,
 } from 'react-native';
 import { Info, Lock, Plus, X } from '@tamagui/lucide-icons';
@@ -37,6 +38,12 @@ import {
   WHITE,
   withAlpha,
 } from '../../utils/colors';
+
+// RN's Role type omits 'listbox' (a valid WAI-ARIA 1.2 role). This local alias
+// widens the role prop so the combobox dropdown can carry role="listbox" on web.
+const ListboxView = View as React.ComponentType<
+  Omit<ViewProps, 'role'> & { role?: string }
+>;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -463,6 +470,9 @@ function PlayerSearchInput({
           <TextInput
             aria-label="Search players to compare"
             accessibilityLabel="Search players to compare"
+            role="combobox"
+            aria-expanded={showDropdown}
+            aria-controls="player-search-listbox"
             editable={!disabled}
             // RN's `editable={false}` renders as `readonly`, not `disabled`, so
             // expose the disabled state to assistive tech (and Playwright's
@@ -500,7 +510,9 @@ function PlayerSearchInput({
         </View>
 
         {showDropdown ? (
-          <View
+          <ListboxView
+            role="listbox"
+            nativeID="player-search-listbox"
             aria-label="Player suggestions"
             style={{
               position: 'absolute',
@@ -604,7 +616,7 @@ function PlayerSearchInput({
                 </Pressable>
               );
             })}
-          </View>
+          </ListboxView>
         ) : null}
 
         {/* Slot-ceiling changes are announced politely to screen readers (LS-7026). */}

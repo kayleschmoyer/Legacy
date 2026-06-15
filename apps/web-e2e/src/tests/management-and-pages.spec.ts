@@ -220,7 +220,7 @@ test.describe('Player Comparison Page @smoke', () => {
 
   test('shows a player search input', async ({ page }) => {
     await expect(
-      page.getByRole('textbox', { name: /search players/i }),
+      page.getByRole('combobox', { name: /search players/i }),
     ).toBeVisible();
   });
 });
