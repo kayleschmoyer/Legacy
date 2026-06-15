@@ -7,6 +7,8 @@ import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
+import { hasEntitlement } from './authorization';
+import { ENTITLEMENTS } from './entitlements';
 import { UserInputError } from './graphql-errors';
 import { SportKindEnum } from './leagues/types';
 import { CareerBattingRef, CareerPitchingRef } from './statistics';
@@ -258,9 +260,15 @@ PlayerRef.implement({
         'Career honours and awards sourced from Baseball Reference (All-Star, Gold Glove, etc.)',
       type: CareerAchievementsRef,
       nullable: true,
-      resolve: (parent) => {
-        // All achievement columns default to 0/false in the DB so they are
-        // always present on rows from the players table after the migration.
+      resolve: async (parent, _args, context) => {
+        // Career achievements are a Premium feature (ENTITLEMENTS.player_comparison).
+        // Enforce server-side as defense-in-depth behind the UI PremiumGate: an
+        // unauthenticated or free-tier caller gets null rather than the data.
+        // Returning null (vs. throwing) keeps the rest of the players query intact.
+        if (!context.user) return null;
+        if (!(await hasEntitlement(context, ENTITLEMENTS.player_comparison))) {
+          return null;
+        }
         return {
           allStarSelections: parent.allStarSelections ?? 0,
           goldGloves: parent.goldGloves ?? 0,
