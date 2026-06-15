@@ -54,6 +54,7 @@ query GetPlayersWithStats(
       atBats
       plateAppearances
       baseOnBalls
+      strikeouts
       hitByPitch
       sacrificeHits
       totalBases

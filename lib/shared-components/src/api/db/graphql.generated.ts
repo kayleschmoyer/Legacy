@@ -6633,6 +6633,7 @@ export type GetPlayersWithStatsQuery = {
       atBats?: number | null;
       plateAppearances?: number | null;
       baseOnBalls?: number | null;
+      strikeouts?: number | null;
       hitByPitch?: number | null;
       sacrificeHits?: number | null;
       totalBases?: number | null;
@@ -13961,6 +13962,7 @@ export const GetPlayersWithStats = gql`
         atBats
         plateAppearances
         baseOnBalls
+        strikeouts
         hitByPitch
         sacrificeHits
         totalBases

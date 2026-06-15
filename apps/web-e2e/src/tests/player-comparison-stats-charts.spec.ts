@@ -67,6 +67,7 @@ const MOCK_PLAYERS = [
       atBats: 3200,
       plateAppearances: 3800,
       baseOnBalls: 400,
+      strikeouts: 1200,
       hitByPitch: 30,
       sacrificeHits: 0,
       totalBases: 1800,
@@ -127,6 +128,7 @@ const MOCK_PLAYERS = [
       atBats: 2340,
       plateAppearances: 2800,
       baseOnBalls: 310,
+      strikeouts: 950,
       hitByPitch: 20,
       sacrificeHits: 0,
       totalBases: 1400,
@@ -200,6 +202,7 @@ const MOCK_PLAYERS = [
       atBats: 3910,
       plateAppearances: 4500,
       baseOnBalls: 520,
+      strikeouts: 800,
       hitByPitch: 25,
       sacrificeHits: 5,
       totalBases: 1900,
@@ -260,6 +263,7 @@ const MOCK_PLAYERS = [
       atBats: 3990,
       plateAppearances: 4900,
       baseOnBalls: 700,
+      strikeouts: 1500,
       hitByPitch: 40,
       sacrificeHits: 0,
       totalBases: 2200,
@@ -620,7 +624,9 @@ adminTest.describe(
     adminTest(
       'shows Strikeouts and Win % in pitching section',
       async ({ page }) => {
-        await expect(page.getByText('Strikeouts')).toBeVisible();
+        // 'Strikeouts' now appears in both Career Batting and Career Pitching;
+        // .first() avoids the strict-mode violation from matching 2 elements.
+        await expect(page.getByText('Strikeouts').first()).toBeVisible();
         await expect(page.getByText('Win %')).toBeVisible();
       },
     );
@@ -743,6 +749,22 @@ adminTest.describe(
       await expect(page.getByText('220').first()).toBeVisible();
       await expect(page.getByText('175').first()).toBeVisible();
     });
+
+    adminTest(
+      'shows batting Strikeouts row with lowerIsBetter BEST indicator',
+      async ({ page }) => {
+        // Ohtani (950 K) has fewer batting strikeouts than Judge (1200 K),
+        // so Ohtani should receive the BEST indicator (lowerIsBetter: true).
+        // Career Batting renders before Career Pitching, so .first() targets
+        // the batting Strikeouts row specifically.
+        const row = page
+          .getByRole('row')
+          .filter({ hasText: 'Strikeouts' })
+          .first();
+        await expect(row).toBeVisible();
+        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      },
+    );
   },
 );
 

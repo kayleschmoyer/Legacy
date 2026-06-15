@@ -1596,6 +1596,7 @@ export function PlayerComparison({
       ['Runs', undefined, false, (p) => p.careerBatting?.runs],
       ['Stolen Bases', undefined, false, (p) => p.careerBatting?.stolenBases],
       ['Walks Drawn', undefined, false, (p) => p.careerBatting?.baseOnBalls],
+      ['Strikeouts', undefined, true, (p) => p.careerBatting?.strikeouts],
       ['Total Bases', undefined, false, (p) => p.careerBatting?.totalBases],
       [
         'oWAR',
