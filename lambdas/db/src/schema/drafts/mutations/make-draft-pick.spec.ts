@@ -52,6 +52,26 @@ function makeSelectChain(rows: unknown[]) {
 }
 
 /**
+ * Reconstruct the static SQL text from a drizzle-orm `sql` object.
+ *
+ * `String(sqlObject)` yields "[object Object]", so `execute` mocks cannot
+ * route on query content that way. Drizzle stores the literal SQL fragments
+ * in `queryChunks` as `StringChunk` objects (each with a `value: string[]`),
+ * interleaved with raw param values. Concatenating the StringChunk values
+ * gives back the static query text we can match against.
+ */
+function sqlText(sqlObject: unknown): string {
+  const chunks = (sqlObject as { queryChunks?: unknown[] })?.queryChunks;
+  if (!Array.isArray(chunks)) return String(sqlObject);
+  return chunks
+    .map((chunk) => {
+      const value = (chunk as { value?: unknown })?.value;
+      return Array.isArray(value) ? value.join('') : '';
+    })
+    .join('');
+}
+
+/**
  * Load the make-draft-pick module with all dependencies mocked and
  * return the captured resolver function + key mocks for assertions.
  */
@@ -127,16 +147,31 @@ function setupResolver(options: {
   // Player
   const playerRow = { id: 42, hallOfFame: false, sport: 'baseball' };
 
-  const mockGetCurrentDraftPickInfo = jest.fn().mockResolvedValue(
-    options.nextPickInfoForIdempotent ?? {
-      draftId: 1,
-      teamId: 6,
-      round: 1,
-      pickNumber: 2,
-      overallPick: 2,
-      isComplete: false,
-    },
-  );
+  // The pick that follows the current one — returned by the idempotent
+  // re-notification's getCurrentDraftPickInfo call so the WS payload carries a
+  // real nextPick (LS-7977). Tests can override it via nextPickInfoForIdempotent.
+  const nextPickInfo = options.nextPickInfoForIdempotent ?? {
+    draftId: 1,
+    teamId: 6,
+    round: 1,
+    pickNumber: 2,
+    overallPick: 2,
+    isComplete: false,
+  };
+
+  // getCurrentDraftPickInfo is called three times: (1) Phase-1 pre-validation
+  // and (2) the Phase-2 authoritative re-check both need the CURRENT pick (the
+  // team whose turn it is — owned by memberRow), while (3) the idempotent path
+  // fetches the NEXT pick for the re-sent notification.
+  const mockGetCurrentDraftPickInfo = jest
+    .fn()
+    .mockImplementation(() =>
+      Promise.resolve(
+        mockGetCurrentDraftPickInfo.mock.calls.length <= 2
+          ? currentPickInfo
+          : nextPickInfo,
+      ),
+    );
 
   const mockCommitDraftPick = jest.fn().mockResolvedValue({
     draftPick: {
@@ -258,7 +293,7 @@ function setupResolver(options: {
 
   const mockTx = {
     execute: jest.fn().mockImplementation((sql: unknown) => {
-      const str = String(sql);
+      const str = sqlText(sql);
       if (str.includes('FOR NO KEY UPDATE')) {
         return Promise.resolve({ rows: [draftRow] });
       }
@@ -268,13 +303,13 @@ function setupResolver(options: {
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       limit: jest.fn().mockImplementation(() => {
-        // Return league row, then member row, etc. based on call order.
-        // Because we can't easily distinguish callers, we use a counter.
+        // Phase-2 select-chain order (no member lookup happens here — that's
+        // Phase 1): 1) re-fetch league under lock, 2) existingOwnPick
+        // (idempotency re-check), 3) existingPick (player-already-drafted).
         const call = mockTx.select.mock.calls.length;
         if (call === 1) return Promise.resolve([leagueRow]);
-        if (call === 2) return Promise.resolve([memberRow]);
         // existingOwnPick lookup
-        if (call === 3)
+        if (call === 2)
           return Promise.resolve(
             options.existingOwnPick !== undefined
               ? options.existingOwnPick
@@ -299,7 +334,7 @@ function setupResolver(options: {
   // Context db: Phase-1 uses context.db.execute + select chains.
   const mockDb = {
     execute: jest.fn().mockImplementation((sql: unknown) => {
-      const str = String(sql);
+      const str = sqlText(sql);
       if (str.includes('SELECT id, league_id')) {
         return Promise.resolve({ rows: [draftRow] });
       }
