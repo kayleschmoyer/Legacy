@@ -1947,7 +1947,7 @@ export function PlayerComparison({
   const statGroups = useMemo<StatGroup[]>(() => {
     const groups: StatGroup[] = [
       {
-        title: 'Fantasy Scoring Projections',
+        title: 'Fantasy Scoring',
         rows: scoringRows,
         disclaimer: 'Projections are estimates',
       },

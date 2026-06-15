@@ -1,7 +1,7 @@
 /**
- * Player Comparison – Fantasy Scoring Projections E2E Tests (LS-5573)
+ * Player Comparison – Fantasy Scoring E2E Tests (LS-5573)
  *
- * Covers the Fantasy Scoring Projections section of /players/compare:
+ * Covers the Fantasy Scoring section of /players/compare:
  *   - Section heading visibility when 2+ players are selected
  *   - All five stat rows: Fantasy Score, Avg Pts/Game, Hitter Score,
  *     Pitcher Score, Field Score
@@ -212,7 +212,7 @@ async function addPlayer(
 // Tests: Section visibility @smoke
 // ---------------------------------------------------------------------------
 
-test.describe('Fantasy Scoring Projections – section visibility @smoke', () => {
+test.describe('Fantasy Scoring – section visibility @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
@@ -223,10 +223,10 @@ test.describe('Fantasy Scoring Projections – section visibility @smoke', () =>
     await addPlayer(page, 'Sh', 'Shohei Ohtani');
   });
 
-  test('shows Fantasy Scoring Projections section heading', async ({
-    page,
-  }) => {
-    await expect(page.getByText(/fantasy scoring projections/i)).toBeVisible();
+  test('shows Fantasy Scoring section heading', async ({ page }) => {
+    await expect(
+      page.getByText('Fantasy Scoring', { exact: true }),
+    ).toBeVisible();
   });
 
   test('shows Fantasy Score row label', async ({ page }) => {
@@ -256,7 +256,7 @@ test.describe('Fantasy Scoring Projections – section visibility @smoke', () =>
 // Tests: Row descriptions @regression
 // ---------------------------------------------------------------------------
 
-test.describe('Fantasy Scoring Projections – row descriptions @regression', () => {
+test.describe('Fantasy Scoring – row descriptions @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
@@ -284,7 +284,7 @@ test.describe('Fantasy Scoring Projections – row descriptions @regression', ()
 // Tests: Stat values @regression
 // ---------------------------------------------------------------------------
 
-test.describe('Fantasy Scoring Projections – stat values @regression', () => {
+test.describe('Fantasy Scoring – stat values @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
@@ -335,7 +335,7 @@ test.describe('Fantasy Scoring Projections – stat values @regression', () => {
 // Tests: BEST indicator @regression
 // ---------------------------------------------------------------------------
 
-test.describe('Fantasy Scoring Projections – BEST indicator @regression', () => {
+test.describe('Fantasy Scoring – BEST indicator @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
@@ -403,7 +403,7 @@ test.describe('Fantasy Scoring Projections – BEST indicator @regression', () =
 // Tests: Section hidden before 2 players selected @regression
 // ---------------------------------------------------------------------------
 
-test.describe('Fantasy Scoring Projections – requires 2+ players @regression', () => {
+test.describe('Fantasy Scoring – requires 2+ players @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
@@ -413,7 +413,7 @@ test.describe('Fantasy Scoring Projections – requires 2+ players @regression',
 
   test('section is not visible with 0 players selected', async ({ page }) => {
     await expect(
-      page.getByText(/fantasy scoring projections/i),
+      page.getByText('Fantasy Scoring', { exact: true }),
     ).not.toBeVisible();
   });
 
@@ -422,14 +422,16 @@ test.describe('Fantasy Scoring Projections – requires 2+ players @regression',
   }) => {
     await addPlayer(page, 'Aa', 'Aaron Judge');
     await expect(
-      page.getByText(/fantasy scoring projections/i),
+      page.getByText('Fantasy Scoring', { exact: true }),
     ).not.toBeVisible();
   });
 
   test('section appears once 2nd player is added', async ({ page }) => {
     await addPlayer(page, 'Aa', 'Aaron Judge');
     await addPlayer(page, 'Sh', 'Shohei Ohtani');
-    await expect(page.getByText(/fantasy scoring projections/i)).toBeVisible();
+    await expect(
+      page.getByText('Fantasy Scoring', { exact: true }),
+    ).toBeVisible();
   });
 });
 
@@ -439,48 +441,43 @@ test.describe('Fantasy Scoring Projections – requires 2+ players @regression',
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 
-freeUserTest.describe(
-  'Fantasy Scoring Projections – premium gate @regression',
-  () => {
-    freeUserTest.beforeEach(async ({ page }) => {
-      await page.route(
-        (url) => isGraphQLEndpoint(url),
-        async (route) => {
-          if (
-            extractOperationName(route).toLowerCase() === 'getmysubscription'
-          ) {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({ data: { mySubscription: null } }),
-            });
-          } else {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({ data: {} }),
-            });
-          }
-        },
-      );
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-    });
-
-    freeUserTest(
-      'non-premium users see the Premium Feature gate overlay',
-      async ({ page }) => {
-        await expect(page.getByText(/premium feature/i)).toBeVisible();
+freeUserTest.describe('Fantasy Scoring – premium gate @regression', () => {
+  freeUserTest.beforeEach(async ({ page }) => {
+    await page.route(
+      (url) => isGraphQLEndpoint(url),
+      async (route) => {
+        if (extractOperationName(route).toLowerCase() === 'getmysubscription') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: { mySubscription: null } }),
+          });
+        } else {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: {} }),
+          });
+        }
       },
     );
+    await page.goto('/players/compare');
+    await page.waitForLoadState('load');
+  });
 
-    freeUserTest(
-      'Fantasy Scoring Projections rows are not accessible behind the gate',
-      async ({ page }) => {
-        await expect(
-          page.getByText(/fantasy scoring projections/i),
-        ).not.toBeVisible();
-      },
-    );
-  },
-);
+  freeUserTest(
+    'non-premium users see the Premium Feature gate overlay',
+    async ({ page }) => {
+      await expect(page.getByText(/premium feature/i)).toBeVisible();
+    },
+  );
+
+  freeUserTest(
+    'Fantasy Scoring rows are not accessible behind the gate',
+    async ({ page }) => {
+      await expect(
+        page.getByText('Fantasy Scoring', { exact: true }),
+      ).not.toBeVisible();
+    },
+  );
+});

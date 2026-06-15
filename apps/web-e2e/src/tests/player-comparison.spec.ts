@@ -415,8 +415,10 @@ adminTest.describe('Player Comparison – comparison table @regression', () => {
     },
   );
 
-  adminTest('shows Fantasy Scoring Projections section', async ({ page }) => {
-    await expect(page.getByText(/fantasy scoring projections/i)).toBeVisible();
+  adminTest('shows Fantasy Scoring section', async ({ page }) => {
+    await expect(
+      page.getByText('Fantasy Scoring', { exact: true }),
+    ).toBeVisible();
   });
 
   adminTest('shows Career Batting section', async ({ page }) => {
