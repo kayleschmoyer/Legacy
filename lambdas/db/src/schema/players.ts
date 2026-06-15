@@ -75,21 +75,27 @@ CareerAchievementsRef.implement({
   fields: (t) => ({
     allStarSelections: t.exposeInt('allStarSelections', {
       description: 'Number of All-Star game selections',
+      nullable: false,
     }),
     goldGloves: t.exposeInt('goldGloves', {
       description: 'Number of Gold Glove Awards',
+      nullable: false,
     }),
     silverSluggers: t.exposeInt('silverSluggers', {
       description: 'Number of Silver Slugger Awards',
+      nullable: false,
     }),
     mvpAwards: t.exposeInt('mvpAwards', {
       description: 'Number of Most Valuable Player Awards (AL or NL)',
+      nullable: false,
     }),
     cyYoungAwards: t.exposeInt('cyYoungAwards', {
       description: 'Number of Cy Young Awards',
+      nullable: false,
     }),
     worldSeriesRings: t.exposeInt('worldSeriesRings', {
       description: 'Number of World Series Championship rings',
+      nullable: false,
     }),
     hallOfFame: t.exposeBoolean('hallOfFame', {
       description: 'Whether the player is in the Baseball Hall of Fame',

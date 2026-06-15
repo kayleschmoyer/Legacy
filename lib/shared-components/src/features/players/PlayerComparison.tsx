@@ -110,6 +110,13 @@ export function fmtAvg(n: number | null | undefined): string {
   return n >= 1 ? n.toFixed(0) : n.toFixed(3).replace(/^0/, '');
 }
 
+// Achievement counts are integers that can legitimately be 0 (e.g. zero MVPs).
+// This formatter preserves the 0 as "0" and reserves "—" for true absence (null/undefined).
+export function fmtCount(n: number | null | undefined): string {
+  if (n == null) return '—';
+  return String(n);
+}
+
 export function bestIndex(
   values: (number | null | undefined)[],
   lowerIsBetter = false,
@@ -1735,7 +1742,7 @@ export function PlayerComparison({
           label,
           desc,
           lowerIsBetter,
-          vals: nums.map((n) => (n == null ? '—' : String(n))),
+          vals: nums.map(fmtCount),
           nums,
         };
       });

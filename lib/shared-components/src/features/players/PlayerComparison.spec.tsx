@@ -5,7 +5,7 @@
  * highlighting and value rendering — the extract-and-test pattern used across
  * the players feature (see PlayersStatsTable.spec.tsx).
  */
-import { bestIndex, fmt, fmtAvg } from './PlayerComparison';
+import { bestIndex, fmt, fmtAvg, fmtCount } from './PlayerComparison';
 
 describe('fmt', () => {
   it('renders an em dash for nullish values', () => {
@@ -41,6 +41,22 @@ describe('fmtAvg', () => {
   });
 });
 
+describe('fmtCount', () => {
+  it('renders an em dash for nullish values (true absence of data)', () => {
+    expect(fmtCount(null)).toBe('—');
+    expect(fmtCount(undefined)).toBe('—');
+  });
+
+  it('renders "0" for a confirmed zero count — not a dash', () => {
+    expect(fmtCount(0)).toBe('0');
+  });
+
+  it('renders positive integer counts as strings', () => {
+    expect(fmtCount(3)).toBe('3');
+    expect(fmtCount(14)).toBe('14');
+  });
+});
+
 describe('bestIndex', () => {
   it('returns null when fewer than two values are present', () => {
     expect(bestIndex([5, null, undefined])).toBeNull();
@@ -61,5 +77,10 @@ describe('bestIndex', () => {
 
   it('ignores nullish values when picking the leader', () => {
     expect(bestIndex([null, 40, 12, undefined])).toBe(1);
+  });
+
+  it('treats 0 as a valid value, not as absent data', () => {
+    expect(bestIndex([0, 3, 1])).toBe(1);
+    expect(bestIndex([0, 0])).toBeNull();
   });
 });

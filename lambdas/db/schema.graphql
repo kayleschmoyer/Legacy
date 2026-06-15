@@ -289,17 +289,17 @@ type CareerAchievements {
   """
   Number of All-Star game selections
   """
-  allStarSelections: Int
+  allStarSelections: Int!
 
   """
   Number of Cy Young Awards
   """
-  cyYoungAwards: Int
+  cyYoungAwards: Int!
 
   """
   Number of Gold Glove Awards
   """
-  goldGloves: Int
+  goldGloves: Int!
 
   """
   Whether the player is in the Baseball Hall of Fame
@@ -309,7 +309,7 @@ type CareerAchievements {
   """
   Number of Most Valuable Player Awards (AL or NL)
   """
-  mvpAwards: Int
+  mvpAwards: Int!
 
   """
   Whether the player won the Rookie of the Year Award
@@ -319,12 +319,12 @@ type CareerAchievements {
   """
   Number of Silver Slugger Awards
   """
-  silverSluggers: Int
+  silverSluggers: Int!
 
   """
   Number of World Series Championship rings
   """
-  worldSeriesRings: Int
+  worldSeriesRings: Int!
 }
 
 type CareerBatting {
