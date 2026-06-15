@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-PKG="${PKG:-com.legacySports}"
+PKG="${PKG:-com.legacysports.app}"
 ACTIVITY="${ACTIVITY:-.MainActivity}"
 SETTLE_SECONDS="${SETTLE_SECONDS:-15}"
 
