@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import PlayersRoute, { FootballPlayers } from './players';
+import PlayersRoute, { FootballPlayers, parseAdvancedSearch } from './players';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -856,6 +856,175 @@ describe('FootballPlayers', () => {
       fireEvent.press(screen.getByTestId('availability-pill-all'));
       expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
       expect(screen.getByText('Tyreek Hill')).toBeTruthy();
+    });
+  });
+
+  describe('parseAdvancedSearch (LS-7051)', () => {
+    it('extracts pos: token into positions array', () => {
+      expect(parseAdvancedSearch('pos:WR')).toEqual({
+        positions: ['WR'],
+        nflTeam: undefined,
+        remainder: '',
+      });
+    });
+
+    it('extracts team: token into nflTeam', () => {
+      expect(parseAdvancedSearch('team:KC')).toEqual({
+        positions: [],
+        nflTeam: 'KC',
+        remainder: '',
+      });
+    });
+
+    it('extracts both tokens and leaves remainder text', () => {
+      expect(parseAdvancedSearch('pos:WR team:KC Mahomes')).toEqual({
+        positions: ['WR'],
+        nflTeam: 'KC',
+        remainder: 'Mahomes',
+      });
+    });
+
+    it('is case-insensitive for keys and uppercases values', () => {
+      expect(parseAdvancedSearch('Pos:wr Team:kc')).toEqual({
+        positions: ['WR'],
+        nflTeam: 'KC',
+        remainder: '',
+      });
+    });
+
+    it('returns plain text as remainder with no tokens', () => {
+      expect(parseAdvancedSearch('Mahomes')).toEqual({
+        positions: [],
+        nflTeam: undefined,
+        remainder: 'Mahomes',
+      });
+    });
+
+    it('handles empty string', () => {
+      expect(parseAdvancedSearch('')).toEqual({
+        positions: [],
+        nflTeam: undefined,
+        remainder: '',
+      });
+    });
+
+    it('handles multiple pos: tokens', () => {
+      const result = parseAdvancedSearch('pos:WR pos:TE');
+      expect(result.positions).toEqual(['WR', 'TE']);
+      expect(result.remainder).toBe('');
+    });
+  });
+
+  describe('advanced search syntax (LS-7051)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows advanced placeholder for premium users', () => {
+      mockUseHasEntitlement.mockImplementation(
+        (key: string) => key === 'advanced_search_filters',
+      );
+      render(<FootballPlayers />);
+      expect(
+        screen.getByPlaceholderText('Search or pos:WR team:KC...'),
+      ).toBeTruthy();
+    });
+
+    it('shows standard placeholder for free users', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballPlayers />);
+      expect(screen.getByPlaceholderText('Search players...')).toBeTruthy();
+    });
+
+    it('parses pos: token and passes position to query for premium users', () => {
+      mockUseHasEntitlement.mockImplementation(
+        (key: string) => key === 'advanced_search_filters',
+      );
+      render(<FootballPlayers />);
+      const input = screen.getByPlaceholderText('Search or pos:WR team:KC...');
+      fireEvent.changeText(input, 'pos:WR');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[]; search?: string } },
+      ];
+      expect(lastCall[0].variables.positions).toContain('WR');
+      expect(lastCall[0].variables.search).toBeUndefined();
+    });
+
+    it('parses team: token and passes nflTeam to query for premium users', () => {
+      mockUseHasEntitlement.mockImplementation(
+        (key: string) => key === 'advanced_search_filters',
+      );
+      render(<FootballPlayers />);
+      const input = screen.getByPlaceholderText('Search or pos:WR team:KC...');
+      fireEvent.changeText(input, 'team:KC');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { nflTeam?: string; search?: string } },
+      ];
+      expect(lastCall[0].variables.nflTeam).toBe('KC');
+      expect(lastCall[0].variables.search).toBeUndefined();
+    });
+
+    it('passes non-token text as regular search for premium users', () => {
+      mockUseHasEntitlement.mockImplementation(
+        (key: string) => key === 'advanced_search_filters',
+      );
+      render(<FootballPlayers />);
+      const input = screen.getByPlaceholderText('Search or pos:WR team:KC...');
+      fireEvent.changeText(input, 'Mahomes');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { search?: string } },
+      ];
+      expect(lastCall[0].variables.search).toBe('mahomes');
+    });
+
+    it('does not parse tokens for free users — raw input becomes search', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballPlayers />);
+      const input = screen.getByPlaceholderText('Search players...');
+      fireEvent.changeText(input, 'pos:WR');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[]; search?: string } },
+      ];
+      expect(lastCall[0].variables.search).toBe('pos:wr');
+      expect(lastCall[0].variables.positions).toBeUndefined();
+    });
+
+    it('merges pos: token positions with pill-selected positions', () => {
+      mockUseHasEntitlement.mockImplementation(
+        (key: string) => key === 'advanced_search_filters',
+      );
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getAllByText('QB')[0]);
+      const input = screen.getByPlaceholderText('Search or pos:WR team:KC...');
+      fireEvent.changeText(input, 'pos:WR');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toContain('QB');
+      expect(lastCall[0].variables.positions).toContain('WR');
     });
   });
 

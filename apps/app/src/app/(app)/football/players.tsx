@@ -474,6 +474,30 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+const ADVANCED_SEARCH_TOKEN_RE = /\b(pos|team):(\S+)/gi;
+
+export function parseAdvancedSearch(input: string): {
+  positions: string[];
+  nflTeam: string | undefined;
+  remainder: string;
+} {
+  const positions: string[] = [];
+  let nflTeam: string | undefined;
+  const remainder = input
+    .replace(ADVANCED_SEARCH_TOKEN_RE, (_match, key: string, value: string) => {
+      const k = key.toLowerCase();
+      if (k === 'pos') {
+        positions.push(value.toUpperCase());
+      } else if (k === 'team') {
+        nflTeam = value.toUpperCase();
+      }
+      return ' ';
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { positions, nflTeam, remainder };
+}
+
 const PROJECTIONS_UPSELL_DESCRIPTION =
   'Upgrade to Premium to unlock weekly projected fantasy points for every player.';
 
@@ -626,18 +650,28 @@ export function FootballPlayers(): React.JSX.Element {
     }
   }, [positionsKey, teamFilter, normalizedSearch]);
 
+  const parsed = hasAdvancedFilters
+    ? parseAdvancedSearch(normalizedSearch)
+    : { positions: [], nflTeam: undefined, remainder: normalizedSearch };
+
+  const effectivePositions = [...new Set([...positions, ...parsed.positions])];
+  const effectiveSearch = parsed.remainder;
+
   const isConference = teamFilter === 'AFC' || teamFilter === 'NFC';
+  const effectiveNflTeam =
+    parsed.nflTeam ??
+    (!isConference && teamFilter !== 'All' && teamFilter !== 'FREE_AGENT'
+      ? teamFilter
+      : undefined);
 
   const { data, loading, error } = useFootballPlayersQuery({
     variables: {
-      positions: positions.length > 0 ? positions : undefined,
-      nflTeam:
-        !isConference && teamFilter !== 'All' && teamFilter !== 'FREE_AGENT'
-          ? teamFilter
-          : undefined,
-      conference: isConference ? teamFilter : undefined,
-      freeAgent: teamFilter === 'FREE_AGENT' ? true : undefined,
-      search: normalizedSearch.length >= 2 ? normalizedSearch : undefined,
+      positions: effectivePositions.length > 0 ? effectivePositions : undefined,
+      nflTeam: effectiveNflTeam,
+      conference: !parsed.nflTeam && isConference ? teamFilter : undefined,
+      freeAgent:
+        !parsed.nflTeam && teamFilter === 'FREE_AGENT' ? true : undefined,
+      search: effectiveSearch.length >= 2 ? effectiveSearch : undefined,
       after: cursor,
     },
     notifyOnNetworkStatusChange: true,
@@ -839,7 +873,11 @@ export function FootballPlayers(): React.JSX.Element {
             alignItems="center"
           >
             <TextInput
-              placeholder="Search players..."
+              placeholder={
+                hasAdvancedFilters
+                  ? 'Search or pos:WR team:KC...'
+                  : 'Search players...'
+              }
               placeholderTextColor="#666"
               value={searchInput}
               onChangeText={setSearchInput}
