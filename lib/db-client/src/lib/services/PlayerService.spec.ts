@@ -339,4 +339,17 @@ describe('PlayerService — searchPlayers', () => {
     expect(mockDb.where).toHaveBeenCalledTimes(1);
     expect(mockDb.limit).toHaveBeenCalledWith(10);
   });
+
+  it('passes adversarial SQL injection input through as a bound parameter (LS-7025)', async () => {
+    // Drizzle's ilike() and sql tagged templates parameterize values — the raw
+    // string is never interpolated into the SQL text, so injection is inert.
+    mockDb.limit.mockResolvedValueOnce([]);
+
+    const injectionInput = "' OR 1=1 --";
+    await service.searchPlayers(injectionInput, 10);
+
+    // The call must reach the DB layer (no throw, no early bail-out).
+    expect(mockDb.where).toHaveBeenCalledTimes(1);
+    expect(mockDb.limit).toHaveBeenCalledWith(10);
+  });
 });

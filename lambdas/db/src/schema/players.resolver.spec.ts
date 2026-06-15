@@ -597,6 +597,37 @@ describe('players resolver', () => {
     expect(result).toBeNull();
   });
 
+  // ── players: search injection safety (LS-7025) ───────────────────────────
+
+  it('players: forwards adversarial search string as fullNameLike without modification', async () => {
+    // The resolver must not sanitize or reject the input — parameterization
+    // happens in the db-client (Drizzle ilike / sql tagged templates).
+    mockPlayersService.getPlayers.mockResolvedValueOnce([]);
+
+    const injectionInput = "' OR 1=1 --";
+    await getQueryResolver('players')(
+      {},
+      {
+        limit: null,
+        offset: null,
+        orderBy: null,
+        orderDirection: null,
+        position: null,
+        search: injectionInput,
+        excludeEmptyNames: false,
+        leagueId: null,
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(mockPlayersService.getPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.objectContaining({ fullNameLike: injectionInput }),
+      }),
+    );
+  });
+
   // ── playerMlbStats ────────────────────────────────────────────────────────
 
   it('playerMlbStats: returns null (stub resolver)', async () => {
