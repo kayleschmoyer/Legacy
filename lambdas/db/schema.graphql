@@ -425,6 +425,7 @@ type CareerPitching {
   saves: Int
   shutouts: Int
   strikeouts: Int
+  whip: Float
   wildPitches: Int
   winPercentage: Float
   wins: Int

@@ -72,6 +72,7 @@ query GetPlayersWithStats(
       hits
       earnedRuns
       outsRecorded
+      whip
       winPercentage
       pitchingWAR
     }

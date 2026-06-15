@@ -1,4 +1,4 @@
-import type { GraphQLSchema } from 'graphql';
+import type { GraphQLObjectType, GraphQLSchema } from 'graphql';
 
 process.setMaxListeners(20);
 
@@ -549,6 +549,74 @@ describe('Statistics Resolver', () => {
       );
 
       expect(result).toEqual(seasons);
+    });
+  });
+
+  // ── CareerPitching.whip field resolver ────────────────────────────────────
+
+  describe('CareerPitching.whip field resolver', () => {
+    function getWhipResolver() {
+      const type = schema.getType('CareerPitching') as GraphQLObjectType;
+      if (!type) throw new Error('CareerPitching type not found');
+      const resolve = type.getFields()['whip']?.resolve;
+      if (!resolve) throw new Error('CareerPitching.whip resolver not found');
+      return resolve;
+    }
+
+    it('computes WHIP correctly from hits, walks, and outs recorded', () => {
+      const resolve = getWhipResolver();
+      // 150 H, 60 BB, 750 outs = 250 IP → WHIP = 210 / 250 = 0.84
+      const result = resolve(
+        { h: 150, bb: 60, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeCloseTo(0.84, 5);
+    });
+
+    it('returns null when hits is null', () => {
+      const resolve = getWhipResolver();
+      const result = resolve(
+        { h: null, bb: 60, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when walks is null', () => {
+      const resolve = getWhipResolver();
+      const result = resolve(
+        { h: 150, bb: null, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when outsRecorded is null', () => {
+      const resolve = getWhipResolver();
+      const result = resolve(
+        { h: 150, bb: 60, outsRecorded: null },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when outsRecorded is zero to avoid division by zero', () => {
+      const resolve = getWhipResolver();
+      const result = resolve(
+        { h: 150, bb: 60, outsRecorded: 0 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
     });
   });
 });

@@ -385,6 +385,7 @@ export type CareerPitching = {
   saves?: Maybe<Scalars['Int']['output']>;
   shutouts?: Maybe<Scalars['Int']['output']>;
   strikeouts?: Maybe<Scalars['Int']['output']>;
+  whip?: Maybe<Scalars['Float']['output']>;
   wildPitches?: Maybe<Scalars['Int']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
@@ -4933,6 +4934,7 @@ export type CareerPitchingFragment = {
   outsRecorded?: number | null;
   outRate?: number | null;
   era?: string | null;
+  whip?: number | null;
   winPercentage?: number | null;
   pitchingWAR?: number | null;
   player?: {
@@ -5888,6 +5890,7 @@ export type GetCareerPitchingStatsQuery = {
     outsRecorded?: number | null;
     outRate?: number | null;
     era?: string | null;
+    whip?: number | null;
     winPercentage?: number | null;
     pitchingWAR?: number | null;
     player?: {
@@ -6652,6 +6655,7 @@ export type GetPlayersWithStatsQuery = {
       hits?: number | null;
       earnedRuns?: number | null;
       outsRecorded?: number | null;
+      whip?: number | null;
       winPercentage?: number | null;
       pitchingWAR?: number | null;
     } | null;
@@ -9580,6 +9584,7 @@ export const CareerPitchingFragmentDoc = gql`
     outsRecorded
     outRate
     era
+    whip
     winPercentage
     pitchingWAR
     player {
@@ -13980,6 +13985,7 @@ export const GetPlayersWithStats = gql`
         hits
         earnedRuns
         outsRecorded
+        whip
         winPercentage
         pitchingWAR
       }

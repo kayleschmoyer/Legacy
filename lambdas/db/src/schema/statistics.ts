@@ -473,6 +473,16 @@ CareerPitchingRef.implement({
         return totalDecisions === 0 ? null : stats.w / totalDecisions;
       },
     }),
+    whip: t.field({
+      type: 'Float',
+      nullable: true,
+      resolve: (stats) => {
+        if (stats.h == null || stats.bb == null || !stats.outsRecorded)
+          return null;
+        const ip = stats.outsRecorded / 3;
+        return ip === 0 ? null : (stats.h + stats.bb) / ip;
+      },
+    }),
     // Player relationship
     player: t.field({
       type: 'Player',

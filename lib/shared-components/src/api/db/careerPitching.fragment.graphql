@@ -25,6 +25,7 @@ fragment CareerPitching on CareerPitching {
   outsRecorded
   outRate
   era
+  whip
   winPercentage
   pitchingWAR
   player {

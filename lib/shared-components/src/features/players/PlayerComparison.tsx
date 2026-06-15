@@ -1691,6 +1691,17 @@ export function PlayerComparison({
       vals: eraNums.map((n) => (n != null ? n.toFixed(2) : '—')),
       nums: eraNums,
     });
+    const whipNums = activePlayers.map((p) => {
+      const n = p.summary.careerPitching?.whip;
+      return n != null && Number.isFinite(n) ? n : null;
+    });
+    baseRows.push({
+      label: 'WHIP',
+      desc: undefined,
+      lowerIsBetter: true,
+      vals: whipNums.map((n) => (n != null ? n.toFixed(2) : '—')),
+      nums: whipNums,
+    });
     return baseRows;
   }, [activePlayers, isPremium]);
 
