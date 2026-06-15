@@ -107,7 +107,7 @@ export function fmt(n: number | null | undefined, decimals = 0): string {
 
 export function fmtAvg(n: number | null | undefined): string {
   if (n == null) return '—';
-  return n >= 1 ? n.toFixed(0) : n.toFixed(3).replace(/^0/, '');
+  return n.toFixed(3).replace(/^0/, '');
 }
 
 // Achievement counts are integers that can legitimately be 0 (e.g. zero MVPs).

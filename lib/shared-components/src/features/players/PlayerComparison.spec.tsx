@@ -35,9 +35,9 @@ describe('fmtAvg', () => {
     expect(fmtAvg(0.3)).toBe('.300');
   });
 
-  it('renders values >= 1 as whole numbers', () => {
-    expect(fmtAvg(1)).toBe('1');
-    expect(fmtAvg(12.7)).toBe('13');
+  it('formats values >= 1 as 3-decimal strings (no silent integer truncation)', () => {
+    expect(fmtAvg(1)).toBe('1.000');
+    expect(fmtAvg(1.012)).toBe('1.012');
   });
 });
 
