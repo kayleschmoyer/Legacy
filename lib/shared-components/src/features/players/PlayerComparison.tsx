@@ -10,12 +10,12 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { Lock, Plus, X } from '@tamagui/lucide-icons';
+import { Info, Lock, Plus, X } from '@tamagui/lucide-icons';
 // Structural table elements use a Tamagui stack: on web the `tag` prop renders
 // a real <table>/<thead>/<tbody>/<tr>/<th>/<td> host element (with `role` kept
 // for native screen readers, since the optimizer strips `role` from the web
 // build). React Native's `View` has no `tag` prop. See StandingsTable (LS-7860).
-import { YStack } from 'tamagui';
+import { Tooltip, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   type GetAllPlayerSeasonStatsQuery,
@@ -734,6 +734,7 @@ function PlayerChip({
 interface StatRow {
   label: string;
   desc?: string;
+  tooltip?: string;
   vals: string[];
   nums: (number | null | undefined)[];
   lowerIsBetter?: boolean;
@@ -742,6 +743,7 @@ interface StatRow {
 interface StatGroup {
   title: string;
   rows: StatRow[];
+  disclaimer?: string;
 }
 
 function ComparisonTable({
@@ -881,6 +883,19 @@ function ComparisonTable({
                   >
                     {g.title}
                   </Text>
+                  {g.disclaimer ? (
+                    <Text
+                      style={{
+                        fontFamily: FONT_BODY,
+                        fontSize: 10,
+                        fontStyle: 'italic',
+                        color: withAlpha(TEXT_MUTED, 0.6),
+                        marginTop: 2,
+                      }}
+                    >
+                      {g.disclaimer}
+                    </Text>
+                  ) : null}
                 </YStack>
               </YStack>
               {g.rows.map((row, ri) => {
@@ -909,16 +924,47 @@ function ComparisonTable({
                       borderBottomColor={cellBorder}
                       justifyContent="center"
                     >
-                      <Text
-                        style={{
-                          fontFamily: FONT_BODY,
-                          fontWeight: '500',
-                          fontSize: 14,
-                          color: TEXT_MUTED,
-                        }}
-                      >
-                        {row.label}
-                      </Text>
+                      <XStack alignItems="center" gap={4}>
+                        <Text
+                          style={{
+                            fontFamily: FONT_BODY,
+                            fontWeight: '500',
+                            fontSize: 14,
+                            color: TEXT_MUTED,
+                          }}
+                        >
+                          {row.label}
+                        </Text>
+                        {row.tooltip ? (
+                          <Tooltip placement="top" delay={0}>
+                            <Tooltip.Trigger aria-label="Projection methodology">
+                              <Info
+                                size={12}
+                                color={withAlpha(TEXT_MUTED, 0.6)}
+                              />
+                            </Tooltip.Trigger>
+                            <Tooltip.Content
+                              backgroundColor="$gray9"
+                              borderRadius="$3"
+                              padding="$2"
+                              enterStyle={{ opacity: 0, scale: 0.9 }}
+                              exitStyle={{ opacity: 0, scale: 0.9 }}
+                              animation="quick"
+                            >
+                              <Tooltip.Arrow />
+                              <Text
+                                style={{
+                                  fontFamily: FONT_BODY,
+                                  fontSize: 12,
+                                  color: WHITE,
+                                }}
+                              >
+                                {row.tooltip}
+                              </Text>
+                            </Tooltip.Content>
+                          </Tooltip>
+                        ) : null}
+                      </XStack>
                       {row.desc ? (
                         <Text
                           style={{
@@ -1607,28 +1653,50 @@ export function PlayerComparison({
       string | undefined,
       boolean,
       (p: PlayerSummary) => number | null | undefined,
+      string | undefined,
     ][] = [
       [
         'Fantasy Score',
         'Projected season total',
         false,
         (p) => p.scoring?.totalScore,
+        'Standard scoring system. Projections are statistical estimates based on career performance. Actual results may vary.',
       ],
       [
         'Avg Pts / Game',
         'Across all seasons',
         false,
         (p) => p.scoring?.avgPointsPerGame,
+        undefined,
       ],
-      ['Hitter Score', undefined, false, (p) => p.scoring?.hitterScore],
-      ['Pitcher Score', undefined, false, (p) => p.scoring?.pitchingScore],
-      ['Field Score', undefined, false, (p) => p.scoring?.fieldingScore],
+      [
+        'Hitter Score',
+        undefined,
+        false,
+        (p) => p.scoring?.hitterScore,
+        undefined,
+      ],
+      [
+        'Pitcher Score',
+        undefined,
+        false,
+        (p) => p.scoring?.pitchingScore,
+        undefined,
+      ],
+      [
+        'Field Score',
+        undefined,
+        false,
+        (p) => p.scoring?.fieldingScore,
+        undefined,
+      ],
     ];
-    return defs.map(([label, desc, lowerIsBetter, ext]) => {
+    return defs.map(([label, desc, lowerIsBetter, ext, tooltip]) => {
       const nums = activePlayers.map((p) => ext(p.summary));
       return {
         label,
         desc,
+        tooltip,
         lowerIsBetter,
         vals: fmtScoreRow(nums),
         nums,
@@ -1878,7 +1946,11 @@ export function PlayerComparison({
 
   const statGroups = useMemo<StatGroup[]>(() => {
     const groups: StatGroup[] = [
-      { title: 'Fantasy Scoring Projections', rows: scoringRows },
+      {
+        title: 'Fantasy Scoring Projections',
+        rows: scoringRows,
+        disclaimer: 'Projections are estimates',
+      },
       { title: 'Career Batting', rows: careerBattingRows },
     ];
     if (careerPitchingRows.length > 0) {
