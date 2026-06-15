@@ -62,13 +62,13 @@ Numbers are the canonical step order. "Tool binding" always means: look up the c
 
 For the concrete call behind each action above, see your environment's binding section:
 
-| Action                        | Local (workflow-overview)                                                 | Cloud (cloud-agent-mode)                                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Worktree / branch setup       | Native-checkbox or sibling worktree + `node_modules` symlink              | Branch off `origin/main` in the repo root (no worktrees)                                                 |
-| Commit / push / status / diff | `worktree_commit` / `worktree_push` / `worktree_status` / `worktree_diff` | Same MCP tools on Copilot; `git` via Bash on default CC web                                              |
-| Open PR / labels / mark ready | `github_create_pr` / `github_manage_labels` / `github_mark_pr_ready`      | Same on Copilot; built-in `mcp__github__*` on CC web (then `github_manage_labels` for the trigger label) |
-| Validate                      | `make_run({ target: "pc" })`                                              | `make_run({ target: "pc", runInBackground: true })` on Copilot; `make pc` via Bash on CC web             |
-| Jira                          | `jira_*` MCP tools                                                        | `jira_*` MCP tools on Copilot; Atlassian plugin on CC web                                                |
+| Action                        | Local (workflow-overview)                                                 | Cloud (cloud-agent-mode)                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worktree / branch setup       | Native-checkbox or sibling worktree + `node_modules` symlink              | Branch off `origin/main` in the repo root (no worktrees)                                                                                                       |
+| Commit / push / status / diff | `worktree_commit` / `worktree_push` / `worktree_status` / `worktree_diff` | Same MCP tools on Copilot; `git` via Bash on default CC web                                                                                                    |
+| Open PR / labels / mark ready | `github_create_pr` / `github_manage_labels` / `github_mark_pr_ready`      | Same on Copilot; built-in `mcp__github__*` on CC web (then `github_manage_labels` for the trigger label)                                                       |
+| Validate                      | `make_run({ target: "pc" })`                                              | Seven `pc-*` chunks **in order**, foreground each (never `make pc`): Bash `make pc-typecheck` … on CC web; `make_run({ target: "pc-typecheck" })` … on Copilot |
+| Jira                          | `jira_*` MCP tools                                                        | `jira_*` MCP tools on Copilot; Atlassian plugin on CC web                                                                                                      |
 
 ## Related
 

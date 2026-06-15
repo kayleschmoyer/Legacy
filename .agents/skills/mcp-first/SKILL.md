@@ -100,15 +100,17 @@ Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool e
 | `make codegen` | `make_run({ target: "codegen" })` |
 | `make install` | `make_run({ target: "install" })` |
 
-**Heavy targets in cloud sessions — use background execution.** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call, which kills a synchronous `make_run` for a long target (`pc`, `build-all`, `test-all`, `install`) before it can finish — regardless of `timeoutMs`. For these, pass `runInBackground: true` and poll:
+**Heavy non-validation targets in cloud sessions — use background execution.** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call, which kills a synchronous `make_run` for a long target (`build-all`, `test-all`, `install`) before it can finish — regardless of `timeoutMs`. For these, pass `runInBackground: true` and poll. (Validation is **not** in this list — in cloud it runs as the per-chunk `pc-*` foreground steps below, never as a single `make pc`.)
 
 ```
-make_run({ target: "pc", runInBackground: true })   // → { jobId, status: "running" }
-make_run_wait({ jobId })                              // blocks ≤55s; re-call if it returns status: "running"
-make_run_status({ jobId })                            // non-blocking snapshot (status + log tail)
+make_run({ target: "build-all", runInBackground: true })   // → { jobId, status: "running" }
+make_run_wait({ jobId })                                     // blocks ≤55s; re-call if it returns status: "running"
+make_run_status({ jobId })                                   // non-blocking snapshot (status + log tail)
 ```
 
-`make_run_wait` returns the full structured result (with `steps[]` for `pc`/`pre-commit`/`full-check`) once the job reaches `done`/`failed`. In local sessions the synchronous form is fine; `runInBackground` is only required where the transport timeout applies.
+`make_run_wait` returns the full structured result (with `steps[]` for multi-step targets like `pre-commit`/`full-check`) once the job reaches `done`/`failed`. In local sessions the synchronous form is fine; `runInBackground` is only required where the transport timeout applies.
+
+**Validation runs in the foreground.** In **local** sessions, `make_run({ target: "pc" })` (or Bash `make pc`) is fine. In **cloud** sessions, do **not** run `make pc` at all — run the seven `pc-*` chunks **in order**, foreground each (`pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`); each chunk finishes inside the ~60s transport window and lets you checkpoint after each. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md). Reserve background `make_run` execution for non-validation heavy targets (`build-all`/`test-all`/`install`).
 
 > **If you find yourself writing `make <target>` in a Bash tool call during a local session, treat this as a signal that the `legacy-sports-make` MCP server is not connected.** Check server connectivity rather than falling back silently — raw `make pc` will fail with `nx: not found` or similar PATH errors when `node_modules/.bin` is not in `$PATH`. Using `make_run` via MCP avoids this PATH resolution problem entirely. If `make pc` fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "nx" not found`, the `node_modules` symlink is broken or missing — repair it with `worktree_install_recover()` (MCP-first), **not** `node scripts/modules-pool/link.mjs` via Bash. After recovery, restart the session so the MCP servers reconnect.
 

@@ -88,7 +88,7 @@ The `check-conflicts.yml` workflow is dispatched from the PR's head branch (not 
 | **Migrations**             | "Verify Migrations Applied" failure                     | Run `db_migrate`, re-push; if journal mismatch after editing a committed migration, soft-reset to branch base so the migration re-stages as "added", then apply via tunnel — see [database skill](../database/SKILL.md) |
 | **Infrastructure / flake** | Timeout, network error, runner OOM                      | Re-run via `ci_rerun_failed_jobs(runId: <id>)` once; if it fails again, investigate root cause                                                                                                                          |
 
-After fixing, validate with `make pc` before pushing. See [workflow-overview](../workflow-overview/SKILL.md) Step 11.
+After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*` chunks in order (never a single `make pc`) — see [cloud-agent-mode](../cloud-agent-mode/SKILL.md); locally `make pc` is fine. See [workflow-overview](../workflow-overview/SKILL.md) Step 11.
 
 ---
 

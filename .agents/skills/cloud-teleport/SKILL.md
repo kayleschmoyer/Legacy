@@ -37,7 +37,7 @@ When a cloud agent determines the next required step is cloud-blocked, it should
 
 Common detection points in the workflow:
 
-- `make pc` passes but the ticket requires a real DB migration (not just local Docker)
+- Validation passes (the seven `pc-*` chunks) but the ticket requires a real DB migration (not just local Docker)
 - The ticket description mentions Terraform changes, infrastructure, or AWS resources
 - The task requires deploying a Lambda or updating CloudFormation/SAM templates
 - Secrets need to be provisioned or rotated in AWS Secrets Manager
@@ -53,7 +53,7 @@ git commit -m "wip(teleport): progress before cloud-to-local handoff"
 git push -u origin <branch-name>
 ```
 
-If `make pc` has already passed, use a proper commit message instead of `wip`:
+If validation has already passed (all seven `pc-*` chunks green), use a proper commit message instead of `wip`:
 
 ```
 git commit -m "feat(scope): description — awaiting local teleport for <blocked-step>"
@@ -84,7 +84,7 @@ Create `.claude/teleport-handoff.md` in the repo root with this structure:
 - [x] Jira ticket transitioned to In Progress
 - [x] Code implementation complete
 - [x] Unit tests written and passing
-- [x] `make pc` passes (lint, typecheck, test, build)
+- [x] Validation passes — seven `pc-*` chunks (lint, typecheck, test, build)
 - [ ] Real DB migration applied
 - [ ] PR created
 
@@ -147,7 +147,7 @@ To continue locally:
 3. Review `.claude/teleport-handoff.md` for full context
 4. Continue with: <specific next command>
 
-All code changes are committed and `make pc` passes.
+All code changes are committed and validation passes (the seven `pc-*` chunks).
 ```
 
 ## Local Pickup Protocol
@@ -224,6 +224,6 @@ When the `work-ticket` skill is running in cloud mode and hits a teleport bounda
 
 **Multiple blocked steps**: List all blocked steps in the handoff, not just the first one. The local session should see the full picture.
 
-**Partial `make pc`**: If code changes are complete but `make pc` can't fully pass due to missing real DB state, note this explicitly. The local agent needs to know whether to re-run `make pc` from scratch.
+**Partial validation**: If code changes are complete but the `pc-*` validation chunks can't fully pass due to missing real DB state, note this explicitly. The local agent needs to know whether to re-run validation (`make pc`) from scratch.
 
 **PR already created**: If the PR was created before hitting the boundary (e.g., during a review-fix cycle), include the PR number in the handoff and note that the local session should push to the existing branch.
