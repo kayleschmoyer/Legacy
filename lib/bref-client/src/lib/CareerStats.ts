@@ -54,6 +54,7 @@ const StatMapping: Record<
   B_SF: 'sf',
   B_IBB: 'ibb',
   B_WAR: 'bwar',
+  B_DWAR: 'dwar',
 
   // Season/year field
   YEAR_ID: 'season',
@@ -174,6 +175,7 @@ const StatMapping: Record<
   W: 'w',
   WHIP: 'whip',
   WAR_BAT: 'bwar',
+  WAR_DEF: 'dwar',
   WAR_PITCH: 'pwar',
   WIN_LOSS_PERC: 'winLossPerc',
   WP: 'wp',

@@ -118,6 +118,7 @@ export const seasonBatting = pgTable(
     team: varchar('team', { length: 50 }).notNull(),
     rowId: varchar('row_id', { length: 50 }).notNull(),
     bwar: doublePrecision('bwar'),
+    dwar: doublePrecision('dwar'),
   },
   (table) => {
     return {
@@ -260,6 +261,8 @@ export const careerBatting = pgView('career_batting', {
   // You can use { mode: "bigint" } if numbers are exceeding js number limitations
   ibb: bigint('ibb', { mode: 'number' }),
   offensiveWar: doublePrecision('offensive_war'),
+  defensiveWar: doublePrecision('defensive_war'),
+  totalWar: doublePrecision('total_war'),
 }).as(sql`SELECT player_id,
        sum(g)       AS g,
        sum(pa)      AS pa,

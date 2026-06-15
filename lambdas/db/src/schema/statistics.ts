@@ -261,6 +261,8 @@ export const CareerBattingRef = builder.objectRef<{
   sh: number | null;
   ibb: number | null;
   offensiveWar: number | null;
+  defensiveWar: number | null;
+  totalWar: number | null;
 }>('CareerBatting');
 
 CareerBattingRef.implement({
@@ -323,6 +325,23 @@ CareerBattingRef.implement({
         'Offensive WAR (oWAR) from Baseball Reference. ' +
         'Career total is the sum of per-season bwar values, rounded to one decimal.',
       resolve: (stats) => stats.offensiveWar ?? null,
+    }),
+    defensiveWAR: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Defensive WAR (dWAR) from Baseball Reference. ' +
+        'Career total is the sum of per-season dwar values, rounded to one decimal. ' +
+        'Null until dwar data is imported.',
+      resolve: (stats) => stats.defensiveWar ?? null,
+    }),
+    totalWAR: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Total WAR (oWAR + dWAR) from Baseball Reference. ' +
+        'Non-null only when both offensive and defensive WAR data are available.',
+      resolve: (stats) => stats.totalWar ?? null,
     }),
     // Player relationship
     player: t.field({

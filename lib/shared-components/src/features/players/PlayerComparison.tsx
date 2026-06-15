@@ -1637,6 +1637,18 @@ export function PlayerComparison({
         'war',
       ],
       [
+        'dWAR',
+        'Defensive Wins Above Replacement',
+        false,
+        (p) => p.careerBatting?.defensiveWAR,
+      ],
+      [
+        'WAR',
+        'Total Wins Above Replacement',
+        false,
+        (p) => p.careerBatting?.totalWAR,
+      ],
+      [
         'Avg Season AVG',
         undefined,
         false,

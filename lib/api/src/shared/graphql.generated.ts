@@ -291,6 +291,8 @@ export type CareerBatting = {
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   battingAverage?: Maybe<Scalars['Float']['output']>;
   caughtStealing?: Maybe<Scalars['Int']['output']>;
+  /** Defensive WAR (dWAR) from Baseball Reference. Career total is the sum of per-season dwar values, rounded to one decimal. Null until dwar data is imported. */
+  defensiveWAR?: Maybe<Scalars['Float']['output']>;
   doubles?: Maybe<Scalars['Int']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
   groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
@@ -313,6 +315,8 @@ export type CareerBatting = {
   stolenBases?: Maybe<Scalars['Int']['output']>;
   strikeouts?: Maybe<Scalars['Int']['output']>;
   totalBases?: Maybe<Scalars['Int']['output']>;
+  /** Total WAR (oWAR + dWAR) from Baseball Reference. Non-null only when both offensive and defensive WAR data are available. */
+  totalWAR?: Maybe<Scalars['Float']['output']>;
   triples?: Maybe<Scalars['Int']['output']>;
 };
 

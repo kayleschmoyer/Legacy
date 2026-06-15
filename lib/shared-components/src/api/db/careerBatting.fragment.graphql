@@ -25,6 +25,8 @@ fragment CareerBatting on CareerBatting {
   onBasePercentage
   sluggingPercentage
   offensiveWAR
+  defensiveWAR
+  totalWAR
   player {
     id
     firstName
