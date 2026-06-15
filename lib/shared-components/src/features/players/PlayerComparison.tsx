@@ -579,17 +579,20 @@ function PlayerSearchInput({
           </View>
         ) : null}
 
-        <Text
-          style={{
-            marginTop: 6,
-            fontFamily: FONT_BODY,
-            fontSize: 13,
-            color: TEXT_MUTED,
-            fontStyle: 'italic',
-          }}
-        >
-          {hintText}
-        </Text>
+        {/* Slot-ceiling changes are announced politely to screen readers (LS-7026). */}
+        <View aria-live="polite" accessibilityLiveRegion="polite">
+          <Text
+            style={{
+              marginTop: 6,
+              fontFamily: FONT_BODY,
+              fontSize: 13,
+              color: TEXT_MUTED,
+              fontStyle: 'italic',
+            }}
+          >
+            {hintText}
+          </Text>
+        </View>
       </View>
 
       {/* Slot chips — filled and empty rendered together inside the selector card */}
