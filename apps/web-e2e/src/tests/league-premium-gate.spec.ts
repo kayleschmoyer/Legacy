@@ -19,6 +19,7 @@ import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -107,38 +108,19 @@ const MOCK_POSITIONS = [
 
 // ---------------------------------------------------------------------------
 // GraphQL mock helpers
+//
+// The user's entitlement tier (free vs premium) is no longer mocked ad-hoc here
+// — it now comes from the shared `useTier(page, tier)` helper (LS-8056), the one
+// source of truth for entitlement state. This helper only mocks the
+// league-specific scenario data; the per-test `beforeEach` calls `useTier`
+// alongside it.
 // ---------------------------------------------------------------------------
 
-function makeUserResponse(subscriptionTier: 'free' | 'premium') {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'testuser@test.com',
-        username: 'testuser',
-        accessLevel: 'none',
-        subscriptionTier,
-        avatarUrl: null,
-      },
-    },
-  };
-}
-
-async function mockLeagueGraphQL(
-  page: import('@playwright/test').Page,
-  subscriptionTier: 'free' | 'premium',
-) {
+async function mockLeagueGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const op = extractOperationName(route);
 
-    if (op === 'GetUserById') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(makeUserResponse(subscriptionTier)),
-      });
-    } else if (op === 'GetMySubscription') {
+    if (op === 'GetMySubscription') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -211,7 +193,8 @@ freeUserTest.describe(
   'League Detail – premium gate for free users @regression',
   () => {
     freeUserTest.beforeEach(async ({ page }) => {
-      await mockLeagueGraphQL(page, 'free');
+      await mockLeagueGraphQL(page);
+      await useTier(page, 'free');
       await page.goto('/baseball/league/1');
       await page.waitForLoadState('load');
     });
@@ -273,7 +256,8 @@ premiumUserTest.describe(
   'League Detail – no gate for premium users @regression',
   () => {
     premiumUserTest.beforeEach(async ({ page }) => {
-      await mockLeagueGraphQL(page, 'premium');
+      await mockLeagueGraphQL(page);
+      await useTier(page, 'premium');
       await page.goto('/baseball/league/1');
       await page.waitForLoadState('load');
     });

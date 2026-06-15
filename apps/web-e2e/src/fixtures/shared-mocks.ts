@@ -17,6 +17,66 @@ import { FIXED_NOW_ISO } from '../mocks/time';
 import { deepFreeze } from '../mocks/deep-freeze';
 
 // ---------------------------------------------------------------------------
+// Entitlement tiers — the one-stop entitlement fixture API (LS-8056)
+//
+// A hermetic spec's entitlement state is driven entirely by the `GetUserById`
+// GraphQL response: `useIsPremium()` reads `subscriptionTier` (and treats an
+// `accessLevel: 'admin'` user as premium), and AdminPage gates the /admin tools
+// on the same response's `accessLevel`. Both are sourced server-side — NOT from
+// the client JWT — so pinning these two fields is what actually flips a user's
+// entitlement in the app. See apps/web/src/hooks/useIsPremium.ts.
+//
+// `premium` is the DEFAULT: the baseline `getuserbyid` mock below is built from
+// the premium tier, so most specs need no opt-in at all. A spec switches to
+// `free` or `admin` in one line with `useTier(page, 'free' | 'admin')` (see
+// helper below) before navigating.
+// ---------------------------------------------------------------------------
+
+/**
+ * The entitlement tiers a hermetic spec can mock:
+ *   - `premium` — paid subscriber; sees all premium-gated content (DEFAULT).
+ *   - `free`    — no subscription; hits premium gates / upgrade CTAs.
+ *   - `admin`   — admin role; treated as premium AND can reach /admin tools.
+ */
+export type EntitlementTier = 'premium' | 'free' | 'admin';
+
+/**
+ * The `subscriptionTier` + `accessLevel` pair for each tier — the single
+ * source of truth folded in from the LS-8010 ad-hoc premium mock.
+ */
+const TIER_USER_FIELDS: Record<
+  EntitlementTier,
+  { subscriptionTier: 'premium' | null; accessLevel: 'none' | 'admin' }
+> = {
+  premium: { subscriptionTier: 'premium', accessLevel: 'none' },
+  free: { subscriptionTier: null, accessLevel: 'none' },
+  admin: { subscriptionTier: 'premium', accessLevel: 'admin' },
+};
+
+/**
+ * Build a `GetUserById` response for an entitlement tier. The shape mirrors the
+ * `User` fragment in apps/web/src/api/db/users/Users.graphql.
+ */
+export function tierUserByIdResponse(tier: EntitlementTier) {
+  const { subscriptionTier, accessLevel } = TIER_USER_FIELDS[tier];
+  return {
+    data: {
+      user: {
+        __typename: 'User',
+        id: 1,
+        email: 'test@example.com',
+        username: 'testuser',
+        name: 'Test User',
+        accessLevel,
+        avatarUrl: null,
+        subscriptionTier,
+        themePreference: null,
+      },
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Baseline GraphQL mock responses
 //
 // Every E2E test gets these automatically via the _apiIsolation auto-fixture.
@@ -38,29 +98,13 @@ import { deepFreeze } from '../mocks/deep-freeze';
 export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   // ── App shell (fires on every authenticated page) ─────────────────
   getunreadnotificationcount: { data: { getUnreadNotificationCount: 0 } },
-  // Mirrors the `User` GraphQL fragment (apps/web/src/api/db/users/Users.graphql).
-  // themePreference must be present so ThemeContext's ThemeServerSync (LS-4913)
-  // hydrates cleanly; null means "server has no stored preference", so it does
-  // NOT clobber the locally-selected theme that the theme specs assert on.
-  getuserbyid: {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'test@example.com',
-        username: 'testuser',
-        name: 'Test User',
-        accessLevel: 'none',
-        avatarUrl: null,
-        // Premium by default so the many existing league-detail / draft specs
-        // that use the default admin fixture keep seeing content after LS-5030
-        // gated those screens. Free-gate specs override GetUserById locally with
-        // subscriptionTier: null (see subscription.spec.ts freeUserByIdResponse).
-        subscriptionTier: 'premium',
-        themePreference: null,
-      },
-    },
-  },
+  // Mirrors the `User` GraphQL fragment (apps/web/src/api/db/users/Users.graphql),
+  // built from the `premium` tier so PREMIUM is the default entitlement: the many
+  // league-detail / draft specs keep seeing ungated content after LS-5030 without
+  // any opt-in. A spec switches to free/admin in one line via `useTier(page, …)`.
+  // `themePreference` is null so ThemeContext's ThemeServerSync (LS-4913) hydrates
+  // without clobbering the locally-selected theme the theme specs assert on.
+  getuserbyid: tierUserByIdResponse('premium'),
   // ThemeServerSync best-effort pushes the user's theme choice to the server on
   // every change (LS-4913). Without this baseline mock the hermetic API-isolation
   // fixture flags it as an unmocked operation and fails every theme spec.
@@ -243,60 +287,63 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
 export const unmockedGraphQLFallback = routerUnmockedFallback;
 
 /**
- * Build a `GetUserById` response with an explicit subscription tier.
+ * Pin the current user's entitlement tier for the rest of the test, then
+ * cascade every other GraphQL operation to the shared baseline.
  *
- * Premium status is sourced server-side from the `GetUserById.subscriptionTier`
- * field by `useIsPremium()` (apps/web/src/hooks/useIsPremium.ts) — NOT from the
- * client JWT. Since LS-5030 / #5236 the baseline `getuserbyid` mock returns a
- * **premium** user (so most specs see ungated content by default), which means a
- * spec whose intent is to verify a premium *gate* must explicitly pin the tier
- * back to `free`. The shape mirrors the `User` fragment in
- * apps/web/src/api/db/users/Users.graphql.
- */
-export function userByIdResponse(tier: 'free' | 'premium') {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'test@example.com',
-        username: 'testuser',
-        name: 'Test User',
-        accessLevel: 'none',
-        avatarUrl: null,
-        subscriptionTier: tier === 'premium' ? 'premium' : null,
-        themePreference: null,
-      },
-    },
-  };
-}
-
-/**
- * Register a GraphQL route that pins the current user's subscription tier and
- * cascades every other operation to the shared baseline.
+ * This is the one-line entitlement switch for hermetic specs (LS-8056):
  *
- * Use this to force a FREE user now that the baseline `getuserbyid` mock returns
- * a premium user (LS-5030 / #5236) — e.g. to exercise the premium gate / upgrade
- * CTA. `mockUserTier(page, 'premium')` is also available for symmetry when a
- * spec wants to be explicit rather than relying on the premium baseline.
+ * ```ts
+ * // premium is the DEFAULT — most specs need no call at all
+ * await useTier(page, 'free');   // exercise a premium gate / upgrade CTA
+ * await useTier(page, 'admin');  // admin role: treated as premium + /admin tools
+ * await page.goto('/baseball/league/1');
+ * ```
+ *
+ * Premium status is sourced server-side from `GetUserById` by `useIsPremium()`
+ * (apps/web/src/hooks/useIsPremium.ts) — NOT the client JWT — so overriding that
+ * one operation is enough to flip the entitlement the app sees. Every other
+ * ambient operation falls through to BASELINE_GRAPHQL_RESPONSES.
  *
  * Must be called BEFORE `page.goto()`.
  */
-export async function mockUserTier(
+export async function useTier(
   page: Page,
-  tier: 'free' | 'premium',
+  tier: EntitlementTier,
 ): Promise<void> {
   await page.route(isGraphQLEndpoint, async (route) => {
     if (extractOperationName(route).toLowerCase() === 'getuserbyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(userByIdResponse(tier)),
+        body: JSON.stringify(tierUserByIdResponse(tier)),
       });
       return;
     }
     await unmockedGraphQLFallback(route);
   });
+}
+
+/**
+ * Build a `GetUserById` response with an explicit subscription tier.
+ *
+ * @deprecated Prefer {@link tierUserByIdResponse}, which also supports the
+ * `admin` tier. Retained as a thin alias so existing specs keep compiling.
+ */
+export function userByIdResponse(tier: 'free' | 'premium') {
+  return tierUserByIdResponse(tier);
+}
+
+/**
+ * Register a GraphQL route that pins the current user's subscription tier.
+ *
+ * @deprecated Prefer {@link useTier}, the unified entitlement helper that also
+ * supports the `admin` tier. Retained as a thin alias for existing specs.
+ */
+export async function mockUserTier(
+  page: Page,
+  tier: 'free' | 'premium',
+): Promise<void> {
+  await useTier(page, tier);
 }
 
 /**

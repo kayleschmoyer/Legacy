@@ -665,6 +665,11 @@
       "apps/web/src/components/PremiumGate.tsx",
       "apps/web/src/hooks/useIsPremium.ts"
     ],
+    "apps/web-e2e/src/tests/entitlement-tiers.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
+      "apps/web/src/components/PremiumGate.tsx",
+      "apps/web/src/hooks/useIsPremium.ts"
+    ],
     "apps/web-e2e/src/tests/submit-new-trade.spec.ts": [
       "apps/web/src/pages/baseball/**",
       "apps/web/src/features/roster/**",
