@@ -6,11 +6,13 @@
  * the players feature (see PlayersStatsTable.spec.tsx).
  */
 import {
+  addPlayerToSlots,
   bestIndex,
   fmt,
   fmtAvg,
   fmtCount,
   fmtScoreRow,
+  type SelectedPlayer,
   tiedIndices,
 } from './PlayerComparison';
 
@@ -149,5 +151,53 @@ describe('tiedIndices', () => {
 
   it('ignores nullish values when detecting ties', () => {
     expect(tiedIndices([null, 40, 40, undefined])).toEqual([1, 2]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addPlayerToSlots — LS-7024
+// ---------------------------------------------------------------------------
+
+function makePlayer(id: number): SelectedPlayer {
+  return {
+    id,
+    name: `Player ${id}`,
+    position: 'SP',
+    summary: {} as SelectedPlayer['summary'],
+  };
+}
+
+describe('addPlayerToSlots', () => {
+  it('fills the first empty slot', () => {
+    const prev = [null, null, null, null] as (SelectedPlayer | null)[];
+    const result = addPlayerToSlots(prev, makePlayer(1));
+    expect(result[0]).toMatchObject({ id: 1 });
+    expect(result.slice(1)).toEqual([null, null, null]);
+  });
+
+  it('returns prev unchanged when the ID is already present — defensive dedupe guard', () => {
+    const player = makePlayer(42);
+    const prev = [player, null, null, null];
+    const result = addPlayerToSlots(prev, makePlayer(42));
+    expect(result).toBe(prev);
+  });
+
+  it('returns prev unchanged when all slots are filled', () => {
+    const prev = [makePlayer(1), makePlayer(2), makePlayer(3), makePlayer(4)];
+    const result = addPlayerToSlots(prev, makePlayer(5));
+    expect(result).toBe(prev);
+  });
+
+  it('does not mutate the previous array', () => {
+    const prev = [null, null, null, null] as (SelectedPlayer | null)[];
+    addPlayerToSlots(prev, makePlayer(7));
+    expect(prev[0]).toBeNull();
+  });
+
+  it('fills the next available slot when earlier slots are occupied', () => {
+    const prev = [makePlayer(1), null, null, null];
+    const result = addPlayerToSlots(prev, makePlayer(2));
+    expect(result[0]).toMatchObject({ id: 1 });
+    expect(result[1]).toMatchObject({ id: 2 });
   });
 });

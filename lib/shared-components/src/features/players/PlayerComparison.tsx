@@ -48,11 +48,28 @@ type PlayerSummary = NonNullable<
 
 type SeasonStatsData = GetAllPlayerSeasonStatsQuery | undefined;
 
-interface SelectedPlayer {
+export interface SelectedPlayer {
   id: number;
   name: string;
   position: string;
   summary: PlayerSummary;
+}
+
+/**
+ * Pure state updater: insert `entry` into the first empty slot.
+ * Returns `prev` unchanged if the ID is already present or all slots are full.
+ * Exported for unit testing; used by `handleAdd` inside `PlayerComparison`.
+ */
+export function addPlayerToSlots(
+  prev: (SelectedPlayer | null)[],
+  entry: SelectedPlayer,
+): (SelectedPlayer | null)[] {
+  if (prev.some((s) => s?.id === entry.id)) return prev;
+  const firstEmpty = prev.findIndex((s) => s === null);
+  if (firstEmpty === -1) return prev;
+  const next = [...prev];
+  next[firstEmpty] = entry;
+  return next;
 }
 
 /** Props for the cross-platform Player Comparison feature. */
@@ -1636,14 +1653,9 @@ export function PlayerComparison({
     if (id == null) return;
     const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
     const position = (p.eligiblePositions ?? []).join(', ') || '—';
-    setSelected((prev) => {
-      if (prev.some((s) => s?.id === id)) return prev;
-      const firstEmpty = prev.findIndex((s) => s === null);
-      if (firstEmpty === -1) return prev;
-      const next = [...prev];
-      next[firstEmpty] = { id, name, position, summary: p };
-      return next;
-    });
+    setSelected((prev) =>
+      addPlayerToSlots(prev, { id, name, position, summary: p }),
+    );
   }, []);
 
   const handleRemove = useCallback((idx: number) => {
