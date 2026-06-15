@@ -1588,52 +1588,82 @@ export function PlayerComparison({
       string | undefined,
       boolean,
       (p: PlayerSummary) => number | null | undefined,
+      'avg' | 'war' | 'count',
     ][] = [
-      ['Games', undefined, false, (p) => p.careerBatting?.games],
-      ['Hits', undefined, false, (p) => p.careerBatting?.hits],
-      ['Home Runs', undefined, false, (p) => p.careerBatting?.homeRuns],
-      ['RBI', undefined, false, (p) => p.careerBatting?.rbi],
-      ['Runs', undefined, false, (p) => p.careerBatting?.runs],
-      ['Stolen Bases', undefined, false, (p) => p.careerBatting?.stolenBases],
-      ['Walks Drawn', undefined, false, (p) => p.careerBatting?.baseOnBalls],
-      ['Strikeouts', undefined, true, (p) => p.careerBatting?.strikeouts],
-      ['Total Bases', undefined, false, (p) => p.careerBatting?.totalBases],
+      ['Games', undefined, false, (p) => p.careerBatting?.games, 'count'],
+      ['Hits', undefined, false, (p) => p.careerBatting?.hits, 'count'],
+      [
+        'Home Runs',
+        undefined,
+        false,
+        (p) => p.careerBatting?.homeRuns,
+        'count',
+      ],
+      ['RBI', undefined, false, (p) => p.careerBatting?.rbi, 'count'],
+      ['Runs', undefined, false, (p) => p.careerBatting?.runs, 'count'],
+      [
+        'Stolen Bases',
+        undefined,
+        false,
+        (p) => p.careerBatting?.stolenBases,
+        'count',
+      ],
+      [
+        'Walks Drawn',
+        undefined,
+        false,
+        (p) => p.careerBatting?.baseOnBalls,
+        'count',
+      ],
+      [
+        'Strikeouts',
+        undefined,
+        true,
+        (p) => p.careerBatting?.strikeouts,
+        'count',
+      ],
+      [
+        'Total Bases',
+        undefined,
+        false,
+        (p) => p.careerBatting?.totalBases,
+        'count',
+      ],
       [
         'oWAR',
         'Offensive Wins Above Replacement',
         false,
         (p) => p.careerBatting?.offensiveWAR,
+        'war',
       ],
       [
         'Avg Season AVG',
         undefined,
         false,
         (p) => p.averageSeasonBatting?.battingAverage,
+        'avg',
       ],
       [
         'Avg Season OBP',
         undefined,
         false,
         (p) => p.averageSeasonBatting?.onBasePercentage,
+        'avg',
       ],
       [
         'Avg Season SLG',
         undefined,
         false,
         (p) => p.averageSeasonBatting?.sluggingPercentage,
+        'avg',
       ],
     ];
-    return defs.map(([label, desc, lowerIsBetter, ext]) => {
+    return defs.map(([label, desc, lowerIsBetter, ext, format]) => {
       const nums = activePlayers.map((p) => ext(p.summary));
       const vals = nums.map((n) => {
         if (n == null) return '—';
-        if (
-          label.includes('AVG') ||
-          label.includes('OBP') ||
-          label.includes('SLG')
-        )
-          return fmtAvg(n);
-        if (label.includes('WAR')) return n.toFixed(1);
+        if (format === 'avg') return fmtAvg(n);
+        if (format === 'war') return n.toFixed(1);
         return fmt(n);
       });
       return { label, desc, lowerIsBetter, vals, nums };
