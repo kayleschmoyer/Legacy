@@ -747,9 +747,11 @@ interface StatGroup {
 function ComparisonTable({
   players,
   groups,
+  isPremium,
 }: {
   players: SelectedPlayer[];
   groups: StatGroup[];
+  isPremium: boolean;
 }) {
   const cellBorder = withAlpha(BRAND_NAVY_LIGHT, 0.1);
   return (
@@ -882,8 +884,12 @@ function ComparisonTable({
                 </YStack>
               </YStack>
               {g.rows.map((row, ri) => {
-                const bi = bestIndex(row.nums, row.lowerIsBetter);
-                const tieIdxs = tiedIndices(row.nums, row.lowerIsBetter);
+                const bi = isPremium
+                  ? bestIndex(row.nums, row.lowerIsBetter)
+                  : null;
+                const tieIdxs = isPremium
+                  ? tiedIndices(row.nums, row.lowerIsBetter)
+                  : [];
                 const isLast = ri === g.rows.length - 1;
                 return (
                   <YStack
@@ -1945,7 +1951,11 @@ export function PlayerComparison({
               title="Head-to-Head"
               meta="Gold ▲ marks the leader in each row · ties show no leader"
             />
-            <ComparisonTable players={activePlayers} groups={statGroups} />
+            <ComparisonTable
+              players={activePlayers}
+              groups={statGroups}
+              isPremium={isPremium}
+            />
 
             <SectionHead
               title="Season by Season"

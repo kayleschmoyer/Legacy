@@ -398,7 +398,10 @@ function makeMockPlayersResponse(players: MockPlayers) {
   return { data: { players } };
 }
 
-function makeMockUserResponse() {
+function makeMockUserResponse(
+  subscriptionTier = 'premium',
+  accessLevel = 'none',
+) {
   return {
     data: {
       user: {
@@ -406,8 +409,8 @@ function makeMockUserResponse() {
         id: 1,
         email: 'user@test.com',
         username: 'testuser',
-        accessLevel: 'none',
-        subscriptionTier: 'premium',
+        accessLevel,
+        subscriptionTier,
         avatarUrl: null,
       },
     },
@@ -417,6 +420,7 @@ function makeMockUserResponse() {
 async function mockGraphQL(
   page: import('@playwright/test').Page,
   players: MockPlayers = MOCK_PLAYERS,
+  userResponse = makeMockUserResponse(),
 ) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
@@ -433,7 +437,7 @@ async function mockGraphQL(
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(makeMockUserResponse()),
+          body: JSON.stringify(userResponse),
         });
       } else if (op === 'GetAllPlayerSeasonStats') {
         await route.fulfill({
@@ -484,6 +488,21 @@ async function addPlayer(
     await input.fill(searchTerm);
     await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
     await page.getByText(fullName).click({ timeout: 5000 });
+  }).toPass({ timeout: 15000 });
+}
+
+async function addPlayerForce(
+  page: import('@playwright/test').Page,
+  searchTerm: string,
+  fullName: string,
+) {
+  const input = page.getByLabel('Search players to compare');
+  await expect(async () => {
+    await input.clear({ force: true });
+    await input.focus({ force: true });
+    await input.fill(searchTerm, { force: true });
+    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
+    await page.getByText(fullName).click({ force: true, timeout: 5000 });
   }).toPass({ timeout: 15000 });
 }
 
@@ -707,6 +726,47 @@ adminTest.describe(
       async ({ page }) => {
         const row = page.getByRole('row').filter({ hasText: 'ERA' });
         await expect(row.getByText(/min\. 50 ip required/i)).toBeVisible();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests: BEST indicator absent for non-premium users (PCM-006) @regression
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – BEST indicator absent for non-premium @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      // Mock GetUserById as a free-tier user so isPremium resolves to false.
+      // All other mocks (players, season stats) remain the same.
+      await mockGraphQL(
+        page,
+        MOCK_PLAYERS,
+        makeMockUserResponse('free', 'none'),
+      );
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+
+      // Force-interact to simulate a user who has bypassed the pointer-events
+      // gate (e.g. via browser DevTools) and added players to the comparison.
+      await addPlayerForce(page, 'Aa', 'Aaron Judge');
+      await addPlayerForce(page, 'Sh', 'Shohei Ohtani');
+    });
+
+    adminTest(
+      'BEST badge is absent from DOM for non-premium users (PCM-006)',
+      async ({ page }) => {
+        await expect(page.getByText('BEST', { exact: true })).toHaveCount(0);
+      },
+    );
+
+    adminTest(
+      'upward triangle ▲ is absent from DOM for non-premium users (PCM-006)',
+      async ({ page }) => {
+        await expect(page.getByText('▲')).toHaveCount(0);
       },
     );
   },
