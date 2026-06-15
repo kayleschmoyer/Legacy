@@ -137,6 +137,10 @@ export interface PlayerStatsDataGridProps {
   testId?: string;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+  /** Set of player IDs considered rostered in the user's fantasy leagues (for availability filtering). */
+  rosteredPlayerIds?: ReadonlySet<number>;
+  /** Availability filter value — client-side applied after fetching. */
+  availabilityFilter?: 'all' | 'free_agents' | 'rostered';
 }
 
 // =============================================================================
@@ -398,6 +402,8 @@ export function PlayerStatsDataGrid({
   className,
   testId = 'player-stats-data-grid',
   statsFormat = 'expanded',
+  rosteredPlayerIds,
+  availabilityFilter,
 }: PlayerStatsDataGridProps): React.ReactElement {
   // =============================================================================
   // State Management
@@ -633,6 +639,24 @@ export function PlayerStatsDataGrid({
     }
     return CAREER_STATS_COLUMNS;
   }, [statsFormat]);
+
+  const displayData = useMemo(() => {
+    if (
+      !availabilityFilter ||
+      availabilityFilter === 'all' ||
+      !rosteredPlayerIds
+    ) {
+      return data;
+    }
+    if (availabilityFilter === 'free_agents') {
+      return data.filter(
+        (p: PlayerCareerStats) => !rosteredPlayerIds.has(p.playerId),
+      );
+    }
+    return data.filter((p: PlayerCareerStats) =>
+      rosteredPlayerIds.has(p.playerId),
+    );
+  }, [data, availabilityFilter, rosteredPlayerIds]);
 
   // =============================================================================
   // Render Helpers
@@ -1079,7 +1103,7 @@ export function PlayerStatsDataGrid({
               </Button>
             </YStack>
           ) : (
-            data.map((player: PlayerCareerStats, index: number) => (
+            displayData.map((player: PlayerCareerStats, index: number) => (
               <XStack
                 key={player.id}
                 data-testid={`player-row-${player.playerId}`}

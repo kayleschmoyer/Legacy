@@ -233,9 +233,12 @@ jest.mock('tamagui', () => {
 });
 
 const mockUseFootballPlayersQuery = jest.fn();
+const mockUseGetUserLeaguesQuery = jest.fn();
 jest.mock('../../../api/db/graphql.generated', () => ({
   useFootballPlayersQuery: (...args: unknown[]) =>
     mockUseFootballPlayersQuery(...args) as Record<string, unknown>,
+  useGetUserLeaguesQuery: (...args: unknown[]) =>
+    mockUseGetUserLeaguesQuery(...args) as Record<string, unknown>,
   Sport: { Football: 'football', Baseball: 'baseball' },
 }));
 
@@ -350,6 +353,7 @@ describe('FootballPlayers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+    mockUseGetUserLeaguesQuery.mockReturnValue({ data: null, loading: false });
     // Reset entitlement to free-user default so premium tests don't bleed into each other.
     mockUseHasEntitlement.mockReturnValue(false);
     mockUseMyRosterPlayerIds.mockReturnValue({
@@ -768,6 +772,93 @@ describe('FootballPlayers', () => {
     });
   });
 
+  describe('availability filter (LS-7042)', () => {
+    const footballLeaguesData = {
+      data: {
+        userLeagues: [{ id: 1, sport: 'football', isMockDraft: false }],
+      },
+      loading: false,
+    };
+
+    it('does not show availability pills when user has no football leagues', () => {
+      render(<FootballPlayers />);
+      expect(screen.queryByTestId('availability-pill-all')).toBeNull();
+    });
+
+    it('shows all three availability pills when user has at least one football league', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue(footballLeaguesData);
+      render(<FootballPlayers />);
+      expect(screen.getByTestId('availability-pill-all')).toBeTruthy();
+      expect(screen.getByTestId('availability-pill-free_agents')).toBeTruthy();
+      expect(screen.getByTestId('availability-pill-rostered')).toBeTruthy();
+    });
+
+    it('Free Agents filter hides rostered players', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue(footballLeaguesData);
+      // QB (id=1) is rostered; WR (id=4) is a free agent.
+      mockUseMyRosterPlayerIds.mockReturnValue({
+        playerIds: new Set([1]),
+        loading: false,
+      });
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [QB_PLAYER, WR_PLAYER],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('availability-pill-free_agents'));
+      expect(screen.queryByText('Patrick Mahomes')).toBeNull();
+      expect(screen.getByText('Tyreek Hill')).toBeTruthy();
+    });
+
+    it('Rostered filter shows only rostered players', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue(footballLeaguesData);
+      mockUseMyRosterPlayerIds.mockReturnValue({
+        playerIds: new Set([1]),
+        loading: false,
+      });
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [QB_PLAYER, WR_PLAYER],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('availability-pill-rostered'));
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+      expect(screen.queryByText('Tyreek Hill')).toBeNull();
+    });
+
+    it('All pill resets to showing all players', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue(footballLeaguesData);
+      mockUseMyRosterPlayerIds.mockReturnValue({
+        playerIds: new Set([1]),
+        loading: false,
+      });
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [QB_PLAYER, WR_PLAYER],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('availability-pill-rostered'));
+      fireEvent.press(screen.getByTestId('availability-pill-all'));
+      expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+      expect(screen.getByText('Tyreek Hill')).toBeTruthy();
+    });
+  });
+
   describe('My Rostered premium filter', () => {
     it('does not render the My Rostered pill for free users', () => {
       render(<FootballPlayers />);
@@ -886,6 +977,7 @@ describe('PlayersRoute (/football/players standalone hub)', () => {
     jest.clearAllMocks();
     mockUseFeatureIsOn.mockReturnValue(false);
     mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+    mockUseGetUserLeaguesQuery.mockReturnValue({ data: null, loading: false });
     mockUseHasEntitlement.mockReturnValue(false);
     mockUseMyRosterPlayerIds.mockReturnValue({
       playerIds: new Set<number>(),

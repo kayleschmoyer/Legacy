@@ -17,6 +17,7 @@ import {
   useFootballPlayersQuery,
   useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
+import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 import type { FootballPlayerSortValue } from '../../components/football/FootballPlayerSort';
 import { FootballPlayerSort } from '../../components/football/FootballPlayerSort';
 import type { FootballPosition } from '../../components/football/FootballPositionFilter';
@@ -639,10 +640,11 @@ export function FootballPlayersPage() {
   }, [setSearchParams]);
   const isPremium = useIsPremium();
 
-  // Cross-league availability matrix (LS-7045). Fetch user's football leagues
-  // so we can show per-league availability for premium users.
+  // Fetch user's football leagues — used by both:
+  // • LS-7042: All / Free Agents / Rostered availability filter (all users)
+  // • LS-7045: Cross-league availability matrix (premium users)
   const { data: userLeaguesData } = useGetUserLeaguesQuery({
-    skip: !isPremium,
+    fetchPolicy: 'cache-first',
   });
   const footballLeagues = (userLeaguesData?.userLeagues ?? []).filter(
     (l) => l.sport === Sport.Football && !l.isMockDraft,
@@ -651,6 +653,16 @@ export function FootballPlayersPage() {
     .map((l) => l.id)
     .filter((id): id is number => id != null);
   const showAvailabilityMatrix = isPremium && footballLeagueIds.length >= 2;
+
+  // Availability filter (LS-7042) — shown when user has at least one football league.
+  const hasFootballLeagues = footballLeagues.length > 0;
+  const [availabilityFilter, setAvailabilityFilter] = useState<
+    'all' | 'free_agents' | 'rostered'
+  >('all');
+  const { playerIds: rosteredIds } = useLeagueRosteredPlayerIds(
+    Sport.Football,
+    !hasFootballLeagues || availabilityFilter === 'all',
+  );
 
   const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
   const [searchInput, setSearchInput] = useState('');
@@ -834,7 +846,14 @@ export function FootballPlayersPage() {
   const isLoadingMore = loading && cursor !== undefined && allNodes.length > 0;
   const isInitialLoad = loading && allNodes.length === 0;
 
-  const players = allNodes ?? [];
+  const players = React.useMemo(() => {
+    const nodes = allNodes ?? [];
+    if (!hasFootballLeagues || availabilityFilter === 'all') return nodes;
+    if (availabilityFilter === 'free_agents') {
+      return nodes.filter((p) => p?.id != null && !rosteredIds.has(p.id));
+    }
+    return nodes.filter((p) => p?.id != null && rosteredIds.has(p.id));
+  }, [allNodes, hasFootballLeagues, availabilityFilter, rosteredIds]);
 
   // Cross-league availability query (LS-7045). Runs only for premium users
   // with 2+ football leagues, after the player list loads.
@@ -999,6 +1018,63 @@ export function FootballPlayersPage() {
           </Text>
           <FootballTeamFilter selected={teamFilter} onChange={setTeamFilter} />
         </XStack>
+
+        {/* Availability filter — visible when user is in at least one football league (LS-7042) */}
+        {hasFootballLeagues && (
+          <XStack alignItems="center" gap={8} flexWrap="wrap">
+            <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+              Availability:
+            </Text>
+            {(
+              [
+                ['all', 'All'],
+                ['free_agents', 'Free Agents'],
+                ['rostered', 'Rostered'],
+              ] as const
+            ).map(([value, label]) => {
+              const active = availabilityFilter === value;
+              return (
+                <YStack
+                  key={value}
+                  paddingHorizontal={12}
+                  paddingVertical={6}
+                  borderRadius={8}
+                  borderWidth={1}
+                  borderColor={active ? BRAND_NAVY_LIGHT : OUTLINE_SUBTLE}
+                  backgroundColor={
+                    active ? withAlpha(BRAND_NAVY_LIGHT, 0.25) : 'transparent'
+                  }
+                  cursor="pointer"
+                  onPress={() => setAvailabilityFilter(value)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={active}
+                  onKeyDown={(e: {
+                    key: string;
+                    preventDefault: () => void;
+                  }) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setAvailabilityFilter(value);
+                    }
+                  }}
+                  hoverStyle={{ borderColor: BRAND_NAVY_LIGHT }}
+                  pressStyle={{ opacity: 0.8 }}
+                  animation="quick"
+                >
+                  <Text
+                    fontSize={13}
+                    fontWeight={active ? '700' : '500'}
+                    color={active ? TEXT_PRIMARY : TEXT_MUTED}
+                    fontFamily={FONT_BODY}
+                  >
+                    {label}
+                  </Text>
+                </YStack>
+              );
+            })}
+          </XStack>
+        )}
 
         {/* Advanced (premium) filters toggle */}
         <XStack

@@ -34,6 +34,12 @@ jest.mock('../../components/PlayerDetailModal', () => ({
 
 jest.mock('../../api/db/graphql.generated', () => ({
   useGetPlayerIdByBrefIdQuery: () => ({ data: null, loading: false }),
+  useGetUserLeaguesQuery: () => ({ data: null, loading: false }),
+  Sport: { Baseball: 'Baseball', Football: 'Football' },
+}));
+
+jest.mock('../../hooks/useLeagueRosteredPlayerIds', () => ({
+  useLeagueRosteredPlayerIds: () => ({ playerIds: new Set(), loading: false }),
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────

@@ -119,6 +119,10 @@ export interface PitchingStatsDataGridProps {
   testId?: string;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+  /** Set of player IDs considered rostered in the user's fantasy leagues (for availability filtering). */
+  rosteredPlayerIds?: ReadonlySet<number>;
+  /** Availability filter value — client-side applied after fetching. */
+  availabilityFilter?: 'all' | 'free_agents' | 'rostered';
 }
 
 // =============================================================================
@@ -345,6 +349,8 @@ export function PitchingStatsDataGrid({
   className,
   testId = 'pitching-stats-data-grid',
   statsFormat = 'expanded',
+  rosteredPlayerIds,
+  availabilityFilter,
 }: PitchingStatsDataGridProps): React.ReactElement {
   // =============================================================================
   // State Management
@@ -381,7 +387,28 @@ export function PitchingStatsDataGrid({
     fetchPolicy: 'cache-and-network',
   });
 
-  const pitchingData = data?.careerPitchingStats ?? [];
+  const pitchingData = useMemo(
+    () => data?.careerPitchingStats ?? [],
+    [data?.careerPitchingStats],
+  );
+
+  const displayPitchingData = useMemo(() => {
+    if (
+      !availabilityFilter ||
+      availabilityFilter === 'all' ||
+      !rosteredPlayerIds
+    ) {
+      return pitchingData;
+    }
+    if (availabilityFilter === 'free_agents') {
+      return pitchingData.filter(
+        (p) => p != null && !rosteredPlayerIds.has(p.playerId ?? -1),
+      );
+    }
+    return pitchingData.filter(
+      (p) => p != null && rosteredPlayerIds.has(p.playerId ?? -1),
+    );
+  }, [pitchingData, availabilityFilter, rosteredPlayerIds]);
 
   const { data: countData } = useGetCareerPitchingStatsCountQuery({
     variables: {
@@ -806,7 +833,7 @@ export function PitchingStatsDataGrid({
                 Loading pitching statistics...
               </Text>
             </XStack>
-          ) : pitchingData.length === 0 ? (
+          ) : displayPitchingData.length === 0 ? (
             <YStack
               justifyContent="center"
               alignItems="center"
@@ -854,7 +881,7 @@ export function PitchingStatsDataGrid({
               </Button>
             </YStack>
           ) : (
-            pitchingData.map(
+            displayPitchingData.map(
               (player: CareerPitchingFragment | null, index: number) => (
                 <XStack
                   key={player?.playerId || index}

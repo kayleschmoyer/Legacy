@@ -35,6 +35,9 @@ export interface PlayerStatsFilters {
   // Date range filters
   activeSince?: string;
   activeUntil?: string;
+
+  // Availability filter — free agents / rostered in user's fantasy leagues
+  availabilityFilter?: 'all' | 'free_agents' | 'rostered';
 }
 
 // Player with statistics interface for the PlayerStats feature

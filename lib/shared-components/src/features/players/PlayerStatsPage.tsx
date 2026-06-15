@@ -207,6 +207,10 @@ export interface PlayerStatsPageProps {
     pageSize: number;
     filters: PlayerStatsFilters;
   }) => void;
+  /** Show the availability filter row. Only meaningful when the user is in at least one league. */
+  showAvailabilityFilter?: boolean;
+  /** Rostered player IDs from the user's fantasy leagues, used for client-side availability filtering. */
+  rosteredPlayerIds?: ReadonlySet<number>;
 }
 
 // ERA "off" sentinel — sits at the high end of the slider so "Max ERA = 5.00" means
@@ -256,11 +260,17 @@ export function PlayerStatsPage({
   onExport,
   onShare,
   onFiltersChange,
+  showAvailabilityFilter = false,
+  rosteredPlayerIds,
 }: PlayerStatsPageProps) {
   // ── View mode ─────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<'combined' | 'hitters' | 'pitchers'>(
     () => normalizeViewMode(initialViewMode),
   );
+
+  const [availabilityFilter, setAvailabilityFilter] = useState<
+    'all' | 'free_agents' | 'rostered'
+  >(initialFilters.availabilityFilter ?? 'all');
 
   // ── Toolbar draft state (not applied until applyFilters()) ─────
   const [search, setSearch] = useState(initialFilters.searchTerm ?? '');
@@ -1097,6 +1107,69 @@ export function PlayerStatsPage({
           </Pressable>
         </XStack>
 
+        {/* ── Availability filter ────────────────────────────────────── */}
+        {showAvailabilityFilter && (
+          <XStack
+            gap={6}
+            alignItems="center"
+            flexWrap="wrap"
+            style={{ paddingTop: 4 }}
+          >
+            <Text
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: '700',
+                fontSize: 11,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: FG3,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Availability
+            </Text>
+            {(
+              [
+                ['all', 'All'],
+                ['free_agents', 'Free Agents'],
+                ['rostered', 'Rostered'],
+              ] as const
+            ).map(([value, label]) => {
+              const active = availabilityFilter === value;
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => setAvailabilityFilter(value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={{
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    borderRadius: 9999,
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    borderColor: active ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT,
+                    backgroundColor: active
+                      ? 'rgba(27,58,92,0.45)'
+                      : 'transparent',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: FONT_BODY,
+                      fontWeight: active ? '700' : '500',
+                      fontSize: 13,
+                      color: active ? TEXT_PRIMARY : FG3,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </XStack>
+        )}
+
         {/* ── Advanced filters panel ─────────────────────────────────── */}
         {/* MOTION: slide down 180ms ease-out when opened (web only) */}
         {advancedOpen && (
@@ -1250,6 +1323,12 @@ export function PlayerStatsPage({
                   showSorting={true}
                   showPagination={true}
                   statsFormat={statsFormat}
+                  availabilityFilter={
+                    showAvailabilityFilter ? availabilityFilter : undefined
+                  }
+                  rosteredPlayerIds={
+                    showAvailabilityFilter ? rosteredPlayerIds : undefined
+                  }
                 />
               </YStack>
             )}
@@ -1269,6 +1348,12 @@ export function PlayerStatsPage({
                   showSorting={true}
                   showPagination={true}
                   statsFormat={statsFormat}
+                  availabilityFilter={
+                    showAvailabilityFilter ? availabilityFilter : undefined
+                  }
+                  rosteredPlayerIds={
+                    showAvailabilityFilter ? rosteredPlayerIds : undefined
+                  }
                 />
               </YStack>
             )}

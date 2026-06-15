@@ -19,7 +19,11 @@ import { StatCategory } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
 import type { FootballPlayersQuery } from '../../../api/db/graphql.generated';
-import { useFootballPlayersQuery } from '../../../api/db/graphql.generated';
+import {
+  Sport,
+  useFootballPlayersQuery,
+  useGetUserLeaguesQuery,
+} from '../../../api/db/graphql.generated';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import PlayerStatsScreen from '../PlayerStats';
 
@@ -565,9 +569,22 @@ export function FootballPlayers(): React.JSX.Element {
   const [allNodes, setAllNodes] = useState<FootballPlayerNode[]>([]);
   const [isFilterChanging, setIsFilterChanging] = useState(false);
   const [showMyRostered, setShowMyRostered] = useState(false);
+  const [availabilityFilter, setAvailabilityFilter] = useState<
+    'all' | 'free_agents' | 'rostered'
+  >('all');
 
+  // Check if user has football leagues — availability filter only shown when true.
+  const { data: leaguesData } = useGetUserLeaguesQuery();
+  const hasFootballLeagues = (leaguesData?.userLeagues ?? []).some(
+    (l) => l.sport === Sport.Football,
+  );
+
+  // Fetch roster data when either the availability filter or the "My Rostered"
+  // premium filter needs it.
+  const skipRosterFetch =
+    (!isPremium || !showMyRostered) && availabilityFilter === 'all';
   const { playerIds: rosteredPlayerIds, loading: rosterLoading } =
-    useMyRosterPlayerIds(!isPremium || !showMyRostered);
+    useMyRosterPlayerIds(skipRosterFetch);
 
   const debouncedSearch = useDebounce(searchInput, 300);
   const normalizedSearch = debouncedSearch.trim().toLowerCase();
@@ -684,10 +701,20 @@ export function FootballPlayers(): React.JSX.Element {
   const isInitialLoad = loading && allNodes.length === 0;
   const isLoadingMore = loading && allNodes.length > 0;
 
-  const displayNodes =
-    isPremium && showMyRostered
-      ? allNodes.filter((p) => rosteredPlayerIds.has(p.id))
-      : allNodes;
+  const displayNodes = (() => {
+    // Premium "My Rostered" filter takes priority.
+    if (isPremium && showMyRostered) {
+      return allNodes.filter((p) => rosteredPlayerIds.has(p.id));
+    }
+    // Availability filter (all users with football leagues).
+    if (availabilityFilter === 'free_agents') {
+      return allNodes.filter((p) => !rosteredPlayerIds.has(p.id));
+    }
+    if (availabilityFilter === 'rostered') {
+      return allNodes.filter((p) => rosteredPlayerIds.has(p.id));
+    }
+    return allNodes;
+  })();
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
@@ -716,6 +743,65 @@ export function FootballPlayers(): React.JSX.Element {
           }}
           style={{ flexGrow: 0 }}
         />
+
+        {/* Availability filter — shown when user is in at least one football league (LS-7042) */}
+        {hasFootballLeagues && (
+          <XStack
+            paddingHorizontal={12}
+            paddingBottom={8}
+            gap={8}
+            alignItems="center"
+            flexWrap="wrap"
+          >
+            <Text
+              fontSize={11}
+              fontWeight="700"
+              color="$gray9"
+              letterSpacing={0.5}
+            >
+              AVAILABILITY
+            </Text>
+            {(
+              [
+                ['all', 'All'],
+                ['free_agents', 'Free Agents'],
+                ['rostered', 'Rostered'],
+              ] as const
+            ).map(([value, label]) => {
+              const active = availabilityFilter === value;
+              return (
+                <YStack
+                  key={value}
+                  paddingHorizontal={12}
+                  paddingVertical={6}
+                  borderRadius={20}
+                  borderWidth={1}
+                  onPress={() => setAvailabilityFilter(value)}
+                  pressStyle={{ opacity: 0.7 }}
+                  backgroundColor={active ? '#1B3A5C4D' : '$glassSurface'}
+                  borderColor={active ? '#1B3A5C' : '$glassBorder'}
+                  justifyContent="center"
+                  alignItems="center"
+                  testID={`availability-pill-${value}`}
+                  accessibilityLabel={`Filter by ${label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text
+                    fontSize={13}
+                    fontWeight="600"
+                    color={active ? '#4A90D9' : '$gray10'}
+                  >
+                    {label}
+                  </Text>
+                </YStack>
+              );
+            })}
+            {rosterLoading && availabilityFilter !== 'all' && (
+              <Spinner size="small" color="$gray10" />
+            )}
+          </XStack>
+        )}
 
         {/* Premium cross-league roster filter (LS-7071) */}
         {isPremium && (

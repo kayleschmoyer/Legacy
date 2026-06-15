@@ -31,7 +31,12 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
-import { useGetPlayerIdByBrefIdQuery } from '../../api/db/graphql.generated';
+import {
+  Sport,
+  useGetPlayerIdByBrefIdQuery,
+  useGetUserLeaguesQuery,
+} from '../../api/db/graphql.generated';
+import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
@@ -137,6 +142,19 @@ export function PlayerStatsRoute() {
   const navigate = useNavigate();
   const [liveMsg, setLiveMsg] = React.useState('');
   const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
+
+  // Check if the user is in at least one baseball league — availability filter
+  // is only surfaced when this is true.
+  const { data: leaguesData } = useGetUserLeaguesQuery({
+    fetchPolicy: 'cache-first',
+  });
+  const hasBaseballLeagues = (leaguesData?.userLeagues ?? []).some(
+    (l) => l.sport === Sport.Baseball,
+  );
+  const { playerIds: baseballRosteredIds } = useLeagueRosteredPlayerIds(
+    Sport.Baseball,
+    !hasBaseballLeagues,
+  );
 
   // Derive sport from URL param, default to 'mlb'. Validates against known values so an
   // unrecognised param doesn't silently corrupt filter state.
@@ -442,6 +460,8 @@ export function PlayerStatsRoute() {
           onExport={handleExport}
           onShare={handleShare}
           onFiltersChange={handleFiltersChange}
+          showAvailabilityFilter={hasBaseballLeagues}
+          rosteredPlayerIds={baseballRosteredIds}
         />
       </PremiumGate>
     </div>
