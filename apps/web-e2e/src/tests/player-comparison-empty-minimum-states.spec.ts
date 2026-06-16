@@ -127,16 +127,20 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
           contentType: 'application/json',
           body: JSON.stringify({ data: { players: MOCK_PLAYERS } }),
         });
-      } else if (op === 'getallplayerseasonstats') {
+      } else if (op === 'getcomparisonseasonstats') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
             data: {
-              player: { eligiblePositions: [], firstName: '', lastName: '' },
-              playerSeasonBatting: [],
-              playerSeasonPitching: [],
-              playerSeasonFielding: [],
+              slot0Batting: [],
+              slot0Pitching: [],
+              slot1Batting: [],
+              slot1Pitching: [],
+              slot2Batting: [],
+              slot2Pitching: [],
+              slot3Batting: [],
+              slot3Pitching: [],
             },
           }),
         });

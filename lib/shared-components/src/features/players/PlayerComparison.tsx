@@ -25,9 +25,9 @@ import { Info, Lock, Plus, X } from '@tamagui/lucide-icons';
 import { Tooltip, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
-  type GetAllPlayerSeasonStatsQuery,
+  type GetComparisonSeasonStatsQuery,
   type GetPlayersWithStatsQuery,
-  useGetAllPlayerSeasonStatsQuery,
+  useGetComparisonSeasonStatsQuery,
   useGetPlayersWithStatsQuery,
 } from '@legacy-sports/graphql';
 import {
@@ -60,7 +60,16 @@ type PlayerSummary = NonNullable<
   NonNullable<GetPlayersWithStatsQuery['players']>[number]
 >;
 
-type SeasonStatsData = GetAllPlayerSeasonStatsQuery | undefined;
+// Per-slot view of the batched comparison season query. Each slot's batting and
+// pitching rows are sliced out of the single GetComparisonSeasonStats response so
+// SeasonBattingBlock can keep consuming a `{ playerSeasonBatting, playerSeasonPitching }`
+// shape unchanged.
+type SeasonStatsData =
+  | {
+      playerSeasonBatting?: GetComparisonSeasonStatsQuery['slot0Batting'];
+      playerSeasonPitching?: GetComparisonSeasonStatsQuery['slot0Pitching'];
+    }
+  | undefined;
 
 export interface SelectedPlayer {
   id: number;
@@ -1340,11 +1349,11 @@ function SeasonRow({
 }
 
 export type SeasonBattingRow = NonNullable<
-  NonNullable<GetAllPlayerSeasonStatsQuery['playerSeasonBatting']>[number]
+  NonNullable<GetComparisonSeasonStatsQuery['slot0Batting']>[number]
 >;
 
 export type SeasonPitchingRow = NonNullable<
-  NonNullable<GetAllPlayerSeasonStatsQuery['playerSeasonPitching']>[number]
+  NonNullable<GetComparisonSeasonStatsQuery['slot0Pitching']>[number]
 >;
 
 /**
@@ -1801,24 +1810,56 @@ export function PlayerComparison({
   const activePlayers = selected.filter((p): p is SelectedPlayer => p !== null);
   const activeIds = activePlayers.map((p) => p.id);
 
-  // Fixed slot hooks — rules of hooks require unconditional calls.
-  const slot0Stats = useGetAllPlayerSeasonStatsQuery({
-    variables: { playerId: selected[0]?.id ?? 0 },
-    skip: !selected[0],
+  // Single batched query for every filled slot (LS-7033). One roundtrip fetches
+  // all selected players' season stats via aliased, `@include`-gated fields,
+  // replacing the previous four per-slot queries. Adding/removing a player
+  // changes the variables, so fall back to `previousData` while the refetch is
+  // in flight — this keeps already-loaded slots rendered instead of blanking
+  // them on every slot change.
+  const {
+    data: currentSeasonData,
+    previousData: previousSeasonData,
+    loading: seasonLoading,
+  } = useGetComparisonSeasonStatsQuery({
+    variables: {
+      id0: selected[0]?.id ?? 0,
+      has0: selected[0] != null,
+      id1: selected[1]?.id ?? 0,
+      has1: selected[1] != null,
+      id2: selected[2]?.id ?? 0,
+      has2: selected[2] != null,
+      id3: selected[3]?.id ?? 0,
+      has3: selected[3] != null,
+    },
+    skip: activePlayers.length === 0,
   });
-  const slot1Stats = useGetAllPlayerSeasonStatsQuery({
-    variables: { playerId: selected[1]?.id ?? 0 },
-    skip: !selected[1],
-  });
-  const slot2Stats = useGetAllPlayerSeasonStatsQuery({
-    variables: { playerId: selected[2]?.id ?? 0 },
-    skip: !selected[2],
-  });
-  const slot3Stats = useGetAllPlayerSeasonStatsQuery({
-    variables: { playerId: selected[3]?.id ?? 0 },
-    skip: !selected[3],
-  });
-  const slotStats = [slot0Stats, slot1Stats, slot2Stats, slot3Stats];
+  const seasonData = currentSeasonData ?? previousSeasonData;
+
+  // Re-slice the batched response into the per-slot shape SeasonBattingBlock
+  // expects. `loading` is computed per slot: a slot only counts as loading when
+  // the query is in flight AND that slot has no data yet, so an already-loaded
+  // slot keeps its table (rather than flashing a spinner) while a newly added
+  // slot's data is fetched.
+  const slotStats = useMemo(() => {
+    const buildSlot = (
+      batting: GetComparisonSeasonStatsQuery['slot0Batting'],
+      pitching: GetComparisonSeasonStatsQuery['slot0Pitching'],
+    ) => {
+      const hasData = batting !== undefined || pitching !== undefined;
+      return {
+        data: seasonData
+          ? { playerSeasonBatting: batting, playerSeasonPitching: pitching }
+          : undefined,
+        loading: seasonLoading && !hasData,
+      };
+    };
+    return [
+      buildSlot(seasonData?.slot0Batting, seasonData?.slot0Pitching),
+      buildSlot(seasonData?.slot1Batting, seasonData?.slot1Pitching),
+      buildSlot(seasonData?.slot2Batting, seasonData?.slot2Pitching),
+      buildSlot(seasonData?.slot3Batting, seasonData?.slot3Pitching),
+    ];
+  }, [seasonData, seasonLoading]);
 
   const handleAdd = useCallback((p: PlayerSummary) => {
     const id = p.id;

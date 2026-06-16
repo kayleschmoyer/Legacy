@@ -15,7 +15,10 @@
  */
 
 import { adminTest, expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -455,15 +458,15 @@ async function mockPlayerComparisonGraphQL(
   page: import('@playwright/test').Page,
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const op = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('getplayerswithstats')) {
+    if (op === 'getplayerswithstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { players: MOCK_COMPARE_PLAYERS } }),
       });
-    } else if (postData.includes('getuserbyid')) {
+    } else if (op === 'getuserbyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -481,7 +484,7 @@ async function mockPlayerComparisonGraphQL(
           },
         }),
       });
-    } else if (postData.includes('getmysubscription')) {
+    } else if (op === 'getmysubscription') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -499,14 +502,24 @@ async function mockPlayerComparisonGraphQL(
           },
         }),
       });
-    } else if (postData.includes('getallplayerseasonstats')) {
-      // Season-by-season query — empty so the comparison table is the only
-      // <table> under assertion (season blocks render a no-data message).
+    } else if (op === 'getcomparisonseasonstats') {
+      // Batched season-by-season query (LS-7033) — empty so the comparison
+      // table is the only <table> under assertion (season blocks render a
+      // no-data message).
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: { playerSeasonBatting: [], playerSeasonPitching: [] },
+          data: {
+            slot0Batting: [],
+            slot0Pitching: [],
+            slot1Batting: [],
+            slot1Pitching: [],
+            slot2Batting: [],
+            slot2Pitching: [],
+            slot3Batting: [],
+            slot3Pitching: [],
+          },
         }),
       });
     } else {

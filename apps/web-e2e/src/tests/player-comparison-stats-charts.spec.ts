@@ -13,7 +13,10 @@
  */
 
 import { adminTest, expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -463,64 +466,72 @@ function makeMockSeasonStatsResponse(
   };
 }
 
+/**
+ * Build a batched GetComparisonSeasonStats response (LS-7033) from the request
+ * variables. For each filled slot (`hasN === true`), the player's per-slot
+ * batting/pitching are aliased as `slotNBatting` / `slotNPitching`, reusing the
+ * single-player mock data keyed by `idN`.
+ */
+function makeMockComparisonSeasonStatsResponse(
+  variables: Record<string, unknown>,
+) {
+  const toId = (raw: unknown): number => {
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const n = Number.parseInt(raw, 10);
+      if (!Number.isNaN(n)) return n;
+    }
+    return 0;
+  };
+  const data: Record<string, unknown> = {};
+  ([0, 1, 2, 3] as const).forEach((i) => {
+    if (!variables[`has${i}`]) return;
+    const per = makeMockSeasonStatsResponse(toId(variables[`id${i}`])).data;
+    data[`slot${i}Batting`] = per.playerSeasonBatting;
+    data[`slot${i}Pitching`] = per.playerSeasonPitching;
+  });
+  return { data };
+}
+
 /** Sets up GraphQL mocks with full season stats support. */
 async function mockGraphQL(page: import('@playwright/test').Page) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
       const body = route.request().postData() ?? '';
-      const postData = body.toLowerCase();
+      const op = extractOperationName(route).toLowerCase();
 
-      if (
-        postData.includes('getplayerswithstats') ||
-        postData.includes('playerswithstats')
-      ) {
+      if (op === 'getplayerswithstats') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(makeMockPlayersResponse()),
         });
-      } else if (
-        postData.includes('getuserbyid') ||
-        postData.includes('userbyid')
-      ) {
+      } else if (op === 'getuserbyid') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(makeMockUserResponse()),
         });
-      } else if (
-        postData.includes('getallplayerseasonstats') ||
-        postData.includes('allplayerseasonstats') ||
-        postData.includes('playerseasonstats')
-      ) {
-        // Extract playerId from the request body
-        let playerId = 0;
+      } else if (op === 'getcomparisonseasonstats') {
+        // Extract the per-slot variables (id0/has0 … id3/has3) from the request.
+        let variables: Record<string, unknown> = {};
         try {
           const parsed = JSON.parse(body) as {
-            variables?: { playerId?: unknown };
+            variables?: Record<string, unknown>;
           };
-          const rawId = parsed.variables?.playerId;
-          if (typeof rawId === 'number') {
-            playerId = rawId;
-          } else if (typeof rawId === 'string') {
-            const numId = Number.parseInt(rawId, 10);
-            if (!Number.isNaN(numId)) playerId = numId;
-          }
+          variables = parsed.variables ?? {};
         } catch {
-          // Fall back to regex if JSON parse fails
-          const match = body.match(/"playerId"\s*:\s*(\d+)/);
-          if (match?.[1]) playerId = Number(match[1]);
+          // Leave variables empty — yields a response with no slots.
         }
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(makeMockSeasonStatsResponse(playerId)),
+          body: JSON.stringify(
+            makeMockComparisonSeasonStatsResponse(variables),
+          ),
         });
-      } else if (
-        postData.includes('getmysubscription') ||
-        postData.includes('mysubscription')
-      ) {
+      } else if (op === 'getmysubscription') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

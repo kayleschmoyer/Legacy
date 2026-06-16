@@ -439,15 +439,20 @@ async function mockGraphQL(
           contentType: 'application/json',
           body: JSON.stringify(userResponse),
         });
-      } else if (op === 'GetAllPlayerSeasonStats') {
+      } else if (op === 'GetComparisonSeasonStats') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
             data: {
-              playerSeasonBatting: [],
-              playerSeasonPitching: [],
-              playerSeasonFielding: [],
+              slot0Batting: [],
+              slot0Pitching: [],
+              slot1Batting: [],
+              slot1Pitching: [],
+              slot2Batting: [],
+              slot2Pitching: [],
+              slot3Batting: [],
+              slot3Pitching: [],
             },
           }),
         });

@@ -9203,6 +9203,189 @@ export type GetCareerPitchingStatsCountQuery = {
   careerPitchingStatsCount?: number | null;
 };
 
+export type GetComparisonSeasonStatsQueryVariables = Exact<{
+  id0: Scalars['Int']['input'];
+  has0: Scalars['Boolean']['input'];
+  id1: Scalars['Int']['input'];
+  has1: Scalars['Boolean']['input'];
+  id2: Scalars['Int']['input'];
+  has2: Scalars['Boolean']['input'];
+  id3: Scalars['Int']['input'];
+  has3: Scalars['Boolean']['input'];
+}>;
+
+export type GetComparisonSeasonStatsQuery = {
+  __typename?: 'Query';
+  slot0Batting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  }> | null;
+  slot0Pitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    gamesStarted?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    earnedRunAverage?: string | null;
+    whip?: number | null;
+  }> | null;
+  slot1Batting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  }> | null;
+  slot1Pitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    gamesStarted?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    earnedRunAverage?: string | null;
+    whip?: number | null;
+  }> | null;
+  slot2Batting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  }> | null;
+  slot2Pitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    gamesStarted?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    earnedRunAverage?: string | null;
+    whip?: number | null;
+  }> | null;
+  slot3Batting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  }> | null;
+  slot3Pitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    gamesStarted?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    earnedRunAverage?: string | null;
+    whip?: number | null;
+  }> | null;
+};
+
 export type GetDisclosureGameBestScoreQueryVariables = Exact<{
   [key: string]: never;
 }>;
@@ -22886,6 +23069,269 @@ export type GetCareerPitchingStatsCountSuspenseQueryHookResult = ReturnType<
 export type GetCareerPitchingStatsCountQueryResult = Apollo.QueryResult<
   GetCareerPitchingStatsCountQuery,
   GetCareerPitchingStatsCountQueryVariables
+>;
+export const GetComparisonSeasonStats = gql`
+  query GetComparisonSeasonStats(
+    $id0: Int!
+    $has0: Boolean!
+    $id1: Int!
+    $has1: Boolean!
+    $id2: Int!
+    $has2: Boolean!
+    $id3: Int!
+    $has3: Boolean!
+  ) {
+    slot0Batting: playerSeasonBatting(playerId: $id0) @include(if: $has0) {
+      season
+      team
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    slot0Pitching: playerSeasonPitching(playerId: $id0) @include(if: $has0) {
+      season
+      team
+      games
+      wins
+      losses
+      gamesStarted
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      strikeouts
+      earnedRunAverage
+      whip
+    }
+    slot1Batting: playerSeasonBatting(playerId: $id1) @include(if: $has1) {
+      season
+      team
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    slot1Pitching: playerSeasonPitching(playerId: $id1) @include(if: $has1) {
+      season
+      team
+      games
+      wins
+      losses
+      gamesStarted
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      strikeouts
+      earnedRunAverage
+      whip
+    }
+    slot2Batting: playerSeasonBatting(playerId: $id2) @include(if: $has2) {
+      season
+      team
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    slot2Pitching: playerSeasonPitching(playerId: $id2) @include(if: $has2) {
+      season
+      team
+      games
+      wins
+      losses
+      gamesStarted
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      strikeouts
+      earnedRunAverage
+      whip
+    }
+    slot3Batting: playerSeasonBatting(playerId: $id3) @include(if: $has3) {
+      season
+      team
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    slot3Pitching: playerSeasonPitching(playerId: $id3) @include(if: $has3) {
+      season
+      team
+      games
+      wins
+      losses
+      gamesStarted
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      strikeouts
+      earnedRunAverage
+      whip
+    }
+  }
+`;
+
+/**
+ * __useGetComparisonSeasonStatsQuery__
+ *
+ * To run a query within a React component, call `useGetComparisonSeasonStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetComparisonSeasonStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetComparisonSeasonStatsQuery({
+ *   variables: {
+ *      id0: // value for 'id0'
+ *      has0: // value for 'has0'
+ *      id1: // value for 'id1'
+ *      has1: // value for 'has1'
+ *      id2: // value for 'id2'
+ *      has2: // value for 'has2'
+ *      id3: // value for 'id3'
+ *      has3: // value for 'has3'
+ *   },
+ * });
+ */
+export function useGetComparisonSeasonStatsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetComparisonSeasonStatsQuery,
+    GetComparisonSeasonStatsQueryVariables
+  > &
+    (
+      | { variables: GetComparisonSeasonStatsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetComparisonSeasonStatsQuery,
+    GetComparisonSeasonStatsQueryVariables
+  >(GetComparisonSeasonStats, options);
+}
+export function useGetComparisonSeasonStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetComparisonSeasonStatsQuery,
+    GetComparisonSeasonStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetComparisonSeasonStatsQuery,
+    GetComparisonSeasonStatsQueryVariables
+  >(GetComparisonSeasonStats, options);
+}
+export function useGetComparisonSeasonStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetComparisonSeasonStatsQuery,
+        GetComparisonSeasonStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetComparisonSeasonStatsQuery,
+    GetComparisonSeasonStatsQueryVariables
+  >(
+    GetComparisonSeasonStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetComparisonSeasonStatsQuery,
+          GetComparisonSeasonStatsQueryVariables
+        >,
+  );
+}
+export type GetComparisonSeasonStatsQueryHookResult = ReturnType<
+  typeof useGetComparisonSeasonStatsQuery
+>;
+export type GetComparisonSeasonStatsLazyQueryHookResult = ReturnType<
+  typeof useGetComparisonSeasonStatsLazyQuery
+>;
+export type GetComparisonSeasonStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetComparisonSeasonStatsSuspenseQuery
+>;
+export type GetComparisonSeasonStatsQueryResult = Apollo.QueryResult<
+  GetComparisonSeasonStatsQuery,
+  GetComparisonSeasonStatsQueryVariables
 >;
 export const GetDisclosureGameBestScore = gql`
   query GetDisclosureGameBestScore {

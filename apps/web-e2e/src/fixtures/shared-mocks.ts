@@ -243,6 +243,18 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   getplayerswithstats: { data: { playersWithStats: [] } },
   searchplayers: { data: { searchPlayers: [] } },
   getallplayerseasonstats: { data: { allPlayerSeasonStats: null } },
+  getcomparisonseasonstats: {
+    data: {
+      slot0Batting: [],
+      slot0Pitching: [],
+      slot1Batting: [],
+      slot1Pitching: [],
+      slot2Batting: [],
+      slot2Pitching: [],
+      slot3Batting: [],
+      slot3Pitching: [],
+    },
+  },
   getplayercareerarc: {
     data: { player: null, playerSeasonBatting: [], playerSeasonPitching: [] },
   },

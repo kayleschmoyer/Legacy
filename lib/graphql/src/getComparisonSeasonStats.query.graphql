@@ -1,0 +1,182 @@
+# Batched per-slot season stats for the Player Comparison feature (LS-7033).
+# Replaces four separate GetAllPlayerSeasonStats roundtrips (one per slot) with a
+# single request: each filled slot's batting + pitching are aliased and gated by
+# an `@include` flag so empty slots add no fields. Only batting + pitching are
+# fetched (the only data the comparison renders); player bio and fielding are
+# intentionally omitted to keep the payload minimal.
+#
+# Fields are inlined rather than spread via a type-conditioned fragment so the
+# selection applies regardless of whether a response carries `__typename` on the
+# SeasonBatting/SeasonPitching rows — matching the original getAllPlayerSeasonStats
+# query and keeping the existing hermetic mocks (which omit row `__typename`) valid.
+query GetComparisonSeasonStats(
+  $id0: Int!
+  $has0: Boolean!
+  $id1: Int!
+  $has1: Boolean!
+  $id2: Int!
+  $has2: Boolean!
+  $id3: Int!
+  $has3: Boolean!
+) {
+  slot0Batting: playerSeasonBatting(playerId: $id0) @include(if: $has0) {
+    season
+    team
+    games
+    plateAppearances
+    atBats
+    runs
+    hits
+    doubles
+    triples
+    homeRuns
+    rbi
+    stolenBases
+    caughtStealing
+    baseOnBalls
+    strikeouts
+    battingAverage
+    onBasePercentage
+    sluggingPercentage
+  }
+  slot0Pitching: playerSeasonPitching(playerId: $id0) @include(if: $has0) {
+    season
+    team
+    games
+    wins
+    losses
+    gamesStarted
+    completeGames
+    shutouts
+    saves
+    inningsPitched
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    strikeouts
+    earnedRunAverage
+    whip
+  }
+  slot1Batting: playerSeasonBatting(playerId: $id1) @include(if: $has1) {
+    season
+    team
+    games
+    plateAppearances
+    atBats
+    runs
+    hits
+    doubles
+    triples
+    homeRuns
+    rbi
+    stolenBases
+    caughtStealing
+    baseOnBalls
+    strikeouts
+    battingAverage
+    onBasePercentage
+    sluggingPercentage
+  }
+  slot1Pitching: playerSeasonPitching(playerId: $id1) @include(if: $has1) {
+    season
+    team
+    games
+    wins
+    losses
+    gamesStarted
+    completeGames
+    shutouts
+    saves
+    inningsPitched
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    strikeouts
+    earnedRunAverage
+    whip
+  }
+  slot2Batting: playerSeasonBatting(playerId: $id2) @include(if: $has2) {
+    season
+    team
+    games
+    plateAppearances
+    atBats
+    runs
+    hits
+    doubles
+    triples
+    homeRuns
+    rbi
+    stolenBases
+    caughtStealing
+    baseOnBalls
+    strikeouts
+    battingAverage
+    onBasePercentage
+    sluggingPercentage
+  }
+  slot2Pitching: playerSeasonPitching(playerId: $id2) @include(if: $has2) {
+    season
+    team
+    games
+    wins
+    losses
+    gamesStarted
+    completeGames
+    shutouts
+    saves
+    inningsPitched
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    strikeouts
+    earnedRunAverage
+    whip
+  }
+  slot3Batting: playerSeasonBatting(playerId: $id3) @include(if: $has3) {
+    season
+    team
+    games
+    plateAppearances
+    atBats
+    runs
+    hits
+    doubles
+    triples
+    homeRuns
+    rbi
+    stolenBases
+    caughtStealing
+    baseOnBalls
+    strikeouts
+    battingAverage
+    onBasePercentage
+    sluggingPercentage
+  }
+  slot3Pitching: playerSeasonPitching(playerId: $id3) @include(if: $has3) {
+    season
+    team
+    games
+    wins
+    losses
+    gamesStarted
+    completeGames
+    shutouts
+    saves
+    inningsPitched
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    strikeouts
+    earnedRunAverage
+    whip
+  }
+}
