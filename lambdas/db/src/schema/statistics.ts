@@ -2,6 +2,8 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
+import { requireEntitlement } from './authorization';
+import { ENTITLEMENTS } from './entitlements';
 
 /**
  * Statistics Schema - Connection-Based Pagination
@@ -1227,7 +1229,8 @@ builder.queryField('playerSeasonBatting', (t) =>
       playerId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
     },
-    resolve: async (parent, { playerId, season }) => {
+    resolve: async (parent, { playerId, season }, context) => {
+      await requireEntitlement(context, ENTITLEMENTS.player_comparison);
       LOGGER.debug(
         `[playerSeasonBatting] Query for playerId=${playerId}, season=${season}`,
       );
@@ -1252,7 +1255,8 @@ builder.queryField('playerSeasonPitching', (t) =>
       playerId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
     },
-    resolve: async (parent, { playerId, season }) => {
+    resolve: async (parent, { playerId, season }, context) => {
+      await requireEntitlement(context, ENTITLEMENTS.player_comparison);
       LOGGER.debug(
         `[playerSeasonPitching] Query for playerId=${playerId}, season=${season}`,
       );

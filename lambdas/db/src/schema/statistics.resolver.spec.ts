@@ -107,6 +107,32 @@ describe('Statistics Resolver', () => {
 
   const emptyCtx = {} as never;
 
+  function makeMockDb(tier: 'premium' | 'free') {
+    return {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn().mockResolvedValue([{ tier }]),
+          })),
+        })),
+      })),
+    };
+  }
+
+  function makePremiumCtx() {
+    return {
+      user: { id: 1, email: 'premium@test.com', isAdmin: false },
+      db: makeMockDb('premium'),
+    } as never;
+  }
+
+  function makeFreeCtx() {
+    return {
+      user: { id: 2, email: 'free@test.com', isAdmin: false },
+      db: makeMockDb('free'),
+    } as never;
+  }
+
   // ── careerBattingStats ────────────────────────────────────────────────────
 
   describe('careerBattingStats query', () => {
@@ -478,12 +504,27 @@ describe('Statistics Resolver', () => {
   // ── playerSeasonBatting ────────────────────────────────────────────────────
 
   describe('playerSeasonBatting query', () => {
+    it('throws PREMIUM_REQUIRED for free-tier users (LS-7028)', async () => {
+      const resolver = getQuery('playerSeasonBatting');
+      await expect(
+        resolver({}, { playerId: 1 }, makeFreeCtx(), undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+      expect(mockStatistics.getSeasonBattingStats).not.toHaveBeenCalled();
+    });
+
+    it('throws UNAUTHENTICATED for unauthenticated requests (LS-7028)', async () => {
+      const resolver = getQuery('playerSeasonBatting');
+      await expect(
+        resolver({}, { playerId: 1 }, emptyCtx, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
     it('returns empty array when no seasons found', async () => {
       const resolver = getQuery('playerSeasonBatting');
       const result = await resolver(
         {},
         { playerId: 1 },
-        emptyCtx,
+        makePremiumCtx(),
         undefined as never,
       );
 
@@ -501,7 +542,7 @@ describe('Statistics Resolver', () => {
       const result = await resolver(
         {},
         { playerId: 1 },
-        emptyCtx,
+        makePremiumCtx(),
         undefined as never,
       );
 
@@ -517,6 +558,26 @@ describe('Statistics Resolver', () => {
   // ── playerSeasonPitching ───────────────────────────────────────────────────
 
   describe('playerSeasonPitching query', () => {
+    it('throws PREMIUM_REQUIRED for free-tier users (LS-7028)', async () => {
+      const resolver = getQuery('playerSeasonPitching');
+      await expect(
+        resolver(
+          {},
+          { playerId: 2, season: 2022 },
+          makeFreeCtx(),
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+      expect(mockStatistics.getSeasonPitchingStats).not.toHaveBeenCalled();
+    });
+
+    it('throws UNAUTHENTICATED for unauthenticated requests (LS-7028)', async () => {
+      const resolver = getQuery('playerSeasonPitching');
+      await expect(
+        resolver({}, { playerId: 2 }, emptyCtx, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
     it('returns player season pitching history', async () => {
       const seasons = [{ playerId: 2, season: 2022, wins: 15 }];
       mockStatistics.getSeasonPitchingStats.mockResolvedValueOnce(seasons);
@@ -525,7 +586,7 @@ describe('Statistics Resolver', () => {
       const result = await resolver(
         {},
         { playerId: 2, season: 2022 },
-        emptyCtx,
+        makePremiumCtx(),
         undefined as never,
       );
 

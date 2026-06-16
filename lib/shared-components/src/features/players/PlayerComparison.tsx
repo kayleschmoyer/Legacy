@@ -2086,6 +2086,10 @@ export function PlayerComparison({
   // changes the variables, so fall back to `previousData` while the refetch is
   // in flight — this keeps already-loaded slots rendered instead of blanking
   // them on every slot change.
+  //
+  // skip when not premium: free users cannot access playerSeasonBatting /
+  // playerSeasonPitching (server enforces PREMIUM_REQUIRED — LS-7028), so never
+  // fire the gated request for them.
   const {
     data: currentSeasonData,
     previousData: previousSeasonData,
@@ -2101,7 +2105,7 @@ export function PlayerComparison({
       id3: selected[3]?.id ?? 0,
       has3: selected[3] != null,
     },
-    skip: activePlayers.length === 0,
+    skip: activePlayers.length === 0 || !isPremium,
   });
   const seasonData = currentSeasonData ?? previousSeasonData;
 
