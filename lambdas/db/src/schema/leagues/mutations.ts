@@ -19,7 +19,6 @@ import {
   countDistinct,
   desc,
   eq,
-  inArray,
   isNull,
   ne,
   sql,
@@ -1376,6 +1375,42 @@ builder.mutationField('deleteLeague', (t) =>
   }),
 );
 
+/**
+ * Atomically delete a set of leagues in a deadlock-safe order (LS-8099).
+ *
+ * `deleteAllLeagues` previously issued a single
+ * `DELETE FROM leagues WHERE id IN (...)`. Each league delete CASCADEs to ~18
+ * child tables and the IN-list order is arbitrary, so two concurrent
+ * deleteAllLeagues transactions over overlapping league sets could acquire the
+ * per-league parent/child row locks in different orders and deadlock (Postgres
+ * 40P01; Rollbar item 153).
+ *
+ * Deleting the leagues one at a time in ascending-id order inside a single
+ * transaction makes every concurrent transaction acquire each league's lock set
+ * in the same global order and hold it until commit, so no deadlock cycle can
+ * form. Atomicity is preserved by the surrounding transaction; child rows are
+ * still removed by the existing CASCADE constraints.
+ */
+export async function deleteLeaguesAtomically(
+  db: Context['db'],
+  leagueIds: number[],
+): Promise<void> {
+  if (leagueIds.length === 0) return;
+
+  // Ascending id is the canonical lock-acquisition order shared by every
+  // concurrent deleteAllLeagues transaction — that consistency is what breaks
+  // the deadlock cycle.
+  const orderedIds = [...leagueIds].sort((a, b) => a - b);
+
+  await db.transaction(async (tx) => {
+    for (const leagueId of orderedIds) {
+      await tx
+        .delete(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId));
+    }
+  });
+}
+
 // Mutation field to delete all leagues owned by the current user.
 // Admins can delete all leagues system-wide; regular users only delete the
 // leagues where they are the owner.
@@ -1423,10 +1458,10 @@ builder.mutationField('deleteAllLeagues', (t) =>
         // league_positions, league_members, drafts, waiver_claims, trade_offers,
         // league_messages, league_scoring_profiles, roster_lock_rules,
         // playoff_brackets, champion_trophies, tiebreaker_rules,
-        // league_week_player_seasons, league_achievement_restrictions
-        await context.db
-          .delete(PublicSchema.leagues)
-          .where(inArray(PublicSchema.leagues.id, leagueIds));
+        // league_week_player_seasons, league_achievement_restrictions.
+        // Ordered + transactional to avoid deadlocks under concurrent invocation
+        // (LS-8099) — see deleteLeaguesAtomically.
+        await deleteLeaguesAtomically(context.db, leagueIds);
 
         return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
       } catch (error) {
