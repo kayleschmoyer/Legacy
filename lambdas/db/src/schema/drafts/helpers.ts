@@ -198,6 +198,31 @@ export async function getUnfilledPositionTypes(
 }
 
 /**
+ * Map a set of still-unfilled league position slot types to the set of player
+ * stat positions that could fill at least one of them (LS-8065).
+ *
+ * Uses the same {@link ALLOWED_POSITIONS} table that {@link getUnfilledPositionTypes}
+ * uses to decide which slots a player covers, so the two stay consistent: a
+ * player whose `player_eligible_positions` intersect this set is exactly a
+ * player that meets a still-open roster requirement for the team.
+ *
+ * Unknown slot types contribute no positions (mirrors the auto-pick helper,
+ * which can never fill a slot type absent from the mapping). Returns a
+ * de-duplicated list; an empty `unfilledPositionTypes` yields an empty list.
+ */
+export function eligibleStatPositionsForUnfilledSlots(
+  unfilledPositionTypes: string[],
+): string[] {
+  return [
+    ...new Set(
+      unfilledPositionTypes.flatMap(
+        (slotType) => ALLOWED_POSITIONS[slotType] ?? [],
+      ),
+    ),
+  ];
+}
+
+/**
  * Calculate current pick information based on draft settings
  */
 export async function getCurrentDraftPickInfo(

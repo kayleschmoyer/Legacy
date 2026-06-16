@@ -11,7 +11,9 @@ import { LOGGER } from '@legacy-sports/logging';
 
 import {
   countRecentMockDrafts,
+  eligibleStatPositionsForUnfilledSlots,
   getCurrentDraftPickInfo,
+  getUnfilledPositionTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
 import {
@@ -28,6 +30,7 @@ import {
 import {
   hasEntitlement,
   isCommissionerOrOwner,
+  type LeagueMembership,
   requireEntitlement,
   verifyLeagueMembership,
 } from '../authorization';
@@ -210,8 +213,16 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         throw UserInputError('Draft not found');
       }
 
-      // Verify user is a member of this league
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+      // Verify user is a member of this league (and capture the caller's team
+      // so we can filter the board by their remaining roster requirements).
+      // The explicit LeagueMembership annotation pins the contract to the
+      // authorization helper (which returns the membership incl. teamId) so the
+      // build fails if this is ever swapped for a void-returning namesake.
+      const membership: LeagueMembership = await verifyLeagueMembership(
+        context.db,
+        draft.leagueId,
+        context.user.id,
+      );
 
       // Get league's player pool setting, career minimums, eligibility filters,
       // and matchup schedule
@@ -300,6 +311,41 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       });
       for (const { condition } of eligibilityConditions) {
         sqlConditions.push(condition);
+      }
+
+      // Hide players who don't meet a still-open roster position requirement
+      // for the caller's team (LS-8065). Auto-pick already refuses to draft a
+      // player who can't fill an unfilled slot via getUnfilledPositionTypes;
+      // the manual board, however, used to show every eligible player, so a
+      // caller who (for example) only had a pitcher slot left still saw — and
+      // could draft — hitters that meet no requirement. We mirror the auto-pick
+      // constraint here so the board can only ever narrow the pool.
+      //
+      // When the caller has no team (spectator/commissioner without a roster),
+      // the league defines no position requirements, or every slot is already
+      // filled, getUnfilledPositionTypes returns an empty list, the eligible
+      // stat-position set is empty, and no positional predicate is added —
+      // preserving the prior unfiltered behaviour.
+      if (membership.teamId != null) {
+        const unfilledPositionTypes = await getUnfilledPositionTypes(
+          context.db,
+          draftId,
+          membership.teamId,
+          draft.leagueId,
+        );
+        const eligibleStatPositions = eligibleStatPositionsForUnfilledSlots(
+          unfilledPositionTypes,
+        );
+        if (eligibleStatPositions.length > 0) {
+          const positionValues = sql.join(
+            eligibleStatPositions.map((pos) => sql`${pos}`),
+            sql`, `,
+          );
+          sqlConditions.push(sql`EXISTS (
+            SELECT 1 FROM public.player_eligible_positions pep
+            WHERE pep.player_id = p.id AND pep.position IN (${positionValues})
+          )`);
+        }
       }
 
       const whereClause =
