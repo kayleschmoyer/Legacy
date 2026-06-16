@@ -50,7 +50,7 @@ updates:
       - dependency-name: "expo"
         update-types: ["version-update:semver-major"]
 
-      # Metro ecosystem - pinned for Expo SDK 53 / React Native 0.79.6 compatibility
+      # Metro ecosystem - pinned for Expo SDK 56 / React Native 0.85.3 compatibility
       # These versions are specifically pinned to prevent TerminalReporter export conflicts
       - dependency-name: "metro"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
@@ -81,7 +81,15 @@ updates:
           - "minor"
           - "patch"
 
-      # React ecosystem - critical to keep versions aligned
+      # React + React Native + Expo + Metro ecosystem — one lockstep group.
+      # `react` is shared between apps/web and apps/app (React Native): RN 0.85.3
+      # peer-depends on react ^19.2.3 and the pnpm override pins a single react
+      # tree-wide, so React and the RN/Expo/Metro toolchain MUST be proposed and
+      # validated together in one PR rather than drifting across separate PRs.
+      # Patch-only is the safe common cadence — major react/react-dom/react-native/
+      # expo and major+minor metro bumps stay ignored above for manual coordination.
+      # See LS-8101 (merged the former react-ecosystem + react-native-ecosystem
+      # groups and folded in metro).
       react-ecosystem:
         patterns:
           - "react"
@@ -89,21 +97,14 @@ updates:
           - "@types/react"
           - "@types/react-dom"
           - "react-router*"
-        update-types:
-          - "minor"
-          - "patch"
-
-      # React Native ecosystem - very sensitive to version mismatches
-      # Metro dependencies are specifically ignored above to maintain compatibility
-      react-native-ecosystem:
-        patterns:
           - "react-native"
           - "@react-native*"
           - "@react-native-community/*"
           - "react-native-*"
           - "expo*"
           - "@expo/*"
-          # Note: metro* patterns are kept for other metro packages not specifically pinned
+          - "metro"
+          - "metro-*"
         update-types:
           - "patch"
 
