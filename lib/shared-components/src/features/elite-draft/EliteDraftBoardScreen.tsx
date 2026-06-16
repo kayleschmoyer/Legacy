@@ -78,7 +78,14 @@ export function EliteDraftBoardScreen({
     variables: { id: userId },
     skip: !user?.id,
   });
-  const isPremium = userSubscriptionData?.user?.subscriptionTier === 'premium';
+  // Admins are always treated as premium, mirroring the web `useIsPremium`
+  // hook (apps/web/src/hooks/useIsPremium.ts) and the backend authorization
+  // layer. The admin flag is sourced from the trusted server `GetUserById`
+  // response (`accessLevel`), never the client-side auth state — a forged
+  // JWT `accessLevel` claim is never signature-verified in the browser.
+  const isPremium =
+    userSubscriptionData?.user?.accessLevel === 'admin' ||
+    userSubscriptionData?.user?.subscriptionTier === 'premium';
 
   const ui = useDraftUIState();
 

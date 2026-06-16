@@ -1,4 +1,5 @@
 import React from 'react';
+import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { AutomatedDraftScreen } from './DraftStateScreens';
 import { EliteDraftBoardScreen } from './EliteDraftBoardScreen';
 import {
@@ -51,7 +52,9 @@ jest.mock('./DraftTopBand', () => ({
   DraftTopBand: () => <div data-testid="draft-top-band" />,
 }));
 jest.mock('./DraftRail', () => ({
-  DraftRail: () => <div data-testid="draft-rail" />,
+  DraftRail: ({ isPremium }: { isPremium: boolean }) => (
+    <div data-testid="draft-rail" data-is-premium={String(isPremium)} />
+  ),
 }));
 jest.mock('./DraftSidebar', () => ({
   DraftSidebar: () => <div data-testid="draft-sidebar" />,
@@ -65,6 +68,7 @@ jest.mock('./PickAnnouncement', () => ({
 jest.mock('./styles', () => ({ CSS: '' }));
 
 const mockUseAuth = jest.mocked(useAuth);
+const mockUseGetUserByIdQuery = jest.mocked(useGetUserByIdQuery);
 const mockUseDraftUIState = jest.mocked(useDraftUIState);
 const mockUseDraftQueries = jest.mocked(useDraftQueries);
 const mockUsePlayerData = jest.mocked(usePlayerData);
@@ -776,5 +780,47 @@ describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
     );
 
     expect(onActiveDraftChange).toHaveBeenCalledWith(false);
+  });
+});
+
+// LS-8105: admin users must be treated as premium on the draft board by
+// default, mirroring the web useIsPremium hook's admin short-circuit. The
+// admin flag is sourced from the trusted server GetUserById response
+// (accessLevel), not the client auth state.
+describe('EliteDraftBoardScreen — premium entitlement (LS-8105)', () => {
+  function withUser(user: { accessLevel?: string; subscriptionTier?: string }) {
+    mockUseGetUserByIdQuery.mockReturnValue({
+      data: { user: { id: 1, ...user } },
+    } as unknown as ReturnType<typeof useGetUserByIdQuery>);
+  }
+
+  it('grants premium to admin users whose subscriptionTier is free (default)', () => {
+    withUser({ accessLevel: 'admin', subscriptionTier: 'free' });
+
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByTestId('draft-rail').getAttribute('data-is-premium')).toBe(
+      'true',
+    );
+  });
+
+  it('grants premium to non-admin users on the premium tier', () => {
+    withUser({ accessLevel: 'member', subscriptionTier: 'premium' });
+
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByTestId('draft-rail').getAttribute('data-is-premium')).toBe(
+      'true',
+    );
+  });
+
+  it('does not grant premium to non-admin users on the free tier', () => {
+    withUser({ accessLevel: 'member', subscriptionTier: 'free' });
+
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByTestId('draft-rail').getAttribute('data-is-premium')).toBe(
+      'false',
+    );
   });
 });
