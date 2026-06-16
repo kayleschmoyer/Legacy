@@ -695,6 +695,10 @@ export const CSS = `
   box-shadow: 0 4px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
   position: relative;
   overflow: hidden;
+  /* d-main is a flex column with a constrained height; without flex-shrink:0
+     a tall player grid compresses this bar and overflow:hidden clips the
+     search input + position pills (LS-8106). Matches .d-view-tabs. */
+  flex-shrink: 0;
 }
 .d-controls::before {
   content: '';
