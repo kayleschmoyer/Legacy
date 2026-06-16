@@ -399,6 +399,20 @@ const MOCK_JUDGE_SEASON_BATTING = [
   },
 ];
 
+/**
+ * Ohtani batting across six seasons (2020–2025) — exercises the expand toggle
+ * (LS-7034). Collapsed, only the four most recent (2025–2022) render; expanding
+ * reveals 2021 and 2020.
+ */
+const MOCK_OHTANI_MANY_BATTING = [2025, 2024, 2023, 2022, 2021, 2020].map(
+  (season, i) => ({
+    ...MOCK_SEASON_BATTING[0],
+    season,
+    // Vary games slightly so each row is distinguishable.
+    games: 150 + i,
+  }),
+);
+
 function makeMockPlayersResponse(players = MOCK_PLAYERS) {
   return { data: { players } };
 }
@@ -470,10 +484,19 @@ function makeMockSeasonStatsResponse(
  * Build a batched GetComparisonSeasonStats response (LS-7033) from the request
  * variables. For each filled slot (`hasN === true`), the player's per-slot
  * batting/pitching are aliased as `slotNBatting` / `slotNPitching`, reusing the
- * single-player mock data keyed by `idN`.
+ * single-player mock data keyed by `idN`. Per-player `seasonOverrides` (keyed by
+ * player id) are threaded through to exercise the expand-all-seasons toggle
+ * (LS-7034).
  */
 function makeMockComparisonSeasonStatsResponse(
   variables: Record<string, unknown>,
+  seasonOverrides?: Record<
+    number,
+    {
+      batting?: typeof MOCK_SEASON_BATTING;
+      pitching?: typeof MOCK_SEASON_PITCHING;
+    }
+  >,
 ) {
   const toId = (raw: unknown): number => {
     if (typeof raw === 'number') return raw;
@@ -486,7 +509,8 @@ function makeMockComparisonSeasonStatsResponse(
   const data: Record<string, unknown> = {};
   ([0, 1, 2, 3] as const).forEach((i) => {
     if (!variables[`has${i}`]) return;
-    const per = makeMockSeasonStatsResponse(toId(variables[`id${i}`])).data;
+    const id = toId(variables[`id${i}`]);
+    const per = makeMockSeasonStatsResponse(id, seasonOverrides?.[id]).data;
     data[`slot${i}Batting`] = per.playerSeasonBatting;
     data[`slot${i}Pitching`] = per.playerSeasonPitching;
   });
@@ -494,7 +518,16 @@ function makeMockComparisonSeasonStatsResponse(
 }
 
 /** Sets up GraphQL mocks with full season stats support. */
-async function mockGraphQL(page: import('@playwright/test').Page) {
+async function mockGraphQL(
+  page: import('@playwright/test').Page,
+  seasonOverrides?: Record<
+    number,
+    {
+      batting?: typeof MOCK_SEASON_BATTING;
+      pitching?: typeof MOCK_SEASON_PITCHING;
+    }
+  >,
+) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
@@ -528,7 +561,7 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(
-            makeMockComparisonSeasonStatsResponse(variables),
+            makeMockComparisonSeasonStatsResponse(variables, seasonOverrides),
           ),
         });
       } else if (op === 'getmysubscription') {
@@ -864,6 +897,72 @@ adminTest.describe(
         await expect(pitchingSection.getByText('ERA').first()).toBeVisible();
         await expect(pitchingSection.getByText('SO').first()).toBeVisible();
         await expect(pitchingSection.getByText('WHIP').first()).toBeVisible();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests: Season expand toggle (LS-7034) @regression
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – season expand toggle (LS-7034) @regression',
+  () => {
+    adminTest(
+      'no expand toggle when a player has 4 or fewer seasons',
+      async ({ page }) => {
+        // Default mock gives Ohtani 2 seasons — below the truncation threshold.
+        await mockGraphQL(page);
+        await page.goto('/players/compare');
+        await page.waitForLoadState('load');
+        await addPlayer(page, 'Sh', 'Shohei Ohtani');
+
+        await expect(
+          page.getByRole('table', { name: 'Season batting for Shohei Ohtani' }),
+        ).toBeVisible();
+        await expect(page.getByTestId('season-expand-2')).toHaveCount(0);
+      },
+    );
+
+    adminTest(
+      'expand toggle reveals seasons beyond the four most recent',
+      async ({ page }) => {
+        // Give Ohtani six batting seasons so the toggle appears.
+        await mockGraphQL(page, { 2: { batting: MOCK_OHTANI_MANY_BATTING } });
+        await page.goto('/players/compare');
+        await page.waitForLoadState('load');
+        await addPlayer(page, 'Sh', 'Shohei Ohtani');
+
+        const battingTable = page.getByRole('table', {
+          name: 'Season batting for Shohei Ohtani',
+        });
+        await expect(battingTable).toBeVisible();
+
+        // Collapsed: four most recent shown (2025–2022); 2020 is truncated.
+        await expect(
+          battingTable.getByText('2025', { exact: true }),
+        ).toBeVisible();
+        await expect(
+          battingTable.getByText('2020', { exact: true }),
+        ).toHaveCount(0);
+
+        const toggle = page.getByTestId('season-expand-2');
+        await expect(toggle).toBeVisible();
+        await expect(toggle).toHaveText(/Expand all 6 seasons/);
+
+        // Expand: the older seasons become visible.
+        await toggle.click();
+        await expect(
+          battingTable.getByText('2020', { exact: true }),
+        ).toBeVisible();
+        await expect(toggle).toHaveText(/Show fewer/);
+
+        // Collapse again: 2020 is hidden once more.
+        await toggle.click();
+        await expect(
+          battingTable.getByText('2020', { exact: true }),
+        ).toHaveCount(0);
       },
     );
   },

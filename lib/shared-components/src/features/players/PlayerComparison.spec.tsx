@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import {
   addPlayerToSlots,
   bestIndex,
+  DEFAULT_SEASON_COUNT,
   fmt,
   fmtAvg,
   fmtCount,
@@ -26,6 +27,7 @@ import {
   selectSeasonPitchingRows,
   SlotBadge,
   tiedIndices,
+  visibleSeasonRows,
 } from './PlayerComparison';
 import { render } from '../../test-utils';
 
@@ -570,5 +572,36 @@ describe('SlotBadge', () => {
   it('exposes an accessible "Slot N" label so the marker is no longer unlabeled', () => {
     const { getByLabelText } = render(<SlotBadge index={3} />);
     expect(getByLabelText('Slot 4')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// visibleSeasonRows — LS-7034 (expand-all-seasons toggle)
+// ---------------------------------------------------------------------------
+
+describe('visibleSeasonRows', () => {
+  const seasons = [2025, 2024, 2023, 2022, 2021, 2020];
+
+  it('truncates to the default count when collapsed', () => {
+    expect(visibleSeasonRows(seasons, false)).toEqual([2025, 2024, 2023, 2022]);
+    expect(visibleSeasonRows(seasons, false)).toHaveLength(
+      DEFAULT_SEASON_COUNT,
+    );
+  });
+
+  it('returns every row when expanded', () => {
+    expect(visibleSeasonRows(seasons, true)).toEqual(seasons);
+  });
+
+  it('returns all rows unchanged when there are fewer than the default count', () => {
+    const few = [2025, 2024];
+    expect(visibleSeasonRows(few, false)).toEqual(few);
+    expect(visibleSeasonRows(few, true)).toEqual(few);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [...seasons];
+    visibleSeasonRows(input, false);
+    expect(input).toEqual(seasons);
   });
 });

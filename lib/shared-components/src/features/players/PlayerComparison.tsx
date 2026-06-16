@@ -18,7 +18,14 @@ import {
   type ViewProps,
   type ViewStyle,
 } from 'react-native';
-import { Info, Lock, Plus, X } from '@tamagui/lucide-icons';
+import {
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Lock,
+  Plus,
+  X,
+} from '@tamagui/lucide-icons';
 // Structural table elements use a Tamagui stack: on web the `tag` prop renders
 // a real <table>/<thead>/<tbody>/<tr>/<th>/<td> host element (with `role` kept
 // for native screen readers, since the optimizer strips `role` from the web
@@ -166,6 +173,19 @@ export function fmt(n: number | null | undefined, decimals = 0): string {
   if (n == null) return '—';
   if (decimals > 0) return n.toFixed(decimals);
   return n.toLocaleString('en-US');
+}
+
+// Number of most-recent seasons each player block shows before the reader
+// expands it (LS-7034). The tables used to truncate to this count with no way
+// to reach older seasons, breaking the page's "read the whole story across
+// eras" promise; the expand toggle reveals the full history on demand.
+export const DEFAULT_SEASON_COUNT = 4;
+
+// Pure truncate/expand selector so the season-table behavior is unit-testable
+// without rendering (extract-and-test pattern, LS-7034). Returns the most
+// recent `DEFAULT_SEASON_COUNT` rows when collapsed, or every row when expanded.
+export function visibleSeasonRows<T>(rows: T[], expanded: boolean): T[] {
+  return expanded ? rows : rows.slice(0, DEFAULT_SEASON_COUNT);
 }
 
 export function fmtAvg(n: number | null | undefined): string {
@@ -1506,35 +1526,41 @@ export type SeasonPitchingRow = NonNullable<
 
 /**
  * Batting rows for the season breakdown: keep only seasons with a real plate
- * presence (`(atBats ?? 0) > 0`), newest first, capped at the 4 most recent.
- * A pitcher with no batting AB yields an empty list, so the batting table is
- * suppressed — symmetric with {@link selectSeasonPitchingRows} so the "No
- * season data" fallback fires only when both tables are empty (LS-7036).
+ * presence (`(atBats ?? 0) > 0`), newest first. Capped at `limit` (the 4 most
+ * recent by default; pass `Infinity` for the full history behind the expand
+ * toggle — LS-7034). A pitcher with no batting AB yields an empty list, so the
+ * batting table is suppressed — symmetric with {@link selectSeasonPitchingRows}
+ * so the "No season data" fallback fires only when both tables are empty
+ * (LS-7036).
  */
 export function selectSeasonBattingRows(
   data: SeasonStatsData,
+  limit: number = DEFAULT_SEASON_COUNT,
 ): SeasonBattingRow[] {
   if (!data?.playerSeasonBatting) return [];
   return [...data.playerSeasonBatting]
     .filter((r) => r?.season != null && (r.atBats ?? 0) > 0)
     .sort((a, b) => (b?.season ?? 0) - (a?.season ?? 0))
-    .slice(0, 4);
+    .slice(0, limit);
 }
 
 /**
  * Pitching rows for the season breakdown: keep only seasons with real innings
- * (`(inningsPitched ?? 0) > 0`), newest first, capped at the 4 most recent.
- * Mirrors {@link selectSeasonBattingRows}; a position player with no innings
- * yields an empty list so the pitching table is suppressed (LS-7036).
+ * (`(inningsPitched ?? 0) > 0`), newest first. Capped at `limit` (the 4 most
+ * recent by default; pass `Infinity` for the full history behind the expand
+ * toggle — LS-7034). Mirrors {@link selectSeasonBattingRows}; a position player
+ * with no innings yields an empty list so the pitching table is suppressed
+ * (LS-7036).
  */
 export function selectSeasonPitchingRows(
   data: SeasonStatsData,
+  limit: number = DEFAULT_SEASON_COUNT,
 ): SeasonPitchingRow[] {
   if (!data?.playerSeasonPitching) return [];
   return [...data.playerSeasonPitching]
     .filter((r) => r?.season != null && (r.inningsPitched ?? 0) > 0)
     .sort((a, b) => (b?.season ?? 0) - (a?.season ?? 0))
-    .slice(0, 4);
+    .slice(0, limit);
 }
 
 function SeasonBattingBlock({
@@ -1550,9 +1576,28 @@ function SeasonBattingBlock({
 }) {
   const accent = PLAYER_ACCENTS[accentIndex] ?? BRAND_GOLD;
 
-  const rows = useMemo(() => selectSeasonBattingRows(data), [data]);
+  // Per-block expand state: collapsed shows the 4 most recent seasons, expanded
+  // shows the full history so older eras aren't truncated silently (LS-7034).
+  // The full (uncapped) lists drive the toggle and meta; visibleSeasonRows
+  // applies the collapse cap, reusing the LS-7037 selectors with no limit.
+  const [expanded, setExpanded] = useState(false);
 
-  const pitchingRows = useMemo(() => selectSeasonPitchingRows(data), [data]);
+  const allBattingRows = useMemo(
+    () => selectSeasonBattingRows(data, Infinity),
+    [data],
+  );
+  const allPitchingRows = useMemo(
+    () => selectSeasonPitchingRows(data, Infinity),
+    [data],
+  );
+
+  const rows = visibleSeasonRows(allBattingRows, expanded);
+  const pitchingRows = visibleSeasonRows(allPitchingRows, expanded);
+
+  // The reader can expand whenever either table has more than the default
+  // count; `totalSeasons` reports the deeper of the two for the meta/label copy.
+  const totalSeasons = Math.max(allBattingRows.length, allPitchingRows.length);
+  const canExpand = totalSeasons > DEFAULT_SEASON_COUNT;
 
   // Pre-format each season into a flat cell array so the table and the
   // narrow-viewport card list share one source of values (LS-7035).
@@ -1634,7 +1679,14 @@ function SeasonBattingBlock({
             fontSize: 12,
           }}
         >
-          {player.position} · showing 4 most recent seasons
+          {player.position}
+          {canExpand
+            ? expanded
+              ? ` · showing all ${totalSeasons} seasons`
+              : ` · showing 4 of ${totalSeasons} seasons`
+            : totalSeasons > 0
+              ? ` · ${totalSeasons} season${totalSeasons === 1 ? '' : 's'}`
+              : ''}
         </Text>
       </View>
 
@@ -1737,6 +1789,50 @@ function SeasonBattingBlock({
         <Text style={{ color: TEXT_MUTED, fontSize: 12, fontStyle: 'italic' }}>
           No season data available.
         </Text>
+      ) : null}
+
+      {!loading && canExpand ? (
+        <Pressable
+          role="button"
+          tabIndex={0}
+          testID={`season-expand-${player.id}`}
+          aria-expanded={expanded}
+          aria-label={
+            expanded
+              ? `Show fewer seasons for ${player.name}`
+              : `Show all ${totalSeasons} seasons for ${player.name}`
+          }
+          onPress={() => setExpanded((v) => !v)}
+          style={{
+            marginTop: 16,
+            alignSelf: 'flex-start',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingVertical: 8,
+            paddingHorizontal: 14,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: withAlpha(accent, 0.5),
+            backgroundColor: withAlpha(accent, 0.08),
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_BODY,
+              fontWeight: '700',
+              fontSize: 12,
+              color: accent,
+            }}
+          >
+            {expanded ? 'Show fewer' : `Expand all ${totalSeasons} seasons`}
+          </Text>
+          {expanded ? (
+            <ChevronUp size={14} color={accent} />
+          ) : (
+            <ChevronDown size={14} color={accent} />
+          )}
+        </Pressable>
       ) : null}
     </View>
   );
@@ -2483,7 +2579,7 @@ export function PlayerComparison({
 
               <SectionHead
                 title="Season by Season"
-                meta="Four most recent per player · full log inside Player Detail"
+                meta="Four most recent per player · expand any block for full history"
               />
               {selected.map((player, idx) =>
                 player ? (
