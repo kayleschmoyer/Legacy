@@ -470,6 +470,13 @@ export const CSS = `
 }
 .d-pos-progress-row.filled .d-pos-progress-count { color: var(--d-text); }
 .d-pos-progress-row.complete .d-pos-progress-count { color: #6FD39A; }
+/* Drag-to-draft drop targets (LS-8068) */
+.d-pos-progress-row.drop-eligible {
+  border-radius: 6px;
+  outline: 1px dashed rgba(111, 211, 154, 0.7);
+  background: rgba(111, 211, 154, 0.08);
+}
+.d-pos-progress-row.drop-ineligible { opacity: 0.4; }
 
 /* Pick history rows */
 .d-pick-row {
@@ -789,6 +796,8 @@ export const CSS = `
   animation: fadeSlideUp 0.45s ease-out both;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
 }
+.d-card.draggable { cursor: grab; }
+.d-card.draggable:active { cursor: grabbing; }
 .d-card::before {
   content: '';
   position: absolute; inset: 0;

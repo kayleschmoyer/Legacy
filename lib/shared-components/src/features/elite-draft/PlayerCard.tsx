@@ -29,6 +29,8 @@ export const PlayerCard = React.memo(function PlayerCard({
   onToggleWatch,
   onToggleQueue,
   onPlayerClick,
+  onDragStartPlayer,
+  onDragEndPlayer,
 }: {
   player: DraftPlayer;
   index: number;
@@ -41,6 +43,9 @@ export const PlayerCard = React.memo(function PlayerCard({
   onToggleWatch: (playerId: number) => void;
   onToggleQueue?: (playerId: number) => void;
   onPlayerClick?: (playerId: number) => void;
+  /** Drag-to-draft (LS-8068): notified when this card starts/stops dragging. */
+  onDragStartPlayer?: (player: DraftPlayer) => void;
+  onDragEndPlayer?: () => void;
 }) {
   const isDrafting = isMyPick && pickLoading;
   const posColor = getPositionColor('baseball', player.position);
@@ -52,12 +57,30 @@ export const PlayerCard = React.memo(function PlayerCard({
     player.careerEndYear,
   );
 
+  // LS-8068: drag-to-draft is only meaningful on the user's pick. Dropping a
+  // card onto an eligible roster slot in the rail drafts the player; the rail
+  // validates eligibility and the active turn before committing the pick.
+  const dragEnabled = isMyPick && !isDrafting && !!onDragStartPlayer;
+
   return (
     <div
-      className="d-card"
+      className={`d-card${dragEnabled ? ' draggable' : ''}`}
       style={{ animationDelay: `${index * 0.04}s` }}
       role="group"
       aria-labelledby={`pn-${player.id}`}
+      draggable={dragEnabled}
+      onDragStart={
+        dragEnabled
+          ? (e: React.DragEvent) => {
+              // text/plain payload makes the native drag valid in all browsers;
+              // the rail reads the dragged player from lifted state, not this.
+              e.dataTransfer.setData('text/plain', String(player.id));
+              e.dataTransfer.effectAllowed = 'move';
+              onDragStartPlayer?.(player);
+            }
+          : undefined
+      }
+      onDragEnd={dragEnabled ? () => onDragEndPlayer?.() : undefined}
     >
       <div className="d-card-accent" style={{ background: posColor }} />
       <div className="d-card-body">

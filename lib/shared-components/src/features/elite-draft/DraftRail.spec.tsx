@@ -9,6 +9,7 @@
 import React from 'react';
 import { DraftRail } from './DraftRail';
 import { POSITION_COLORS } from './constants';
+import type { DraftPlayer } from './types';
 import { fireEvent, render } from '../../test-utils';
 
 jest.mock('./DraftIntelligence', () => ({
@@ -94,6 +95,100 @@ describe('DraftRail roster depth chart', () => {
       const { queryByLabelText } = render(<DraftRail {...baseProps} />);
       expect(queryByLabelText('C: 0 of 1')).toBeTruthy();
       expect(queryByLabelText('P: 0 of 9')).toBeTruthy();
+    });
+  });
+
+  // LS-8068: drag-to-draft onto an eligible roster slot.
+  describe('drag-to-draft', () => {
+    const player = (eligiblePositions: string[]): DraftPlayer =>
+      ({
+        id: 42,
+        name: 'Drafty McDraftface',
+        position: eligiblePositions[0],
+        eligiblePositions,
+      }) as DraftPlayer;
+
+    it('drafts the player when dropped on an eligible slot during your turn', () => {
+      const onDraftPlayer = jest.fn();
+      const { getByLabelText } = render(
+        <DraftRail
+          {...baseProps}
+          isMyPick
+          draggedPlayer={player(['SS'])}
+          onDraftPlayer={onDraftPlayer}
+        />,
+      );
+      fireEvent.drop(getByLabelText('SS: 0 of 1'));
+      expect(onDraftPlayer).toHaveBeenCalledWith(42);
+    });
+
+    it('rejects a drop on an ineligible slot with a toast', () => {
+      const onDraftPlayer = jest.fn();
+      const onShowToast = jest.fn();
+      const { getByLabelText } = render(
+        <DraftRail
+          {...baseProps}
+          isMyPick
+          draggedPlayer={player(['SS'])}
+          onDraftPlayer={onDraftPlayer}
+          onShowToast={onShowToast}
+        />,
+      );
+      fireEvent.drop(getByLabelText('C: 0 of 1'));
+      expect(onDraftPlayer).not.toHaveBeenCalled();
+      expect(onShowToast).toHaveBeenCalledWith(
+        expect.stringContaining('eligible'),
+      );
+    });
+
+    it('rejects a drop when it is not your turn', () => {
+      const onDraftPlayer = jest.fn();
+      const onShowToast = jest.fn();
+      const { getByLabelText } = render(
+        <DraftRail
+          {...baseProps}
+          isMyPick={false}
+          draggedPlayer={player(['SS'])}
+          onDraftPlayer={onDraftPlayer}
+          onShowToast={onShowToast}
+        />,
+      );
+      fireEvent.drop(getByLabelText('SS: 0 of 1'));
+      expect(onDraftPlayer).not.toHaveBeenCalled();
+      expect(onShowToast).toHaveBeenCalledWith(
+        expect.stringContaining('your turn'),
+      );
+    });
+
+    it('force-picks via commissioner mode when dropped on an eligible slot', () => {
+      const onCommissionerPick = jest.fn();
+      const onDraftPlayer = jest.fn();
+      const { getByLabelText } = render(
+        <DraftRail
+          {...baseProps}
+          isMyPick={false}
+          commPickMode
+          isOwner
+          draggedPlayer={player(['SP'])}
+          onCommissionerPick={onCommissionerPick}
+          onDraftPlayer={onDraftPlayer}
+        />,
+      );
+      fireEvent.drop(getByLabelText('P: 0 of 9'));
+      expect(onCommissionerPick).toHaveBeenCalledWith(42);
+      expect(onDraftPlayer).not.toHaveBeenCalled();
+    });
+
+    it('highlights eligible slots while a card is being dragged', () => {
+      const { getByLabelText } = render(
+        <DraftRail {...baseProps} isMyPick draggedPlayer={player(['SS'])} />,
+      );
+      expect(
+        getByLabelText('SS: 0 of 1').classList.contains('drop-eligible'),
+      ).toBe(true);
+      expect(
+        getByLabelText('C: 0 of 1').classList.contains('drop-ineligible'),
+      ).toBe(true);
     });
   });
 

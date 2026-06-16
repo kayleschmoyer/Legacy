@@ -72,6 +72,10 @@ interface DraftPlayerBoardProps {
   onCommissionerPick: (playerId: number) => void;
   onToggleQueue: (playerId: number) => void;
   onLoadMore: () => void;
+  /** Drag-to-draft (LS-8068): lifted to the screen so the rail can highlight
+   *  eligible slots and commit the pick on drop. */
+  onPlayerDragStart?: (player: DraftPlayer) => void;
+  onPlayerDragEnd?: () => void;
 }
 
 const VIEW_TABS: Array<{ mode: ViewMode; label: string }> = [
@@ -115,6 +119,8 @@ export function DraftPlayerBoard({
   onCommissionerPick,
   onToggleQueue,
   onLoadMore,
+  onPlayerDragStart,
+  onPlayerDragEnd,
 }: DraftPlayerBoardProps): React.JSX.Element {
   const gridCols =
     viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
@@ -671,6 +677,8 @@ export function DraftPlayerBoard({
                       : undefined
                   }
                   onPlayerClick={handlePlayerClick}
+                  onDragStartPlayer={onPlayerDragStart}
+                  onDragEndPlayer={onPlayerDragEnd}
                 />
               ))}
               {filteredPlayers.length === 0 && !availablePlayersLoading && (

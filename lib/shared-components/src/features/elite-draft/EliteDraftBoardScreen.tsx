@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
@@ -29,6 +29,7 @@ import { DraftChatOverlay } from './DraftChatOverlay';
 import { DraftSidebar } from './DraftSidebar';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
+import type { DraftPlayer } from './types';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
 
@@ -341,6 +342,16 @@ export function EliteDraftBoardScreen({
     void refetchCurrentPick();
   }, [refetchCurrentPick]);
 
+  // LS-8068: drag-to-draft. The player card being dragged is held here so the
+  // DraftRail can highlight eligible roster slots during the drag and validate
+  // eligibility on drop. Cleared when the drag ends (drop or cancel).
+  const [draggedPlayer, setDraggedPlayer] = useState<DraftPlayer | null>(null);
+  const handlePlayerDragStart = useCallback(
+    (player: DraftPlayer) => setDraggedPlayer(player),
+    [],
+  );
+  const handlePlayerDragEnd = useCallback(() => setDraggedPlayer(null), []);
+
   // ---- Early returns for special states ----
   if (!leagueId) return <NoLeagueScreen onNavigate={onNavigate} />;
 
@@ -598,6 +609,8 @@ export function EliteDraftBoardScreen({
           onCommissionerPick={handleCommissionerPick}
           onToggleQueue={handleToggleQueuePlayer}
           onLoadMore={handleLoadMore}
+          onPlayerDragStart={handlePlayerDragStart}
+          onPlayerDragEnd={handlePlayerDragEnd}
         />
 
         <DraftRail
@@ -611,12 +624,14 @@ export function EliteDraftBoardScreen({
           autoPickDisabled={ui.autoPickDisabled}
           myTeam={playerData.myTeam}
           positionCounts={playerData.positionCounts}
+          sport={sport}
           pickHistory={queries.pickHistory}
           statsLookup={playerData.statsLookup}
           teamNameById={queries.teamNameById}
           onShowToast={ui.showToast}
           onDraftPlayer={handleDraftPlayer}
           onCommissionerPick={handleCommissionerPick}
+          draggedPlayer={draggedPlayer}
         />
       </div>
 

@@ -3,6 +3,7 @@ import type { DraftPickRecord, DraftPlayer } from './types';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { getPositionColor } from './utils';
+import { isPlayerEligibleForSlot } from './draftDnd';
 import type { Sport } from '../../utils/colors';
 
 // Position slot configuration for the depth-chart-style roster summary,
@@ -56,6 +57,8 @@ interface DraftRailProps {
   pickHistory: DraftPickRecord[];
   statsLookup: Map<number, DraftPlayer>;
   teamNameById: (teamId: number | null | undefined) => string;
+  /** Drag-to-draft (LS-8068): the player card currently being dragged, or null. */
+  draggedPlayer?: DraftPlayer | null;
   // Actions
   onShowToast: (msg: string) => void;
   onDraftPlayer: (playerId: number) => void;
@@ -96,6 +99,7 @@ export function DraftRail({
   pickHistory,
   statsLookup,
   teamNameById,
+  draggedPlayer = null,
   onShowToast,
   onDraftPlayer,
   onCommissionerPick,
@@ -103,6 +107,29 @@ export function DraftRail({
   const positionSlots = getPositionSlotsForSport(sport);
   const totalDrafted = myTeam.length;
   const totalSlots = positionSlots.reduce((sum, s) => sum + s.slots, 0);
+
+  // LS-8068: drag-to-draft. A player card dropped onto an eligible roster slot
+  // drafts that player (the server is the final gate on the pick). Mirrors the
+  // PlayerCard "Draft Now" gating: commissioner force-pick when in comm-pick
+  // mode, otherwise only on the user's own turn.
+  const canDraft = commPickMode ? isOwner : isMyPick;
+  const handleSlotDrop = (slotPos: string, label: string) => {
+    const player = draggedPlayer;
+    if (!player) return;
+    if (!canDraft) {
+      onShowToast('Wait for your turn to draft.');
+      return;
+    }
+    if (!isPlayerEligibleForSlot(sport, slotPos, player.eligiblePositions)) {
+      onShowToast(`${player.name} isn't eligible at ${label}.`);
+      return;
+    }
+    if (commPickMode && isOwner) {
+      onCommissionerPick(player.id);
+    } else {
+      onDraftPlayer(player.id);
+    }
+  };
 
   // LS-4824: on mobile the rail sits above the player pool and consumes the
   // top of the viewport. Default to collapsed so mobile users can see the
@@ -197,12 +224,43 @@ export function DraftRail({
               const barColor = getPositionColor(sport ?? 'baseball', pos);
               const isFilled = count > 0;
               const isComplete = count >= slots;
+              // Drag-to-draft highlight: only when a draggable player is active.
+              const dropEligible =
+                draggedPlayer != null &&
+                canDraft &&
+                isPlayerEligibleForSlot(
+                  sport,
+                  pos,
+                  draggedPlayer.eligiblePositions,
+                );
+              const isDragActive = draggedPlayer != null;
               return (
                 <div
                   key={pos}
-                  className={`d-pos-progress-row${isFilled ? ' filled' : ''}${isComplete ? ' complete' : ''}`}
+                  className={`d-pos-progress-row${isFilled ? ' filled' : ''}${isComplete ? ' complete' : ''}${isDragActive ? (dropEligible ? ' drop-eligible' : ' drop-ineligible') : ''}`}
                   role="listitem"
                   aria-label={`${label}: ${count} of ${slots}`}
+                  onDragOver={
+                    isDragActive
+                      ? (e: React.DragEvent) => {
+                          // preventDefault makes every rail row a valid drop
+                          // target so an ineligible drop still fires and we can
+                          // toast *why* it was rejected. Eligibility is conveyed
+                          // visually via the drop-eligible / drop-ineligible
+                          // classes while hovering.
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                        }
+                      : undefined
+                  }
+                  onDrop={
+                    isDragActive
+                      ? (e: React.DragEvent) => {
+                          e.preventDefault();
+                          handleSlotDrop(pos, label);
+                        }
+                      : undefined
+                  }
                 >
                   <span className="d-pos-progress-label">{label}</span>
                   <div className="d-pos-progress-bar" aria-hidden="true">
