@@ -7,7 +7,7 @@
  */
 import type { GetAllPlayerSeasonStatsQuery } from '@legacy-sports/graphql';
 import { act, renderHook } from '@testing-library/react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   addPlayerToSlots,
   bestIndex,
@@ -24,8 +24,10 @@ import {
   type SelectedPlayer,
   selectSeasonBattingRows,
   selectSeasonPitchingRows,
+  SlotBadge,
   tiedIndices,
 } from './PlayerComparison';
+import { render } from '../../test-utils';
 
 describe('fmt', () => {
   it('renders an em dash for nullish values', () => {
@@ -543,5 +545,30 @@ describe('isNarrowSeasonViewport', () => {
     expect(isNarrowSeasonViewport(SEASON_STACK_BREAKPOINT)).toBe(false);
     expect(isNarrowSeasonViewport(768)).toBe(false);
     expect(isNarrowSeasonViewport(1280)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SlotBadge — slot identity is conveyed by number, not color alone (PCM-044 /
+// LS-7039). Color-blind users must be able to distinguish slots and map a chip
+// to its comparison-table column without relying on the accent color. The badge
+// is shared by the selected-player chip and the comparison-table column header.
+// ---------------------------------------------------------------------------
+
+describe('SlotBadge', () => {
+  it('renders the 1-based slot number as visible text (index 0 → "1")', () => {
+    const { getByText } = render(<SlotBadge index={0} />);
+    // The digit is the non-color differentiator that replaces the bare dot.
+    expect(getByText('1')).toBeTruthy();
+  });
+
+  it('numbers slots from the player index (index 2 → "3")', () => {
+    const { getByText } = render(<SlotBadge index={2} />);
+    expect(getByText('3')).toBeTruthy();
+  });
+
+  it('exposes an accessible "Slot N" label so the marker is no longer unlabeled', () => {
+    const { getByLabelText } = render(<SlotBadge index={3} />);
+    expect(getByLabelText('Slot 4')).toBeTruthy();
   });
 });

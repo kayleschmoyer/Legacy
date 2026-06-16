@@ -753,6 +753,56 @@ function PlayerSearchInput({
 }
 
 // ---------------------------------------------------------------------------
+// Slot badge
+// ---------------------------------------------------------------------------
+
+/**
+ * Numbered slot badge (1–4). Slot identity is conveyed by the **number**, not
+ * the accent color alone, so color-blind users can tell slots apart and map a
+ * chip to its comparison-table column (PCM-044 / LS-7039). The accent color is
+ * a secondary, redundant cue; the digit is the primary differentiator. The
+ * navy digit sits on the lighter accent fill so the visible glyph clears WCAG
+ * AA contrast, replacing the bare decorative dot.
+ */
+export function SlotBadge({
+  index,
+  size = 18,
+}: {
+  index: number;
+  size?: number;
+}) {
+  const accent = PLAYER_ACCENTS[index] ?? BRAND_GOLD;
+  const slot = index + 1;
+  return (
+    <View
+      aria-label={`Slot ${slot}`}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: accent,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text
+        aria-hidden
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: '800',
+          fontSize: Math.round(size * 0.6),
+          lineHeight: size,
+          textAlign: 'center',
+          color: BRAND_NAVY_DARK,
+        }}
+      >
+        {slot}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Player chip
 // ---------------------------------------------------------------------------
 
@@ -765,7 +815,6 @@ function PlayerChip({
   index: number;
   onRemove: () => void;
 }) {
-  const accent = PLAYER_ACCENTS[index] ?? BRAND_GOLD;
   const borderColor = PLAYER_ACCENT_ALPHAS[index] ?? 'rgba(197,165,90,0.5)';
   return (
     <View
@@ -783,14 +832,7 @@ function PlayerChip({
         backgroundColor: SURFACE_PANEL,
       }}
     >
-      <View
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: 5,
-          backgroundColor: accent,
-        }}
-      />
+      <SlotBadge index={index} />
       <Text
         style={{
           fontFamily: FONT_DISPLAY,
@@ -1027,16 +1069,22 @@ function ComparisonTable({
                   >
                     {p.position}
                   </Text>
-                  <View
-                    aria-hidden
-                    style={{
-                      width: 32,
-                      height: 3,
-                      borderRadius: 2,
-                      marginTop: 6,
-                      backgroundColor: PLAYER_ACCENTS[i] ?? BRAND_GOLD,
-                    }}
-                  />
+                  {/* Numbered slot badge + accent bar. The badge mirrors the
+                      selected-player chip so color-blind users can map a chip
+                      to its column by number, not color alone (PCM-044). The
+                      bar stays decorative (aria-hidden). */}
+                  <XStack alignItems="center" gap={6} marginTop={6}>
+                    <SlotBadge index={i} size={16} />
+                    <View
+                      aria-hidden
+                      style={{
+                        width: 24,
+                        height: 3,
+                        borderRadius: 2,
+                        backgroundColor: PLAYER_ACCENTS[i] ?? BRAND_GOLD,
+                      }}
+                    />
+                  </XStack>
                 </YStack>
               ))}
             </YStack>
