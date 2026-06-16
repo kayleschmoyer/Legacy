@@ -45,6 +45,11 @@ import {
   ROSTER_RANGE_BY_SPORT,
 } from './sport-validation';
 import { generateSecureInviteCode } from './helpers';
+import {
+  describeDbError,
+  formatDbError,
+  withTransientRetry,
+} from './delete-resilience';
 import { builder, type Context } from '../builder';
 import {
   adjustMatchupsForNewTotal,
@@ -1352,24 +1357,47 @@ builder.mutationField('deleteLeague', (t) =>
           );
         }
 
-        // Delete the league - CASCADE DELETE constraints handle the rest
-        await context.db
-          .delete(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, args.leagueId));
+        // Delete the league - CASCADE DELETE constraints handle the rest.
+        // Retry transient deadlock / lock-timeout failures (LS-8100).
+        await withTransientRetry(
+          () =>
+            context.db
+              .delete(PublicSchema.leagues)
+              .where(eq(PublicSchema.leagues.id, args.leagueId)),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn('Retrying league delete after transient DB error', {
+                leagueId: args.leagueId,
+                attempt,
+                pgCode: detail.code,
+              }),
+          },
+        );
 
         return `Successfully deleted league ${args.leagueId} and all associated data`;
       } catch (error) {
         if (error instanceof GraphQLError) {
           throw error;
         }
+        // Drizzle hides the real Postgres error in `error.cause`; surface it so
+        // failures are diagnosable instead of an opaque "Failed query" (LS-8100).
+        const detail = describeDbError(error);
         LOGGER.error(
           'Error deleting league',
           error instanceof Error ? error : new Error(String(error)),
-          { leagueId: args.leagueId, userId: context.user?.id },
+          {
+            leagueId: args.leagueId,
+            userId: context.user?.id,
+            pgCode: detail.code,
+            constraint: detail.constraint,
+            table: detail.table,
+            detail: detail.detail,
+          },
         );
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        throw new Error('Failed to delete league: ' + errorMessage);
+        throw new GraphQLError(
+          'Failed to delete league: ' + formatDbError(detail),
+          { extensions: { code: 'LEAGUE_DELETE_FAILED' } },
+        );
       }
     },
   }),
@@ -1453,29 +1481,54 @@ builder.mutationField('deleteAllLeagues', (t) =>
 
         const leagueIds = allLeagues.map((l) => l.id);
 
-        // Delete all leagues — CASCADE DELETE constraints handle all related data:
-        // teams, team_members, matchups, matchup_players, matchup_player_games,
-        // league_positions, league_members, drafts, waiver_claims, trade_offers,
-        // league_messages, league_scoring_profiles, roster_lock_rules,
-        // playoff_brackets, champion_trophies, tiebreaker_rules,
-        // league_week_player_seasons, league_achievement_restrictions.
-        // Ordered + transactional to avoid deadlocks under concurrent invocation
-        // (LS-8099) — see deleteLeaguesAtomically.
-        await deleteLeaguesAtomically(context.db, leagueIds);
+        // Delete all leagues — CASCADE DELETE constraints handle all related
+        // data: teams, team_members, matchups, matchup_players,
+        // matchup_player_games, league_positions, league_members, drafts,
+        // waiver_claims, trade_offers, league_messages, league_scoring_profiles,
+        // roster_lock_rules, playoff_brackets, champion_trophies,
+        // tiebreaker_rules, league_week_player_seasons,
+        // league_achievement_restrictions. deleteLeaguesAtomically removes them
+        // one at a time in a single transaction in ascending-id order, so
+        // concurrent invocations acquire locks in the same order and no deadlock
+        // cycle can form (LS-8099). Any residual transient lock/deadlock is
+        // retried, and the real Postgres cause is surfaced in the catch below
+        // instead of an opaque "Failed query" (LS-8100).
+        await withTransientRetry(
+          () => deleteLeaguesAtomically(context.db, leagueIds),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn(
+                'Retrying deleteAllLeagues after transient DB error',
+                {
+                  userId: context.user?.id,
+                  attempt,
+                  pgCode: detail.code,
+                },
+              ),
+          },
+        );
 
         return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
       } catch (error) {
         if (error instanceof GraphQLError) {
           throw error;
         }
+        const detail = describeDbError(error);
         LOGGER.error(
           'Error deleting leagues',
           error instanceof Error ? error : new Error(String(error)),
-          { userId: context.user?.id },
+          {
+            userId: context.user?.id,
+            pgCode: detail.code,
+            constraint: detail.constraint,
+            table: detail.table,
+            detail: detail.detail,
+          },
         );
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        throw new Error('Failed to delete leagues: ' + errorMessage);
+        throw new GraphQLError(
+          'Failed to delete leagues: ' + formatDbError(detail),
+          { extensions: { code: 'LEAGUE_DELETE_FAILED' } },
+        );
       }
     },
   }),
