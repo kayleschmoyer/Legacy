@@ -37,6 +37,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
+import { useFeatureValue } from '../../context/GrowthBookProvider';
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
@@ -137,6 +138,74 @@ function readDefaultSport(): 'baseball' | 'football' {
  */
 const TOAST_DURATION_MS = 2400;
 
+const SPORT_SWITCH_FONT = "'Big Shoulders Display', sans-serif";
+
+const sportSwitchButtonStyle = (active: boolean): React.CSSProperties => ({
+  padding: '8px 18px',
+  minHeight: 40,
+  borderRadius: 9999,
+  border: 'none',
+  backgroundColor: active ? BRAND_NAVY_LIGHT : 'transparent',
+  color: active ? WHITE : TEXT_HIGH_CONTRAST,
+  fontFamily: SPORT_SWITCH_FONT,
+  fontWeight: 700,
+  fontSize: 12,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  cursor: active ? 'default' : 'pointer',
+});
+
+/**
+ * Sport switcher rendered above the (MLB-only) stats page. Surfaces a visible
+ * affordance to switch to NFL, which navigates to the dedicated football
+ * players page — mirroring the existing `sport=nfl` redirect (LS-8083). Only
+ * rendered when football is enabled so a disabled sport is never offered.
+ */
+function StatsSportSwitcher({ onSelectNfl }: { onSelectNfl: () => void }) {
+  return (
+    <div
+      style={{
+        maxWidth: 1280,
+        width: '100%',
+        margin: '0 auto',
+        padding: '24px 24px 0',
+      }}
+    >
+      <div
+        role="group"
+        aria-label="Select sport"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: 5,
+          background: SURFACE_CARD,
+          border: `1px solid ${withAlpha(BRAND_GOLD, 0.2)}`,
+          borderRadius: 9999,
+        }}
+      >
+        <button
+          type="button"
+          aria-pressed={true}
+          aria-label="View MLB statistics"
+          style={sportSwitchButtonStyle(true)}
+        >
+          MLB
+        </button>
+        <button
+          type="button"
+          onClick={onSelectNfl}
+          aria-pressed={false}
+          aria-label="Switch to NFL statistics"
+          style={sportSwitchButtonStyle(false)}
+        >
+          NFL
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PlayerStatsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -167,6 +236,17 @@ export function PlayerStatsRoute() {
       navigate('/football/players', { replace: true });
     }
   }, [sport, navigate]);
+
+  // Football availability gates the visible sport switcher. Defaults to `true`
+  // (matching the route-level FootballGate) so the control isn't hidden while
+  // GrowthBook loads or in unconfigured environments.
+  const footballEnabled = useFeatureValue('football_enabled', true);
+
+  // Deliberate user navigation to the NFL view — pushes (not replace) so Back
+  // returns to the MLB stats page, unlike the automatic sport=nfl redirect.
+  const handleSelectNfl = useCallback(() => {
+    navigate('/football/players');
+  }, [navigate]);
 
   // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
   // sr-only live region populated (screen readers re-announce changes; the
@@ -442,6 +522,9 @@ export function PlayerStatsRoute() {
           </svg>
           {liveMsg}
         </div>
+      )}
+      {footballEnabled !== false && (
+        <StatsSportSwitcher onSelectNfl={handleSelectNfl} />
       )}
       <PremiumGate
         isPremium={isPremium}
