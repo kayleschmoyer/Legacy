@@ -14,12 +14,13 @@
  * - Join validation: empty team name keeps button disabled
  * - Join success: success banner shown, redirect triggered
  * - Footer CTA: "Can't find the right league?" visible when leagues present
+ *
+ * Page-object migration (LS-8092 / ADR-0015): all locators live on
+ * `leaguePage` and the `LeagueCard` component — specs are selector-free.
  */
 
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth';
+import { expect, leagueTest as test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
-import { LeaguePage } from '../pages/league.page';
 import {
   joinPublicLeagueResponse,
   mockPublicLeague,
@@ -55,54 +56,45 @@ async function routeGraphQL(
 // ── critical: page load ───────────────────────────────────────────
 
 test.describe('League Discovery — page load @critical', () => {
-  test('displays heading and search bar', async ({ page }) => {
+  test('displays heading and search bar', async ({ page, leaguePage }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await expect(lp.discoverySearch).toBeVisible();
-    await expect(lp.discoveryRefreshButton).toBeVisible();
+    await expect(leaguePage.discoverySearch).toBeVisible();
+    await expect(leaguePage.discoveryRefreshButton).toBeVisible();
   });
 
   test('shows draft-status and player-pool filter buttons', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
     // Draft status filters
+    await expect(leaguePage.button('All', { exact: true })).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'All', exact: true }),
+      leaguePage.button('Open (Not Started)', { exact: true }),
     ).toBeVisible();
+    await expect(leaguePage.button('Queued', { exact: true })).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Open (Not Started)', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Queued', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'In Progress', exact: true }),
+      leaguePage.button('In Progress', { exact: true }),
     ).toBeVisible();
 
     // Player pool filters
     await expect(
-      page.getByRole('button', { name: 'All Leagues', exact: true }),
+      leaguePage.button('All Leagues', { exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'NL Only', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'AL Only', exact: true }),
-    ).toBeVisible();
+    await expect(leaguePage.button('NL Only', { exact: true })).toBeVisible();
+    await expect(leaguePage.button('AL Only', { exact: true })).toBeVisible();
   });
 });
 
@@ -111,6 +103,7 @@ test.describe('League Discovery — page load @critical', () => {
 test.describe('League Discovery — league cards @critical', () => {
   test('renders league name, draft status, player pool, and spots', async ({
     page,
+    leaguePage,
   }) => {
     const league = mockPublicLeague({
       id: 10,
@@ -125,21 +118,20 @@ test.describe('League Discovery — league cards @critical', () => {
       getpublicleagues: publicLeaguesResponse([league]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    const card = page.getByTestId('league-card-10');
-    await expect(card.getByText('Rocket League Fantasy')).toBeVisible();
-    await expect(card.getByText('Open', { exact: true })).toBeVisible();
+    const card = leaguePage.cardById(10);
+    await expect(card.text('Rocket League Fantasy')).toBeVisible();
+    await expect(card.text('Open', { exact: true })).toBeVisible();
     // "NL Only" renders twice in the card (badge + filter chip); the assertion
     // verifies the value is present without pinning a specific position.
-    await expect(card.getByText('NL Only').first()).toBeVisible();
+    await expect(card.text('NL Only').first()).toBeVisible();
     // spots available column: "5 / 12" or similar
-    await expect(card.getByText('5 / 12')).toBeVisible();
+    await expect(card.text('5 / 12')).toBeVisible();
   });
 
-  test('shows results count', async ({ page }) => {
+  test('shows results count', async ({ page, leaguePage }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse([
         mockPublicLeague({ id: 1, name: 'League 1' }),
@@ -147,89 +139,92 @@ test.describe('League Discovery — league cards @critical', () => {
       ]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await expect(lp.discoveryResultsCount).toBeVisible();
+    await expect(leaguePage.discoveryResultsCount).toBeVisible();
   });
 
-  test('shows footer CTA when leagues are present', async ({ page }) => {
+  test('shows footer CTA when leagues are present', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await expect(lp.discoveryFooterCta).toBeVisible();
+    await expect(leaguePage.discoveryFooterCta).toBeVisible();
   });
 });
 
 // ── smoke: search & filters ───────────────────────────────────────
 
 test.describe('League Discovery — search @smoke', () => {
-  test('search input is interactive', async ({ page }) => {
+  test('search input is interactive', async ({ page, leaguePage }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await lp.discoverySearch.fill('Alpha League');
+    await leaguePage.discoverySearch.fill('Alpha League');
 
     // Verify the input accepted the typed value
-    await expect(lp.discoverySearch).toHaveValue('Alpha League');
+    await expect(leaguePage.discoverySearch).toHaveValue('Alpha League');
   });
 
-  test('clearing search restores results', async ({ page }) => {
+  test('clearing search restores results', async ({ page, leaguePage }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await lp.discoverySearch.fill('something');
-    await lp.discoverySearch.clear();
+    await leaguePage.discoverySearch.fill('something');
+    await leaguePage.discoverySearch.clear();
 
-    await expect(lp.discoverySearch).toHaveValue('');
-    await expect(lp.discoveryHeading).toBeVisible();
+    await expect(leaguePage.discoverySearch).toHaveValue('');
+    await expect(leaguePage.discoveryHeading).toBeVisible();
   });
 });
 
 // ── regression: empty state ───────────────────────────────────────
 
 test.describe('League Discovery — empty state @regression', () => {
-  test('shows empty state when no leagues are returned', async ({ page }) => {
+  test('shows empty state when no leagues are returned', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesEmptyResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await expect(lp.discoveryEmptyHeading).toBeVisible();
+    await expect(leaguePage.discoveryEmptyHeading).toBeVisible();
     // Footer CTA should not appear when there are no leagues
-    await expect(lp.discoveryFooterCta).not.toBeVisible();
+    await expect(leaguePage.discoveryFooterCta).not.toBeVisible();
   });
 
-  test('empty state without search shows generic message', async ({ page }) => {
+  test('empty state without search shows generic message', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesEmptyResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
     await expect(
-      page.getByText(/No public leagues are currently open/i),
+      leaguePage.text(/No public leagues are currently open/i),
     ).toBeVisible();
   });
 });
@@ -239,6 +234,7 @@ test.describe('League Discovery — empty state @regression', () => {
 test.describe('League Discovery — member & full badges @regression', () => {
   test('shows already-member banner for leagues the user has joined', async ({
     page,
+    leaguePage,
   }) => {
     const league = mockPublicLeague({
       id: 5,
@@ -250,19 +246,17 @@ test.describe('League Discovery — member & full badges @regression', () => {
       getpublicleagues: publicLeaguesResponse([league]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await expect(page.getByTestId('already-member-banner')).toBeVisible();
+    await expect(leaguePage.testId('already-member-banner')).toBeVisible();
     // "View League →" button should appear instead of "Join League →"
-    await expect(
-      page.getByRole('button', { name: /View League/i }),
-    ).toBeVisible();
+    await expect(leaguePage.button(/View League/i)).toBeVisible();
   });
 
   test('shows full banner for leagues with no available spots', async ({
     page,
+    leaguePage,
   }) => {
     const league = mockPublicLeague({
       id: 6,
@@ -275,15 +269,12 @@ test.describe('League Discovery — member & full badges @regression', () => {
       getpublicleagues: publicLeaguesResponse([league]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await expect(page.getByText(/This league is full/i)).toBeVisible();
+    await expect(leaguePage.text(/This league is full/i)).toBeVisible();
     // Join League button should NOT appear for a full league
-    await expect(
-      page.getByRole('button', { name: /Join League →/i }),
-    ).not.toBeVisible();
+    await expect(leaguePage.button(/Join League →/i)).not.toBeVisible();
   });
 });
 
@@ -292,6 +283,7 @@ test.describe('League Discovery — member & full badges @regression', () => {
 test.describe('League Discovery — join flow @critical', () => {
   test('inline join form expands when clicking Join League', async ({
     page,
+    leaguePage,
   }) => {
     const league = mockPublicLeague({ id: 7, name: 'Open Draft League' });
 
@@ -299,19 +291,19 @@ test.describe('League Discovery — join flow @critical', () => {
       getpublicleagues: publicLeaguesResponse([league]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await lp.clickJoinLeague('Open Draft League');
+    const card = leaguePage.cardByName('Open Draft League');
+    await card.clickJoin();
 
     // Team name prompt appears
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
-    await expect(page.getByPlaceholder('e.g. Shortstop Stars')).toBeVisible();
+    await card.expectTeamNamePrompt();
   });
 
   test('join button is disabled until team name is entered', async ({
     page,
+    leaguePage,
   }) => {
     const league = mockPublicLeague({ id: 8, name: 'Empty Name League' });
 
@@ -319,44 +311,42 @@ test.describe('League Discovery — join flow @critical', () => {
       getpublicleagues: publicLeaguesResponse([league]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await lp.clickJoinLeague('Empty Name League');
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
+    const card = leaguePage.cardByName('Empty Name League');
+    await card.clickJoin();
+    await card.expectTeamNamePrompt();
 
     // The inline Join League submit button should be disabled with empty name
-    const joinSubmit = page
-      .getByRole('button', { name: /Join League/i })
-      .last();
-    await expect(joinSubmit).toBeDisabled();
+    await card.expectJoinDisabled();
   });
 
-  test('cancel button closes the inline join form', async ({ page }) => {
+  test('cancel button closes the inline join form', async ({
+    page,
+    leaguePage,
+  }) => {
     const league = mockPublicLeague({ id: 9, name: 'Cancel Test League' });
 
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse([league]),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await lp.clickJoinLeague('Cancel Test League');
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
+    const card = leaguePage.cardByName('Cancel Test League');
+    await card.clickJoin();
+    await card.expectTeamNamePrompt();
 
-    await page.getByRole('button', { name: /Cancel/i }).click();
+    await card.cancelJoin();
 
     // Form collapses — team name prompt gone, "Join League →" restored
-    await expect(page.getByText(/Choose a team name/i)).not.toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Join League →/i }),
-    ).toBeVisible();
+    await card.expectTeamNamePromptHidden();
+    await expect(card.button(/Join League →/i)).toBeVisible();
   });
 
-  test('successful join shows success banner', async ({ page }) => {
+  test('successful join shows success banner', async ({ page, leaguePage }) => {
     const league = mockPublicLeague({ id: 11, name: 'Winners Circle' });
 
     await routeGraphQL(page, {
@@ -364,16 +354,16 @@ test.describe('League Discovery — join flow @critical', () => {
       joinpublicleague: joinPublicLeagueResponse(11),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await lp.clickJoinLeague('Winners Circle');
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
+    const card = leaguePage.cardByName('Winners Circle');
+    await card.clickJoin();
+    await card.expectTeamNamePrompt();
 
-    await lp.fillAndSubmitDiscoveryJoin('Winners Circle', 'Home Run Heroes');
+    await card.joinWithTeamName('Home Run Heroes');
 
-    await expect(page.getByText(/Successfully joined/i)).toBeVisible();
+    await expect(leaguePage.text(/Successfully joined/i)).toBeVisible();
   });
 });
 
@@ -382,44 +372,40 @@ test.describe('League Discovery — join flow @critical', () => {
 test.describe('League Discovery — filters @regression', () => {
   test('clicking a draft-status filter changes its selected state', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    const openBtn = page.getByRole('button', {
-      name: 'Open (Not Started)',
-      exact: true,
-    });
-    await openBtn.click();
+    await leaguePage.clickButton('Open (Not Started)', { exact: true });
 
     // After click the button should visually indicate it's selected.
     // We can't easily assert CSS colors, so assert the click didn't error
     // and the page is still functional.
-    await expect(lp.discoveryHeading).toBeVisible();
+    await expect(leaguePage.discoveryHeading).toBeVisible();
   });
 
   test('clicking a player-pool filter changes its selected state', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       getpublicleagues: publicLeaguesResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
-    await page.getByRole('button', { name: 'NL Only', exact: true }).click();
+    await leaguePage.clickButton('NL Only', { exact: true });
 
-    await expect(lp.discoveryHeading).toBeVisible();
+    await expect(leaguePage.discoveryHeading).toBeVisible();
   });
 
-  test('refresh button triggers a new query', async ({ page }) => {
+  test('refresh button triggers a new query', async ({ page, leaguePage }) => {
     let callCount = 0;
 
     await page.route(isGraphQLEndpoint, async (route) => {
@@ -436,12 +422,11 @@ test.describe('League Discovery — filters @regression', () => {
       await unmockedGraphQLFallback(route);
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoDiscovery();
-    await lp.expectDiscoveryLoaded();
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
 
     const initialCount = callCount;
-    await lp.discoveryRefreshButton.click();
+    await leaguePage.discoveryRefreshButton.click();
 
     // A new network call should have been made
     await expect.poll(() => callCount).toBeGreaterThan(initialCount);

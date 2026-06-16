@@ -1,4 +1,4 @@
-﻿/**
+/**
  * E2E tests for the Join League flow.
  *
  * Covers:
@@ -11,12 +11,13 @@
  * - League-full state
  * - Server-side GraphQL error handling
  * - Cancel navigation
+ *
+ * Page-object migration (LS-8092 / ADR-0015): all locators live on
+ * `leaguePage` — specs are selector-free.
  */
 
-import { expect, unauthTest } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth';
+import { expect, leagueTest as test, unauthTest } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
-import { LeaguePage } from '../pages/league.page';
 import {
   joinLeagueByCodeResponse,
   validateInviteCodeNotFoundResponse,
@@ -24,7 +25,6 @@ import {
 } from '../mocks/graphql/league.mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
-/** Matches GraphQL API calls but not source-file imports. */
 // ── helpers ───────────────────────────────────────────────────────
 
 /** Route all GraphQL requests through a per-operation handler map.
@@ -55,33 +55,30 @@ async function routeGraphQL(
 // ── critical: page load ───────────────────────────────────────────
 
 test.describe('Join League — page load @critical', () => {
-  test('displays the join form correctly', async ({ page }) => {
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+  test('displays the join form correctly', async ({ leaguePage }) => {
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
     // Heading visible
-    await expect(lp.joinHeading).toBeVisible();
+    await expect(leaguePage.joinHeading).toBeVisible();
 
     // No deep-link banner on plain /join
-    await expect(lp.deepLinkBanner).not.toBeVisible();
+    await expect(leaguePage.deepLinkBanner).not.toBeVisible();
 
     // Join button disabled until both fields are filled
-    await expect(lp.joinButton).toBeDisabled();
+    await expect(leaguePage.joinButton).toBeDisabled();
 
     // Cancel button present
-    await expect(lp.cancelButton).toBeVisible();
+    await expect(leaguePage.cancelButton).toBeVisible();
   });
 
-  test('renders the How It Works info card', async ({ page }) => {
+  test('renders the How It Works info card', async ({ page, leaguePage }) => {
     await page.goto('/baseball/league/join');
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(
-      page.getByRole('heading', { name: /How It Works/i }),
-    ).toBeVisible();
+    await expect(leaguePage.heading(/How It Works/i)).toBeVisible();
 
-    await expect(page.getByText(/8-character code/i)).toBeVisible();
+    await expect(leaguePage.text(/8-character code/i)).toBeVisible();
   });
 });
 
@@ -90,6 +87,7 @@ test.describe('Join League — page load @critical', () => {
 test.describe('Join League — deep link @critical', () => {
   test('pre-fills invite code from URL and shows banner after validation', async ({
     page,
+    leaguePage,
   }) => {
     // The banner is gated on leagueInfo being returned from validateInviteCode,
     // so we must mock the query before navigating (it fires on mount).
@@ -101,28 +99,26 @@ test.describe('Join League — deep link @critical', () => {
       }),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin('ABC12XYZ');
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin('ABC12XYZ');
+    await leaguePage.expectJoinFormVisible();
 
     // Code is pre-filled from the URL
-    await expect(lp.inviteCodeInput).toHaveValue('ABC12XYZ');
+    await expect(leaguePage.inviteCodeInput).toHaveValue('ABC12XYZ');
 
     // Deep-link confirmation banner appears after the code is validated
-    await expect(lp.deepLinkBanner).toBeVisible();
+    await expect(leaguePage.deepLinkBanner).toBeVisible();
 
     // Subtext changes to indicate code is pre-filled
     await expect(
-      page.getByText(/Your invite code has been pre-filled/i),
+      leaguePage.text(/Your invite code has been pre-filled/i),
     ).toBeVisible();
   });
 
-  test('deep-link code is auto-uppercased', async ({ page }) => {
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin('abc12xyz');
-    await lp.expectJoinFormVisible();
+  test('deep-link code is auto-uppercased', async ({ leaguePage }) => {
+    await leaguePage.gotoJoin('abc12xyz');
+    await leaguePage.expectJoinFormVisible();
 
-    await expect(lp.inviteCodeInput).toHaveValue('ABC12XYZ');
+    await expect(leaguePage.inviteCodeInput).toHaveValue('ABC12XYZ');
   });
 });
 
@@ -131,6 +127,7 @@ test.describe('Join League — deep link @critical', () => {
 test.describe('Join League — invite code validation @critical', () => {
   test('shows league name and available spots after valid 8-char code', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse({
@@ -141,33 +138,35 @@ test.describe('Join League — invite code validation @critical', () => {
       }),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.inviteCodeInput.fill('SLUGGER1');
+    await leaguePage.inviteCodeInput.fill('SLUGGER1');
 
-    await expect(page.getByText(/Summer Sluggers/i)).toBeVisible();
-    await expect(page.getByText(/3.*of.*10.*spot/i)).toBeVisible();
+    await expect(leaguePage.text(/Summer Sluggers/i)).toBeVisible();
+    await expect(leaguePage.text(/3.*of.*10.*spot/i)).toBeVisible();
   });
 
   test('shows "invalid invite code" for unknown 8-char code', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeNotFoundResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.inviteCodeInput.fill('BADCODE1');
+    await leaguePage.inviteCodeInput.fill('BADCODE1');
 
-    await expect(page.getByText(/Invalid invite code/i)).toBeVisible();
+    await expect(leaguePage.text(/Invalid invite code/i)).toBeVisible();
   });
 
-  test('shows league-full state when isFull is true', async ({ page }) => {
+  test('shows league-full state when isFull is true', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse({
         leagueName: 'Full House League',
@@ -177,48 +176,51 @@ test.describe('Join League — invite code validation @critical', () => {
       }),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.inviteCodeInput.fill('FULLLEAG');
+    await leaguePage.inviteCodeInput.fill('FULLLEAG');
 
-    await expect(page.getByText(/League full/i)).toBeVisible();
-    await expect(page.getByText(/all 10 spots taken/i)).toBeVisible();
+    await expect(leaguePage.text(/League full/i)).toBeVisible();
+    await expect(leaguePage.text(/all 10 spots taken/i)).toBeVisible();
   });
 });
 
 // ── critical: successful join ─────────────────────────────────────
 
 test.describe('Join League — successful join @critical', () => {
-  test('joins league and redirects to league detail page', async ({ page }) => {
+  test('joins league and redirects to league detail page', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse(),
       joinleaguebycode: joinLeagueByCodeResponse(42),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.fillAndSubmitJoinForm('VALIDCO1', 'My Awesome Team');
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'My Awesome Team');
 
     await expect(page).toHaveURL(/\/baseball\/league\/42/, { timeout: 15000 });
   });
 
-  test('deep-link: pre-filled code join succeeds', async ({ page }) => {
+  test('deep-link: pre-filled code join succeeds', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse(),
       joinleaguebycode: joinLeagueByCodeResponse(77),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin('DEEPLINK');
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin('DEEPLINK');
+    await leaguePage.expectJoinFormVisible();
 
     // Code is pre-filled; just add team name
-    await lp.teamNameInput.fill('Deep Liners');
-    await lp.joinButton.click();
+    await leaguePage.teamNameInput.fill('Deep Liners');
+    await leaguePage.joinButton.click();
 
     await expect(page).toHaveURL(/\/baseball\/league\/77/, { timeout: 15000 });
   });
@@ -229,64 +231,63 @@ test.describe('Join League — successful join @critical', () => {
 test.describe('Join League — form validation @regression', () => {
   test('join button remains disabled until both fields are filled', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse(),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
     // Both fields empty → disabled
-    await expect(lp.joinButton).toBeDisabled();
+    await expect(leaguePage.joinButton).toBeDisabled();
 
     // Code filled, team name empty → still disabled (leagueInfo populates but teamName empty)
-    await lp.inviteCodeInput.fill('ONLYCOD1');
-    await expect(lp.joinButton).toBeDisabled();
+    await leaguePage.inviteCodeInput.fill('ONLYCOD1');
+    await expect(leaguePage.joinButton).toBeDisabled();
 
     // Team name filled, code empty → still disabled
-    await lp.inviteCodeInput.fill('');
-    await lp.teamNameInput.fill('My Team');
-    await expect(lp.joinButton).toBeDisabled();
+    await leaguePage.inviteCodeInput.fill('');
+    await leaguePage.teamNameInput.fill('My Team');
+    await expect(leaguePage.joinButton).toBeDisabled();
 
     // Both filled → enabled (validation mock confirms code is valid)
-    await lp.inviteCodeInput.fill('VALIDCO1');
-    await expect(lp.joinButton).toBeEnabled();
+    await leaguePage.inviteCodeInput.fill('VALIDCO1');
+    await expect(leaguePage.joinButton).toBeEnabled();
   });
 
-  test('shows error when submitting invalid code format', async ({ page }) => {
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+  test('shows error when submitting invalid code format', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
     // Type a short code to bypass the 8-char maxlength check
     // then directly submit via page.evaluate to bypass the button disabled state
-    await lp.inviteCodeInput.fill('SHORT');
-    await lp.teamNameInput.fill('My Team');
+    await leaguePage.inviteCodeInput.fill('SHORT');
+    await leaguePage.teamNameInput.fill('My Team');
 
     // The button should be disabled because the code < 8 chars
-    await expect(lp.joinButton).toBeDisabled();
+    await expect(leaguePage.joinButton).toBeDisabled();
   });
 
-  test('input enforces 8-character maximum', async ({ page }) => {
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+  test('input enforces 8-character maximum', async ({ leaguePage }) => {
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
     // maxLength={8} on the input
-    await lp.inviteCodeInput.fill('TOOLONGCODE');
-    const val = await lp.inviteCodeInput.inputValue();
+    await leaguePage.inviteCodeInput.fill('TOOLONGCODE');
+    const val = await leaguePage.inviteCodeInput.inputValue();
     expect(val.length).toBeLessThanOrEqual(8);
   });
 
-  test('input auto-uppercases typed characters', async ({ page }) => {
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+  test('input auto-uppercases typed characters', async ({ leaguePage }) => {
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.inviteCodeInput.fill('abcdefgh');
-    await expect(lp.inviteCodeInput).toHaveValue('ABCDEFGH');
+    await leaguePage.inviteCodeInput.fill('abcdefgh');
+    await expect(leaguePage.inviteCodeInput).toHaveValue('ABCDEFGH');
   });
 });
 
@@ -295,6 +296,7 @@ test.describe('Join League — form validation @regression', () => {
 test.describe('Join League — league full @regression', () => {
   test('join button disabled when league is reported as full', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse({
@@ -305,18 +307,17 @@ test.describe('Join League — league full @regression', () => {
       }),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.inviteCodeInput.fill('FULLLEAG');
-    await lp.teamNameInput.fill('My Team');
+    await leaguePage.inviteCodeInput.fill('FULLLEAG');
+    await leaguePage.teamNameInput.fill('My Team');
 
     // Banner should appear and submit should be disabled
     await expect(
-      page.getByRole('alert').filter({ hasText: /This league is full/i }),
+      leaguePage.alert.filter({ hasText: /This league is full/i }),
     ).toBeVisible();
-    await expect(lp.joinButton).toBeDisabled();
+    await expect(leaguePage.joinButton).toBeDisabled();
   });
 });
 
@@ -325,6 +326,7 @@ test.describe('Join League — league full @regression', () => {
 test.describe('Join League — error handling @regression', () => {
   test('shows inline error when joinLeagueByCode mutation fails', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse(),
@@ -334,20 +336,22 @@ test.describe('Join League — error handling @regression', () => {
       },
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.fillAndSubmitJoinForm('VALIDCO1', 'Repeat Team');
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Repeat Team');
 
     // Error message should appear in a red card
-    await expect(lp.formErrorCard).toBeVisible();
+    await expect(leaguePage.formErrorCard).toBeVisible();
 
     // Stays on the join page
     await expect(page).toHaveURL('/baseball/league/join');
   });
 
-  test('shows error if network fails during join', async ({ page }) => {
+  test('shows error if network fails during join', async ({
+    page,
+    leaguePage,
+  }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse(),
     });
@@ -362,13 +366,12 @@ test.describe('Join League — error handling @regression', () => {
       await route.fallback();
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.fillAndSubmitJoinForm('VALIDCO1', 'Network Team');
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Network Team');
 
-    await expect(lp.formErrorCard).toBeVisible();
+    await expect(leaguePage.formErrorCard).toBeVisible();
     await expect(page).toHaveURL('/baseball/league/join');
   });
 });
@@ -376,12 +379,14 @@ test.describe('Join League — error handling @regression', () => {
 // ── regression: cancel navigation ────────────────────────────────
 
 test.describe('Join League — cancel @regression', () => {
-  test('Cancel button returns to baseball landing page', async ({ page }) => {
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+  test('Cancel button returns to baseball landing page', async ({
+    page,
+    leaguePage,
+  }) => {
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.cancelButton.click();
+    await leaguePage.cancelButton.click();
 
     await expect(page).toHaveURL('/baseball');
   });
@@ -399,22 +404,22 @@ test.describe('Join League — cancel @regression', () => {
 test.describe('Join League — keyboard submission @regression', () => {
   test('pressing Enter in team-name input submits the form (LS-1004)', async ({
     page,
+    leaguePage,
   }) => {
     await routeGraphQL(page, {
       validateinvitecode: validateInviteCodeResponse(),
       joinleaguebycode: joinLeagueByCodeResponse(55),
     });
 
-    const lp = new LeaguePage(page);
-    await lp.gotoJoin();
-    await lp.expectJoinFormVisible();
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
 
-    await lp.inviteCodeInput.fill('VALIDCO1');
-    await lp.teamNameInput.fill('Keyboard Team');
+    await leaguePage.inviteCodeInput.fill('VALIDCO1');
+    await leaguePage.teamNameInput.fill('Keyboard Team');
 
     // Wait for server validation to pass and button to become enabled
     // (the validation query fires asynchronously when the invite code changes)
-    await expect(lp.joinButton).toBeEnabled({ timeout: 10000 });
+    await expect(leaguePage.joinButton).toBeEnabled({ timeout: 10000 });
 
     // Submit via keyboard — exercises the form onSubmit handler,
     // not the button onPress handler.
@@ -462,17 +467,17 @@ unauthTest.describe(
 
     unauthTest(
       'shows "Join League" heading on /baseball/league/join when unauthenticated (LS-3481)',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('heading', { name: /join league/i }),
-        ).toBeVisible({ timeout: 15_000 });
+      async ({ leaguePage }) => {
+        await expect(leaguePage.heading(/join league/i)).toBeVisible({
+          timeout: 15_000,
+        });
       },
     );
 
     unauthTest(
       'shows invite code input on /baseball/league/join when unauthenticated (LS-3481)',
-      async ({ page }) => {
-        await expect(page.getByPlaceholder(/8-character code/i)).toBeVisible({
+      async ({ leaguePage }) => {
+        await expect(leaguePage.placeholder(/8-character code/i)).toBeVisible({
           timeout: 15_000,
         });
       },
@@ -480,19 +485,19 @@ unauthTest.describe(
 
     unauthTest(
       'shows team name input on /baseball/league/join when unauthenticated (LS-3482)',
-      async ({ page }) => {
+      async ({ leaguePage }) => {
         await expect(
-          page.getByPlaceholder(/enter your team name/i),
+          leaguePage.placeholder(/enter your team name/i),
         ).toBeVisible({ timeout: 15_000 });
       },
     );
 
     unauthTest(
       'shows "Join League" submit button on /baseball/league/join when unauthenticated (LS-3482)',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('button', { name: /join league/i }),
-        ).toBeVisible({ timeout: 15_000 });
+      async ({ leaguePage }) => {
+        await expect(leaguePage.button(/join league/i)).toBeVisible({
+          timeout: 15_000,
+        });
       },
     );
   },

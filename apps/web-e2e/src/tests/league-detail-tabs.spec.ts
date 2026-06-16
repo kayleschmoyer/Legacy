@@ -9,10 +9,16 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8092 / ADR-0015): all locators live on
+// `leaguePage` — specs are selector-free. The default `test` from
+// `../fixtures/pages` is the auth-enhanced isolated test with page objects
+// injected (identical isolation to the previous `../fixtures/auth-enhanced`
+// import, now with `{ leaguePage, … }`).
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -402,64 +408,65 @@ async function mockLeagueDetailGraphQL(
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
 test.describe('Overview Tab — navigation @smoke', () => {
-  test('navigates to the overview tab without error', async ({ page }) => {
+  test('navigates to the overview tab without error', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
     await expect(page).toHaveURL('/baseball/league/1/overview');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
   });
 
-  test('shows the league name on the overview page', async ({ page }) => {
+  test('shows the league name on the overview page', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
     // V2: league name is in an <h1> element (no data-testid="league-title")
     await expect(
-      page.getByRole('heading', { name: 'Playoff Push League', level: 1 }),
+      leaguePage.leagueNameHeading('Playoff Push League'),
     ).toBeVisible();
   });
 
   test('overview tab button is active when on the overview route', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
     // The tab bar should contain an "Overview" label
-    await expect(page.getByText('Overview').first()).toBeVisible();
+    await expect(leaguePage.text('Overview').first()).toBeVisible();
   });
 });
 
 // ── Activity Feed (within Overview) ─────────────────────────────────────────
 
 test.describe('Activity Feed – section rendering @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, leaguePage }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
   });
 
-  test('shows "League Activity" section heading', async ({ page }) => {
-    await expect(page.getByText('League Activity')).toBeVisible();
+  test('shows "League Activity" section heading', async ({ leaguePage }) => {
+    await expect(leaguePage.text('League Activity')).toBeVisible();
   });
 
   test('shows a "Trade accepted" event from mocked activity data', async ({
-    page,
+    leaguePage,
   }) => {
-    await expect(page.getByText('Trade accepted')).toBeVisible();
+    await expect(leaguePage.text('Trade accepted')).toBeVisible();
   });
 
   test('shows actor usernames from mocked activity events', async ({
-    page,
+    leaguePage,
   }) => {
     await expect(
-      page.getByText('Alpha Squad', { exact: false }).first(),
+      leaguePage.text('Alpha Squad', { exact: false }).first(),
     ).toBeVisible();
   });
 });
@@ -467,13 +474,13 @@ test.describe('Activity Feed – section rendering @regression', () => {
 test.describe('Activity Feed — empty state @regression', () => {
   test('shows "No activity yet" when there are no activity events', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page, { activityEvents: [] });
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
     await expect(
-      page.getByText('No activity yet', { exact: false }),
+      leaguePage.text('No activity yet', { exact: false }),
     ).toBeVisible();
   });
 });
@@ -481,107 +488,104 @@ test.describe('Activity Feed — empty state @regression', () => {
 // ── Chat Section (within Overview) ───────────────────────────────────────────
 
 test.describe('League Chat – section rendering @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, leaguePage }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
   });
 
-  test('shows "League Chat" section heading', async ({ page }) => {
-    await expect(page.getByText('Chat', { exact: true })).toBeVisible();
+  test('shows "League Chat" section heading', async ({ leaguePage }) => {
+    await expect(leaguePage.text('Chat', { exact: true })).toBeVisible();
   });
 
-  test('shows chat messages from mocked data', async ({ page }) => {
+  test('shows chat messages from mocked data', async ({ leaguePage }) => {
     // Switch to the Chat sub-tab (Activity is selected by default)
-    await page.getByText('Chat', { exact: true }).click();
-    await expect(page.getByText('Good luck this week everyone!')).toBeVisible();
-    await expect(page.getByText('May the best roster win!')).toBeVisible();
+    await leaguePage.openTab('Chat', { exact: true });
+    await expect(
+      leaguePage.text('Good luck this week everyone!'),
+    ).toBeVisible();
+    await expect(leaguePage.text('May the best roster win!')).toBeVisible();
   });
 
-  test('shows message send input field', async ({ page }) => {
+  test('shows message send input field', async ({ leaguePage }) => {
     // Switch to the Chat sub-tab first
-    await page.getByText('Chat', { exact: true }).click();
+    await leaguePage.openTab('Chat', { exact: true });
     // Chat input should be rendered (textarea or input)
-    const chatInput = page.getByPlaceholder(/message/i).first();
-    await expect(chatInput).toBeVisible();
+    await expect(leaguePage.chatInput).toBeVisible();
   });
 });
 
 // ── Standings Tab — navigation smoke ─────────────────────────────────────────
 
 test.describe('Standings Tab — navigation @smoke', () => {
-  test('navigates to standings tab without error', async ({ page }) => {
+  test('navigates to standings tab without error', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/standings');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'standings');
 
     await expect(page).toHaveURL('/baseball/league/1/standings');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
   });
 
   test('clicking the Standings tab navigates from overview', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
-    await page.getByText('Standings').first().click();
+    await leaguePage.openTab('Standings');
     await expect(page).toHaveURL(/\/standings/);
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
   });
 });
 
 // ── Roster Tab ───────────────────────────────────────────────────────────────
 
 test.describe('Roster Tab — navigation @smoke', () => {
-  test('navigates to the roster tab without error', async ({ page }) => {
+  test('navigates to the roster tab without error', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/roster');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'roster');
 
     await expect(page).toHaveURL('/baseball/league/1/roster');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
   });
 
-  test('clicking the Roster tab navigates from overview', async ({ page }) => {
+  test('clicking the Roster tab navigates from overview', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
-    await page.getByText('My Roster').first().click();
+    await leaguePage.openTab('My Roster');
     await expect(page).toHaveURL(/\/roster/);
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
   });
 });
 
 test.describe('Roster Tab – data rendering @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, leaguePage }) => {
     await mockLeagueDetailGraphQL(page, { teamMembers: MOCK_TEAM_MEMBERS });
-    await page.goto('/baseball/league/1/roster');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'roster');
   });
 
-  test('shows a roster player from mocked team members', async ({ page }) => {
+  test('shows a roster player from mocked team members', async ({
+    leaguePage,
+  }) => {
     await expect(
-      page.getByText('Mike Johnson', { exact: false }),
+      leaguePage.text('Mike Johnson', { exact: false }),
     ).toBeVisible();
   });
 
-  test('shows roster position slots for the league', async ({ page }) => {
+  test('shows roster position slots for the league', async ({ leaguePage }) => {
     // RosterBoardV2 groups the league's roster positions under a
     // "Starting Hitters" section (mock positions C and 1B are both hitters).
-    await expect(
-      page.getByRole('heading', { name: 'Starting Hitters' }),
-    ).toBeVisible();
+    await expect(leaguePage.heading('Starting Hitters')).toBeVisible();
   });
 });
 
@@ -590,17 +594,17 @@ test.describe('Roster Tab – data rendering @regression', () => {
 test.describe('Pending Waivers — with claims @regression', () => {
   test('shows pending waiver claim card when claims exist', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page, {
       waiverClaims: MOCK_WAIVER_CLAIMS,
       teamMembers: MOCK_TEAM_MEMBERS,
     });
-    await page.goto('/baseball/league/1/roster');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'roster');
 
     // PendingWaiverClaims renders when there are pending claims
     await expect(
-      page.getByText('Waiver Target', { exact: false }),
+      leaguePage.text('Waiver Target', { exact: false }),
     ).toBeVisible();
   });
 });
@@ -608,17 +612,17 @@ test.describe('Pending Waivers — with claims @regression', () => {
 test.describe('Pending Waivers — no claims @regression', () => {
   test('does not show waiver claim card when there are no pending claims', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page, {
       waiverClaims: [],
       teamMembers: MOCK_TEAM_MEMBERS,
     });
-    await page.goto('/baseball/league/1/roster');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'roster');
 
     // The waiver claims component renders null when empty — no card should appear
     await expect(
-      page.getByText('Pending Waiver Claims', { exact: false }),
+      leaguePage.text('Pending Waiver Claims', { exact: false }),
     ).not.toBeVisible();
   });
 });
@@ -626,23 +630,21 @@ test.describe('Pending Waivers — no claims @regression', () => {
 // ── LS-2940: /my-team alias for /team-settings @regression ───────────────────
 
 test.describe('my-team URL alias — LS-2940 regression @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, leaguePage }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/my-team');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'my-team');
   });
 
   test('/my-team stays on /my-team, mounts team-settings panel, and shows no error', async ({
     page,
+    leaguePage,
   }) => {
     // URL should remain /my-team (alias, not a redirect to /team-settings or /overview)
     await expect(page).toHaveURL(/\/baseball\/league\/1\/my-team/);
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
     // V2: The team settings panel is identified by the team name input
     // (no #panel-team-settings ID in V2 — that was the legacy page)
-    await expect(page.locator('#team-name-input')).toBeAttached();
+    await expect(leaguePage.teamNameSettingInput).toBeAttached();
   });
 });
 
@@ -694,6 +696,7 @@ test.describe('Unknown Tab Redirect — LS-1303 regression @regression', () => {
 test.describe('Team rename confirmation — LS-4018 @regression', () => {
   test('clicking Save Name opens a confirmation dialog and does not call the rename mutation directly', async ({
     page,
+    leaguePage,
   }) => {
     let renameCalled = false;
     await mockLeagueDetailGraphQL(page, {
@@ -701,47 +704,49 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
         renameCalled = true;
       },
     });
-    await page.goto('/baseball/league/1/team-settings');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'team-settings');
 
-    const input = page.locator('#team-name-input');
+    const input = leaguePage.teamNameSettingInput;
     await expect(input).toBeVisible();
     await input.fill('Brand New Name');
 
-    await page.getByRole('button', { name: /save name/i }).click();
+    await leaguePage.saveTeamName();
 
-    const dialog = page.getByTestId('rename-team-confirm');
+    const dialog = leaguePage.renameConfirmDialog;
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute('role', 'alertdialog');
     await expect(
-      dialog.getByText(/rename team\?/i, { exact: false }),
+      leaguePage.text(/rename team\?/i, { exact: false }),
     ).toBeVisible();
     expect(renameCalled).toBe(false);
   });
 
-  test('cancel closes the dialog without renaming', async ({ page }) => {
+  test('cancel closes the dialog without renaming', async ({
+    page,
+    leaguePage,
+  }) => {
     let renameCalled = false;
     await mockLeagueDetailGraphQL(page, {
       onRenameTeam: () => {
         renameCalled = true;
       },
     });
-    await page.goto('/baseball/league/1/team-settings');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'team-settings');
 
-    await page.locator('#team-name-input').fill('Brand New Name');
-    await page.getByRole('button', { name: /save name/i }).click();
+    await leaguePage.teamNameSettingInput.fill('Brand New Name');
+    await leaguePage.saveTeamName();
 
-    const dialog = page.getByTestId('rename-team-confirm');
+    const dialog = leaguePage.renameConfirmDialog;
     await expect(dialog).toBeVisible();
 
-    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await leaguePage.cancelRename();
     await expect(dialog).toHaveCount(0);
     expect(renameCalled).toBe(false);
   });
 
   test('confirming the dialog submits the rename mutation with the new name', async ({
     page,
+    leaguePage,
   }) => {
     const renameVariables: Array<{
       teamId: number;
@@ -751,14 +756,12 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
     await mockLeagueDetailGraphQL(page, {
       onRenameTeam: (v) => renameVariables.push(v),
     });
-    await page.goto('/baseball/league/1/team-settings');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'team-settings');
 
-    await page.locator('#team-name-input').fill('Brand New Name');
-    await page.getByRole('button', { name: /save name/i }).click();
+    await leaguePage.teamNameSettingInput.fill('Brand New Name');
+    await leaguePage.saveTeamName();
 
-    const dialog = page.getByTestId('rename-team-confirm');
-    await dialog.getByRole('button', { name: /^rename$/i }).click();
+    await leaguePage.confirmRename();
 
     await expect.poll(() => renameVariables.length).toBeGreaterThan(0);
     expect(renameVariables[0].newName).toBe('Brand New Name');
@@ -766,6 +769,7 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
 
   test('pressing Enter in the input opens the confirmation dialog instead of submitting directly', async ({
     page,
+    leaguePage,
   }) => {
     let renameCalled = false;
     await mockLeagueDetailGraphQL(page, {
@@ -773,14 +777,13 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
         renameCalled = true;
       },
     });
-    await page.goto('/baseball/league/1/team-settings');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'team-settings');
 
-    const input = page.locator('#team-name-input');
+    const input = leaguePage.teamNameSettingInput;
     await input.fill('Enter Submitted Name');
     await input.press('Enter');
 
-    await expect(page.getByTestId('rename-team-confirm')).toBeVisible();
+    await expect(leaguePage.renameConfirmDialog).toBeVisible();
     expect(renameCalled).toBe(false);
   });
 });
@@ -790,30 +793,30 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
 test.describe('QR code loading skeleton — LS-4018 @regression', () => {
   test('shows a skeleton placeholder while inviteCode is unavailable, with accessible loading state', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page, { inviteCode: null });
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
-    await page.getByRole('button', { name: /show qr code to invite/i }).click();
+    await leaguePage.showQrCode();
 
-    const skeleton = page.getByTestId('qr-code-skeleton');
+    const skeleton = leaguePage.qrCodeSkeleton;
     await expect(skeleton).toBeVisible();
     await expect(skeleton).toHaveAttribute('role', 'status');
     await expect(skeleton).toHaveAttribute('aria-label', 'Loading QR code');
-    await expect(page.getByTestId('qr-code-svg')).toHaveCount(0);
+    await expect(leaguePage.qrCodeSvg).toHaveCount(0);
   });
 
   test('renders the QR code (no skeleton) once inviteCode is present', async ({
     page,
+    leaguePage,
   }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
-    await page.getByRole('button', { name: /show qr code to invite/i }).click();
+    await leaguePage.showQrCode();
 
-    await expect(page.getByTestId('qr-code-svg')).toBeVisible();
-    await expect(page.getByTestId('qr-code-skeleton')).toHaveCount(0);
+    await expect(leaguePage.qrCodeSvg).toBeVisible();
+    await expect(leaguePage.qrCodeSkeleton).toHaveCount(0);
   });
 });
