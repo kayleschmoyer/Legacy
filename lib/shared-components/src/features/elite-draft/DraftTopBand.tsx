@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { formatPickClock } from './pickClock';
 import type { CurrentDraftPickInfo, LeagueTeam } from './types';
 
 interface DraftTopBandProps {
@@ -32,12 +33,6 @@ interface DraftTopBandProps {
   onToggleAutoPickDisabled: () => void;
   onToggleUserAutoPick: () => void;
   onCommissionerToggleUserAutoPick: (teamId: number, enable: boolean) => void;
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function timerClass(seconds: number, limit: number, paused: boolean): string {
@@ -169,16 +164,18 @@ export function DraftTopBand({
             aria-label={
               draftPaused
                 ? 'Draft paused'
-                : `${formatTime(timeRemaining)} remaining`
+                : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
             }
           >
-            {draftPaused ? '⏸' : formatTime(timeRemaining)}
+            {draftPaused
+              ? '⏸'
+              : formatPickClock(timeRemaining, pickTimeLimitSeconds)}
           </span>
         </div>
         <div className="d-tb-timer-info">
           <div className="d-tb-timer-cap">Time left</div>
           <div className="d-tb-timer-of">
-            of {formatTime(pickTimeLimitSeconds)}
+            of {formatPickClock(pickTimeLimitSeconds, pickTimeLimitSeconds)}
           </div>
         </div>
       </div>

@@ -69,6 +69,36 @@ describe('DraftTopBand round meta (LS-7973)', () => {
   });
 });
 
+describe('DraftTopBand slow-mode clock (LS-8064)', () => {
+  it('shows an hours group in the header for a slow-mode draft, matching the sidebar', () => {
+    const { getByText } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        // 4-hour pick clock with 2h 02m 05s remaining
+        timeRemaining={7325}
+        pickTimeLimitSeconds={14400}
+      />,
+    );
+    expect(getByText('2:02:05')).toBeTruthy();
+    expect(getByText(/of 4:00:00/)).toBeTruthy();
+  });
+
+  it('keeps M:SS formatting for a fast draft', () => {
+    const { getByText } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        timeRemaining={75}
+        pickTimeLimitSeconds={120}
+      />,
+    );
+    expect(getByText('1:15')).toBeTruthy();
+  });
+});
+
 describe('DraftTopBand autopick visibility (LS-7980)', () => {
   it('shows the autopick toggle for a non-commissioner team member', () => {
     const { getByRole } = render(

@@ -1,5 +1,6 @@
 import React from 'react';
 import { TIMER_CIRCUMFERENCE, TIMER_RADIUS } from './constants';
+import { formatPickClock } from './pickClock';
 
 // ---------------------------------------------------------------------------
 // Circular Timer Sub-component
@@ -27,15 +28,9 @@ export function CircularTimer({
         ? 'url(#timerWarn)'
         : 'url(#timerSafe)';
   // Format display: show hours for slow-mode timers (>= 1 hour)
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const isSlowMode = pickTimeLimitSeconds >= 3600;
   const timeDisplay = noLimit
     ? '∞'
-    : isSlowMode
-      ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-      : `${Math.floor(seconds / 60)}:${secs.toString().padStart(2, '0')}`;
+    : formatPickClock(seconds, pickTimeLimitSeconds);
 
   return (
     <div
