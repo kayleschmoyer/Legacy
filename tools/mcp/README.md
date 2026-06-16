@@ -163,6 +163,20 @@ Agent-driven browser debugging and screenshot capture:
 
 See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the end-to-end screenshot workflow.
 
+### rollbar-server
+
+> **Server ID:** `legacy-sports-rollbar`
+
+Read-only access to Rollbar error tracking data (the read complement to `lib/rollbar` / `lambdas/rollbar-discord`, which write):
+
+- **rollbar_auth_status** — Check whether the read token is configured; call first
+- **rollbar_list_items** — List items (deduplicated errors), filterable by status, level, environment, or search query
+- **rollbar_get_item** — Fetch one item by internal id or by its per-project counter
+- **rollbar_list_occurrences** — List recent occurrences of an item, each with a truncated message summary
+- **rollbar_top_active_items** — The "top active items" view with summed recent occurrence counts
+
+Requires `ROLLBAR_READ_ACCESS_TOKEN` (a Rollbar `read`-scope project access token) in `.env.local`. See `tools/mcp/rollbar-server/README.md`.
+
 ## Cloud vs Local Availability
 
 Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
@@ -178,3 +192,4 @@ Some servers depend on infrastructure that is unavailable in the GitHub Copilot 
 | `legacy-sports-make`    |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                                                   |
 | `legacy-sports-aws`     |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead                                    |
 | `legacy-sports-browser` |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                                                         |
+| `legacy-sports-rollbar` |         ✅          |  ✅ (needs secrets)   | Requires `ROLLBAR_READ_ACCESS_TOKEN` (Rollbar `read`-scope token) in the environment; cloud has it only if the secret is provided                                            |
