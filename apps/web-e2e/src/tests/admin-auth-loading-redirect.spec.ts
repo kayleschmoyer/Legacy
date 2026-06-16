@@ -19,7 +19,7 @@ import {
   expect,
   unauthTest,
 } from '../fixtures/auth-enhanced';
-import { extractOperationName } from '../fixtures/shared-mocks';
+import { extractOperationName, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -31,28 +31,7 @@ const nonAdminTest = createCustomAuthTest('nonadmin@example.com', 'none');
 async function mockAdminGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const opName = extractOperationName(route).toLowerCase();
-    if (opName === 'getuserbyid') {
-      // The redesigned AdminPage gates admin access on a server-side
-      // GetUserById lookup (serverUserData?.user?.accessLevel). Return the
-      // admin identity matching the adminTest JWT so the not-admin redirect
-      // does not fire and the admin lands on /admin.
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            user: {
-              __typename: 'User',
-              id: 1,
-              email: 'admin@test.com',
-              username: 'admin',
-              name: 'admin',
-              accessLevel: 'admin',
-            },
-          },
-        }),
-      });
-    } else if (opName === 'admingetusers') {
+    if (opName === 'admingetusers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -70,6 +49,10 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
       });
     }
   });
+  // Flip the current user to admin via the shared entitlement fixture (LS-8058).
+  // Registered after the admin route so its GetUserById handler runs first
+  // (Playwright LIFO); every other admin op cascades back to the handler above.
+  await useTier(page, 'admin');
 }
 
 // ---------------------------------------------------------------------------

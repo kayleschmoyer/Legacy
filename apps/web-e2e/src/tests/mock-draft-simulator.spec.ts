@@ -14,17 +14,6 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
-/** Premium user — subscriptionTier unlocks PremiumGate. */
-const PREMIUM_USER = {
-  __typename: 'User',
-  id: 1,
-  email: 'test@example.com',
-  username: 'testuser',
-  name: 'Test User',
-  accessLevel: 'none',
-  subscriptionTier: 'premium',
-};
-
 /** League owned by user id=1, with mock-draft settings. */
 const MOCK_LEAGUE = {
   __typename: 'League',
@@ -81,14 +70,9 @@ async function setupGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
-    // User query — must return premium tier for PremiumGate
-    if (postData.includes('getuserbyid') || postData.includes('"getuser"')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { user: PREMIUM_USER } }),
-      });
-    } else if (
+    // GetUserById (premium) is served by the shared premium-by-default
+    // baseline (LS-8058); the ad-hoc premium mock was removed.
+    if (
       postData.includes('getleaguebyid') ||
       postData.includes('"getleague"')
     ) {

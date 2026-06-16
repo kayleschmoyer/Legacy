@@ -22,6 +22,7 @@ import {
   extractOperationName,
   filterUsers,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -89,18 +90,7 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
         typeof variables.search === 'string' ? variables.search : '';
       const matchedUsers = filterUsers(MOCK_USERS, search);
 
-      if (op === 'getuserbyid') {
-        // The redesigned AdminPage gates admin access on a server-side
-        // GetUserById lookup (serverUserData?.user?.accessLevel). The baseline
-        // mock returns accessLevel 'none', which trips the not-admin redirect
-        // away from /admin and races the "Admin Console" assertion. Return the
-        // admin identity matching the adminTest JWT so the page stays put.
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { user: MOCK_USERS[0] } }),
-        });
-      } else if (op === 'getuserscount') {
+      if (op === 'getuserscount') {
         // GetUsersCount feeds the "Total Users" stat / search-result count.
         // Honor the search variable so /admin/users count reflects the
         // filtered set.
@@ -143,6 +133,10 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
       }
     },
   );
+  // Flip the current user to admin via the shared entitlement fixture (LS-8058).
+  // Registered after the admin route so its GetUserById handler runs first
+  // (Playwright LIFO); every other admin op cascades back to the handler above.
+  await useTier(page, 'admin');
 }
 
 // ---------------------------------------------------------------------------

@@ -14,7 +14,7 @@
  */
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
-import { extractOperationName } from '../fixtures/shared-mocks';
+import { extractOperationName, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -117,22 +117,6 @@ function makeMockPlayersResponse(players = MOCK_PLAYERS) {
   return { data: { players } };
 }
 
-function makeMockUserResponse() {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'user@test.com',
-        username: 'testuser',
-        accessLevel: 'none',
-        subscriptionTier: 'premium',
-        avatarUrl: null,
-      },
-    },
-  };
-}
-
 function makeMockPremiumSubscriptionResponse() {
   return {
     data: {
@@ -163,12 +147,6 @@ async function mockPlayerComparisonGraphQL(
           contentType: 'application/json',
           body: JSON.stringify(makeMockPlayersResponse()),
         });
-      } else if (op === 'getuserbyid') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(makeMockUserResponse()),
-        });
       } else if (op === 'getallplayerseasonstats') {
         await route.fulfill({
           status: 200,
@@ -190,6 +168,11 @@ async function mockPlayerComparisonGraphQL(
       }
     },
   );
+  // Pin the current user to premium via the shared entitlement fixture
+  // (LS-8058). Registered after the route above so its GetUserById handler runs
+  // first (Playwright LIFO); this handler's else returns {data:{}} and would
+  // otherwise leave the user non-premium.
+  await useTier(page, 'premium');
 }
 
 /** Add a player by searching and clicking their name in the dropdown. */
@@ -465,6 +448,10 @@ freeUserTest.describe(
           }
         },
       );
+      // Pin the current user to free via the shared entitlement fixture
+      // (LS-8058) so the inline premium upgrade CTA renders. Registered after
+      // the route above so its GetUserById handler runs first (Playwright LIFO).
+      await useTier(page, 'free');
       await page.goto('/players/compare');
       await page.waitForLoadState('load');
     });

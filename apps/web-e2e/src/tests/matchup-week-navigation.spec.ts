@@ -10,7 +10,7 @@
  */
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { unmockedGraphQLFallback, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -203,42 +203,6 @@ const MOCK_MATCHUP_PLAYERS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Premium user mock — returns subscriptionTier: 'premium' from GetUserById
-// ---------------------------------------------------------------------------
-
-function premiumUserResponse() {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'test@example.com',
-        username: 'testuser',
-        name: 'Test User',
-        accessLevel: 'none',
-        subscriptionTier: 'premium',
-      },
-    },
-  };
-}
-
-function freeUserResponse() {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'test@example.com',
-        username: 'testuser',
-        name: 'Test User',
-        accessLevel: 'none',
-        subscriptionTier: null,
-      },
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Route handler factory
 // ---------------------------------------------------------------------------
 
@@ -359,17 +323,6 @@ async function mockMatchupGraphQL(
           }),
         });
       } else if (
-        opName.includes('getuserbyid') ||
-        opName.includes('userbyid')
-      ) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(
-            isPremium ? premiumUserResponse() : freeUserResponse(),
-          ),
-        });
-      } else if (
         opName.includes('getmysubscription') ||
         opName.includes('mysubscription')
       ) {
@@ -395,6 +348,10 @@ async function mockMatchupGraphQL(
       }
     },
   );
+  // Pin the entitlement tier via the shared fixture (LS-8058). Registered after
+  // the route above so its GetUserById handler runs first (Playwright LIFO).
+  // Win-probability premium tests pass isPremium: true; the rest default to free.
+  await useTier(page, isPremium ? 'premium' : 'free');
 }
 
 // ---------------------------------------------------------------------------
@@ -546,8 +503,8 @@ premiumTest.describe(
 // ---------------------------------------------------------------------------
 // Tests – win probability hidden for non-premium users
 //
-// Same non-admin identity — the mock returns subscriptionTier: null so
-// useIsPremium resolves to false, exercising the PremiumGate overlay path.
+// Same non-admin identity — useTier(page, 'free') pins a null subscriptionTier
+// so useIsPremium resolves to false, exercising the PremiumGate overlay path.
 // ---------------------------------------------------------------------------
 
 const freeTest = createCustomAuthTest('free@test.com');

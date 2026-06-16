@@ -388,30 +388,6 @@ async function mockDraftGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (opName === 'getuserbyid') {
-      // Premium required for EliteDraftBoardScreenWrapper PremiumGate (LS-5030)
-      // and for DraftIntelligence when AI recommendations are included.
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            user: {
-              __typename: 'User',
-              id: 1,
-              email: 'test@example.com',
-              username: 'testuser',
-              name: 'Test User',
-              accessLevel: 'none',
-              avatarUrl: null,
-              subscriptionTier: 'premium',
-              discordId: null,
-              discordUsername: null,
-              themePreference: null,
-            },
-          },
-        }),
-      });
     } else if (opName.includes('autopick')) {
       await route.fulfill({
         status: 200,

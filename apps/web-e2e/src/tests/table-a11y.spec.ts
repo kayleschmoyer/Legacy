@@ -18,6 +18,7 @@ import { adminTest, expect, test } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -466,24 +467,6 @@ async function mockPlayerComparisonGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { players: MOCK_COMPARE_PLAYERS } }),
       });
-    } else if (op === 'getuserbyid') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            user: {
-              __typename: 'User',
-              id: 1,
-              email: 'user@test.com',
-              username: 'testuser',
-              accessLevel: 'none',
-              subscriptionTier: 'premium',
-              avatarUrl: null,
-            },
-          },
-        }),
-      });
     } else if (op === 'getmysubscription') {
       await route.fulfill({
         status: 200,
@@ -530,6 +513,11 @@ async function mockPlayerComparisonGraphQL(
       });
     }
   });
+  // Pin the current user to premium via the shared entitlement fixture
+  // (LS-8058) so the premium comparison table renders. Registered after the
+  // route above so its GetUserById handler runs first (Playwright LIFO); this
+  // handler's else returns {data:{}} and would otherwise leave the user free.
+  await useTier(page, 'premium');
 }
 
 // ---------------------------------------------------------------------------

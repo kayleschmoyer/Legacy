@@ -20,6 +20,7 @@ import {
   extractOperationName,
   filterUsers,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -110,24 +111,6 @@ async function mockAdminGraphQL(
           body: JSON.stringify({ data: { users: matchedUsers } }),
         });
       }
-    } else if (op === 'getuserbyid') {
-      // Return the admin user that matches the adminTest JWT (admin@test.com)
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            user: {
-              __typename: 'User',
-              id: 1,
-              email: 'admin@test.com',
-              username: 'AdminUser',
-              name: 'AdminUser',
-              accessLevel: 'admin',
-            },
-          },
-        }),
-      });
     } else if (op === 'impersonateuser') {
       await route.fulfill({
         status: 200,
@@ -145,6 +128,10 @@ async function mockAdminGraphQL(
       await unmockedGraphQLFallback(route);
     }
   });
+  // Flip the current user to admin via the shared entitlement fixture (LS-8058).
+  // Registered after the admin route so its GetUserById handler runs first
+  // (Playwright LIFO); every other admin op cascades back to the handler above.
+  await useTier(page, 'admin');
 }
 
 // ---------------------------------------------------------------------------

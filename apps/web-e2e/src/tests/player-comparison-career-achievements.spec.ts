@@ -221,22 +221,6 @@ function makeMockPlayersResponse(players = MOCK_PLAYERS) {
   return { data: { players } };
 }
 
-function makeMockUserResponse() {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'user@test.com',
-        username: 'testuser',
-        accessLevel: 'none',
-        subscriptionTier: 'premium',
-        avatarUrl: null,
-      },
-    },
-  };
-}
-
 /** Sets up GraphQL mocks for the Player Comparison page. */
 async function mockGraphQL(page: import('@playwright/test').Page) {
   await page.route(
@@ -249,12 +233,6 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(makeMockPlayersResponse()),
-        });
-      } else if (op === 'getuserbyid') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(makeMockUserResponse()),
         });
       } else if (op === 'getallplayerseasonstats') {
         await route.fulfill({

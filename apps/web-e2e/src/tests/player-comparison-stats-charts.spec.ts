@@ -417,22 +417,6 @@ function makeMockPlayersResponse(players = MOCK_PLAYERS) {
   return { data: { players } };
 }
 
-function makeMockUserResponse() {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'user@test.com',
-        username: 'testuser',
-        accessLevel: 'none',
-        subscriptionTier: 'premium',
-        avatarUrl: null,
-      },
-    },
-  };
-}
-
 function makeMockSeasonStatsResponse(
   playerId: number,
   opts?: {
@@ -539,12 +523,6 @@ async function mockGraphQL(
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(makeMockPlayersResponse()),
-        });
-      } else if (op === 'getuserbyid') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(makeMockUserResponse()),
         });
       } else if (op === 'getcomparisonseasonstats') {
         // Extract the per-slot variables (id0/has0 … id3/has3) from the request.

@@ -377,27 +377,7 @@ test.describe('Commissioner — draft mode save-completion guard (LS-4352)', () 
 
     await page.route(isGraphQLEndpoint, async (route) => {
       const op = extractOperationName(route);
-      if (op === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              user: {
-                __typename: 'User',
-                id: 1,
-                email: 'test@example.com',
-                username: 'testuser',
-                name: 'Test User',
-                accessLevel: 'none',
-                avatarUrl: null,
-                subscriptionTier: 'premium',
-                themePreference: null,
-              },
-            },
-          }),
-        });
-      } else if (op === 'GetLeagueById') {
+      if (op === 'GetLeagueById') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

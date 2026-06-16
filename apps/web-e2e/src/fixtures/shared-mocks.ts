@@ -336,29 +336,6 @@ export async function useTier(
 }
 
 /**
- * Build a `GetUserById` response with an explicit subscription tier.
- *
- * @deprecated Prefer {@link tierUserByIdResponse}, which also supports the
- * `admin` tier. Retained as a thin alias so existing specs keep compiling.
- */
-export function userByIdResponse(tier: 'free' | 'premium') {
-  return tierUserByIdResponse(tier);
-}
-
-/**
- * Register a GraphQL route that pins the current user's subscription tier.
- *
- * @deprecated Prefer {@link useTier}, the unified entitlement helper that also
- * supports the `admin` tier. Retained as a thin alias for existing specs.
- */
-export async function mockUserTier(
-  page: Page,
-  tier: 'free' | 'premium',
-): Promise<void> {
-  await useTier(page, tier);
-}
-
-/**
  * Seed GrowthBook feature flags before the app bundle loads.
  *
  * `GrowthBookProvider` reads `window.__gbSeededFeatures` at module-load time

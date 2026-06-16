@@ -14,10 +14,7 @@ import {
   expect,
   test,
 } from '../fixtures/auth-enhanced';
-import {
-  mockUserTier,
-  unmockedGraphQLFallback,
-} from '../fixtures/shared-mocks';
+import { unmockedGraphQLFallback, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
@@ -58,53 +55,6 @@ async function mockCreateLeagueSuccess(page: import('@playwright/test').Page) {
     } else {
       await unmockedGraphQLFallback(route);
     }
-  });
-}
-
-/**
- * Mock GetUserById to return a premium subscriber.
- *
- * Premium status — which ungates the Historical/Custom Era, FAAB, and Salary
- * Cap controls on the Create League page — is sourced server-side from the
- * GetUserById response, NOT the client JWT (`useIsPremiumStatus`, LGN-013). The
- * baseline mock returns a non-premium user, so a test that *interacts* with a
- * premium-gated control must register this override BEFORE navigating; without
- * it the PremiumGate overlay intercepts the click (or the EraFilterGrid routes
- * the click to the upgrade modal) and the expected input never appears. This
- * was the deterministic root cause of the LS-7859 league-creation flake: the
- * `adminTest`/default JWT identity is admin, but the server-sourced premium
- * check ignores the JWT, so the gate stayed up. Non-GetUserById operations
- * cascade to the shared baseline via `unmockedGraphQLFallback`.
- *
- * Mirrors the established premium-mock pattern used by player-comparison.spec.ts,
- * mock-draft-simulator.spec.ts, and matchup-week-navigation.spec.ts.
- */
-async function mockPremiumUser(page: import('@playwright/test').Page) {
-  await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
-    if (postData.includes('getuserbyid')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            user: {
-              __typename: 'User',
-              id: 1,
-              email: 'test@example.com',
-              username: 'testuser',
-              name: 'Test User',
-              accessLevel: 'none',
-              avatarUrl: null,
-              subscriptionTier: 'premium',
-              themePreference: null,
-            },
-          },
-        }),
-      });
-      return;
-    }
-    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -384,7 +334,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // Premium status is sourced from GetUserById, whose baseline mock now
       // returns a premium user (LS-5030 / #5236). Pin this user back to free so
       // the FAAB PremiumGate actually fires for this gate-verification test.
-      await mockUserTier(page, 'free');
+      await useTier(page, 'free');
       await page.goto('/baseball/league/create');
       await expect(
         page.getByPlaceholder('Enter your league name'),
@@ -452,7 +402,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     // Custom Era is a premium-gated control — establish premium before nav.
-    await mockPremiumUser(page);
+    await useTier(page, 'premium');
     await page.goto('/baseball/league/create');
     await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
@@ -477,7 +427,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     page,
   }) => {
     // Custom Era is a premium-gated control — establish premium before nav.
-    await mockPremiumUser(page);
+    await useTier(page, 'premium');
     await page.goto('/baseball/league/create');
     await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
@@ -545,7 +495,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     async ({ page }) => {
       // Salary Cap is wrapped in a PremiumGate — establish premium before nav
       // so the gate overlay does not intercept the toggle click.
-      await mockPremiumUser(page);
+      await useTier(page, 'premium');
       await page.goto('/baseball/league/create');
       await expect(
         page.getByPlaceholder('Enter your league name'),

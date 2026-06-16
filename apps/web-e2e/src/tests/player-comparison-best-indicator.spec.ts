@@ -12,6 +12,7 @@ import { adminTest, expect } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -398,29 +399,9 @@ function makeMockPlayersResponse(players: MockPlayers) {
   return { data: { players } };
 }
 
-function makeMockUserResponse(
-  subscriptionTier = 'premium',
-  accessLevel = 'none',
-) {
-  return {
-    data: {
-      user: {
-        __typename: 'User',
-        id: 1,
-        email: 'user@test.com',
-        username: 'testuser',
-        accessLevel,
-        subscriptionTier,
-        avatarUrl: null,
-      },
-    },
-  };
-}
-
 async function mockGraphQL(
   page: import('@playwright/test').Page,
   players: MockPlayers = MOCK_PLAYERS,
-  userResponse = makeMockUserResponse(),
 ) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
@@ -432,12 +413,6 @@ async function mockGraphQL(
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(makeMockPlayersResponse(players)),
-        });
-      } else if (op === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(userResponse),
         });
       } else if (op === 'GetComparisonSeasonStats') {
         await route.fulfill({
@@ -747,13 +722,12 @@ adminTest.describe(
   'Player Comparison – BEST indicator absent for non-premium @regression',
   () => {
     adminTest.beforeEach(async ({ page }) => {
-      // Mock GetUserById as a free-tier user so isPremium resolves to false.
-      // All other mocks (players, season stats) remain the same.
-      await mockGraphQL(
-        page,
-        MOCK_PLAYERS,
-        makeMockUserResponse('free', 'none'),
-      );
+      // Pin the current user to free via the shared entitlement fixture
+      // (LS-8058) so isPremium resolves to false. All other mocks (players,
+      // season stats) remain the premium-baseline defaults. useTier is
+      // registered after mockGraphQL so its GetUserById handler runs first.
+      await mockGraphQL(page, MOCK_PLAYERS);
+      await useTier(page, 'free');
       await page.goto('/players/compare');
       await page.waitForLoadState('load');
       await expect(page.getByLabel('Search players to compare')).toBeVisible();

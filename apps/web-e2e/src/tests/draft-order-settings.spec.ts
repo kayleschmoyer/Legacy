@@ -18,6 +18,7 @@ import { test } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -148,27 +149,9 @@ async function setupCommissionerGraphQL(
     async (route) => {
       const op = extractOperationName(route);
 
-      if (op === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              user: {
-                __typename: 'User',
-                id: 1,
-                email: 'test@example.com',
-                username: 'testuser',
-                name: 'Test User',
-                accessLevel: 'none',
-                avatarUrl: null,
-                subscriptionTier: 'premium',
-                themePreference: null,
-              },
-            },
-          }),
-        });
-      } else if (op === 'GetLeagueById') {
+      // GetUserById (premium) is served by the shared premium-by-default
+      // baseline (LS-8058); the ad-hoc premium mock was removed.
+      if (op === 'GetLeagueById') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -293,27 +276,10 @@ async function setupFreeUserGraphQL(
     async (route) => {
       const op = extractOperationName(route);
 
-      if (op === 'GetUserById') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              user: {
-                __typename: 'User',
-                id: 1,
-                email: 'test@example.com',
-                username: 'testuser',
-                name: 'Test User',
-                accessLevel: 'none',
-                avatarUrl: null,
-                subscriptionTier: null,
-                themePreference: null,
-              },
-            },
-          }),
-        });
-      } else if (op === 'GetLeagueById') {
+      // Free-tier entitlement is pinned via useTier(page, 'free') below
+      // (LS-8058) — the GetUserById override is consolidated into the shared
+      // fixture so the premium gate fires for this commissioner free user.
+      if (op === 'GetLeagueById') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -374,6 +340,10 @@ async function setupFreeUserGraphQL(
       }
     },
   );
+  // Pin the current user to free via the shared entitlement fixture (LS-8058)
+  // so the commissioner page's premium gate fires. Registered after the route
+  // above so its GetUserById handler runs first (Playwright LIFO).
+  await useTier(page, 'free');
 }
 
 test.describe('Draft Settings Control — free user premium gate @regression', () => {

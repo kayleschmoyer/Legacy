@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/auth-enhanced';
-import { enableFootball, mockUserTier } from '../fixtures/shared-mocks';
+import { enableFootball, useTier } from '../fixtures/shared-mocks';
 
 /**
  * E2E coverage for the premium gating added in LS-5024.
@@ -11,7 +11,7 @@ import { enableFootball, mockUserTier } from '../fixtures/shared-mocks';
  *
  * Premium status is sourced from `GetUserById.subscriptionTier` by `useIsPremium`
  * (apps/web/src/hooks/useIsPremium.ts), and the baseline mock returns a premium
- * user (LS-5030). These specs pin the tier to FREE via `mockUserTier` before
+ * user (LS-5030). These specs pin the tier to FREE via `useTier` before
  * navigating so the gate renders. The gate overlay carries
  * `data-testid="premium-feature-gate"`.
  */
@@ -21,7 +21,7 @@ const UPGRADE_CTA = /upgrade to premium/i;
 
 test.describe('Premium gating — free user @critical', () => {
   test('Player Stats page is gated for free users', async ({ page }) => {
-    await mockUserTier(page, 'free');
+    await useTier(page, 'free');
     await page.goto('/players/stats');
 
     await expect(page.getByTestId(GATE)).toBeVisible();
@@ -31,7 +31,7 @@ test.describe('Premium gating — free user @critical', () => {
   });
 
   test('View Game Logs page is gated for free users', async ({ page }) => {
-    await mockUserTier(page, 'free');
+    await useTier(page, 'free');
     await page.goto('/players/view-game-logs');
 
     await expect(page.getByTestId(GATE)).toBeVisible();
@@ -42,7 +42,7 @@ test.describe('Premium gating — free user @critical', () => {
 
   test('Football Game Logs page is gated for free users', async ({ page }) => {
     await enableFootball(page);
-    await mockUserTier(page, 'free');
+    await useTier(page, 'free');
     await page.goto('/football/players/view-game-logs');
 
     await expect(page.getByTestId(GATE)).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('Premium gating — free user @critical', () => {
   test('Player Detail career stats are gated for free users', async ({
     page,
   }) => {
-    await mockUserTier(page, 'free');
+    await useTier(page, 'free');
     await page.goto('/players/123');
 
     await expect(page.getByTestId(GATE)).toBeVisible();
@@ -68,7 +68,7 @@ test.describe('Premium gating — premium user @critical', () => {
   test('View Game Logs page is not gated for premium users', async ({
     page,
   }) => {
-    await mockUserTier(page, 'premium');
+    await useTier(page, 'premium');
     await page.goto('/players/view-game-logs');
     await page.waitForLoadState('load');
 
