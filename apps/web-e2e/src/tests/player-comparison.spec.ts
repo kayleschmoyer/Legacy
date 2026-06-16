@@ -476,6 +476,30 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
   );
 
   adminTest(
+    'removing a player shows an undo toast that restores the chip',
+    async ({ page }) => {
+      // Sanity: chip present before removal.
+      await expect(page.getByTestId('selected-chip-1')).toBeVisible();
+
+      await page.getByRole('button', { name: /remove aaron judge/i }).click();
+
+      // Chip is gone, but a non-destructive undo toast appears (LS-7040).
+      await expect(page.getByTestId('selected-chip-1')).toHaveCount(0);
+      const toast = page.getByTestId('undo-remove-toast');
+      await expect(toast).toBeVisible();
+      await expect(toast).toContainText('Removed Aaron Judge');
+
+      // Clicking Undo restores the removed player to its slot.
+      await page
+        .getByRole('button', { name: /undo removing aaron judge/i })
+        .click();
+
+      await expect(page.getByTestId('selected-chip-1')).toBeVisible();
+      await expect(page.getByTestId('undo-remove-toast')).toHaveCount(0);
+    },
+  );
+
+  adminTest(
     'minimum player hint reappears after removing second player',
     async ({ page }) => {
       // Add a second player (retry fill+click — dropdown can detach during re-render)

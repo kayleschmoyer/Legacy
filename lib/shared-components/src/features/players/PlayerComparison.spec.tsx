@@ -12,6 +12,7 @@ import {
   fmtAvg,
   fmtCount,
   fmtScoreRow,
+  restorePlayerToSlot,
   type SelectedPlayer,
   tiedIndices,
 } from './PlayerComparison';
@@ -199,5 +200,44 @@ describe('addPlayerToSlots', () => {
     const result = addPlayerToSlots(prev, makePlayer(2));
     expect(result[0]).toMatchObject({ id: 1 });
     expect(result[1]).toMatchObject({ id: 2 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// restorePlayerToSlot — LS-7040 (undo a removed chip)
+// ---------------------------------------------------------------------------
+
+describe('restorePlayerToSlot', () => {
+  it('restores the player to its original slot when that slot is empty', () => {
+    const prev = [null, null, null, null] as (SelectedPlayer | null)[];
+    const result = restorePlayerToSlot(prev, 2, makePlayer(9));
+    expect(result[2]).toMatchObject({ id: 9 });
+    expect(result[0]).toBeNull();
+    expect(result[1]).toBeNull();
+    expect(result[3]).toBeNull();
+  });
+
+  it('returns prev unchanged when the target slot is now occupied', () => {
+    const prev = [null, makePlayer(5), null, null];
+    const result = restorePlayerToSlot(prev, 1, makePlayer(9));
+    expect(result).toBe(prev);
+  });
+
+  it('returns prev unchanged when the player ID is already present elsewhere', () => {
+    const prev = [makePlayer(9), null, null, null];
+    const result = restorePlayerToSlot(prev, 2, makePlayer(9));
+    expect(result).toBe(prev);
+  });
+
+  it('returns prev unchanged for an out-of-range index', () => {
+    const prev = [null, null, null, null] as (SelectedPlayer | null)[];
+    expect(restorePlayerToSlot(prev, -1, makePlayer(9))).toBe(prev);
+    expect(restorePlayerToSlot(prev, 4, makePlayer(9))).toBe(prev);
+  });
+
+  it('does not mutate the previous array', () => {
+    const prev = [null, null, null, null] as (SelectedPlayer | null)[];
+    restorePlayerToSlot(prev, 0, makePlayer(7));
+    expect(prev[0]).toBeNull();
   });
 });

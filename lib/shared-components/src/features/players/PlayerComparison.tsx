@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -80,6 +86,25 @@ export function addPlayerToSlots(
   return next;
 }
 
+/**
+ * Pure state updater: restore a previously-removed `player` to its original
+ * `idx` (LS-7040 undo). Returns `prev` unchanged if that slot is no longer
+ * empty (the user filled it again before clicking Undo) or the player's ID is
+ * already present in another slot — so undo never duplicates or clobbers.
+ * Exported for unit testing; used by `handleUndo` inside `PlayerComparison`.
+ */
+export function restorePlayerToSlot(
+  prev: (SelectedPlayer | null)[],
+  idx: number,
+  player: SelectedPlayer,
+): (SelectedPlayer | null)[] {
+  if (idx < 0 || idx >= prev.length || prev[idx] !== null) return prev;
+  if (prev.some((s) => s?.id === player.id)) return prev;
+  const next = [...prev];
+  next[idx] = player;
+  return next;
+}
+
 /** Props for the cross-platform Player Comparison feature. */
 export interface PlayerComparisonProps {
   /** Drives the inline premium banner (Subscribed vs. Upgrade pill). */
@@ -106,6 +131,9 @@ export const PLAYER_COMPARISON_FEATURE_DESCRIPTION =
 
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
+
+// How long the undo toast stays visible after a chip is removed (LS-7040).
+const UNDO_TOAST_MS = 5000;
 
 // Per-slot accent colors matching the mockup spec
 const PLAYER_ACCENTS = [BRAND_GOLD, '#60A5FA', '#34D399', '#F87171'] as const;
@@ -783,6 +811,86 @@ function PlayerChip({
         }}
       >
         <X size={12} color={TEXT_MUTED} />
+      </Pressable>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Undo toast (LS-7040) — non-destructive feedback after a chip is removed
+// ---------------------------------------------------------------------------
+
+/**
+ * Transient "Removed [name] · Undo" toast surfaced after a player chip is
+ * removed. Removal is destructive (the slot, its stats, and column position are
+ * lost), so this gives a 5s window to restore the player. Built from RN
+ * primitives so it renders on both web and native; `role="alert"` +
+ * `aria-live="assertive"` announce the removal to screen readers.
+ */
+function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
+  return (
+    <View
+      testID="undo-remove-toast"
+      role="alert"
+      aria-live="assertive"
+      style={{
+        position: 'absolute',
+        bottom: 24,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 10,
+        paddingLeft: 16,
+        paddingRight: 8,
+        borderWidth: 1,
+        borderColor: withAlpha(BRAND_GOLD, 0.5),
+        borderRadius: 9999,
+        backgroundColor: SURFACE_PANEL,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontWeight: '500',
+          fontSize: 13,
+          color: WHITE,
+        }}
+      >
+        Removed {name}
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 13,
+          color: TEXT_MUTED,
+        }}
+      >
+        ·
+      </Text>
+      <Pressable
+        testID="undo-remove-button"
+        role="button"
+        aria-label={`Undo removing ${name}`}
+        accessibilityLabel={`Undo removing ${name}`}
+        onPress={onUndo}
+        style={{
+          paddingVertical: 4,
+          paddingHorizontal: 10,
+          borderRadius: 9999,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: '700',
+            fontSize: 13,
+            letterSpacing: 0.7,
+            color: BRAND_GOLD,
+          }}
+        >
+          Undo
+        </Text>
       </Pressable>
     </View>
   );
@@ -1693,13 +1801,54 @@ export function PlayerComparison({
     );
   }, []);
 
-  const handleRemove = useCallback((idx: number) => {
-    setSelected((prev) => {
-      const next = [...prev];
-      next[idx] = null;
-      return next;
-    });
+  // Undo toast state (LS-7040): the most recently removed player plus the slot
+  // it occupied, so an accidental removal can be restored within a 5s window.
+  const [removed, setRemoved] = useState<{
+    player: SelectedPlayer;
+    index: number;
+  } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+
+  const clearUndoTimer = useCallback(() => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = undefined;
+    }
   }, []);
+
+  const handleRemove = useCallback(
+    (idx: number) => {
+      const player = selected[idx];
+      setSelected((prev) => {
+        const next = [...prev];
+        next[idx] = null;
+        return next;
+      });
+      if (!player) return;
+      setRemoved({ player, index: idx });
+      clearUndoTimer();
+      undoTimerRef.current = setTimeout(() => {
+        setRemoved(null);
+        undoTimerRef.current = undefined;
+      }, UNDO_TOAST_MS);
+    },
+    [selected, clearUndoTimer],
+  );
+
+  const handleUndo = useCallback(() => {
+    clearUndoTimer();
+    if (removed) {
+      setSelected((prev) =>
+        restorePlayerToSlot(prev, removed.index, removed.player),
+      );
+    }
+    setRemoved(null);
+  }, [removed, clearUndoTimer]);
+
+  // Clear any pending undo timer on unmount to avoid setState-after-unmount.
+  useEffect(() => clearUndoTimer, [clearUndoTimer]);
 
   // ---------- Build stat groups ----------
 
@@ -2033,79 +2182,84 @@ export function PlayerComparison({
   };
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
-      <View style={containerStyle}>
-        {(isPremium || onUpgrade != null) && (
-          <PremiumBanner isPremium={isPremium} onUpgrade={onUpgrade} />
-        )}
-        <Masthead />
-
-        <PlayerSearchInput
-          onSelect={handleAdd}
-          excludeIds={activeIds}
-          disabled={activePlayers.length >= MAX_PLAYERS}
-          usedCount={activePlayers.length}
-          filledSlots={selected.map((p, idx) =>
-            p ? (
-              <PlayerChip
-                key={p.id}
-                player={p}
-                index={idx}
-                onRemove={() => handleRemove(idx)}
-              />
-            ) : null,
+    <YStack flex={1}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+        <View style={containerStyle}>
+          {(isPremium || onUpgrade != null) && (
+            <PremiumBanner isPremium={isPremium} onUpgrade={onUpgrade} />
           )}
-        />
+          <Masthead />
 
-        {activePlayers.length === 0 ? <EmptyState /> : null}
-
-        {showNudge ? (
-          <View>
-            <OnePlayerNudge />
-            <SeasonBattingBlock
-              player={activePlayers[0]}
-              accentIndex={nudgeIndex}
-              data={slotStats[nudgeIndex]?.data}
-              loading={slotStats[nudgeIndex]?.loading ?? false}
-            />
-          </View>
-        ) : null}
-
-        {showTable ? (
-          <View>
-            <SectionHead
-              title="Head-to-Head"
-              meta={
-                isPremium
-                  ? 'Gold ▲ marks the leader in each row · ties show no leader'
-                  : undefined
-              }
-            />
-            <ComparisonTable
-              players={activePlayers}
-              groups={statGroups}
-              isPremium={isPremium}
-            />
-
-            <SectionHead
-              title="Season by Season"
-              meta="Four most recent per player · full log inside Player Detail"
-            />
-            {selected.map((player, idx) =>
-              player ? (
-                <SeasonBattingBlock
-                  key={player.id}
-                  player={player}
-                  accentIndex={idx}
-                  data={slotStats[idx]?.data}
-                  loading={slotStats[idx]?.loading ?? false}
+          <PlayerSearchInput
+            onSelect={handleAdd}
+            excludeIds={activeIds}
+            disabled={activePlayers.length >= MAX_PLAYERS}
+            usedCount={activePlayers.length}
+            filledSlots={selected.map((p, idx) =>
+              p ? (
+                <PlayerChip
+                  key={p.id}
+                  player={p}
+                  index={idx}
+                  onRemove={() => handleRemove(idx)}
                 />
               ) : null,
             )}
-          </View>
-        ) : null}
-      </View>
-    </ScrollView>
+          />
+
+          {activePlayers.length === 0 ? <EmptyState /> : null}
+
+          {showNudge ? (
+            <View>
+              <OnePlayerNudge />
+              <SeasonBattingBlock
+                player={activePlayers[0]}
+                accentIndex={nudgeIndex}
+                data={slotStats[nudgeIndex]?.data}
+                loading={slotStats[nudgeIndex]?.loading ?? false}
+              />
+            </View>
+          ) : null}
+
+          {showTable ? (
+            <View>
+              <SectionHead
+                title="Head-to-Head"
+                meta={
+                  isPremium
+                    ? 'Gold ▲ marks the leader in each row · ties show no leader'
+                    : undefined
+                }
+              />
+              <ComparisonTable
+                players={activePlayers}
+                groups={statGroups}
+                isPremium={isPremium}
+              />
+
+              <SectionHead
+                title="Season by Season"
+                meta="Four most recent per player · full log inside Player Detail"
+              />
+              {selected.map((player, idx) =>
+                player ? (
+                  <SeasonBattingBlock
+                    key={player.id}
+                    player={player}
+                    accentIndex={idx}
+                    data={slotStats[idx]?.data}
+                    loading={slotStats[idx]?.loading ?? false}
+                  />
+                ) : null,
+              )}
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+      {removed ? (
+        <UndoToast name={removed.player.name} onUndo={handleUndo} />
+      ) : null}
+    </YStack>
   );
 }
 
